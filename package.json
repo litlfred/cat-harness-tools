@@ -1,15 +1,49 @@
 {
   "name": "@litlfred/cat-harness-tools",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "What implements C@T Harness's Tool definitions: the MCP servers, tool registrars and routes. The definitions stay in cat-harness.",
   "license": "Apache-2.0",
   "type": "module",
-  "repository": "https://github.com/litlfred/cat-harness-tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/litlfred/cat-harness-tools.git"
+  },
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./types": "./src/types.ts",
+    "./core/rbac": "./src/core/rbac.ts",
+    "./routes/branches": "./src/routes/branches.ts",
+    "./routes/chat": "./src/routes/chat.ts",
+    "./tools/check-deps": "./src/tools/check-deps.ts",
+    "./tools/preferences": "./src/tools/preferences.ts",
+    "./tools/preview": "./src/tools/preview.ts",
+    "./tools/nquads-query": "./src/tools/nquads-query.ts"
+  },
+  "files": [
+    "src/",
+    "adapters/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "mcp:start": "bun run adapters/mcp-server/server.ts",
     "mcp:start:stdio": "bun run adapters/mcp-server/server.ts --stdio",
-    "test": "bun test ."
+    "test": "bun test .",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript7": "npm:typescript@^7.0.2"
   },
   "checkoutScripts": {
     "auth:login": "bun run cat-harness-tools/scripts/auth-login.ts",
