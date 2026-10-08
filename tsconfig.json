@@ -13,7 +13,8 @@
     "src/**/*.ts",
     "adapters/**/*.ts",
     "scripts/**/*.ts",
-    "types/**/*.d.ts"
+    "types/**/*.d.ts",
+    "test/**/*.ts"
   ],
   "exclude": [
     "dist",
