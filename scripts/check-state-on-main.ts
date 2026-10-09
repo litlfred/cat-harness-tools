@@ -153,6 +153,12 @@ export function stateDirectories(repoRoot: string): StateDirectory[] {
     // worktree named `som` — a message naming a file that does not exist is
     // worse than no message, because the reader goes looking for it.
     const declFile = `${instRel ? `${instRel}/` : ""}${findDeclarationFile(inst) ?? "<declaration>"}`;
+    // A `repository`-scoped entry describes a directory of the CHECKOUT, not
+    // of the instance declaring it: in the index checkout cat-harness declares
+    // the root's `beans/`, `todos/`, `uploads/` (decision (b), the root itself
+    // declaring nothing). It is keyed and located at the root (`.`), where the
+    // baseline has always named those directories; joining it under the
+    // instance reported `cat-harness/beans/defs`, which does not exist.
     const own = (decl.directories ?? []).map((d) => ({
       id: d.id,
       path: d.path,
@@ -161,27 +167,39 @@ export function stateDirectories(repoRoot: string): StateDirectory[] {
       storage: (d as { storage?: unknown }).storage,
       declaredIn: declFile,
       parent: undefined as string | undefined,
+      atRoot: (d as { scope?: string }).scope === "repository",
     }));
+    const byId = new Map(own.map((d) => [d.id, d]));
     const nested = nestedDirectories(inst, decl).map((d) => ({
       id: d.id,
       path: d.path,
       graphTypologies: d.graphTypologies ?? [],
       source: d.source,
       storage: d.storage,
+      atRoot: byId.get(d.parentId)?.atRoot ?? false,
       // The from-within file, named by the PARENT entry it hangs off, so a
       // message says which file to edit rather than which instance to search.
       declaredIn: `${instRel ? `${instRel}/` : ""}${d.parentId}/${d.parentId}.json`,
       parent: d.parentId,
     }));
+    // Off the checkout is INHERITED: an entry declared from within a directory
+    // whose content lives on a branch is on that branch too. `beans/defs` is
+    // read from the mounted `cat/cat-harness/beans`, not from `main`, whatever
+    // `beans/beans.json` says of it.
+    const off = new Map<string, boolean>();
     for (const d of [...own, ...nested]) {
+      const inherited = d.parent !== undefined && off.get(d.parent) === true;
+      const offCheckout = inherited || contentIsOffCheckout({ source: d.source as never, storage: d.storage });
+      off.set(d.id, offCheckout);
       const stateKinds = d.graphTypologies.filter(holdsState);
       if (stateKinds.length === 0) continue;
+      const where = d.atRoot ? "" : instRel;
       out.push({
-        instance: instRel,
+        instance: where,
         id: d.id,
-        path: join(instRel, d.path).replace(/\\/g, "/").replace(/\/+$/, ""),
+        path: join(where, d.path).replace(/\\/g, "/").replace(/\/+$/, ""),
         stateKinds,
-        offCheckout: contentIsOffCheckout({ source: d.source as never, storage: d.storage }),
+        offCheckout,
         declaredIn: d.declaredIn,
       });
     }

@@ -169,6 +169,45 @@ describe("stateDirectories reads the declaration, not the disk", () => {
     expect(ids).toContain("beans/workflows");
   });
 
+  test("an entry declared from within a BRANCH-sourced directory is off the checkout too", () => {
+    // `beans/beans.json` declares `defs` with no source of its own, but its
+    // content is read from the mounted branch, not from `main`. Reporting it
+    // on `main` made every bean sub-directory a finding after the cutover.
+    const root = instance(
+      [{ id: "beans", path: "beans/", graphTypologies: ["beans"], source: { kind: "branch", branch: "cat/cat-harness/beans", keyedBy: "tip" } }],
+      { beans: [{ id: "defs", path: "defs", graphTypologies: ["bean-defs"] }] },
+    );
+    const by = new Map(stateDirectories(root).map((d) => [d.id, d.offCheckout]));
+    expect(by.get("beans")).toBe(true);
+    expect(by.get("beans/defs")).toBe(true);
+  });
+
+  test("a `repository`-scoped entry is keyed and located at the checkout root, not under its declarer", () => {
+    // The index checkout's root declares nothing; cat-harness declares the
+    // checkout's `uploads/` with `scope: "repository"`. It is the ROOT's
+    // directory, and the baseline names it `.::<id>`.
+    const repo = mkdtempSync(join(tmpdir(), "state-on-main-repo-"));
+    made.push(repo);
+    const inst = join(repo, "fixture");
+    mkdirSync(inst);
+    writeFileSync(
+      join(inst, "fixture.json"),
+      JSON.stringify({
+        $schema: "folio-harness/v1",
+        name: "fixture",
+        directories: [
+          { id: "checkout-uploads", path: "uploads/", graphTypologies: ["uploads"], scope: "repository" },
+          { id: "health", path: "health/", graphTypologies: ["health"] },
+        ],
+      }, null, 2),
+    );
+    const got = new Map(stateDirectories(repo).map((d) => [d.id, d]));
+    expect(keyOf(got.get("checkout-uploads")!)).toBe(".::checkout-uploads");
+    expect(got.get("checkout-uploads")!.path).toBe("uploads");
+    expect(keyOf(got.get("health")!)).toBe("fixture::health");
+    expect(got.get("health")!.path).toBe("fixture/health");
+  });
+
   test("an ABSENT directory is not a finding — the question is the declaration", () => {
     // Nothing is created on disk here. A checkout where nobody ran
     // `state:mount` must not read as a state directory appearing on main,
