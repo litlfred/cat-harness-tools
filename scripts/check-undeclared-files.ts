@@ -125,6 +125,10 @@ export const ROOT_INFRASTRUCTURE: Readonly<Record<string, string>> = {
   // instance's stub. That is the defect the stub pattern exists to remove,
   // reintroduced one directory along. The barrel stays at the top on purpose.
   tools: "the merged Tool barrel five modules import as `../tools/index.js`",
+  // The index repository's own workflow tests (#2521, ruling 1c): they test
+  // `.github/workflows/`, which is the root's and no layer's, so they live
+  // beside it rather than in an instance that does not own what they test.
+  test: "the index repository's tests of its own .github/workflows (#2521 ruling 1c)",
   // Playwright's `outputDir`, created by a run rather than authored. Accounted
   // for here rather than left to `gitIgnored`, and the difference is worth
   // noticing: `_kg/` IS in `.gitignore` and this is not, so a run leaves an
