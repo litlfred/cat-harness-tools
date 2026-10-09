@@ -41,6 +41,13 @@ describe("the rule", () => {
     expect(auditWorkflow("staging.yml", FIXED).findings).toHaveLength(0);
   });
 
+  test("the index checkout's `.github/mount-from-lock.sh` wrapper is a lock replay too", () => {
+    const wrapped = BROKEN.replace("      - run: |\n", '      - run: bash "./.github/mount-from-lock.sh" --root "source"\n      - run: |\n');
+    expect(auditWorkflow("staging.yml", wrapped).findings).toHaveLength(0);
+    const elsewhere = BROKEN.replace("      - run: |\n", "      - run: bash .github/mount-from-lock.sh --root other\n      - run: |\n");
+    expect(auditWorkflow("staging.yml", elsewhere).findings).toHaveLength(1);
+  });
+
   test("`submodules: true` alone no longer clears it — there is no `.gitmodules` to read", () => {
     const sub = BROKEN.replace("          path: source", "          submodules: true\n          path: source");
     expect(auditWorkflow("staging.yml", sub).findings).toHaveLength(1);

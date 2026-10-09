@@ -175,7 +175,11 @@ export function checkoutsOf(job: Job): CheckoutStep[] {
     const root = norm(full ?? ".");
     const after = job.lines.slice(i + 1);
     const mounted = after.some((l, k) => {
-      const m = /mount-from-lock\.ts["']?\s+--root\s+["']?([^"'\s;]+)/.exec(l);
+      // The replayer itself (`.ts`), or the index checkout's `.github/
+      // mount-from-lock.sh`, which fetches the pinned replayer and runs it
+      // with the same `--root` — every job in an index checkout calls the
+      // wrapper, because the replayer lives in a mount it cannot yet see.
+      const m = /mount-from-lock\.(?:ts|sh)["']?\s+--root\s+["']?([^"'\s;]+)/.exec(l);
       if (m?.[1] === undefined) return false;
       // A path that is a step output reaches the script through `env:`, never
       // interpolated (check:workflow-injection): follow `$VAR` to its value in
@@ -243,7 +247,7 @@ export function auditWorkflow(
         job: job.name,
         line: c.line,
         detail:
-          `checkout is not followed by a lock replay (\`bun <path>/cat-harness/scripts/mount-from-lock.ts --root <path>\`), ` +
+          `checkout is not followed by a lock replay (\`bun <path>/cat-harness/scripts/mount-from-lock.ts --root <path>\` or \`bash .github/mount-from-lock.sh --root <path>\`), ` +
           `and this job runs ${runs.length} platform script(s) (first: \`${runs[0]?.script ?? "?"}\` at line ${runs[0]?.line ?? 0}) — ` +
           `one reaching \`cat-harness/schemas/\` dies on \`bootstrap-tools\`, which is a remote mount (bean nn8e)`,
       });
