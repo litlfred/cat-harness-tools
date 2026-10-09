@@ -34,7 +34,7 @@ const REPO = repoRootFor(ROOT);
 
 describe("the generated artefacts are the ones declared", () => {
 
-  test("the folio directory's viewer — read from the pages — is the page that exists", () => {
+  test("the folio directory's viewer — read from the harness declaration — is the page that exists", () => {
     // A viewer that resolves to nothing is `pb04`: the coverage reads as met
     // and the link is dead. Since #1168 B7a-2b the page names the directory it
     // draws, and the directory no longer names its page.

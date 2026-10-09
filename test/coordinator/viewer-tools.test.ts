@@ -1,64 +1,55 @@
 /**
- * The viewer Tools' `renders` declarations, grounded against the corpus
- * (#1168 B7a, bean `w91p`).
+ * The viewer Tools' `renders` declarations, grounded against the HARNESS
+ * declarations (owner, 2026-10-09: *"Need harness to declare visualizer is
+ * renderedBy"*).
  *
- * Until `coverage.visualiser` is derived from the Tools, both exist, so the
- * two are checked against each other: a directory that declares a viewer and
- * whose kinds no Tool renders is a viewer with no declared renderer, and a
- * rendered kind no directory declares is a claim about nothing.
+ * A Tool's `renders` is what it CAN draw; a harness's `visualisers` say what
+ * it DOES, each `renderedBy` one Tool. So the two are checked against each
+ * other: every visualiser names a Tool that exists, every Tool a visualiser
+ * names renders something, and every rendered kind is declared somewhere.
+ * `check:visualiser-routes` is the gate over the same facts; this pins them in
+ * the test set the checkout runs.
  *
  * Moved here from `cat-harness/scripts/tests/viewer-tools.test.ts` to the
- * checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
- * "Top-level instance"): every test in it reads every viewer page and every
- * directory that declares the kind it renders, across the checkout, which only
- * the whole checkout holds. Standing alone, cat-harness has none of it, and
- * `check:cat-harness-standalone` collects every test in that layer. Paths are
- * composed from ORIGIN_DIR, the directory it was written in, so nothing it
- * reads changed.
+ * checkout's own test home `test/` (bean `7zz1`): it reads every instance's
+ * declaration, which only the whole checkout holds.
  */
 import { describe, expect, it } from "bun:test";
 import { resolve, join } from "node:path";
 
 import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../../cat-harness/schemas/cat-harness.js";
-// Every instance's Tools, as `viewer-declarations` reads them: a viewer Tool
-// may live in a dependency's `tools` graph (fhir-harness's `ig-pages`), and the
-// cat-harness barrel alone would report its pages as naming no renderer.
+// Every instance's Tools: a viewer Tool may live in a dependency's `tools`
+// graph (fhir-harness's `ig-pages`).
 import { tools } from "../../../cat-harness/tools/discover.js";
-import { viewerPages } from "../../../cat-harness/scripts/viewer-declarations.js";
+import { declaredVisualisers } from "../../../cat-harness/scripts/viewer-declarations.js";
 
-/** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
+/** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
-
 
 const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 
-interface Dir { id: string; graphTypologies?: string[]; coverage?: { visualiser?: unknown } }
+interface Dir { id: string; graphTypologies?: string[] }
 
 const dirs: { instance: string; dir: Dir }[] = [];
-// Own entries AND those declared from within (bean `cmsl`): `voices` is
-// declared only from `skills/skills.json` now.
+// Own entries AND those declared from within (bean `cmsl`).
 for (const root of instanceRootsIn(REPO)) {
   for (const dir of instanceDirectories(root)) dirs.push({ instance: root, dir });
 }
 
-const renderers = tools().filter((t) => (t.renders ?? []).length > 0);
+const all = tools();
+const renderers = all.filter((t) => (t.renders ?? []).length > 0);
 const rendered = new Set(renderers.flatMap((t) => t.renders ?? []));
+const visualisers = declaredVisualisers(REPO);
 
 describe("viewer Tools declare what they render", () => {
-  it("there are viewer Tools at all", () => {
+  it("there are viewer Tools, and declared visualisers, at all", () => {
     expect(renderers.length).toBeGreaterThan(0);
+    expect(visualisers.length).toBeGreaterThan(0);
   });
 
-  it("every viewer page names a Tool that declares what it renders", () => {
-    // Since #1168 B7a-2b a directory's viewer is read from the pages, and a
-    // page counts only when the Tool it names renders the directory's kind.
-    // A page naming no such Tool would silently never be anybody's viewer.
-    const tracked = Bun.spawnSync(["git", "ls-files", "*.md", "*.html"], { cwd: REPO })
-      .stdout.toString().split("\n").filter(Boolean);
-    const pages = viewerPages(REPO, tracked);
-    expect(pages.length).toBeGreaterThan(0);
-    const ids = new Set(renderers.map((t) => t.id));
-    expect(pages.filter((p) => p.renderedBy === undefined || !ids.has(p.renderedBy)).map((p) => p.page)).toEqual([]);
+  it("every declared visualiser is renderedBy a Tool that exists", () => {
+    const ids = new Set(all.map((t) => t.id));
+    expect(visualisers.filter((v) => !ids.has(v.renderedBy)).map((v) => `${v.harness}/${v.id} → ${v.renderedBy}`)).toEqual([]);
   });
 
   it("every rendered kind is declared by some directory", () => {
