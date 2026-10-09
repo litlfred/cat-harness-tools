@@ -18,7 +18,7 @@ import {
   KG_QA_RESULTS_DIR,
   KG_SUBJECT_GRAPH_TYPOLOGIES,
   KG_SUBJECT_KINDS,
-} from "@litlfred/cat-harness/schemas/kg-qa";
+} from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { defaultGraphTypologies, instanceRootsIn, kgQaHomeFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 

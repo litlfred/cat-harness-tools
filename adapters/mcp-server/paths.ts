@@ -6,7 +6,7 @@
 
 import { resolve } from "path";
 import { readFileSync } from "fs";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
 import { deferResolution, directoriesForGraph, directoryForGraph, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**

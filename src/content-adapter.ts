@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from "fs";
 import { resolveBuiltinAdapter } from "@litlfred/cat-harness/src/builtin-adapters.js";
 import type { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
 import { log } from "@litlfred/cat-harness/src/core/logging.js";
-import { expectedInstanceConfigPath } from "@litlfred/cat-harness/schemas/harness-config";
+import { expectedInstanceConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { NoContentAdapter } from "./no-content-adapter.js";
 import type { ContentAdapter } from "./types.js";
 

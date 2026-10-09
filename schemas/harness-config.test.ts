@@ -16,7 +16,7 @@ import {
   resolveSkillDirs,
   resolveTranslationDirs,
   materialiseDeclaredDirectories,
-} from "@litlfred/cat-harness/schemas/harness-config";
+} from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { instanceConfigPathIn, writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an

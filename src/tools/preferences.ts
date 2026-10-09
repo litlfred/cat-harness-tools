@@ -13,7 +13,7 @@ import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve } from "path";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
 
 // The FOLIO's root, as in `preview.ts`. `.folio-prefs.json` is the name the
 // document adapter also reads; the MCP adapter's copy used

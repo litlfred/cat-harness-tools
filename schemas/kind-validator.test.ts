@@ -17,8 +17,8 @@ import {
   isZodSchema,
   parseValidatorRef,
   resolveKindValidator,
-} from "@litlfred/cat-harness/schemas/kind-validator";
-import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/cat-harness";
+} from "@litlfred/cat-harness/schemas/kind-validator.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const INSTANCE = HARNESS_ROOT;
 
@@ -144,7 +144,7 @@ describe("this instance's own kinds", () => {
 
 describe("kindForPath", () => {
   test("the LONGEST matching directory wins, because declarations nest", async () => {
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate");
+    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
     const root = mkdtempSync(join(tmpdir(), "kfp-"));
     mkdirSync(join(root, "beans", "defs"), { recursive: true });
     writeFileSync(join(root, "beans", "defs", "a.md"), "");
@@ -159,7 +159,7 @@ describe("kindForPath", () => {
   test("a directory declaring SEVERAL graphs yields nothing, rather than guessing", async () => {
     // `schemas/` declares two. Picking one would be the lie of precision the
     // `cat-harness` kind's own doc comment warns about.
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate");
+    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
     const root = mkdtempSync(join(tmpdir(), "kfp2-"));
     mkdirSync(join(root, "schemas"), { recursive: true });
     const dirs = [{ path: "schemas/", graphTypologies: ["schemas", "cat-harness"] }];
@@ -168,7 +168,7 @@ describe("kindForPath", () => {
   });
 
   test("a path outside the root belongs to no kind", async () => {
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate");
+    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
     expect(kindForPath("/etc/passwd", "/tmp/x", [{ path: "a/", graphTypologies: ["beans"] }]))
       .toBeUndefined();
   });
@@ -178,7 +178,7 @@ describe("per-family node schemas (bean rdkm)", () => {
   const HARNESS = HARNESS_ROOT;
 
   test("qa names every family, and each resolves to a schema, a shape, or a recorded absence", async () => {
-    const { resolveNodeSchemas } = await import("@litlfred/cat-harness/schemas/kind-validator");
+    const { resolveNodeSchemas } = await import("@litlfred/cat-harness/schemas/kind-validator.ts");
     const fams = await resolveNodeSchemas("qa", HARNESS);
     expect(fams.map((f) => f.tag).sort()).toEqual([
       "block-qa/v1", "folio-detangle-sidecar/v1", "folio-lsi-index/v1", "folio-qa-index/v1",
@@ -209,7 +209,7 @@ describe("per-family node schemas (bean rdkm)", () => {
   });
 
   test("a shape is read from source, fields and optionality included", async () => {
-    const { readShape } = await import("@litlfred/cat-harness/schemas/kind-validator");
+    const { readShape } = await import("@litlfred/cat-harness/schemas/kind-validator.ts");
     const dir = mkdtempSync(join(tmpdir(), "shape-"));
     writeFileSync(join(dir, "m.ts"), "export interface Thing { id: string; note?: number }\n");
     const r = readShape(dir, "m.ts#Thing");
@@ -230,9 +230,9 @@ describe("per-family node schemas (bean rdkm)", () => {
     // fact about the declaration and the node's tag, and the corpus is leaving
     // `main`. The directory may be absent (it is a `qa` kind, which may leave
     // `main`), so it is created for the fixture and removed after if so.
-    const { validatePath } = await import("@litlfred/cat-harness/scripts/kg-validate");
+    const { validatePath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
     const { existsSync } = await import("node:fs");
-    const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/kg-qa");
+    const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/kg-qa.ts");
     const results = join(HARNESS, "test", "results");
     const hadResults = existsSync(results);
     const dir = join(results, `.kind-validator-fixture-${process.pid}`);
@@ -260,7 +260,7 @@ describe("per-family node schemas (bean rdkm)", () => {
 
 describe("instance-qualified references (bean quda)", () => {
   test("`name:module#Export` resolves through the instance that declares the name", async () => {
-    const { parseValidatorRef, rootOf } = await import("@litlfred/cat-harness/schemas/kind-validator");
+    const { parseValidatorRef, rootOf } = await import("@litlfred/cat-harness/schemas/kind-validator.ts");
     expect(parseValidatorRef("folio-assistant-core:schemas/catalogue.ts#CatalogueSchema")).toEqual({
       instance: "folio-assistant-core",
       module: "schemas/catalogue.ts",
@@ -273,12 +273,12 @@ describe("instance-qualified references (bean quda)", () => {
   });
 
   test("an escaping path is still refused — the name is the only way out", async () => {
-    const { parseValidatorRef } = await import("@litlfred/cat-harness/schemas/kind-validator");
+    const { parseValidatorRef } = await import("@litlfred/cat-harness/schemas/kind-validator.ts");
     expect(() => parseValidatorRef("../folio-assistant-core/schemas/catalogue.ts#CatalogueSchema")).toThrow();
   });
 
   test("top-level `_` annotations are dropped before a node is checked", async () => {
-    const { stripAnnotations } = await import("@litlfred/cat-harness/schemas/kind-validator");
+    const { stripAnnotations } = await import("@litlfred/cat-harness/schemas/kind-validator.ts");
     expect(stripAnnotations({ _comment: "x", a: 1, b: { _keep: 2 } })).toEqual({ a: 1, b: { _keep: 2 } });
     expect(stripAnnotations([1])).toEqual([1]);
   });

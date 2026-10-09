@@ -13,9 +13,9 @@
  * (`seed:ready --layer folio-assistant-sci --rehearse`, 2026-10-07).
  */
 import { describe, expect, test } from "bun:test";
-import { contributionsRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions";
+import { contributionsRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 const COST_CRITERIA = ["proof-compile-cost", "proof-no-cost-regression"];
 
 async function checkersFrom(root: string) {

@@ -6,11 +6,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { scriptSidecarPath } from "@litlfred/cat-harness/content/pipeline/qa-utils";
-import { detailFileName, detailRelPath } from "@litlfred/cat-harness/scripts/agent-memory";
-import { stickyFile } from "@litlfred/cat-harness/scripts/ensure-landing-sticky";
-import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa";
-import { portableSegment, unportablePath, unportableSegment } from "@litlfred/cat-harness/schemas/portable-path";
+import { scriptSidecarPath } from "@litlfred/cat-harness/content/pipeline/qa-utils.ts";
+import { detailFileName, detailRelPath } from "@litlfred/cat-harness/scripts/agent-memory.ts";
+import { stickyFile } from "@litlfred/cat-harness/scripts/ensure-landing-sticky.ts";
+import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { portableSegment, unportablePath, unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 
 describe("unportableSegment", () => {
   test("accepts the ordinary names this repository is full of", () => {

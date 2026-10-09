@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
-import { TodoItemSchema } from "@litlfred/cat-harness/schemas/constraints";
+import { TodoItemSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
 import {
   TodoTagsSchema,
   TodoNodeSchema,
@@ -21,7 +21,7 @@ import {
   danglingTags,
   TODO_SCHEMA_TAG,
   type KgIndex,
-} from "@litlfred/cat-harness/schemas/todo";
+} from "@litlfred/cat-harness/schemas/todo.ts";
 import { readTodoFiles, todoDefaultTheme } from "@litlfred/cat-harness/scripts/todos.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";

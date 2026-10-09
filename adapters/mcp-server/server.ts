@@ -20,8 +20,8 @@
  */
 
 import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "@litlfred/cat-harness/schemas/types";
-import { FeedbackItemSchema } from "@litlfred/cat-harness/schemas/constraints";
+import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "@litlfred/cat-harness/schemas/types.ts";
+import { FeedbackItemSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
 import {
   INVALID_ENUM, parseTodoPriority, parseTodoStatus, TODO_PRIORITIES, TODO_STATUSES,
 } from "@litlfred/cat-harness/src/core/feedback.js";
@@ -41,7 +41,7 @@ import { readDeclaredFolioProfile } from "@litlfred/cat-harness/content/pipeline
 import { registerServedToolGroups } from "../../src/tool-groups.js";
 import { createContentAdapter } from "../../src/content-adapter.js";
 import { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
-import { leanStatusBucket } from "@litlfred/cat-harness/schemas/types";
+import { leanStatusBucket } from "@litlfred/cat-harness/schemas/types.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { REPO_ROOT, BUILD_DIR, FEEDBACK_DIR, FEEDBACK_WORKTREE, MAIN_TEX, FOLIO_PORT, LIBRARY_DIRS, UPLOADS_DIR } from "./paths.js";
@@ -70,9 +70,9 @@ import {
 } from "./git.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions";
-import { contributionsRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { contributionsRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "@litlfred/cat-harness/src/core/handover-screen.js";
 
@@ -127,7 +127,7 @@ function parseFeedbackTs(content: string): unknown[] {
 /** Serialize feedback items to TypeScript source. */
 function serializeFeedbackTs(items: FeedbackItem[]): string {
   const json = JSON.stringify(items, null, 2);
-  return `import type { FeedbackItem } from "@litlfred/cat-harness/schemas/types";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
+  return `import type { FeedbackItem } from "@litlfred/cat-harness/schemas/types.ts";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
 }
 
 /**

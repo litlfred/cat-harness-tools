@@ -30,7 +30,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, basename } from "node:path";
-import { safeSegment } from "@litlfred/cat-harness/src/core/safe-path";
+import { safeSegment } from "@litlfred/cat-harness/src/core/safe-path.ts";
 
 // `import.meta.dir` is `cat-harness-tools/test`, so the instance root is one up.
 // Moved here with the server (bean `w2gr`, step 3a).

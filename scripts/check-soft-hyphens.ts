@@ -24,7 +24,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness";
+import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const REPO = resolve(import.meta.dir, "../..");
 

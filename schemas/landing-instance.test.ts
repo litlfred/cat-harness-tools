@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { instantiatedHarnessNames, resolveLandingInstance, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config";
+import { instantiatedHarnessNames, resolveLandingInstance, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { formatLanding } from "../scripts/check-landing-instance";
 
 const made: string[] = [];

@@ -12,7 +12,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { runReadmeAudit } from "@litlfred/cat-harness/content/pipeline/readme-links";
+import { runReadmeAudit } from "@litlfred/cat-harness/content/pipeline/readme-links.ts";
 
 export function registerReadmeAuditTools(server: McpServer): void {
   server.tool(

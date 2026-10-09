@@ -14,14 +14,14 @@ import { resolve, join } from "path";
 import {
   PAPER_BLOCK_KINDS,
   CONTENT_ADAPTERS,
-} from "@litlfred/cat-harness/schemas/block-kinds";
-import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa";
-import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config";
+} from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions";
+} from "@litlfred/cat-harness/schemas/contributions.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
