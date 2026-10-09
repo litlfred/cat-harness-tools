@@ -11,13 +11,13 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
-import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/folio-graph-typology";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes";
-import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph";
-import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/todo-graph";
-import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness";
+import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/folio-graph-typology.ts";
+import { THEMES } from "@litlfred/cat-harness/schemas/themes.ts";
+import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
+import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/todo-graph.ts";
+import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
-import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config";
+import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 const TMP = join(import.meta.dir, "__test_agent_harness__");
 const INSTANCE_ROOT = HARNESS_ROOT;

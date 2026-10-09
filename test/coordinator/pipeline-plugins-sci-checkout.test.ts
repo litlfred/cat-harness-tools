@@ -20,7 +20,7 @@ import {
   PIPELINE_PLUGIN_KINDS,
   pipelinePlugin,
   usePipelinePluginRegistry,
-} from "@litlfred/cat-harness/content/pipeline/pipeline-plugins";
+} from "@litlfred/cat-harness/content/pipeline/pipeline-plugins.ts";
 
 afterEach(() => usePipelinePluginRegistry(undefined));
 

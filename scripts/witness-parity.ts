@@ -57,7 +57,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { stripEphemeral } from "@litlfred/cat-harness/schemas/computation-witness.ts";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
 
 export type Verdict = "pass" | "fail" | "unknown";
 export interface ParityResult {

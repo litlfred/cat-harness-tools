@@ -27,7 +27,7 @@ import {
   GraphTypologyRegistry,
   resolveCoveragePath,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/cat-harness";
+} from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 /**

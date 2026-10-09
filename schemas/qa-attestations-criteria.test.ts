@@ -31,7 +31,7 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations,
   type CriteriaMap,
-} from "@litlfred/cat-harness/schemas/qa-attestations";
+} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { derivedReports, migrateCriteria } from "../scripts/migrate-qa-attestations";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

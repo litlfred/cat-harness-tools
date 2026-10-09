@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pushTriggerOf } from "@litlfred/cat-harness/src/workflow/ci-health";
+import { pushTriggerOf } from "@litlfred/cat-harness/src/workflow/ci-health.ts";
 
 /**
  * Exit-code contract for `check-ci-health.ts`.

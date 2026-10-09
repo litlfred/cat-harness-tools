@@ -23,8 +23,8 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
-import { extractMarkdown, formatPot } from "@litlfred/cat-harness/content/pipeline/pot-extract";
-import { parsePo, injectMarkdown } from "@litlfred/cat-harness/content/pipeline/po-inject";
+import { extractMarkdown, formatPot } from "@litlfred/cat-harness/content/pipeline/pot-extract.ts";
+import { parsePo, injectMarkdown } from "@litlfred/cat-harness/content/pipeline/po-inject.ts";
 import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

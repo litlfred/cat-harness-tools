@@ -11,8 +11,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { instanceRepositories, locationMismatch, repositoryNamespaces, resolveInstance } from "@litlfred/cat-harness/schemas/instance-repositories";
-import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces";
+import { instanceRepositories, locationMismatch, repositoryNamespaces, resolveInstance } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
+import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

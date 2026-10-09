@@ -29,7 +29,7 @@ import {
   parseFieldAssigns,
   parseDecls,
   parseStructureDecls,
-} from "@litlfred/cat-harness/content/pipeline/qa-checkers-vacuity";
+} from "@litlfred/cat-harness/content/pipeline/qa-checkers-vacuity.ts";
 
 function withLean<T>(src: string, fn: (p: string) => T): T {
   const dir = mkdtempSync(join(tmpdir(), "qa-vacuity-"));

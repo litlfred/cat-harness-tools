@@ -30,7 +30,7 @@ import {
   slugify,
   type InitFolioOptions,
 } from "@litlfred/cat-harness/scripts/init-folio.js";
-import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config";
+import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /**
  * Is this directory already a folio?

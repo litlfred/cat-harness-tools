@@ -47,7 +47,7 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/bean-graph";
+} from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { WORKFLOW_DIR } from "@litlfred/cat-harness/src/workflow/store.js";
 import { graphReadPath } from "@litlfred/cat-harness/scripts/graph-read.ts";
 
