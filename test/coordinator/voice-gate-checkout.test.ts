@@ -21,7 +21,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 describe("readActiveVoices", () => {
 
-  test("this instance activates no voice", () => {
+  test("this instance activates the base skill-authoring voice", () => {
     // Issue #208: "the folio-asst's own docuemtnation conent doesnt have any
     // voice". Asserted so that activating one here is a deliberate act.
     //
@@ -30,18 +30,31 @@ describe("readActiveVoices", () => {
     // only answerable of something that declares itself. `cat-harness/` is
     // where `folio-assistant` is declared; its config sits one level up at
     // the checkout root, and the outward walk finds it there.
+    //
+    // RESTATED 2026-10-09: the two answers SWAPPED, because the decision
+    // moved. The owner's round-5 activation (issue #1694) lived in the root's
+    // `folio-assistant.config.json`; the owner removed that file with the root
+    // declaration (3d4caf6, 2026-10-08), and the activation now lives on
+    // cat-harness's own `index.config.json` entry (`voices.active`). So the
+    // instance that judges this checkout's skills is the one that activates the
+    // voice, and it is still a DECISION read from config, not a default.
     const inst = join(ORIGIN_DIR, "../..");
-    expect(readActiveVoices(inst)).toEqual([]);
+    expect(readActiveVoices(inst)).toEqual(["agent-skill-authoring"]);
   });
 
-  test("the instantiated checkout root now answers like any configured instance", () => {
+  test("the checkout root declares no instance, so it has no voices to answer", () => {
     // The other half of the change, asserted rather than left implicit: the
     // root is instantiated, so its answer is a DECISION rather than an
     // absence. Until 2026-09-30 that decision was "no voice"; the owner then
     // activated the base skill-authoring voice for this checkout's skills
     // (round 5, issue #1694). Still determined, which is the point here.
+    //
+    // RESTATED 2026-10-09, the other half of the swap: the root is an index
+    // now, not an instantiated instance, so it has no config and the answer
+    // is the third state -- `undefined`, never `[]`, which would be a decision
+    // nobody made.
     const root = repoRootFor(join(ORIGIN_DIR, "../.."));
-    expect(readActiveVoices(root)).toEqual(["agent-skill-authoring"]);
+    expect(readActiveVoices(root)).toBeUndefined();
   });
 });
 

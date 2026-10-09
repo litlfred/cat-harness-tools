@@ -31,13 +31,20 @@ describe("instance repositories — this checkout (bean 6rmv)", () => {
     expect(map.entries.map((e) => locationMismatch(e, CHECKOUT)).filter(Boolean)).toEqual([]);
   });
 
-  test("every livesAt names the checkout's own repository as host", () => {
-    // The instance AT the checkout root — not merely one without `livesAt`:
-    // a submodule instance has none either, and sits at its own root.
-    const host = map.entries.find((e) => resolve(e.root) === CHECKOUT);
-    expect(host).toBeDefined();
-    const hosts = new Set(map.entries.flatMap((e) => (e.livesAt ? [e.livesAt.repository] : [])));
-    expect([...hosts]).toEqual([host!.repository]);
+  test("every livesAt names the instance's OWN repository as its home", () => {
+    // This compared each `livesAt` with the repository of the instance AT the
+    // checkout root -- the host every staged instance lived in. Both premises
+    // are gone: the owner removed the root declaration (3d4caf6, 2026-10-08),
+    // and since cat-harness#15 a mounted instance's `livesAt` names its HOME,
+    // where it lives in its own repository, not the checkout that mounts it.
+    // RESTATED to that rule: no instance at the root, and every `livesAt`
+    // names the declaring instance's own repository. A `livesAt` pointing at
+    // another repository is a staged instance claiming a home it does not
+    // have, and fails here as a mismatch against the root instance did.
+    expect(map.entries.some((e) => resolve(e.root) === CHECKOUT)).toBe(false);
+    const withHome = map.entries.filter((e) => e.livesAt !== undefined);
+    expect(withHome.length).toBeGreaterThan(0);
+    expect(withHome.filter((e) => e.livesAt!.repository !== e.repository).map((e) => `${e.name} -> ${e.livesAt!.repository}`)).toEqual([]);
   });
 
   test("a reference resolves by owner/repo and, transitionally, by name", () => {

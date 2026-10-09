@@ -135,10 +135,11 @@
  * @module scripts/check-usage-paths
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
 import { trackedPaths } from "../../cat-harness/scripts/check-portable-paths.js";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 import { scriptsOf } from "../../cat-harness/schemas/script-table.ts";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, ".."));
@@ -239,13 +240,31 @@ export function namesSelf(rel: string, spelled: string): boolean {
 }
 
 /**
+ * Every file of the checkout at `root`, repo-relative: `trackedPaths`'s
+ * answer, widened to the mounted instances.
+ *
+ * In a composed checkout every instance is a REMOTE MOUNT, laid down from
+ * `index.lock.json` and ignored by the index repository's git, so a bare
+ * `git ls-files` at the root lists none of their files. `gitCorpus` counts a
+ * mount's files as it counted a submodule's, and is tracked-plus-untracked
+ * exactly as before everywhere else.
+ *
+ * When git cannot answer, this falls back to `trackedPaths`, which reports
+ * nothing outside a checkout -- the could-not-determine the caller handles.
+ */
+export function checkoutPaths(root: string): string[] {
+  const all = gitCorpus(root);
+  return all === undefined ? trackedPaths(root) : all.map((f) => relative(root, f).split(sep).join("/"));
+}
+
+/**
  * Every subject file under `root`, repo-relative.
  *
  * Tests are dropped here rather than filtered later so a caller cannot
  * reintroduce them by forgetting — see the module header on why a deliberate
  * fixture must not be reported.
  */
-export function subjectFiles(root: string, list: (r: string) => string[] = trackedPaths): string[] {
+export function subjectFiles(root: string, list: (r: string) => string[] = checkoutPaths): string[] {
   return list(root)
     .filter((rel) => SUBJECT.test(rel))
     .filter((rel) => !/\.test\.(ts|tsx)$/.test(rel))

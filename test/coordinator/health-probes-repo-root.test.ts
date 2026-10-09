@@ -50,7 +50,7 @@ describe("the root the sweep is given", () => {
     // throughout.
     const { existsSync } = await import("node:fs");
     const { join, resolve } = await import("node:path");
-    const { repoRootFor } = await import("../cat-harness/schemas/cat-harness.ts");
+    const { repoRootFor } = await import("../../../cat-harness/schemas/cat-harness.ts");
 
     const instanceRoot = resolve(ORIGIN_DIR, "..", "..");
     const repoRoot = repoRootFor(instanceRoot);
@@ -70,7 +70,7 @@ describe("countConsideredOptions — the parse the MADR criterion rests on", () 
     // Asserted against the real bean store rather than a fixture, for the same
     // reason the staging test above is: the failure mode is the detector matching
     // nothing in practice, and every fixture in this file would pass throughout.
-    const { repoRootFor } = await import("../cat-harness/schemas/cat-harness.ts");
+    const { repoRootFor } = await import("../../../cat-harness/schemas/cat-harness.ts");
     const { resolve } = await import("node:path");
     const p = probeBeans(repoRootFor(resolve(ORIGIN_DIR, "..", "..")));
     expect(p.state).toBe("ok");

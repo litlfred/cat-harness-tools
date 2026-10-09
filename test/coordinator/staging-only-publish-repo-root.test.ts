@@ -37,10 +37,16 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 // Where it cannot be built (no mount; a standalone layer with no root script),
 // the tests that need the page fail on their own, by name, rather than this
 // hook failing the whole file.
+//
+// The hook gets an explicit budget. It spawns a whole build, which measured
+// 6.2 s on a composed checkout (2026-10-09) against bun's 5 s default for a
+// hook, so the default killed the build mid-write and failed the file with
+// no assertion run. 60 s bounds a hang without racing an honest build.
+const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
   const r = spawnSync("bun", ["run", "cat", "derive:publish"], { cwd: REPO, encoding: "utf8" });
   if (r.status !== 0) console.warn(`derive:publish did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
-});
+}, BUILD_BUDGET_MS);
 
 function composeTo(opts: { staging?: boolean }): { dir: string; report: ReturnType<typeof compose> } {
   const dir = mkdtempSync(join(tmpdir(), "compose-"));

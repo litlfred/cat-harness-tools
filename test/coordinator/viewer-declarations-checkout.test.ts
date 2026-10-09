@@ -49,8 +49,11 @@ describe("the corpus: viewers are read from the pages (#1168 B7a-2b)", () => {
     // It survives only where a page the platform draws cannot say it — each
     // with its reason — and an entry anywhere else is the arrow coming back.
     const ELSEWHERE: Record<string, string> = {
-      // Declared by the checkout's ROOT instance since placement PR0 (bean `ejye`).
-      "folio-assistant/fsh-guts": "never published — no published artefact may carry a path to it",
+      // Declared by the checkout's ROOT instance from placement PR0 (bean
+      // `ejye`) until the owner removed that declaration (3d4caf6,
+      // 2026-10-08); cat-harness declares it now, repository-scoped
+      // (coordinator decision (b)). Same directory, same reason.
+      "cat-harness/fsh-guts": "never published — no published artefact may carry a path to it",
       "who-iris/who-iris-catalogue": "drawn by who-iris's own generator, which declares no tools graph",
       "folio-assistant-core/glossary": "drawn by folio-assistant-core's own generator",
     };
@@ -72,10 +75,12 @@ describe("the corpus: viewers are read from the pages (#1168 B7a-2b)", () => {
     // mirror is gone (placement PR0) and the owner's entry resolves the same page.
     expect(resolveFor("who-iris", "library")).toBe("cat-harness/docs/cat-harness/library/who-iris/index.html");
     expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
-    expect(resolveFor("folio-assistant", "beans")).toBe("cat-harness/docs/beans/index.html");
+    // `beans` and `fsh-guts` were the root instance's; cat-harness declares
+    // both now, repository-scoped (3d4caf6; decision (b)). Same pages.
+    expect(resolveFor("cat-harness", "beans")).toBe("cat-harness/docs/beans/index.html");
     // An index page that merely LISTS a directory is not its viewer: the
     // auto-docs processes pages draw `cat-harness/processes` too, and lose.
-    expect(resolveFor("folio-assistant", "fsh-guts")).toBe("cat-harness/docs/fsh-guts/index.md");
+    expect(resolveFor("cat-harness", "fsh-guts")).toBe("cat-harness/docs/fsh-guts/index.md");
   });
 
   // "Exists" includes a page BUILT AT PUBLISH (bean 0b8c): never committed,

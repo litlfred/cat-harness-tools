@@ -11,11 +11,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.ts";
 
 import { loadProcessModel } from "../../cat-harness/src/workflow/process-model.ts";
 import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "../../cat-harness/schemas/namespaces.ts";
-import { execSync } from "node:child_process";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 const DIAGRAM = join("processes", "initialize-harness.bpmn");
@@ -156,7 +157,12 @@ describe("nothing matches our elements by the text folio: again", () => {
 });
 
 describe("every diagram writes each element under the Subgraph that defines it (stage 3)", () => {
-  const diagrams = execSync("git ls-files '*.bpmn'", { cwd: REPO_ROOT }).toString().trim().split("\n");
+  // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
+  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // `ls-files` from the root listed no diagram, and split("\n") on the empty
+  // answer handed the loop below one empty path (EISDIR). `gitCorpus` counts
+  // a mount's files as a submodule's were counted.
+  const diagrams = (gitCorpus(REPO_ROOT, ["*.bpmn"]) ?? []).map((f) => relative(REPO_ROOT, f));
   /** Element names an `ns.jsonld` vocabulary defines, keyed by its namespace. */
   const defined = new Map<string, Set<string>>();
   for (const [ns, file] of [

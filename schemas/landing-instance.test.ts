@@ -100,12 +100,15 @@ describe("rootInstanceName — never the clone's folder name", () => {
 });
 
 describe("this repository", () => {
-  test("lands on cat-harness, named by index.config.json — `/` is unchanged", () => {
-    // Since 2026-10-07 the root `index.config.json` names the landing
-    // (`site.landing: "cat-harness"`); cat-harness.config.json still carries
-    // the flag, and both say the same thing.
+  test("lands on folio-assistant-core, named by index.config.json", () => {
+    // Since 2026-10-07 the root `index.config.json` names the landing. It said
+    // `cat-harness` until the owner's 3d4caf6 (2026-10-08: "remove root
+    // toolchain and folio-assistant declaration"), which set
+    // `site.landing: "folio-assistant-core"`; the per-instance
+    // `cat-harness.config.json` that "still carried the flag" is gone with the
+    // split. The property is unchanged: the INDEX decides, and says so.
     const r = resolveLandingInstance(join(import.meta.dir, "..", ".."));
-    expect(r.kind === "instance" && r.name).toBe("cat-harness");
+    expect(r.kind === "instance" && r.name).toBe("folio-assistant-core");
     expect(r.kind === "instance" && r.by).toBe("index");
   });
 });

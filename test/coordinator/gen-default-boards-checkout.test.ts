@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 
 import { BoardSchema } from "../../../cat-harness/schemas/board.js";
 import { isExemptFrom, readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
-import { instanceConfigFilename } from "../../../cat-harness/schemas/harness-config.js";
+import { instantiatedHarnessNames } from "../../../cat-harness/schemas/harness-config.js";
 import { boardsDir, harnessesOwedABoard } from "../../../cat-harness/scripts/gen-default-boards.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -39,8 +39,13 @@ describe("who owes a board", () => {
     // board is a CONSEQUENCE of that declaration, not a second decision. This
     // list is the real answer for this checkout and is meant to change when
     // the checkout does; it fails loudly rather than drifting quietly.
+    //
+    // `folio-assistant` left the list when the owner removed the root
+    // declaration (3d4caf6, 2026-10-08): the checkout root is an index, not an
+    // instance, so it is owed nothing. Instantiation is read from the index
+    // now (cat-harness#21), not from `<name>.config.json` files.
     const owed = harnessesOwedABoard(REPO, names());
-    expect(owed).toEqual(["cat-harness", "folio-assistant", "who-iris"]);
+    expect(owed).toEqual(["cat-harness", "who-iris"]);
   });
 
   test("bootstrap is excluded BY ITS DECLARATION, not by its name", () => {
@@ -51,7 +56,9 @@ describe("who owes a board", () => {
     expect(isExemptFrom(boot, "visualiser")).toBe(true);
     expect(harnessesOwedABoard(REPO, names())).not.toContain("bootstrap");
     // ...and it IS instantiated, so exclusion cannot be coming from that.
-    expect(existsSync(join(REPO, instanceConfigFilename("bootstrap")))).toBe(true);
+    // Asked of the index, which is where instantiation is declared now -- a
+    // `bootstrap.config.json` file no longer exists to ask (cat-harness#21).
+    expect(instantiatedHarnessNames(REPO).includes("bootstrap")).toBe(true);
   });
 });
 

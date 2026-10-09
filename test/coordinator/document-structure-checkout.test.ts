@@ -11,9 +11,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
+import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.ts";
 import { structureOf } from "../../../cat-harness/schemas/document-structure.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -24,8 +24,12 @@ const REPO = resolve(ORIGIN_DIR, "..", "..");
 describe("structureOf reads every committed structure, each as its own variant", () => {
   // The whole premise of A+B: pdf-structure/v1 stays as it is. If any
   // committed file stops reading through the accessor, the premise is false.
-  const files = spawnSync("git", ["ls-files", "*structure.json"], { cwd: REPO, encoding: "utf-8" })
-    .stdout.split("\n")
+  // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
+  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // `ls-files` from the root lists none of their files. `gitCorpus` counts a
+  // mount's files as a submodule's were counted.
+  const files = (gitCorpus(REPO, ["*structure.json"]) ?? [])
+    .map((f) => relative(REPO, f))
     .filter((f) => f.endsWith("/structure.json"));
 
   test("there are committed files to read — the guard every assertion below needs", () => {

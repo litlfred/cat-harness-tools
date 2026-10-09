@@ -25,9 +25,10 @@
  * directory it was written in, so nothing it reads changed.
  */
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
+
+import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -37,9 +38,14 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 
 /** Tracked shell scripts and workflows: the places a `$?` is written. */
 function shellSources(): string[] {
-  const r = spawnSync("git", ["ls-files", "-z", "--", "*.sh", "*.bash", ".github/workflows/*.yml", ".github/workflows/*.yaml"], { cwd: REPO, encoding: "utf-8" });
-  if (r.status !== 0) throw new Error(`git ls-files failed: ${r.stderr}`);
-  return r.stdout.split("\0").filter(Boolean);
+  // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
+  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // `ls-files` at the root listed the index's own scripts and none of the
+  // instances' -- a scan that went on passing over a corpus it had silently
+  // lost. `gitCorpus` counts a mount's files as a submodule's were counted.
+  const r = gitCorpus(REPO, ["*.sh", "*.bash", ".github/workflows/*.yml", ".github/workflows/*.yaml"]);
+  if (r === undefined) throw new Error(`git could not list the files in ${REPO}`);
+  return r.map((f) => relative(REPO, f));
 }
 
 /** Every `$?` read that no longer holds the status of the command it is meant to report. */

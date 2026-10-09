@@ -64,7 +64,6 @@
  * @module scripts/check-process-bindings
  * @covers processes, skills
  */
-import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -74,6 +73,7 @@ import { ancestorsOf, flattenDependencies } from "../../cat-harness/schemas/depe
 import { allowedFromNeeds } from "../../cat-harness/schemas/layer-direction.js";
 import { BASELINE, type BindingBaselineEntry } from "../../cat-harness/scripts/process-bindings.baseline.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -182,9 +182,14 @@ export function analyse(repoRoot = REPO_ROOT): Binding[] {
   const allowed = allowedFromNeeds(new Map(all.map((i) => [i.name, i.needs])), ancestorsOf(flat.order));
   const holders = skillHolders(all);
 
-  const bpmn = execFileSync("git", ["ls-files", "-z", "--", "*.bpmn"], { cwd: root, encoding: "utf-8" })
-    .split("\0")
-    .filter(Boolean);
+  // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
+  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // by the index repository's git, so `ls-files` at the root lists none of
+  // their files. `gitCorpus` counts a mount's files as it counted a
+  // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
+  const listed = gitCorpus(root, ["*.bpmn"]);
+  if (listed === undefined) throw new Error(`check:process-bindings: git could not list the files in ${root}`);
+  const bpmn = listed.map((f) => relative(root, f));
   const out: Binding[] = [];
   for (const rel of bpmn) {
     const abs = join(root, rel);

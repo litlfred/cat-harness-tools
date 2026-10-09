@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 
 import { defaultGraphTypologies, isActiveKg, undecidedWorkKinds, workPlanGraphsIn } from "../../../cat-harness/schemas/cat-harness";
 import { formatReport } from "../check-graph-typology-work";
-import {  } from "../../../cat-harness/schemas/cat-harness.js";
+import { readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
 
 function repoWith(instances: Record<string, unknown>): string {
@@ -82,12 +82,15 @@ describe("the verdict is asked of the REPOSITORY, not one instance", () => {
     const repo = resolve(import.meta.dir, "..", "..", "..");
     expect(isActiveKg(repo)).toBe(true);
     const { plan } = workPlanGraphsIn(repo);
-    // The ROOT instance declares the work plan since placement PR0 (bean
-    // `ejye`): `beans/` and `todos/` sit at the checkout's root and belong to
-    // the checkout. Until then cat-harness declared them at
-    // `scope: "repository"`, and this asserted the opposite pair.
-    expect(plan.map((p) => p.instance)).toContain("folio-assistant");
-    expect(plan.map((p) => p.instance)).not.toContain("cat-harness");
+    // WHO declares the checkout's work plan has moved twice. cat-harness did,
+    // at `scope: "repository"`; from placement PR0 (bean `ejye`) the ROOT
+    // instance did, and this asserted that pair. The owner then removed the
+    // root declaration (3d4caf6, 2026-10-08), and cat-harness hosts the
+    // checkout-root `beans/` and `todos/` again (coordinator decision (b)).
+    // What has not moved is the verdict above: the REPOSITORY is active, on
+    // the checkout's own work plan, declared by exactly the host.
+    expect(readDeclaration(repo)).toBeUndefined();
+    expect(plan.map((p) => p.instance)).toContain("cat-harness");
   });
 });
 

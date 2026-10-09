@@ -34,7 +34,6 @@
  * Usage:
  *   bun run cat-harness/scripts/check-model-languages.ts [--instance ROOT]
  */
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -47,6 +46,7 @@ import {
   type ModelEntry,
 } from "../../bootstrap-tools/schemas/model-registry.js";
 import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = HARNESS_ROOT;
@@ -80,11 +80,15 @@ export function unregisteredModelIds(
   repoRoot: string,
   registered: ReadonlySet<string>,
 ): { id: string; count: number }[] {
-  const files = spawnSync("git", ["ls-files", "*.json"], { cwd: repoRoot, encoding: "utf8" });
-  if (files.status !== 0) throw new Error(`git ls-files failed in ${repoRoot}`);
+  // In a composed checkout every instance is a REMOTE MOUNT, laid down from
+  // `index.lock.json` and ignored by the index repository's git, so a bare
+  // `git ls-files` at the root lists none of their files. `gitCorpus` counts a
+  // mount's files as it counted a submodule's, and is tracked-plus-untracked
+  // exactly as before everywhere else.
+  const files = gitCorpus(repoRoot, ["*.json"]);
+  if (files === undefined) throw new Error(`git could not list the files in ${repoRoot}`);
   const counts = new Map<string, number>();
-  for (const rel of files.stdout.split("\n").filter(Boolean)) {
-    const path = join(repoRoot, rel);
+  for (const path of files) {
     if (!existsSync(path)) continue;
     for (const m of readFileSync(path, "utf8").matchAll(/"(?:model|agent_model)":\s*"([^"]+)"/g)) {
       const id = m[1]!;

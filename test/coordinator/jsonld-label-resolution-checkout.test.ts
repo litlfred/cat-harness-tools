@@ -19,8 +19,8 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 describe("contributed label prefixes", () => {
 
   test("the real registry supplies them", async () => {
-    const { loadContributions } = await import("../cat-harness/schemas/harness-config");
-    const { ContributionRegistry } = await import("../cat-harness/schemas/contributions");
+    const { loadContributions } = await import("../../../cat-harness/schemas/harness-config");
+    const { ContributionRegistry } = await import("../../../cat-harness/schemas/contributions");
     const registry = await loadContributions<FolioContribution, InstanceType<typeof ContributionRegistry>>(
       resolve(ORIGIN_DIR, "../../.."),
       new ContributionRegistry(),

@@ -28,6 +28,7 @@ describe("a harness sticky shows the landing's text, not the author's (ob3m 3)",
     const root = instanceRootFor(join(ORIGIN_DIR, ".."));
     expect(readerTextProblems(root)).toEqual([]);
     const cards = new Map(readLandingStickies(root).map((s) => [s.id, s]));
+    const judgedIds: string[] = [];
     let judged = 0;
     for (const d of declaredContributions(root)) {
       if (d.contribution.bodyFrom === undefined || d.summary === undefined) continue;
@@ -39,9 +40,15 @@ describe("a harness sticky shows the landing's text, not the author's (ob3m 3)",
         expect(card!.comment).not.toContain(d.description);
       }
       judged += 1;
+      judgedIds.push(d.contribution.id);
     }
-    // folio-assistant and cat-harness both declare a summary. A count of zero
-    // would mean this loop judged nothing and passed over it.
-    expect(judged).toBeGreaterThanOrEqual(2);
+    // folio-assistant and cat-harness both declared a summary, so this was
+    // `>= 2`. The owner removed folio-assistant's declaration (3d4caf6,
+    // 2026-10-08), and with it its card; cat-harness's is the one left. So
+    // the vacuity guard names the card it must have judged rather than a count
+    // that would now have to drop: a loop that judged nothing still fails, and
+    // so does one that skipped cat-harness's.
+    expect(judged).toBeGreaterThanOrEqual(1);
+    expect(judgedIds.some((id) => id.includes("cat-harness"))).toBe(true);
   });
 });

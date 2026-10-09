@@ -74,6 +74,7 @@ import { fileURLToPath } from "node:url";
 import { siteDirFor } from "../../cat-harness/schemas/cat-harness.js";
 import { normaliseDestination } from "../../cat-harness/scripts/lib/nav-label.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, writeQaResult, type QaResult, type QaVerdict } from "../../cat-harness/scripts/qa-results.ts";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.
@@ -264,8 +265,13 @@ export interface NavNamesResult {
 
 /** Every tracked file under `dir`, repo-relative. */
 function tracked(repoRoot: string, dir: string): string[] {
-  const r = Bun.spawnSync(["git", "ls-files", "-z", "--", dir], { cwd: repoRoot });
-  return r.stdout.toString().split("\0").filter(Boolean);
+  // In a composed checkout every instance is a REMOTE MOUNT, laid down from
+  // `index.lock.json` and ignored by the index repository's git, so a bare
+  // `git ls-files` at the root lists none of their files. `gitCorpus` counts a
+  // mount's files as it counted a submodule's, and is tracked-plus-untracked
+  // exactly as before everywhere else. A DIRECTORY is spelled `<dir>/**`:
+  // a mount's files are matched as globs, and a bare directory matches none.
+  return (gitCorpus(repoRoot, [`${dir}/**`]) ?? []).map((f) => relative(repoRoot, f));
 }
 
 /**

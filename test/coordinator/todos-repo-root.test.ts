@@ -28,12 +28,19 @@ import { workflowFiles } from "../../../cat-harness/scripts/known-skills.js";
 import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.js";
 
 describe("the declaration and the directory agree", () => {
-  test("the checkout's root declaration declares a `todos` graph", () => {
-    // The ROOT instance's, since placement PR0 (bean `ejye`): `todos/` sits at
-    // the checkout's root and belongs to the checkout, not to the platform.
-    const d = readDeclaration(repoRootFor(ROOT));
-    const entry = d?.directories?.find((x) => x.graphTypologies?.includes("todos"));
+  test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {
+    // It was the ROOT instance's from placement PR0 (bean `ejye`): `todos/`
+    // sits at the checkout's root and belongs to the checkout, not to one
+    // layer. RESTATED 2026-10-09: the owner removed the root declaration on
+    // 2026-10-08 (3d4caf6), and the checkout-root state graphs are now
+    // declared by cat-harness with `scope: "repository"` (coordinator decision
+    // (b); cat-harness#10 gives their nested graphs that owner). What has not
+    // changed is where the directory is -- the checkout root -- and that
+    // exactly one declaration says so.
+    expect(readDeclaration(repoRootFor(ROOT))).toBeUndefined();
+    const entry = readDeclaration(ROOT)?.directories?.find((x) => x.graphTypologies?.includes("todos"));
     expect(entry?.path).toBe("todos/");
+    expect(entry?.scope).toBe("repository");
   });
 
   test("the declared directory EXISTS — declare only what exists", () => {
