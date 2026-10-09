@@ -178,7 +178,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
     rewrites: ["cat-harness/content/pipeline/script-sidecars/*.script.json"],
     because: "script block verdicts over the docs tree; agent verdicts are composed from test/attestations/, which stays on main. Read by the witnesses below",
   },
-  { id: "check:l1-complete", run: ["check:l1-complete", "--write"], writes: [`${R}/library-qa/**`], because: "per-library-entry L1 completeness; `--write` is its writer form" },
+  // `*/test/results`, not `${R}`: since cat-harness#12 each verdict is written
+  // under the instance that owns the library entry (who-iris, smart-base,
+  // fhir-harness …), and claiming only cat-harness's tree left 24 of them
+  // `unclaimed` in the composed checkout (2026-10-09).
+  { id: "check:l1-complete", run: ["check:l1-complete", "--write"], writes: [`*/test/results/library-qa/**`], because: "per-library-entry L1 completeness, under the instance owning each entry; `--write` is its writer form" },
   {
     id: "p2:refusals",
     run: ["p2:refusals"],
