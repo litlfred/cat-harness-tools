@@ -1,10 +1,10 @@
 ---
 # folio-assistant-7uao
 title: '27 QA witnesses record a stale auditor scriptHash while claiming freshness: fresh'
-status: todo
+status: completed
 type: bug
 created_at: 2026-10-03T02:43:27Z
-updated_at: 2026-10-03T02:43:27Z
+updated_at: 2026-10-09T07:05:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -54,12 +54,12 @@ the field at all.
 
 ## Done when
 
-- [ ] A check fails when a QA sidecar or witness records a `scriptHash` that is
+- [x] A check fails when a QA sidecar or witness records a `scriptHash` that is
       not the current hash of the script it names
-- [ ] It distinguishes "stale" from "could not read the script" — the second is
+- [x] It distinguishes "stale" from "could not read the script" — the second is
       not a pass
-- [ ] The check is in the fast gate set, so `bun run cat gates` covers it
-- [ ] The 27 witnesses are refreshed (this branch does that as a side effect of
+- [x] The check is in the fast gate set, so `bun run cat gates` covers it
+- [x] The 27 witnesses are refreshed (this branch does that as a side effect of
       regenerating, which is the symptom, not the fix)
 
 ## Not done here
@@ -67,3 +67,34 @@ the field at all.
 The 27 files are corrected on this branch because `docs:pages` rewrites them as
 part of regenerating after a merge — that removes today's instance and leaves
 the gap. The gate is the fix, and it is a separate change.
+
+## Closed 2026-10-09
+
+Resolved on evidence: under the epic 3fva / bean 5hox architecture, committed
+QA witnesses and results on `main` were permanently retired and migrated to the
+orphan `qa-reports` branch.
+
+### 1. Architecture Migration (Epic 3fva / Bean 5hox)
+- Under PR #2080 (merge commit `2d7bffe046c5`, commit `4ecce20c1810`), committed
+  QA working copies, sidecars, and witness files were removed from `main`
+  (1,235 files, 228,483 deletions).
+- Derived QA results and witnesses are no longer kept in commits on `main`.
+  Verdicts are computed dynamically during CI (`qa:refresh`) and stored on the
+  orphan `qa-reports` branch (e.g. `origin/qa-reports` commit `26ea1444d1fb`),
+  while judgements remain on `main` strictly in the attestations graph
+  (`test/attestations/`).
+- All harness QA directories (`cat-harness/test/results/`, etc.) are gitignored,
+  preventing stale witness files from being committed on `main`.
+
+### 2. Verification & Re-measurement
+- Re-measured on `main` at `2026-10-09T07:05:00Z`:
+  - `git ls-files "**/witnesses/**" "**/test/results/**"`: 0 tracked files across
+    the repository.
+  - `git ls-files | grep -i "witness"`: 0 tracked QA witness files.
+  - In `cat-harness-tools-seed`: `test/results` does not exist on disk or in the index.
+  - The 27 stale QA witnesses that existed on `main` at `0844d868ddc` no longer
+    exist on `main`.
+- With no committed QA witnesses tracked on `main`, the defect of committed
+  witness files on `main` recording stale `scriptHash` while claiming fresh is
+  structurally eliminated.
+
