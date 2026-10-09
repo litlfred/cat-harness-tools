@@ -29,20 +29,35 @@
  * it was written in, so nothing it reads changed.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { findContentRepoRoot } from "../../../cat-harness/content/pipeline/repo-root";
 import { readDeclaredFolioProfile } from "../../../cat-harness/content/pipeline/profile-check";
-import { expectedInstanceConfigPath, resolveHarnessConfigPath } from "../../../cat-harness/schemas/harness-config";
+import { folioOptionalAxes } from "../../../cat-harness/content/pipeline/qa-criteria-registry";
+import { readEffectiveConfig } from "../../../cat-harness/schemas/harness-config";
 
+/**
+ * RESTATED 2026-10-09 for the index. The tests below required a
+ * `<name>.config.json` FILE at the end of an outward walk. Since the split the
+ * checkout root carries `index.config.json` (`folio-index-config/v1`), whose
+ * per-instance ENTRIES are the config, and the per-instance files are gone
+ * (the owner's 3d4caf6 removed the root's; cat-harness carries none). Every
+ * config reader now goes through `readEffectiveConfig` -- the index entry
+ * first, then the file (cat-harness#19). So "the content root and its config
+ * agree" is asked of that reader: it must find the entry (`state: "ok"`, `via:
+ * "index"`, `from` naming it), and the two consumers the `zkgs` defect broke
+ * -- the declared profile and the optional axes -- must read the same answer.
+ * The defect this pins is unchanged: a resolver that answers with a plausible
+ * place rather than the config fails here.
+ */
 describe("this repository's content root and its config agree — bean `zkgs`", () => {
   const root = findContentRepoRoot();
 
-  test("the content root resolves to a config file that EXISTS", () => {
-    const hit = resolveHarnessConfigPath(root);
-    expect(hit).toBeDefined(); // `undefined` is the zkgs defect
-    expect(existsSync(hit!.path)).toBe(true);
+  test("the content root resolves to its index entry, not to nothing", () => {
+    const eff = readEffectiveConfig(root);
+    expect(eff.state).toBe("ok"); // anything else is the zkgs defect
+    expect(eff.via).toBe("index");
+    expect(eff.from).toMatch(/^index\.config\.json entry "/);
   });
 
   test("the declared profile is `document`, never the third state", () => {
@@ -54,32 +69,34 @@ describe("this repository's content root and its config agree — bean `zkgs`", 
   /**
    * THE NESTED INSTANCE RESOLVES TO ITS OWN CONFIG, not the root's.
    *
-   * Added 2026-09-23 from a duplicate investigation of this bean that reached
-   * the same conclusion independently; the rest of that work was dropped
-   * rather than landed beside this file, because two tests answering one
-   * question is how they drift. This assertion is the part that was not
-   * already here.
-   *
-   * It matters because `cat-harness/` is the directory the walk USED to stop
-   * at, and the root is the one it used to miss — they are the two ends of
-   * the defect. The tests above pin the root; without this one, a resolver
-   * that answered the root's config for every instance would pass them all
-   * while making every nested instance read the wrong `contentType`.
+   * Added 2026-09-23 from a duplicate investigation of this bean. `cat-harness/`
+   * is the directory the walk USED to stop at, and the root the one it used to
+   * miss -- the two ends of the defect. In the composed checkout cat-harness IS
+   * the content root, and its config is its OWN index entry: a resolver that
+   * answered some other instance's entry (or cat-harness's own nested
+   * `index.config.json`, which names it with no `contentType` -- the mount-scope
+   * defect cat-harness#19 fixed) would hand every instance the wrong
+   * `contentType`.
    */
-  test("`cat-harness/` resolves to its OWN config, not the repository root's", () => {
-    const nested = readDeclaredFolioProfile(join(root, "cat-harness"));
+  test("`cat-harness/` resolves to its OWN entry, not another instance's", () => {
+    const dir = join(root, "..", "cat-harness");
+    const eff = readEffectiveConfig(dir);
+    expect(eff.state).toBe("ok");
+    expect(eff.from).toContain('entry "cat-harness"');
+    const nested = readDeclaredFolioProfile(dir);
     expect(nested.profile).toBe("document");
-    expect(nested.declaredBy).toContain("cat-harness.config.json");
+    expect(nested.declaredBy).toContain('entry "cat-harness"');
     expect(nested.declaredBy).not.toMatch(/undetermined/);
   });
 
-  test("the optional-axes reader looks where the config actually is", () => {
-    // `folioOptionalAxes()` reads this path. If it pointed at a file that is
-    // not there, every axis opt-in would be silently ignored — the other half
-    // of the defect, invisible because "no axes" is also a legitimate answer.
-    const p = expectedInstanceConfigPath(root);
-    expect(p).toBeDefined();
-    expect(existsSync(p!)).toBe(true);
-    expect(p).toBe(resolveHarnessConfigPath(root)!.path);
+  test("the optional-axes reader reads where the config actually is", () => {
+    // `folioOptionalAxes()` reads `readEffectiveConfig(findContentRepoRoot())`.
+    // If it read anywhere else, every axis opt-in would be silently ignored --
+    // the other half of the defect, invisible because "no axes" is also a
+    // legitimate answer. So its answer must be exactly the entry's `qaAxes`.
+    const eff = readEffectiveConfig(root);
+    expect(eff.state).toBe("ok");
+    const declared = (eff.state === "ok" ? (eff.config as { qaAxes?: unknown }).qaAxes : undefined) ?? [];
+    expect(folioOptionalAxes()).toEqual(declared as string[]);
   });
 });
