@@ -52,7 +52,10 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // when the WHO style guide was folded into who-iris as a subgraph (bean
     // `qsx4`) — the voices declared from within `skills/skills.json`, the
     // glossary in who-iris.json. Same reason as both above.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "glossary", "library", "qa", "schemas", "skills", "themes", "translation-sources", "uploads", "voices"].map(K));
+    // TWELVE since 2026-10-09: `tools` joined when who-iris declared its own
+    // Tool node (`iris-pages`), the one its catalogue visualiser is
+    // `renderedBy` (owner: "Need harness to declare visualizer is renderedBy").
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "glossary", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -78,6 +81,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       "schemas",
       "skills",
       "themes",
+      // `tools`: who-iris's own Tool graph (2026-10-09) publishes no page.
+      "tools",
       // `translation-sources`: who-iris carries its own glossary catalogues
       // since bean riit ("move things to semantically appropriate place").
       "translation-sources",

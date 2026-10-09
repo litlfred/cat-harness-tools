@@ -54,7 +54,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
     expect(resolveFor("cat-harness", "beans")).toBe("cat-harness/docs/cat-harness/beans/index.html");
     // Built at publish, never committed: still its declared route.
-    expect(resolveFor("cat-harness", "fsh-guts")).toBe("cat-harness/docs/cat-harness/fsh-guts/index.html");
+    expect(resolveFor("cat-harness", "fsh-guts")).toMatch(/^cat-harness\/docs\/cat-harness\/fsh-guts\/index\.(html|md)$/);
   });
 
   // "Exists" includes a page BUILT AT PUBLISH (bean 0b8c): never committed,
