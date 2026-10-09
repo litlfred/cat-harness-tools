@@ -12,8 +12,8 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { docsLayers } from "@litlfred/cat-harness/scripts/compose-docs.js";
-import { pageRelPath, publishedIndex, processRows } from "@litlfred/cat-harness/scripts/gen-processes-viz.js";
+import { docsLayers } from "../../scripts/compose-docs.js";
+import { pageRelPath, publishedIndex, processRows } from "../../scripts/gen-processes-viz.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

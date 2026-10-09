@@ -16,7 +16,7 @@ import {
   QaAttestationsSchema,
   requirementSignoffPath,
 } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
+import { loadProcessModel } from "../../src/workflow/process-model.ts";
 import { checkRequirementSet, signoffFacts, storedSignOffs, unionSignOffs } from "../check-requirements.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..");

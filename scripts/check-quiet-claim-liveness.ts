@@ -42,9 +42,9 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { probeBeans, beanDefsDirRelative } from "@litlfred/cat-harness/test/health/probes.ts";
-import { claimPopulations } from "@litlfred/cat-harness/test/health/checks.ts";
-import { isAncestor } from "@litlfred/cat-harness/scripts/git-ancestry.ts";
+import { probeBeans, beanDefsDirRelative } from "../test/health/probes.ts";
+import { claimPopulations } from "../test/health/checks.ts";
+import { isAncestor } from "./git-ancestry.ts";
 
 export const SIGNALS = ["open-pr", "unmerged-branch"] as const;
 export type Signal = (typeof SIGNALS)[number];

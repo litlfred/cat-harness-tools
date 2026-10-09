@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 
 import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.ts";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.ts";
-import { ALLOWED } from "@litlfred/cat-harness/scripts/partition/instance-rules.ts";
+import { ALLOWED } from "../scripts/partition/instance-rules.ts";
 import { classifyByDirection } from "@litlfred/cat-harness/schemas/detangle.ts";
 
 /** This repository's instance stack, as `kg-detangle` reads it: three declared, one not. */

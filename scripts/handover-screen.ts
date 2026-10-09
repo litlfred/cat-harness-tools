@@ -3,7 +3,7 @@
  * delegated prompt, a tool result, or a comment from a person who is not the
  * session's principal. Bean `ieum`, rules H3, H5 and H9 of
  * `skills/conduct/security/zero-trust-handover.md`; the logic is
- * `cat-harness/src/core/handover-screen.ts`.
+ * `cat-harness-tools/src/core/handover-screen.ts`.
  *
  * Usage:
  *   bun run cat handover:screen --schema <schema.json> <payload.json>
@@ -25,7 +25,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { screenHandover, type HandoverSchema, type ScreenVerdict } from "@litlfred/cat-harness/src/core/handover-screen.ts";
+import { screenHandover, type HandoverSchema, type ScreenVerdict } from "../src/core/handover-screen.ts";
 
 export const SCREEN_EXIT = { clean: 0, refused: 1, undetermined: 2, quarantined: 3 } as const;
 

@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
 import { mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
-import { MEMORY_DIRS } from "@litlfred/cat-harness/scripts/agent-memory.ts";
+import { MEMORY_DIRS } from "../../scripts/agent-memory.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

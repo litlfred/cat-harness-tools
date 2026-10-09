@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { declaredGraphs } from "@litlfred/cat-harness/scripts/mount-instance-docs.ts";
+import { declaredGraphs } from "../mount-instance-docs.ts";
 
 describe("declaredGraphs' rows are declared kind rows (#2151)", () => {
   const rows = declaredGraphs("who-iris", new Map([["docs", "../docs/who-iris/"]]));

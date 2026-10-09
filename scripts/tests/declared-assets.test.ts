@@ -13,8 +13,8 @@ import { join, resolve } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { auditInstance, isCheckable, markdownLinks } from "../check-declared-assets.js";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
-import { checkIndexRender, renderIndex } from "@litlfred/cat-harness/scripts/index-render.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { checkIndexRender, renderIndex } from "../index-render.js";
 
 const ROOT = resolve(import.meta.dir, "../..");
 

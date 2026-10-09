@@ -21,7 +21,7 @@ import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts"
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const INSTANCE = HARNESS_ROOT;
 const REPO = repoRootFor(INSTANCE);

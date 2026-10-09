@@ -19,11 +19,11 @@ import {
   FHIR_PIN,
   FHIR_SNAPSHOT,
   pinnedTerminology,
-} from "@litlfred/cat-harness/scripts/check-term-mapping.ts";
+} from "../../scripts/check-term-mapping.ts";
 
 describe("corpus — the real glossary, asserting scope rather than a count", () => {
   test("every candidate gets a row for BOTH targets, and fhir is never silently unmapped", async () => {
-    const { run } = await import("@litlfred/cat-harness/scripts/check-term-mapping.ts");
+    const { run } = await import("../../scripts/check-term-mapping.ts");
     const { mappings, scope } = await run(process.cwd());
     expect(TermMappingsFileSchema.safeParse({
       $schema: "folio-term-mappings/v1", checked_at: "2026-09-30", scope, mappings,
@@ -49,7 +49,7 @@ describe("corpus — the real glossary, asserting scope rather than a count", ()
   }, 60_000);
 
   test("the pin and its snapshot agree on the version", async () => {
-    const { pinnedTerminology } = await import("@litlfred/cat-harness/scripts/check-term-mapping.ts");
+    const { pinnedTerminology } = await import("../../scripts/check-term-mapping.ts");
     const p = pinnedTerminology(process.cwd());
     // A snapshot of one version labelled another is the single way this could
     // assert something false, so it is refused rather than reported.

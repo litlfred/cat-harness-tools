@@ -9,8 +9,8 @@
  * @module folio-assistant/routes/branches
  */
 
-import type { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
-import { log, logDebug } from "@litlfred/cat-harness/src/core/logging.js";
+import type { GitHelper } from "../core/git.js";
+import { log, logDebug } from "../core/logging.js";
 import { spawnSync } from "child_process";
 import type { MountedRoute, RouteDeps } from "../route-groups.js";
 

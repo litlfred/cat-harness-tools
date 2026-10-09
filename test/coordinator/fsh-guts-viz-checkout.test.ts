@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { gutsDir, gutsFiles, page } from "@litlfred/cat-harness/scripts/gen-fsh-guts-viz.ts";
+import { gutsDir, gutsFiles, page } from "../../scripts/gen-fsh-guts-viz.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

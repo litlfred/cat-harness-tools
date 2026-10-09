@@ -216,7 +216,7 @@ describe("loading the graph must not RUN it (bean `ymsu`)", () => {
 
 describe("over the real corpus", () => {
   test("the skills load, and none is unreadable", async () => {
-    const { kgRoots } = await import("@litlfred/cat-harness/scripts/known-skills.ts");
+    const { kgRoots } = await import("../../scripts/known-skills.ts");
     const { skills, unreadable } = await loadSkillNeeds(kgRoots(INSTANCE));
     // A relative specifier resolved against THIS module, not the caller's
     // cwd, and every import failed — caught in one run because `unreadable`
@@ -235,7 +235,7 @@ describe("over the real corpus", () => {
     // The list is EMPTY and stays empty: a new undeclared id fails here,
     // which is the point. Never widen it to make this green — that turns
     // the check back into the thing it was written to catch.
-    const { kgRoots } = await import("@litlfred/cat-harness/scripts/known-skills.ts");
+    const { kgRoots } = await import("../../scripts/known-skills.ts");
     const { loadCapabilities } = await import("./capabilities.ts");
     const { repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
     const { skills } = await loadSkillNeeds(kgRoots(INSTANCE));
@@ -300,7 +300,7 @@ describe("over the real corpus", () => {
   // So the budget is not a workaround for a deeper problem. It is the whole fix,
   // on its own terms.
   test("the real join runs and produces a verdict per skill", async () => {
-    const { kgRoots } = await import("@litlfred/cat-harness/scripts/known-skills.ts");
+    const { kgRoots } = await import("../../scripts/known-skills.ts");
     const { loadCapabilities, probeAll } = await import("./capabilities.ts");
     const { repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
     const { skills } = await loadSkillNeeds(kgRoots(INSTANCE));

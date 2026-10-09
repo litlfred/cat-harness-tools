@@ -31,7 +31,7 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-import { auditSchemaNodes } from "@litlfred/cat-harness/scripts/schema-nodes.js";
+import { auditSchemaNodes } from "./schema-nodes.js";
 
 const ROOT = HARNESS_ROOT;
 

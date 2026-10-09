@@ -10,7 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { CI_SWEEP_ACTOR, LOCAL_SWEEP_ACTOR, sweepActor } from "@litlfred/cat-harness/content/pipeline/qa-utils.ts";
+import { CI_SWEEP_ACTOR, LOCAL_SWEEP_ACTOR, sweepActor } from "../../content/pipeline/qa-utils.ts";
 import { readActors, reviewerOutcome } from "../check-qa-reviewer-permission.ts";
 
 describe("sweepActor", () => {

@@ -36,8 +36,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { regenPass, writerFor, type Runner } from "@litlfred/cat-harness/scripts/regen-after-merge.ts";
-import { chromiumExecutable } from "@litlfred/cat-harness/scripts/bpmn-render.ts";
+import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
+import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 

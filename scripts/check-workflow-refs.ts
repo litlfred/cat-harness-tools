@@ -33,10 +33,10 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
-import { workflowFiles, corpusScopeFor } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative } from "node:path";
-import { loadProcessModel, isActivity } from "@litlfred/cat-harness/src/workflow/process-model.js";
-import { knownSkills } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { loadProcessModel, isActivity } from "../src/workflow/process-model.js";
+import { knownSkills } from "./known-skills.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 interface Dangling { file: string; node: string; ref: string }

@@ -93,7 +93,7 @@ import {
   type Judgement,
   type QaResult,
   type QaResultState,
-} from "@litlfred/cat-harness/scripts/qa-results.ts";
+} from "./qa-results.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);

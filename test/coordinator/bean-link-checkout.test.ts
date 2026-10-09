@@ -13,8 +13,8 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
-import { workflowFile } from "@litlfred/cat-harness/scripts/known-skills.ts";
-import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
+import { workflowFile } from "../../scripts/known-skills.ts";
+import { loadProcessModel } from "../../src/workflow/process-model.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

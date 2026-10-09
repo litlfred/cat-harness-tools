@@ -65,18 +65,18 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 // no graph-typology registered to ask. `readDeclaration` would, and a gate that
 // throws on an unregistered kind reports a break it did not find.
 import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "@litlfred/cat-harness/scripts/qa-results.js";
-import { readQaTree } from "@litlfred/cat-harness/scripts/qa-store.js";
-import { PUBLISHED_ELSEWHERE, declaredInstanceStubs, instanceExportPlan, type PlannedExport } from "@litlfred/cat-harness/scripts/instance-exports.js";
-import { publishedInstanceSchemas, scannedInstanceSchemas } from "@litlfred/cat-harness/scripts/kg-export.js";
+import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
+import { readQaTree } from "./qa-store.js";
+import { PUBLISHED_ELSEWHERE, declaredInstanceStubs, instanceExportPlan, type PlannedExport } from "./instance-exports.js";
+import { publishedInstanceSchemas, scannedInstanceSchemas } from "./kg-export.js";
 import {
   PUBLIC_SCHEMA_EXPORT,
   instanceZodSchemaDirs,
   zodSchemaPath,
   type InstanceSchemaExport,
-} from "@litlfred/cat-harness/scripts/harness-schema-export.js";
+} from "./harness-schema-export.js";
 import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
-import { isExternalContract, skillContracts } from "@litlfred/cat-harness/scripts/skill-contracts.js";
+import { isExternalContract, skillContracts } from "./skill-contracts.js";
 import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");

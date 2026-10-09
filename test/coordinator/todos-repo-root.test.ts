@@ -22,10 +22,10 @@ import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-
 import { BEAN_GRAPH_FILE, parseBeanGraph } from "@litlfred/cat-harness/schemas/bean-graph.js";
 import { contentIsOffCheckout, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { ROOT, TODO_ROOT, readTodos, todoDirs } from "@litlfred/cat-harness/scripts/todos.js";
+import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../scripts/todos.js";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.js";
-import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
+import { workflowFiles } from "../../scripts/known-skills.js";
+import { loadProcessModel } from "../../src/workflow/process-model.js";
 
 describe("the declaration and the directory agree", () => {
   test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {

@@ -73,7 +73,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "./bean-store-read.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 
@@ -122,7 +122,7 @@ export interface StalePathReport {
  * Keyed `<bean>:<rule>` rather than by line, because the line is the thing that
  * gets edited: keying on it would make every rewording look like a new defect.
  */
-export const BASELINE_FILE = "cat-harness/scripts/stale-paths-baseline.json";
+export const BASELINE_FILE = "cat-harness-tools/scripts/stale-paths-baseline.json";
 
 /** Missing or unparseable is an EMPTY baseline — every finding fails, which is the safe direction. */
 export function readBaseline(root: string): Set<string> {

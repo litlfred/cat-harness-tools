@@ -48,7 +48,7 @@ import { resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-import { CLOSED_STATUSES, readBeanFiles } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+import { CLOSED_STATUSES, readBeanFiles } from "./bean-store-read.ts";
 
 /** The tag. One spelling, named once. */
 export const READY_TAG = "ready-to-close";

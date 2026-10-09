@@ -79,7 +79,7 @@ import { basename, dirname, extname, join } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
-import { readEntryBlocks, readLibraryGraph, type LibraryEntry } from "@litlfred/cat-harness/scripts/library-graph.ts";
+import { readEntryBlocks, readLibraryGraph, type LibraryEntry } from "./library-graph.ts";
 import {
   catalogueRecordFor,
   dcValue,
@@ -90,9 +90,9 @@ import {
   resolveLibraryTitle,
   TITLE_AUTHORITY,
   type LibraryTitleSource,
-} from "@litlfred/cat-harness/content/pipeline/library-title.ts";
-import { tally } from "@litlfred/cat-harness/scripts/summaries.ts";
-import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "@litlfred/cat-harness/scripts/qa-results.js";
+} from "../content/pipeline/library-title.ts";
+import { tally } from "./summaries.ts";
+import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.

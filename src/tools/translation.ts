@@ -21,8 +21,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createHash } from "crypto";
 
-import { extractMarkdown, formatPot, type PotEntry } from "@litlfred/cat-harness/content/pipeline/pot-extract.js";
-import { parsePo, injectMarkdown } from "@litlfred/cat-harness/content/pipeline/po-inject.js";
+import { extractMarkdown, formatPot, type PotEntry } from "../../content/pipeline/pot-extract.js";
+import { parsePo, injectMarkdown } from "../../content/pipeline/po-inject.js";
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
  * `.po` live. Falls back to the convention because extraction CREATES the

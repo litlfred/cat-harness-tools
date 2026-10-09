@@ -31,7 +31,7 @@ import {
   otherWorkflowSteps,
   unclassifiedSteps,
   unrunScripts,
-} from "@litlfred/cat-harness/scripts/gates.ts";
+} from "../../scripts/gates.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**

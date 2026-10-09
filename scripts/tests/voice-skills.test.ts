@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { dirname, join } from "node:path";
 
 import { checkVoiceSkills, restatements } from "../check-voice-skills.ts";
-import { readVoicesGraph } from "@litlfred/cat-harness/scripts/voices-graph.ts";
+import { readVoicesGraph } from "../voices-graph.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", ".."));

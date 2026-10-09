@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { BLOCK_HEADING, BASELINE_FILE, inspect, scan } from "../check-bean-blocks.ts";
-import { readBeans, type BeanNode } from "@litlfred/cat-harness/scripts/beans.ts";
+import { readBeans, type BeanNode } from "../beans.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 

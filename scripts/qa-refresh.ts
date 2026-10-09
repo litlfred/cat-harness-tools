@@ -94,9 +94,9 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "@litlfred/cat-harness/scripts/qa-store.ts";
-import { movedInventory, movedRoots, type MovedInventory } from "@litlfred/cat-harness/scripts/qa-verify-moved.ts";
-import { BUILDING_ENV } from "@litlfred/cat-harness/scripts/qa-working-copy.ts";
+import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
+import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
+import { BUILDING_ENV } from "./qa-working-copy.ts";
 
 export { REFRESH_SCHEMA, refreshReportComplete };
 export const REFRESH_EXIT = { complete: 0, incomplete: 1, unknown: 2 } as const;
@@ -172,7 +172,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },
   {
     id: "qa-sweep:docs",
-    run: ["cat-harness/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
+    run: ["cat-harness-tools/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
     writes: [`${R}/block-qa/**`],
     // declared-path-literal: the script sidecars the sweep restamps, measured from the 2026-10-07 restore log (65 of them).
     rewrites: ["cat-harness/content/pipeline/script-sidecars/*.script.json"],

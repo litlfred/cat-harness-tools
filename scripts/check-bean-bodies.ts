@@ -50,7 +50,7 @@ import {
   isFoldedTitle,
   readBeanFiles,
   type BeanFile,
-} from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+} from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -339,7 +339,7 @@ export interface BeanBodyReport {
  * stops matching is reported as stale so the baseline shrinks as the backlog
  * is worked, rather than fossilising.
  */
-export const BASELINE_FILE = "cat-harness/scripts/bean-bodies-baseline.json";
+export const BASELINE_FILE = "cat-harness-tools/scripts/bean-bodies-baseline.json";
 
 function loadBaseline(root: string): Set<string> {
   const f = resolve(root, BASELINE_FILE);

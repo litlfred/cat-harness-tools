@@ -79,7 +79,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { fshGutsDirectories } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
-import { exitUnlessMounted } from "@litlfred/cat-harness/scripts/branch-store.ts";
+import { exitUnlessMounted } from "./branch-store.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 

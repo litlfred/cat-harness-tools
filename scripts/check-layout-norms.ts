@@ -96,8 +96,8 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+} from "./qa-results.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
@@ -110,7 +110,7 @@ const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
  * a declaration that carried its own exceptions would be asserting them as
  * intended layout.
  */
-const BASELINE = join(INSTANCE_ROOT, "scripts", "layout-norms-baseline.json");
+const BASELINE = join(TOOLS_ROOT, "scripts", "layout-norms-baseline.json");
 
 /**
  * `<instance>: <outer path> contains <inner path>` — the stable spelling of a pair.
@@ -216,7 +216,7 @@ export function checkLayoutNorms(repoRoot = REPO_ROOT, baselineFile = BASELINE):
 /** The sidecar document for a report. Pure, so the judge and the writer render ONE computation. */
 export function layoutNormsDocument(r: LayoutReport): QaResult {
   return buildQaResult({
-    script: "cat-harness/scripts/check-layout-norms.ts",
+    script: "cat-harness-tools/scripts/check-layout-norms.ts",
     scriptAbsPath: fileURLToPath(import.meta.url),
     subject: { kind: "corpus", id: "declared-directories" },
     families: {

@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { commandText, isGenerated, reconcile, write } from "@litlfred/cat-harness/scripts/gen-skill-commands.ts";
+import { commandText, isGenerated, reconcile, write } from "../gen-skill-commands.ts";
 import { userInvocableSkills } from "../../src/tools/skill-prompts.ts";
 
 const made: string[] = [];

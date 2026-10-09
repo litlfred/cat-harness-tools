@@ -33,7 +33,7 @@ import {
   renderEntries,
   syncAll,
   syncAntigravityRule,
-} from "@litlfred/cat-harness/scripts/agent-memory.js";
+} from "../../scripts/agent-memory.js";
 
 describe("the corpus", () => {
   test("there are memory nodes to check — otherwise this proves nothing", () => {

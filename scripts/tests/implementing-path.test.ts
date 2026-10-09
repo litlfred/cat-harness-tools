@@ -23,8 +23,8 @@ import {
   implementingRootFor,
   resolveImplementingPath,
 } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { unresolvedPaths } from "@litlfred/cat-harness/scripts/check-tools.ts";
-import { toolsOf } from "@litlfred/cat-harness/tools/discover.ts";
+import { unresolvedPaths } from "../check-tools.ts";
+import { toolsOf } from "../../tools/discover.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
@@ -131,7 +131,7 @@ describe("in this checkout", () => {
   test("a path that exists only in this layer resolves from a harness declaration", () => {
     // `scripts/lib/roots.ts` is in this layer and not in the harness: the
     // shape every moved module will have.
-    expect(existsSync(join(HARNESS_ROOT, "scripts/lib/roots.ts"))).toBe(false);
+    expect(existsSync(join(HARNESS_ROOT, "scripts", "lib", "roots.ts"))).toBe(false);
     expect(resolveImplementingPath(HARNESS_ROOT, "scripts/lib/roots.ts")).toEqual({
       state: "found",
       root: TOOLS_ROOT,

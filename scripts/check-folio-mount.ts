@@ -97,7 +97,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { hasMount } from "@litlfred/cat-harness/scripts/folio-mount.ts";
+import { hasMount } from "./folio-mount.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
 
@@ -276,7 +276,7 @@ function main(): void {
     } else {
       console.log(
         "\n  A page with no mount is a reader whose folio disappears when they follow a link.\n" +
-          "  Emit it with `fragment()` from `cat-harness/scripts/folio-mount.ts`.",
+          "  Emit it with `fragment()` from `cat-harness-tools/scripts/folio-mount.ts`.",
       );
     }
   }

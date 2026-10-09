@@ -10,8 +10,8 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { checkTools, knownSkills } from "@litlfred/cat-harness/scripts/check-tools.js";
-import { tools } from "@litlfred/cat-harness/tools/discover.js";
+import { checkTools, knownSkills } from "../../scripts/check-tools.js";
+import { tools } from "../../tools/discover.js";
 import { danglingRemedies, networkToolsWithoutRemedies, remediesFor } from "@litlfred/cat-harness/schemas/tool.js";
 
 /**

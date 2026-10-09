@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/tabular-records.ts";
-import { checkAll, checkEntry } from "@litlfred/cat-harness/scripts/check-l1-complete.ts";
-import { planFor, sniffMimetype, tabularDelimiter } from "@litlfred/cat-harness/scripts/ingest-document.ts";
+import { checkAll, checkEntry } from "../check-l1-complete.ts";
+import { planFor, sniffMimetype, tabularDelimiter } from "../ingest-document.ts";
 
 // The harness: the Python scripts it spawns stayed there; this test moved up in 70lx B2b.
 const ROOT = HARNESS_ROOT;
@@ -83,7 +83,7 @@ function csv(dir: string, body: string, name = "data.csv"): string {
 }
 
 function extract(file: string, out: string) {
-  const r = Bun.spawnSync(["python3", "scripts/tabular-records.py", "-o", out, file], { cwd: ROOT });
+  const r = Bun.spawnSync(["python3", join(TOOLS_ROOT, "scripts/tabular-records.py"), "-o", out, file], { cwd: ROOT });
   if (r.exitCode !== 0) throw new Error(new TextDecoder().decode(r.stderr));
   const slug = file.endsWith(".xlsx") ? "book" : "data";
   return TabularRecordsSchema.safeParse(JSON.parse(readFileSync(join(out, slug, "tabular.jsonld"), "utf-8")));
@@ -327,7 +327,7 @@ describe("the real corpus", () => {
 
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-context-emission.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 describe("the tabular record is JSON-LD a processor keeps whole", () => {
   test("the arm emits the published content context", () => {
@@ -348,7 +348,7 @@ describe("the tabular record is JSON-LD a processor keeps whole", () => {
   });
 
   test("the Python constant IS the TypeScript one — one URL, not two", () => {
-    const py = readFileSync(join(ROOT, "scripts", "_content_context.py"), "utf-8");
+    const py = readFileSync(join(TOOLS_ROOT, "scripts", "_content_context.py"), "utf-8");
     expect(/CONTENT_CONTEXT_URL = "([^"]+)"/.exec(py)?.[1]).toBe(CONTENT_CONTEXT_URL);
   });
 

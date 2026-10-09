@@ -67,12 +67,12 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { readInstances, ownerOf, type Instance } from "@litlfred/cat-harness/scripts/check-import-direction.ts";
-import { isSkillMd, skillMdDirs } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { readInstances, ownerOf, type Instance } from "./check-import-direction.ts";
+import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
-import { BASELINE, type BindingBaselineEntry } from "@litlfred/cat-harness/scripts/process-bindings.baseline.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { BASELINE, type BindingBaselineEntry } from "./process-bindings.baseline.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
@@ -226,7 +226,7 @@ if (import.meta.main) {
     console.log(`  COULD NOT DETERMINE ${count("undetermined")}: ${from.join(", ")} declare(s) no needs`);
   }
   if (process.argv.includes("--shrink")) {
-    const path = join(HARNESS_ROOT, "scripts", "process-bindings.baseline.ts"); // stayed in cat-harness (70lx B2)
+    const path = join(TOOLS_ROOT, "scripts", "process-bindings.baseline.ts"); // stayed in cat-harness (70lx B2)
     const src = readFileSync(path, "utf-8");
     const kept = BASELINE.filter((b) => !stale.includes(b));
     writeFileSync(path, `${src.slice(0, src.indexOf("export const BASELINE"))}export const BASELINE: readonly BindingBaselineEntry[] = ${JSON.stringify(kept, null, 2)};\n`);

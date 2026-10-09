@@ -41,9 +41,9 @@ import {
 } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
 import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.js";
-import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "@litlfred/cat-harness/scripts/concern-groups.js";
-import { packageDirsIn } from "@litlfred/cat-harness/scripts/skill-topics.js";
-import { knownSkills, workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "../concern-groups.js";
+import { packageDirsIn } from "../skill-topics.js";
+import { knownSkills, workflowFiles } from "../known-skills.js";
 import { collect as collectInstanceGraph } from "../check-instance-graph.js";
 import { collect as collectConcernGroups } from "../check-concern-groups.js";
 

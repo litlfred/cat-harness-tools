@@ -28,7 +28,7 @@ import {
   resolveCoveragePath,
   siteDirFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /**
  * A throwaway instance whose one directory carries `coverage`.

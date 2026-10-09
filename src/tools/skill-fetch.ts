@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { nodeSummary } from "@litlfred/cat-harness/scripts/front-matter.js";
+import { nodeSummary } from "../../scripts/front-matter.js";
 
 // Session-level cache (lives for the lifetime of the MCP server process)
 const skillCache = new Map<string, { content: string; fetchedAt: number }>();
@@ -72,8 +72,8 @@ const REFERENCE_PACKAGES: Record<string, { repo: string; ref: string; skills: Re
 // reachable when something can SERVE it. `scripts/kg-audit.ts` reads this table
 // rather than keeping its own copy, so a package added here cannot be reported
 // as unreachable, and one removed here cannot pass.
-export { discoverLocalPackages, LOCAL_PACKAGES } from "@litlfred/cat-harness/scripts/skill-packages.js";
-import { LOCAL_PACKAGES } from "@litlfred/cat-harness/scripts/skill-packages.js";
+export { discoverLocalPackages, LOCAL_PACKAGES } from "../../scripts/skill-packages.js";
+import { LOCAL_PACKAGES } from "../../scripts/skill-packages.js";
 
 
 /** A servable skill: its id, and what it says it is — when it says anything. */

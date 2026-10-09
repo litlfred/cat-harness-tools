@@ -11,7 +11,7 @@
 import { describe, expect, it } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { pageHtml, readDocumentKinds } from "@litlfred/cat-harness/scripts/gen-document-kinds-viz.ts";
+import { pageHtml, readDocumentKinds } from "../../scripts/gen-document-kinds-viz.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

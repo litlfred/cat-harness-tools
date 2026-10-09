@@ -13,8 +13,8 @@ import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
-import { buildExport } from "@litlfred/cat-harness/scripts/kg-export.js";
-import { declaresOwnCanonical } from "@litlfred/cat-harness/scripts/instance-exports.js";
+import { buildExport } from "../../scripts/kg-export.js";
+import { declaresOwnCanonical } from "../../scripts/instance-exports.js";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 

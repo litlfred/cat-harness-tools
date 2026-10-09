@@ -24,8 +24,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { WORKFLOW_DIR } from "@litlfred/cat-harness/src/workflow/store.js";
-import { MOUNT_MARKER_SCHEMA, markerPath } from "@litlfred/cat-harness/scripts/branch-store.ts";
+import { WORKFLOW_DIR } from "../../src/workflow/store.js";
+import { MOUNT_MARKER_SCHEMA, markerPath } from "../branch-store.ts";
 import { beansYmlPath, checkHarnessDirs } from "../check-harness-dirs.js";
 import { readHarnessConfig, resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 import {
@@ -35,9 +35,9 @@ import {
   noteBean,
   readStoreConfig,
   updateBean,
-} from "@litlfred/cat-harness/scripts/beans-fallback.js";
+} from "../beans-fallback.js";
 import { repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { configNameFor, writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { configNameFor, writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 // The REPOSITORY root, and it has to be said out loud now: `"..", ".."` from
 // here reaches the INSTANCE, and this file's subject — `.beans.yml`, `beans/`

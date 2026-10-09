@@ -36,7 +36,7 @@
  * @covers qa
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { noteAbsent, splitDeclared } from "@litlfred/cat-harness/scripts/lib/declared-presence.ts";
+import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 

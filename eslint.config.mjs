@@ -83,7 +83,7 @@ export default tseslint.config(
       // value is matching its upstream, and it is a Liquid template — Jekyll
       // front matter and `{% %}` tags — that eslint cannot parse at all
       // ("Parsing error: Expression expected" at 1:2). Its behaviour is pinned
-      // by `cat-harness/test/search-lazy.e2e.ts`, which renders it through
+      // by `cat-harness-tools/test/search-lazy.e2e.ts`, which renders it through
       // Liquid and runs it.
       "cat-harness/docs/assets/js/just-the-docs.js",
     ],

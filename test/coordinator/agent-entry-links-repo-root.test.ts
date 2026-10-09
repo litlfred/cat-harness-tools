@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { parseLinks } from "@litlfred/cat-harness/src/core/markdown-links.js";
+import { parseLinks } from "../../src/core/markdown-links.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**

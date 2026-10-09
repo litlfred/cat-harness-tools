@@ -17,7 +17,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { runReadmeSync, SECTIONS } from "@litlfred/cat-harness/content/pipeline/readme-sections.ts";
+import { runReadmeSync, SECTIONS } from "../../content/pipeline/readme-sections.ts";
 
 export function registerReadmeSyncTools(server: McpServer): void {
   const markers = SECTIONS.map((s) => s.marker);

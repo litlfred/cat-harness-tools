@@ -38,7 +38,7 @@ import {
   SIDECAR_STEM,
   type PendingEntry,
 } from "../check-reference-direction.ts";
-import { judgeQaResult, qaResultPath, writeQaResult, type QaResult } from "@litlfred/cat-harness/scripts/qa-results.ts";
+import { judgeQaResult, qaResultPath, writeQaResult, type QaResult } from "../qa-results.ts";
 
 // ── The rule, with no filesystem ────────────────────────────────
 

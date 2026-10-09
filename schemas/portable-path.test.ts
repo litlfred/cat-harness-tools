@@ -6,9 +6,9 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { scriptSidecarPath } from "@litlfred/cat-harness/content/pipeline/qa-utils.ts";
-import { detailFileName, detailRelPath } from "@litlfred/cat-harness/scripts/agent-memory.ts";
-import { stickyFile } from "@litlfred/cat-harness/scripts/ensure-landing-sticky.ts";
+import { scriptSidecarPath } from "../content/pipeline/qa-utils.ts";
+import { detailFileName, detailRelPath } from "../scripts/agent-memory.ts";
+import { stickyFile } from "../scripts/ensure-landing-sticky.ts";
 import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { portableSegment, unportablePath, unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 
@@ -99,7 +99,7 @@ describe("the id-to-filename composers, as a class", () => {
   test("every composer encodes, so no id can compose an uncheckable name", () => {
     const hostile = "req:x";
     expect(scriptSidecarPath(hostile, "/repo")).toBe(
-      join("/repo", "content/pipeline/script-sidecars", "req%3Ax.script.json"),
+      join("/repo", "test/results/script-sidecars", "req%3Ax.script.json"),
     );
     expect(stickyFile(hostile)).toBe("req%3Ax.json");
     expect(detailFileName(hostile)).toBe("req%3Ax.md");
@@ -114,7 +114,7 @@ describe("the id-to-filename composers, as a class", () => {
     // slug, so no committed sidecar, sticky or detail file changes path. If
     // this fails, the change is a silent mass rename rather than a guard.
     expect(scriptSidecarPath("lean-mirror-drift", "/repo")).toBe(
-      join("/repo", "content/pipeline/script-sidecars", "lean-mirror-drift.script.json"),
+      join("/repo", "test/results/script-sidecars", "lean-mirror-drift.script.json"),
     );
     expect(stickyFile("getting-started")).toBe("getting-started.json");
     expect(detailFileName("kg-audit-baseline")).toBe("kg-audit-baseline.md");

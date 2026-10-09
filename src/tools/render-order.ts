@@ -17,7 +17,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { instanceRootFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { runPipeline } from "@litlfred/cat-harness/scripts/render-pipeline.js";
+import { runPipeline } from "../../scripts/render-pipeline.js";
 
 export function registerRenderOrderTools(server: McpServer): void {
   server.tool(

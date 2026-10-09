@@ -58,7 +58,7 @@ import { join, relative, resolve } from "node:path";
 
 import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
-import { checkerHash } from "@litlfred/cat-harness/test/health/run.js";
+import { checkerHash } from "../test/health/run.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -70,8 +70,8 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.js";
-import { readQaTree } from "@litlfred/cat-harness/scripts/qa-store.js";
+} from "./qa-results.js";
+import { readQaTree } from "./qa-store.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { parse as parseYaml } from "yaml";

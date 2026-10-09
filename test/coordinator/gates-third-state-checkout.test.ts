@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
 
-import { loadGates } from "@litlfred/cat-harness/scripts/gates.ts";
+import { loadGates } from "../../scripts/gates.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

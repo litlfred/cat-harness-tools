@@ -16,7 +16,7 @@ import {
   CONTENT_ADAPTERS,
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
+import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {
   ContributionRegistry,

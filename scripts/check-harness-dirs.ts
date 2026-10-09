@@ -48,8 +48,8 @@ import {
   nodeOfKind,
   parseBeanGraph,
 } from "@litlfred/cat-harness/schemas/bean-graph.ts";
-import { WORKFLOW_DIR } from "@litlfred/cat-harness/src/workflow/store.js";
-import { graphReadPath } from "@litlfred/cat-harness/scripts/graph-read.ts";
+import { WORKFLOW_DIR } from "../src/workflow/store.js";
+import { graphReadPath } from "./graph-read.ts";
 
 export interface HarnessDirsReport {
   /** A parseable `beans/beans.json` was found. */

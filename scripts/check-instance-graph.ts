@@ -73,7 +73,7 @@ export type IriOf = (root: string) => string | undefined;
 
 /** The exporter's own answer, loaded lazily: `kg-export` is a large module. */
 async function exporterIri(): Promise<IriOf> {
-  const { exportIdentity } = await import("@litlfred/cat-harness/scripts/kg-export.js");
+  const { exportIdentity } = await import("./kg-export.js");
   return (root) => exportIdentity({ instanceRoot: root }).canonicalIri;
 }
 

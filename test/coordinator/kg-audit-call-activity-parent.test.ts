@@ -24,7 +24,7 @@ const REPO = resolve(ORIGIN_DIR, "../../..");
 describe("kg-audit: call-activity-resolves across repository instances (bean `t5j5`)", () => {
   test("a call activity whose target resolves from the parent root is a PASS with hosting instance evidence", async () => {
     const p = Bun.spawn(
-      ["bun", "run", "cat-harness/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
+      ["bun", "run", "cat-harness-tools/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
       { cwd: REPO, stdout: "pipe", stderr: "pipe" },
     );
     const out = await new Response(p.stdout).text();
@@ -44,7 +44,7 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
 
   test("a call activity whose targets are all local resolves as a PASS with empty findings", async () => {
     const p = Bun.spawn(
-      ["bun", "run", "cat-harness/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
+      ["bun", "run", "cat-harness-tools/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
       { cwd: REPO, stdout: "pipe", stderr: "pipe" },
     );
     const out = await new Response(p.stdout).text();
@@ -78,7 +78,7 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
     try {
       writeFileSync(testBpmn, bpmnContent);
       const p = Bun.spawn(
-        ["bun", "run", "cat-harness/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
+        ["bun", "run", "cat-harness-tools/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
         { cwd: REPO, stdout: "pipe", stderr: "pipe" },
       );
       const out = await new Response(p.stdout).text();
@@ -102,7 +102,7 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
     try {
       writeFileSync(testBpmn, "<not-valid-xml");
       const p = Bun.spawn(
-        ["bun", "run", "cat-harness/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
+        ["bun", "run", "cat-harness-tools/scripts/kg-audit.ts", "--instance", "./folio-assistant-core", "--check", "--json"],
         { cwd: REPO, stdout: "pipe", stderr: "pipe" },
       );
       const out = await new Response(p.stdout).text();

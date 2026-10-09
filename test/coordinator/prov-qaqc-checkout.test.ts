@@ -15,7 +15,7 @@ import {
   outputs,
   staleness,
   totals,
-} from "@litlfred/cat-harness/scripts/prov-qaqc.js";
+} from "../../scripts/prov-qaqc.js";
 
 describe("prov-qaqc: the real repository", () => {
   test("vacuity guard: the committed instances yield more than zero activities, all valid", async () => {

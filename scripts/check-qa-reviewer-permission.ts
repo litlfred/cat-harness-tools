@@ -73,11 +73,11 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { join, relative } from "node:path";
 
 import type { QaCriterionEntry, QaReviewer } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { isCheckerWitness, isCouldNotDispatch } from "@litlfred/cat-harness/content/pipeline/untainted-verification.ts";
+import { isCheckerWitness, isCouldNotDispatch } from "../content/pipeline/untainted-verification.ts";
 import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { vacuityRefusal, type Source } from "@litlfred/cat-harness/scripts/vacuity-refusal.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const ACTOR_DIR = actorsDir(ROOT) ?? (() => { throw new Error("the platform declares no `scenarios` graph, so the actor registry (bean rqao) has no home to read"); })();
@@ -93,7 +93,7 @@ const RESULTS = join(ROOT, "cat-harness", "test", "results");
 function attestationsDir(): string | undefined {
   return directoryForGraph(join(ROOT, "cat-harness"), "attestations");
 }
-const BASELINE = join(HARNESS_ROOT, "scripts", "qa-reviewer-permission-baseline.json");
+const BASELINE = join(TOOLS_ROOT, "scripts", "qa-reviewer-permission-baseline.json");
 const PERMISSION = "qa-reporting";
 
 export type Outcome = "permitted" | "forbidden" | "unresolved";

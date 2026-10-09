@@ -36,7 +36,7 @@ import {
   ComputationWitnessSchema,
   WITNESS_SUFFIX,
 } from "@litlfred/cat-harness/schemas/computation-witness.ts";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
+import { findContentRepoRoot } from "../content/pipeline/repo-root.ts";
 
 export interface ConformanceReport {
   directories: string[];

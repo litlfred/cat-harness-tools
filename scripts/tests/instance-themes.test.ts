@@ -28,14 +28,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { coversIn } from "@litlfred/cat-harness/scripts/audit-coverage.js";
+import { coversIn } from "../audit-coverage.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const SCRIPT = join("cat-harness-tools", "scripts", "check-instance-themes.ts");
 // Scripts live in TWO directories while the 70lx split is in flight: the
 // harness's and, once moved, the tools layer's. A claim is about a script,
 // not about which directory it currently sits in, so both are scanned.
-const SCRIPTS_DIRS = [join(REPO, "cat-harness", "scripts"), join(REPO, "cat-harness-tools", "scripts")];
+const SCRIPTS_DIRS = [join(REPO, "cat-harness", "scripts"), join(REPO, "cat-harness-tools", "scripts")].filter((d) => existsSync(d));
 const scriptPath = (file: string): string => SCRIPTS_DIRS.map((d) => join(d, file)).find((p) => existsSync(p)) ?? join(SCRIPTS_DIRS[0]!, file);
 
 function run(...args: string[]): { status: number; out: string } {

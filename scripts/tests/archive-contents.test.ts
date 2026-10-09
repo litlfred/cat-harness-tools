@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/archive-contents.ts";
-import { checkAll, checkEntry } from "@litlfred/cat-harness/scripts/check-l1-complete.ts";
-import { planFor, sniffMimetype } from "@litlfred/cat-harness/scripts/ingest-document.ts";
+import { checkAll, checkEntry } from "../check-l1-complete.ts";
+import { planFor, sniffMimetype } from "../ingest-document.ts";
 
 // The harness: the Python scripts it spawns stayed there; this test moved up in 70lx B2b.
 const ROOT = HARNESS_ROOT;
@@ -48,7 +48,7 @@ function fixtures(): { dir: string; zip: string; tgz: string } {
 }
 
 function listed(archive: string, out: string): ReturnType<typeof ArchiveContentsSchema.safeParse> {
-  const r = Bun.spawnSync(["python3", "scripts/archive-contents.py", "-o", out, archive], { cwd: ROOT });
+  const r = Bun.spawnSync(["python3", join(TOOLS_ROOT, "scripts/archive-contents.py"), "-o", out, archive], { cwd: ROOT });
   if (r.exitCode !== 0) throw new Error(new TextDecoder().decode(r.stderr));
   const slug = archive.endsWith(".zip") ? "t" : "ttar";
   return ArchiveContentsSchema.safeParse(JSON.parse(readFileSync(join(out, slug, "contents.jsonld"), "utf-8")));
@@ -115,7 +115,7 @@ describe("one schema, whatever the container", () => {
     const f = fixtures();
     const notArchive = join(f.dir, "plain.zip");
     writeFileSync(notArchive, "I am not a zip, whatever my name says");
-    const r = Bun.spawnSync(["python3", "scripts/archive-contents.py", "-o", join(f.dir, "lib"), notArchive], {
+    const r = Bun.spawnSync(["python3", join(TOOLS_ROOT, "scripts/archive-contents.py"), "-o", join(f.dir, "lib"), notArchive], {
       cwd: ROOT,
     });
     expect(r.exitCode).not.toBe(0);
@@ -273,7 +273,7 @@ describe("the real corpus", () => {
 
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-context-emission.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 describe("the archive record is JSON-LD a processor keeps whole", () => {
   test("the arm emits the published context, and every key is a declared term", () => {

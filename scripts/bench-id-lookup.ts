@@ -193,7 +193,7 @@ export interface BrowserReport {
 
 async function browserRun(dir: string, ids: string[]): Promise<BrowserReport[]> {
   const { chromium } = await import("playwright");
-  const { resolveChromium } = await import("@litlfred/cat-harness/scripts/playwright-chromium.js");
+  const { resolveChromium } = await import("./playwright-chromium.js");
   const choice = resolveChromium(process.env as Record<string, string | undefined>);
   const server = Bun.serve({
     port: 0,

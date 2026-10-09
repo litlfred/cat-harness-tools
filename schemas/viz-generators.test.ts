@@ -22,11 +22,11 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { viewerHtml as schemaViewer, viewerPlacement } from "@litlfred/cat-harness/scripts/gen-schema-viz.ts";
-import { unscopedSelectors } from "@litlfred/cat-harness/scripts/lib/themed-page.ts";
-import { viewerHtml as libraryShell, VIEWER_CSS, VIEWER_JS } from "@litlfred/cat-harness/scripts/gen-library-viz.ts";
-import { readSchemaGraph } from "@litlfred/cat-harness/scripts/schema-graph.ts";
-import { readLibraryGraph } from "@litlfred/cat-harness/scripts/library-graph.ts";
+import { viewerHtml as schemaViewer, viewerPlacement } from "../scripts/gen-schema-viz.ts";
+import { unscopedSelectors } from "../scripts/lib/themed-page.ts";
+import { viewerHtml as libraryShell, VIEWER_CSS, VIEWER_JS } from "../scripts/gen-library-viz.ts";
+import { readSchemaGraph } from "../scripts/schema-graph.ts";
+import { readLibraryGraph } from "../scripts/library-graph.ts";
 import { directoriesForGraph, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const ROOT = HARNESS_ROOT;

@@ -17,12 +17,12 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { resolve, join } from "path";
 
-import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
-import { checkerFunctionName } from "@litlfred/cat-harness/content/pipeline/qa-checker-discovery.ts";
+import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
+import { checkerFunctionName } from "../../content/pipeline/qa-checker-discovery.ts";
 import {
   isCriterionSourceMiss,
   resolveCriterionSource,
-} from "@litlfred/cat-harness/content/pipeline/criterion-source.ts";
+} from "../../content/pipeline/criterion-source.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {

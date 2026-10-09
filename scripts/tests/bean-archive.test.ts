@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { afterAll, expect, test } from "bun:test";
 
 import { nonTerminal, ROOT, TERMINAL } from "../check-bean-archive.js";
-import { beanDefsDir, readArchivedBeans, readBeans, resolveBeanArchive } from "@litlfred/cat-harness/scripts/beans.js";
+import { beanDefsDir, readArchivedBeans, readBeans, resolveBeanArchive } from "../beans.js";
 
 const scratches: string[] = [];
 afterAll(() => {

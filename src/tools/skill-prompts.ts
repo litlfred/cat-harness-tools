@@ -31,15 +31,15 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync } from "node:fs";
 
-import { LOCAL_PACKAGES } from "@litlfred/cat-harness/scripts/skill-packages.js";
+import { LOCAL_PACKAGES } from "../../scripts/skill-packages.js";
 
 export {
   declaresUserInvocable,
   userInvocableSkills,
   type InvocableSkill,
   type InvocableSkillList,
-} from "@litlfred/cat-harness/scripts/invocable-skills.js";
-import { type InvocableSkill, userInvocableSkills } from "@litlfred/cat-harness/scripts/invocable-skills.js";
+} from "../../scripts/invocable-skills.js";
+import { type InvocableSkill, userInvocableSkills } from "../../scripts/invocable-skills.js";
 
 /** The message a prompt sends: the skill's own body, plus whatever the person typed after it. */
 export function promptText(skill: InvocableSkill, args?: string): string {

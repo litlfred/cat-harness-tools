@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { avatarFor } from "@litlfred/cat-harness/schemas/avatars.ts";
-import { KIND_TABLE_DOC, KIND_TABLE_HEADER } from "@litlfred/cat-harness/scripts/kind-table.ts";
+import { KIND_TABLE_DOC, KIND_TABLE_HEADER } from "../kind-table.ts";
 import { STEPS, authoredGaps, hueReport } from "../kind-register.ts";
 
 /**

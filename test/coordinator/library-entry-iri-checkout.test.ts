@@ -13,7 +13,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { entryView, instanceRootRoutes } from "@litlfred/cat-harness/scripts/gen-library-viz.ts";
+import { entryView, instanceRootRoutes } from "../../scripts/gen-library-viz.ts";
 import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { libraryAssetIri, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";

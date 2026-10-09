@@ -28,8 +28,8 @@ import { resolve } from "node:path";
 import { resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
-import { readInstances } from "@litlfred/cat-harness/scripts/check-import-direction.ts";
-import { readDocumentKinds } from "@litlfred/cat-harness/scripts/gen-document-kinds-viz.ts";
+import { readInstances } from "./check-import-direction.ts";
+import { readDocumentKinds } from "./gen-document-kinds-viz.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

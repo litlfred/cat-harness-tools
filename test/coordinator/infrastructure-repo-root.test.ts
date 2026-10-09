@@ -15,9 +15,9 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { INSTANCE_ROOT, REPO_ROOT } from "@litlfred/cat-harness/scripts/tests/helpers.ts";
+import { INSTANCE_ROOT, REPO_ROOT } from "../../scripts/tests/helpers.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { folioTemplates } from "@litlfred/cat-harness/scripts/init-folio.ts";
+import { folioTemplates } from "../../scripts/init-folio.ts";
 
 /**
  * The workflows that run in the paper-assistant container: the platform's

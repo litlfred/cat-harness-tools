@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { libraryEntry } from "@litlfred/cat-harness/scripts/tests/library-dirs.ts";
+import { libraryEntry } from "../../scripts/tests/library-dirs.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

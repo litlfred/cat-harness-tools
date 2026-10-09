@@ -11,7 +11,7 @@
  * a 404). The same renderer drew every panel in every family, so it was every
  * link. It was wrong twice: the path lacked `cat-harness/`, and a derived
  * result's record is the `qa-reports` branch, keyed by commit, not `main`.
- * The address now comes from ONE place, `cat-harness/scripts/qa-result-link.ts`.
+ * The address now comes from ONE place, `cat-harness-tools/scripts/qa-result-link.ts`.
  * This gate keeps a second one from appearing.
  *
  * ## What it judges
@@ -56,7 +56,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { resolveQaLocation } from "@litlfred/cat-harness/scripts/qa-store.ts";
+import { resolveQaLocation } from "./qa-store.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 export interface QaDirDecl {

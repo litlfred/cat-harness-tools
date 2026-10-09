@@ -13,7 +13,7 @@ import {
   queryBeanStore,
   formatTable,
   NAMED_QUERIES
-} from "@litlfred/cat-harness/scripts/beans-query.ts";
+} from "../../scripts/beans-query.ts";
 
 export function registerBeanQueryTool(server: McpServer, repoRoot: string): void {
   server.tool(

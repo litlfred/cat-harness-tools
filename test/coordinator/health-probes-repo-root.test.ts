@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "bun:test";
 
-import { probeBeans } from "@litlfred/cat-harness/test/health/probes.ts";
+import { probeBeans } from "../health/probes.ts";
 
 /**
  * The directory this test was written in (`cat-harness/test/health/`): every path below

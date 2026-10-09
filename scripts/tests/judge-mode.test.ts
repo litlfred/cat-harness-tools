@@ -36,14 +36,14 @@ import {
   qaResultPath,
   unknownFlags,
   type Judgement,
-} from "@litlfred/cat-harness/scripts/qa-results.ts";
+} from "../qa-results.ts";
 import { checkWireframes, judgeWireframes, type WireframeReport } from "../check-wireframes.ts";
 import { checkLayoutNorms, judgeLayoutNorms } from "../check-layout-norms.ts";
 import { checkRenderedLabels, judgeRenderedLabels } from "../check-rendered-labels.ts";
 import { checkSourceLicence, judgeSourceLicence } from "../check-source-licence.ts";
-import { checkMethodologyEvidence, judgeMethodologyEvidence } from "@litlfred/cat-harness/scripts/check-methodology-evidence.ts";
+import { checkMethodologyEvidence, judgeMethodologyEvidence } from "../check-methodology-evidence.ts";
 import { checkLanes, judgeLaneDocumentation } from "../check-lane-documentation.ts";
-import { judgeKgExport } from "@litlfred/cat-harness/scripts/kg-export.ts";
+import { judgeKgExport } from "../kg-export.ts";
 import { coverage, judgeAvatarCoverage, trashDerivationPresent } from "../check-avatar-coverage.ts";
 import {
   healthProducerCurrent,
@@ -53,7 +53,7 @@ import {
   todoProcessRefs,
   type Family,
 } from "../check-harness-state.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 // The harness owns the sidecars and baselines; this test moved up in 70lx B2b.
@@ -223,7 +223,7 @@ describe("check:layout-norms", () => {
   // (`smart-base/methodologies` contains `…/processes`), so as for wireframes
   // the CLI half asserts agreement and no write.
   test("CLI judge mode writes nothing — not the sidecar, not the baseline", () => {
-    const baseline = join(INSTANCE_ROOT, "scripts", "layout-norms-baseline.json");
+    const baseline = join(TOOLS_ROOT, "scripts", "layout-norms-baseline.json");
     const before = readFileSync(baseline, "utf-8");
     const run = judgeRun("check-layout-norms.ts", "layout-norms");
     expect(run.wrote).toBe(false);

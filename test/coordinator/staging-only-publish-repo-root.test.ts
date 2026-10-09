@@ -19,8 +19,8 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { compose, isWithheld, withheldFromCanonical } from "@litlfred/cat-harness/scripts/compose-docs.js";
-import { gutsDir, gutsFiles, pageRelPath } from "@litlfred/cat-harness/scripts/gen-fsh-guts-viz.js";
+import { compose, isWithheld, withheldFromCanonical } from "../../scripts/compose-docs.js";
+import { gutsDir, gutsFiles, pageRelPath } from "../../scripts/gen-fsh-guts-viz.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

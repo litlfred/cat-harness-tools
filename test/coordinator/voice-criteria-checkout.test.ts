@@ -16,12 +16,12 @@ import {
   QA_CRITERIA_REGISTRY,
   qaCriteriaFor,
   qaCriteriaByIdFor,
-} from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
+} from "../../content/pipeline/qa-criteria-registry.ts";
 import {
   judgesBlocks,
   shippedVoices,
   voiceOverlayCriteria,
-} from "@litlfred/cat-harness/content/pipeline/voice-criteria.ts";
+} from "../../content/pipeline/voice-criteria.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

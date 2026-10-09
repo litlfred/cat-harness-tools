@@ -26,13 +26,13 @@ const FAMILIES = {
   "lake-cache": {
     names: ["cat/folio-assistant-sci/lake-cache", "cat-lake-cache", "lake-cache"],
     files: [
-      "cat-harness/scripts/lake-cache.sh",
-      "cat-harness/scripts/lake-cache-fetch.sh",
-      "cat-harness/scripts/lake-cache-fetch-multi.py",
-      "cat-harness/scripts/lake-cache-produce.py",
-      "cat-harness/scripts/reseed-lean-cache.sh",
+      "cat-harness-tools/scripts/lake-cache.sh",
+      "cat-harness-tools/scripts/lake-cache-fetch.sh",
+      "cat-harness-tools/scripts/lake-cache-fetch-multi.py",
+      "cat-harness-tools/scripts/lake-cache-produce.py",
+      "cat-harness-tools/scripts/reseed-lean-cache.sh",
       ".github/actions/lake-cache-restore/action.yml",
-      "cat-harness/templates/paper/github/actions/lake-cache-restore/action.yml",
+      "cat-harness-tools/templates/paper/github/actions/lake-cache-restore/action.yml",
     ],
   },
   "fhir-ast": {
@@ -62,7 +62,7 @@ describe("cache scripts carry the same built-in fallback names, in the same orde
   // The order matters where the list is written as one literal. Pinned on the
   // two literals a reader would copy: lake-cache.sh's and ig-cache.sh's.
   test("lake-cache.sh's fallback list is newest first", () => {
-    const text = readFileSync(resolve(REPO, "cat-harness/scripts/lake-cache.sh"), "utf-8");
+    const text = readFileSync(resolve(REPO, "cat-harness-tools/scripts/lake-cache.sh"), "utf-8");
     expect(text).toContain('CACHE_PREFIX="cat/folio-assistant-sci/lake-cache"');
     expect(text).toContain('LEGACY_CACHE_PREFIXES="cat-lake-cache lake-cache"');
   });

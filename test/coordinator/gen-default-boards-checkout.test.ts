@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 import { BoardSchema } from "@litlfred/cat-harness/schemas/board.js";
 import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { boardsDir, harnessesOwedABoard } from "@litlfred/cat-harness/scripts/gen-default-boards.js";
+import { boardsDir, harnessesOwedABoard } from "../../scripts/gen-default-boards.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

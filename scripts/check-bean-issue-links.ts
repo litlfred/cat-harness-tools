@@ -39,7 +39,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { OPEN_STATUSES, readBeanFiles } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+import { OPEN_STATUSES, readBeanFiles } from "./bean-store-read.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";

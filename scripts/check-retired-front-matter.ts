@@ -40,8 +40,8 @@ import { Glob } from "bun";
 
 import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
 import { checkoutRootFor, repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { exitUnlessMounted } from "@litlfred/cat-harness/scripts/branch-store.ts";
-import { kgRoots } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { exitUnlessMounted } from "./branch-store.ts";
+import { kgRoots } from "./known-skills.ts";
 import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 const INSTANCE = HARNESS_ROOT;

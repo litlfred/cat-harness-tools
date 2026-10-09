@@ -63,7 +63,7 @@
  * terminal beans with its own declaration and its own reader) does not fold
  * into this count. Re-globbing the directory here would have picked it up.
  */
-import { readBeans } from "@litlfred/cat-harness/scripts/beans.ts";
+import { readBeans } from "./beans.ts";
 
 const BEAN_ID = "folio-assistant-[a-z0-9]{4}";
 

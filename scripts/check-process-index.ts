@@ -49,10 +49,10 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { workflowFiles } from "./known-skills.ts";
 import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
 import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { framedInstances as framedRoots, subgraphOutDir } from "@litlfred/cat-harness/scripts/gen-subgraph-jsonld.ts";
+import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { buildSubgraphs, publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 

@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 
 import { buildReport } from "../check-actor-reach";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 
 type Actor = Record<string, unknown>;

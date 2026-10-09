@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { TASK_IO } from "@litlfred/cat-harness/scripts/task-io.ts";
+import { TASK_IO } from "../../scripts/task-io.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */

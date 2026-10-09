@@ -78,9 +78,9 @@ import {
   type ViewerNavPage,
   type ViewerNavQa,
 } from "@litlfred/cat-harness/schemas/viewer-nav-qa.ts";
-import { declinesNavbar, isStandalonePage, sitePathForPage } from "@litlfred/cat-harness/scripts/viewer-page.ts";
-import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "@litlfred/cat-harness/scripts/lib/harness-rail.ts";
-import { againstOrUsage, qaResultsFile, readBaseline } from "@litlfred/cat-harness/scripts/qa-results.ts";
+import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
+import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
+import { againstOrUsage, qaResultsFile, readBaseline } from "./qa-results.ts";
 
 const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);

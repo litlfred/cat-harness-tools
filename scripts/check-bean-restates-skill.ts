@@ -166,7 +166,7 @@
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-import { OPEN_STATUSES, readBeanStore, type BeanFile } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+import { OPEN_STATUSES, readBeanStore, type BeanFile } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

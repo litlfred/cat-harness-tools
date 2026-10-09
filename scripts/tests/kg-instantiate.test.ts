@@ -10,11 +10,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { sweep } from "../check-instance-config.ts";
-import { harnessTiles } from "@litlfred/cat-harness/scripts/harness-tiles.ts";
-import { harnessHome, instantiate, stateDirectoriesOf, unsafePathReason } from "@litlfred/cat-harness/scripts/kg-instantiate.ts";
-import { subscribedHarnesses, subscribedTile } from "@litlfred/cat-harness/scripts/subscribed-harnesses.ts";
-import { type RootFetcher, setTopLevelKey, subscribe } from "@litlfred/cat-harness/scripts/kg-subscribe.ts";
-import { render, subscriptionCards } from "@litlfred/cat-harness/scripts/subscriptions-viz.ts";
+import { harnessTiles } from "../harness-tiles.ts";
+import { harnessHome, instantiate, stateDirectoriesOf, unsafePathReason } from "../kg-instantiate.ts";
+import { subscribedHarnesses, subscribedTile } from "../subscribed-harnesses.ts";
+import { type RootFetcher, setTopLevelKey, subscribe } from "../kg-subscribe.ts";
+import { render, subscriptionCards } from "../subscriptions-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";

@@ -55,8 +55,8 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.ts";
-import { withViewers } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
+} from "./qa-results.ts";
+import { withViewers } from "./viewer-declarations.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
