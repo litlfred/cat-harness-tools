@@ -74,6 +74,15 @@
       "graphTypologies": [
         "code"
       ]
+    },
+    {
+      "id": "beans",
+      "path": "beans/",
+      "scope": "repository",
+      "description": "The work plan for cat-harness-tools.",
+      "graphTypologies": [
+        "beans"
+      ]
     }
   ],
   "assets": [
