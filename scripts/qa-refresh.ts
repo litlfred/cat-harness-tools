@@ -172,7 +172,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },
   {
     id: "qa-sweep:docs",
-    run: ["cat-harness/content/pipeline/qa-sweep.ts", "cat-harness/content/docs"],
+    run: ["cat-harness/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
     writes: [`${R}/block-qa/**`],
     // declared-path-literal: the script sidecars the sweep restamps, measured from the 2026-10-07 restore log (65 of them).
     rewrites: ["cat-harness/content/pipeline/script-sidecars/*.script.json"],
