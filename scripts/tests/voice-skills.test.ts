@@ -136,9 +136,14 @@ describe("the structural half — what Zod cannot check", () => {
     });
     // The corpus must actually CONTAIN one, or this asserts nothing.
     expect(bare.length).toBeGreaterThan(0);
+    // ONE run of the checker, asked about every bare voice. It was run once
+    // PER voice: ~0.19 s a run over the composed checkout, and 43 bare voices
+    // (cat-harness and folio-assistant-core, measured 2026-10-09) made this
+    // 8.4 s against the 5 s budget — the same answer recomputed 43 times.
+    const findings = checkVoiceSkills(REPO);
     for (const v of bare) {
       expect(existsSync(join(REPO, v.path, "SKILL.md"))).toBe(false);
-      expect(checkVoiceSkills(REPO).filter((f) => f.voice === v.id)).toEqual([]);
+      expect(findings.filter((f) => f.voice === v.id)).toEqual([]);
     }
   });
 
