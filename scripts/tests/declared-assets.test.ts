@@ -7,13 +7,14 @@
  * checker" but "the file is declared, so a checker has a reason to look".
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
 import { auditInstance, isCheckable, markdownLinks } from "../check-declared-assets.js";
 import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { checkIndexRender, renderIndex } from "../../../cat-harness/scripts/index-render.js";
 
 const ROOT = resolve(import.meta.dir, "../..");
 
@@ -44,23 +45,51 @@ describe("this repository's own declarations", () => {
     }
   });
 
-  test("the provenance sits on the file bootstrap actually copies", () => {
+  test("the provenance sits on the file bootstrap actually copies — and that file is RENDERED", () => {
     // Absent `source` is a THIRD STATE — authored here — and is a different
     // fact from an upstream that cannot be reached.
     //
-    // Which file carries it moved in #592. cat-harness used to declare the
-    // REPOSITORY's AGENTS.md as its own (`scope: "repository"`) and carried
-    // the bootstrap provenance with it. Once the two were split, that
-    // provenance belonged to the repository root's file — the one bootstrap
-    // copies at initialisation — and cat-harness's own became authored in
-    // place. Both halves are asserted, because moving a `source` onto the
-    // wrong file is exactly as wrong as dropping it.
-    const boot = declaredAssets(join(repoRootFor(ROOT), "bootstrap")).find((a) => a.id === "agent-instructions");
+    // Which file carries it has moved twice. In #592 cat-harness stopped
+    // declaring the REPOSITORY's AGENTS.md as its own and the bootstrap
+    // provenance went to the root declaration's `agent-instructions` asset,
+    // because the root's is the file bootstrap copies at initialisation. Then
+    // the root stopped declaring any instance at all (owner, 2026-10-08), and
+    // the owner ruled on 2026-10-09 that the root AGENTS.md and README are
+    // RENDERED files (option a). So the provenance is no longer a `source`
+    // field anybody could forget to move: the renderer QUOTES bootstrap's
+    // AGENTS.md as the cold start and names it, and the root file is checked
+    // to be the renderer's current output. All three halves are asserted,
+    // because moving the provenance onto the wrong file is exactly as wrong as
+    // dropping it.
+    const repo = repoRootFor(ROOT);
+    const boot = declaredAssets(join(repo, "bootstrap")).find((a) => a.id === "agent-instructions");
     const harness = declaredAssets(ROOT).find((a) => a.id === "agent-instructions");
-    const repo = declaredAssets(repoRootFor(ROOT)).find((a) => a.id === "agent-instructions");
     expect(boot!.source).toBeUndefined();
     expect(harness!.source).toBeUndefined();
-    expect(repo!.source?.path).toBe("bootstrap/AGENTS.md");
+
+    // The root declares nothing, so nothing there carries a `source`...
+    expect(declaredAssets(repo)).toEqual([]);
+    // ...and the root file names bootstrap's as what it quotes, as rendered.
+    const r = renderIndex(repo);
+    if (r.state !== "ok") throw new Error(`index:render could not render: ${JSON.stringify(r)}`);
+    expect(r.files["AGENTS.md"]).toContain("](bootstrap/AGENTS.md)");
+    expect(checkIndexRender(repo)).toEqual({ state: "current" });
+  });
+
+  test("every relative link out of the rendered root files resolves", () => {
+    // What `check:declared-assets` asked of the root's DECLARED AGENTS.md and
+    // README while it had a declaration, asked of the rendered files now: a
+    // generated link is worse than a missing one, because it asserts the
+    // target exists.
+    const repo = repoRootFor(ROOT);
+    for (const f of ["AGENTS.md", "README.md", "CLAUDE.md", "GEMINI.md"]) {
+      const text = readFileSync(join(repo, f), "utf-8");
+      const dead = markdownLinks(text)
+        .filter(isCheckable)
+        .map((t) => t.split("#")[0]!)
+        .filter((t) => t !== "" && !existsSync(join(repo, decodeURI(t))));
+      expect([f, dead]).toEqual([f, []]);
+    }
   });
 });
 
