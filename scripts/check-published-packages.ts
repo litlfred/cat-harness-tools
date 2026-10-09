@@ -69,8 +69,10 @@
  * @covers cat-harness
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
+import { mountedInstanceRoots } from "../../cat-harness/schemas/remote-mount.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -116,6 +118,41 @@ export class GitUnanswerable extends Error {
   }
 }
 
+/**
+ * The manifests of each REMOTE-MOUNTED instance, for one filename.
+ *
+ * In the index checkout every layer is a mount: another repository's bytes,
+ * laid down from the lock and never tracked here, so `git ls-files` sees none
+ * of them and this check found nothing — "not a pass" by its own rule, on a
+ * checkout whose cat-harness mount carries `@litlfred/block-qa-schema`. A
+ * mount is DECLARED (the lock), so walking it is the declaration answering,
+ * as `viewer-declarations.ts` does for mounted pages. Each mount's own
+ * top-level manifest is skipped — it is that repository itself, the same
+ * reason the checkout root is — and `node_modules/`, `.venv/` and dot
+ * directories are never entered (the `ramz` rule the index read exists for).
+ */
+function mountedManifests(root: string, filename: string): string[] {
+  const out: string[] = [];
+  for (const mountRoot of mountedInstanceRoots(root).values()) {
+    const walk = (dir: string): void => {
+      let entries: import("node:fs").Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "dist") continue;
+        const abs = join(dir, e.name);
+        if (e.isDirectory()) walk(abs);
+        else if (e.name === filename && dir !== mountRoot) out.push(relative(root, abs).split(sep).join("/"));
+      }
+    };
+    walk(mountRoot);
+  }
+  return out.sort();
+}
+
 /** The manifests git accounts for, for one filename. */
 function manifests(root: string, glob: string): string[] {
   // 64 MiB for the same reason `gitCorpus` carries it: node caps a child's
@@ -141,7 +178,7 @@ function manifests(root: string, glob: string): string[] {
 export function publishablePackages(root: string = ROOT): PublishablePackage[] {
   const out: PublishablePackage[] = [];
 
-  for (const rel of manifests(root, "*package.json")) {
+  for (const rel of [...manifests(root, "*package.json"), ...mountedManifests(root, "package.json")]) {
     if (rel === "package.json") continue; // the repository itself is not published
     let raw: Record<string, unknown>;
     try {
@@ -160,7 +197,7 @@ export function publishablePackages(root: string = ROOT): PublishablePackage[] {
     });
   }
 
-  for (const rel of manifests(root, "*pyproject.toml")) {
+  for (const rel of [...manifests(root, "*pyproject.toml"), ...mountedManifests(root, "pyproject.toml")]) {
     let raw: Record<string, unknown>;
     try {
       raw = Bun.TOML.parse(readFileSync(join(root, rel), "utf-8")) as Record<string, unknown>;
