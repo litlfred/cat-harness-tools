@@ -74,7 +74,17 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { mountedInstanceRoots } from "../../cat-harness/schemas/remote-mount.ts";
 
-const ROOT = resolve(import.meta.dir, "..", "..");
+function findIndexLockRoot(): string {
+  if (existsSync(join(process.cwd(), "index.lock.json"))) return process.cwd();
+  let cur = import.meta.dir;
+  for (let i = 0; i < 6; i++) {
+    cur = dirname(cur);
+    if (existsSync(join(cur, "index.lock.json"))) return cur;
+  }
+  return resolve(import.meta.dir, "..");
+}
+
+const ROOT = findIndexLockRoot();
 
 /** Which registry a half ships to, and therefore whose tooling runs it. */
 export type Ecosystem = "npm" | "pypi";
@@ -335,7 +345,11 @@ if (import.meta.main) {
         // Reported, never passed over: whether a shipped package should have
         // this script is a question this check does not answer, and silence
         // would answer it.
-        skipped.push(`${label} (${pkg.dir}) — no \`${step.name}\` step declared`);
+        if (step.name === "build" && pkg.ecosystem === "pypi") {
+          skipped.push(`${label} (${pkg.dir}) — no \`build\` step (pure-Python hatchling; force-include schemas unverified by build)`);
+        } else {
+          skipped.push(`${label} (${pkg.dir}) — no \`${step.name}\` step declared`);
+        }
         continue;
       }
       const r =
