@@ -21,10 +21,29 @@ import { writeDeclaration } from "../../cat-harness/test/support/instance-fixtur
 const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
 
+/**
+ * A fresh directory for ONE fixture instance, alone in a private parent.
+ *
+ * Not `mkdtempSync(tmpdir())` itself: a leaf instance's checkout is its
+ * PARENT (`checkoutRootFor`), so a fixture made directly in the system temp
+ * directory is resolved as a sibling of everything else there. Measured
+ * 2026-10-09 with ~22,000 entries in `/tmp` left by other runs: one
+ * `resolveSkillDirs` took 62 s there against 0.14 s in a private parent —
+ * the 55 s "a knowledge graph NOT at skills/" timeout — and every leftover
+ * declared fixture in `/tmp` was read as part of this one's checkout. A clean
+ * CI runner hid both. The fixture now decides its own checkout.
+ */
+function fixtureRoot(prefix: string): string {
+  const parent = mkdtempSync(join(tmpdir(), prefix));
+  roots.push(parent);
+  const root = join(parent, "instance");
+  mkdirSync(root);
+  return root;
+}
+
 /** An instance whose knowledge graph sits at `kgPath` — deliberately NOT always "skills". */
 function instance(name: string, kgPath: string): string {
-  const root = mkdtempSync(join(tmpdir(), `overlay-${name}-`));
-  roots.push(root);
+  const root = fixtureRoot(`overlay-${name}-`);
   mkdirSync(join(root, kgPath), { recursive: true });
   writeDeclaration(root, JSON.stringify({
       name,
@@ -95,8 +114,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
   test("a directory declared but absent is not returned", () => {
     // `AGENTS.md`: a declared-but-absent directory is the `dh4f` defect, where
     // a consumer scans nothing and reports a clean run over it.
-    const root = mkdtempSync(join(tmpdir(), "overlay-absent-"));
-    roots.push(root);
+    const root = fixtureRoot("overlay-absent-");
     writeDeclaration(root, JSON.stringify({
         name: "absent",
         directories: [{ id: "cat-harness", path: "nope", graphTypologies: ["cat-harness"] }],
@@ -112,8 +130,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
     // `AGENTS.md`: "Absent declaration is fine — an unmigrated instance falls
     // back to today's conventions." Reading a declaration is the improvement;
     // REQUIRING one would be a breaking change wearing its clothes.
-    const root = mkdtempSync(join(tmpdir(), "overlay-undeclared-"));
-    roots.push(root);
+    const root = fixtureRoot("overlay-undeclared-");
     mkdirSync(join(root, "skills"), { recursive: true });
 
     expect(resolveSkillDirs(root)).toEqual([join(root, "skills")]);
@@ -123,16 +140,14 @@ describe("the overlay is read from declarations, not from a literal", () => {
   test("an undeclared instance with NO conventional directory yields nothing", () => {
     // Existence-filtered: a default that is not there is the `dh4f` defect,
     // where a consumer scans nothing and reports a clean run over it.
-    const root = mkdtempSync(join(tmpdir(), "overlay-bare-"));
-    roots.push(root);
+    const root = fixtureRoot("overlay-bare-");
     expect(resolveSkillDirs(root)).toEqual([]);
   });
 
   test("a directory holding more than the kg is excluded", () => {
     // `schemas/` declares ["schemas", "cat-harness"]: its .md files are
     // READMEs, so including it put 150 skills where the corpus has 149.
-    const root = mkdtempSync(join(tmpdir(), "overlay-mixed-"));
-    roots.push(root);
+    const root = fixtureRoot("overlay-mixed-");
     mkdirSync(join(root, "schemas"), { recursive: true });
     writeDeclaration(root, JSON.stringify({
         name: "mixed",

@@ -35,7 +35,6 @@ function workflow(drop: string[] = []): string {
   const lines: Record<string, string> = {
     plan: "          bun run cat-harness/scripts/instance-exports.ts --out-dir ./_site",
     "cat-harness": '          bun run cat-harness/scripts/kg-export.ts             --scope instance --out "./_site/${STUB}.jsonld"',
-    "folio-assistant": '          bun run cat-harness/scripts/kg-export.ts --instance . --out "./_site/${ROOT_STUB}/${ROOT_STUB}.jsonld"',
     bootstrap: '          bun run bootstrap-tools/scripts/export-graph.ts --root ./bootstrap --base-url "x" --out y',
   };
   return Object.entries(lines)
@@ -136,8 +135,19 @@ describe("completeness — bean 4ak5 item 5", () => {
   });
 
   test("an exemption naming no declared instance is a finding, not a pass", () => {
-    const got = incompleteExports(new Map([[DEPLOY_WORKFLOW, workflow()]]), new Set(["cat-harness", "bootstrap"]));
-    expect(got.join("\n")).toContain("`folio-assistant`, which no instance in this checkout declares");
+    // Pinned on `folio-assistant` until 2026-10-09: the case was "the declared
+    // set lacks an exempt stub", and that stub was the only one the fixed set
+    // `["cat-harness", "bootstrap"]` left out. Its exemption went with the
+    // checkout root's declaration (cat-harness 080df096), so that set lacked
+    // nothing and the case passed over no exemption at all. Asked of EVERY
+    // exemption now, so the next one removed cannot empty it again.
+    const stubs = Object.keys(PUBLISHED_ELSEWHERE);
+    expect(stubs.length).toBeGreaterThan(0);
+    for (const stub of stubs) {
+      const without = new Set([...declared].filter((s) => s !== stub));
+      const got = incompleteExports(new Map([[DEPLOY_WORKFLOW, workflow()]]), without);
+      expect(got.join("\n")).toContain(`\`${stub}\`, which no instance in this checkout declares`);
+    }
   });
 
   test("the REAL workflows are complete", () => {
