@@ -10,9 +10,11 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { basename, join, resolve } from "node:path";
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -61,7 +63,17 @@ describe("the site root is one answer, not a literal", () => {
     // is what every `@id` in the graph is minted against, so renaming it
     // renames the whole graph. Using the stub here would have made this guard
     // check `.gitignore` against a directory that does not exist, and pass.
-    const site = `${basename(ROOT)}/${siteDirFor(ROOT)}`;
+    //
+    // RESTATED for the split (2026-10-09). The repository that commits these
+    // files is no longer the checkout: cat-harness is litlfred/cat-harness,
+    // laid into the composed checkout as a REMOTE MOUNT that the index's own
+    // `.gitignore` ignores wholesale (`/cat-harness/`). Asked at the checkout
+    // root, every path below is ignored and the guard says nothing about the
+    // site root. So the question goes to the `.gitignore` of the repository
+    // that holds the site -- the instance's own, alone, in a throwaway
+    // repository -- with the paths relative to that repository's root, which
+    // is the instance root. Same eight probes, same two directions.
+    const site = siteDirFor(ROOT);
 
     // Hand-written source Jekyll serves verbatim. Ignoring these is the SILENT
     // failure: `git add` says nothing and the asset never deploys.
@@ -80,12 +92,14 @@ describe("the site root is one answer, not a literal", () => {
       `${site}/_site/probe.html`,
     ];
 
+    const own = mkdtempSync(join(tmpdir(), "site-dir-ignore-"));
+    expect(spawnSync("git", ["init", "-q"], { cwd: own }).status).toBe(0);
+    copyFileSync(join(ROOT, ".gitignore"), join(own, ".gitignore"));
     const ignored = (rel: string) =>
-      spawnSync("git", ["check-ignore", "-q", "--no-index", "--", rel], {
-        cwd: repoRootFor(ROOT),
-      }).status === 0;
+      spawnSync("git", ["check-ignore", "-q", "--no-index", "--", rel], { cwd: own }).status === 0;
 
     expect(mustBeAddable.filter(ignored)).toEqual([]);
     expect(mustBeIgnored.filter((r) => !ignored(r))).toEqual([]);
+    rmSync(own, { recursive: true, force: true });
   });
 });
