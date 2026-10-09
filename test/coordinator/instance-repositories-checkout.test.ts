@@ -31,21 +31,20 @@ describe("instance repositories — this checkout (bean 6rmv)", () => {
     expect(map.entries.map((e) => locationMismatch(e, CHECKOUT)).filter(Boolean)).toEqual([]);
   });
 
-  test("every livesAt names the checkout's own repository as host", () => {
+  test("every livesAt names the instance's OWN repository as its home", () => {
     // This compared each `livesAt` with the repository of the instance AT the
-    // checkout root. RESTATED 2026-10-09: the owner removed that declaration
-    // on 2026-10-08 (3d4caf6, "should not need folio-assistant declared at
-    // all"), so the checkout root is an index and declares no repository of
-    // its own. What still holds, and is what the comparison was for: every
-    // `livesAt` names ONE host, and that host is the checkout itself -- the
-    // repository no instance in it IS. A `livesAt` naming one of the mounted
-    // instances' repositories, or two different hosts, fails exactly as a
-    // mismatch against the root instance did.
+    // checkout root -- the host every staged instance lived in. Both premises
+    // are gone: the owner removed the root declaration (3d4caf6, 2026-10-08),
+    // and since cat-harness#15 a mounted instance's `livesAt` names its HOME,
+    // where it lives in its own repository, not the checkout that mounts it.
+    // RESTATED to that rule: no instance at the root, and every `livesAt`
+    // names the declaring instance's own repository. A `livesAt` pointing at
+    // another repository is a staged instance claiming a home it does not
+    // have, and fails here as a mismatch against the root instance did.
     expect(map.entries.some((e) => resolve(e.root) === CHECKOUT)).toBe(false);
-    const hosts = new Set(map.entries.flatMap((e) => (e.livesAt ? [e.livesAt.repository] : [])));
-    expect(hosts.size).toBe(1);
-    const own = new Set(map.entries.map((e) => e.repository));
-    expect([...hosts].filter((h) => own.has(h))).toEqual([]);
+    const withHome = map.entries.filter((e) => e.livesAt !== undefined);
+    expect(withHome.length).toBeGreaterThan(0);
+    expect(withHome.filter((e) => e.livesAt!.repository !== e.repository).map((e) => `${e.name} -> ${e.livesAt!.repository}`)).toEqual([]);
   });
 
   test("a reference resolves by owner/repo and, transitionally, by name", () => {
