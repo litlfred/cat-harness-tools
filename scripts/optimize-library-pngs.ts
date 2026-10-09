@@ -128,10 +128,12 @@ export function updateCatalogueFixity(
       const visit = (o: unknown): void => {
         if (Array.isArray(o)) return o.forEach(visit);
         if (!o || typeof o !== "object") return;
-        const rec = o as Record<string, any>;
+        type Fixity = { algorithm?: unknown; digest?: unknown; verifiedAt?: unknown };
+        type Materialization = { localPath?: unknown; bytes?: unknown; fixity?: Fixity };
+        const rec = o as Record<string, unknown> & { bytes?: unknown; materialization?: Materialization };
         const m = rec.materialization;
         const hit = m && typeof m.localPath === "string" ? want.get(resolve(root, m.localPath)) : undefined;
-        if (hit) {
+        if (m && hit) {
           const buf = readFileSync(hit.file);
           const bytes = buf.length;
           const sha256 = createHash("sha256").update(buf).digest("hex");
