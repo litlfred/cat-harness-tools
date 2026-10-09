@@ -29,6 +29,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "mcp:start": "bun run adapters/mcp-server/server.ts",
     "mcp:start:stdio": "bun run adapters/mcp-server/server.ts --stdio",
