@@ -75,7 +75,9 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.ts";
 import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */
@@ -83,14 +85,39 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const REPO = join(ORIGIN_DIR, "..", "..", "..");
 
-/** Banner lines in `HEAD`, as `HEAD:<path>:<line>`. ONE subprocess. */
+const PAGES = ["cat-harness/docs/*.md", "cat-harness/docs/**/*.md"];
+
+/**
+ * Banner lines as `<where>:<path>:<line>`, from the COMMITTED content.
+ *
+ * Restated for the split checkout: `cat-harness/docs/` is no longer tracked by
+ * this repository at all. It is a REMOTE MOUNT, laid down from
+ * `index.lock.json` at the commit the lock pins and checked against the tree
+ * digest it records, so `git grep HEAD` here finds none of it — and the
+ * vacuity guard below then fails, correctly, on a corpus it never read. A
+ * mount's bytes ARE the pinned commit's, so for a mounted page the disk is
+ * the committed content; whatever this repository does track is still read at
+ * `HEAD`, for the reason point 1 gives. ONE `git grep` either way, inside the
+ * test bodies.
+ */
 function bannerLines(): string[] {
-  const out = execFileSync(
-    "git",
-    ["grep", "-n", "Do not hand-edit", "HEAD", "--", "cat-harness/docs/*.md", "cat-harness/docs/**/*.md"],
-    { cwd: REPO, encoding: "utf-8", timeout: 60_000 },
-  );
-  return out.split("\n").filter((l) => l.includes("<!--"));
+  let tracked = "";
+  try {
+    tracked = execFileSync("git", ["grep", "-n", "Do not hand-edit", "HEAD", "--", ...PAGES], { cwd: REPO, encoding: "utf-8", timeout: 60_000 });
+  } catch (e) {
+    // `git grep` exits 1 when nothing matched — an answer, not a failure.
+    if ((e as { status?: number }).status !== 1) throw e;
+  }
+  const atHead = new Set(execFileSync("git", ["ls-files", "--", ...PAGES], { cwd: REPO, encoding: "utf-8", timeout: 60_000 }).split("\n").filter(Boolean));
+  const mounted: string[] = [];
+  for (const abs of gitCorpus(REPO, PAGES) ?? []) {
+    const rel = relative(REPO, abs);
+    if (atHead.has(rel)) continue;
+    readFileSync(abs, "utf-8").split("\n").forEach((text, i) => {
+      if (text.includes("Do not hand-edit")) mounted.push(`mount:${rel}:${i + 1}:${text}`);
+    });
+  }
+  return [...tracked.split("\n"), ...mounted].filter((l) => l.includes("<!--"));
 }
 
 /** `namespace:name` in backticks, with the page that names it. */

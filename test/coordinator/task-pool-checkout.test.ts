@@ -18,7 +18,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 describe("task-io declarations", () => {
   test("every declared script exists in package.json", async () => {
-    const { repoRootFor } = await import("../cat-harness/schemas/cat-harness.ts");
+    const { repoRootFor } = await import("../../../cat-harness/schemas/cat-harness.ts");
     const pkg = { scripts: scriptsOf(repoRootFor(join(ORIGIN_DIR, "..", ".."))) };
     for (const name of Object.keys(TASK_IO)) expect(pkg.scripts[name], `${name} is not a script`).toBeDefined();
   });

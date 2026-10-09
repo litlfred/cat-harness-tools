@@ -17,7 +17,7 @@
  * reads changed.
  */
 import { describe, expect, it } from "bun:test";
-import { resolve, join } from "node:path";
+import { relative, resolve, join } from "node:path";
 
 import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../../cat-harness/schemas/cat-harness.js";
 // Every instance's Tools, as `viewer-declarations` reads them: a viewer Tool
@@ -25,6 +25,7 @@ import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "
 // cat-harness barrel alone would report its pages as naming no renderer.
 import { tools } from "../../../cat-harness/tools/discover.js";
 import { viewerPages } from "../../../cat-harness/scripts/viewer-declarations.js";
+import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -53,8 +54,11 @@ describe("viewer Tools declare what they render", () => {
     // Since #1168 B7a-2b a directory's viewer is read from the pages, and a
     // page counts only when the Tool it names renders the directory's kind.
     // A page naming no such Tool would silently never be anybody's viewer.
-    const tracked = Bun.spawnSync(["git", "ls-files", "*.md", "*.html"], { cwd: REPO })
-      .stdout.toString().split("\n").filter(Boolean);
+    // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
+    // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+    // `ls-files` from the root lists none of their files. `gitCorpus` counts a
+    // mount's files as a submodule's were counted.
+    const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? []).map((f) => relative(REPO, f));
     const pages = viewerPages(REPO, tracked);
     expect(pages.length).toBeGreaterThan(0);
     const ids = new Set(renderers.map((t) => t.id));

@@ -17,7 +17,7 @@ describe("declared diagram paths resolve", () => {
     // `docs/process/publication-workflow.md` is a PAGE embedding three diagrams. The
     // re-render skipped it silently, and a skipped diagram is
     // indistinguishable from one that needed no work.
-    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("../cat-harness/schemas/translation-tools.ts");
+    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("../../../cat-harness/schemas/translation-tools.ts");
     const missing: string[] = [];
     for (const ct of CONTENT_TYPE_TRANSLATIONS) {
       for (const rel of ct.bpmnDiagrams ?? []) {

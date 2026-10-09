@@ -10,9 +10,10 @@
  */
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import { declarationPathIn } from "../../../cat-harness/schemas/cat-harness.js";
+import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.js";
 import { docsLayers } from "../../../cat-harness/scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../../cat-harness/scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows } from "../../../cat-harness/scripts/gen-tools-viz.js";
@@ -45,7 +46,12 @@ const entryFor = (kind: string) => (decl.directories ?? []).find((e) => (e.graph
 // tools graph's page is found by asking the pages, not the directory entry.
 const docsPagesFor = (kind: string): string[] => {
   const e = entryFor(kind)!;
-  const tracked = Bun.spawnSync(["git", "ls-files", "*.md", "*.html"], { cwd: REPO }).stdout.toString().split("\n").filter(Boolean);
+  // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
+  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored by
+  // the index repository's git, so `ls-files` from the root lists none of
+  // cat-harness's pages. `gitCorpus` counts a mount's files as a submodule's
+  // were counted, which is what "the checkout's pages" means since the split.
+  const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? []).map((f) => relative(REPO, f));
   return documentingPages(
     { instance: "cat-harness", id: e.id ?? "", graphTypologies: e.graphTypologies ?? [] },
     docsPages(REPO, tracked),
@@ -54,7 +60,7 @@ const docsPagesFor = (kind: string): string[] => {
   );
 };
 
-const { tools } = (await import("../cat-harness/tools/index.js")) as { tools: () => unknown[] };
+const { tools } = (await import("../../../cat-harness/tools/index.js")) as { tools: () => unknown[] };
 const rows = toolRows(tools());
 
 describe("the tools graph is not documented by the skills page", () => {
