@@ -1069,11 +1069,12 @@ describe("instanceRootsIn — discovered, never listed", () => {
       // it, and the voice derived from it -- KG assets, not the IG pipeline,
       // which stays `nsbb`'s question.
       "smart-base",
-      // `smart-ig`: the one sibling left of the owner's 2026-09-22 stack
-      // ruling (issue #975). `smart-l1` and `smart-dak` were retired in stage
-      // D of the smart-* separation (#1767, owner 2026-10-01): L1 and DAK are
-      // document KINDS inside smart-base, not layers.
-      "smart-ig",
+      // `smart-ig` was the one sibling left of the owner's 2026-09-22 stack
+      // ruling (issue #975) until the owner retired it too (cd8293f,
+      // 2026-10-08: "retire issue-marks, todos, patches, and smart-ig");
+      // smart-trust now needs smart-base directly. `smart-l1` and `smart-dak`
+      // went in stage D (#1767, owner 2026-10-01): L1 and DAK are document
+      // KINDS inside smart-base, not layers. It fired as designed.
       "smart-immunizations",
       "smart-trust",
       "who-iris",
