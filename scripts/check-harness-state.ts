@@ -123,9 +123,22 @@ export interface Family {
  * one tree is walked once, and the file set, since two declared directories may
  * still overlap by nesting.
  */
+/**
+ * Every root whose declaration may name a directory: each instance, AND the
+ * checkout root itself. Until the separation the checkout root WAS an instance
+ * (folio-assistant.json), and it declared `beans/`; now the index checkout
+ * declares nothing and `beans/` is declared `scope: "repository"` by
+ * cat-harness, which only a lookup FROM the checkout resolves. Asking the
+ * instances alone found no `merge-queue` or `session-survey` directory and
+ * reported both families could-not-determine over a mounted store holding them.
+ */
+function declaringRoots(): string[] {
+  return [...new Set([resolve(REPO), ...instanceRootsIn(REPO).map((r) => resolve(r))])];
+}
+
 function nodesOf(kind: string, ext: string): string[] {
   const dirs = new Set<string>();
-  for (const inst of instanceRootsIn(REPO)) for (const dir of directoriesForGraph(inst, kind)) dirs.add(resolve(dir));
+  for (const inst of declaringRoots()) for (const dir of directoriesForGraph(inst, kind)) dirs.add(resolve(dir));
   const out = new Set<string>();
   for (const dir of dirs) {
     const walk = (d: string): void => {
@@ -212,7 +225,7 @@ export function healthProducerCurrent(opts: { against?: string } = {}): Family {
   }));
   if (results.length === 0) {
     const declared = new Set<string>();
-    for (const inst of instanceRootsIn(REPO)) for (const dir of directoriesForGraph(inst, "health")) declared.add(resolve(dir));
+    for (const inst of declaringRoots()) for (const dir of directoriesForGraph(inst, "health")) declared.add(resolve(dir));
     // `health` is a kind the arc moves off `main` (`OFF_MAIN_KINDS`), so a
     // declared directory that is not here is a stored record, not a blind spot.
     const leaves = mayLeaveMain({ graphTypologies: ["health"] });
@@ -456,7 +469,7 @@ export function interactionProfilesRead(): Family {
   // directory is a declaration read from memory, and it goes stale the moment
   // anybody relocates one. It also under-searched: a literal list covers THIS
   // instance, while a profile may be honoured by a dependency's skill.
-  for (const inst of instanceRootsIn(REPO)) {
+  for (const inst of declaringRoots()) {
     for (const kind of ["cat-harness", "skills", "code", "schemas"]) {
       for (const dir of directoriesForGraph(inst, kind)) walk(dir);
     }
@@ -501,7 +514,7 @@ export function interactionProfilesRead(): Family {
  */
 function declaredDirs(kind: string): string[] | undefined {
   const dirs = new Set<string>();
-  for (const inst of instanceRootsIn(REPO)) {
+  for (const inst of declaringRoots()) {
     for (const dir of directoriesForGraph(inst, kind)) if (existsSync(dir)) dirs.add(resolve(dir));
   }
   return dirs.size === 0 ? undefined : [...dirs].sort();
