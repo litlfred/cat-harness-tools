@@ -23,7 +23,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { resolveDirectories } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories } from "../../../cat-harness/schemas/cat-harness.js";
 import {
   checkoutDependentsOf,
   checkoutDirectories,
@@ -365,8 +365,24 @@ describe("this checkout", () => {
   });
 
   test("falsifier 2: the platform resolved alone names nothing above it", () => {
+    // RESTATED 2026-10-09. The checkout-root state graphs (`beans/`, `todos/`,
+    // `fsh-guts/`, `issue-marks/`) were the ROOT instance's until the owner
+    // removed that declaration (3d4caf6, 2026-10-08); the platform declares
+    // them now, `scope: "repository"` (coordinator decision (b)), so they and
+    // their nested nodes resolve from the platform alone. They sit at the
+    // checkout root -- not inside any instance -- so they are not "above" it
+    // in the sense this falsifier means: a dependent's directory. That stays
+    // forbidden, and is checked directly: no hosted root may be an instance.
+    const hosted = (readDeclaration(PLATFORM)?.directories ?? [])
+      .filter((d) => d.scope === "repository")
+      .map((d) => d.path.replace(/\/+$/, ""));
+    expect(hosted.length).toBeGreaterThan(0);
+    const instances = new Set(instanceRootsIn(REPO).map((r) => relative(REPO, r)));
+    expect(hosted.filter((h) => instances.has(h))).toEqual([]);
     const alone = resolveDirectories(declarationChain(PLATFORM)).map((d) => relative(REPO, d.absPath));
-    const above = alone.filter((p) => !/^(cat-harness|bootstrap|bootstrap-tools)(\/|$)/.test(p));
+    const above = alone.filter(
+      (p) => !/^(cat-harness|bootstrap|bootstrap-tools)(\/|$)/.test(p) && !hosted.some((h) => p === h || p.startsWith(`${h}/`)),
+    );
     expect(above).toEqual([]);
     expect(knownSkills(PLATFORM, "instance").has("lean-formal-edges")).toBe(false);
   });

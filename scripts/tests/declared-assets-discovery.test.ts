@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredInstances } from "../check-declared-assets.js";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { readDeclaration, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, "..", ".."));
@@ -54,10 +54,14 @@ describe("instances are discovered, not listed", () => {
     expect(names).toContain("folio-assistant-core");
   });
 
-  test("the root's own declaration counts, and carrying no assets is not a finding", () => {
-    // The root became an instance during this work. It declares no assets
-    // today, and an instance with none must not read as a problem.
-    expect(declaredInstances(ROOT)).toContain(ROOT);
+  test("the root declares no instance, so it is not among them", () => {
+    // The root BECAME an instance during this work, and this asserted that it
+    // counted. RESTATED 2026-10-09: the owner removed that declaration
+    // (3d4caf6, 2026-10-08: "should not need folio-assistant declared at
+    // all"), so the checkout root is an index and discovery must not invent an
+    // instance there. Discovered, not listed, in both directions.
+    expect(readDeclaration(ROOT)).toBeUndefined();
+    expect(declaredInstances(ROOT)).not.toContain(ROOT);
   });
 
   test("a directory with no harness.json is NOT an instance", () => {

@@ -55,7 +55,7 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { orderedDependencies } from "../../cat-harness/schemas/harness-config.js";
 import { docsPages, documentingPages } from "../../cat-harness/scripts/docs-declarations.js";
@@ -81,6 +81,7 @@ import {
   visualisationResolves,
 } from "../../cat-harness/schemas/cat-harness.js";
 import { withViewers } from "../../cat-harness/scripts/viewer-declarations.js";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 
 /** The three obligations, in the order the owner named them. */
 export const CRITERIA = ["visualiser", "docs", "skill", "serialisations"] as const;
@@ -401,10 +402,15 @@ const trackedCache = new Map<string, string[]>();
 function trackedFiles(repoRoot: string): string[] {
   let files = trackedCache.get(repoRoot);
   if (!files) {
-    const ls = Bun.spawnSync(["git", "ls-files"], { cwd: repoRoot });
+    // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
+    // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+    // by the index repository's git, so `ls-files` at the root lists none of
+    // their files. `gitCorpus` counts a mount's files as it counted a
+    // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
+    const listed = gitCorpus(repoRoot);
     files =
-      ls.exitCode === 0
-        ? new TextDecoder().decode(ls.stdout).split("\n").filter(Boolean)
+      listed !== undefined
+        ? listed.map((f) => relative(repoRoot, f).split(sep).join("/"))
         : // Not a git checkout (a scratch repository in a test): the skills
           // and pages are whatever markdown and HTML sit on disk.
           [...new Bun.Glob("**/*.{md,html}").scanSync({ cwd: repoRoot })].filter((f) => !f.includes("node_modules/"));

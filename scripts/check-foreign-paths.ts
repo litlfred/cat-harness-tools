@@ -49,7 +49,6 @@
  * Usage: bun run cat check:foreign-paths [--update]
  * Exit:  0 at or under the baseline · 1 above it
  */
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize, relative, resolve, sep } from "node:path";
 
@@ -64,6 +63,7 @@ import {
   stripComments,
 } from "../../cat-harness/scripts/check-declared-paths.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 
 export const BASELINE_PATH = resolve(HARNESS_ROOT, "scripts", "foreign-path-baseline.json");
 
@@ -131,12 +131,14 @@ export function foreignTargets(scanner: InstanceDirs, all: InstanceDirs[]): Arra
 /** Tracked, non-test `.ts` files of an instance, excluding nested instances. */
 function sourceFiles(repo: string, inst: InstanceDirs, all: InstanceDirs[]): string[] {
   const nested = all.map((i) => i.root).filter((r) => r !== inst.root && (inst.root === "" || r.startsWith(`${inst.root}/`)));
-  const listed = execFileSync("git", ["-C", repo, "ls-files", "-z", "--", inst.root === "" ? "*.ts" : `${inst.root}/*.ts`], {
-    encoding: "utf-8",
-    maxBuffer: 256 * 1024 * 1024,
-  })
-    .split("\0")
-    .filter(Boolean);
+  // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
+  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // by the index repository's git, so `ls-files` at the root lists none of
+  // their files. `gitCorpus` counts a mount's files as it counted a
+  // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
+  const corpus = gitCorpus(repo, [inst.root === "" ? "*.ts" : `${inst.root}/*.ts`]);
+  if (corpus === undefined) throw new Error(`git could not list the files in ${repo}`);
+  const listed = corpus.map((f) => relative(repo, f).split(sep).join("/"));
   return listed.filter(
     (f) =>
       !nested.some((r) => r !== "" && f.startsWith(`${r}/`)) &&

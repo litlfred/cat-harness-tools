@@ -32,12 +32,20 @@ describe("instance repositories — this checkout (bean 6rmv)", () => {
   });
 
   test("every livesAt names the checkout's own repository as host", () => {
-    // The instance AT the checkout root — not merely one without `livesAt`:
-    // a submodule instance has none either, and sits at its own root.
-    const host = map.entries.find((e) => resolve(e.root) === CHECKOUT);
-    expect(host).toBeDefined();
+    // This compared each `livesAt` with the repository of the instance AT the
+    // checkout root. RESTATED 2026-10-09: the owner removed that declaration
+    // on 2026-10-08 (3d4caf6, "should not need folio-assistant declared at
+    // all"), so the checkout root is an index and declares no repository of
+    // its own. What still holds, and is what the comparison was for: every
+    // `livesAt` names ONE host, and that host is the checkout itself -- the
+    // repository no instance in it IS. A `livesAt` naming one of the mounted
+    // instances' repositories, or two different hosts, fails exactly as a
+    // mismatch against the root instance did.
+    expect(map.entries.some((e) => resolve(e.root) === CHECKOUT)).toBe(false);
     const hosts = new Set(map.entries.flatMap((e) => (e.livesAt ? [e.livesAt.repository] : [])));
-    expect([...hosts]).toEqual([host!.repository]);
+    expect(hosts.size).toBe(1);
+    const own = new Set(map.entries.map((e) => e.repository));
+    expect([...hosts].filter((h) => own.has(h))).toEqual([]);
   });
 
   test("a reference resolves by owner/repo and, transitionally, by name", () => {

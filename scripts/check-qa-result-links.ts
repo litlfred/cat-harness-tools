@@ -54,9 +54,10 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { resolveQaLocation } from "../../cat-harness/scripts/qa-store.ts";
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 
 export interface QaDirDecl {
   /** Repo-relative, no trailing slash. */
@@ -137,9 +138,14 @@ const SOURCE_EXT = /\.(ts|tsx|js|mjs|cjs|html|liquid|ya?ml)$/;
 const SOURCE_SKIP = [/\.test\.ts$/, /\.e2e\.ts$/, /(^|\/)tests?\//, /(^|\/)docs\/proposals\//, /(^|\/)beans\//, /check-qa-result-links\.ts$/];
 
 function trackedFiles(repoRoot: string): string[] {
-  const r = spawnSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf-8", maxBuffer: 1 << 28 });
-  if (r.status !== 0) throw new Error(`git ls-files failed: ${r.stderr}`);
-  return r.stdout.split("\0").filter(Boolean);
+  // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
+  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // by the index repository's git, so `ls-files` at the root lists none of
+  // their files. `gitCorpus` counts a mount's files as it counted a
+  // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
+  const r = gitCorpus(repoRoot);
+  if (r === undefined) throw new Error(`git could not list the files in ${repoRoot}`);
+  return r.map((f) => relative(repoRoot, f).split(sep).join("/"));
 }
 
 function walk(dir: string, out: string[] = []): string[] {

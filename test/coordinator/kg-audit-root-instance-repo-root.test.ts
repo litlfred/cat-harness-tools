@@ -13,9 +13,10 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -26,7 +27,27 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const REPO = resolve(ORIGIN_DIR, "../../..");
 
 describe("kg:audit over the instance declared at the repository root (bean `pgzn`)", () => {
-  test("the repository root IS a declared instance, so the case is not vacuous", () => {
-    expect(readDeclaration(REPO), "no declaration at the repository root — this test has no subject").toBeTruthy();
+  // `pgzn` was an instance sitting AT the repository root that kg:audit never
+  // reached. This asserted the root was declared, so that case had a subject.
+  //
+  // RESTATED 2026-10-09: the owner removed the root declaration on 2026-10-08
+  // (3d4caf6: "should not need folio-assistant declared at all"), and its
+  // repository-scoped state graphs are cat-harness's now (coordinator decision
+  // (b), cat-harness#10). So there is no root instance for kg:audit to miss --
+  // which is itself the property to pin, because a root declaration coming
+  // back would bring `pgzn` back with it. The non-vacuity half moves to what
+  // the root DOES hold: an index whose every instance is a declared instance
+  // below it, so each is reached as a nested instance.
+  test("the repository root declares no instance, so nothing escapes kg:audit by sitting at the root", () => {
+    expect(readDeclaration(REPO)).toBeUndefined();
+  });
+
+  test("every instance the root's index lists is declared below it — the cases kg:audit does reach", () => {
+    const index = JSON.parse(readFileSync(join(REPO, "index.config.json"), "utf-8")) as { instances?: { name: string }[] };
+    const names = (index.instances ?? []).map((i) => i.name);
+    expect(names.length).toBeGreaterThan(0);
+    const roots = instanceRootsIn(REPO).filter((r) => r !== REPO);
+    const declared = new Set(roots.map((r) => readDeclaration(r)?.name));
+    expect(names.filter((n) => !declared.has(n))).toEqual([]);
   });
 });

@@ -45,8 +45,11 @@ const CLIENT = join(CLIENT_INSTANCE, siteDirFor(CLIENT_INSTANCE), "assets", "js"
 // The row's registry, `ROW_GLYPHS`, lives beside it (beans `lhvt`, `9rq1`).
 const ROW_CLIENT = join(dirname(CLIENT), "navbar-row.js");
 const DECL = join(REPO, "cat-harness", "cat-harness.json");
-// The ROOT instance holds the `beans` tile since placement PR0 (bean `ejye`).
-const ROOT_DECL = join(REPO, "folio-assistant.json");
+// The declaration that holds the `beans` tile. The ROOT instance's from
+// placement PR0 (bean `ejye`) until the owner removed it (3d4caf6,
+// 2026-10-08); cat-harness hosts the checkout-root `beans/` again since then,
+// repository-scoped (coordinator decision (b)), so its tile is declared here.
+const BEANS_TILE_DECL = DECL;
 
 /** Run the check, returning its exit status and combined output. */
 function run(...args: string[]): { status: number; out: string } {
@@ -152,7 +155,7 @@ describe("the two namespaces stay separate", () => {
   });
 
   test("an unregistered TILE icon fails (a name absent from the registry)", () => {
-    withEdit(ROOT_DECL, (s) => s.replace('"icon": "beans"', '"icon": "no-such-glyph"'), () => {
+    withEdit(BEANS_TILE_DECL, (s) => s.replace('"icon": "beans"', '"icon": "no-such-glyph"'), () => {
       const { status, out } = run("--check");
       expect(out).toContain("unregistered-tile-icon");
       expect(status).toBe(1);
@@ -285,12 +288,14 @@ describe("the themes set is iterated, not hardcoded", () => {
 });
 
 describe("the denominator comes from the declared enumerator", () => {
-  test("`instanceRootsIn` includes the repository root and excludes graph declarations", () => {
+  test("`instanceRootsIn` excludes the repository root and graph declarations", () => {
     const roots = instanceRootsIn(REPO).map((p) => resolve(p));
-    // The root declares. Compared as a PATH: its basename is whatever the
-    // operator named the checkout, and an agent worktree is never called
-    // `folio-assistant` (bean `8zsb`).
-    expect(roots).toContain(REPO);
+    // The root DECLARED until the owner removed that declaration (3d4caf6,
+    // 2026-10-08); it holds an index now, so it is not an instance and the
+    // enumerator must not count it. Still compared as a PATH: its basename is
+    // whatever the operator named the checkout (bean `8zsb`).
+    expect(roots).not.toContain(REPO);
+    expect(roots.length).toBeGreaterThan(1);
     const names = roots.filter((p) => p !== REPO).map((p) => p.split("/").pop());
     for (const notAnInstance of ["beans", "interaction", "todos"]) {
       expect(names).not.toContain(notAnInstance);

@@ -42,7 +42,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, kgQaHomeFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
 import { owningInstanceRoot, validatePath } from "../../../cat-harness/scripts/kg-validate.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -78,8 +78,14 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
       join(REPO, "smart-base"),
     );
     expect(owningInstanceRoot(join(HARNESS, "test/results/kg-qa.manifest.json"), HARNESS)).toBe(HARNESS);
-    // A file in no nested instance belongs to the instance AT the checkout root.
-    expect(owningInstanceRoot(join(REPO, "package.json"), HARNESS)).toBe(REPO);
+    // A file in no nested instance belonged to the instance AT the checkout
+    // root. RESTATED 2026-10-09: the owner removed that declaration (3d4caf6,
+    // 2026-10-08), so the root is an index and no instance contains such a
+    // file. It falls back to the auditing instance -- cat-harness, which hosts
+    // the checkout-root graphs repository-scoped (coordinator decision (b)), so
+    // a root-level `beans/` sidecar is judged by the instance that declares it.
+    expect(readDeclaration(REPO)).toBeUndefined();
+    expect(owningInstanceRoot(join(REPO, "package.json"), HARNESS)).toBe(HARNESS);
   });
 
   test("resolving against the auditor's own instance — the old behaviour — refuses a nested sidecar", async () => {

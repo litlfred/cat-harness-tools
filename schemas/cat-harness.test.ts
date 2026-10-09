@@ -1019,7 +1019,9 @@ describe("instanceRootsIn — discovered, never listed", () => {
     const repo = resolve(import.meta.dir, "..", "..");
     const found = instanceRootsIn(repo).map((r) => r.slice(repo.length + 1) || ".");
     expect(found).toEqual([
-      ".",
+      // `"."`, the ROOT, led this list until the owner removed its declaration
+      // (3d4caf6, 2026-10-08: "should not need folio-assistant declared at
+      // all"); the checkout root holds an index now. It fired as designed.
       "bootstrap",
       // Added 2026-09-30 when it fired as designed: bootstrap's tools were
       // re-created as the sibling instance `bootstrap-tools/` (bean `xsqm`),
@@ -1086,7 +1088,9 @@ describe("instanceRootsIn — discovered, never listed", () => {
     // `folio-assistant-core` is the rename that would otherwise read as a
     // deletion plus an addition.
     expect(found).toContain("folio-assistant-core");
-    expect(found).toContain(".");
+    // The root is pinned the other way now: an index, never an instance. If a
+    // root declaration comes back, this fails and the list above must say so.
+    expect(found).not.toContain(".");
   });
 });
 

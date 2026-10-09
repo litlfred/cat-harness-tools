@@ -169,7 +169,10 @@ describe("this repository's own instances", () => {
     // instance is a path inside the repository and the same in every clone.
     const found = instancesIn(REPO).map((p) => (resolve(p) === resolve(REPO) ? readDeclaration(p)?.name : p.split("/").pop()));
     expect(found).toEqual([
-      "folio-assistant",
+      // `folio-assistant`, the ROOT, led this list until the owner removed its
+      // declaration (3d4caf6, 2026-10-08: "should not need folio-assistant
+      // declared at all"). The checkout root is an index now and declares no
+      // instance, so discovery finds none there. It fired as designed.
       "bootstrap",
       // Added 2026-09-30 when it fired as designed: bootstrap's tools were
       // re-created as the sibling instance `bootstrap-tools/` (bean `xsqm`),
@@ -216,11 +219,10 @@ describe("this repository's own instances", () => {
       // and that it RENDERS. The duplication is the deliberate cost noted
       // above.
       "smart-base",
-      // `smart-ig`: the one sibling left of the owner's 2026-09-22 stack
-      // ruling (issue #975). `smart-l1` and `smart-dak` were retired in stage
-      // D of the smart-* separation (#1767, owner 2026-10-01): L1 and DAK are
-      // document KINDS inside smart-base, not layers.
-      "smart-ig",
+      // `smart-ig` was the one sibling left of the owner's 2026-09-22 stack
+      // ruling (issue #975) until the owner retired it too (cd8293f,
+      // 2026-10-08). `smart-l1` and `smart-dak` went in stage D (#1767, owner
+      // 2026-10-01): L1 and DAK are document KINDS inside smart-base.
       "smart-immunizations",
       "smart-trust",
       "who-iris",
@@ -231,7 +233,11 @@ describe("this repository's own instances", () => {
     // the old literal omitted, so if a future edit narrows the set again, the
     // failure should say which instance stopped being checked.
     expect(found).toContain("folio-assistant-core");
-    expect(found).toContain("folio-assistant");
+    // The other was the ROOT, `folio-assistant`, whose declaration the owner
+    // removed (3d4caf6, 2026-10-08). Pinned the other way now: discovery must
+    // not find an instance at the checkout root, which holds an index.
+    expect(found).not.toContain("folio-assistant");
+    expect(instancesIn(REPO).map((p) => resolve(p))).not.toContain(resolve(REPO));
   });
 
   test("every instance renders, and none renders nothing", async () => {
