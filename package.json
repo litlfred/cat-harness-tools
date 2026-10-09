@@ -70,6 +70,7 @@
     "check:red-gate-is-last": "bun run cat-harness-tools/scripts/check-red-gate-is-last.ts",
     "check:bun-runtime": "bun run cat-harness-tools/scripts/check-bun-runtime.ts",
     "check:asset-roles": "bun run cat-harness-tools/scripts/check-asset-roles.ts",
+    "typecheck:instances": "bun run cat-harness-tools/scripts/typecheck-instances.ts",
     "check:avatar-instances": "bun run cat-harness-tools/scripts/check-avatar-instances.ts",
     "check:avatar-coverage": "bun run cat-harness-tools/scripts/check-avatar-coverage.ts",
     "check:avatar-coverage:check": "bun run cat-harness-tools/scripts/check-avatar-coverage.ts --check",
