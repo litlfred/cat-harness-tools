@@ -13,7 +13,7 @@ import { chmodSync, lstatSync, readFileSync, readlinkSync, statSync, symlinkSync
 import { join } from "node:path";
 
 import { mountState } from "../../../cat-harness/scripts/state-mount.js";
-import { pushState, report } from "../state-push.js";
+import { pushState, report, unknownArgs } from "../state-push.js";
 import { BRANCH, cleanup, git, PDF, richSeed, stateFixture } from "../../../cat-harness/scripts/tests/state-fixture.js";
 
 afterEach(cleanup);
@@ -116,5 +116,22 @@ describe("bytes, modes and symlinks round-trip through the commands", () => {
     expect(lstatSync(join(b.root, "todos/link.md")).isSymbolicLink()).toBe(true);
     expect(readlinkSync(join(b.root, "todos/link.md"))).toBe("a.md");
     expect(readFileSync(join(b.root, "todos/doc.pdf")).equals(PDF)).toBe(true);
+  });
+});
+
+describe("arguments it does not understand stop it before it pushes", () => {
+  // 2026-10-09: `state:push --help` pushed the whole fsh-guts mount, because
+  // `--help` was ignored rather than refused.
+  test("an unknown flag is refused", () => {
+    expect(unknownArgs(["--help"])).toEqual(["--help"]);
+    expect(unknownArgs(["--id", "fsh-guts", "--force"])).toEqual(["--force"]);
+  });
+  test("the flags it knows pass, with their values", () => {
+    expect(unknownArgs(["--id", "fsh-guts", "-m", "a message", "--dry-run", "--json"])).toEqual([]);
+    expect(unknownArgs([])).toEqual([]);
+  });
+  test("a valued flag with no value is refused, not read as the next flag", () => {
+    expect(unknownArgs(["-m"])).toEqual(["-m (needs a value)"]);
+    expect(unknownArgs(["--id", "--dry-run"])).toEqual(["--id (needs a value)"]);
   });
 });

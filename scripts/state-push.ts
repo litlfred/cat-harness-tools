@@ -226,8 +226,41 @@ export function report(r: PushResult): string {
   return L.concat(r.reason + ".").join("\n");
 }
 
+/** The flags `state:push` understands; `-m` and `--id` each take one value. */
+const FLAGS = new Set(["--dry-run", "--json"]);
+const VALUED = new Set(["-m", "--id"]);
+
+/**
+ * The arguments this command does not understand, or `[]`. Anything unknown is
+ * REFUSED rather than ignored: this command writes to a shared branch, and on
+ * 2026-10-09 `state:push --help` — `--help` being unknown and so ignored —
+ * pushed the whole local fsh-guts mount with the default message. A command
+ * whose side effect is a push must not treat "I did not understand you" as
+ * "go ahead".
+ */
+export function unknownArgs(argv: readonly string[]): string[] {
+  const bad: string[] = [];
+  for (let k = 0; k < argv.length; k++) {
+    const a = argv[k]!;
+    if (FLAGS.has(a)) continue;
+    if (VALUED.has(a)) {
+      if (k + 1 >= argv.length || argv[k + 1]!.startsWith("-")) bad.push(`${a} (needs a value)`);
+      else k++;
+      continue;
+    }
+    bad.push(a);
+  }
+  return bad;
+}
+
 if (import.meta.main) {
   const argv = process.argv.slice(2);
+  const bad = unknownArgs(argv);
+  if (bad.length > 0) {
+    console.error(`state:push: not understood: ${bad.join(", ")}. Nothing was pushed.`);
+    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--json]");
+    process.exit(2);
+  }
   const at = argv.indexOf("-m");
   const i = argv.indexOf("--id");
   const r = pushState({
