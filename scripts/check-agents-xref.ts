@@ -57,7 +57,6 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -263,9 +262,15 @@ if (import.meta.main) {
   const strict = process.argv.includes("--strict");
   let cites: Citation[];
   try {
-    // `AGENTS.md` is the repository's; the skills are the instance's.
+    // The skills AND the `AGENTS.md` they cite are the instance's. Until
+    // 2026-10-09 the cited file was the checkout root's; the root of an index
+    // checkout declares no instance, and its `AGENTS.md` is now a RENDERED
+    // index of the instances (`index-render.ts`, owner's option a). The
+    // sections a skill cites moved, with the rest of that file's pointers, to
+    // the harness's own `AGENTS.md` — which is also the file a skill means
+    // when this layer is checked out on its own, with no root above it.
     const instance = HARNESS_ROOT;
-    cites = auditXrefs(repoRootFor(instance), SKILL_ROOTS, instance);
+    cites = auditXrefs(instance, SKILL_ROOTS, instance);
   } catch (e) {
     console.error(`could not check: ${(e as Error).message}`);
     process.exit(2);

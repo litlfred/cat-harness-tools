@@ -16,13 +16,13 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, ASSET_ROLES, INSTANCE_README_ROLE, REQUIRED_ASSET_ROLES, ROLE_OWNED_ASSET_KEYS, assetRoleDelivery, assetRoleLayer, assetRolePurpose, declaredAssetPath, graphLayer, layerIsWritable, processMayWrite, processMayWriteAsset, strayAssetRoleKeys } from "../../../cat-harness/schemas/cat-harness.js";
 import { collect, formatReport, isClean } from "../check-asset-roles.js";
-import {  } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
 
 const REPO = join(import.meta.dir, "..", "..", "..");
@@ -95,29 +95,47 @@ describe("the delivery path — read as a file, with no injection budget", () =>
     }
   });
 
-  test("this repository's own `AGENTS.md` is far past the injection budget", () => {
+  /**
+   * The longest file this checkout DECLARES in `role`, and its length.
+   *
+   * It measured the checkout root's own files until 2026-10-09. The root of
+   * an index checkout declares no instance, and its AGENTS.md and README are
+   * RENDERED indexes (owner, option a) — short, and no instance's asset — so
+   * the rule's observable consequence is now carried by whichever declared
+   * file is longest: the harness layer's own AGENTS.md, which took the root's
+   * pointers, and bootstrap's README.
+   */
+  function longestDeclared(role: string): { path: string; lines: number } | undefined {
+    let best: { path: string; lines: number } | undefined;
+    for (const root of instanceRootsIn(REPO)) {
+      const path = declaredAssetPath(root, role);
+      if (path === undefined || !existsSync(path)) continue;
+      const lines = readFileSync(path, "utf8").split("\n").length;
+      if (best === undefined || lines > best.lines) best = { path, lines };
+    }
+    return best;
+  }
+
+  test("this checkout's longest declared `AGENTS.md` is far past the injection budget", () => {
     // The assertion that makes `delivery: "file"` bite rather than restate
     // itself. A file is OPENED, so nothing truncates it; memory is SPLICED
     // into a prompt and pays the budget, with the overflow dropped silently.
     //
-    // So the rule has an observable consequence right here: the root
-    // `AGENTS.md` is legal at this length precisely because it is delivered as
-    // a file. Were the role ever switched to `injected`, every line past the
-    // budget would vanish without a word — and this test is what says so
-    // before a reader finds out by losing half the file.
-    const path = declaredAssetPath(REPO, AGENT_INSTRUCTIONS_ROLE);
-    expect(path).toBeDefined();
-    const lines = readFileSync(path!, "utf8").split("\n").length;
-    expect(lines).toBeGreaterThan(INJECTION_BUDGET_LINES);
+    // So the rule has an observable consequence right here: an `AGENTS.md`
+    // this long is legal precisely because it is delivered as a file. Were
+    // the role ever switched to `injected`, every line past the budget would
+    // vanish without a word — and this test is what says so before a reader
+    // finds out by losing half the file.
+    const longest = longestDeclared(AGENT_INSTRUCTIONS_ROLE);
+    expect(longest).toBeDefined();
+    expect(longest!.lines).toBeGreaterThan(INJECTION_BUDGET_LINES);
     expect(assetRoleDelivery(AGENT_INSTRUCTIONS_ROLE)).toBe("file");
   });
 
-  test("and so is the README", () => {
-    const path = declaredAssetPath(REPO, INSTANCE_README_ROLE);
-    expect(path).toBeDefined();
-    expect(readFileSync(path!, "utf8").split("\n").length).toBeGreaterThan(
-      INJECTION_BUDGET_LINES,
-    );
+  test("and so is the longest declared README", () => {
+    const longest = longestDeclared(INSTANCE_README_ROLE);
+    expect(longest).toBeDefined();
+    expect(longest!.lines).toBeGreaterThan(INJECTION_BUDGET_LINES);
   });
 });
 

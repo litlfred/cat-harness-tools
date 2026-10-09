@@ -125,12 +125,18 @@ describe("carrier 2 — asset sources", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("this repository's own unpinned source is found", () => {
-    // The real one, and the reason this gate is not a check over nothing: the
-    // root's `agent-instructions` names bootstrap's file with no ref.
+  it("this repository names no asset source now, and the carrier SAYS so rather than reading clean", () => {
+    // Until 2026-10-08 the real case was the root's `agent-instructions`,
+    // naming bootstrap's file with no ref. The root stopped declaring any
+    // instance, and its AGENTS.md is RENDERED (owner, 2026-10-09, option a):
+    // the renderer quotes bootstrap's file from the mount `index.lock.json`
+    // pins, so the reference is pinned by the lock rather than carried as an
+    // unpinned `source`. The fixture above keeps the finding itself honest;
+    // this keeps "examined nothing" from passing as a clean sweep.
     const repo = resolve(import.meta.dir, "..", "..", "..");
-    const wheres = assetSourceRefs(repo).findings.map((f) => f.where);
-    expect(wheres.some((w) => w.includes("agent-instructions"))).toBe(true);
+    const r = assetSourceRefs(repo);
+    expect(r.findings.some((f) => f.where.includes("agent-instructions"))).toBe(false);
+    if (r.examined === 0) expect(r.note).toContain("authored in place");
   });
 });
 
