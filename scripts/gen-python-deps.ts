@@ -36,7 +36,7 @@ import {
   type DepTier,
 } from "@litlfred/cat-harness/schemas/python-deps.ts";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
-import { tools } from "@litlfred/cat-harness/tools/discover.ts";
+import { tools } from "../tools/discover.ts";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
 
 // THIS LAYER's root, because `requirementsPath` is relative to it. The pair

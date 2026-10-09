@@ -129,13 +129,13 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
-const BASELINE = join(HARNESS_ROOT, "scripts", "workflow-injection-baseline.json");
+const BASELINE = join(TOOLS_ROOT, "scripts", "workflow-injection-baseline.json");
 
 /**
  * Unbounded, attacker-supplied text. A quote in any of these is a shell break.

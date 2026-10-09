@@ -62,7 +62,7 @@ import { readdirSync, readFileSync, statSync } from "fs";
 import { join, relative, resolve } from "path";
 
 import { LEAN_PACKAGES, type LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.ts";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
+import { findContentRepoRoot } from "../content/pipeline/repo-root.ts";
 
 /** A `class` declaration and whether it carries a claim. */
 interface ClassInfo {

@@ -112,8 +112,8 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative, resolve } from "path";
 
 import { LEAN_PACKAGES, type LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.ts";
-import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root.ts";
-import { ARCHIMEDEAN_TYPE_RE } from "@litlfred/cat-harness/content/pipeline/qa-checkers-voice.ts";
+import { findContentRepoRoot } from "../content/pipeline/repo-root.ts";
+import { ARCHIMEDEAN_TYPE_RE } from "../content/pipeline/qa-checkers-voice.ts";
 
 // ── Lean surface parsing ─────────────────────────────────────────
 

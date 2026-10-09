@@ -86,7 +86,7 @@ import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { historicalPrefixes } from "@litlfred/cat-harness/src/docs/declaration-claims.js";
+import { historicalPrefixes } from "../src/docs/declaration-claims.js";
 
 /**
  * The RETIRED declaration filename.

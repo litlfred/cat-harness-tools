@@ -16,7 +16,7 @@ import {
   UNCOVERED_BY_DESIGN,
   staleAnnotations,
   triage,
-} from "@litlfred/cat-harness/scripts/tool-coverage.js";
+} from "../../scripts/tool-coverage.js";
 
 describe("the real corpus", () => {
   test("no annotation is stale", async () => {

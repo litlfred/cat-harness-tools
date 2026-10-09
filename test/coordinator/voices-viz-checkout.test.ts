@@ -11,9 +11,9 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { readVoicesGraph, type VoicesGraph } from "@litlfred/cat-harness/scripts/voices-graph.ts";
-import { viewerHtml } from "@litlfred/cat-harness/scripts/gen-voices-viz.ts";
-import { shippedVoices } from "@litlfred/cat-harness/content/pipeline/voice-criteria.ts";
+import { readVoicesGraph, type VoicesGraph } from "../../scripts/voices-graph.ts";
+import { viewerHtml } from "../../scripts/gen-voices-viz.ts";
+import { shippedVoices } from "../../content/pipeline/voice-criteria.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

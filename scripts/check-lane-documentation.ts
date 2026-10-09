@@ -89,7 +89,7 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.js";
+} from "./qa-results.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -341,7 +341,7 @@ export function checkLanes(root = REPO): LaneReport {
 /** The sidecar document for a report. Pure, so the judge and the writer render ONE computation. */
 export function laneDocumentationDocument(r: LaneReport): QaResult {
   return buildQaResult({
-    script: "cat-harness/scripts/check-lane-documentation.ts",
+    script: "cat-harness-tools/scripts/check-lane-documentation.ts",
     scriptAbsPath: resolve(import.meta.dir, "check-lane-documentation.ts"),
     subject: { kind: "corpus", id: "bpmn-lanes" },
     families: {

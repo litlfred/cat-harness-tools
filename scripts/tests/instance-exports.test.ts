@@ -17,15 +17,15 @@ import {
   unpublishedInstanceSchemas,
   unpublishedZodSchemas,
 } from "../check-published-instance-exports.js";
-import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "@litlfred/cat-harness/scripts/kg-export.js";
-import { inAggregate } from "@litlfred/cat-harness/test/support/checkout.js";
+import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../kg-export.js";
+import { inAggregate } from "../../test/support/checkout.js";
 import {
   PUBLISHED_ELSEWHERE,
   declaredInstanceStubs,
   instanceExportPlan,
   publishesInstanceSchema,
   type PlannedExport,
-} from "@litlfred/cat-harness/scripts/instance-exports.js";
+} from "../instance-exports.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const wf = (n: string) => readFileSync(join(REPO, ".github", "workflows", n), "utf-8");

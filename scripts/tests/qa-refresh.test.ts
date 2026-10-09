@@ -29,13 +29,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { QA_WRITERS, assess, claimants, globToRegExp, mayRestore, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
-import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "@litlfred/cat-harness/scripts/qa-store.ts";
-import { movedRoots, type MovedInventory } from "@litlfred/cat-harness/scripts/qa-verify-moved.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "../qa-store.ts";
+import { movedRoots, type MovedInventory } from "../qa-verify-moved.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
-const STORE_CLI = join(HARNESS_ROOT, "scripts", "qa-store.ts");
+const STORE_CLI = join(TOOLS_ROOT, "scripts", "qa-store.ts");
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const SHA = "d".repeat(40);
 const T = 60_000;

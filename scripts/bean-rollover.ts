@@ -78,8 +78,8 @@ import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { git, parseMemberSpec, resolveMember } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
-import { pathClass, differsOnlyInRegions } from "@litlfred/cat-harness/scripts/merge-pipeline-paths.ts";
+import { git, parseMemberSpec, resolveMember } from "./merge-pipeline-git.ts";
+import { pathClass, differsOnlyInRegions } from "./merge-pipeline-paths.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 // The DECLARED beans subgraph (bean `gz47`), not a spelled "beans/". A

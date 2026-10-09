@@ -12,7 +12,7 @@ import { project, buildArgv, unmetRequirement, recordInvocation } from "../../sr
 import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { toolTypeIri, isInjectionSafe, TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { ToolInvocationSchema } from "@litlfred/cat-harness/schemas/tool-invocation.js";
-import { tools } from "@litlfred/cat-harness/tools/discover.js";
+import { tools } from "../../tools/discover.js";
 
 const B = "https://example.invalid/fa";
 const t = (n: Parameters<typeof toolTypeIri>[1]): string => toolTypeIri(B, n);

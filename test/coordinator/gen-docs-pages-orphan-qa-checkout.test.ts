@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { readQaGraph } from "@litlfred/cat-harness/content/pipeline/qa-graph-index.ts";
+import { readQaGraph } from "../../content/pipeline/qa-graph-index.ts";
 import { directoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
@@ -49,7 +49,7 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       expect(existsSync(orphanPath)).toBe(true);
 
       // Step 2: Run the generator once
-      const r1 = spawnSync("bun", ["cat-harness/scripts/gen-docs-pages.ts"], {
+      const r1 = spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], {
         cwd: REPO_ROOT,
         encoding: "utf-8",
       });
@@ -81,7 +81,7 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       expect(witnessFamily1?.buckets?.["fail"]).not.toBe(999);
 
       // Step 5: Pin idempotence — a second run on the unchanged tree publishes identical counts
-      const r2 = spawnSync("bun", ["cat-harness/scripts/gen-docs-pages.ts"], {
+      const r2 = spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], {
         cwd: REPO_ROOT,
         encoding: "utf-8",
       });

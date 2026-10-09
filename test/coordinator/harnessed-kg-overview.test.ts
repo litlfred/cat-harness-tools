@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { ActorDefSchema } from "@litlfred/cat-harness/schemas/role-graph.ts";
-import { ownKgRoots, workflowFile } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { ownKgRoots, workflowFile } from "../../scripts/known-skills.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

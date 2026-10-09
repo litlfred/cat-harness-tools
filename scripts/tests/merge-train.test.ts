@@ -19,9 +19,9 @@ import {
   verdictOf,
   type TrainReport,
 } from "../merge-train.ts";
-import { git as runGit } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { git as runGit } from "../merge-pipeline-git.ts";
 import { conflicts } from "../milestone-status.ts";
-import { makeRepo, type Repo } from "@litlfred/cat-harness/scripts/tests/merge-pipeline-fixture.ts";
+import { makeRepo, type Repo } from "./merge-pipeline-fixture.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

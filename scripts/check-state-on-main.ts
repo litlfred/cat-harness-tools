@@ -96,7 +96,7 @@ import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/subgraph-sou
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 
 /** Where the recorded debt lives. One file, named in one place. */
-export const BASELINE = "cat-harness/scripts/state-on-main-baseline.json";
+export const BASELINE = "cat-harness-tools/scripts/state-on-main-baseline.json";
 
 /** A declared directory that holds state, and where its content lives. */
 export interface StateDirectory {

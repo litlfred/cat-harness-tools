@@ -31,7 +31,7 @@ import { join, relative } from "node:path";
 
 import { directoriesForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { CONCERN_GROUP_LIST, declaredGroupsIn, groupingKinds, resolveGroups, type ResolvedGroup } from "@litlfred/cat-harness/scripts/concern-groups.ts";
+import { CONCERN_GROUP_LIST, declaredGroupsIn, groupingKinds, resolveGroups, type ResolvedGroup } from "./concern-groups.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

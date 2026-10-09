@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { contractFile, skillContracts } from "@litlfred/cat-harness/scripts/skill-contracts.js";
+import { contractFile, skillContracts } from "../../scripts/skill-contracts.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

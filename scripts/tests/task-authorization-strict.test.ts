@@ -11,11 +11,11 @@
 import { describe, expect, test } from "bun:test";
 import { basename } from "node:path";
 
-import { isActivity, loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
-import { authorizeTask } from "@litlfred/cat-harness/src/workflow/authorize.js";
-import { loadAccessContext, principalFromEnv } from "@litlfred/cat-harness/src/core/access.js";
+import { isActivity, loadProcessModel } from "../../src/workflow/process-model.js";
+import { authorizeTask } from "../../src/workflow/authorize.js";
+import { loadAccessContext, principalFromEnv } from "../../src/core/access.js";
 import { githubPrincipalFor } from "../../src/core/github-auth.js";
-import { workflowFile, workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The access context, permissions and diagrams are the HARNESS's; this test moved up with the code (70lx).

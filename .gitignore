@@ -4,3 +4,5 @@
 # Dependencies: each instance now installs its own (see package.json), so a
 # standalone `bun install` leaves these here. Never committed.
 node_modules/
+__pycache__/
+*.pyc

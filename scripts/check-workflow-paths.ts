@@ -176,7 +176,7 @@
  * @module scripts/check-workflow-paths
  * @covers none — .github/workflows/ is not a declared graph typology
  */
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
@@ -802,7 +802,7 @@ function classifyWorkDir(
 }
 
 /** The ratchet file, beside this module — see {@link workDirBaseline}. */
-const BASELINE_FILE = join(HARNESS_ROOT, "scripts", "workdir-baseline.json");
+const BASELINE_FILE = join(TOOLS_ROOT, "scripts", "workdir-baseline.json");
 
 /**
  * Known-open `working-directory` declarations — a RATCHET, not an exemption.

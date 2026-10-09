@@ -173,7 +173,7 @@ import {
   qaResultPath,
   writeQaResult,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.js";
+} from "./qa-results.js";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 /**
@@ -384,7 +384,7 @@ const EXTENSIONS = new Set([".ts", ".tsx", ".md", ".json", ".jsonld", ".bpmn", "
  */
 // declared-path-literal: the three files the owner's X3 ruling names, repo-root-relative because that is how an occurrence's file is reported
 const LAYERING_SPECIFICATIONS = [
-  "cat-harness/scripts/partition/instance-rules.ts",
+  "cat-harness-tools/scripts/partition/instance-rules.ts",
   "smart-base/skills/content/authoring-who-smart-guidelines/smart-stack-layering.md",
   "cat-harness-tools/scripts/check-reference-direction.ts",
 ] as const;
@@ -496,20 +496,20 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-preprocessing.md", names: 3 },
   { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
-  { file: "cat-harness/scripts/dak-pdf.ts", names: 2 },
-  { file: "cat-harness/scripts/external-schemas.ts", names: 3 },
+  { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
+  { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
   { file: "cat-harness/docs/methodologies/index.md", names: 2 },
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
   { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
-  { file: "cat-harness/scripts/kg-export.ts", names: 2 },
-  { file: "cat-harness/scripts/layout-norms-baseline.json", names: 2 },
+  { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
+  { file: "cat-harness-tools/scripts/layout-norms-baseline.json", names: 2 },
   { file: "cat-harness/tools/discover.ts", names: 2 },
   { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
   { file: "cat-harness/schemas/harness-config.ts", names: 3 },
   { file: "cat-harness/docs/source/fhir-ig-publisher/what-it-cannot-be-asked-for.md", names: 2 },
   { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
-  { file: "cat-harness/scripts/harness-schema-export.ts", names: 2 },
+  { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
   { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
   { file: "smart-ig/README.md", names: 2 },
   { file: "smart-ig/AGENTS.md", names: 2 },

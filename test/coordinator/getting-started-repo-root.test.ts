@@ -12,7 +12,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { derivePagesUrl } from "@litlfred/cat-harness/scripts/pages-bootstrap.js";
+import { derivePagesUrl } from "../../scripts/pages-bootstrap.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

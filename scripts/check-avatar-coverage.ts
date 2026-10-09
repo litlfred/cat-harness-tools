@@ -49,7 +49,7 @@ import {
   isPublishedGraphTypology,
   readDeclaration,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { avatarsCssPath } from "@litlfred/cat-harness/scripts/gen-avatars-css.js";
+import { avatarsCssPath } from "./gen-avatars-css.js";
 import {
   buildQaResult,
   concludeJudgement,
@@ -59,9 +59,9 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.js";
+} from "./qa-results.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = HARNESS_ROOT;
 
@@ -145,7 +145,7 @@ export function trashDerivationPresent(root: string = ROOT): boolean {
 export function avatarCoverageDocument(c: Coverage, derived: boolean): QaResult {
   return buildQaResult({
     script: "scripts/check-avatar-coverage.ts",
-    scriptAbsPath: join(ROOT, "scripts/check-avatar-coverage.ts"),
+    scriptAbsPath: join(TOOLS_ROOT, "scripts", "check-avatar-coverage.ts"),
     subject: { kind: "avatars", id: "avatar-coverage" },
     families: {
       "kind-has-avatar": {

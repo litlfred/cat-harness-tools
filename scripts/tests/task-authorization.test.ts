@@ -11,12 +11,12 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
-import { complete, enabled, startInstance } from "@litlfred/cat-harness/src/workflow/instance.js";
-import { authorizeTask } from "@litlfred/cat-harness/src/workflow/authorize.js";
-import { loadAccessContext, principalFromEnv, type AccessContext } from "@litlfred/cat-harness/src/core/access.js";
+import { loadProcessModel } from "../../src/workflow/process-model.js";
+import { complete, enabled, startInstance } from "../../src/workflow/instance.js";
+import { authorizeTask } from "../../src/workflow/authorize.js";
+import { loadAccessContext, principalFromEnv, type AccessContext } from "../../src/core/access.js";
 import { allows, principalOf } from "../../src/core/rbac.js";
-import { workflowFile } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { workflowFile } from "../known-skills.js";
 import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
 import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

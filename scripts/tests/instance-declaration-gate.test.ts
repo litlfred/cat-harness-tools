@@ -14,9 +14,9 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { collect, isClean } from "../check-instance-graph.js";
-import { exportIdentity } from "@litlfred/cat-harness/scripts/kg-export.js";
+import { exportIdentity } from "../kg-export.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const made: string[] = [];
 afterAll(() => {

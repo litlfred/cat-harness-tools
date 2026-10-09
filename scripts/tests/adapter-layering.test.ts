@@ -21,7 +21,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { analyse, classify } from "@litlfred/cat-harness/scripts/repo-partition.ts";
+import { analyse, classify } from "../repo-partition.ts";
 import type { TodoRef, MacroDef } from "../../src/types.ts";
 import type { FeedbackItem, PaperMacro } from "@litlfred/cat-harness/schemas/types.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -37,8 +37,9 @@ describe("the partition has no wrong-direction edges", () => {
     // tool exits 2 on an empty scan for the same reason; assert it here too,
     // because this file's whole subject is a check that used to pass over
     // ground it never covered.
-    expect(r.modules.size).toBeGreaterThan(500);
-    expect(r.totalEdges).toBeGreaterThan(1000);
+    // 70lx moved the harness's code out; its schemas remain, ~250 modules (2026-10-09).
+    expect(r.modules.size).toBeGreaterThan(200);
+    expect(r.totalEdges).toBeGreaterThan(300);  // 70lx: ~370 edges remain in the harness (2026-10-09)
   });
 
   test("...and nothing is unassigned, which is a separate axis", () => {
@@ -61,7 +62,7 @@ describe("the harness contract does not import the content model", () => {
     // Split out of `src/types.ts` (bean `w2gr`, step 1) so the content model
     // stays in the harness when the server half moves to `cat-harness-tools`.
     // It must not reach into `schemas/` (bean `jcmx`) nor into the server.
-    const src = readFileSync(join(INSTANCE, "src/content-types.ts"), "utf-8");
+    const src = readFileSync(join(TOOLS_ROOT, "src", "content-types.ts"), "utf-8");
     expect(src).toContain("export interface ContentSource");
     expect([...src.matchAll(/^import .*? from "([^"]+)";$/gm)]).toEqual([]);
   });
@@ -109,7 +110,7 @@ describe("the core types still satisfy the harness minima", () => {
     // it is that `TodoRef` is far smaller than what it stands in for.
     // `TodoRef` moved to `src/content-types.ts` with the rest of the content
     // model (bean `w2gr`, step 1); `src/types.ts` re-exports it.
-    const src = readFileSync(join(INSTANCE, "src/content-types.ts"), "utf-8");
+    const src = readFileSync(join(TOOLS_ROOT, "src", "content-types.ts"), "utf-8");
     const body = src.slice(src.indexOf("export interface TodoRef"));
     const fields = [...body.slice(0, body.indexOf("}")).matchAll(/^\s{2}(\w+)[?]?:/gm)];
     expect(fields.length).toBeLessThanOrEqual(4);

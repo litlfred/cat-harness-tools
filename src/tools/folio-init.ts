@@ -29,7 +29,7 @@ import {
   isValidSlug,
   slugify,
   type InitFolioOptions,
-} from "@litlfred/cat-harness/scripts/init-folio.js";
+} from "../../scripts/init-folio.js";
 import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /**

@@ -21,11 +21,11 @@ import {
   pageRelPath,
   short,
   type MethodologyRow,
-} from "@litlfred/cat-harness/scripts/gen-methodologies-viz.js";
+} from "../../scripts/gen-methodologies-viz.js";
 import {
   checkMethodologyEvidence,
   methodologyNodes,
-} from "@litlfred/cat-harness/scripts/check-methodology-evidence.js";
+} from "../../scripts/check-methodology-evidence.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

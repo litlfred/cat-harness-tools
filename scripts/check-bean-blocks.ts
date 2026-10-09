@@ -70,7 +70,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { beanFindings, hasExpiry, readBeans, resolveBeanDefs, type BeanNode } from "@litlfred/cat-harness/scripts/beans.ts";
+import { beanFindings, hasExpiry, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
@@ -97,7 +97,7 @@ const ROOT = HARNESS_ROOT;
  * The file may only SHRINK: an entry nothing matches is reported stale and
  * fails, so a repair cannot leave a licence behind.
  */
-export const BASELINE_FILE = "cat-harness/scripts/bean-blocks-baseline.json";
+export const BASELINE_FILE = "cat-harness-tools/scripts/bean-blocks-baseline.json";
 
 /** A defect's identity, stable across a title edit: the verdict and the bean. */
 const key = (verdict: string, id: string): string => `${verdict}:${id}`;

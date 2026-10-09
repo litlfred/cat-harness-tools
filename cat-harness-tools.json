@@ -82,6 +82,65 @@
       "graphTypologies": [
         "beans"
       ]
+    },
+    {
+      "id": "cat-harness-tools-content",
+      "path": "content/",
+      "description": "The content pipeline — build, render, QA checkers and generators over a folio's content graph — moved here from `cat-harness/content/pipeline/` by bean `70lx` (stage 1a). Its QA script sidecars stayed in the harness, under `test/results/script-sidecars/`, because they are the harness's QA state.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "folio-templates",
+      "path": "templates/",
+      "description": "Files `folio_init` WRITES INTO a new folio, kept as real files rather than strings inside `scripts/init-folio.ts`. Moved here from `cat-harness/templates/` by bean `70lx`; the id is kept, because `init-folio.ts` looks the directory up by it (`TEMPLATES_ID`).",
+      "graphTypologies": [
+        "code"
+      ],
+      "coverage": {
+        "skill": "where-does-this-go"
+      }
+    },
+    {
+      "id": "cat-harness-tools-deploy",
+      "path": "deploy/",
+      "description": "How a folio-assistant host is stood up and kept current: `provision.sh`, `deploy.sh`, `self-update.sh`, `docker-compose.yml`, `Caddyfile.template` and `GOOGLE_OAUTH_SETUP.md`. Reached from outside the graph today -- the `deploy-access` capability detects on `cat-harness/deploy/.env` -- which is exactly the shape of a directory no declaration-walking consumer could see. Its governing skill is `deployment-auth`, whose architecture diagram is of these files. Moved here from `cat-harness/deploy/` by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-ui",
+      "path": "ui/",
+      "description": "Static pages and styles the harness's local tools serve (bib-qa, glossary curator, source relevance). Moved here from `cat-harness/ui/` by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-viewer",
+      "path": "viewer/",
+      "description": "The standalone viewer page and its package manifest. Moved here from `cat-harness/viewer/` by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-archimate",
+      "path": "archimate/scripts/",
+      "description": "The ArchiMate subgraph's generators, checker and tests; the subgraph's content and schema stay in `cat-harness/archimate/`. Moved by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-openapi",
+      "path": "openapi/scripts/",
+      "description": "The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content and schema stay in `cat-harness/openapi/`. Moved by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
     }
   ],
   "assets": [

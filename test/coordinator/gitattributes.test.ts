@@ -75,7 +75,7 @@ describe("a sidecar whose producer reads it back is NOT marked", () => {
     // `readAttestations(sidecarPath(r))` in `kg-audit.ts` is the fact. If that
     // ever stops being true this test should be revisited deliberately, not
     // deleted because it became inconvenient.
-    const audit = readFileSync(join(REPO, "cat-harness", "scripts", "kg-audit.ts"), "utf-8");
+    const audit = readFileSync(join(REPO, "cat-harness-tools", "scripts", "kg-audit.ts"), "utf-8");
     expect(audit, "kg-audit no longer reads its sidecars back — re-examine this rule").toContain("readAttestations");
     for (const p of [
       "cat-harness/test/results/kg-qa/processes/adjudication.kg-qa.json",

@@ -21,7 +21,7 @@ import {
 } from "@litlfred/cat-harness/schemas/python-deps.ts";
 import { checkPythonDeps, scanImports } from "../check-python-deps.ts";
 import { dockerfileFindings, dockerfileOf, generatedPaths, imageFindings, requirementsBody, staleTiers } from "../gen-python-deps.ts";
-import { tools } from "@litlfred/cat-harness/tools/discover.ts";
+import { tools } from "../../tools/discover.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 // TWO ROOTS, because this file asks two questions of two different trees.
@@ -35,7 +35,7 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 // instance, `requirements.txt` is ENOENT; at the repository, the
 // `scripts/**/*.py` glob matches nothing and the scan reports 0 imports —
 // which the vacuity guard below is there to refuse.
-const INSTANCE = HARNESS_ROOT;
+const INSTANCE = TOOLS_ROOT;  // bean 70lx: where the scripts are
 
 describe("the declaration matches what the scripts actually import", () => {
   test("nothing imported is undeclared, and nothing declared is dead", () => {

@@ -49,7 +49,7 @@ import {
   skillPackages,
   unlisted,
   withoutKey,
-} from "@litlfred/cat-harness/scripts/skill-register.js";
+} from "../skill-register.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");

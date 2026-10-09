@@ -10,10 +10,10 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { navbarRegionsHtml } from "@litlfred/cat-harness/scripts/lib/navbar.js";
-import { railModel } from "@litlfred/cat-harness/scripts/lib/harness-rail.js";
-import { declaredGraphs } from "@litlfred/cat-harness/scripts/mount-instance-docs.js";
-import { kindTitle } from "@litlfred/cat-harness/scripts/lib/nav-label.js";
+import { navbarRegionsHtml } from "../../scripts/lib/navbar.js";
+import { railModel } from "../../scripts/lib/harness-rail.js";
+import { declaredGraphs } from "../../scripts/mount-instance-docs.js";
+import { kindTitle } from "../../scripts/lib/nav-label.js";
 
 describe("every declared graph reaches the navbar, linked or not", () => {
   // The owner's report: "there shuold be all the harness controlled

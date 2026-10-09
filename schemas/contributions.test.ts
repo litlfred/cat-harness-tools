@@ -18,7 +18,7 @@ import {
 } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
-import { writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { writeInstanceConfig } from "../test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the

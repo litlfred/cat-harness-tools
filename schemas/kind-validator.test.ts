@@ -144,7 +144,7 @@ describe("this instance's own kinds", () => {
 
 describe("kindForPath", () => {
   test("the LONGEST matching directory wins, because declarations nest", async () => {
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
+    const { kindForPath } = await import("../scripts/kg-validate.ts");
     const root = mkdtempSync(join(tmpdir(), "kfp-"));
     mkdirSync(join(root, "beans", "defs"), { recursive: true });
     writeFileSync(join(root, "beans", "defs", "a.md"), "");
@@ -159,7 +159,7 @@ describe("kindForPath", () => {
   test("a directory declaring SEVERAL graphs yields nothing, rather than guessing", async () => {
     // `schemas/` declares two. Picking one would be the lie of precision the
     // `cat-harness` kind's own doc comment warns about.
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
+    const { kindForPath } = await import("../scripts/kg-validate.ts");
     const root = mkdtempSync(join(tmpdir(), "kfp2-"));
     mkdirSync(join(root, "schemas"), { recursive: true });
     const dirs = [{ path: "schemas/", graphTypologies: ["schemas", "cat-harness"] }];
@@ -168,7 +168,7 @@ describe("kindForPath", () => {
   });
 
   test("a path outside the root belongs to no kind", async () => {
-    const { kindForPath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
+    const { kindForPath } = await import("../scripts/kg-validate.ts");
     expect(kindForPath("/etc/passwd", "/tmp/x", [{ path: "a/", graphTypologies: ["beans"] }]))
       .toBeUndefined();
   });
@@ -230,7 +230,7 @@ describe("per-family node schemas (bean rdkm)", () => {
     // fact about the declaration and the node's tag, and the corpus is leaving
     // `main`. The directory may be absent (it is a `qa` kind, which may leave
     // `main`), so it is created for the fixture and removed after if so.
-    const { validatePath } = await import("@litlfred/cat-harness/scripts/kg-validate.ts");
+    const { validatePath } = await import("../scripts/kg-validate.ts");
     const { existsSync } = await import("node:fs");
     const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/kg-qa.ts");
     const results = join(HARNESS, "test", "results");

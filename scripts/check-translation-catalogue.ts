@@ -96,8 +96,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { buildTranslationIndex, siteRoot } from "@litlfred/cat-harness/content/pipeline/translation-index.ts";
-import { catalogueFor, fileForUrl } from "@litlfred/cat-harness/content/pipeline/translation-drift.ts";
+import { buildTranslationIndex, siteRoot } from "../content/pipeline/translation-index.ts";
+import { catalogueFor, fileForUrl } from "../content/pipeline/translation-drift.ts";
 
 /**
  * This instance's root — `cat-harness/`, one level up from `scripts/`.

@@ -64,7 +64,7 @@
  * @module scripts/check-rendered-labels
  * @covers cat-harness
  */
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,7 +79,7 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "@litlfred/cat-harness/scripts/qa-results.ts";
+} from "./qa-results.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
@@ -89,7 +89,7 @@ const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
  * it records what has NOT been done yet, which is a property of the work
  * rather than of the graph.
  */
-const BASELINE = join(INSTANCE_ROOT, "scripts", "rendered-labels-baseline.json");
+const BASELINE = join(TOOLS_ROOT, "scripts", "rendered-labels-baseline.json");
 
 /**
  * A character reference that survived into drawn text.

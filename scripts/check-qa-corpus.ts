@@ -73,7 +73,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { checkQaDirs } from "@litlfred/cat-harness/content/pipeline/qa-graph-integrity.ts";
+import { checkQaDirs } from "../content/pipeline/qa-graph-integrity.ts";
 import { directoriesForGraph, instanceRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 // `directoriesForGraph` reads declarations, which throw on the `folio` kind
 // unless core has registered it — the same side-effect import qa-store carries.
@@ -85,8 +85,8 @@ import {
   KgQaReportSchema,
   type KgQaReport,
 } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import { JUDGEMENT_EXIT } from "@litlfred/cat-harness/scripts/qa-results.ts";
-import { githubPublishDecision, QaUsageError, readQaTree } from "@litlfred/cat-harness/scripts/qa-store.ts";
+import { JUDGEMENT_EXIT } from "./qa-results.ts";
+import { githubPublishDecision, QaUsageError, readQaTree } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.

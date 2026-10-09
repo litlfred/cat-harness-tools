@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { BranchStoreUsageError, MANIFEST_SCHEMA, type BranchStoreOptions, type TipLocation } from "@litlfred/cat-harness/scripts/branch-store.js";
+import { BranchStoreUsageError, MANIFEST_SCHEMA, type BranchStoreOptions, type TipLocation } from "../branch-store.js";
 import { StateStore } from "../state-store.js";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];

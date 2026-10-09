@@ -9,7 +9,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { executeNamedQuery } from "@litlfred/cat-harness/scripts/nquads-query.js";
+import { executeNamedQuery } from "../../scripts/nquads-query.js";
 
 export function registerNQuadsQueryTools(server: McpServer): void {
   server.tool(

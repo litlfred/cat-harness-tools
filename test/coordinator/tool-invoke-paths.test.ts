@@ -46,8 +46,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { unresolvedPaths } from "@litlfred/cat-harness/scripts/check-tools.ts";
-import { tools, toolsOf } from "@litlfred/cat-harness/tools/discover.js";
+import { unresolvedPaths } from "../../scripts/check-tools.ts";
+import { tools, toolsOf } from "../../tools/discover.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 

@@ -9,8 +9,8 @@ import { join } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutFlags, stripFlags, untippedControls } from "../check-viewer-nav.ts";
-import { injectRail } from "@litlfred/cat-harness/scripts/lib/harness-rail.ts";
-import { withHeadingIds } from "@litlfred/cat-harness/scripts/viewer-page.ts";
+import { injectRail } from "../lib/harness-rail.ts";
+import { withHeadingIds } from "../viewer-page.ts";
 
 const page = (body: string): string => `<!doctype html><html><head></head><body>${body}</body></html>`;
 const rail = (body: string, label?: string): string =>
@@ -99,7 +99,7 @@ describe("ob3m finding 1 — tooltips on icon-only controls, ▦ Harnesses at re
   });
 
   it("the rail's own ⚙ carries the tooltip, equal to its aria-label", async () => {
-    const { navbarHtml } = await import("@litlfred/cat-harness/scripts/lib/navbar.ts");
+    const { navbarHtml } = await import("../lib/navbar.ts");
     const nav = navbarHtml({
       instance: "cat-harness",
       harnesses: {
@@ -192,7 +192,7 @@ describe("sibling rows in a group share one indent (owner, 2026-10-01)", () => {
   // subjects beside it: `.fa-nav-dead` took the bare pad while a sub-group
   // link took pad + one glyph step. Same depth must mean same indent.
   it("a label-only row is indented like a linked one; a kind row stays flush", async () => {
-    const { navbarCss } = await import("@litlfred/cat-harness/scripts/lib/navbar.ts");
+    const { navbarCss } = await import("../lib/navbar.ts");
     const css = navbarCss();
     const pad = (selector: string): string | undefined =>
       new RegExp(`${selector.replace(/[.]/g, "\\.")}\\{padding-left:(\\d+)px`).exec(css)?.[1];

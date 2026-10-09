@@ -402,7 +402,7 @@ export function qaReportsUnretried(text: string, file: string): WorkflowFinding[
       kind: "qa-reports-unretried" as const,
       detail:
         `a raw push to \`${QA_REPORTS_BRANCH}\`. Every write to that branch goes through ` +
-        "`bun run cat qa:publish` / `qa:prune` (`cat-harness/scripts/qa-store.ts`): fetch the tip, splice, " +
+        "`bun run cat qa:publish` / `qa:prune` (`cat-harness-tools/scripts/qa-store.ts`): fetch the tip, splice, " +
         "`commit-tree -p`, push without `-f`, three attempts with `backoff-sleep.ts`. A hand-rolled push " +
         "loses a concurrent writer's entry or force-pushes over it.",
     });

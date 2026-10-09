@@ -83,9 +83,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
-import { orphanSubjectPages, viewerPlacement } from "@litlfred/cat-harness/scripts/gen-schema-viz.ts";
+import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { classify } from "./check-docs-populated.ts";
-import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "./known-skills.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import {
   findDeclarationFile,
@@ -100,12 +100,12 @@ import {
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
-import { skillPageHref, skillPagesOf } from "@litlfred/cat-harness/scripts/lib/skill-pages.ts";
+import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { renderedPath, withRendersFrontMatter } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
-import { publishPlan } from "@litlfred/cat-harness/scripts/derive-at-publish.ts";
+import { renderedPath, withRendersFrontMatter } from "./viewer-declarations.js";
+import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { themedPage as sharedThemedPage } from "@litlfred/cat-harness/scripts/lib/themed-page.ts";
+import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
 
 function decodeEntities(s: string): string {
   return s

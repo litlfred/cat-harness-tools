@@ -15,7 +15,7 @@ import { join, relative } from "node:path";
 
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 
-import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
+import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "@litlfred/cat-harness/schemas/namespaces.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");

@@ -128,8 +128,8 @@ import { resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harnes
 import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
-import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "@litlfred/cat-harness/scripts/branch-store.ts";
-import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "@litlfred/cat-harness/scripts/state-drift.ts";
+import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "./branch-store.ts";
+import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "./state-drift.ts";
 
 /** What the manifest says, as far as a refresh needs it. */
 interface SeedManifest {

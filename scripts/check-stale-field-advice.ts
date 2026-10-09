@@ -183,7 +183,7 @@ export function skipPath(rel: string): string | undefined {
   // author's idea of it. One of them happens to name this field, and inserting
   // a qualifier into it would make it not verbatim — which is the whole
   // property the fixture has.
-  if (rel === "cat-harness/scripts/tests/decisions-named-not-asked.test.ts") {
+  if (rel === "cat-harness-tools/scripts/tests/decisions-named-not-asked.test.ts") {
     return "verbatim transcript fixtures — a qualifier inserted here would stop them being verbatim";
   }
   return undefined;

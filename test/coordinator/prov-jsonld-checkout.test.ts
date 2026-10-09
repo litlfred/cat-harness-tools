@@ -13,7 +13,7 @@ import { resolve, join } from "node:path";
 
 import jsonld from "jsonld";
 
-import { localLoader } from "@litlfred/cat-harness/scripts/publish-verify.ts";
+import { localLoader } from "../../scripts/publish-verify.ts";
 import {
   addressBook,
   provJsonldDocument,

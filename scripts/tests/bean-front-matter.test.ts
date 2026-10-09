@@ -27,7 +27,7 @@ import {
   mechanicalWinner,
   reconcile,
 } from "../check-bean-front-matter.ts";
-import { readBeanFiles } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
+import { readBeanFiles } from "../bean-store-read.ts";
 import { readdirSync } from "node:fs";
 
 /** `sqtq` as committed in `224e0beac8`, line for line. */

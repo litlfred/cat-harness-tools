@@ -58,9 +58,9 @@ import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { docsPages, documentingPages } from "@litlfred/cat-harness/scripts/docs-declarations.js";
-import { governingSkills, skillGovernance } from "@litlfred/cat-harness/scripts/skill-governance.js";
-import { processIndex, resolveProcess, type ProcessIndex } from "@litlfred/cat-harness/scripts/governing-process.js";
+import { docsPages, documentingPages } from "./docs-declarations.js";
+import { governingSkills, skillGovernance } from "./skill-governance.js";
+import { processIndex, resolveProcess, type ProcessIndex } from "./governing-process.js";
 
 import {
   instanceDirectories,
@@ -80,7 +80,7 @@ import {
   visualisationsOf,
   visualisationResolves,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { withViewers } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
+import { withViewers } from "./viewer-declarations.js";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 /** The three obligations, in the order the owner named them. */

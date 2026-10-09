@@ -66,7 +66,7 @@ import {
   repoRootFor,
   type CatHarnessDeclaration,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { collectInstanceNodes } from "@litlfred/cat-harness/scripts/kg-export.js";
+import { collectInstanceNodes } from "./kg-export.js";
 
 /** How an instance's render came out. Never two states. */
 export type RenderVerdict = "rendered" | "undetermined" | "failed";

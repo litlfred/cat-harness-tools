@@ -65,7 +65,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
 import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "@litlfred/cat-harness/scripts/qa-results.js";
+import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
 import {
   type Bump,
   type SurfaceSubject,
@@ -188,7 +188,7 @@ export function surfaceAtRef(repoRoot: string, ref: string): SurfaceSubject[] | 
     // that carries it at the root. Both are tried rather than one assumed,
     // because "the script is not there" and "the export failed" would
     // otherwise be one observation.
-    const candidates = ["cat-harness/scripts/kg-export.ts", "scripts/kg-export.ts"];
+    const candidates = ["cat-harness-tools/scripts/kg-export.ts", "scripts/kg-export.ts"];
     const script = candidates.find((c) => existsSync(join(wt, c)));
     if (script === undefined) return undefined;
     const r = spawnSync("bun", ["run", script, "--out", out], { cwd: wt, encoding: "utf-8", timeout: 600_000 });
@@ -227,7 +227,7 @@ export function surfaceAtHead(
 ): { subjects: SurfaceSubject[]; qa: QaResultState | undefined } | undefined {
   const tmp = mkdtempSync(join(tmpdir(), "vbump-head-"));
   const out = join(tmp, "surface.jsonld");
-  const script = ["cat-harness/scripts/kg-export.ts", "scripts/kg-export.ts"].find((c) =>
+  const script = ["cat-harness-tools/scripts/kg-export.ts", "scripts/kg-export.ts"].find((c) =>
     existsSync(join(repoRoot, c)),
   );
   if (script === undefined) return undefined;

@@ -105,7 +105,7 @@ describe("workflow-level defaults", () => {
     const text = `
 defaults:
   run:
-    working-directory: cat-harness
+    working-directory: cat-harness-tools
 jobs:
   j:
     steps:
@@ -113,7 +113,7 @@ jobs:
         run: bun run scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
-    expect(inv.cwd).toBe("cat-harness");
+    expect(inv.cwd).toBe("cat-harness-tools");
     expect(inv.verdict).toBe(Verdict.Resolves);
   });
 
@@ -126,13 +126,13 @@ jobs:
   j:
     defaults:
       run:
-        working-directory: cat-harness
+        working-directory: cat-harness-tools
     steps:
       - name: s
         run: bun run scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
-    expect(inv.cwd).toBe("cat-harness");
+    expect(inv.cwd).toBe("cat-harness-tools");
   });
 });
 
@@ -187,11 +187,11 @@ jobs:
   j:
     steps:
       - name: s
-        working-directory: cat-harness
+        working-directory: cat-harness-tools
         run: bun run scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
-    expect(inv.cwd).toBe("cat-harness");
+    expect(inv.cwd).toBe("cat-harness-tools");
     expect(inv.verdict).toBe(Verdict.Resolves);
   });
 
@@ -201,7 +201,7 @@ jobs:
   j:
     defaults:
       run:
-        working-directory: cat-harness
+        working-directory: cat-harness-tools
     steps:
       - name: s
         run: bun run scripts/gates.ts
@@ -246,7 +246,7 @@ jobs:
           path: source
       - name: s
         working-directory: source
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -264,7 +264,7 @@ jobs:
         with:
           path: source
       - name: s
-        run: bun run source/cat-harness/scripts/gates.ts
+        run: bun run source/cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -280,7 +280,7 @@ jobs:
           path: source
       - name: s
         working-directory: pages
-        run: bun run ../source/cat-harness/scripts/gates.ts
+        run: bun run ../source/cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -302,7 +302,7 @@ jobs:
         with:
           path: source
       - name: s
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Missing);
@@ -321,7 +321,7 @@ jobs:
         with:
           path: source
       - name: s
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -335,7 +335,7 @@ jobs:
   j:
     steps:
       - name: s
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -358,7 +358,7 @@ jobs:
           path: pages
       - name: s
         working-directory: pages
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Undetermined);
@@ -379,7 +379,7 @@ jobs:
           path: pages
       - name: s
         working-directory: pages
-        run: bun run ../source/cat-harness/scripts/gates.ts
+        run: bun run ../source/cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -396,7 +396,7 @@ jobs:
           path: source
       - name: s
         working-directory: source
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Resolves);
@@ -415,7 +415,7 @@ jobs:
           path: source
       - name: s
         working-directory: source
-        run: bun run cat-harness/scripts/gates.ts
+        run: bun run cat-harness-tools/scripts/gates.ts
 `;
     const [inv] = invocationsFrom("f.yml", text);
     expect(inv.verdict).toBe(Verdict.Missing);
@@ -580,7 +580,7 @@ jobs:
     const yaml = `
 defaults:
   run:
-    working-directory: cat-harness
+    working-directory: cat-harness-tools
 jobs:
   plain:
     steps:
@@ -607,7 +607,7 @@ jobs:
   j:
     defaults:
       run:
-        working-directory: cat-harness
+        working-directory: cat-harness-tools
     steps:
       - name: s
         working-directory: folio-assistant

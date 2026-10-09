@@ -1,0 +1,110 @@
+# QA-sweep nightly — keeps this folio's QA verdicts current on qa-reports
+#
+# Written by `folio_init` from the platform's template
+# (cat-harness/templates/document/github/workflows/qa-sweep-nightly.yml).
+#
+# Why this exists
+# ────────────────
+# A verdict is keyed on its block's content hash, so an edit that fixes a
+# finding leaves the old verdict STALE until the sweep runs again. Without a
+# periodic re-sweep, stale fails accumulate and the open-fail count reports
+# problems that merged pull requests already fixed. In the folio this
+# template came from, most open fails were stale by the time anyone looked,
+# and one post-merge re-sweep cleared nearly all of them.
+#
+# Derived QA verdicts live on the orphan `qa-reports` branch (keyed by commit,
+# written by `qa-store.ts publish` / `qa:publish`) rather than being committed
+# to `main` as `*.qa.json` sidecars. Judgements (attestations) remain on `main`.
+#
+# Triggers
+# ────────
+#   workflow_dispatch — manual run, and the only trigger as written.
+#   To run it nightly, uncomment the `schedule` below (04:30 UTC, off-peak).
+#   It is off by default so a scaffolded folio spends no Actions minutes
+#   until its author chooses to.
+#
+# Steps
+# ─────
+#   1. Check out main with full history, and the platform.
+#   2. Set up bun + install the platform's dependencies.
+#   3. Run the platform's qa-sweep over `{{folio}}/` for each non-proof
+#      axis (canonical / one-voice / q-usage / compute / detangler). The
+#      proof axis needs a Lean toolchain and is left to the Lean workflows.
+#   4. Publish refreshed QA verdicts to the orphan `qa-reports` branch
+#      via `qa-store.ts publish` (under `main/<sha>/`).
+#
+# What the workflow NEVER does
+# ────────────────────────────
+# - Never pushes to `main` directly.
+# - Never opens PRs committing derived QA sidecars to `main`.
+# - Never modifies content blocks (.md / .ts / .lean).
+# - Stores derived verdicts on the orphan `qa-reports` branch, keeping `main` clean.
+
+name: QA sweep nightly
+
+on:
+  # schedule:
+  #   - cron: "30 4 * * *"
+  workflow_dispatch:
+    inputs:
+      axes:
+        description: "Comma-separated axes to sweep (default: canonical,one-voice,q-usage,compute,detangler)"
+        required: false
+        default: "canonical,one-voice,q-usage,compute,detangler"
+
+permissions:
+  contents: write       # write to orphan qa-reports branch
+
+jobs:
+  qa-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Check out the platform if the folio does not carry it
+        run: |
+          if [ ! -f "{{assistant}}/bun.lock" ]; then
+            git clone --depth 1 "{{platform_git}}" "{{assistant}}"
+          fi
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install the platform's dependencies
+        run: |
+          cd "{{assistant}}"
+          bun install --frozen-lockfile
+
+      - name: Run QA sweep across non-proof axes
+        env:
+          AXES: ${{ github.event.inputs.axes || 'canonical,one-voice,q-usage,compute,detangler' }}
+        run: |
+          set -e
+          IFS=',' read -ra AXIS_LIST <<< "$AXES"
+          for axis in "${AXIS_LIST[@]}"; do
+            axis_trim="$(echo "$axis" | xargs)"
+            echo "::group::axis $axis_trim"
+            bun run "{{assistant}}/cat-harness/content/pipeline/qa-sweep.ts" "{{folio}}" --axis "$axis_trim" --ci
+            echo "::endgroup::"
+          done
+
+      # Derived QA results live on the orphan qa-reports branch (arc 3fva,
+      # skills/sdlc/sdlc-core/qa-reports.md), keyed by commit: main/<sha>/
+      # for pushes/sweeps on main. Judgements (attestations) stay on main.
+      - name: Publish QA verdicts to qa-reports
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ ! -d test/results ] || [ -z "$(find test/results -type f 2>/dev/null)" ]; then
+            echo "No QA results to publish — exiting cleanly."
+            exit 0
+          fi
+          bun run "{{assistant}}/cat-harness/scripts/qa-store.ts" publish \
+            --ref "main/$(git rev-parse HEAD)" \
+            --root test/results

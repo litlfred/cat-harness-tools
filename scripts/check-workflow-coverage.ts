@@ -82,7 +82,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { bpmnIds, workflowBpmn, workflowPaths } from "@litlfred/cat-harness/scripts/workflow-bpmn.js";
+import { bpmnIds, workflowBpmn, workflowPaths } from "./workflow-bpmn.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = repoRootFor(resolve(import.meta.dir, ".."));

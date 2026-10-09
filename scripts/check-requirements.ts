@@ -71,7 +71,7 @@ import {
   RequirementSignoffAttestationsSchema,
 } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { kgRoots } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { kgRoots } from "./known-skills.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
 const INSTANCE = join(REPO, "cat-harness");

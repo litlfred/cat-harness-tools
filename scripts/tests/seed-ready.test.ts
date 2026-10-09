@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { resolve } from "path";
 
-import { loadDecisionTable, type DecisionTable } from "@litlfred/cat-harness/src/workflow/decision-table.ts";
+import { loadDecisionTable, type DecisionTable } from "../../src/workflow/decision-table.ts";
 import {
   assess,
   closureOf,

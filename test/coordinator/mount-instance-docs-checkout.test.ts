@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { servedDirectories } from "@litlfred/cat-harness/scripts/mount-instance-docs.js";
+import { servedDirectories } from "../../scripts/mount-instance-docs.js";
 
 describe("a served directory's bytes publish at /<instance>/<path> — bean 680p", () => {
 

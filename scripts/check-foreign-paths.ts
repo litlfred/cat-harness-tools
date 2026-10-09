@@ -61,11 +61,11 @@ import {
   markerCoverage,
   pathContextRanges,
   stripComments,
-} from "@litlfred/cat-harness/scripts/check-declared-paths.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+} from "./check-declared-paths.js";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
-export const BASELINE_PATH = resolve(HARNESS_ROOT, "scripts", "foreign-path-baseline.json");
+export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");
 
 /** One instance and the directories it declares, repo-relative and code-free. */
 export interface InstanceDirs {

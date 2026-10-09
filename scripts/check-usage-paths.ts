@@ -138,7 +138,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { trackedPaths } from "@litlfred/cat-harness/scripts/check-portable-paths.js";
+import { trackedPaths } from "./check-portable-paths.js";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 

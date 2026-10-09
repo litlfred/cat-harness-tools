@@ -26,7 +26,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { mutatedDuring } from "../check-merged.ts";
-import type { TreeReading } from "@litlfred/cat-harness/scripts/gate-tree-guard.ts";
+import type { TreeReading } from "../gate-tree-guard.ts";
 
 const read = (pairs: [string, string][]): TreeReading => ({
   ok: true,

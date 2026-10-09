@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { beanDefsDir } from "@litlfred/cat-harness/scripts/beans.js";
+import { beanDefsDir } from "../../scripts/beans.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { primeFromDir } from "./beans-prime.js";
 

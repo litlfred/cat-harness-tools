@@ -38,7 +38,7 @@
  * @covers code
  */
 import { spawnSync } from "node:child_process";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 import { PYTHON_DEPS, importNameOf, type PythonDep } from "@litlfred/cat-harness/schemas/python-deps.ts";
 
@@ -48,7 +48,7 @@ import { PYTHON_DEPS, importNameOf, type PythonDep } from "@litlfred/cat-harness
 // `ar1s`), though CI installs it from the checkout root. One constant answered both while the two roots were one
 // directory; pointing it at the repository made the glob match nothing and
 // the scan report 0 imports — a vacuous pass the neighbouring guard caught.
-const ROOT = HARNESS_ROOT;
+const ROOT = TOOLS_ROOT;  // bean 70lx: the scripts moved here; the declaration they answer to stayed
 
 export interface PythonImport {
   module: string;

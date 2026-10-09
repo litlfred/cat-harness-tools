@@ -32,9 +32,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { mountState, report } from "@litlfred/cat-harness/scripts/state-mount.js";
+import { mountState, report } from "../state-mount.js";
 import { pushState, report as pushReport } from "../state-push.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const MANIFEST = JSON.stringify({ $schema: "state-manifest/v1", status: "seed", authoritative: false, keyedBy: "tip" });
@@ -358,7 +358,7 @@ describe("the exit code carries the finding", () => {
   // The sweep calls this with `|| true`, so a non-zero exit is the only thing
   // a wrapper cannot turn into silence. Run the real CLI.
   function run(root: string): { status: number; out: string } {
-    const r = spawnSync("bun", ["run", join(HARNESS_ROOT, "scripts", "state-mount.ts")], { cwd: root, encoding: "utf-8" });
+    const r = spawnSync("bun", ["run", join(TOOLS_ROOT, "scripts", "state-mount.ts")], { cwd: root, encoding: "utf-8" });
     return { status: r.status ?? 128, out: (r.stdout ?? "") + (r.stderr ?? "") };
   }
 

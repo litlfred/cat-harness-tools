@@ -47,7 +47,7 @@ import {
 } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { tools } from "@litlfred/cat-harness/tools/index.ts";
 import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = HARNESS_ROOT;
 
@@ -61,7 +61,7 @@ const toolCriteria = KG_CRITERIA.filter((c) => c.applies.includes("tool"));
  * Spawned once, at load, because `kg-audit.ts` is a script that runs on import.
  */
 const FRESH: Map<string, KgQaReport> = (() => {
-  const run = Bun.spawnSync(["bun", "run", resolve(INSTANCE, "scripts", "kg-audit.ts"), "--check", "--json"], {
+  const run = Bun.spawnSync(["bun", "run", resolve(TOOLS_ROOT, "scripts", "kg-audit.ts"), "--check", "--json"], {
     cwd: INSTANCE,
     stdout: "pipe",
     stderr: "pipe",

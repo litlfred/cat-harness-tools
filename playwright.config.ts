@@ -5,7 +5,7 @@
  * @covers none — a browser-test runner's configuration, not a graph audit
  */
 import { defineConfig, devices } from '@playwright/test';
-import { resolveChromium } from '@litlfred/cat-harness/scripts/playwright-chromium.ts';
+import { resolveChromium } from './scripts/playwright-chromium.ts';
 
 // Which Chromium to launch, decided once and REPORTED. A prebuilt image pins
 // a browser build that the installed @playwright/test may not be the one that
@@ -109,7 +109,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // `cat-harness/test/test-server.mjs` serves the repo root statically. It was
+  // `cat-harness-tools/test/test-server.mjs` serves the repo root statically. It was
   // referenced here long before it existed — see bean `dzl3` — so no e2e test
   // in this repo was runnable until it was written. It sat at the repository
   // root until 2026-10-06 and moved beside the e2e specs it serves (bean

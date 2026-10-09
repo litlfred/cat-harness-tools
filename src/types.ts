@@ -23,8 +23,8 @@ export const ROLE_LEVELS: Record<UserRole, number> = {
 
 // Defined in `./content-types.ts` (bean `w2gr`, step 1) and re-exported so
 // every existing importer of this module keeps working unchanged.
-import type { ContentSource } from "@litlfred/cat-harness/src/content-types.js";
-export type { BlockDiff, BranchCharacterization, ChapterDetail, ContentOutline, ContentSource, DocumentDiff, FolioItem, MacroDef, OutlineChapter, OutlineSection, ResolvedBlock, ResolvedChapter, ResolvedDocument, ResolvedSection, SectionStub, TodoRef, TriageResult } from "@litlfred/cat-harness/src/content-types.js";
+import type { ContentSource } from "./content-types.js";
+export type { BlockDiff, BranchCharacterization, ChapterDetail, ContentOutline, ContentSource, DocumentDiff, FolioItem, MacroDef, OutlineChapter, OutlineSection, ResolvedBlock, ResolvedChapter, ResolvedDocument, ResolvedSection, SectionStub, TodoRef, TriageResult } from "./content-types.js";
 
 /**
  * ContentAdapter — the interface each content type must implement.

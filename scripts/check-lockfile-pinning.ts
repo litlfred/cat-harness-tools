@@ -69,11 +69,11 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
-const BASELINE = join(HARNESS_ROOT, "scripts", "lockfile-pinning-baseline.json");
+const BASELINE = join(TOOLS_ROOT, "scripts", "lockfile-pinning-baseline.json");
 
 /** A pinned install whose failure is swallowed by a fallback. */
 const DEGRADING_PIN = /--frozen-lockfile[^\n]*\|\|/;

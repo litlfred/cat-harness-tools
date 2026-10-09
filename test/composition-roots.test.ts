@@ -43,7 +43,7 @@ import {
   BUILTIN_ADAPTERS,
   discoverBuiltinAdapters,
   resolveBuiltinAdapter,
-} from "@litlfred/cat-harness/src/builtin-adapters.ts";
+} from "../src/builtin-adapters.ts";
 import { SERVER_ROUTES } from "../src/server.ts";
 import { dispatchGet, dispatchPost, mountDeclaredRoutes } from "../src/route-groups.ts";
 

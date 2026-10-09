@@ -16,7 +16,7 @@ import {
   declaredContributions,
   readLandingStickies,
   readerTextProblems,
-} from "@litlfred/cat-harness/scripts/ensure-landing-sticky.js";
+} from "../../scripts/ensure-landing-sticky.js";
 import { instanceRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */

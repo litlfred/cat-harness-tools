@@ -22,7 +22,7 @@ import {
   TODO_SCHEMA_TAG,
   type KgIndex,
 } from "@litlfred/cat-harness/schemas/todo.ts";
-import { readTodoFiles, todoDefaultTheme } from "@litlfred/cat-harness/scripts/todos.js";
+import { readTodoFiles, todoDefaultTheme } from "../scripts/todos.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
 import { themeById } from "@litlfred/cat-harness/schemas/themes.js";

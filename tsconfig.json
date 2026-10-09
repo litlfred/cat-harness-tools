@@ -14,7 +14,17 @@
     "adapters/**/*.ts",
     "scripts/**/*.ts",
     "types/**/*.d.ts",
-    "test/**/*.ts"
+    "test/**/*.ts",
+    "content/**/*.ts",
+    "archimate/**/*.ts",
+    "openapi/**/*.ts",
+    "schemas/**/*.ts",
+    "skills/**/*.ts",
+    "tools/**/*.ts",
+    "templates/**/*.ts",
+    "ui/**/*.ts",
+    "viewer/**/*.ts",
+    "deploy/**/*.ts"
   ],
   "exclude": [
     "dist",

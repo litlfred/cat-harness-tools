@@ -13,8 +13,8 @@ import { existsSync, readFileSync } from "fs";
 import { join, extname, resolve } from "path";
 
 import type { ContentAdapter } from "./types.js";
-import { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
-import { log, logDebug } from "@litlfred/cat-harness/src/core/logging.js";
+import { GitHelper } from "./core/git.js";
+import { log, logDebug } from "./core/logging.js";
 import { registerServedToolGroups } from "./tool-groups.js";
 import { registerSkillPrompts } from "./tools/skill-prompts.js";
 import {

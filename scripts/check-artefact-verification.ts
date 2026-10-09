@@ -55,11 +55,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
-const DECL = join(HARNESS_ROOT, "scripts", "artefact-verification.json");
+const DECL = join(TOOLS_ROOT, "scripts", "artefact-verification.json");
 
 /**
  * Calls that mean the script parses or validates SOMETHING.

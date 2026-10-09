@@ -21,13 +21,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { checkoutRootFor, isForeignCheckout, instanceRootsIn, repoRootFor, rootForScope, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutHolding } from "@litlfred/cat-harness/test/support/checkout.js";
-import { declareInstance } from "@litlfred/cat-harness/test/support/instance-fixture.js";
-import { skillMdDirs } from "@litlfred/cat-harness/scripts/known-skills.js";
-import { findPublishWorkflows } from "@litlfred/cat-harness/scripts/pages-bootstrap.js";
+import { checkoutHolding } from "../test/support/checkout.js";
+import { declareInstance } from "../test/support/instance-fixture.js";
+import { skillMdDirs } from "../scripts/known-skills.js";
+import { findPublishWorkflows } from "../scripts/pages-bootstrap.js";
 import { scan as retiredScan } from "../scripts/check-retired-front-matter.js";
 import { auditInstance } from "../scripts/check-subgraph-coverage.js";
-import { readSchemaGraph } from "@litlfred/cat-harness/scripts/schema-graph.js";
+import { readSchemaGraph } from "../scripts/schema-graph.js";
 
 /** Whether `p` lies inside `dir` (or is it). */
 function inside(p: string, dir: string): boolean {

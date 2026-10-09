@@ -42,12 +42,12 @@ import {
   type PagesReport,
   type RunSummary,
   type Window,
-} from "@litlfred/cat-harness/src/workflow/ci-health.js";
+} from "../src/workflow/ci-health.js";
 
-import { whyNoRun } from "@litlfred/cat-harness/src/workflow/workflow-triggers.js";
+import { whyNoRun } from "../src/workflow/workflow-triggers.js";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { readBeanStore } from "@litlfred/cat-harness/scripts/bean-store-read.js";
+import { readBeanStore } from "./bean-store-read.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

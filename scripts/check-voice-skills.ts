@@ -66,7 +66,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readVoicesGraph } from "@litlfred/cat-harness/scripts/voices-graph.ts";
+import { readVoicesGraph } from "./voices-graph.ts";
 import { loadVoices } from "@litlfred/cat-harness/schemas/voices.ts";
 import {
   directoriesForGraph,

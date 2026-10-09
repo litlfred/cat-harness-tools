@@ -13,11 +13,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { declarationPathIn, instanceRootsIn, visualisationResolves } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { tools } from "@litlfred/cat-harness/tools/discover.js";
+import { tools } from "../../tools/discover.js";
 import {
   viewersOf,
   type ViewedDirectory,
-} from "@litlfred/cat-harness/scripts/viewer-declarations.js";
+} from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

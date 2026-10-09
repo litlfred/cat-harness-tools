@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { harnessTiles } from "@litlfred/cat-harness/scripts/harness-tiles.js";
+import { harnessTiles } from "../../scripts/harness-tiles.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

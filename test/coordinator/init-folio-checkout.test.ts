@@ -17,7 +17,7 @@ import { tmpdir } from "os";
 import {
   initFolio,
   type InitFolioOptions,
-} from "@litlfred/cat-harness/scripts/init-folio.ts";
+} from "../../scripts/init-folio.ts";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
 

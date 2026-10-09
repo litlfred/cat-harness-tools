@@ -43,7 +43,7 @@ import { existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-import { diffReadings, readTree, type TreeReading } from "@litlfred/cat-harness/scripts/gate-tree-guard.ts";
+import { diffReadings, readTree, type TreeReading } from "./gate-tree-guard.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

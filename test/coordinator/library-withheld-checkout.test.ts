@@ -35,10 +35,10 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { withheldPaths } from "@litlfred/cat-harness/scripts/lib/withheld.ts";
-import { avatarCopies, entryBlocks, projection } from "@litlfred/cat-harness/scripts/gen-library-viz.ts";
-import { readLibraryGraph } from "@litlfred/cat-harness/scripts/library-graph.ts";
-import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { withheldPaths } from "../../scripts/lib/withheld.ts";
+import { avatarCopies, entryBlocks, projection } from "../../scripts/gen-library-viz.ts";
+import { readLibraryGraph } from "../../scripts/library-graph.ts";
+import { writeDeclaration } from "../support/instance-fixture.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every checkout path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

@@ -123,7 +123,7 @@ describe("against this repository's own sources", () => {
     // report the repository's best-behaved slow test as its worst offender.
     const ranges = declaredBudgetRanges(
       readFileSync(
-        `${REPO}cat-harness/scripts/tests/declared-directory-resolves.test.ts`,
+        `${REPO}cat-harness-tools/scripts/tests/declared-directory-resolves.test.ts`,
         "utf-8",
       ),
       "declared-directory-resolves.test.ts",
