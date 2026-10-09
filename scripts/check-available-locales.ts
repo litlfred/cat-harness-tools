@@ -66,7 +66,6 @@
  * @covers docs
  * @graphNode tool
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -82,6 +81,7 @@ import {
   type TranslationIndex,
 } from "../../cat-harness/content/pipeline/translation-index.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
+import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
@@ -145,12 +145,15 @@ export function backedLocales(index: TranslationIndex, src: string, sourceKey: s
 /** Tracked `.md` files under the instance's site directory, repo-relative. */
 function trackedPages(): string[] {
   const siteAbs = join(INSTANCE_ROOT, SITE_DIR);
-  const out = execFileSync("git", ["ls-files", "--", relative(REPO_ROOT, siteAbs)], {
-    cwd: REPO_ROOT,
-    encoding: "utf-8",
-    timeout: 60_000,
-  });
-  return out.split("\n").filter((f) => f.endsWith(".md"));
+  // In a composed checkout every instance is a REMOTE MOUNT, laid down from
+  // `index.lock.json` and ignored by the index repository's git, so a bare
+  // `git ls-files` at the root lists none of their files. `gitCorpus` counts a
+  // mount's files as it counted a submodule's, and is tracked-plus-untracked
+  // exactly as before everywhere else. A DIRECTORY is spelled `<dir>/**`:
+  // a mount's files are matched as globs, and a bare directory matches none.
+  const out = gitCorpus(REPO_ROOT, [`${relative(REPO_ROOT, siteAbs)}/**`]);
+  if (out === undefined) throw new Error(`git could not list the files under ${siteAbs}`);
+  return out.map((f) => relative(REPO_ROOT, f)).filter((f) => f.endsWith(".md"));
 }
 
 export function availableLocaleClaims(): Report {

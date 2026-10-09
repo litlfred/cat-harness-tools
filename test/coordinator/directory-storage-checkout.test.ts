@@ -11,7 +11,8 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveQaLocation } from "../../../cat-harness/scripts/qa-store.js";
@@ -39,7 +40,18 @@ describe("the real declarations (bean 5hox)", () => {
   });
 
   test("attestations are never ignored: they stay on main (ruling D2 (a))", () => {
-    const r = spawnSync("git", ["check-ignore", "--no-index", "-q", "cat-harness/test/attestations/kg-qa/probe.attestations.json"], { cwd: repoRoot });
+    // RESTATED for the split. `main` is now litlfred/cat-harness's, and in the
+    // composed checkout `cat-harness/` is a REMOTE MOUNT that the index's own
+    // `.gitignore` ignores wholesale (`/cat-harness/`) -- so asking the index
+    // reports every path in the mount as ignored, which says nothing about the
+    // ruling. The question is whether the repository that HOLDS the
+    // attestations ignores them, so it is put to cat-harness's own
+    // `.gitignore`, alone, in a throwaway repository.
+    const scratch = mkdtempSync(join(tmpdir(), "attestations-ignore-"));
+    made.push(scratch);
+    expect(spawnSync("git", ["init", "-q"], { cwd: scratch }).status).toBe(0);
+    copyFileSync(join(repoRoot, "cat-harness", ".gitignore"), join(scratch, ".gitignore"));
+    const r = spawnSync("git", ["check-ignore", "--no-index", "-q", "test/attestations/kg-qa/probe.attestations.json"], { cwd: scratch });
     expect(r.status).toBe(1);
   });
 });

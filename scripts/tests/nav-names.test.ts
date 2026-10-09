@@ -119,7 +119,10 @@ describe("a planted second name fails", () => {
     const c = siteCopy();
     const path = join(c.site, "_data", "harness.json");
     const d = JSON.parse(readFileSync(path, "utf-8")) as { tiles: { id: string; title: string; href?: string }[] };
-    const skills = d.tiles.find((t) => t.id === "skills")!;
+    // Found by the NAME under test, not by id: the tile's id is whatever the
+    // generator gave it (`skills` before the split, `core-skills` since
+    // folio-assistant-core became the landing), and the plant renames a title.
+    const skills = d.tiles.find((t) => t.title === "Skills")!;
     expect(skills.title).toBe("Skills");
     skills.title = "Skills — cat-harness";
     writeFileSync(path, JSON.stringify(d));
