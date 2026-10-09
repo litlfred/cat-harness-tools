@@ -64,10 +64,10 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { executed, runsForHead } from "../../cat-harness/scripts/check-head-has-run.js";
-import { classifyResponse, withBackoff } from "../../cat-harness/src/core/retry.js";
-import { detectRepoUrl, ownerRepo } from "../../cat-harness/src/core/git-refs.js";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { executed, runsForHead } from "@litlfred/cat-harness/scripts/check-head-has-run.js";
+import { classifyResponse, withBackoff } from "@litlfred/cat-harness/src/core/retry.js";
+import { detectRepoUrl, ownerRepo } from "@litlfred/cat-harness/src/core/git-refs.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = repoRootFor(resolve(import.meta.dir, ".."));
 

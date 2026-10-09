@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { buildGlossary } from "../../../cat-harness/scripts/glossary-export.ts";
+import { buildGlossary } from "@litlfred/cat-harness/scripts/glossary-export.ts";
 
 describe("the corpus it is actually run against", () => {
   const { report } = buildGlossary({ today: () => "2026-09-21" });

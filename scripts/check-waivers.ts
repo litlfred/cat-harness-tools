@@ -47,8 +47,8 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { WaiverNodeSchema, waiverState, type WaiverNode } from "../../cat-harness/schemas/waiver.js";
-import { corpusDirectoriesForGraph } from "../../cat-harness/schemas/harness-config.js";
+import { WaiverNodeSchema, waiverState, type WaiverNode } from "@litlfred/cat-harness/schemas/waiver.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;

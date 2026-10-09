@@ -26,7 +26,7 @@ import {
   surveyWorkflows,
   workflowJobs,
 } from "../check-workflow-coverage.js";
-import { bpmnIds, workflowBpmn } from "../../../cat-harness/scripts/workflow-bpmn.js";
+import { bpmnIds, workflowBpmn } from "@litlfred/cat-harness/scripts/workflow-bpmn.js";
 
 describe("a workflow DECLARES its diagram (bean 61ca)", () => {
   test("the `# bpmn:` header is read", () => {

@@ -18,9 +18,9 @@ import {
   KG_QA_RESULTS_DIR,
   KG_SUBJECT_GRAPH_TYPOLOGIES,
   KG_SUBJECT_KINDS,
-} from "../../cat-harness/schemas/kg-qa";
-import { defaultGraphTypologies, instanceRootsIn, kgQaHomeFor, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { actorsDir } from "../../cat-harness/schemas/role-graph.ts";
+} from "@litlfred/cat-harness/schemas/kg-qa";
+import { defaultGraphTypologies, instanceRootsIn, kgQaHomeFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 
 describe("the criteria registry", () => {
   test("ids are unique", () => {

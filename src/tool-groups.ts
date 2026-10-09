@@ -37,9 +37,9 @@
 
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { declarationChain, resolveImplementingPath } from "../../cat-harness/schemas/harness-config.js";
-import type { ToolDefinition } from "../../cat-harness/schemas/tool.js";
-import { discoverTools } from "../../cat-harness/tools/discover.js";
+import { declarationChain, resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
+import { discoverTools } from "@litlfred/cat-harness/tools/discover.js";
 
 /** The harness this layer implements: its Tool nodes are served for every folio. */
 const HARNESS_ROOT = resolve(import.meta.dir, "..", "..", "cat-harness");

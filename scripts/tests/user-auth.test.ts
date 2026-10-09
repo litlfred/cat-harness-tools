@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { GITHUB_ROLE_ACTOR, githubIdentity, principalFromGithub, repoSlug } from "../../src/core/github-auth.js";
-import { loadAccessContext } from "../../../cat-harness/src/core/access.js";
+import { loadAccessContext } from "@litlfred/cat-harness/src/core/access.js";
 import { grainNote, whoami } from "../../src/tools/auth.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

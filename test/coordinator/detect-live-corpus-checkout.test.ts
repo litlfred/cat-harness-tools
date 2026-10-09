@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { derivedWriters } from "../../../cat-harness/scripts/detect-live-corpus.ts";
+import { derivedWriters } from "@litlfred/cat-harness/scripts/detect-live-corpus.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

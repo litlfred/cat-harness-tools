@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { AMBIGUOUS_NAMES, checkAnchorNames, instanceDirs } from "../check-anchor-names.ts";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 /** A repo with one instance at `cat-harness/`, holding `scripts/tests/a.ts`. */
 function fixture(src: string): string {

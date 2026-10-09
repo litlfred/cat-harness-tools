@@ -21,7 +21,7 @@ import {
   totalBytes,
   type ExtractedAsset,
   type Extraction,
-} from "../../cat-harness/schemas/extraction.js";
+} from "@litlfred/cat-harness/schemas/extraction.js";
 import { REPO_ROOT } from "./lib/roots.ts";
 
 // What recorded paths are relative to. Before bean `tlat` moved this file down

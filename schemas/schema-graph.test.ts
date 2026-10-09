@@ -25,7 +25,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readSchemaGraph } from "../../cat-harness/scripts/schema-graph.ts";
+import { readSchemaGraph } from "@litlfred/cat-harness/scripts/schema-graph.ts";
 
 /** A throwaway instance whose `schemas/` holds exactly the given files. */
 function fixture(files: Record<string, string>): { root: string; cleanup: () => void } {

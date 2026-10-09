@@ -15,11 +15,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import { describe, expect, it } from "bun:test";
 
-import { stagingSlug } from "../../../cat-harness/test/health/checks.ts";
+import { stagingSlug } from "@litlfred/cat-harness/test/health/checks.ts";
 
 /**
  * The directory this test was written in (`cat-harness/test/health/`): every path below

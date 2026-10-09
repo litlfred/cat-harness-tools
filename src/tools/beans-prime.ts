@@ -15,11 +15,11 @@
 import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { beanDefsDir } from "../../../cat-harness/scripts/beans.js";
+import { beanDefsDir } from "@litlfred/cat-harness/scripts/beans.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { listInstances } from "../../../cat-harness/src/workflow/store.js";
-import { positionOf } from "../../../cat-harness/src/workflow/instance.js";
-import type { InstanceState } from "../../../cat-harness/src/workflow/instance.js";
+import { listInstances } from "@litlfred/cat-harness/src/workflow/store.js";
+import { positionOf } from "@litlfred/cat-harness/src/workflow/instance.js";
+import type { InstanceState } from "@litlfred/cat-harness/src/workflow/instance.js";
 
 /** Run a command in the repo, returning trimmed stdout or "" on failure. */
 function run(cmd: string, cwd: string): string {

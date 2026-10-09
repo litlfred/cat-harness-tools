@@ -33,9 +33,9 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, readFileSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
-import { SkillRegistrySchema } from "../../../cat-harness/schemas/constraints.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { packageDirsIn } from "../../../cat-harness/scripts/skill-topics.js";
+import { SkillRegistrySchema } from "@litlfred/cat-harness/schemas/constraints.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { packageDirsIn } from "@litlfred/cat-harness/scripts/skill-topics.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

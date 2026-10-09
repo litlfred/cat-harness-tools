@@ -15,8 +15,8 @@
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
-import { coverage, gateCoverage } from "../../../cat-harness/scripts/audit-coverage.js";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { coverage, gateCoverage } from "@litlfred/cat-harness/scripts/audit-coverage.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The directory this test was written in (`cat-harness-tools/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness-tools/scripts/tests");

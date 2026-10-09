@@ -36,7 +36,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse, parseDocument } from "yaml";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = join(repoRootFor(ROOT), ".github", "workflows");

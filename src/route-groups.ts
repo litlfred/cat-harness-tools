@@ -74,7 +74,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { resolveImplementingPath } from "../../cat-harness/schemas/harness-config.js";
+import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** Which repository layer a route will live in after the split. */
 export type RouteLayer = "core" | "sci" | "harness";

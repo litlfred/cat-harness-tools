@@ -16,9 +16,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 
-import { LOG_DIR } from "../../../cat-harness/schemas/log-entry.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { fshGutsDirectory } from "../../../cat-harness/schemas/fsh-guts.js";
+import { LOG_DIR } from "@litlfred/cat-harness/schemas/log-entry.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

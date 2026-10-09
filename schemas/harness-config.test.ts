@@ -16,8 +16,8 @@ import {
   resolveSkillDirs,
   resolveTranslationDirs,
   materialiseDeclaredDirectories,
-} from "../../cat-harness/schemas/harness-config";
-import { instanceConfigPathIn, writeInstanceConfig } from "../../cat-harness/test/support/instance-fixture.js";
+} from "@litlfred/cat-harness/schemas/harness-config";
+import { instanceConfigPathIn, writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the

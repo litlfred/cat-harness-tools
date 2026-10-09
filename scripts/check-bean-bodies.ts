@@ -42,7 +42,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import {
   CLOSED_STATUSES,
@@ -50,7 +50,7 @@ import {
   isFoldedTitle,
   readBeanFiles,
   type BeanFile,
-} from "../../cat-harness/scripts/bean-store-read.ts";
+} from "@litlfred/cat-harness/scripts/bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

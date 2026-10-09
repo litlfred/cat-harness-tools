@@ -10,11 +10,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { readdirSync } from "node:fs";
-import { workflowDir } from "../../../cat-harness/src/workflow/store.ts";
+import { workflowDir } from "@litlfred/cat-harness/src/workflow/store.ts";
 
-import { roleOf } from "../../../cat-harness/src/core/handover-screen.ts";
-import { processFiles } from "../../../cat-harness/src/workflow/process-files.ts";
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.ts";
+import { roleOf } from "@litlfred/cat-harness/src/core/handover-screen.ts";
+import { processFiles } from "@litlfred/cat-harness/src/workflow/process-files.ts";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
 import {
   registerWorkflowTools,
   WORKFLOW_COMPLETE_HANDOVER,

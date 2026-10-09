@@ -16,15 +16,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ancestorsOf, flattenDependencies } from "../../../cat-harness/schemas/dependency-order.ts";
-import { allowedFromNeeds, type LayerRule } from "../../../cat-harness/schemas/layer-direction.ts";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.ts";
+import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.ts";
 import {
   classifyReference,
   occurrencesOf,
   type NameCollision,
   type Occurrence,
   type ReferenceExemption,
-} from "../../../cat-harness/schemas/reference-direction.ts";
+} from "@litlfred/cat-harness/schemas/reference-direction.ts";
 import {
   analyse,
   buildDirectionResult,
@@ -38,7 +38,7 @@ import {
   SIDECAR_STEM,
   type PendingEntry,
 } from "../check-reference-direction.ts";
-import { judgeQaResult, qaResultPath, writeQaResult, type QaResult } from "../../../cat-harness/scripts/qa-results.ts";
+import { judgeQaResult, qaResultPath, writeQaResult, type QaResult } from "@litlfred/cat-harness/scripts/qa-results.ts";
 
 // ── The rule, with no filesystem ────────────────────────────────
 

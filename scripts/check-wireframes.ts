@@ -45,7 +45,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { instanceDirectories, instanceRootsIn, repoRootFor, siteDirFor, visualisationsOf } from "../../cat-harness/schemas/cat-harness.ts";
+import { instanceDirectories, instanceRootsIn, repoRootFor, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -55,8 +55,8 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.ts";
-import { withViewers } from "../../cat-harness/scripts/viewer-declarations.js";
+} from "@litlfred/cat-harness/scripts/qa-results.ts";
+import { withViewers } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);

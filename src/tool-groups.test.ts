@@ -10,8 +10,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { clearCheckoutCache } from "../../cat-harness/schemas/harness-config.js";
-import { tools } from "../../cat-harness/tools/index.js";
+import { clearCheckoutCache } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { tools } from "@litlfred/cat-harness/tools/index.js";
 import { registerDeclaredToolGroups, toolGroupsFromNodes } from "./tool-groups.js";
 
 const ROOT = resolve(import.meta.dir, "..");

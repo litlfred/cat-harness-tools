@@ -12,8 +12,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { viewersOf, type ViewedDirectory } from "../../../cat-harness/scripts/viewer-declarations.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { viewersOf, type ViewedDirectory } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

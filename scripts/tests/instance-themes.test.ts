@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { coversIn } from "../../../cat-harness/scripts/audit-coverage.js";
+import { coversIn } from "@litlfred/cat-harness/scripts/audit-coverage.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const SCRIPT = join("cat-harness-tools", "scripts", "check-instance-themes.ts");
@@ -110,7 +110,7 @@ describe("one answer, not two", () => {
     const text = readFileSync(scriptPath("check-instance-themes.ts"), "utf-8");
     // The SAME module, wherever the script sits relative to it (70lx moves
     // scripts to `cat-harness-tools/`, which reaches it through `cat-harness/`).
-    expect(text).toMatch(/import \{[^}]*instanceThemes[^}]*\} from "\.\.\/(?:\.\.\/cat-harness\/)?schemas\/theme-by-ref\.js"/s);
+    expect(text).toMatch(/import \{[^}]*instanceThemes[^}]*\} from "(?:\.\.\/|@litlfred\/cat-harness\/)schemas\/theme-by-ref\.js"/s);
   });
 });
 

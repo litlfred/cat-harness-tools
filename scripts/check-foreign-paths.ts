@@ -52,7 +52,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   LITERAL,
   firstLiteralIn,
@@ -61,9 +61,9 @@ import {
   markerCoverage,
   pathContextRanges,
   stripComments,
-} from "../../cat-harness/scripts/check-declared-paths.js";
+} from "@litlfred/cat-harness/scripts/check-declared-paths.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 export const BASELINE_PATH = resolve(HARNESS_ROOT, "scripts", "foreign-path-baseline.json");
 

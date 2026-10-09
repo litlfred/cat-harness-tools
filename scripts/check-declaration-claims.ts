@@ -15,7 +15,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { claimsIn, declaredGraphs, historicalPrefixes, type Claim } from "../../cat-harness/src/docs/declaration-claims.js";
+import { claimsIn, declaredGraphs, historicalPrefixes, type Claim } from "@litlfred/cat-harness/src/docs/declaration-claims.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 

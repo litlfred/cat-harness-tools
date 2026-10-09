@@ -12,8 +12,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.ts";
-import { KnowledgeGraphDeclarationSchema } from "../../../bootstrap-tools/schemas/graph.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

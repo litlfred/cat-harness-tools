@@ -32,7 +32,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { mountState, report } from "../../../cat-harness/scripts/state-mount.js";
+import { mountState, report } from "@litlfred/cat-harness/scripts/state-mount.js";
 import { pushState, report as pushReport } from "../state-push.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

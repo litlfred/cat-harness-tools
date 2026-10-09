@@ -52,7 +52,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { scriptTable, type ScriptEntry } from "../../cat-harness/schemas/script-table.ts";
+import { scriptTable, type ScriptEntry } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { parseDockerUses, parseUses, stagingExempt } from "./pin-actions.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");

@@ -16,9 +16,9 @@ import { join, resolve } from "path";
 import {
   SECTIONS,
   isForeignRoot,
-} from "../../../cat-harness/content/pipeline/readme-sections";
-import { loadReadmeConfig } from "../../../cat-harness/content/pipeline/readme-toc";
-import {  } from "../../../cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/content/pipeline/readme-sections";
+import { loadReadmeConfig } from "@litlfred/cat-harness/content/pipeline/readme-toc";
+import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

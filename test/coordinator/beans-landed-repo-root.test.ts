@@ -14,7 +14,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { openBeans } from "../../../cat-harness/scripts/beans-landed.js";
+import { openBeans } from "@litlfred/cat-harness/scripts/beans-landed.js";
 
 describe("openBeans", () => {
   test("reads the real store through its declaration, and excludes epics and closed beans", () => {

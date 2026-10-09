@@ -9,8 +9,8 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { directoriesForGraph, instanceRootsIn, readDeclaration } from "../../../cat-harness/schemas/cat-harness.ts";
-import { documentContext, instancePrefixes } from "../../../cat-harness/schemas/content-context.ts";
+import { directoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { documentContext, instancePrefixes } from "@litlfred/cat-harness/schemas/content-context.ts";
 
 const ROOT = join(import.meta.dir, "../../..");
 

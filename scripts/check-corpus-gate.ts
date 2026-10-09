@@ -29,9 +29,9 @@
  */
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-import { checkCorpusGate } from "../../cat-harness/src/workflow/corpus-gate.js";
-import { readBlockManifest } from "../../cat-harness/content/pipeline/qa-utils.js";
-import { loadBlockModuleSync } from "../../cat-harness/content/pipeline/block-module.js";
+import { checkCorpusGate } from "@litlfred/cat-harness/src/workflow/corpus-gate.js";
+import { readBlockManifest } from "@litlfred/cat-harness/content/pipeline/qa-utils.js";
+import { loadBlockModuleSync } from "@litlfred/cat-harness/content/pipeline/block-module.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

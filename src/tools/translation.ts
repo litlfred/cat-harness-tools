@@ -21,8 +21,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createHash } from "crypto";
 
-import { extractMarkdown, formatPot, type PotEntry } from "../../../cat-harness/content/pipeline/pot-extract.js";
-import { parsePo, injectMarkdown } from "../../../cat-harness/content/pipeline/po-inject.js";
+import { extractMarkdown, formatPot, type PotEntry } from "@litlfred/cat-harness/content/pipeline/pot-extract.js";
+import { parsePo, injectMarkdown } from "@litlfred/cat-harness/content/pipeline/po-inject.js";
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
  * `.po` live. Falls back to the convention because extraction CREATES the
@@ -35,7 +35,7 @@ function translationsRoot(repoRoot: string): string {
   return directoryForGraph(repoRoot, "translation-sources") ?? join(repoRoot, "translations");
 }
 
-import { directoryForGraph } from "../../../cat-harness/schemas/cat-harness.js";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 export function registerTranslationTools(server: McpServer, repoRoot: string): void {
 

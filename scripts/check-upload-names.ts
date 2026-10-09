@@ -66,7 +66,7 @@ import {
   instanceDirectoriesForGraph,
   instanceRootsIn,
   readDeclaration,
-} from "../../cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The graph typologies whose files are named after what somebody uploaded. */
 const KINDS = ["uploads", "library"] as const;

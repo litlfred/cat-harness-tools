@@ -22,7 +22,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { DEPLOY_ONLY_STEP, parseMergeMainDispatches } from "../../../cat-harness/scripts/merge-guard.ts";
+import { DEPLOY_ONLY_STEP, parseMergeMainDispatches } from "@litlfred/cat-harness/scripts/merge-guard.ts";
 
 /** The directory this test was written in (`cat-harness-tools/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness-tools/scripts/tests");

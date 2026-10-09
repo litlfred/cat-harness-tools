@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { knownSubstrates } from "../../../cat-harness/scripts/subscriptions-viz.ts";
+import { knownSubstrates } from "@litlfred/cat-harness/scripts/subscriptions-viz.ts";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";

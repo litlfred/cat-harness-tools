@@ -13,7 +13,7 @@ import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolve } from "path";
-import { findContentRepoRoot } from "../../../cat-harness/content/pipeline/repo-root";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
 
 // The FOLIO's root, not the platform's: `resolve(import.meta.dir, "../../..")`
 // was right only when the platform is a submodule two levels down, and named

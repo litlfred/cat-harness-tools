@@ -23,9 +23,9 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
-import { extractMarkdown, formatPot } from "../../../cat-harness/content/pipeline/pot-extract";
-import { parsePo, injectMarkdown } from "../../../cat-harness/content/pipeline/po-inject";
-import { directoryForGraph, deferResolution} from "../../../cat-harness/schemas/cat-harness.js";
+import { extractMarkdown, formatPot } from "@litlfred/cat-harness/content/pipeline/pot-extract";
+import { parsePo, injectMarkdown } from "@litlfred/cat-harness/content/pipeline/po-inject";
+import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // ── Configuration ───────────────────────────────────────────────

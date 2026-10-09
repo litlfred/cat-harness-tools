@@ -19,8 +19,8 @@ import {
   formatReport,
   publishedGraphRefs,
 } from "../check-published-refs";
-import {  } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration, writeInstanceConfig } from "../../../cat-harness/test/support/instance-fixture.js";
+import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration, writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 describe("classifyRef", () => {
   it("accepts a version, with or without the tag's leading v", () => {

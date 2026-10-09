@@ -10,12 +10,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "path";
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model";
 import {
   loadRelaxations,
   validateRelaxations,
-} from "../../../cat-harness/src/workflow/gate";
-import { workflowFile } from "../../../cat-harness/scripts/known-skills.ts";
+} from "@litlfred/cat-harness/src/workflow/gate";
+import { workflowFile } from "@litlfred/cat-harness/scripts/known-skills.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

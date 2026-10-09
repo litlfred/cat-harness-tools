@@ -19,13 +19,13 @@
 import { describe, expect, it } from "bun:test";
 import { relative, resolve, join } from "node:path";
 
-import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/cat-harness.js";
 // Every instance's Tools, as `viewer-declarations` reads them: a viewer Tool
 // may live in a dependency's `tools` graph (fhir-harness's `ig-pages`), and the
 // cat-harness barrel alone would report its pages as naming no renderer.
-import { tools } from "../../../cat-harness/tools/discover.js";
-import { viewerPages } from "../../../cat-harness/scripts/viewer-declarations.js";
-import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.js";
+import { tools } from "@litlfred/cat-harness/tools/discover.js";
+import { viewerPages } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

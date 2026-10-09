@@ -94,9 +94,9 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "../../cat-harness/scripts/qa-store.ts";
-import { movedInventory, movedRoots, type MovedInventory } from "../../cat-harness/scripts/qa-verify-moved.ts";
-import { BUILDING_ENV } from "../../cat-harness/scripts/qa-working-copy.ts";
+import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "@litlfred/cat-harness/scripts/qa-store.ts";
+import { movedInventory, movedRoots, type MovedInventory } from "@litlfred/cat-harness/scripts/qa-verify-moved.ts";
+import { BUILDING_ENV } from "@litlfred/cat-harness/scripts/qa-working-copy.ts";
 
 export { REFRESH_SCHEMA, refreshReportComplete };
 export const REFRESH_EXIT = { complete: 0, incomplete: 1, unknown: 2 } as const;

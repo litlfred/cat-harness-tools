@@ -63,7 +63,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn } from "../../cat-harness/schemas/cat-harness.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

@@ -132,12 +132,12 @@ import { spawnSync } from "node:child_process";
 import { join, relative } from "node:path";
 import { readdirSync, readFileSync } from "node:fs";
 
-import { readBeans } from "../../cat-harness/scripts/beans.ts";
-import { milestoneRollup, type MilestoneReport } from "../../cat-harness/scripts/milestone-rollup.ts";
-import { git } from "../../cat-harness/scripts/merge-pipeline-git.ts";
-import { pathClass } from "../../cat-harness/scripts/merge-pipeline-paths.ts";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { beanDefsDir } from "../../cat-harness/scripts/beans.ts";
+import { readBeans } from "@litlfred/cat-harness/scripts/beans.ts";
+import { milestoneRollup, type MilestoneReport } from "@litlfred/cat-harness/scripts/milestone-rollup.ts";
+import { git } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { pathClass } from "@litlfred/cat-harness/scripts/merge-pipeline-paths.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { beanDefsDir } from "@litlfred/cat-harness/scripts/beans.ts";
 
 const ROOT = repoRootFor(join(import.meta.dir, ".."));
 const REPO = "litlfred/folio-assistant";

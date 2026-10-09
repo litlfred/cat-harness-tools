@@ -27,8 +27,8 @@ import {
   GraphTypologyRegistry,
   resolveCoveragePath,
   siteDirFor,
-} from "../../../cat-harness/schemas/cat-harness";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+} from "@litlfred/cat-harness/schemas/cat-harness";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 /**
  * A throwaway instance whose one directory carries `coverage`.

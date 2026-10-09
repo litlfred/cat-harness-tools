@@ -63,13 +63,13 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { join, resolve } from "node:path";
 
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "../../cat-harness/schemas/jsonld.js";
-import { stubOfNamespace } from "../../cat-harness/schemas/namespaces.js";
-import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "../../cat-harness/schemas/prov-jsonld.js";
-import { SUBGRAPH_CONTEXT_PATH } from "../../cat-harness/schemas/subgraph-manifest.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { stubOfNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
+import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

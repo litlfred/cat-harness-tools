@@ -18,10 +18,10 @@ import {
   depsForTier,
   importNameOf,
   requirementsPath,
-} from "../../../cat-harness/schemas/python-deps.ts";
+} from "@litlfred/cat-harness/schemas/python-deps.ts";
 import { checkPythonDeps, scanImports } from "../check-python-deps.ts";
 import { dockerfileFindings, dockerfileOf, generatedPaths, imageFindings, requirementsBody, staleTiers } from "../gen-python-deps.ts";
-import { tools } from "../../../cat-harness/tools/discover.ts";
+import { tools } from "@litlfred/cat-harness/tools/discover.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 // TWO ROOTS, because this file asks two questions of two different trees.

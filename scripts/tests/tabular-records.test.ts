@@ -18,9 +18,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "../../../cat-harness/schemas/tabular-records.ts";
-import { checkAll, checkEntry } from "../../../cat-harness/scripts/check-l1-complete.ts";
-import { planFor, sniffMimetype, tabularDelimiter } from "../../../cat-harness/scripts/ingest-document.ts";
+import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { checkAll, checkEntry } from "@litlfred/cat-harness/scripts/check-l1-complete.ts";
+import { planFor, sniffMimetype, tabularDelimiter } from "@litlfred/cat-harness/scripts/ingest-document.ts";
 
 // The harness: the Python scripts it spawns stayed there; this test moved up in 70lx B2b.
 const ROOT = HARNESS_ROOT;
@@ -325,7 +325,7 @@ describe("the real corpus", () => {
 // emits the PUBLISHED context, and every key it writes is a declared term —
 // checked by the same function the CI gate runs, over the arm's real output.
 
-import { CONTENT_CONTEXT_URL } from "../../../cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-context-emission.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

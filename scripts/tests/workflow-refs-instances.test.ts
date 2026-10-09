@@ -32,8 +32,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { workflowFiles } from "../../../cat-harness/scripts/known-skills.js";
-import { repoRootFor, siteDirFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(INSTANCE_ROOT);

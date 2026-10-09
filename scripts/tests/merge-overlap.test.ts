@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { buildReport, classifyMember, measure, pairsOf, parseGhPrLines, type OverlapMember } from "../merge-overlap.ts";
-import { makeRepo, readme, type Repo } from "../../../cat-harness/scripts/tests/merge-pipeline-fixture.ts";
+import { makeRepo, readme, type Repo } from "@litlfred/cat-harness/scripts/tests/merge-pipeline-fixture.ts";
 
 const GEN = "cat-harness/docs/glossary/index.md";
 const member = (id: string, files: string[], regionOnly?: (p: string) => boolean | undefined): OverlapMember =>

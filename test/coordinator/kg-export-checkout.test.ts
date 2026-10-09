@@ -13,10 +13,10 @@ import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
-import { buildExport } from "../../../cat-harness/scripts/kg-export.js";
-import { declaresOwnCanonical } from "../../../cat-harness/scripts/instance-exports.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { termIri } from "../../../cat-harness/schemas/namespaces.js";
+import { buildExport } from "@litlfred/cat-harness/scripts/kg-export.js";
+import { declaresOwnCanonical } from "@litlfred/cat-harness/scripts/instance-exports.js";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

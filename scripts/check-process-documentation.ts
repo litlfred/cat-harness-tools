@@ -53,7 +53,7 @@
  */
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { gitFiles } from "../../cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;

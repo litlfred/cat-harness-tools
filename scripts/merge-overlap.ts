@@ -38,9 +38,9 @@
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { git } from "../../cat-harness/scripts/merge-pipeline-git.ts";
-import { differsOnlyInRegions, pathClass, sharedDeclarationsOf } from "../../cat-harness/scripts/merge-pipeline-paths.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { git } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { differsOnlyInRegions, pathClass, sharedDeclarationsOf } from "@litlfred/cat-harness/scripts/merge-pipeline-paths.ts";
 
 /** One open PR or branch, with the fields the queue schema computes per member. */
 export interface OverlapMember {

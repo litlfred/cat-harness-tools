@@ -18,9 +18,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "../../../cat-harness/schemas/archive-contents.ts";
-import { checkAll, checkEntry } from "../../../cat-harness/scripts/check-l1-complete.ts";
-import { planFor, sniffMimetype } from "../../../cat-harness/scripts/ingest-document.ts";
+import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/archive-contents.ts";
+import { checkAll, checkEntry } from "@litlfred/cat-harness/scripts/check-l1-complete.ts";
+import { planFor, sniffMimetype } from "@litlfred/cat-harness/scripts/ingest-document.ts";
 
 // The harness: the Python scripts it spawns stayed there; this test moved up in 70lx B2b.
 const ROOT = HARNESS_ROOT;
@@ -271,7 +271,7 @@ describe("the real corpus", () => {
 
 // ── The record is real JSON-LD — bean `yh6u` ───────────────────────────────
 
-import { CONTENT_CONTEXT_URL } from "../../../cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-context-emission.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

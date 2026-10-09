@@ -9,8 +9,8 @@
  * so nothing they read changed.
  */
 import { describe, expect, test } from "bun:test";
-import { renderCommitted } from "../../../cat-harness/scripts/gen-lsi-viz.ts";
-import { type LsiSidecar } from "../../../cat-harness/scripts/lsi.ts";
+import { renderCommitted } from "@litlfred/cat-harness/scripts/gen-lsi-viz.ts";
+import { type LsiSidecar } from "@litlfred/cat-harness/scripts/lsi.ts";
 
 /** Two real skill files, so "every unit it names is a file" has something true to check. */
 const UNIT_A = "cat-harness/skills/sdlc/sdlc-core/qa-reports.md";

@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { harnessTiles } from "../../../cat-harness/scripts/harness-tiles.js";
+import { harnessTiles } from "@litlfred/cat-harness/scripts/harness-tiles.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -27,8 +27,8 @@ describe("an instance's OWN theme tones its tile (bean v8n5)", () => {
   const tiles = harnessTiles(REPO, HOST, ["who-iris", "cat-harness", "bootstrap"]);
 
   test("who-iris's tile tone is the hue of its own theme's accent, not the avatar's", async () => {
-    const { themeByRef } = await import("../../../cat-harness/schemas/theme-by-ref.js");
-    const { hexHue } = await import("../../../cat-harness/schemas/theme.js");
+    const { themeByRef } = await import("@litlfred/cat-harness/schemas/theme-by-ref.js");
+    const { hexHue } = await import("@litlfred/cat-harness/schemas/theme.js");
     const r = themeByRef({ instance: "who-iris", themeId: "iris-sticky" }, REPO);
     expect(r.ok).toBe(true);
     const who = tiles.find((t) => t.name === "who-iris")!;

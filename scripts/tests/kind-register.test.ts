@@ -21,8 +21,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { avatarFor } from "../../../cat-harness/schemas/avatars.ts";
-import { KIND_TABLE_DOC, KIND_TABLE_HEADER } from "../../../cat-harness/scripts/kind-table.ts";
+import { avatarFor } from "@litlfred/cat-harness/schemas/avatars.ts";
+import { KIND_TABLE_DOC, KIND_TABLE_HEADER } from "@litlfred/cat-harness/scripts/kind-table.ts";
 import { STEPS, authoredGaps, hueReport } from "../kind-register.ts";
 
 /**

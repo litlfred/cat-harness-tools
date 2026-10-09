@@ -7,8 +7,8 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { beanDefsDir } from "../../../cat-harness/scripts/beans.js";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { beanDefsDir } from "@litlfred/cat-harness/scripts/beans.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { primeFromDir } from "./beans-prime.js";
 
 const REPO = repoRootFor(resolve(import.meta.dir, "../.."));

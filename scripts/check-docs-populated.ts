@@ -115,8 +115,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { readRoleGraph } from "../../cat-harness/schemas/role-graph.ts";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

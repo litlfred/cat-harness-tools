@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { siteDir } from "../../../cat-harness/schemas/cat-harness.ts";
+import { siteDir } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 import {
   depthSensitive,

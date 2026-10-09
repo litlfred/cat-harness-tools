@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredKinds, instancesIn, renderInstance } from "../check-instance-render.ts";
-import { repoRootFor, declarationPathIn, readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { repoRootFor, declarationPathIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 const made: string[] = [];
 afterEach(() => {

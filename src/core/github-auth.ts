@@ -43,7 +43,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import type { Principal } from "../../../cat-harness/src/core/access.js";
+import type { Principal } from "@litlfred/cat-harness/src/core/access.js";
 
 /** GitHub's repository roles, highest first. */
 export const GITHUB_ROLES = ["admin", "maintain", "write", "triage", "read", "none"] as const;

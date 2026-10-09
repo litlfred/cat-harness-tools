@@ -13,7 +13,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory these tests were written in (`fhir-harness/scripts/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../fhir-harness/scripts");

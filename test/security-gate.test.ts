@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { scriptTable } from "../../cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { actionPinning, blocks, PINNED_CHECK_COMMANDS, runCheck, SECURITY_CHECKS, unpinnedActions, type GateResult } from "../scripts/security-gate.ts";
 
 function repo(workflow?: string, scripts: Record<string, string> = {}): string {

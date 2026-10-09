@@ -20,10 +20,10 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { AGENT_INSTRUCTIONS_ROLE, ASSET_ROLES, INSTANCE_README_ROLE, REQUIRED_ASSET_ROLES, ROLE_OWNED_ASSET_KEYS, assetRoleDelivery, assetRoleLayer, assetRolePurpose, declaredAssetPath, graphLayer, layerIsWritable, processMayWrite, processMayWriteAsset, strayAssetRoleKeys } from "../../../cat-harness/schemas/cat-harness.js";
+import { AGENT_INSTRUCTIONS_ROLE, ASSET_ROLES, INSTANCE_README_ROLE, REQUIRED_ASSET_ROLES, ROLE_OWNED_ASSET_KEYS, assetRoleDelivery, assetRoleLayer, assetRolePurpose, declaredAssetPath, graphLayer, layerIsWritable, processMayWrite, processMayWriteAsset, strayAssetRoleKeys } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { collect, formatReport, isClean } from "../check-asset-roles.js";
-import { instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 const REPO = join(import.meta.dir, "..", "..", "..");
 

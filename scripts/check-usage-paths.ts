@@ -137,10 +137,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { trackedPaths } from "../../cat-harness/scripts/check-portable-paths.js";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
-import { scriptsOf } from "../../cat-harness/schemas/script-table.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { trackedPaths } from "@litlfred/cat-harness/scripts/check-portable-paths.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, ".."));
 

@@ -12,9 +12,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { instanceStickyThemes } from "../../../cat-harness/schemas/theme-by-ref.js";
-import { THEMES } from "../../../cat-harness/schemas/themes.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceStickyThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
+import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

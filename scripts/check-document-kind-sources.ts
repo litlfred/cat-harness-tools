@@ -25,11 +25,11 @@
  */
 import { resolve } from "node:path";
 
-import { resolveDirectories } from "../../cat-harness/schemas/cat-harness.ts";
-import { ancestorsOf, flattenDependencies } from "../../cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds } from "../../cat-harness/schemas/layer-direction.js";
-import { readInstances } from "../../cat-harness/scripts/check-import-direction.ts";
-import { readDocumentKinds } from "../../cat-harness/scripts/gen-document-kinds-viz.ts";
+import { resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
+import { readInstances } from "@litlfred/cat-harness/scripts/check-import-direction.ts";
+import { readDocumentKinds } from "@litlfred/cat-harness/scripts/gen-document-kinds-viz.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

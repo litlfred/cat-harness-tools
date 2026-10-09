@@ -19,12 +19,12 @@
  * @module scripts/mcp-server/server
  */
 
-import { folioDir, folioDirDeferred } from "../../../cat-harness/schemas/cat-harness.js";
-import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "../../../cat-harness/schemas/types";
-import { FeedbackItemSchema } from "../../../cat-harness/schemas/constraints";
+import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "@litlfred/cat-harness/schemas/types";
+import { FeedbackItemSchema } from "@litlfred/cat-harness/schemas/constraints";
 import {
   INVALID_ENUM, parseTodoPriority, parseTodoStatus, TODO_PRIORITIES, TODO_STATUSES,
-} from "../../../cat-harness/src/core/feedback.js";
+} from "@litlfred/cat-harness/src/core/feedback.js";
 import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../../src/core/rbac.js";
 // `renderBlock` was reached through `await import(join(REPO_ROOT, …))`, which
 // types as `any` — so nothing checked what was handed to it, and a
@@ -36,16 +36,16 @@ import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../..
 // and the TeX renderer belongs to the science layer, so it is resolved from
 // the folio's declared profile through `resolveRenderTarget`. See
 // `schemas/render-targets.ts`.
-import { resolveRenderTarget } from "../../../cat-harness/content/pipeline/render-discovery.js";
-import { readDeclaredFolioProfile } from "../../../cat-harness/content/pipeline/profile-check.js";
+import { resolveRenderTarget } from "@litlfred/cat-harness/content/pipeline/render-discovery.js";
+import { readDeclaredFolioProfile } from "@litlfred/cat-harness/content/pipeline/profile-check.js";
 import { registerServedToolGroups } from "../../src/tool-groups.js";
 import { createContentAdapter } from "../../src/content-adapter.js";
-import { GitHelper } from "../../../cat-harness/src/core/git.js";
-import { leanStatusBucket } from "../../../cat-harness/schemas/types";
+import { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
+import { leanStatusBucket } from "@litlfred/cat-harness/schemas/types";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { REPO_ROOT, BUILD_DIR, FEEDBACK_DIR, FEEDBACK_WORKTREE, MAIN_TEX, FOLIO_PORT, LIBRARY_DIRS, UPLOADS_DIR } from "./paths.js";
-import { safeSegment, joinSegments, realPathWithin, writableWithin } from "../../../cat-harness/src/core/safe-path.js";
+import { safeSegment, joinSegments, realPathWithin, writableWithin } from "@litlfred/cat-harness/src/core/safe-path.js";
 
 /**
  * An archive was REFUSED, as distinct from failing to be an archive.
@@ -70,11 +70,11 @@ import {
 } from "./git.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
-import { loadContributions } from "../../../cat-harness/schemas/harness-config";
-import { ContributionRegistry, type FolioContribution } from "../../../cat-harness/schemas/contributions";
-import { contributionsRoot } from "../../../cat-harness/content/pipeline/repo-root";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions";
+import { contributionsRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
 import Anthropic from "@anthropic-ai/sdk";
-import { guardUntrusted, oneLineLabel } from "../../../cat-harness/src/core/handover-screen.js";
+import { guardUntrusted, oneLineLabel } from "@litlfred/cat-harness/src/core/handover-screen.js";
 
 // ── Access control ───────────────────────────────────────────
 // Decided by the instance's ODRL policies through the core module (issue
@@ -127,7 +127,7 @@ function parseFeedbackTs(content: string): unknown[] {
 /** Serialize feedback items to TypeScript source. */
 function serializeFeedbackTs(items: FeedbackItem[]): string {
   const json = JSON.stringify(items, null, 2);
-  return `import type { FeedbackItem } from "../../../cat-harness/schemas/types";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
+  return `import type { FeedbackItem } from "@litlfred/cat-harness/schemas/types";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
 }
 
 /**
@@ -329,11 +329,11 @@ const GRAPH_ROOTS = [
     dir,
   })),
 ];
-import { resolveFormalRef } from "../../../cat-harness/schemas/formal-ref.js";
+import { resolveFormalRef } from "@litlfred/cat-harness/schemas/formal-ref.js";
 import {
   blockCaption, blockExamples, blockLean, blockProofs, blockTex,
   isSectionRef, sectionBlockNames,
-} from "../../../cat-harness/adapters/manifest-entries.js";
+} from "@litlfred/cat-harness/adapters/manifest-entries.js";
 
 /**
  * Resolve the Lean source for a block across branch-backed storage.

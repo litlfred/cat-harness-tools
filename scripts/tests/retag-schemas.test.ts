@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { RENAMES_2026_10_05, retag } from "../../../cat-harness/scripts/retag-schemas.ts";
+import { RENAMES_2026_10_05, retag } from "@litlfred/cat-harness/scripts/retag-schemas.ts";
 
 /** Issue #2195: only the `$schema` VALUE changes; prose naming an old tag is history. */
 describe("retag", () => {

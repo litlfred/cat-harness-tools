@@ -10,9 +10,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { composeAttestations, entryFingerprints, migrateTree } from "../migrate-qa-attestations";
-import { readAttestations } from "../../../cat-harness/scripts/prose-code-pairs";
-import { readVoiceReviews } from "../../../cat-harness/scripts/skill-voice-review";
-import { ATTESTATIONS_SUFFIX, KG_QA_SIDECAR_SUFFIX, kgAttestationTrees } from "../../../cat-harness/schemas/qa-attestations";
+import { readAttestations } from "@litlfred/cat-harness/scripts/prose-code-pairs";
+import { readVoiceReviews } from "@litlfred/cat-harness/scripts/skill-voice-review";
+import { ATTESTATIONS_SUFFIX, KG_QA_SIDECAR_SUFFIX, kgAttestationTrees } from "@litlfred/cat-harness/schemas/qa-attestations";
 
 const HOST = resolve(import.meta.dir, "..", "..");
 const REPO = resolve(HOST, "..");

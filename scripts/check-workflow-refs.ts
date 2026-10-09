@@ -33,11 +33,11 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
-import { workflowFiles, corpusScopeFor } from "../../cat-harness/scripts/known-skills.js";
+import { workflowFiles, corpusScopeFor } from "@litlfred/cat-harness/scripts/known-skills.js";
 import { join, relative } from "node:path";
-import { loadProcessModel, isActivity } from "../../cat-harness/src/workflow/process-model.js";
-import { knownSkills } from "../../cat-harness/scripts/known-skills.js";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { loadProcessModel, isActivity } from "@litlfred/cat-harness/src/workflow/process-model.js";
+import { knownSkills } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 interface Dangling { file: string; node: string; ref: string }
 interface Coverage { file: string; covered: number; total: number; uncovered: string[] }
@@ -281,7 +281,7 @@ if (adjTotal > 0) {
  * re-render skipped it silently and a skipped diagram is indistinguishable
  * from a diagram that needed no work.
  */
-const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("../../cat-harness/schemas/translation-tools.js");
+const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/translation-tools.js");
 const missingDeclared: string[] = [];
 for (const ct of CONTENT_TYPE_TRANSLATIONS) {
   for (const rel of ct.bpmnDiagrams ?? []) {

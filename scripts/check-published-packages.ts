@@ -72,7 +72,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { mountedInstanceRoots } from "../../cat-harness/schemas/remote-mount.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 
 function findIndexLockRoot(): string {
   if (existsSync(join(process.cwd(), "index.lock.json"))) return process.cwd();

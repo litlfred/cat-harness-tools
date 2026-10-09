@@ -10,9 +10,9 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { checkTools, knownSkills } from "../../../cat-harness/scripts/check-tools.js";
-import { tools } from "../../../cat-harness/tools/discover.js";
-import { danglingRemedies, networkToolsWithoutRemedies, remediesFor } from "../../../cat-harness/schemas/tool.js";
+import { checkTools, knownSkills } from "@litlfred/cat-harness/scripts/check-tools.js";
+import { tools } from "@litlfred/cat-harness/tools/discover.js";
+import { danglingRemedies, networkToolsWithoutRemedies, remediesFor } from "@litlfred/cat-harness/schemas/tool.js";
 
 /**
  * The Tool audit, run ONCE at module scope.

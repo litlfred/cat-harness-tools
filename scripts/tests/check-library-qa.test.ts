@@ -21,9 +21,9 @@ import {
   usableSourceTitle,
   yearOf,
 } from "../check-library-qa.ts";
-import { readLibraryGraph, type LibraryEntry } from "../../../cat-harness/scripts/library-graph.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { readStructure, STRUCTURE_FILENAME } from "../../../cat-harness/schemas/document-structure.ts";
+import { readLibraryGraph, type LibraryEntry } from "@litlfred/cat-harness/scripts/library-graph.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", ".."));
 

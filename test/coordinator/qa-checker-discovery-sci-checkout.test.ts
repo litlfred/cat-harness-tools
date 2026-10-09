@@ -21,10 +21,10 @@ import {
   criterionSubject,
   discoverBlockCheckers,
   discoverScriptCheckers,
-} from "../../../cat-harness/content/pipeline/qa-checker-discovery.ts";
-import { QA_CRITERIA_REGISTRY } from "../../../cat-harness/content/pipeline/qa-criteria-registry.ts";
-import { loadContributions } from "../../../cat-harness/schemas/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "../../../cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/content/pipeline/qa-checker-discovery.ts";
+import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { join } from "node:path";
 
 /** The directory this test was written in (`folio-assistant-sci/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */

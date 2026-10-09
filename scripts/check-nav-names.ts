@@ -67,14 +67,14 @@
  *   a committed sidecar that is stale or absent. This is the gate CI runs.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { RAIL_DATA_DIR, expandRail, railDataJson } from "../../cat-harness/scripts/lib/harness-rail.ts";
+import { RAIL_DATA_DIR, expandRail, railDataJson } from "@litlfred/cat-harness/scripts/lib/harness-rail.ts";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { siteDirFor } from "../../cat-harness/schemas/cat-harness.js";
-import { normaliseDestination } from "../../cat-harness/scripts/lib/nav-label.ts";
-import { againstOrUsage, buildQaResult, judgeQaResult, writeQaResult, type QaResult, type QaVerdict } from "../../cat-harness/scripts/qa-results.ts";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { normaliseDestination } from "@litlfred/cat-harness/scripts/lib/nav-label.ts";
+import { againstOrUsage, buildQaResult, judgeQaResult, writeQaResult, type QaResult, type QaVerdict } from "@litlfred/cat-harness/scripts/qa-results.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.

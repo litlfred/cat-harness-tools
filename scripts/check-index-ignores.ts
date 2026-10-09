@@ -23,8 +23,8 @@
  */
 import { resolve } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { checkIgnoreBlock, readIndexConfig, type IgnoreBlockState } from "../../cat-harness/schemas/index-config.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkIgnoreBlock, readIndexConfig, type IgnoreBlockState } from "@litlfred/cat-harness/schemas/index-config.js";
 
 /** Resolved from this file, not `process.cwd()` — the reason `check-landing-instance` gives. */
 const REPO = repoRootFor(resolve(import.meta.dir, ".."));

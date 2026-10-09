@@ -19,7 +19,7 @@ import { join, resolve } from "node:path";
 import { parse } from "yaml";
 
 import { checkWorkflows, qaReportsUnretried } from "../check-workflows.js";
-import { gatesFrom, GATES_WORKFLOW, loadGates, publishes, unclassifiedSteps } from "../../../cat-harness/scripts/gates.js";
+import { gatesFrom, GATES_WORKFLOW, loadGates, publishes, unclassifiedSteps } from "@litlfred/cat-harness/scripts/gates.js";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const wf = (name: string) => readFileSync(join(REPO, ".github", "workflows", name), "utf-8");

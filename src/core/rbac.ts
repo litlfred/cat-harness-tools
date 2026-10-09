@@ -24,8 +24,8 @@
 
 import type { UserRole } from "../types.js";
 import { ROLE_LEVELS } from "../types.js";
-import { decide, type Decision, type RequestScope } from "../../../cat-harness/schemas/odrl.js";
-import { accessContext, type AccessContext, type Principal } from "../../../cat-harness/src/core/access.js";
+import { decide, type Decision, type RequestScope } from "@litlfred/cat-harness/schemas/odrl.js";
+import { accessContext, type AccessContext, type Principal } from "@litlfred/cat-harness/src/core/access.js";
 
 export interface HttpPrincipal extends Principal {
   /** The gateway session's tier, kept for display and for the chat prompt. */

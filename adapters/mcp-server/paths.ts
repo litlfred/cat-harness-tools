@@ -6,8 +6,8 @@
 
 import { resolve } from "path";
 import { readFileSync } from "fs";
-import { findContentRepoRoot } from "../../../cat-harness/content/pipeline/repo-root";
-import { deferResolution, directoriesForGraph, directoryForGraph, folioDirDeferred } from "../../../cat-harness/schemas/cat-harness.js";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { deferResolution, directoriesForGraph, directoryForGraph, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The FOLIO's root — the content repo this server serves.

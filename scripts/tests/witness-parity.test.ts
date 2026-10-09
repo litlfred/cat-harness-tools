@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripEphemeral } from "../../../cat-harness/schemas/computation-witness.ts";
+import { stripEphemeral } from "@litlfred/cat-harness/schemas/computation-witness.ts";
 import { checkParity, diffPaths, environmentMismatch, resolveScript } from "../witness-parity.ts";
 
 describe("stripEphemeral", () => {

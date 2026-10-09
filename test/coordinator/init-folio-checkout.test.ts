@@ -17,9 +17,9 @@ import { tmpdir } from "os";
 import {
   initFolio,
   type InitFolioOptions,
-} from "../../../cat-harness/scripts/init-folio";
-import { instanceConfigFilename } from "../../../cat-harness/schemas/harness-config.js";
-import { declarationChain, resolveSkillDirs } from "../../../cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/scripts/init-folio";
+import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

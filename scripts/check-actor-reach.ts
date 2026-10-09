@@ -27,11 +27,11 @@ import {
   reachConflict,
   type NetworkReach,
   type ReachConflict,
-} from "../../cat-harness/schemas/actor-reach";
-import { type LoadedActor } from "../../cat-harness/schemas/role-graph";
-import { findInstanceRoot, readDeclaration, repoRootFor } from "../../cat-harness/schemas/cat-harness";
-import { actorsDir } from "../../cat-harness/schemas/role-graph.ts";
-import { checkoutActors } from "../../cat-harness/schemas/scenario-overlay.js";
+} from "@litlfred/cat-harness/schemas/actor-reach";
+import { type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph";
+import { findInstanceRoot, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness";
+import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { checkoutActors } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

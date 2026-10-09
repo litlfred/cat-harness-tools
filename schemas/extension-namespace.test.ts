@@ -13,10 +13,10 @@ import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, write
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 
-import { loadProcessModel } from "../../cat-harness/src/workflow/process-model.ts";
-import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "../../cat-harness/schemas/namespaces.ts";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
+import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "@litlfred/cat-harness/schemas/namespaces.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 const DIAGRAM = join("processes", "initialize-harness.bpmn");

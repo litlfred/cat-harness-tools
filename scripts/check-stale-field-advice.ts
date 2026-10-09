@@ -77,7 +77,7 @@
  *   three kinds that hold one are the skills, the guides and the workflows.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
 /** The repository root — this file lives at `<root>/cat-harness/scripts/`. */

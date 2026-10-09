@@ -66,13 +66,13 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readVoicesGraph } from "../../cat-harness/scripts/voices-graph.ts";
-import { loadVoices } from "../../cat-harness/schemas/voices.ts";
+import { readVoicesGraph } from "@litlfred/cat-harness/scripts/voices-graph.ts";
+import { loadVoices } from "@litlfred/cat-harness/schemas/voices.ts";
 import {
   directoriesForGraph,
   instanceRootsIn,
   repoRootFor,
-} from "../../cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 const ROOT = HARNESS_ROOT;
 

@@ -43,7 +43,7 @@
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const ROOT = repoRootFor(join(import.meta.dir, ".."));
 const WORKFLOW_DIR = join(ROOT, ".github", "workflows");

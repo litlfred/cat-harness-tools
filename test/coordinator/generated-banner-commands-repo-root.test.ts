@@ -77,8 +77,8 @@ import { execFileSync } from "node:child_process";
 
 import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.ts";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

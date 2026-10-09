@@ -28,8 +28,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredInstances } from "../check-declared-assets.js";
-import { readDeclaration, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, "..", ".."));
 

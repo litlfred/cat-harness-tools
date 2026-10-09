@@ -180,7 +180,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { parse } from "yaml";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, ".."));

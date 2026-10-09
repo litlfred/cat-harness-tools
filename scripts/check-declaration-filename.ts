@@ -82,11 +82,11 @@
  */
 
 import { readdirSync, readFileSync } from "node:fs";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "../../cat-harness/schemas/cat-harness.js";
-import { historicalPrefixes } from "../../cat-harness/src/docs/declaration-claims.js";
+import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { historicalPrefixes } from "@litlfred/cat-harness/src/docs/declaration-claims.js";
 
 /**
  * The RETIRED declaration filename.

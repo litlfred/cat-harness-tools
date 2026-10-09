@@ -47,9 +47,9 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind,
   parseBeanGraph,
-} from "../../cat-harness/schemas/bean-graph";
-import { WORKFLOW_DIR } from "../../cat-harness/src/workflow/store.js";
-import { graphReadPath } from "../../cat-harness/scripts/graph-read.ts";
+} from "@litlfred/cat-harness/schemas/bean-graph";
+import { WORKFLOW_DIR } from "@litlfred/cat-harness/src/workflow/store.js";
+import { graphReadPath } from "@litlfred/cat-harness/scripts/graph-read.ts";
 
 export interface HarnessDirsReport {
   /** A parseable `beans/beans.json` was found. */

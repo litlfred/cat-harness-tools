@@ -31,9 +31,9 @@
  */
 import { z } from "zod";
 
-import type { ToolDefinition } from "../../../cat-harness/schemas/tool.js";
-import { TOOL_TYPES, isInjectionSafe, type ToolTypeName } from "../../../cat-harness/schemas/tool-types.js";
-import type { InvocationAuthority, InvocationContext, ToolInvocation } from "../../../cat-harness/schemas/tool-invocation.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
+import { TOOL_TYPES, isInjectionSafe, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
+import type { InvocationAuthority, InvocationContext, ToolInvocation } from "@litlfred/cat-harness/schemas/tool-invocation.js";
 
 /** An MCP tool declaration, as `tools/list` returns it. */
 export interface McpToolDeclaration {

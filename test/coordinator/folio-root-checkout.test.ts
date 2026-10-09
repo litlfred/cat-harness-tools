@@ -11,8 +11,8 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
-import { INSTANCE_ROOT } from "../../../cat-harness/scripts/tests/helpers";
-import { readDeclaration, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { INSTANCE_ROOT } from "@litlfred/cat-harness/scripts/tests/helpers";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 describe("FOLIO_ROOT detection", () => {
   test("INSTANCE_ROOT is this platform checkout", () => {

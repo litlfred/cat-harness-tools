@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { darkRules } from "../../../cat-harness/scripts/lib/scheme-css.ts";
+import { darkRules } from "@litlfred/cat-harness/scripts/lib/scheme-css.ts";
 
 /** Issue #2208: one sheet, two deciders — the OS until the reader picks, then the reader. */
 describe("darkRules", () => {

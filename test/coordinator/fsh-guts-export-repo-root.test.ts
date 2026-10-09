@@ -17,9 +17,9 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { buildFshGutsExport, fshGutsDirs } from "../../../cat-harness/scripts/fsh-guts-export.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { buildFshGutsExport, fshGutsDirs } from "@litlfred/cat-harness/scripts/fsh-guts-export.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

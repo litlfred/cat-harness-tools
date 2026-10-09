@@ -9,9 +9,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { leftover, verdictOf, type LeftoverPath } from "../merge-leftover.ts";
-import { differsOnlyInRegions, isInstanceDeclaration, pathClass, sharedDeclarationsOf, stripGeneratedRegions } from "../../../cat-harness/scripts/merge-pipeline-paths.ts";
-import { parseMemberSpec } from "../../../cat-harness/scripts/merge-pipeline-git.ts";
-import { makeRepo, readme, type Repo } from "../../../cat-harness/scripts/tests/merge-pipeline-fixture.ts";
+import { differsOnlyInRegions, isInstanceDeclaration, pathClass, sharedDeclarationsOf, stripGeneratedRegions } from "@litlfred/cat-harness/scripts/merge-pipeline-paths.ts";
+import { parseMemberSpec } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { makeRepo, readme, type Repo } from "@litlfred/cat-harness/scripts/tests/merge-pipeline-fixture.ts";
 
 const GEN = "cat-harness/docs/glossary/index.md"; // `glossary`: take-base
 let repo: Repo | undefined;

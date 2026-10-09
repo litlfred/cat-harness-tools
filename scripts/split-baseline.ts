@@ -44,7 +44,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { captureTools } from "./capture-mcp-tools.ts";
-import { knownSkills } from "../../cat-harness/scripts/known-skills.ts";
+import { knownSkills } from "@litlfred/cat-harness/scripts/known-skills.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 export const BASELINE_FILE = join(import.meta.dir, "split-baseline.json");

@@ -58,20 +58,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { RequirementFields, RequirementSchema } from "../../bootstrap-tools/schemas/requirement.ts";
+import { RequirementFields, RequirementSchema } from "@litlfred/bootstrap-tools/schemas/requirement.ts";
 import {
   RequirementSetFields,
   requirementSetProblems,
   type RequirementSet,
   type SignOff,
-} from "../../bootstrap-tools/schemas/requirement-set.ts";
+} from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
 import {
   attestationsHomeFor,
   requirementSignoffPath,
   RequirementSignoffAttestationsSchema,
-} from "../../cat-harness/schemas/qa-attestations.ts";
-import { nestedDirectories, readDeclaration } from "../../cat-harness/schemas/cat-harness.ts";
-import { kgRoots } from "../../cat-harness/scripts/known-skills.ts";
+} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { kgRoots } from "@litlfred/cat-harness/scripts/known-skills.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
 const INSTANCE = join(REPO, "cat-harness");

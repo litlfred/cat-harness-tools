@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { KG_QA_MANIFEST_SCHEMA, KG_QA_SCHEMA, tally, type KgQaReport } from "../../../cat-harness/schemas/kg-qa.ts";
+import { KG_QA_MANIFEST_SCHEMA, KG_QA_SCHEMA, tally, type KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { badgePages, corpusLayout, judgeReport, judgeWitnesses, validateQaTree, WITNESS_TREE } from "../check-qa-corpus.ts";
 
 const HOSTED = "cat-harness/test/results/bootstrap";

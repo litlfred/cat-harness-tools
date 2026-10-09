@@ -91,15 +91,15 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { mountScopeFor } from "../../cat-harness/schemas/remote-mount.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { clearCheckoutCache, resolveImplementingPath } from "../../cat-harness/schemas/harness-config.js";
-import { toolsOf } from "../../cat-harness/tools/discover.js";
-import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "../../cat-harness/content/pipeline/qa-criteria-registry.js";
-import { RENDER_TARGETS } from "../../cat-harness/schemas/render-targets.js";
-import { evaluate, loadDecisionTable, type DecisionTable } from "../../cat-harness/src/workflow/decision-table.js";
-import { workflowFile } from "../../cat-harness/scripts/known-skills.js";
-import { classify as classifyConflict } from "../../cat-harness/scripts/merge-conflict-patterns.js";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { clearCheckoutCache, resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { toolsOf } from "@litlfred/cat-harness/tools/discover.js";
+import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.js";
+import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.js";
+import { evaluate, loadDecisionTable, type DecisionTable } from "@litlfred/cat-harness/src/workflow/decision-table.js";
+import { workflowFile } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { classify as classifyConflict } from "@litlfred/cat-harness/scripts/merge-conflict-patterns.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This instance's root — where the declared `processes` graph is found from. */

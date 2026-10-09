@@ -31,8 +31,8 @@ import {
   otherWorkflowSteps,
   unclassifiedSteps,
   unrunScripts,
-} from "../../../cat-harness/scripts/gates.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/scripts/gates.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

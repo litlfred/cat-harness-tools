@@ -67,13 +67,13 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { readInstances, ownerOf, type Instance } from "../../cat-harness/scripts/check-import-direction.ts";
-import { isSkillMd, skillMdDirs } from "../../cat-harness/scripts/known-skills.ts";
-import { ancestorsOf, flattenDependencies } from "../../cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds } from "../../cat-harness/schemas/layer-direction.js";
-import { BASELINE, type BindingBaselineEntry } from "../../cat-harness/scripts/process-bindings.baseline.ts";
+import { readInstances, ownerOf, type Instance } from "@litlfred/cat-harness/scripts/check-import-direction.ts";
+import { isSkillMd, skillMdDirs } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
+import { BASELINE, type BindingBaselineEntry } from "@litlfred/cat-harness/scripts/process-bindings.baseline.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

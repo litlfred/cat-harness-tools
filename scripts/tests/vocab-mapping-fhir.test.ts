@@ -31,8 +31,8 @@ import {
   VocabMappingSchema,
   applyVocabMapping,
   type VocabMapping,
-} from "../../../cat-harness/schemas/vocab-mapping";
-import { detectRelease, fromConceptMap, toConceptMap, type FhirRelease } from "../../../cat-harness/schemas/vocab-mapping-fhir";
+} from "@litlfred/cat-harness/schemas/vocab-mapping";
+import { detectRelease, fromConceptMap, toConceptMap, type FhirRelease } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir";
 
 const FIX = resolve(import.meta.dir, "fixtures", "conceptmap");
 type Json = Record<string, unknown>;
@@ -254,8 +254,8 @@ describe("applying a table (the vocab-map Tool)", () => {
 describe("the vocab-mappings:check gate's own judgements", () => {
   test("a clean table passes; a derived target with no authoritative source, and an undeclared prefix, are each a finding", async () => {
     const { tableFindings } = await import("../vocab-mappings");
-    const { STANDARD_PREFIXES } = await import("../../../cat-harness/schemas/vocab-mapping-fhir");
-    const { NS_PREFIXES } = await import("../../../cat-harness/schemas/namespaces.js");
+    const { STANDARD_PREFIXES } = await import("@litlfred/cat-harness/schemas/vocab-mapping-fhir");
+    const { NS_PREFIXES } = await import("@litlfred/cat-harness/schemas/namespaces.js");
     const prefixes = { ...STANDARD_PREFIXES, ...NS_PREFIXES };
     expect(tableFindings(SCHEME, prefixes)).toEqual([]);
     const orphan = VocabMappingSchema.parse({

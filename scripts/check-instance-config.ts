@@ -38,9 +38,9 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { findDeclarationFile, readDeclaration } from "../../cat-harness/schemas/cat-harness.js";
-import { instanceConfigFilename, LEGACY_HARNESS_CONFIG } from "../../cat-harness/schemas/harness-config.js";
-import { rootConfigStems } from "../../cat-harness/schemas/instance-roots.js";
+import { findDeclarationFile, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceConfigFilename, LEGACY_HARNESS_CONFIG } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { rootConfigStems } from "@litlfred/cat-harness/schemas/instance-roots.js";
 
 const CHECKOUT = resolve(import.meta.dir, "..", "..");
 

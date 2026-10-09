@@ -29,7 +29,7 @@ import {
   withNarrowViewport,
   withSavedScheme,
   schemeKey,
-} from "../../../cat-harness/scripts/viewer-page.ts";
+} from "@litlfred/cat-harness/scripts/viewer-page.ts";
 
 const PAGE = (body: string, head = ""): string =>
   `<!doctype html>\n<html lang="en">\n<head>${head}</head>\n<body>${body}</body>\n</html>\n`;

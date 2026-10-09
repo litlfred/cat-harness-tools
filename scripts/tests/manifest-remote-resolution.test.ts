@@ -20,7 +20,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { codeWithoutComments } from "../../../cat-harness/scripts/repo-files.js";
+import { codeWithoutComments } from "@litlfred/cat-harness/scripts/repo-files.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */

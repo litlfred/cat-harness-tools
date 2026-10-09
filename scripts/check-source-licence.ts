@@ -77,10 +77,10 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { licenceProblem, manifestLicence, type SourceLicence } from "../../cat-harness/schemas/source-licence.ts";
-import { checkLicenceExpression, loadSpdxLicenseList, type SpdxLicenseList } from "../../cat-harness/schemas/spdx-license-expression.ts";
-import { gitScan } from "../../cat-harness/schemas/git-corpus.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { licenceProblem, manifestLicence, type SourceLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
+import { checkLicenceExpression, loadSpdxLicenseList, type SpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { gitScan } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -93,7 +93,7 @@ import {
   type Judgement,
   type QaResult,
   type QaResultState,
-} from "../../cat-harness/scripts/qa-results.ts";
+} from "@litlfred/cat-harness/scripts/qa-results.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);

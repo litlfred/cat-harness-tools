@@ -19,8 +19,8 @@ import {
   humanBytes,
   undeclaredAtRoot,
 } from "../check-undeclared-files.js";
-import { findDeclarationFile } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 /** A repository with one instance, which declares a repository-scoped directory. */
 function repo(): string {

@@ -54,14 +54,14 @@ import { join } from "node:path";
 import {
   readDeclaration,
   siteDirFor,
-} from "../../cat-harness/schemas/cat-harness.js";
-import { THEME_LAYOUTS, type ThemeLayout } from "../../cat-harness/schemas/theme.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { THEME_LAYOUTS, type ThemeLayout } from "@litlfred/cat-harness/schemas/theme.js";
 import {
   formatIntakeReport,
   ingestThemeArt,
   type ArtCandidate,
   type ThemeArtIntakeResult,
-} from "../../cat-harness/schemas/theme-art-intake.js";
+} from "@litlfred/cat-harness/schemas/theme-art-intake.js";
 
 /** Roles whose images are theme backdrops, as opposed to icons or marks. */
 export function backdropRoles(

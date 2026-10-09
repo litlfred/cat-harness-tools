@@ -28,8 +28,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { checkoutDirectoriesForGraph } from "../../../cat-harness/schemas/harness-config.ts";
-import { SOURCE_DESCRIPTOR_SCHEMA_TAG, SourceDescriptorSchema } from "../../../cat-harness/schemas/source-descriptor.ts";
+import { checkoutDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { SOURCE_DESCRIPTOR_SCHEMA_TAG, SourceDescriptorSchema } from "@litlfred/cat-harness/schemas/source-descriptor.ts";
 
 /** The directory this test was written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

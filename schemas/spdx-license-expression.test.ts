@@ -10,8 +10,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { judgeSourceLicence, type LicenceReport } from "../scripts/check-source-licence.ts";
-import { snapshotOf } from "../../cat-harness/scripts/pin-spdx-license-list.ts";
-import { checkLicenceExpression, loadSpdxLicenseList, spdxLicenseListOf } from "../../cat-harness/schemas/spdx-license-expression.ts";
+import { snapshotOf } from "@litlfred/cat-harness/scripts/pin-spdx-license-list.ts";
+import { checkLicenceExpression, loadSpdxLicenseList, spdxLicenseListOf } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 

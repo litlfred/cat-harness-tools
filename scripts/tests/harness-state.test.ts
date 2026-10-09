@@ -23,7 +23,7 @@ import {
   todoProcessRefs,
   writesSidecar,
 } from "../check-harness-state.js";
-import { checkerHash } from "../../../cat-harness/test/health/run.js";
+import { checkerHash } from "@litlfred/cat-harness/test/health/run.js";
 
 // `interactionProfilesRead` reads every declared code and skill directory into
 // memory: about 15,000 files, 4.1-4.5 s alone on a quiet container, and 7.2 s

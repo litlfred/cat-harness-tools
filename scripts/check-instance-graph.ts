@@ -32,13 +32,13 @@
  */
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   orderedDependencies,
   repositoryMirrors,
   resolveInstanceGraph,
   type InstanceGraphProblem,
-} from "../../cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The declaration-level findings this gate adds to the graph's own (#1548). */
 export type DeclarationProblem =
@@ -73,7 +73,7 @@ export type IriOf = (root: string) => string | undefined;
 
 /** The exporter's own answer, loaded lazily: `kg-export` is a large module. */
 async function exporterIri(): Promise<IriOf> {
-  const { exportIdentity } = await import("../../cat-harness/scripts/kg-export.js");
+  const { exportIdentity } = await import("@litlfred/cat-harness/scripts/kg-export.js");
   return (root) => exportIdentity({ instanceRoot: root }).canonicalIri;
 }
 

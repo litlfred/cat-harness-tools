@@ -44,9 +44,9 @@ import {
   parseModelRegistry,
   validatedLanguages,
   type ModelEntry,
-} from "../../bootstrap-tools/schemas/model-registry.js";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+} from "@litlfred/bootstrap-tools/schemas/model-registry.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = HARNESS_ROOT;
