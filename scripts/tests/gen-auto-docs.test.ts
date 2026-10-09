@@ -20,8 +20,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } from "../gen-auto-docs.ts";
-import { knownSkills } from "../../../cat-harness/scripts/known-skills.ts";
-import { readDeclaration, siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
+import { knownSkills } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).

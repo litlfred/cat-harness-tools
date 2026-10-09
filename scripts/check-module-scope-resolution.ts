@@ -39,7 +39,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

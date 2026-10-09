@@ -13,7 +13,7 @@ import { describe, expect, test } from "bun:test";
 
 // The whole REGISTRY: since bean dmx1 kinds are declared per harness, and the
 // sweep reaches every one of them (riit), not only the code list.
-import { defaultGraphTypologies } from "../../../cat-harness/schemas/graph-typology-registry.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { sweep } from "../check-kind-validators.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

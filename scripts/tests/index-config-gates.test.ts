@@ -14,8 +14,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { indexAgreement, resolveLandingInstance } from "../../../cat-harness/schemas/harness-config.ts";
-import { INDEX_CONFIG_SCHEMA, IndexConfigSchema, checkIgnoreBlock, readIndexConfig, syncIgnoreBlock } from "../../../cat-harness/schemas/index-config.ts";
+import { indexAgreement, resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { INDEX_CONFIG_SCHEMA, IndexConfigSchema, checkIgnoreBlock, readIndexConfig, syncIgnoreBlock } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { instantiatedNames } from "../check-avatar-instances.ts";
 import { instanceNames } from "../check-folio-mount.ts";
 import { formatIgnoreBlock } from "../check-index-ignores.ts";

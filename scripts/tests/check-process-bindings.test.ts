@@ -8,7 +8,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { activityRefs, judgeBinding, ratchet, skillName, type Binding } from "../check-process-bindings.ts";
-import { BASELINE } from "../../../cat-harness/scripts/process-bindings.baseline.ts";
+import { BASELINE } from "@litlfred/cat-harness/scripts/process-bindings.baseline.ts";
 
 // core needs harness; smart needs core (so, transitively, harness); floor declares no needs.
 const allowed = new Map([

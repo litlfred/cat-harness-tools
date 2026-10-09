@@ -70,17 +70,17 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { repoRootFor, siteDirFor } from "../../cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   VIEWER_NAV_QA_SCHEMA,
   ViewerNavQaSchema,
   type ViewerNavFlag,
   type ViewerNavPage,
   type ViewerNavQa,
-} from "../../cat-harness/schemas/viewer-nav-qa.ts";
-import { declinesNavbar, isStandalonePage, sitePathForPage } from "../../cat-harness/scripts/viewer-page.ts";
-import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "../../cat-harness/scripts/lib/harness-rail.ts";
-import { againstOrUsage, qaResultsFile, readBaseline } from "../../cat-harness/scripts/qa-results.ts";
+} from "@litlfred/cat-harness/schemas/viewer-nav-qa.ts";
+import { declinesNavbar, isStandalonePage, sitePathForPage } from "@litlfred/cat-harness/scripts/viewer-page.ts";
+import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "@litlfred/cat-harness/scripts/lib/harness-rail.ts";
+import { againstOrUsage, qaResultsFile, readBaseline } from "@litlfred/cat-harness/scripts/qa-results.ts";
 
 const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);

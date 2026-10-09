@@ -23,7 +23,7 @@
 import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { capabilitiesDir } from "../../../cat-harness/schemas/role-graph.js";
+import { capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.js";
 
 export interface CapabilityDetection {
   method: "command" | "env-var" | "file-exists" | "mcp-probe" | "always";

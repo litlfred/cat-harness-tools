@@ -52,8 +52,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
-import "../../cat-harness/schemas/folio-graph-typology.js";
-import { findDeclarationFile, instanceRootsIn } from "../../cat-harness/schemas/cat-harness.js";
+import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   ATTESTATIONS_SUFFIX,
   attestationKeyForDerived,
@@ -73,7 +73,7 @@ import {
   type CriteriaMap,
   type KgAttestations,
   type KgAttestationTree as TreePair,
-} from "../../cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/qa-attestations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The kg-qa arrays that are judgements, in the order the sidecar carried them. */

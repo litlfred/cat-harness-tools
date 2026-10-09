@@ -25,9 +25,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { extractBpmn } from "../../../cat-harness/content/pipeline/bpmn-translate.js";
+import { extractBpmn } from "@litlfred/cat-harness/content/pipeline/bpmn-translate.js";
 import { checkLanes } from "../check-lane-documentation.js";
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.ts";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 

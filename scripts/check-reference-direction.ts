@@ -154,9 +154,9 @@ import {
   isDerivedGraph,
   isStateGraph,
   rootForScope,
-} from "../../cat-harness/schemas/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "../../cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds, type LayerRule } from "../../cat-harness/schemas/layer-direction.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import {
   classifyReference,
   occurrencesOf,
@@ -164,7 +164,7 @@ import {
   type Occurrence,
   type ReferenceExemption,
   type ReferenceVerdict,
-} from "../../cat-harness/schemas/reference-direction.js";
+} from "@litlfred/cat-harness/schemas/reference-direction.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -173,7 +173,7 @@ import {
   qaResultPath,
   writeQaResult,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.js";
+} from "@litlfred/cat-harness/scripts/qa-results.js";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 /**

@@ -5,7 +5,7 @@
  * @covers none — a browser-test runner's configuration, not a graph audit
  */
 import { defineConfig, devices } from '@playwright/test';
-import { resolveChromium } from '../cat-harness/scripts/playwright-chromium';
+import { resolveChromium } from '@litlfred/cat-harness/scripts/playwright-chromium';
 
 // Which Chromium to launch, decided once and REPORTED. A prebuilt image pins
 // a browser build that the installed @playwright/test may not be the one that

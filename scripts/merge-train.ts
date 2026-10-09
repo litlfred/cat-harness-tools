@@ -54,10 +54,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { plan } from "../../cat-harness/scripts/merge-base.ts";
-import { git, parseMemberSpec, resolveMember, type GitResult } from "../../cat-harness/scripts/merge-pipeline-git.ts";
-import { TASK_IO, type ScriptIO } from "../../cat-harness/scripts/task-io.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { plan } from "@litlfred/cat-harness/scripts/merge-base.ts";
+import { git, parseMemberSpec, resolveMember, type GitResult } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { TASK_IO, type ScriptIO } from "@litlfred/cat-harness/scripts/task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export type MemberStatus = "merged" | "already-contained" | "refused" | "would-merge" | "would-refuse";

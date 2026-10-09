@@ -5,8 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
-import { ModelEntrySchema, ModelIdSchema, NOT_DISCLOSED } from "../../../bootstrap-tools/schemas/model-registry.js";
-import { AttributionSchema } from "../../../cat-harness/schemas/attribution.js";
+import { ModelEntrySchema, ModelIdSchema, NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
+import { AttributionSchema } from "@litlfred/cat-harness/schemas/attribution.js";
 import { checkModelLanguages, unregisteredModelIds } from "../check-model-languages.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");

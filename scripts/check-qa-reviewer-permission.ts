@@ -68,15 +68,15 @@
  * @covers policies, scenarios
  */
 
-import { readPolicyGrants } from "../../cat-harness/schemas/odrl.js";
+import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import type { QaCriterionEntry, QaReviewer } from "../../cat-harness/schemas/block-qa.ts";
-import { isCheckerWitness, isCouldNotDispatch } from "../../cat-harness/content/pipeline/untainted-verification.ts";
-import { actorsDir } from "../../cat-harness/schemas/role-graph.ts";
-import { directoryForGraph } from "../../cat-harness/schemas/cat-harness.ts";
-import { vacuityRefusal, type Source } from "../../cat-harness/scripts/vacuity-refusal.ts";
+import type { QaCriterionEntry, QaReviewer } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { isCheckerWitness, isCouldNotDispatch } from "@litlfred/cat-harness/content/pipeline/untainted-verification.ts";
+import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { vacuityRefusal, type Source } from "@litlfred/cat-harness/scripts/vacuity-refusal.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");

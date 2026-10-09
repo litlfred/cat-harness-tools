@@ -23,10 +23,10 @@ import {
   repairableGates,
   scriptOf,
   writerFor,
-} from "../../../cat-harness/scripts/regen-after-merge.ts";
-import { loadGates } from "../../../cat-harness/scripts/gates.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+} from "@litlfred/cat-harness/scripts/regen-after-merge.ts";
+import { loadGates } from "@litlfred/cat-harness/scripts/gates.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

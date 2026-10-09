@@ -38,11 +38,11 @@ import { resolve, relative, join } from "node:path";
 
 import { Glob } from "bun";
 
-import { parseFrontMatter } from "../../cat-harness/schemas/front-matter.ts";
-import { checkoutRootFor, repoRootFor, declarationPathIn } from "../../cat-harness/schemas/cat-harness.ts";
-import { exitUnlessMounted } from "../../cat-harness/scripts/branch-store.ts";
-import { kgRoots } from "../../cat-harness/scripts/known-skills.ts";
-import { corpusDirectoryForGraph } from "../../cat-harness/schemas/harness-config.js";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
+import { checkoutRootFor, repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { exitUnlessMounted } from "@litlfred/cat-harness/scripts/branch-store.ts";
+import { kgRoots } from "@litlfred/cat-harness/scripts/known-skills.ts";
+import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 const INSTANCE = HARNESS_ROOT;
 const REPO = repoRootFor(INSTANCE);

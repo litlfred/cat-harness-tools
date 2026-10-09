@@ -99,13 +99,13 @@ import { join } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   beanDefsDir,
   readBeanStore,
   type BeanStore,
   type SkippedFile,
-} from "../../cat-harness/scripts/bean-store-read.ts";
+} from "@litlfred/cat-harness/scripts/bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

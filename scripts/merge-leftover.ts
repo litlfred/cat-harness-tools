@@ -41,10 +41,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.ts";
-import { isAncestor } from "../../cat-harness/scripts/git-ancestry.ts";
-import { git, parseMemberSpec, resolveMember } from "../../cat-harness/scripts/merge-pipeline-git.ts";
-import { differsOnlyInRegions, pathClass } from "../../cat-harness/scripts/merge-pipeline-paths.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isAncestor } from "@litlfred/cat-harness/scripts/git-ancestry.ts";
+import { git, parseMemberSpec, resolveMember } from "@litlfred/cat-harness/scripts/merge-pipeline-git.ts";
+import { differsOnlyInRegions, pathClass } from "@litlfred/cat-harness/scripts/merge-pipeline-paths.ts";
 
 export type LeftoverVerdict = "landed" | "not-landed" | "could-not-determine";
 

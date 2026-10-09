@@ -42,14 +42,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { allAvatars, AVATARS, GENERIC, hasAvatar } from "../../cat-harness/schemas/avatars.js";
+import { allAvatars, AVATARS, GENERIC, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
 import {
   BASE_GRAPH_TYPOLOGIES,
   defaultGraphTypologies,
   isPublishedGraphTypology,
   readDeclaration,
-} from "../../cat-harness/schemas/cat-harness.js";
-import { avatarsCssPath } from "../../cat-harness/scripts/gen-avatars-css.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { avatarsCssPath } from "@litlfred/cat-harness/scripts/gen-avatars-css.js";
 import {
   buildQaResult,
   concludeJudgement,
@@ -59,7 +59,7 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.js";
+} from "@litlfred/cat-harness/scripts/qa-results.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

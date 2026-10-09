@@ -92,8 +92,8 @@ import {
   instanceRootsIn,
   readDeclaration,
   siteDirFor,
-} from "../../cat-harness/schemas/cat-harness.js";
-import { KIND_TILE_ICONS } from "../../cat-harness/scripts/graph-tiles.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { KIND_TILE_ICONS } from "@litlfred/cat-harness/scripts/graph-tiles.js";
 
 /**
  * The client that owns both glyph registries, resolved through `siteDirFor`

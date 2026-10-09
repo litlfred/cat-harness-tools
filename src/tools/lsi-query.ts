@@ -14,8 +14,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { buildLsi, query, tokenize } from "../../../cat-harness/content/pipeline/lsi.js";
-import { proseGraphs, unitsOf } from "../../../cat-harness/scripts/lsi.js";
+import { buildLsi, query, tokenize } from "@litlfred/cat-harness/content/pipeline/lsi.js";
+import { proseGraphs, unitsOf } from "@litlfred/cat-harness/scripts/lsi.js";
 
 export function lsiQueryText(text: string, opts: { instance?: string; graph?: string; top?: number } = {}): string {
   const targets = proseGraphs().filter((t) => (!opts.instance || t.instance === opts.instance) && (!opts.graph || t.id === opts.graph));

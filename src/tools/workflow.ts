@@ -33,21 +33,21 @@
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { processFiles, processRoots } from "../../../cat-harness/src/workflow/process-files.js";
+import { processFiles, processRoots } from "@litlfred/cat-harness/src/workflow/process-files.js";
 import { z } from "zod";
 import { basename, resolve } from "node:path";
-import { findInModel, loadProcessModel, type ProcessModel } from "../../../cat-harness/src/workflow/process-model.js";
-import { complete, describe, startInstance, type InstanceState } from "../../../cat-harness/src/workflow/instance.js";
-import { describePreflight, preflight, preflightRefusal } from "../../../cat-harness/src/workflow/preflight.js";
-import { describeCapture, writeLogEntry } from "../../../cat-harness/src/logging/log-writer.js";
-import { instanceId, listInstances, loadInstance, saveInstance } from "../../../cat-harness/src/workflow/store.js";
-import { applyWorkPlanOp } from "../../../cat-harness/src/workflow/bean-link.js";
-import { checkGate, loadRelaxations, validateRelaxations } from "../../../cat-harness/src/workflow/gate.js";
-import { type RoleGraph } from "../../../cat-harness/schemas/role-graph.js";
-import { roleGraphFor } from "../../../cat-harness/scripts/known-skills.js";
-import { accessContext } from "../../../cat-harness/src/core/access.js";
+import { findInModel, loadProcessModel, type ProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
+import { complete, describe, startInstance, type InstanceState } from "@litlfred/cat-harness/src/workflow/instance.js";
+import { describePreflight, preflight, preflightRefusal } from "@litlfred/cat-harness/src/workflow/preflight.js";
+import { describeCapture, writeLogEntry } from "@litlfred/cat-harness/src/logging/log-writer.js";
+import { instanceId, listInstances, loadInstance, saveInstance } from "@litlfred/cat-harness/src/workflow/store.js";
+import { applyWorkPlanOp } from "@litlfred/cat-harness/src/workflow/bean-link.js";
+import { checkGate, loadRelaxations, validateRelaxations } from "@litlfred/cat-harness/src/workflow/gate.js";
+import { type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { roleGraphFor } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { accessContext } from "@litlfred/cat-harness/src/core/access.js";
 import { githubPrincipalFor } from "../core/github-auth.js";
-import { oneLineLabel, screenHandover, type FieldSpec } from "../../../cat-harness/src/core/handover-screen.js";
+import { oneLineLabel, screenHandover, type FieldSpec } from "@litlfred/cat-harness/src/core/handover-screen.js";
 
 /**
  * An instance id as `instanceId` mints it (`crdm--folio-assistant-6lb8`,
@@ -101,7 +101,7 @@ export const WORKFLOW_COMPLETE_HANDOVER: Record<string, FieldSpec> = {
  * that is the price of authentication being real rather than typed.
  */
 const ENGINE_MODE = "strict" as const;
-import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "../../../cat-harness/src/workflow/authorize.js";
+import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "@litlfred/cat-harness/src/workflow/authorize.js";
 
 // Re-exported: the resolver lives in cat-harness so cat-harness scripts
 // (audit-reachability) can measure the SAME list without importing upward.

@@ -25,7 +25,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { screenHandover, type HandoverSchema, type ScreenVerdict } from "../../cat-harness/src/core/handover-screen.ts";
+import { screenHandover, type HandoverSchema, type ScreenVerdict } from "@litlfred/cat-harness/src/core/handover-screen.ts";
 
 export const SCREEN_EXIT = { clean: 0, refused: 1, undetermined: 2, quarantined: 3 } as const;
 

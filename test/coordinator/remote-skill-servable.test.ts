@@ -51,8 +51,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { knownSkills, remotePackageDeclarations } from "../../../cat-harness/scripts/known-skills.js";
-import { syncedPackageDir, wrapperSkillsDirs } from "../../../cat-harness/scripts/sync-remote-skills.js";
+import { knownSkills, remotePackageDeclarations } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { syncedPackageDir, wrapperSkillsDirs } from "@litlfred/cat-harness/scripts/sync-remote-skills.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

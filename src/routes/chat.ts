@@ -10,8 +10,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ContentAdapter } from "../types.js";
 import { getUserRole, getUserName } from "../core/rbac.js";
-import { log, logDebug } from "../../../cat-harness/src/core/logging.js";
-import { guardUntrusted } from "../../../cat-harness/src/core/handover-screen.js";
+import { log, logDebug } from "@litlfred/cat-harness/src/core/logging.js";
+import { guardUntrusted } from "@litlfred/cat-harness/src/core/handover-screen.js";
 import type { MountedRoute, RouteDeps } from "../route-groups.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*" };
@@ -19,7 +19,7 @@ const CORS = { "Access-Control-Allow-Origin": "*" };
 // Lives in `core/anthropic.ts` (bean `w2gr`, step 2) so the content half of an
 // adapter can reach it without importing this route; re-exported for the
 // importers this module already had.
-import { getAnthropic } from "../../../cat-harness/src/core/anthropic.js";
+import { getAnthropic } from "@litlfred/cat-harness/src/core/anthropic.js";
 export { getAnthropic };
 
 export async function handleChatPost(

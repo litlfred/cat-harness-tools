@@ -36,10 +36,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { regenPass, writerFor, type Runner } from "../../../cat-harness/scripts/regen-after-merge.ts";
-import { chromiumExecutable } from "../../../cat-harness/scripts/bpmn-render.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+import { regenPass, writerFor, type Runner } from "@litlfred/cat-harness/scripts/regen-after-merge.ts";
+import { chromiumExecutable } from "@litlfred/cat-harness/scripts/bpmn-render.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

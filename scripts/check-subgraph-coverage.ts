@@ -57,10 +57,10 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { orderedDependencies } from "../../cat-harness/schemas/harness-config.js";
-import { docsPages, documentingPages } from "../../cat-harness/scripts/docs-declarations.js";
-import { governingSkills, skillGovernance } from "../../cat-harness/scripts/skill-governance.js";
-import { processIndex, resolveProcess, type ProcessIndex } from "../../cat-harness/scripts/governing-process.js";
+import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { docsPages, documentingPages } from "@litlfred/cat-harness/scripts/docs-declarations.js";
+import { governingSkills, skillGovernance } from "@litlfred/cat-harness/scripts/skill-governance.js";
+import { processIndex, resolveProcess, type ProcessIndex } from "@litlfred/cat-harness/scripts/governing-process.js";
 
 import {
   instanceDirectories,
@@ -79,9 +79,9 @@ import {
   type CatHarnessDeclaration,
   visualisationsOf,
   visualisationResolves,
-} from "../../cat-harness/schemas/cat-harness.js";
-import { withViewers } from "../../cat-harness/scripts/viewer-declarations.js";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { withViewers } from "@litlfred/cat-harness/scripts/viewer-declarations.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 /** The three obligations, in the order the owner named them. */
 export const CRITERIA = ["visualiser", "docs", "skill", "serialisations"] as const;

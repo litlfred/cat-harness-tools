@@ -39,7 +39,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { checkMaintainedArtefacts } from "../check-maintained-artefacts.js";
-import { artefactDeclarationDrift, declaredArtefacts } from "../../../cat-harness/scripts/harness-schema-export.js";
+import { artefactDeclarationDrift, declaredArtefacts } from "@litlfred/cat-harness/scripts/harness-schema-export.js";
 
 /**
  * The subjects each check actually judges.

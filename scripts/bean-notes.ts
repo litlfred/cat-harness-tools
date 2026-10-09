@@ -45,13 +45,13 @@ import { join, relative, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { BEAN_GRAPH_FILE, DEFAULT_BEAN_GRAPH_ROOT, parseBeanGraph } from "../../cat-harness/schemas/bean-graph.ts";
+import { BEAN_GRAPH_FILE, DEFAULT_BEAN_GRAPH_ROOT, parseBeanGraph } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import {
   BEAN_NOTE_TAG,
   BeanNoteFrontMatterSchema,
   noteFileName,
   type BeanNoteFrontMatter,
-} from "../../cat-harness/schemas/bean-note.ts";
+} from "@litlfred/cat-harness/schemas/bean-note.ts";
 
 export const ROOT = resolve(import.meta.dir, "..", "..");
 

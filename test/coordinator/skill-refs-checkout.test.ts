@@ -13,8 +13,8 @@ import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { kgRoots, resolvableSkillIndex, resolveSkillRef } from "../../../cat-harness/scripts/known-skills.js";
-import { tools } from "../../../cat-harness/tools/discover.js";
+import { kgRoots, resolvableSkillIndex, resolveSkillRef } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { tools } from "@litlfred/cat-harness/tools/discover.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

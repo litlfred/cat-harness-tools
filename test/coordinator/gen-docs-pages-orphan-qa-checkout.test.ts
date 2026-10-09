@@ -21,8 +21,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { readQaGraph } from "../../../cat-harness/content/pipeline/qa-graph-index.ts";
-import { directoryForGraph, siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
+import { readQaGraph } from "@litlfred/cat-harness/content/pipeline/qa-graph-index.ts";
+import { directoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

@@ -36,7 +36,7 @@
  * @covers cat-harness
  */
 
-import { defaultGraphTypologies, undecidedWorkKinds } from "../../cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies, undecidedWorkKinds } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 export function formatReport(undecided: readonly string[], stateKinds: number): string {
   const out: string[] = ["Graph typologies — every `state` kind says whether it records work", ""];

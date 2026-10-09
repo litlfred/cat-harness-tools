@@ -56,8 +56,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { resolveQaLocation } from "../../cat-harness/scripts/qa-store.ts";
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.js";
+import { resolveQaLocation } from "@litlfred/cat-harness/scripts/qa-store.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 export interface QaDirDecl {
   /** Repo-relative, no trailing slash. */

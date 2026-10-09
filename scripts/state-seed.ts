@@ -124,12 +124,12 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { resolveDirectories, type ResolvedDirectory } from "../../cat-harness/schemas/cat-harness.ts";
-import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "../../cat-harness/schemas/fsh-guts.ts";
-import { findDeclarationFile, instanceRootsIn } from "../../cat-harness/schemas/instance-roots.ts";
-import { instanceStateBranch } from "../../cat-harness/schemas/subgraph-source.ts";
-import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "../../cat-harness/scripts/branch-store.ts";
-import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "../../cat-harness/scripts/state-drift.ts";
+import { resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "@litlfred/cat-harness/scripts/branch-store.ts";
+import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "@litlfred/cat-harness/scripts/state-drift.ts";
 
 /** What the manifest says, as far as a refresh needs it. */
 interface SeedManifest {

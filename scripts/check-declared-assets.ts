@@ -35,7 +35,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
-import { declaredAssets, instanceRootsIn } from "../../cat-harness/schemas/cat-harness.js";
+import { declaredAssets, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * Instances whose declarations this repository owns — **discovered, not

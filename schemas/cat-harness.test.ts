@@ -11,13 +11,13 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
-import { registerFolioGraphTypology } from "../../cat-harness/schemas/folio-graph-typology";
-import { THEMES } from "../../cat-harness/schemas/themes";
-import { BEAN_GRAPH_FILE } from "../../cat-harness/schemas/bean-graph";
-import { TODO_GRAPH_FILE } from "../../cat-harness/schemas/todo-graph";
-import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "../../cat-harness/schemas/cat-harness";
-import { writeDeclaration } from "../../cat-harness/test/support/instance-fixture.js";
-import { checkoutDirectories, corpusDirectoriesForGraph } from "../../cat-harness/schemas/harness-config";
+import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/folio-graph-typology";
+import { THEMES } from "@litlfred/cat-harness/schemas/themes";
+import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph";
+import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/todo-graph";
+import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config";
 
 const TMP = join(import.meta.dir, "__test_agent_harness__");
 const INSTANCE_ROOT = HARNESS_ROOT;

@@ -25,7 +25,7 @@ import { describe, test, expect } from "bun:test";
 import { BEAN_STORE_READERS, beanGateUnmounted, checkWorkflows, ghPagesWipesStaging, GH_PAGES_GROUP, STATE_MOUNT } from "../check-workflows.js";
 import { readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const WORKFLOW_DIR = join(repoRootFor(resolve(import.meta.dir, "..", "..")), ".github", "workflows");
 

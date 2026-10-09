@@ -42,8 +42,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "../../../cat-harness/schemas/cat-harness.js";
-import { owningInstanceRoot, validatePath } from "../../../cat-harness/scripts/kg-validate.js";
+import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { owningInstanceRoot, validatePath } from "@litlfred/cat-harness/scripts/kg-validate.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

@@ -13,7 +13,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import {
   methodologyRows,
@@ -21,11 +21,11 @@ import {
   pageRelPath,
   short,
   type MethodologyRow,
-} from "../../../cat-harness/scripts/gen-methodologies-viz.js";
+} from "@litlfred/cat-harness/scripts/gen-methodologies-viz.js";
 import {
   checkMethodologyEvidence,
   methodologyNodes,
-} from "../../../cat-harness/scripts/check-methodology-evidence.js";
+} from "@litlfred/cat-harness/scripts/check-methodology-evidence.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

@@ -12,11 +12,11 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn } from "../../../cat-harness/schemas/cat-harness.js";
-import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.js";
-import { docsLayers } from "../../../cat-harness/scripts/compose-docs.js";
-import { docsPages, documentingPages } from "../../../cat-harness/scripts/docs-declarations.js";
-import { page, publishedPage, pageRelPath, skillIds, toolRows } from "../../../cat-harness/scripts/gen-tools-viz.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { docsLayers } from "@litlfred/cat-harness/scripts/compose-docs.js";
+import { docsPages, documentingPages } from "@litlfred/cat-harness/scripts/docs-declarations.js";
+import { page, publishedPage, pageRelPath, skillIds, toolRows } from "@litlfred/cat-harness/scripts/gen-tools-viz.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -60,7 +60,7 @@ const docsPagesFor = (kind: string): string[] => {
   );
 };
 
-const { tools } = (await import("../../../cat-harness/tools/index.js")) as { tools: () => unknown[] };
+const { tools } = (await import("@litlfred/cat-harness/tools/index.js")) as { tools: () => unknown[] };
 const rows = toolRows(tools());
 
 describe("the tools graph is not documented by the skills page", () => {

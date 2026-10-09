@@ -17,10 +17,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";
-import { firstSentence } from "../../../cat-harness/scripts/kg-export.ts";
-import { subgraphOutDir } from "../../../cat-harness/scripts/gen-subgraph-jsonld.ts";
-import { repoRootFor, siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { inAggregate } from "../../../cat-harness/test/support/checkout.ts";
+import { firstSentence } from "@litlfred/cat-harness/scripts/kg-export.ts";
+import { subgraphOutDir } from "@litlfred/cat-harness/scripts/gen-subgraph-jsonld.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { inAggregate } from "@litlfred/cat-harness/test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;
 const REPO = repoRootFor(HARNESS);

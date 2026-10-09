@@ -31,10 +31,10 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { findContentRepoRoot } from "../../../cat-harness/content/pipeline/repo-root";
-import { readDeclaredFolioProfile } from "../../../cat-harness/content/pipeline/profile-check";
-import { folioOptionalAxes } from "../../../cat-harness/content/pipeline/qa-criteria-registry";
-import { readEffectiveConfig } from "../../../cat-harness/schemas/harness-config";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { readDeclaredFolioProfile } from "@litlfred/cat-harness/content/pipeline/profile-check";
+import { folioOptionalAxes } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config";
 
 /**
  * RESTATED 2026-10-09 for the index. The tests below required a

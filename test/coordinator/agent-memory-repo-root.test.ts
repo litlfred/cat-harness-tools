@@ -22,7 +22,7 @@ import {
   MemoryNodeSchema,
   memoryForAgent,
   memoryForRoles,
-} from "../../../cat-harness/schemas/memory.js";
+} from "@litlfred/cat-harness/schemas/memory.js";
 import {
   AGENT_MEMORY_DIR,
   ANTIGRAVITY_RULE_BYTE_BUDGET,
@@ -33,7 +33,7 @@ import {
   renderEntries,
   syncAll,
   syncAntigravityRule,
-} from "../../../cat-harness/scripts/agent-memory.js";
+} from "@litlfred/cat-harness/scripts/agent-memory.js";
 
 describe("the corpus", () => {
   test("there are memory nodes to check — otherwise this proves nothing", () => {

@@ -16,8 +16,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { checkBeanParents } from "../../../cat-harness/scripts/check-bean-parents.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { checkBeanParents } from "@litlfred/cat-harness/scripts/check-bean-parents.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

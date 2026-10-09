@@ -13,8 +13,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { gitCorpus } from "../../../cat-harness/schemas/git-corpus.ts";
-import { structureOf } from "../../../cat-harness/schemas/document-structure.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

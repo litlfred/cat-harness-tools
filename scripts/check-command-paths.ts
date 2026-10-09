@@ -54,11 +54,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "../../cat-harness/schemas/cat-harness.js";
-import { corpusDirectoriesForGraph } from "../../cat-harness/schemas/harness-config.js";
+import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
-import { findEntryFiles } from "../../cat-harness/scripts/check-agent-entry-links.ts";
-import { isSyncedSkillDir } from "../../cat-harness/scripts/sync-remote-skills.js";
+import { findEntryFiles } from "@litlfred/cat-harness/scripts/check-agent-entry-links.ts";
+import { isSyncedSkillDir } from "@litlfred/cat-harness/scripts/sync-remote-skills.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

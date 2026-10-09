@@ -89,8 +89,8 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.js";
-import { gitFiles } from "../../cat-harness/schemas/git-corpus.ts";
+} from "@litlfred/cat-harness/scripts/qa-results.js";
+import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;

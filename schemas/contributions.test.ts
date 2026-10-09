@@ -15,10 +15,10 @@ import {
   ContributionCollisionError,
   composedKindOwner,
   type FolioContribution,
-} from "../../cat-harness/schemas/contributions";
-import { loadContributions } from "../../cat-harness/schemas/harness-config";
-import { adapterForKind } from "../../cat-harness/schemas/block-kinds";
-import { writeInstanceConfig } from "../../cat-harness/test/support/instance-fixture.js";
+} from "@litlfred/cat-harness/schemas/contributions";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config";
+import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds";
+import { writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the

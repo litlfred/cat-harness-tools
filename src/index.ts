@@ -13,8 +13,8 @@
 import { resolve } from "path";
 import { FolioServer } from "./server.js";
 import { createContentAdapter, readFolioContentConfig } from "./content-adapter.js";
-import { GitHelper } from "../../cat-harness/src/core/git.js";
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { GitHelper } from "@litlfred/cat-harness/src/core/git.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 // ── Parse CLI args ───────────────────────────────────────────────
 
@@ -80,8 +80,8 @@ if (args.includes("--check-deps")) {
     const { loadSkillNeeds, allSkillAvailability, formatSkillAvailability } = await import(
       "./tools/degradation.js"
     );
-    const { kgRoots } = await import("../../cat-harness/scripts/known-skills.js");
-    const { fallbackRolesBySkill } = await import("../../cat-harness/scripts/check-fallback-roles.js");
+    const { kgRoots } = await import("@litlfred/cat-harness/scripts/known-skills.js");
+    const { fallbackRolesBySkill } = await import("@litlfred/cat-harness/scripts/check-fallback-roles.js");
     const { skills, unreadable } = await loadSkillNeeds(kgRoots(instance));
 
     // ONE pass, not one per skill. The comment this replaces already noticed

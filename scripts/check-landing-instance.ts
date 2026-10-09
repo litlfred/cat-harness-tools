@@ -25,8 +25,8 @@
  */
 import { resolve } from "node:path";
 
-import { repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "../../cat-harness/schemas/harness-config.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /**
  * Resolved from this file, not `process.cwd()` (`check-folio-mount` says why:

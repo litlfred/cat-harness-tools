@@ -16,9 +16,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { declaredSubgraphNode } from "../../../cat-harness/scripts/kg-export.ts";
-import { subgraphPublicationFindings } from "../../../cat-harness/scripts/subgraph-node.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { declaredSubgraphNode } from "@litlfred/cat-harness/scripts/kg-export.ts";
+import { subgraphPublicationFindings } from "@litlfred/cat-harness/scripts/subgraph-node.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

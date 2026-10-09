@@ -31,7 +31,7 @@ import {
   toolGroupsFromNodes,
   type ToolGroupDeclaration,
 } from "../src/tool-groups.ts";
-import { tools as harnessTools } from "../../cat-harness/tools/index.ts";
+import { tools as harnessTools } from "@litlfred/cat-harness/tools/index.ts";
 
 /** This instance's root, for the ad-hoc declarations below. */
 const MCP_ROOT = new URL("..", import.meta.url).pathname;
@@ -43,7 +43,7 @@ import {
   BUILTIN_ADAPTERS,
   discoverBuiltinAdapters,
   resolveBuiltinAdapter,
-} from "../../cat-harness/src/builtin-adapters.ts";
+} from "@litlfred/cat-harness/src/builtin-adapters.ts";
 import { SERVER_ROUTES } from "../src/server.ts";
 import { dispatchGet, dispatchPost, mountDeclaredRoutes } from "../src/route-groups.ts";
 

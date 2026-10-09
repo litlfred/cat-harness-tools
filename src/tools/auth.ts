@@ -21,10 +21,10 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { decide, unscopedGrants, type RequestScope } from "../../../cat-harness/schemas/odrl.js";
-import { accessContext, type AccessContext, type Principal } from "../../../cat-harness/src/core/access.js";
+import { decide, unscopedGrants, type RequestScope } from "@litlfred/cat-harness/schemas/odrl.js";
+import { accessContext, type AccessContext, type Principal } from "@litlfred/cat-harness/src/core/access.js";
 import { GITHUB_ROLE_ACTOR, githubPrincipalFor, principalFromGithub, type GithubIdentity } from "../core/github-auth.js";
-import { authorizeTask, describeVerdict } from "../../../cat-harness/src/workflow/authorize.js";
+import { authorizeTask, describeVerdict } from "@litlfred/cat-harness/src/workflow/authorize.js";
 
 export interface WhoamiInput {
   /** A BPMN actor the caller says it is acting as. */

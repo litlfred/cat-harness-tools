@@ -13,10 +13,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { entryView, instanceRootRoutes } from "../../../cat-harness/scripts/gen-library-viz.ts";
-import { LibraryIndexSchema } from "../../../cat-harness/schemas/site-indexes.ts";
-import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { libraryAssetIri, libraryAssetSitePath } from "../../../cat-harness/schemas/library-iri.ts";
+import { entryView, instanceRootRoutes } from "@litlfred/cat-harness/scripts/gen-library-viz.ts";
+import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { libraryAssetIri, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

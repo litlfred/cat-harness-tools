@@ -18,14 +18,14 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readDeclaration, repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
-import { BEAN_GRAPH_FILE, parseBeanGraph } from "../../../cat-harness/schemas/bean-graph.js";
-import { contentIsOffCheckout, resolveSubgraphSource } from "../../../cat-harness/schemas/subgraph-source.js";
-import { TODO_GRAPH_FILE, parseTodoGraph } from "../../../cat-harness/schemas/todo-graph.js";
-import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../../cat-harness/scripts/todos.js";
-import { siteDirFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { workflowFiles } from "../../../cat-harness/scripts/known-skills.js";
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.js";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { BEAN_GRAPH_FILE, parseBeanGraph } from "@litlfred/cat-harness/schemas/bean-graph.js";
+import { contentIsOffCheckout, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
+import { ROOT, TODO_ROOT, readTodos, todoDirs } from "@litlfred/cat-harness/scripts/todos.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
 
 describe("the declaration and the directory agree", () => {
   test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {

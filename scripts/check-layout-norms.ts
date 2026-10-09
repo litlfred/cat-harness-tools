@@ -86,7 +86,7 @@ import {
   repoRootFor,
   resolveDirectories,
   subgraphTree,
-} from "../../cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -96,7 +96,7 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.ts";
+} from "@litlfred/cat-harness/scripts/qa-results.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;

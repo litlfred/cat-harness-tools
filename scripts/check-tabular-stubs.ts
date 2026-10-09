@@ -36,13 +36,13 @@
  * @covers qa
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { noteAbsent, splitDeclared } from "../../cat-harness/scripts/lib/declared-presence.ts";
+import { noteAbsent, splitDeclared } from "@litlfred/cat-harness/scripts/lib/declared-presence.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { tools } from "../../cat-harness/tools/index.ts";
-import { TABULAR_CSVW_FILENAME, TabularCsvwSchema } from "../../cat-harness/schemas/tabular-csvw.ts";
-import { corpusDirectoriesForGraph } from "../../cat-harness/schemas/harness-config.js";
+import { tools } from "@litlfred/cat-harness/tools/index.ts";
+import { TABULAR_CSVW_FILENAME, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 const ROOT = HARNESS_ROOT;
 

@@ -52,7 +52,7 @@
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { readArchivedBeans, resolveBeanArchive, type BeanNode } from "../../cat-harness/scripts/beans.ts";
+import { readArchivedBeans, resolveBeanArchive, type BeanNode } from "@litlfred/cat-harness/scripts/beans.ts";
 
 export const ROOT = resolve(import.meta.dir, "..", "..");
 

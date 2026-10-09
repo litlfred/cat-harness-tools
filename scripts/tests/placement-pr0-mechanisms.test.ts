@@ -23,7 +23,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   checkoutDependentsOf,
   checkoutDirectories,
@@ -31,19 +31,19 @@ import {
   corpusDirectoriesForGraph,
   declarationChain,
   repositoryMirrors,
-} from "../../../cat-harness/schemas/harness-config.js";
-import { readRoleGraph, type LoadedActor, type RoleGraph } from "../../../cat-harness/schemas/role-graph.js";
+} from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import {
   checkoutActors,
   checkoutCapabilities,
   checkoutRoleGraph,
   overlayRoleGraphs,
-} from "../../../cat-harness/schemas/scenario-overlay.js";
-import { ToolDefinitionSchema } from "../../../cat-harness/schemas/tool.js";
-import { ConcernGroupsSchema } from "../../../cat-harness/schemas/concern-groups.js";
-import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "../../../cat-harness/scripts/concern-groups.js";
-import { packageDirsIn } from "../../../cat-harness/scripts/skill-topics.js";
-import { knownSkills, workflowFiles } from "../../../cat-harness/scripts/known-skills.js";
+} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
+import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.js";
+import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "@litlfred/cat-harness/scripts/concern-groups.js";
+import { packageDirsIn } from "@litlfred/cat-harness/scripts/skill-topics.js";
+import { knownSkills, workflowFiles } from "@litlfred/cat-harness/scripts/known-skills.js";
 import { collect as collectInstanceGraph } from "../check-instance-graph.js";
 import { collect as collectConcernGroups } from "../check-concern-groups.js";
 

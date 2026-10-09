@@ -17,12 +17,12 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
-import { exportGraph } from "../../../bootstrap-tools/scripts/export-graph.ts";
+import { exportGraph } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
 import {
   repoRootFor,
   readDeclaration,
   artefactStub,
-} from "../../../cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

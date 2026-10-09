@@ -11,14 +11,14 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.js";
-import { complete, enabled, startInstance } from "../../../cat-harness/src/workflow/instance.js";
-import { authorizeTask } from "../../../cat-harness/src/workflow/authorize.js";
-import { loadAccessContext, principalFromEnv, type AccessContext } from "../../../cat-harness/src/core/access.js";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
+import { complete, enabled, startInstance } from "@litlfred/cat-harness/src/workflow/instance.js";
+import { authorizeTask } from "@litlfred/cat-harness/src/workflow/authorize.js";
+import { loadAccessContext, principalFromEnv, type AccessContext } from "@litlfred/cat-harness/src/core/access.js";
 import { allows, principalOf } from "../../src/core/rbac.js";
-import { workflowFile } from "../../../cat-harness/scripts/known-skills.js";
-import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "../../../cat-harness/schemas/odrl.js";
-import { readPermissions, type LoadedActor } from "../../../cat-harness/schemas/role-graph.js";
+import { workflowFile } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
+import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The access context, permissions and diagrams are the HARNESS's; this test moved up with the code (70lx).

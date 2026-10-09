@@ -21,9 +21,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { analyse, classify } from "../../../cat-harness/scripts/repo-partition.ts";
+import { analyse, classify } from "@litlfred/cat-harness/scripts/repo-partition.ts";
 import type { TodoRef, MacroDef } from "../../src/types.ts";
-import type { FeedbackItem, PaperMacro } from "../../../cat-harness/schemas/types.ts";
+import type { FeedbackItem, PaperMacro } from "@litlfred/cat-harness/schemas/types.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 // `src/types.ts` moved to this layer (70lx); the content vocabulary stayed in the harness.

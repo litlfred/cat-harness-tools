@@ -66,12 +66,12 @@
  */
 import { spawnSync } from "node:child_process";
 
-import { defaultGraphTypologies } from "../../cat-harness/schemas/cat-harness.js";
-import { allAvatars, hasAvatar } from "../../cat-harness/schemas/avatars.js";
-import { documentedKinds, KIND_TABLE_DOC } from "../../cat-harness/scripts/kind-table.ts";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { allAvatars, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { documentedKinds, KIND_TABLE_DOC } from "@litlfred/cat-harness/scripts/kind-table.ts";
 // `folio` is registered by CORE as a load-time side effect, so the harness alone
 // does not know it exists. Same import, same reason, as `check-declared-dirs`.
-import "../../cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 
 export interface Step {
   /** What to run, as `bun run` arguments. */

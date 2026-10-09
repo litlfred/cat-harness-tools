@@ -17,18 +17,18 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { resolve, join } from "path";
 
-import { QA_CRITERIA_REGISTRY } from "../../../cat-harness/content/pipeline/qa-criteria-registry.ts";
-import { checkerFunctionName } from "../../../cat-harness/content/pipeline/qa-checker-discovery.ts";
+import { QA_CRITERIA_REGISTRY } from "@litlfred/cat-harness/content/pipeline/qa-criteria-registry.ts";
+import { checkerFunctionName } from "@litlfred/cat-harness/content/pipeline/qa-checker-discovery.ts";
 import {
   isCriterionSourceMiss,
   resolveCriterionSource,
-} from "../../../cat-harness/content/pipeline/criterion-source.ts";
-import { instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.ts";
-import { loadContributions } from "../../../cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/content/pipeline/criterion-source.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {
   ContributionRegistry,
   type FolioContribution,
-} from "../../../cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/schemas/contributions.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

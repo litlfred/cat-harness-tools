@@ -19,10 +19,10 @@ import {
   TABULAR_CSVW_SCHEMA_ID,
   toCsvw,
   stubsIn,
-} from "../../../cat-harness/schemas/tabular-csvw.ts";
-import { CONTENT_CONTEXT } from "../../../cat-harness/schemas/jsonld.ts";
+} from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { stubFindings, stubbedTools } from "../check-tabular-stubs.ts";
-import { tools } from "../../../cat-harness/tools/index.ts";
+import { tools } from "@litlfred/cat-harness/tools/index.ts";
 
 const COLUMN = {
   name: "country",

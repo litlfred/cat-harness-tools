@@ -10,13 +10,13 @@ import { join } from "node:path";
 
 import Ajv from "ajv";
 
-import { RequirementSetSchema, SignerKindSchema, type SignOff } from "../../../bootstrap-tools/schemas/requirement-set.ts";
-import { QA_REVIEWER_KINDS } from "../../../cat-harness/schemas/block-qa.ts";
+import { RequirementSetSchema, SignerKindSchema, type SignOff } from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
+import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import {
   QaAttestationsSchema,
   requirementSignoffPath,
-} from "../../../cat-harness/schemas/qa-attestations.ts";
-import { loadProcessModel } from "../../../cat-harness/src/workflow/process-model.ts";
+} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.ts";
 import { checkRequirementSet, signoffFacts, storedSignOffs, unionSignOffs } from "../check-requirements.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..");

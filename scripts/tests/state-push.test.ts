@@ -12,9 +12,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, lstatSync, readFileSync, readlinkSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { mountState } from "../../../cat-harness/scripts/state-mount.js";
+import { mountState } from "@litlfred/cat-harness/scripts/state-mount.js";
 import { pushState, report, unknownArgs } from "../state-push.js";
-import { BRANCH, cleanup, git, PDF, richSeed, stateFixture } from "../../../cat-harness/scripts/tests/state-fixture.js";
+import { BRANCH, cleanup, git, PDF, richSeed, stateFixture } from "@litlfred/cat-harness/scripts/tests/state-fixture.js";
 
 afterEach(cleanup);
 

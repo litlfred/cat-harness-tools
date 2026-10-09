@@ -34,7 +34,7 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { instanceRootsIn, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The instances under `repoRoot` that carry a `tsconfig.json`, as config paths. */
 export function instanceConfigs(repoRoot: string): string[] {

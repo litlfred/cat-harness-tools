@@ -64,8 +64,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "../../cat-harness/scripts/qa-results.js";
+import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "@litlfred/cat-harness/scripts/qa-results.js";
 import {
   type Bump,
   type SurfaceSubject,
@@ -74,7 +74,7 @@ import {
   comparable,
   diffSurface,
   surfaceOf,
-} from "../../cat-harness/schemas/version-bump.js";
+} from "@litlfred/cat-harness/schemas/version-bump.js";
 
 export type BumpState = "ok" | "under" | "unreleased" | "undetermined";
 

@@ -27,8 +27,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { defaultGraphTypologies, siteDirFor } from "../../cat-harness/schemas/cat-harness.js";
-import { newUnkinded, nodeKindIndex, unkindedKey, type NodeKindIndex } from "../../cat-harness/schemas/node-kind-index.js";
+import { defaultGraphTypologies, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { newUnkinded, nodeKindIndex, unkindedKey, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
 const repoRoot = REPO_ROOT ?? join(HARNESS_ROOT, "..");

@@ -15,9 +15,9 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "bun:test";
 
-import { branchSlug, noteFileName } from "../../../cat-harness/schemas/bean-note.ts";
+import { branchSlug, noteFileName } from "@litlfred/cat-harness/schemas/bean-note.ts";
 import { addNote, checkNotes, noteDirs, writeIndex } from "../bean-notes.ts";
-import { classify, resolveGeneratedRegions } from "../../../cat-harness/scripts/merge-conflict-patterns.ts";
+import { classify, resolveGeneratedRegions } from "@litlfred/cat-harness/scripts/merge-conflict-patterns.ts";
 
 const BEAN = "folio-assistant-ob3m";
 const BEAN_FILE = `beans/defs/${BEAN}--navbar-findings.md`;

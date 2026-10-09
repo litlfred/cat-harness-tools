@@ -54,8 +54,8 @@ import {
   type Change,
   type TipLocation,
   type WriteResult,
-} from "../../cat-harness/scripts/branch-store.js";
-import { repoRootOf } from "../../cat-harness/scripts/state-mount.js";
+} from "@litlfred/cat-harness/scripts/branch-store.js";
+import { repoRootOf } from "@litlfred/cat-harness/scripts/state-mount.js";
 
 export interface PushOptions {
   repoRoot?: string;

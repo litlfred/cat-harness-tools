@@ -29,7 +29,7 @@
 
 import { readFileSync } from "node:fs";
 
-import { readRows, render, stale, type Report } from "../../cat-harness/src/sessions/staleness.js";
+import { readRows, render, stale, type Report } from "@litlfred/cat-harness/src/sessions/staleness.js";
 
 const argv = process.argv.slice(2);
 const warn = argv.includes("--warn");

@@ -36,14 +36,14 @@ import {
   qaResultPath,
   unknownFlags,
   type Judgement,
-} from "../../../cat-harness/scripts/qa-results.ts";
+} from "@litlfred/cat-harness/scripts/qa-results.ts";
 import { checkWireframes, judgeWireframes, type WireframeReport } from "../check-wireframes.ts";
 import { checkLayoutNorms, judgeLayoutNorms } from "../check-layout-norms.ts";
 import { checkRenderedLabels, judgeRenderedLabels } from "../check-rendered-labels.ts";
 import { checkSourceLicence, judgeSourceLicence } from "../check-source-licence.ts";
-import { checkMethodologyEvidence, judgeMethodologyEvidence } from "../../../cat-harness/scripts/check-methodology-evidence.ts";
+import { checkMethodologyEvidence, judgeMethodologyEvidence } from "@litlfred/cat-harness/scripts/check-methodology-evidence.ts";
 import { checkLanes, judgeLaneDocumentation } from "../check-lane-documentation.ts";
-import { judgeKgExport } from "../../../cat-harness/scripts/kg-export.ts";
+import { judgeKgExport } from "@litlfred/cat-harness/scripts/kg-export.ts";
 import { coverage, judgeAvatarCoverage, trashDerivationPresent } from "../check-avatar-coverage.ts";
 import {
   healthProducerCurrent,
@@ -54,7 +54,7 @@ import {
   type Family,
 } from "../check-harness-state.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { implementingRootFor } from "../../../cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 // The harness owns the sidecars and baselines; this test moved up in 70lx B2b.
 const INSTANCE_ROOT = HARNESS_ROOT;

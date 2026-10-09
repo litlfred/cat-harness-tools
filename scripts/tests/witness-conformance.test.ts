@@ -13,8 +13,8 @@ import { join } from "node:path";
 import {
   ComputationWitnessConformanceSchema as Contract,
   ComputationWitnessSchema as Envelope,
-} from "../../../cat-harness/schemas/computation-witness.ts";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "../../../cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/computation-witness.ts";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkWitnesses } from "../witness-conformance.ts";
 
 const CONFORMING = {

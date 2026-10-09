@@ -19,11 +19,11 @@ import { describe, expect, test } from "bun:test";
 
 import { join } from "node:path";
 
-import { COVERED } from "../../../cat-harness/scripts/pair-cover.ts";
-import { repairableGates } from "../../../cat-harness/scripts/regen-after-merge.ts";
-import { loadGates } from "../../../cat-harness/scripts/gates.ts";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+import { COVERED } from "@litlfred/cat-harness/scripts/pair-cover.ts";
+import { repairableGates } from "@litlfred/cat-harness/scripts/regen-after-merge.ts";
+import { loadGates } from "@litlfred/cat-harness/scripts/gates.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory this test was written in (`cat-harness-tools/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness-tools/scripts/tests");

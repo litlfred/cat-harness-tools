@@ -19,7 +19,7 @@ import {
   formatCapabilityReport,
   type Capability,
 } from "../../src/tools/capabilities";
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", ".."));
 

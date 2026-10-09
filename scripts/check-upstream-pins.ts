@@ -24,7 +24,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { assessPin, exitCode, readPin, render, type PinDef, type PinVerdict } from "../../cat-harness/src/upstream/pins.js";
+import { assessPin, exitCode, readPin, render, type PinDef, type PinVerdict } from "@litlfred/cat-harness/src/upstream/pins.js";
 
 const ROOT = HARNESS_ROOT;
 const argv = process.argv.slice(2);

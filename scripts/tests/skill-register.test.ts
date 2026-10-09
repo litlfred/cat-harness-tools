@@ -49,8 +49,8 @@ import {
   skillPackages,
   unlisted,
   withoutKey,
-} from "../../../cat-harness/scripts/skill-register.js";
-import { scriptsOf } from "../../../cat-harness/schemas/script-table.ts";
+} from "@litlfred/cat-harness/scripts/skill-register.js";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const scripts = (): Record<string, string> => scriptsOf(ROOT);

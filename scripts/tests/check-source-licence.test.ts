@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkMode, sourceLicenceDoc, CHECK_EXIT, type LicenceReport } from "../check-source-licence.ts";
-import { qaResultPath } from "../../../cat-harness/scripts/qa-results.ts";
+import { qaResultPath } from "@litlfred/cat-harness/scripts/qa-results.ts";
 
 const INSTANCE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 

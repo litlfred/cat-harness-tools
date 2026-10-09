@@ -73,7 +73,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "../../cat-harness/scripts/bean-store-read.ts";
+import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "@litlfred/cat-harness/scripts/bean-store-read.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 

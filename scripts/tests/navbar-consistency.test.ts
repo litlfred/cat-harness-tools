@@ -33,7 +33,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync,
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const SCRIPT = join("cat-harness-tools", "scripts", "check-navbar-consistency.ts");

@@ -12,8 +12,8 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { contentCodeFindings, contentInstanceCode } from "../../../cat-harness/scripts/content-holds-code.ts";
-import { KG_CRITERIA_BY_ID } from "../../../cat-harness/schemas/kg-qa.ts";
+import { contentCodeFindings, contentInstanceCode } from "@litlfred/cat-harness/scripts/content-holds-code.ts";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

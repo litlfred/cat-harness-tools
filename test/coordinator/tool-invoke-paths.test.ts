@@ -46,10 +46,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { unresolvedPaths } from "../../../cat-harness/scripts/check-tools.ts";
-import { tools, toolsOf } from "../../../cat-harness/tools/discover.js";
-import { instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.js";
-import { resolveImplementingPath } from "../../../cat-harness/schemas/harness-config.js";
+import { unresolvedPaths } from "@litlfred/cat-harness/scripts/check-tools.ts";
+import { tools, toolsOf } from "@litlfred/cat-harness/tools/discover.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

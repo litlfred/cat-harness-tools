@@ -14,9 +14,9 @@ import { join, resolve } from "node:path";
 import {
   owningDirectory,
   resolveDirectories,
-} from "../../../cat-harness/schemas/cat-harness.ts";
-import { scanSubgraphs } from "../../../cat-harness/scripts/check-subgraphs.ts";
-import { checkoutDirectories } from "../../../cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { scanSubgraphs } from "@litlfred/cat-harness/scripts/check-subgraphs.ts";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

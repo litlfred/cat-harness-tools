@@ -20,7 +20,7 @@ import {
   parseModelRegistry,
   validatedLanguages,
   type ModelEntry,
-} from "../../../bootstrap-tools/schemas/model-registry.ts";
+} from "@litlfred/bootstrap-tools/schemas/model-registry.ts";
 import { checkModelLanguages, registryPath } from "../check-model-languages.ts";
 
 const BOOTSTRAP = resolve(import.meta.dir, "..", "..", "..", "bootstrap");

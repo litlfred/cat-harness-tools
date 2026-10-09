@@ -31,7 +31,7 @@ import {
   contentDocuments,
   prefixesOf,
 } from "../check-context-emission.ts";
-import { CONTENT_CONTEXT } from "../../../cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 
 /** A tree of `.jsonld` documents, and nothing else. */
 function corpus(docs: Record<string, unknown>): string {
@@ -198,7 +198,7 @@ describe("the bound set is read from the context, not listed here", () => {
 // corpus first, for the reason at the top of this file.
 
 import { checkPrefixDeclaration, declaredStubs } from "../check-context-emission.ts";
-import { NS_PREFIXES, stubOfNamespace } from "../../../cat-harness/schemas/namespaces.ts";
+import { NS_PREFIXES, stubOfNamespace } from "@litlfred/cat-harness/schemas/namespaces.ts";
 
 const URL = "https://example.org/ctx.jsonld";
 const OWN = "https://litlfred.github.io/folio-assistant/some-instance/ns#";

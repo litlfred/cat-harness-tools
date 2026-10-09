@@ -26,8 +26,8 @@ import { readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { Glob } from "bun";
 
-import { declarationPathIn, instanceRootsIn } from "../../../cat-harness/schemas/cat-harness.js";
-import { themeByRef } from "../../../cat-harness/schemas/theme-by-ref.js";
+import { declarationPathIn, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { themeByRef } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

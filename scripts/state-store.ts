@@ -66,7 +66,7 @@ import {
   type TipLocation,
   type TreeRead,
   type WriteResult,
-} from "../../cat-harness/scripts/branch-store.js";
+} from "@litlfred/cat-harness/scripts/branch-store.js";
 
 /** A change expressed relative to the directory, not to the branch root. */
 export interface StateChange {

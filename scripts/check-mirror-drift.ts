@@ -107,13 +107,13 @@
  * as drift). Every one of them moved a count.
  */
 
-import { folioDir } from "../../cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative, resolve } from "path";
 
-import { LEAN_PACKAGES, type LeanPackage } from "../../cat-harness/schemas/lean-packages.ts";
-import { findContentRepoRoot } from "../../cat-harness/content/pipeline/repo-root";
-import { ARCHIMEDEAN_TYPE_RE } from "../../cat-harness/content/pipeline/qa-checkers-voice.ts";
+import { LEAN_PACKAGES, type LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.ts";
+import { findContentRepoRoot } from "@litlfred/cat-harness/content/pipeline/repo-root";
+import { ARCHIMEDEAN_TYPE_RE } from "@litlfred/cat-harness/content/pipeline/qa-checkers-voice.ts";
 
 // ── Lean surface parsing ─────────────────────────────────────────
 

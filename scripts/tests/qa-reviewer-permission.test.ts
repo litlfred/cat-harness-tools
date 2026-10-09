@@ -21,8 +21,8 @@ import {
   scan,
   scanCounted,
 } from "../check-qa-reviewer-permission.ts";
-import { couldNotDispatchEntry } from "../../../cat-harness/content/pipeline/untainted-verification.ts";
-import type { QaCriterionEntry } from "../../../cat-harness/schemas/block-qa.ts";
+import { couldNotDispatchEntry } from "@litlfred/cat-harness/content/pipeline/untainted-verification.ts";
+import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 function fixture(): { results: string; actors: string } {
   const root = mkdtempSync(join(tmpdir(), "qa-perm-"));

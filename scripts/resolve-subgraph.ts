@@ -22,7 +22,7 @@
  */
 import { resolve } from "node:path";
 
-import { checkoutDirectories, declaredSubgraph, type DeclaredSubgraph } from "../../cat-harness/schemas/harness-config.ts";
+import { checkoutDirectories, declaredSubgraph, type DeclaredSubgraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 function arg(name: string): string | undefined {

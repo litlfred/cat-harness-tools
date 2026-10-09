@@ -10,7 +10,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { stakeholderMap, formatStakeholderMap } from "../../../cat-harness/src/impact/stakeholder-map.js";
+import { stakeholderMap, formatStakeholderMap } from "@litlfred/cat-harness/src/impact/stakeholder-map.js";
 
 export function registerStakeholderTools(server: McpServer, repoRoot: string): void {
   server.tool(

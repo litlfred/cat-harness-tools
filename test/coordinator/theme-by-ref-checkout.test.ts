@@ -12,8 +12,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceStickyThemes, themeByRef } from "../../../cat-harness/schemas/theme-by-ref.ts";
-import { THEMES } from "../../../cat-harness/schemas/themes.ts";
+import { instanceStickyThemes, themeByRef } from "@litlfred/cat-harness/schemas/theme-by-ref.ts";
+import { THEMES } from "@litlfred/cat-harness/schemas/themes.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

@@ -38,7 +38,7 @@ import {
   describePreflight,
   preflight,
   preflightRefusal,
-} from "../../../cat-harness/src/workflow/preflight.ts";
+} from "@litlfred/cat-harness/src/workflow/preflight.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "preflight-"));
 

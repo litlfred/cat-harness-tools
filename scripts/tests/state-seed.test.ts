@@ -22,10 +22,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { BranchStore, MANIFEST_SCHEMA } from "../../../cat-harness/scripts/branch-store.ts";
+import { BranchStore, MANIFEST_SCHEMA } from "@litlfred/cat-harness/scripts/branch-store.ts";
 import { archiveIds, archiveTreeId, cutoverMain, exitCode, refreshSeed, retireInstance, rowFor } from "../state-seed.ts";
-import { FROZEN_SUBTREE_FIELDS, FROZEN_SUBTREE_KIND, readFshGutsNode } from "../../../cat-harness/schemas/fsh-guts.ts";
-import { defaultRepoRoot, driftOf, observedRows } from "../../../cat-harness/scripts/state-drift.ts";
+import { FROZEN_SUBTREE_FIELDS, FROZEN_SUBTREE_KIND, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { defaultRepoRoot, driftOf, observedRows } from "@litlfred/cat-harness/scripts/state-drift.ts";
 
 const made: string[] = [];
 afterAll(() => {

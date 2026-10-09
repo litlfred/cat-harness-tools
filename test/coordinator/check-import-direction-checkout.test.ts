@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { analyse, readInstances, type ImportDirectionReport } from "../../../cat-harness/scripts/check-import-direction.ts";
+import { analyse, readInstances, type ImportDirectionReport } from "@litlfred/cat-harness/scripts/check-import-direction.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

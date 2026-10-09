@@ -17,9 +17,9 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { workflowFiles, corpusScopeFor } from "../../cat-harness/scripts/known-skills.js";
-import { loadProcessModel } from "../../cat-harness/src/workflow/process-model.js";
-import { loadRelaxations, validateRelaxations, PolicyError } from "../../cat-harness/src/workflow/gate.js";
+import { workflowFiles, corpusScopeFor } from "@litlfred/cat-harness/scripts/known-skills.js";
+import { loadProcessModel } from "@litlfred/cat-harness/src/workflow/process-model.js";
+import { loadRelaxations, validateRelaxations, PolicyError } from "@litlfred/cat-harness/src/workflow/gate.js";
 
 const root = HARNESS_ROOT;
 // Every declared knowledge-graph directory. A relaxation is validated

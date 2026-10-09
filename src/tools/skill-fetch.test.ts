@@ -9,9 +9,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { LOCAL_PACKAGES, discoverLocalPackages, locateLocalSkill } from "./skill-fetch.js";
-import { writeInstanceConfig } from "../../../cat-harness/test/support/instance-fixture.js";
-import {  } from "../../../cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../../cat-harness/test/support/instance-fixture.js";
+import { writeInstanceConfig } from "@litlfred/cat-harness/test/support/instance-fixture.js";
+import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { writeDeclaration } from "@litlfred/cat-harness/test/support/instance-fixture.js";
 
 const ROOT = resolve(import.meta.dir, "../..");
 

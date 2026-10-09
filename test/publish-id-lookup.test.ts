@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 import { indexedSources, outDirFor } from "../scripts/gen-id-lookup.ts";
 import { SITE_DIR, publish } from "../scripts/publish-id-lookup.ts";
-import { ID_LOOKUP_DIR, publishedLookups } from "../../cat-harness/scripts/search-split.ts";
+import { ID_LOOKUP_DIR, publishedLookups } from "@litlfred/cat-harness/scripts/search-split.ts";
 
 describe("publish-id-lookup", () => {
   test("the client and every declared index land where the splitter looks", () => {

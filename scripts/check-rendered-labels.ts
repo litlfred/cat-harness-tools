@@ -69,7 +69,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { gitCorpus } from "../../cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -79,7 +79,7 @@ import {
   writeQaResult,
   type Judgement,
   type QaResult,
-} from "../../cat-harness/scripts/qa-results.ts";
+} from "@litlfred/cat-harness/scripts/qa-results.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");

@@ -68,9 +68,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "../../cat-harness/schemas/cat-harness.js";
-import { dependsOnFor } from "../../cat-harness/schemas/depends-on.js";
-import { expectedInstanceConfigPath } from "../../cat-harness/schemas/harness-config.js";
+import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
+import { expectedInstanceConfigPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /**
  * Keys whose value records where THIS artefact came from.

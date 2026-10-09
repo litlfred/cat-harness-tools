@@ -13,7 +13,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "../../../cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { strayBacktick, viewerSources } from "../check-viewer-backticks.ts";
 
 const ROOT = repoRootFor(join(import.meta.dir, "../.."));
