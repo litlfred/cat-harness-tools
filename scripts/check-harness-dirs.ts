@@ -40,7 +40,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import {
   BEAN_GRAPH_FILE,
@@ -49,6 +49,7 @@ import {
   parseBeanGraph,
 } from "../../cat-harness/schemas/bean-graph";
 import { WORKFLOW_DIR } from "../../cat-harness/src/workflow/store.js";
+import { graphReadPath } from "../../cat-harness/scripts/graph-read.ts";
 
 export interface HarnessDirsReport {
   /** A parseable `beans/beans.json` was found. */
@@ -90,10 +91,13 @@ export function checkHarnessDirs(root: string): HarnessDirsReport {
   let declaredWorkPlan = join(DEFAULT_BEAN_GRAPH_ROOT, "defs");
   let declaredWorkflowState = join(DEFAULT_BEAN_GRAPH_ROOT, "workflows");
 
+  const where = graphReadPath("beans", root);
+  const graphRoot = where.state === "ok" ? where.at : join(root, DEFAULT_BEAN_GRAPH_ROOT);
+
   // The bean graph is the DECLARATION. It used to be `harness.config.json`'s
   // `harness` block; moving it here removed one of the three places the same
   // path was written, rather than adding a fourth. See schemas/bean-graph.ts.
-  const graphPath = join(root, DEFAULT_BEAN_GRAPH_ROOT, BEAN_GRAPH_FILE);
+  const graphPath = join(graphRoot, BEAN_GRAPH_FILE);
   if (existsSync(graphPath)) {
     try {
       const graph = parseBeanGraph(JSON.parse(readFileSync(graphPath, "utf-8")));
@@ -148,15 +152,20 @@ export function checkHarnessDirs(root: string): HarnessDirsReport {
     }
   }
 
-  const wpDir = resolve(root, declaredWorkPlan);
   let beanCount = -1;
-  if (existsSync(wpDir)) {
-    beanCount = readdirSync(wpDir).filter((f) => f.endsWith(".md")).length;
-    if (beanCount === 0) {
-      notes.push(`${declaredWorkPlan}/ exists but holds no beans — an empty plan, not a broken one.`);
-    }
+  if (where.state === "refused") {
+    problems.push(where.reason);
   } else {
-    problems.push(`harness.workPlan names "${declaredWorkPlan}", which does not exist.`);
+    const relToGraph = relative(DEFAULT_BEAN_GRAPH_ROOT, declaredWorkPlan);
+    const wpDir = resolve(graphRoot, relToGraph);
+    if (existsSync(wpDir)) {
+      beanCount = readdirSync(wpDir).filter((f) => f.endsWith(".md")).length;
+      if (beanCount === 0) {
+        notes.push(`${declaredWorkPlan}/ exists but holds no beans — an empty plan, not a broken one.`);
+      }
+    } else {
+      problems.push(`harness.workPlan names "${declaredWorkPlan}", which does not exist.`);
+    }
   }
 
   return {

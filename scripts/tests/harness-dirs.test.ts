@@ -19,11 +19,13 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { WORKFLOW_DIR } from "../../../cat-harness/src/workflow/store.js";
+import { MOUNT_MARKER_SCHEMA, markerPath } from "../../../cat-harness/scripts/branch-store.ts";
 import { beansYmlPath, checkHarnessDirs } from "../check-harness-dirs.js";
 import { readHarnessConfig, resolveHarnessConfigPath } from "../../../cat-harness/schemas/harness-config.js";
 import {
@@ -342,3 +344,55 @@ describe("the config name — `<instance>.config.json`, and only that", () => {
     }
   });
 });
+
+const TIP = { branch: "cat/cat-harness/beans", keyedBy: "tip" } as const;
+
+function branchRepo(dirs: Array<Record<string, unknown>>): string {
+  const root = mkdtempSync(join(tmpdir(), "harness-dirs-branch-"));
+  writeFileSync(
+    join(root, "cat-harness.json"),
+    JSON.stringify({ $schema: "folio-harness/v1", name: "cat-harness", directories: dirs }, null, 2),
+  );
+  writeFileSync(join(root, ".beans.yml"), "beans:\n    path: beans/defs\n");
+  spawnSync("git", ["init", "-q", "-b", "main"], { cwd: root });
+  spawnSync("git", ["config", "user.email", "t@t"], { cwd: root });
+  spawnSync("git", ["config", "user.name", "t"], { cwd: root });
+  return root;
+}
+
+function mountBranch(root: string, id: string, into: string): void {
+  mkdirSync(into, { recursive: true });
+  const p = markerPath(root, id);
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id, branch: TIP.branch, path: "beans", into, tip: "0".repeat(40), files: {} }));
+}
+
+describe("branch-mounted beans store", () => {
+  test("when beans is on a branch and unmounted, it reports the unmounted reason rather than missing directory", () => {
+    const root = branchRepo([{ id: "beans", path: "beans/", graphTypologies: ["beans"], source: { kind: "branch", branch: TIP.branch, keyedBy: "tip" } }]);
+    try {
+      const r = checkHarnessDirs(root);
+      expect(r.problems.some((p) => p.includes("is on cat/cat-harness/beans and is not mounted"))).toBe(true);
+      expect(r.problems.some((p) => p.includes("which does not exist"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("when beans is on a branch and mounted, it checks the mount and passes", () => {
+    const root = branchRepo([{ id: "beans", path: "beans/", graphTypologies: ["beans"], source: { kind: "branch", branch: TIP.branch, keyedBy: "tip" } }]);
+    const into = join(root, "mounted-beans");
+    mountBranch(root, "beans", into);
+    writeGraph(into, [{ id: "defs", path: "defs", graphTypologies: ["bean-defs"] }]);
+    mkdirSync(join(into, "defs"), { recursive: true });
+    writeFileSync(join(into, "defs", "test-1234.md"), "---\nid: test-1234\n---\n");
+    try {
+      const r = checkHarnessDirs(root);
+      expect(r.problems).toEqual([]);
+      expect(r.beanCount).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
