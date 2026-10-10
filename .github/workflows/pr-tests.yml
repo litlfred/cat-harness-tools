@@ -5,7 +5,9 @@
 # `bootstrap/`, `smart-base/` and so on. So each run checks out folio-assistant
 # main, mounts every instance from its `index.lock.json`, then puts this
 # repository (at the ref under test) and cat-harness main in place of their
-# locked mounts, since this repository's main tracks cat-harness main.
+# locked mounts, since this repository's main tracks cat-harness main. Their
+# `.git` directories are removed so they are discovered as instances, the
+# same as a lock mount.
 #
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
@@ -48,11 +50,20 @@ jobs:
         run: |
           rm -rf fa/cat-harness
           git clone -q --depth 1 https://github.com/litlfred/cat-harness fa/cat-harness
+          rm -rf fa/cat-harness/.git
       - name: Put the PR in place of the locked cat-harness-tools
         run: rm -rf fa/cat-harness-tools
       - uses: actions/checkout@v4
         with:
           path: fa/cat-harness-tools
+      - &unnest
+        # A directory holding its own `.git` inside the index checkout is a
+        # FOREIGN checkout to `instanceRootsIn` (cat-harness
+        # schemas/instance-roots.ts), so it is not discovered as an instance
+        # and its scripts drop out of the script table. Lock mounts carry no
+        # `.git`; make these two look the same.
+        name: Make the swapped-in checkouts plain mounts
+        run: rm -rf fa/cat-harness-tools/.git fa/cat-harness/.git
       - &install
         name: Install
         working-directory: fa
@@ -80,6 +91,7 @@ jobs:
         with:
           path: fa/cat-harness-tools
           ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+      - *unnest
       - *install
       - name: bun test
         working-directory: fa
