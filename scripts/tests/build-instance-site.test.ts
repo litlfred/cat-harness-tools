@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf } from "../build-instance-site.ts";
+import { SCRIPT_NAME, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf } from "../build-instance-site.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -42,5 +42,10 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
   test("urls are read by an HTML parser: a quote-concatenated string in a script is not a link", async () => {
     const html = `<a href="a.html">x</a><img src="i.png"><form action="f/"></form><script>var u = "<a href='" + base + "x.html'>";</script>`;
     expect(await pageUrls(html)).toEqual(["a.html", "i.png", "f/"]);
+  });
+
+  test("--pre and --source-step take package script names, never commands", () => {
+    for (const ok of ["check:catalogue", "site:catalogue", "iris.pages-check_2"]) expect(SCRIPT_NAME.test(ok)).toBe(true);
+    for (const bad of ["bun run x", "a;rm -rf /", "$(id)", "a && b", "-x", ""]) expect(SCRIPT_NAME.test(bad)).toBe(false);
   });
 });
