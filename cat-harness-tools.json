@@ -111,22 +111,6 @@
       ]
     },
     {
-      "id": "cat-harness-tools-ui",
-      "path": "ui/",
-      "description": "Static pages and styles the harness's local tools serve (bib-qa, glossary curator, source relevance). Moved here from `cat-harness/ui/` by bean `70lx`.",
-      "graphTypologies": [
-        "code"
-      ]
-    },
-    {
-      "id": "cat-harness-tools-viewer",
-      "path": "viewer/",
-      "description": "The standalone viewer page and its package manifest. Moved here from `cat-harness/viewer/` by bean `70lx`.",
-      "graphTypologies": [
-        "code"
-      ]
-    },
-    {
       "id": "cat-harness-tools-archimate",
       "path": "archimate/scripts/",
       "description": "The ArchiMate subgraph's generators, checker and tests; the subgraph's content and schema stay in `cat-harness/archimate/`. Moved by bean `70lx`.",
