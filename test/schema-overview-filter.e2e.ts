@@ -35,7 +35,6 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { serveThemedAt } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

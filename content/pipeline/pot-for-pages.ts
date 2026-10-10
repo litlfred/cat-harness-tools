@@ -51,7 +51,6 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { directoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { extractMarkdown, formatPot, potWithoutTimestamp } from "./pot-extract.js";

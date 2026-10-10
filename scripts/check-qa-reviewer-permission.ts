@@ -77,7 +77,7 @@ import { isCheckerWitness, isCouldNotDispatch } from "../content/pipeline/untain
 import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const ACTOR_DIR = actorsDir(ROOT) ?? (() => { throw new Error("the platform declares no `scenarios` graph, so the actor registry (bean rqao) has no home to read"); })();

@@ -19,7 +19,7 @@ import {
   detectOrphansAcrossGraphs,
   orphanSubjectResolves,
 } from "../orphan-detector.js";
-import { KG_CRITERIA, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
 
 const tmpDirs: string[] = [];
 afterEach(() => {

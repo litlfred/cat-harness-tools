@@ -9,7 +9,6 @@ import {
 import {
   buildTraceability,
   collectBeans,
-  collectBlocks,
   evaluateTraceabilityAudit,
   extractExplicitTargets,
   extractInferredTargets,

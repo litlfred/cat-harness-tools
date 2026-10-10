@@ -114,7 +114,6 @@ export function readCommitsFromGit(
   headRef = "HEAD",
   cwd?: string,
 ): CommitInfo[] {
-  const range = baseRef ? `${baseRef}..${headRef}` : headRef;
   const args = ["log", "-z", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B"];
 
   if (baseRef) {

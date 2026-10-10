@@ -60,7 +60,7 @@ import { dirname, join } from "node:path";
 
 import { flattenDependencies, runInOrder, type OrderedStep } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { buildManifest, readManifest, selectSteps } from "./render-selection.js";
-import { instanceRootFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** A step, plus the command that performs it. */

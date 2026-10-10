@@ -176,7 +176,7 @@
  * @module scripts/check-workflow-paths
  * @covers none — .github/workflows/ is not a declared graph typology
  */
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 

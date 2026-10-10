@@ -59,7 +59,7 @@
  * names) carry its state, so no theme can remove the second channel (WCAG
  * SC 1.4.1, the `j66n` rule).
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";

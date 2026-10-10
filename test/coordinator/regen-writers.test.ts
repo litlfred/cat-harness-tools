@@ -103,7 +103,7 @@ const CASES: Case[] = [
   // not a regen question; the record is written by `qa-publish`.
   {
     check: "bat:sync:check",
-    artefact: () => firstIn("cat-harness/scripts", ".bat"),
+    artefact: () => firstIn("cat-harness-tools/scripts", ".bat"),
     stale: (t) => `${t}REM hand edit (i1q7 fixture)\r\n`,
   },
   {

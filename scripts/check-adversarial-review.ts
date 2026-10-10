@@ -31,11 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import {
-  detectAgentProvenance,
-  type AgentProvenanceResult,
-  type ProvenanceInput,
-} from "./agent-provenance.ts";
+import { detectAgentProvenance, type AgentProvenanceResult } from "./agent-provenance.ts";
 import {
   evaluateMergeReviewGateState,
   evaluateReviewGateState,

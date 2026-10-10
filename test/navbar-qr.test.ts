@@ -21,6 +21,9 @@ const NAVBAR_ROW_JS = readFileSync(join(ROOT, "docs/assets/js/navbar-row.js"), "
 const QRCODE_JS = readFileSync(join(ROOT, "docs/assets/js/vendor/qrcode.js"), "utf8");
 const QRCODE_UTF8_JS = readFileSync(join(ROOT, "docs/assets/js/vendor/qrcode_UTF8.js"), "utf8");
 
+// A hand-rolled DOM mock that the vendored navbar and QR scripts run against:
+// its events and elements are whatever those scripts hand it, so they stay `any`.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type EventHandler = (event: any) => void;
 
 class MockElement {
@@ -39,6 +42,7 @@ class MockElement {
 
   constructor(tagName: string) {
     this.tagName = tagName.toUpperCase();
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the classList methods below are object-literal functions with their own `this`
     const self = this;
     this.classList = {
       add(...tokens: string[]) {
@@ -335,7 +339,7 @@ describe("LHS navbar QR code capability (bean folio-assistant-5rmf)", () => {
   });
 
   it("toggles the QR code open on first click and closed on second click (l4zi reachable inverse)", () => {
-    const { bar, sandbox } = createTestEnv({
+    const { bar } = createTestEnv({
       barClass: "side-bar",
       url: "https://example.com/folio-assistant/guides/test.html",
     });

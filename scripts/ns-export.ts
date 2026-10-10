@@ -50,7 +50,14 @@ import { dirname, join, resolve } from "node:path";
 import { defaultGraphTypologies, graphTypologyLayer, isPublishedGraphTypology, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 import "@litlfred/cat-harness/schemas/glossary-graph-typology.js";
-import { LEGACY_FOLIO_NS, NS_PREFIXES, namespaceForLayer, prefixForLayer, replacementIri, stubOfNamespace, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import {
+  LEGACY_FOLIO_NS,
+  NS_PREFIXES,
+  namespaceForLayer,
+  prefixForLayer,
+  replacementIri,
+  termIri,
+} from "@litlfred/cat-harness/schemas/namespaces.js";
 import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -135,14 +142,10 @@ export function namespaceForPrefixOrLayer(target: string): string {
   return `${LEGACY_FOLIO_NS.replace(/ns#$/, "")}${target}/ns#`;
 }
 
-/** The concept scheme IRI for a layer or instance. */
-export function conceptSchemeIriFor(target: string): string {
-  return namespaceForPrefixOrLayer(target).replace(/#$/, "");
-}
-
 /**
- * The `skos:ConceptScheme` a layer's terms belong to — and it is the layer's
- * OWN namespace document, not a fourth IRI invented to hold them.
+ * The concept scheme IRI for a layer or instance: the `skos:ConceptScheme` its
+ * terms belong to, which is the layer's OWN namespace document, not a fourth
+ * IRI invented to hold them.
  *
  * `--layer <l> --exact` already publishes exactly that layer's terms under
  * exactly that IRI, which is the definition of a concept scheme: a set of
@@ -154,8 +157,8 @@ export function conceptSchemeIriFor(target: string): string {
  * So in `--exact` mode the document node IS the scheme and gains the type
  * rather than a duplicate `@id` appearing in its own `@graph`.
  */
-function conceptSchemeIri(layer: TermLayer): string {
-  return conceptSchemeIriFor(layer);
+export function conceptSchemeIriFor(target: string): string {
+  return namespaceForPrefixOrLayer(target).replace(/#$/, "");
 }
 
 /** Instances that publish an ns document (have vocabulary terms or declare block-kinds). */

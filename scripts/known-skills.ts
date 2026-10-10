@@ -13,8 +13,7 @@
  * @module scripts/known-skills
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, join as joinPath, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, isAbsolute, join, join as joinPath, relative, resolve } from "node:path";
 
 import { checkoutRootFor, resolveDirectories, repoRootFor, isKgContentDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

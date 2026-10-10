@@ -74,7 +74,6 @@
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { exportIdentity } from "./kg-export.js";
 import {

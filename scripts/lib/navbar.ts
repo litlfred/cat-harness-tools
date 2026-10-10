@@ -52,7 +52,7 @@
  * @module scripts/lib/navbar
  */
 
-import { BLANK_AVATAR } from "@litlfred/cat-harness/schemas/avatars.js";
+import { BLANK_AVATAR } from "@litlfred/cat-harness/schemas/blank-avatar.js";
 import {
   NAV_COLLAPSED_PX,
   NAV_MARK_PX as NAV_GLYPH_PX,

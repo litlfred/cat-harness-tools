@@ -55,9 +55,7 @@ import { join } from "node:path";
 
 import { knownSkills, manifestResolvableSkills, remotePackageSkills } from "../known-skills.js";
 import { codeWithoutComments } from "../repo-files.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
-
-const ROOT = join(HARNESS_ROOT);
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /** Every `.ts` under the roots a sync could plausibly live in, repo-relative. */
 function tsFiles(root: string): string[] {

@@ -23,7 +23,7 @@ import {
   ownVisualiserRefs,
   prunableDashboards,
 } from "../state-visualizer.ts";
-import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import {
   existingPageDir,

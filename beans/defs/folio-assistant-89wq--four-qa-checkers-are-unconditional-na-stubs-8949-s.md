@@ -1,10 +1,11 @@
 ---
 # folio-assistant-89wq
 title: Four QA checkers are unconditional n/a stubs — 8949 sidecar entries indistinguishable from a correct decline, two of them proof-build-green / proof-no-axiom-growth
-status: todo
+status: in-progress
 type: task
+priority: normal
 created_at: 2026-09-27T10:37:00Z
-updated_at: 2026-09-27T10:37:00Z
+updated_at: 2026-10-10T16:41:14Z
 parent: folio-assistant-1swy
 ---
 

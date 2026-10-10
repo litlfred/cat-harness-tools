@@ -1,11 +1,11 @@
 ---
 # folio-assistant-oz5w
 title: 'STAGING CLEANUP vs BRANCH REUSE: merging PR N deletes the preview PR N+1 just published'
-status: todo
+status: scrapped
 type: task
 priority: normal
 created_at: 2026-09-21T20:12:17Z
-updated_at: 2026-09-29T20:52:41Z
+updated_at: 2026-10-10T16:44:10Z
 parent: folio-assistant-1xhc
 ---
 
@@ -91,3 +91,9 @@ open bean and this does not touch it.
 
 
 _2026-09-29_ — **Re-parented `ahvw` → `1xhc`** by subject, per todo-manager §"WHICH parent" (owner choice '1 2 3' on the LSI epic-filing proposal, bean ansc). Staging-preview deletion is the staging/concurrency machinery 1xhc already groups (xd1s, w2g5, lx2s).
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the `cleanup` job of folio-assistant's `feature-staging.yml` deleting previews on `gh-pages`. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.

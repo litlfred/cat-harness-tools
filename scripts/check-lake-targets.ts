@@ -16,7 +16,7 @@
  * @covers cat-harness
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
 

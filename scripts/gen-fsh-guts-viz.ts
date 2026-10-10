@@ -53,7 +53,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { frozenSubtreeNote, fshGutsDirectory, withoutFrozenSubtrees } from "@litlfred/cat-harness/schemas/fsh-guts.js";
 import { BranchStoreUsageError, exitUnlessMounted, readMarker } from "./branch-store.js";
 import { baseDocsDir } from "./compose-docs.js";

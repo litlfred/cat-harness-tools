@@ -28,8 +28,6 @@ import {
   visualizerAliasRoute,
   visualizerUrl,
   checkVisualizerRouteCollisions,
-  type MountCollisionFinding,
-  type RouteCollisionFinding,
 } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { checkAllCollisions } from "../check-mount-collisions.js";
 

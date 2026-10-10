@@ -25,7 +25,6 @@ import {
   type AdversarialFinding,
   type AdversarialReview,
   type MergeReview,
-  type RedFlagCategory,
   type RedFlagOverride,
 } from "@litlfred/cat-harness/schemas/red-flag.ts";
 import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.ts";
@@ -238,7 +237,7 @@ describe("AdversarialReview and sidecar compatibility", () => {
     expect(parsed.success).toBe(true);
 
     // Existing sidecar without adversarial_reviews remains completely valid
-    const { adversarial_reviews, ...existingSidecar } = sidecarWithReview;
+    const { adversarial_reviews: _adversarialReviews, ...existingSidecar } = sidecarWithReview;
     const parsedExisting = KgQaReportSchema.safeParse(existingSidecar);
     expect(parsedExisting.success).toBe(true);
   });
@@ -287,7 +286,7 @@ describe("Human override path (OverrideDecisionSchema & applyRedFlagOverride)", 
   });
 
   test("refuses override missing finding_id or flag_id", () => {
-    const { finding_id, ...missingTarget } = validOverride;
+    const { finding_id: _findingId, ...missingTarget } = validOverride;
     const parsed = OverrideDecisionSchema.safeParse(missingTarget);
     expect(parsed.success).toBe(false);
   });

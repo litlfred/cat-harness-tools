@@ -35,7 +35,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { NAV_GEOMETRY, rem } from "./lib/navbar-geometry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

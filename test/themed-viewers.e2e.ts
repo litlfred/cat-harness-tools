@@ -14,7 +14,6 @@
 import { test, expect } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { serveThemedAt, THEME_LINK, type Scheme } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

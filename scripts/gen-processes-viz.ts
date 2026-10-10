@@ -96,7 +96,6 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 const VIEWER_TOOL = "processes-viewer";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
-const KIND = "processes";
 
 
 /** One diagram, as the index sees it. */

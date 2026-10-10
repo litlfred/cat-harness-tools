@@ -19,7 +19,6 @@ import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const SCRIPTS_DIR = resolve(import.meta.dir, "..");
-const INSTANCE_ROOT = resolve(SCRIPTS_DIR, "..");
 const PIN_FILE = join(HARNESS_ROOT, ".bun-version");  // bean 70lx: the pin stayed with the harness
 const INSTALL_SH = join(SCRIPTS_DIR, "install-bun.sh");
 const INSTALL_BAT = join(SCRIPTS_DIR, "install-bun.bat");
@@ -64,9 +63,10 @@ describe("bun version pin and alignment (folio-assistant-p3zo)", () => {
       try {
         execFileSync(INSTALL_SH, [badVer], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         expect.unreachable("expected error for " + badVer);
-      } catch (err: any) {
-        expect(err.status).toBe(2);
-        const stderr = String(err.stderr ?? "");
+      } catch (err) {
+        const e = err as { status?: number; stderr?: unknown };
+        expect(e.status).toBe(2);
+        const stderr = String(e.stderr ?? "");
         expect(stderr).toContain("not a valid bare X.Y.Z version");
       }
     }

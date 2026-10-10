@@ -498,7 +498,7 @@ export function judge(entries: readonly LibraryEntry[], repoRoot: string): Judge
 }
 
 /** The sidecar document for a judgement. */
-export function resultOf(j: Judgement, root: string = ROOT): QaResult {
+export function resultOf(j: Judgement, _root: string = ROOT): QaResult {
   return buildQaResult({
     script: SCRIPT,
     scriptAbsPath: join(TOOLS_ROOT, SCRIPT),  // the producer is code, here since 70lx; `root` is the content

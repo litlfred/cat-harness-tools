@@ -64,7 +64,16 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { checkoutRootFor, type ContentDirectory, findDeclarationFile, findInstanceRoot, instanceRootFor, readDeclaration, repoRootFor, rootForScope, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {
+  checkoutRootFor,
+  type ContentDirectory,
+  findDeclarationFile,
+  findInstanceRoot,
+  readDeclaration,
+  repoRootFor,
+  rootForScope,
+  declarationPathIn,
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import {
   LandingStickySchema,

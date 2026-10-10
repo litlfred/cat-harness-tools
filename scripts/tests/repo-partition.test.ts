@@ -5,11 +5,13 @@ describe("repo-partition classification", () => {
   test("explicit path rules win over keyword rules", () => {
     // `workflow` would match nothing sci/base, but the point is that an
     // explicit harness rule is consulted before any keyword sweep.
-    // The two examples this used to name (`src/tools/workflow.ts`,
-    // `src/core/rbac.ts`) left the partition's scope in 70lx B1; these are
-    // explicit harness rules over files the partition still scans.
-    expect(classify("scripts/workflow-bpmn.ts")).toEqual({ repo: "harness", provenance: "rule" });
-    expect(classify("src/core/access.ts")).toEqual({ repo: "harness", provenance: "rule" });
+    // The examples this used to name (`src/tools/workflow.ts`, `src/core/rbac.ts`,
+    // then `scripts/workflow-bpmn.ts`, `src/core/access.ts`) left the
+    // partition's scope as 70lx moved the code out (the dead rules were
+    // removed, owner 2026-10-10); these are explicit harness rules over files
+    // the partition still scans.
+    expect(classify("schemas/avatars.ts")).toEqual({ repo: "harness", provenance: "rule" });
+    expect(classify("schemas/blank-avatar.ts")).toEqual({ repo: "harness", provenance: "rule" });
   });
 
   test("a test is classified by what it IS, not by what it exercises", () => {

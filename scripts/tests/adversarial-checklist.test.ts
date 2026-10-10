@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import {
@@ -172,7 +172,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     };
 
     // Review on synthetic content with broken command
-    const { review, findings } = reviewNodeAdversarially(badSkillNode, ROOT);
+    const { review } = reviewNodeAdversarially(badSkillNode, ROOT);
     // Even if path does not exist, review completes
     expect(review.result).toBe("pass");
   });

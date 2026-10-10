@@ -92,7 +92,6 @@ import {
   directoriesForGraph,
   instanceRootsIn,
   readDeclaration,
-  repoRootFor,
   siteDirFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { makeEmit } from "./viewer-page.ts";

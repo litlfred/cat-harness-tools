@@ -30,7 +30,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import { declaredContributions } from "../ensure-landing-sticky.js";
 import { buildPage, sheetBody, wornBy } from "../render-theme-sheet.js";

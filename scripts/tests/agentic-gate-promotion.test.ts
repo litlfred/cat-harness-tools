@@ -18,7 +18,6 @@ import { describe, expect, test } from "bun:test";
 import {
   WouldHaveBlockedRecordSchema,
   WouldHaveBlockedFindingSchema,
-  WouldHaveBlockedMetricsSchema,
   AgenticPromotionCriteriaSchema,
   DEFAULT_AGENTIC_PROMOTION_CRITERIA,
   calculateWouldHaveBlockedMetrics,

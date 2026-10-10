@@ -23,9 +23,7 @@ import { join } from "node:path";
 import { ResolvedThemeSchema, type ResolvedTheme } from "@litlfred/cat-harness/schemas/theme.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import { renderThemesCss } from "../gen-themes-css.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
-
-const ROOT = join(HARNESS_ROOT);
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const L = { minWidth: "13rem", padding: "1rem", fontScale: 1 };
 const note = ResolvedThemeSchema.parse({

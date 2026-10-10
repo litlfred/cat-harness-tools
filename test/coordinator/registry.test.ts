@@ -51,7 +51,7 @@ let hadExisting = false;
 beforeAll(() => {
   hadExisting = existsSync(OUT);
   if (hadExisting) renameSync(OUT, SAVED);
-  const r = spawnSync("bun", ["run", join(ROOT, "scripts", "generate-registry.ts")], {
+  const r = spawnSync("bun", ["run", join(import.meta.dir, "..", "..", "scripts", "generate-registry.ts")], {
     cwd: ROOT, stdio: "pipe",
   });
   if (r.status !== 0) throw new Error(`generate-registry failed: ${r.stderr?.toString()}`);

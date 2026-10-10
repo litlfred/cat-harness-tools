@@ -218,6 +218,7 @@
     "check:undeclared-files:check": "bun run cat-harness-tools/scripts/check-undeclared-files.ts --check",
     "check:upstream-pins": "bun run cat-harness-tools/scripts/check-upstream-pins.ts",
     "check:usage-paths": "bun run cat-harness-tools/scripts/check-usage-paths.ts",
+    "paths:rewrite-moved": "bun run cat-harness-tools/scripts/rewrite-moved-paths.ts",
     "check:version-bump": "bun run cat-harness-tools/scripts/check-version-bump.ts",
     "check:viewer-backticks": "bun run cat-harness-tools/scripts/check-viewer-backticks.ts",
     "check:viewer-nav": "bun run cat-harness-tools/scripts/check-viewer-nav.ts --check --against main",

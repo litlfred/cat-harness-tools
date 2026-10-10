@@ -42,7 +42,6 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
 import {
   DOCS_SITE_BASE,

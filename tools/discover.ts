@@ -41,8 +41,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, resolve } from "node:path";
 
 import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";

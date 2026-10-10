@@ -29,7 +29,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { instanceRootFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import type { ImageRegion } from "@litlfred/cat-harness/schemas/kg-node.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

@@ -12,8 +12,7 @@
  * cat-harness has none of it.
  */
 import { describe, expect, it } from "bun:test";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 import {
   frontMatterOf,
