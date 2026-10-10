@@ -19,7 +19,9 @@ import { join, relative, resolve } from "node:path";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 
-const FIXTURE = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
+// The fixture is cat-harness's: its tests read it (schemas/test-fixture-preload.ts).
+// 70lx moved it here by mistake; cat-harness#117 took it home.
+const FIXTURE = resolve(HARNESS_ROOT, "test", "fixtures", "standalone-checkout");
 const CHECKOUT = resolve(dirname(HARNESS_ROOT));
 
 function filesUnder(dir: string): string[] {
