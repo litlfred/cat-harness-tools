@@ -245,7 +245,8 @@ export const PATTERNS: readonly ConflictPattern[] = [
   },
   {
     id: "health-report",
-    globs: ["**/test/health/results/*.health-report.json"],
+    // An instance that declares a code `test/` keeps `health` at its root instead (cat-harness-tools, layout-norms).
+    globs: ["**/test/health/results/*.health-report.json", "**/health/*.health-report.json"],
     strategy: "take-base",
     why: "the committed repository health report: a MEASUREMENT of external state (the publish branch, clone size, the work plan) written by `bun run cat health` and refreshed daily on the base by the health-check workflow, so the base's copy is the newer measurement. check:harness-state judges its producer hash; if the merge changes the producer, `bun run cat health` rewrites it. Found 2026-10-01 on #1754.",
   },
