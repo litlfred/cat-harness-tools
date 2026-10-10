@@ -5,15 +5,19 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { reviewPageHtml } from "../gen-review-page.js";
+import { reviewPageHtml, reviewSiteRoot } from "../gen-review-page.js";
 
 const html = reviewPageHtml();
 
 describe("review page", () => {
   test("reads its data when opened, from the preview's own files", () => {
-    // Built BEFORE the ChangeSet exists in folio-staging.yml, so it must fetch.
-    expect(html).toContain('get("../changeset.json")');
-    expect(html).toContain('get("../staging.json")');
+    // Built BEFORE the ChangeSet exists in folio-staging.yml, so it must fetch,
+    // from the site root it finds on its own path (folio-assistant#2527).
+    expect(html).toContain("var ROOT = reviewSiteRoot(location.pathname, LOCALES);");
+    expect(html).toContain('var LOCALES = ["en"];');
+    expect(html).not.toMatch(/get\("\.\.\//);
+    expect(html).toContain('get(ROOT + "changeset.json")');
+    expect(html).toContain('get(ROOT + "staging.json")');
   });
 
   test("never builds markup from folio content", () => {
@@ -47,7 +51,7 @@ describe("review page", () => {
   });
 
   test("reads review comments, and says when there is no comment data rather than showing none", () => {
-    expect(html).toContain('get("../review-comments.json")');
+    expect(html).toContain('get(ROOT + "review-comments.json")');
     expect(html).toContain("No comment data on this build.");
   });
 
@@ -59,7 +63,7 @@ describe("review page", () => {
   });
 
   test("embeds the tested renderers and the registry, not copies of them (d903)", () => {
-    expect(html).toContain('get("../changeset-text.json")');
+    expect(html).toContain('get(ROOT + "changeset-text.json")');
     expect(html).toContain("var wordDiff = ");
     expect(html).toContain("var renderInline = ");
     for (const id of ["word", "inline", "side-by-side"]) expect(html).toContain(`"id":"${id}"`);
@@ -75,17 +79,49 @@ describe("review page", () => {
   });
 
   test("loads the rendered list when opened, and says when the build published none (bean bnjs)", () => {
-    expect(html).toContain('get("../rendered-impact.json")');
+    expect(html).toContain('get(ROOT + "rendered-impact.json")');
     expect(html).toContain("Rendered pages this change alters");
     expect(html).toContain("is not known (which is not the same as none)");
     expect(html).toContain("var renderedModel = ");
   });
 
   test("shows the build diff under the list, and says when there is none (bean ehh6)", () => {
-    expect(html).toContain('get("../rendered-measured.json")');
+    expect(html).toContain('get(ROOT + "rendered-measured.json")');
     expect(html).toContain("var measuredModel = ");
     expect(html).toContain("var renderMeasured = ");
     expect(html).toContain("Not measured: this build published no rendered-measured.json");
   });
+
+  test("links documents, the outline and the list of documents from the site root it found (#2527)", () => {
+    expect(html).toContain("href(ROOT, c.head, c.label)");
+    expect(html).toContain("badgesOf, jumpSection, ROOT)");
+    expect(html).toContain("window.location.href = ROOT + page");
+    expect(html).toContain('allDocs.href = ROOT + "index.html"');
+    // A document's page is the outline's, under the locale; <doc>/index.html only without one.
+    expect(html).toContain("function docPage(doc)");
+    expect(html).toContain("base + docPage(doc)");
+  });
 });
 
+describe("reviewSiteRoot — the site root from the review page's own path (#2527)", () => {
+  const L = ["en"];
+  test("one level up from <root>/review/, the address before the locale", () => {
+    expect(reviewSiteRoot("/preview/review/", L)).toBe("../");
+    expect(reviewSiteRoot("/smart-ra/STAGING/my-branch/review/index.html", L)).toBe("../");
+    expect(reviewSiteRoot("/review/", L)).toBe("../");
+  });
+  test("two levels up from <root>/<locale>/review/", () => {
+    expect(reviewSiteRoot("/preview/en/review/", L)).toBe("../../");
+    expect(reviewSiteRoot("/smart-ra/STAGING/my-branch/en/review/index.html", L)).toBe("../../");
+    expect(reviewSiteRoot("/en/review/", L)).toBe("../../");
+    expect(reviewSiteRoot("/tmp/site/en/review/index.html", L)).toBe("../../");
+  });
+  test("only a PUBLISHED locale counts: another segment there is the site's own path", () => {
+    expect(reviewSiteRoot("/preview/fr/review/", L)).toBe("../");
+    expect(reviewSiteRoot("/preview/fr/review/", ["en", "fr"])).toBe("../../");
+  });
+  test("runs in the page as embedded: no TypeScript survives toString()", () => {
+    const fn = new Function(`return (${reviewSiteRoot.toString()});`)() as typeof reviewSiteRoot;
+    expect(fn("/x/en/review/", L)).toBe("../../");
+  });
+});

@@ -25,7 +25,7 @@ export interface RenderedRow {
   anchor?: string;
   role: string;
   change: string;
-  /** Relative to the review page (`review/`), so `../<path>`. */
+  /** Relative to the review page: the site root as seen from it (`root`), then the path. */
   after: string;
   /** On the before side's published site; absent when the page does not know it. */
   before?: string;
@@ -45,8 +45,12 @@ export interface RenderedModel {
  * anchor where the file names several (a document page with a changed block
  * each), in path order within each renderer. Accepts one impact or an array,
  * as the CLI writes either.
+ *
+ * `root` is the site root as seen from the review page: `../` from `review/`,
+ * `../../` from `<locale>/review/` (folio-assistant#2527). The page passes the
+ * one it computed from its own path (`reviewSiteRoot`).
  */
-export function renderedModel(impacts: unknown, mainSite?: string | null): RenderedModel {
+export function renderedModel(impacts: unknown, mainSite?: string | null, root = "../"): RenderedModel {
   const list = (Array.isArray(impacts) ? impacts : [impacts]) as Array<{
     renderer: string;
     files: Array<{ path: string; change: string; role: string; anchors?: string[] }>;
@@ -65,7 +69,7 @@ export function renderedModel(impacts: unknown, mainSite?: string | null): Rende
         const anchors = f.anchors && f.anchors.length ? f.anchors : [undefined];
         anchors.forEach(function (a) {
           const frag = a ? "#" + encodeURIComponent(a) : "";
-          const row: RenderedRow = { renderer: imp.renderer, path: f.path, role: f.role, change: f.change, after: "../" + f.path + frag };
+          const row: RenderedRow = { renderer: imp.renderer, path: f.path, role: f.role, change: f.change, after: root + f.path + frag };
           if (a) row.anchor = a;
           if (base && f.change !== "added") row.before = base + f.path + frag;
           model.rows.push(row);
@@ -137,7 +141,8 @@ export interface MeasuredModel {
   beforeCommit?: string;
 }
 
-export function measuredModel(measured: unknown): MeasuredModel {
+/** `root`: the site root as seen from the review page, as for {@link renderedModel}. */
+export function measuredModel(measured: unknown, root = "../"): MeasuredModel {
   const m = measured as {
     status?: string;
     beforeCommit?: string;
@@ -149,7 +154,7 @@ export function measuredModel(measured: unknown): MeasuredModel {
   ((m.measured && m.measured.files) || []).forEach(function (f) { change[f.path] = f.change; });
   const missed = m.check.missed.slice().sort().map(function (p) {
     const c = change[p] || "changed";
-    return c === "removed" ? { path: p, change: c } : { path: p, change: c, after: "../" + p };
+    return c === "removed" ? { path: p, change: c } : { path: p, change: c, after: root + p };
   });
   if (m.status !== "known") return { state: "not-base", missed: missed, beforeCommit: m.beforeCommit ? String(m.beforeCommit).slice(0, 7) : undefined };
   return { state: missed.length ? "missed" : "clean", missed: missed };

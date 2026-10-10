@@ -102,6 +102,7 @@
  */
 
 import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/diff-renderers.js";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
 import { cleanRendered, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
@@ -180,6 +181,11 @@ const STYLE = `
 
 const SCRIPT = `
 (function () {
+  // Where the site root is, from this page's own path (folio-assistant#2527):
+  // every data file and every page below is relative to it.
+  var ROOT = reviewSiteRoot(location.pathname, LOCALES);
+  var allDocs = document.getElementById("all-documents");
+  if (allDocs) allDocs.href = ROOT + "index.html";
   var status = document.getElementById("status");
   var summary = document.getElementById("summary");
   var list = document.getElementById("changes");
@@ -199,9 +205,21 @@ const SCRIPT = `
     // "." and ".." match the character class, and would climb out of the site.
     return /^[A-Za-z0-9._-]+$/.test(seg) && !/^\\.+$/.test(seg) ? seg : null;
   }
+  // The page a document is on, relative to the site root: the outline's
+  // \`page\` when this build published one (under the locale since
+  // folio-assistant#2527), else \`<doc>/index.html\`, where
+  // build-document-site wrote it before. Kept to safe segments, like docOf.
+  function docPage(doc) {
+    var ds = OUTLINE && OUTLINE.documents ? OUTLINE.documents : [];
+    for (var i = 0; i < ds.length; i++) {
+      var p = ds[i].slug === doc ? String(ds[i].page || "") : "";
+      if (p && /^[A-Za-z0-9._\\/-]+$/.test(p) && p.split("/").every(function (s) { return s && !/^\\.+$/.test(s); })) return p;
+    }
+    return doc + "/index.html";
+  }
   function href(base, at, label) {
     var doc = docOf(at);
-    return doc == null ? null : base + doc + "/index.html#" + encodeURIComponent(label);
+    return doc == null ? null : base + docPage(doc) + "#" + encodeURIComponent(label);
   }
   function kindWords(c) {
     if (c.change === "added") return ["added"];
@@ -330,7 +348,7 @@ const SCRIPT = `
     } else if (id === "side-by-side") {
       out = renderSideBySide(document, ctx.before, ctx.after);
     } else if (id === "visual") {
-      out = renderVisual(document, ctx.visual, "../", "vis-" + panel.id);
+      out = renderVisual(document, ctx.visual, ROOT, "vis-" + panel.id);
     }
     if (typeof out === "string") panel.appendChild(el("p", out, "muted"));
     else if (out) panel.appendChild(out);
@@ -395,25 +413,25 @@ const SCRIPT = `
   var renderedBox = document.getElementById("rendered");
   // The build diff under it (bean ehh6): a missing file is "not measured", said.
   Promise.all([
-    get("../rendered-impact.json"),
-    get("../staging.json").catch(function () { return {}; }),
-    get("../rendered-measured.json").catch(function () { return null; }),
+    get(ROOT + "rendered-impact.json"),
+    get(ROOT + "staging.json").catch(function () { return {}; }),
+    get(ROOT + "rendered-measured.json").catch(function () { return null; }),
   ]).then(function (r) {
-    renderRendered(renderedBox, renderedModel(r[0], r[1].mainSite));
-    renderMeasured(renderedBox, measuredModel(r[2]));
+    renderRendered(renderedBox, renderedModel(r[0], r[1].mainSite, ROOT));
+    renderMeasured(renderedBox, measuredModel(r[2], ROOT));
   }).catch(function () {
     renderedBox.textContent = "This build published no rendered-impact.json, so which rendered pages the change alters is not known (which is not the same as none).";
   });
 
-  get("../changeset.json").then(function (cs) {
+  get(ROOT + "changeset.json").then(function (cs) {
     return Promise.all([
-      get("../staging.json").catch(function () { return {}; }),
-      get("../review-comments.json").catch(function () { return null; }),
-      get("../changeset-text.json").catch(function () { return null; }),
-      get("../blocks.json").catch(function () { return null; }),
-      get("../block-qa.json").catch(function () { return null; }),
-      get("../outline.json").catch(function () { return null; }),
-      get("../visual-diff.json").catch(function () { return null; }),
+      get(ROOT + "staging.json").catch(function () { return {}; }),
+      get(ROOT + "review-comments.json").catch(function () { return null; }),
+      get(ROOT + "changeset-text.json").catch(function () { return null; }),
+      get(ROOT + "blocks.json").catch(function () { return null; }),
+      get(ROOT + "block-qa.json").catch(function () { return null; }),
+      get(ROOT + "outline.json").catch(function () { return null; }),
+      get(ROOT + "visual-diff.json").catch(function () { return null; }),
     ]).then(function (both) {
       var visualFile = both[6];
       OUTLINE = both[5];
@@ -493,7 +511,7 @@ const SCRIPT = `
           }
           if (c.from) li.appendChild(el("span", " (was " + c.from + ")", "muted"));
           var links = el("div", null, "links");
-          var after = c.change !== "removed" ? href("../", c.head, c.label) : null;
+          var after = c.change !== "removed" ? href(ROOT, c.head, c.label) : null;
           var before = c.change !== "added" && main ? href(main, c.base, c.from || c.label) : null;
           if (after) { var a = el("a", "view on this preview"); a.href = after; links.appendChild(a); }
           if (before) { var b = el("a", "view on " + beforeName); b.href = before; links.appendChild(b); }
@@ -592,8 +610,8 @@ const SCRIPT = `
           var top = railIn.querySelector(".fa-nav-top");
           railIn.insertBefore(railHost, top ? top.nextSibling : railIn.firstChild);
         }
-        if (railHost) railHost.insertBefore(railOutline(document, OUTLINE, badgesOf, jumpSection), railHost.firstChild);
-        else navPane.appendChild(renderOutline(document, OUTLINE, badgesOf, jumpSection));
+        if (railHost) railHost.insertBefore(railOutline(document, OUTLINE, badgesOf, jumpSection, ROOT), railHost.firstChild);
+        else navPane.appendChild(renderOutline(document, OUTLINE, badgesOf, jumpSection, ROOT));
         var changeOf = {};
         cs.changes.forEach(function (c) { if (c.change !== "removed") changeOf[c.label] = c.change === "added" ? "added" : "changed"; });
         navPane.appendChild(renderMinimap(document, OUTLINE, function (label) {
@@ -603,7 +621,7 @@ const SCRIPT = `
         }, function (label, page) {
           for (var i = 0; i < items.length; i++) if (items[i].getAttribute("data-label") === label) { focusItem(i); items[i].scrollIntoView({ block: "center" }); return; }
           // Nothing to review here: open the block where it is published.
-          window.location.href = "../" + page + "#" + encodeURIComponent(label);
+          window.location.href = ROOT + page + "#" + encodeURIComponent(label);
         }));
       } else {
         navPane.appendChild(el("p", "No outline on this build: the folio's build did not publish outline.json. Use Next and Previous.", "muted"));
@@ -617,6 +635,25 @@ const SCRIPT = `
   });
 })();
 `;
+
+/**
+ * The site root as seen from the review page, read from the page's own path
+ * (folio-assistant#2527): `../` from `<root>/review/`, `../../` from
+ * `<root>/<locale>/review/`, where `<locale>` is one of `locales`
+ * (`PUBLISHED_LOCALES`). So the page carries no depth of its own: the same
+ * bytes are right at either address, on the main site and under a staging
+ * slug, and from `file://`.
+ *
+ * Read off the path's segments: the last is the file (or empty, after a
+ * trailing slash), the one before it the page's directory, and the one before
+ * THAT a locale or not. Like every relative link on the site, it expects the
+ * page addressed as its directory (`…/review/`) or its file. Self-contained:
+ * it runs in the page.
+ */
+export function reviewSiteRoot(pathname: string, locales: readonly string[]): string {
+  const segs = String(pathname || "").split("/");
+  return segs.length >= 4 && locales.indexOf(segs[segs.length - 3]!) >= 0 ? "../../" : "../";
+}
 
 /** The review page. Static: all of its data is fetched when it is opened. */
 export function reviewPageHtml(): string {
@@ -641,7 +678,7 @@ export function reviewPageHtml(): string {
   <button type="button" id="prevc">Previous with comments (p)</button>
   <button type="button" id="nextc">Next with comments (n)</button>
   <button type="button" id="nextu">Next unreviewed (u)</button>
-  <a href="../index.html">All documents</a>
+  <a id="all-documents" href="../index.html">All documents</a>
 </div>
 <div class="viewrow"><label for="view">Show every change as</label> <select id="view"></select></div>
 <section aria-labelledby="rendered-h"><h2 id="rendered-h">Rendered pages this change alters</h2><div id="rendered" class="muted">Loading the rendered impact…</div></section>
@@ -650,6 +687,8 @@ export function reviewPageHtml(): string {
 </main>
 </div>
 <script>
+var LOCALES = ${JSON.stringify(PUBLISHED_LOCALES).replace(/</g, "\\u003c")};
+var reviewSiteRoot = ${reviewSiteRoot.toString()};
 var RENDERERS = ${JSON.stringify(DIFF_RENDERERS).replace(/</g, "\\u003c")};
 var wordDiff = ${wordDiff.toString()};
 var cleanRendered = ${cleanRendered.toString()};
