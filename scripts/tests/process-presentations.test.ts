@@ -15,6 +15,7 @@ import { workflowFiles, workflowFile } from "../known-skills.js";
 import { processPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { PAGE_LOCALE } from "../viewer-declarations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -37,13 +38,13 @@ describe("processTarget — where a subprocess box lands", () => {
     expect(processTarget("x", [p("guides/who-smart-ig", "the-l3-pipeline")])).toBe("guides/who-smart-ig.html#the-l3-pipeline");
   });
 
-  test("none → the process's own generated page, at the DECLARED route (2026-10-09)", () => {
-    expect(processTarget("options-analysis", undefined)).toBe("cat-harness/processes/options-analysis.html");
-    expect(processTarget("options-analysis", [])).toBe("cat-harness/processes/options-analysis.html");
+  test("none → the process's own generated page, at the DECLARED route under the page locale (2026-10-09)", () => {
+    expect(processTarget("options-analysis", undefined)).toBe(`${PAGE_LOCALE}/cat-harness/processes/options-analysis.html`);
+    expect(processTarget("options-analysis", [])).toBe(`${PAGE_LOCALE}/cat-harness/processes/options-analysis.html`);
   });
 
   test("MORE than one → the process page, which lists them all — never a silent pick", () => {
-    expect(processTarget("content-lifecycle", [p("a", "x"), p("b", "y")])).toBe("cat-harness/processes/content-lifecycle.html");
+    expect(processTarget("content-lifecycle", [p("a", "x"), p("b", "y")])).toBe(`${PAGE_LOCALE}/cat-harness/processes/content-lifecycle.html`);
   });
 });
 

@@ -41,9 +41,12 @@ import {
   isChrome,
   isWithheld,
   mergeConfig,
+  redirectStub,
   treeDigest,
+  withheldFromCanonical,
   type ComposedInstance,
 } from "../compose-docs.ts";
+import { clearDeclaredVisualisers, PAGE_LOCALE } from "../viewer-declarations.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { parse as parseYaml } from "yaml";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
@@ -185,12 +188,16 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // addition, and only where a declaration opted into one: every stray must
     // be a stub the report names, never a file it does not.
     const prefixes = report.composed.map((c) => `${c.under}/`);
-    const stubs = new Set(report.aliases.written);
+    // So is a FORWARDING page at an old visualiser address (folio-assistant#2527),
+    // written only where nothing the layers carry already stands.
+    const stubs = new Set([...report.aliases.written, ...report.forwards.written]);
     const strays = [...after.keys()].filter(
       (p) => !before.has(p) && !prefixes.some((pre) => p.startsWith(pre)) && !stubs.has(p),
     );
     expect(strays).toEqual([]);
     expect(report.aliases.collisions).toEqual([]);
+    // A forwarding page never replaces a file a layer carries.
+    for (const f of report.forwards.written) expect(before.has(f)).toBe(false);
 
     // ...and the composition actually happened. Both checks above are
     // satisfied by a composer that emitted nothing: no base file differs and
@@ -585,5 +592,116 @@ describe("--shell: the chrome only", () => {
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * A fixture whose instance DECLARES visualisers, so the route machinery has
+ * something to forward: `todos` (alias `todos`), `fsh` (staging-only).
+ */
+function routedFixture(base: Record<string, string>): string {
+  const root = mkdtempSync(join(tmpdir(), "composedocs-routes-"));
+  mkdirSync(join(root, INSTANCE), { recursive: true });
+  writeDeclaration(
+    join(root, INSTANCE),
+    JSON.stringify({
+      name: INSTANCE,
+      directories: ENTRIES,
+      visualisers: [
+        { id: "todos", renderedBy: "state-viewer", covers: ["schemas"], alias: "todos" },
+        { id: "fsh", renderedBy: "staging-graph-viewer", covers: ["schemas"], publish: "staging-only" },
+      ],
+    }),
+  );
+  for (const [rel, body] of Object.entries(base)) {
+    const at = join(layerDir(root, "docs"), rel);
+    mkdirSync(join(at, ".."), { recursive: true });
+    writeFileSync(at, body);
+  }
+  mkdirSync(layerDir(root, "root-docs"), { recursive: true });
+  clearDeclaredVisualisers();
+  return root;
+}
+
+describe("forwarding pages at the old visualiser addresses (folio-assistant#2527)", () => {
+  const L = PAGE_LOCALE;
+
+  test("a page under the locale gets a forwarding page at its old address; a data file gets none", () => {
+    const root = routedFixture({
+      [`${L}/${INSTANCE}/todos/index.md`]: "---\ntitle: T\n---\nlist",
+      [`${L}/${INSTANCE}/todos/item/index.html`]: "<html><head></head><body>item</body></html>",
+      [`${L}/${INSTANCE}/todos/data.json`]: "{}",
+    });
+    const r = compose(out(root), root);
+    expect(r.forwards.written).toEqual([`${INSTANCE}/todos/index.html`, `${INSTANCE}/todos/item/index.html`]);
+    expect(r.forwards.superseded).toEqual([]);
+    const top = readFileSync(join(out(root), INSTANCE, "todos", "index.html"), "utf-8");
+    expect(top).toContain(`url=../../${L}/${INSTANCE}/todos/`);
+    const item = readFileSync(join(out(root), INSTANCE, "todos", "item", "index.html"), "utf-8");
+    expect(item).toContain(`url=../../../${L}/${INSTANCE}/todos/item/`);
+    // Data is fetched by a script, which does not follow a redirect page.
+    expect(existsSync(join(out(root), INSTANCE, "todos", "data.json"))).toBe(false);
+    // And the page itself is where the layer put it, untouched.
+    expect(readFileSync(join(out(root), L, INSTANCE, "todos", "index.md"), "utf-8")).toBe("---\ntitle: T\n---\nlist");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a page still at the old address stands, and its forwarding page is reported as not written", () => {
+    const root = routedFixture({
+      [`${L}/${INSTANCE}/todos/index.md`]: "new",
+      [`${INSTANCE}/todos/index.md`]: "old, not yet regenerated",
+    });
+    const r = compose(out(root), root);
+    expect(r.forwards.written).toEqual([]);
+    expect(r.forwards.superseded).toEqual([`${INSTANCE}/todos/index.html`]);
+    expect(readFileSync(join(out(root), INSTANCE, "todos", "index.md"), "utf-8")).toBe("old, not yet regenerated");
+    expect(existsSync(join(out(root), INSTANCE, "todos", "index.html"))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("an alias redirects to the page under the locale, never to the forwarding page", () => {
+    const root = routedFixture({ [`${L}/${INSTANCE}/todos/index.md`]: "list" });
+    const r = compose(out(root), root);
+    expect(r.aliases.written).toEqual(["todos/index.html"]);
+    expect(readFileSync(join(out(root), "todos", "index.html"), "utf-8")).toContain(`url=../${L}/${INSTANCE}/todos/`);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("an alias of a page not yet moved still redirects to where the page is", () => {
+    const root = routedFixture({ [`${INSTANCE}/todos/index.md`]: "old" });
+    const r = compose(out(root), root);
+    expect(r.forwards.written).toEqual([]);
+    expect(r.aliases.written).toEqual(["todos/index.html"]);
+    expect(readFileSync(join(out(root), "todos", "index.html"), "utf-8")).toContain(`url=../${INSTANCE}/todos/`);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a staging-only visualiser is withheld at BOTH addresses, and nothing forwards to it", () => {
+    const root = routedFixture({ [`${L}/${INSTANCE}/fsh/index.md`]: "trashcan" });
+    expect(withheldFromCanonical(root)).toEqual([`${INSTANCE}/fsh/`, `${L}/${INSTANCE}/fsh/`].sort());
+    const r = compose(out(root), root);
+    expect(existsSync(join(out(root), L, INSTANCE, "fsh"))).toBe(false);
+    expect(existsSync(join(out(root), INSTANCE, "fsh"))).toBe(false);
+    expect(r.forwards.written).toEqual([]);
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe("a redirect page carries the ?query and the #fragment (folio-assistant#2527)", () => {
+  test("the script appends location.search and location.hash; the meta refresh is the fallback", () => {
+    const html = redirectStub("../../en/cat-harness/library/");
+    const script = html.indexOf("<script>");
+    const meta = html.indexOf('http-equiv="refresh"');
+    expect(html).toContain('location.replace("../../en/cat-harness/library/" + location.search + location.hash)');
+    // The script runs before the refresh can drop the fragment.
+    expect(script).toBeGreaterThan(-1);
+    expect(script).toBeLessThan(meta);
+    expect(html).toContain('<link rel="canonical" href="../../en/cat-harness/library/">');
+  });
+
+  test("a target cannot close the script element it sits in", () => {
+    const html = redirectStub("x</script><b>");
+    expect(html).not.toContain("x</script>");
+    expect(html).toContain("\\u003c/script>");
   });
 });

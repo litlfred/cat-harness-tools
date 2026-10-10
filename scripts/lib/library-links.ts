@@ -20,12 +20,13 @@
  * link at all, so it stays text rather than becoming a 404.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 
 import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { detectRepoUrl } from "../../src/core/git-refs.js";
 import { docsLayers } from "../compose-docs.js";
 import { itemFacts } from "../library-readmes.ts";
+import { existingPageDir } from "../viewer-declarations.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The links a library reference resolves to; each absent where it does not. */
@@ -70,11 +71,15 @@ export function libraryResolver(repo: string, instanceRoot: string): LibraryReso
       const e = matches[0]!;
       const out: LibraryLinks = {};
       if (base !== undefined && handler !== undefined && seg !== undefined) {
-        if (existsSync(join(base, handler, seg, e.instance, "index.html"))) {
+        // The page under the locale (`<locale>/<harness>/<seg>/<instance>/`,
+        // folio-assistant#2527) or, on a site not yet regenerated, at the old
+        // address — never the forwarding page compose-docs writes there.
+        const dir = existingPageDir(base, { harness: handler, visualiser: seg, subgraph: e.instance });
+        if (dir !== undefined && existsSync(join(dir, "index.html"))) {
           // The viewer's own anchor key is `<instance>/<id>` (`honourAnchor` in
           // gen-library-viz.ts matches `e.instance + "/" + e.id`), so a bare id
           // would open the page without selecting anything.
-          out.viewer = `${handler}/${seg}/${e.instance}/#${encodeURIComponent(`${e.instance}/${e.id}`)}`;
+          out.viewer = `${relative(base, dir).split(sep).join("/")}/#${encodeURIComponent(`${e.instance}/${e.id}`)}`;
         }
       }
       const readme = `${e.dir}/README.md`;

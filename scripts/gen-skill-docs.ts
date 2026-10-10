@@ -35,7 +35,7 @@ import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { stripInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
-import { visualiserSitePath } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
@@ -72,13 +72,14 @@ const EDIT_GLYPH = "\u270E";
 /**
  * Where the process pages are: the route of the visualiser cat-harness
  * DECLARES rendered by `processes-viewer` (owner, 2026-10-09:
- * `<base>/<harness>/<visualizer>`), read rather than spelled.
+ * `<base>/<harness>/<visualizer>`, under the page locale — folio-assistant#2527),
+ * read rather than spelled.
  */
 const PROCESSES_ROUTE = ((): string => {
   try {
     return dirname(visualiserSitePath(INSTANCE_ROOT, "processes-viewer").rel);
   } catch {
-    return "cat-harness/processes";
+    return `${PAGE_LOCALE}/cat-harness/processes`;
   }
 })();
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "reference", "skill-instructions");
@@ -156,6 +157,24 @@ function reportCollisions(): void {
       `guards served a cold bootstrap agent the body for a\n  repository it was not in.`,
   );
   process.exit(1);
+}
+
+/**
+ * The index row's summary: the first 100 characters of a skill's opening
+ * paragraph, never ending inside a link.
+ *
+ * A plain cut at 100 lands inside a `](...)` target often enough to publish a
+ * dead link in the index (`../../en/cat-harness/proces`). When the cut falls
+ * inside a link target, it is extended to that link's closing parenthesis, so
+ * the row keeps the link whole.
+ */
+export function indexSummary(line: string, max = 100): string {
+  const cut = line.slice(0, max);
+  if (cut.length === line.length) return cut;
+  const open = cut.lastIndexOf("](");
+  if (open === -1 || cut.includes(")", open)) return cut;
+  const close = line.indexOf(")", open);
+  return close === -1 ? cut : line.slice(0, close + 1);
 }
 
 /**
@@ -1149,7 +1168,7 @@ async function main(): Promise<void> {
       emit(join(OUT_DIR, `${published}.md`), page.join("\n"));
       written.set(published, group.category);
 
-      const desc = escapePipes((body.match(/^#\s+.+\n+([^\n#].*)$/m)?.[1] ?? "").slice(0, 100));
+      const desc = escapePipes(indexSummary(body.match(/^#\s+.+\n+([^\n#].*)$/m)?.[1] ?? ""));
       const schemaCell = hasSchema ? `[schema](../skills/${name}.html)` : "—";
       indexRows[group.category].push(`| [${title}](${published}.html) | \`${name}\` | ${schemaCell} | ${desc} |`);
       console.log(`  ✓ ${published}.md (${group.category})`);

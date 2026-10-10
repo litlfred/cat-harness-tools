@@ -59,7 +59,7 @@ import {
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
 import { makeEmit } from "./viewer-page.ts";
-import { declaredRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { SKILL_PAGES_DIR, skillPagesOf } from "./lib/skill-pages.ts";
@@ -463,10 +463,10 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<harness>/<id>/`, from the
+  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<locale>/<harness>/<id>/`, from the
   // visualiser this harness declares `renderedBy` this Tool — never composed
   // here from the directory's name.
-  const route = declaredRoute(ROOT, VIEWER_TOOL);
+  const route = declaredPageRoute(ROOT, VIEWER_TOOL);
   if (route === undefined) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
     process.exit(0);

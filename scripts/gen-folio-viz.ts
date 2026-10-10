@@ -78,7 +78,7 @@ import {
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { declaredRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -352,10 +352,10 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<harness>/<id>/`, from the
+  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<locale>/<harness>/<id>/`, from the
   // visualiser this harness declares `renderedBy` this Tool — never composed
   // here from the directory's name.
-  const route = declaredRoute(ROOT, VIEWER_TOOL);
+  const route = declaredPageRoute(ROOT, VIEWER_TOOL);
   if (route === undefined) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
     process.exit(0);

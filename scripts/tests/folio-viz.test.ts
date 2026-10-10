@@ -13,6 +13,7 @@ import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
 
 /**
  * The folio graph has a view of its own. Bean `7ofc`.
@@ -105,7 +106,9 @@ describe("the page", () => {
 });
 
 describe("the generated artefacts are the ones declared", () => {
-  const page = join(SITE, "cat-harness", "folio", "index.html");
+  // Under the page locale, or at the old address on a site not yet regenerated.
+  const parts = { harness: "cat-harness", visualiser: "folio" };
+  const page = join(existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts)), "index.html");
   const data = join(SITE, "assets", "folio", "index.json");
 
   test("both exist — run `bun run cat folio:viz` if not", () => {

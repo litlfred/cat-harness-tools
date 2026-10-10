@@ -9,22 +9,30 @@
  * `cat-harness-tools/test/coordinator/viewer-declarations-checkout.test.ts`.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { DEFAULT_LOCALE, PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
 import {
   carriesRenders,
   clearDeclaredVisualisers,
+  declaredPageRoute,
   declaredRoute,
   declaredVisualisers,
+  existingPageDir,
+  forwardingParts,
+  PAGE_LOCALE,
+  pageParts,
   renderedByOf,
   renderedPath,
   viewersOf,
+  visualiserPageDir,
+  visualiserSitePath,
   withRenderedBy,
   withRenderedByFrontMatter,
 } from "../viewer-declarations.js";
-import { declarationFindings } from "../check-visualiser-routes.js";
+import { declarationFindings, pagePlacement } from "../check-visualiser-routes.js";
 
 describe("provenance: a page names the Tool that drew it, and nothing else", () => {
   test("HTML: inserted after <head>, replaced not duplicated, and any `renders` meta removed", () => {
@@ -126,10 +134,16 @@ describe("collisions are declaration errors", () => {
     ...(alias ? { alias } : {}),
   });
 
-  test("two declarations of one route", () => {
+  test("two declarations of one route — the LOCALISED route (folio-assistant#2527)", () => {
     const f = declarationFindings([v("a", "x"), v("a", "x")], [], ["a"]);
     expect(f.map((x) => x.kind)).toEqual(["route-collision"]);
-    expect(f[0]!.subject).toBe("a/x/");
+    expect(f[0]!.subject).toBe(`${PAGE_LOCALE}/a/x/`);
+  });
+
+  test("an alias may not take a published locale's top-level segment", () => {
+    const f = declarationFindings([v("a", "x", PAGE_LOCALE)], [], ["a"]);
+    expect(f.map((x) => `${x.kind}:${x.subject}`)).toEqual([`alias-collision:${PAGE_LOCALE}/`]);
+    expect(f[0]!.detail).toContain(`locale ${PAGE_LOCALE}`);
   });
 
   test("an alias naming another alias, a harness, or something the site already carries", () => {
@@ -143,5 +157,89 @@ describe("collisions are declaration errors", () => {
 
   test("distinct routes and free aliases are clean", () => {
     expect(declarationFindings([v("a", "x", "x"), v("b", "x")], ["guides"], ["a", "b"])).toEqual([]);
+  });
+});
+
+describe("the locale goes in front of every visualiser page (folio-assistant#2527)", () => {
+  test("the page locale is cat-harness's default, supplied in ONE place", () => {
+    expect(PAGE_LOCALE).toBe(DEFAULT_LOCALE);
+    expect(PUBLISHED_LOCALES as readonly string[]).toContain(PAGE_LOCALE);
+    expect(pageParts({ harness: "h", visualiser: "v" })).toEqual({ harness: "h", visualiser: "v", locale: PAGE_LOCALE });
+    // A locale the caller names is kept, and dropping it gives the old address.
+    expect(pageParts({ harness: "h", visualiser: "v", locale: "fr" }).locale).toBe("fr");
+    expect(forwardingParts(pageParts({ harness: "h", visualiser: "v", subgraph: "s" }))).toEqual({ harness: "h", visualiser: "v", subgraph: "s" });
+  });
+
+  test("a generator writes under the locale; the unlocalised route is the forwarding address", () => {
+    const repo = fixture();
+    expect(declaredPageRoute(join(repo, "base"), "library-viewer")).toBe(`${PAGE_LOCALE}/cat-harness/library`);
+    expect(declaredRoute(join(repo, "base"), "library-viewer")).toBe("cat-harness/library");
+    expect(declaredPageRoute(join(repo, "base"), "no-such-tool")).toBeUndefined();
+    const p = visualiserSitePath(join(repo, "base"), "state-viewer");
+    expect(p.rel).toBe(`${PAGE_LOCALE}/cat-harness/todos/index.md`);
+    // Three directories deep, so three steps back to the site root.
+    expect(p.up).toBe("../../../");
+  });
+
+  test("the localised page dir is under `<site>/<locale>/<harness>/<visualiser>/`", () => {
+    const site = "/s";
+    expect(visualiserPageDir(site, pageParts({ harness: "cat-harness", visualiser: "library", subgraph: "who-iris" }))).toBe(
+      join(site, PAGE_LOCALE, "cat-harness", "library", "who-iris"),
+    );
+  });
+
+  test("a page is read where it IS: under the locale once drawn there, else at the old address", () => {
+    const repo = fixture();
+    const site = join(repo, "base/docs");
+    const parts = { harness: "cat-harness", visualiser: "todos" };
+    // Only the old copy exists (a site not regenerated yet).
+    expect(existingPageDir(site, parts)).toBe(join(site, "cat-harness", "todos"));
+    // Drawn under the locale: that wins, the old copy notwithstanding.
+    mkdirSync(join(site, PAGE_LOCALE, "cat-harness", "todos"), { recursive: true });
+    writeFileSync(join(site, PAGE_LOCALE, "cat-harness", "todos", "index.html"), "<html><head></head></html>");
+    expect(existingPageDir(site, parts)).toBe(join(site, PAGE_LOCALE, "cat-harness", "todos"));
+    expect(existingPageDir(site, { harness: "cat-harness", visualiser: "nothing" })).toBeUndefined();
+    // And a tile opens the localised page, never the forwarding address.
+    const got = viewersOf({ id: "todos", path: "todos/", graphTypologies: ["todos"] }, join(repo, "base"), repo);
+    expect(got.map((g) => g.ref)).toEqual([`base/docs/${PAGE_LOCALE}/cat-harness/todos/index.html`]);
+  });
+
+  test("with no page anywhere, a tile names the localised address, not the forwarding one", () => {
+    const repo = fixture();
+    rmSync(join(repo, "base/docs/cat-harness/todos"), { recursive: true });
+    const got = viewersOf({ id: "todos", path: "todos/", graphTypologies: ["todos"] }, join(repo, "base"), repo);
+    expect(got.map((g) => g.ref)).toEqual([`base/docs/${PAGE_LOCALE}/cat-harness/todos/index.html`]);
+  });
+});
+
+describe("check:visualiser-routes places pages under the localised routes (folio-assistant#2527)", () => {
+  const vis = [
+    { harness: "cat-harness", harnessRoot: "/r/cat-harness", id: "library", renderedBy: "library-viewer", covers: ["d"] as [string, ...string[]] },
+    { harness: "cat-harness", harnessRoot: "/r/cat-harness", id: "todos", renderedBy: "state-viewer", covers: ["d"] as [string, ...string[]] },
+  ];
+  const tools = new Set(["library-viewer", "state-viewer"]);
+
+  test("a page under `<locale>/<harness>/<visualiser>/`, by its own Tool, is placed", () => {
+    expect(pagePlacement(`${PAGE_LOCALE}/cat-harness/library/index.html`, "library-viewer", vis, tools)).toEqual({ kind: "ok" });
+    expect(pagePlacement(`${PAGE_LOCALE}/cat-harness/library/who-iris/index.html`, "library-viewer", vis, tools)).toEqual({ kind: "ok" });
+  });
+
+  test("the same page at the OLD address is counted as legacy, not failed", () => {
+    expect(pagePlacement("cat-harness/library/who-iris/index.html", "library-viewer", vis, tools)).toEqual({
+      kind: "legacy",
+      route: "cat-harness/library/",
+    });
+  });
+
+  test("a page by another Tool under the localised route is foreign; one under no route is outside", () => {
+    expect(pagePlacement(`${PAGE_LOCALE}/cat-harness/todos/index.html`, "library-viewer", vis, tools).kind).toBe("foreign-page");
+    const out = pagePlacement("elsewhere/index.html", "library-viewer", vis, tools);
+    expect(out.kind).toBe("outside-route");
+    expect(out.kind === "outside-route" && out.detail).toContain(`${PAGE_LOCALE}/cat-harness/library/`);
+  });
+
+  test("a page naming no discovered Tool is not this gate's to place", () => {
+    expect(pagePlacement("anything/index.html", undefined, vis, tools)).toEqual({ kind: "ok" });
+    expect(pagePlacement("anything/index.html", "unknown", vis, tools)).toEqual({ kind: "ok" });
   });
 });

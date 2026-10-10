@@ -372,7 +372,7 @@ export function viewerPlacement(
  * to ask an ownership question. */
 import { orphanSubjectPages } from "./orphan-pages.ts";
 import { makeEmit } from "./viewer-page.ts";
-import { declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
+import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -1420,10 +1420,10 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<harness>/<id>/`, from the
+  // THE ROUTE IS DECLARED (owner, 2026-10-09): `<locale>/<harness>/<id>/`, from the
   // visualiser this harness declares `renderedBy` this Tool — never composed
   // here from the directory's name.
-  const route = declaredRoute(ROOT, VIEWER_TOOL);
+  const route = declaredPageRoute(ROOT, VIEWER_TOOL);
   if (route === undefined) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
     process.exit(0);
@@ -1476,12 +1476,19 @@ if (import.meta.main) {
   // owner's to apply, and a tile reading "1 modules" undermines the number.
   const modules = (n: number): readonly [number, string] =>
     [n, n === 1 ? "module" : "modules"];
-  const wholeId = byRef.get(refOf(route));
+  // A tile's ref is the page where it IS (`existingPageDir`): under the
+  // localised route once this has written there, but at the address before
+  // the locale segment while only a committed copy sits there. Either is the
+  // same page, so either finds its directory, and the counts do not depend on
+  // whether this is the first run since the move.
+  const oldRoute = declaredRoute(ROOT, VIEWER_TOOL)!;
+  const idOf = (sub: string): string | undefined => byRef.get(refOf(`${route}${sub}`)) ?? byRef.get(refOf(`${oldRoute}${sub}`));
+  const wholeId = idOf("");
   if (wholeId !== undefined) scoped[wholeId] = modules(g.modules.length);
 
   // Then each SUBJECT page, counted over that subject alone.
   for (const subject of subjects) {
-    const id = byRef.get(refOf(`${route}/${subject}`));
+    const id = idOf(`/${subject}`);
     if (id === undefined) continue;
     scoped[id] = modules(g.modules.filter((m) => m.instance === subject).length);
   }

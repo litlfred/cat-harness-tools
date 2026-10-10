@@ -101,7 +101,7 @@ import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { declaredRoute, declaredVisualisers, siteOwnerDir, visualiserPageRef, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
@@ -308,8 +308,13 @@ function stagingOnlyRefs(): Set<string> {
   const site = siteOwnerDir(REPO_ROOT);
   for (const v of declaredVisualisers(REPO_ROOT)) {
     if (v.publish !== "staging-only") continue;
+    // At BOTH of its addresses: under the locale segment, where it is written
+    // now, and the one before it, where a copy written earlier may still sit.
     const parts = { harness: v.harness, visualiser: v.id };
-    for (const f of ["index.md", "index.html"]) out.add(visualiserPageRef(REPO_ROOT, parts, site).replace(/index\.(md|html)$/, f));
+    for (const at of [pageParts(parts), forwardingParts(parts)]) {
+      const dir = renderedPath(REPO_ROOT, visualiserPageDir(site, at));
+      for (const f of ["index.md", "index.html"]) out.add(`${dir}/${f}`);
+    }
   }
   return out;
 }
@@ -1357,6 +1362,13 @@ if (import.meta.main) {
   // THE ROUTE IS DECLARED (owner, 2026-10-09): cat-harness's `auto-docs`
   // visualiser, rendered by this Tool, at `<harness>/<id>/`. Each auto-doc
   // TYPE is a declared sub-graph beneath it (`auto-docs.json`).
+  //
+  // NOT under the locale segment yet (folio-assistant#2527), unlike every
+  // other visualiser's pages: this route is itself a DECLARED DIRECTORY —
+  // `docs/docs.json`'s `auto-docs`, at `cat-harness/auto-docs` — and the
+  // `auto-docs.json` written below names each type's directory relative to
+  // it. Writing the pages under `en/` while that declaration stays would leave
+  // every declared type directory empty. They move when the declaration does.
   const route = declaredRoute(ROOT, VIEWER_TOOL);
   if (route === undefined) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
