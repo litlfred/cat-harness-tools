@@ -13,7 +13,7 @@ import { differsOnlyInRegions, isInstanceDeclaration, pathClass, sharedDeclarati
 import { parseMemberSpec } from "../merge-pipeline-git.ts";
 import { makeRepo, readme, type Repo } from "./merge-pipeline-fixture.ts";
 
-const GEN = "cat-harness/docs/glossary/index.md"; // `glossary`: take-base
+const GEN = "cat-harness/docs/folio-assistant-core/glossary/index.md"; // `glossary`: take-base
 let repo: Repo | undefined;
 afterEach(() => { repo?.cleanup(); repo = undefined; });
 

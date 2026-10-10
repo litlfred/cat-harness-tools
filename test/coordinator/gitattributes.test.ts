@@ -52,7 +52,7 @@ describe(".gitattributes exists and is read by git", () => {
   test("the three high-churn generated files are marked", () => {
     expect(existsSync(ATTRS)).toBe(true);
     for (const p of [
-      "cat-harness/docs/glossary/index.md",
+      "cat-harness/docs/folio-assistant-core/glossary/index.md",
       "cat-harness/docs/cat-harness/auto-docs/index/index.html",
       "cat-harness/test/results/audit-coverage.qa-results.json",
       // Added 2026-09-27, bean `5gqn`. Rewritten whole by `gen-docs-pages.ts`; reads

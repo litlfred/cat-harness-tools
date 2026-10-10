@@ -25,7 +25,7 @@ import { makeRepo, type Repo } from "./merge-pipeline-fixture.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const GEN = "cat-harness/docs/glossary/index.md";
+const GEN = "cat-harness/docs/folio-assistant-core/glossary/index.md";
 
 /** The shape `merge-base.ts` prints, copied from its `describe` and abort lines. */
 const REFUSED_LOG = `merge-base: 3 conflicted path(s) merging abc

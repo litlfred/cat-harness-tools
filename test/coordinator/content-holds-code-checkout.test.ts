@@ -23,7 +23,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 describe("contentInstanceCode — this checkout", () => {
   // Owner ruling 2026-10-01: a QA WARNING, not a failure — but one that still
   // NAMES every file. Bean `eayu`.
-  test("who-iris is a QA warning, naming its nine IRIS-specific code files", () => {
+  test("who-iris is a QA warning, naming its ten IRIS-specific code files", () => {
     expect(KG_CRITERIA_BY_ID["content-instance-holds-code"]?.severity).toBe("minor");
     const v = contentInstanceCode(join(REPO, "who-iris"));
     expect(v.state).toBe("judged");
@@ -40,6 +40,10 @@ describe("contentInstanceCode — this checkout", () => {
       "scripts/tests/iris-oxigraph.test.ts",
       "themes/themes.test.ts",
       "themes/themes.ts",
+      // Its Tool node (2026-10-09): the `iris-pages` generator its catalogue
+      // visualiser is `renderedBy`. A declaration, but a `.ts` one, as every
+      // instance's `tools` graph is.
+      "tools/index.ts",
     ]);
     expect(contentCodeFindings(v).map((f) => f.where)).toEqual(v.files);
     // The generic code left: none of the moved files may reappear here.

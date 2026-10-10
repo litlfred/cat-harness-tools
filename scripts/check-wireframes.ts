@@ -8,12 +8,19 @@
  *
  * ## What it reads
  *
- * - **The declarations.** Every instance's `coverage.visualiser`, through
- *   {@link visualisationsOf}, so there is no second list of visualisers
- *   free to disagree with the navbar's.
+ * - **The declarations.** Every harness's `visualisers` (owner, 2026-10-09:
+ *   *"the harness [is] where specific visualizers/pages are declared"*),
+ *   through `declaredVisualisers` in `viewer-declarations.ts`, so there is
+ *   no second list of visualisers free to disagree with the navbar's. Each
+ *   is named by its ROUTE KEY, `<harness>/<visualiser>` — the route
+ *   `visualiserRoute` computes, without the base — never by a page path: a
+ *   page path is where a generator happened to write, and the route is the
+ *   declaration.
  * - **`cat-harness/docs/wireframes/index.json`.** Which wireframe covers
- *   which declared ref. One wireframe may cover several refs, because one
- *   template renders several libraries.
+ *   which visualiser. A `covers` entry is a route key, or a route key and a
+ *   sub-graph (`cat-harness/auto-docs/index/skills`) when the wireframe is of
+ *   one sub-graph's view; either covers the visualiser. One wireframe may
+ *   cover several, because one template renders several views.
  * - **Each wireframe directory.** It must hold `intent.md`, at least one
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
@@ -45,7 +52,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { instanceDirectories, instanceRootsIn, repoRootFor, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -56,7 +63,7 @@ import {
   type Judgement,
   type QaResult,
 } from "./qa-results.ts";
-import { withViewers } from "./viewer-declarations.js";
+import { declaredVisualisers as harnessVisualisers } from "./viewer-declarations.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
@@ -79,17 +86,14 @@ export interface WireframeReport {
   failing: { wireframe: string; candidate: string; viewport: string; criterion: string; notes?: string }[];
 }
 
-/** Every declared visualiser ref, across every instance under the repository root. */
+/** Every declared visualiser, by route key `<harness>/<visualiser>`, across every instance in the checkout. */
 export function declaredVisualisers(repoRoot: string = REPO_ROOT): string[] {
-  const refs = new Set<string>();
-  for (const root of instanceRootsIn(repoRoot)) {
-    // Own entries AND those declared from within (bean `cmsl`); viewers
-    // RESOLVED from the pages (#1168 B7a-2b).
-    for (const d of withViewers(instanceDirectories(root), root, repoRoot)) {
-      for (const v of visualisationsOf(d.coverage, d.id)) refs.add(v.ref);
-    }
-  }
-  return [...refs].sort();
+  return [...new Set(harnessVisualisers(repoRoot).map((v) => `${v.harness}/${v.id}`))].sort();
+}
+
+/** The declared route key a `covers` entry names — itself, or the visualiser of the sub-graph it names. */
+export function coveredKey(entry: string, declared: readonly string[]): string | undefined {
+  return declared.find((k) => entry === k || entry.startsWith(`${k}/`));
 }
 
 export function checkWireframes(repoRoot: string = REPO_ROOT, dir: string = WIREFRAMES): WireframeReport {
@@ -107,8 +111,9 @@ export function checkWireframes(repoRoot: string = REPO_ROOT, dir: string = WIRE
   const coverer = new Map<string, string>();
   for (const [name, w] of Object.entries(index.wireframes)) {
     for (const ref of w.covers) {
-      if (!r.declared.includes(ref)) r.unknownRef.push({ wireframe: name, ref });
-      coverer.set(ref, name);
+      const key = coveredKey(ref, r.declared);
+      if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
+      else if (!coverer.has(key)) coverer.set(key, name);
     }
     const wdir = join(dir, name);
     if (!existsSync(join(wdir, "intent.md"))) r.incomplete.push({ wireframe: name, problem: "no intent.md" });

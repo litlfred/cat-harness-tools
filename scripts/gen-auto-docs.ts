@@ -94,7 +94,6 @@ import {
   repoRootFor,
   resolveDirectories,
   siteDirFor,
-  visualisationsOf,
   forgeLocation,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
@@ -102,7 +101,7 @@ import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { renderedPath, withRendersFrontMatter } from "./viewer-declarations.js";
+import { declaredRoute, declaredVisualisers, siteOwnerDir, visualiserPageRef, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
@@ -303,11 +302,14 @@ function docsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; 
  * remembered.
  */
 function stagingOnlyRefs(): Set<string> {
+  // Every harness's DECLARED visualisers (owner, 2026-10-09), each at its
+  // route — the same route `compose-docs.ts` withholds.
   const out = new Set<string>();
-  for (const d of resolveDirectories([{ name: "(local)", root: ROOT, own: true }])) {
-    for (const v of visualisationsOf(d.coverage, d.id)) {
-      if (v.publish === "staging-only") out.add(v.ref.replace(/\\/g, "/"));
-    }
+  const site = siteOwnerDir(REPO_ROOT);
+  for (const v of declaredVisualisers(REPO_ROOT)) {
+    if (v.publish !== "staging-only") continue;
+    const parts = { harness: v.harness, visualiser: v.id };
+    for (const f of ["index.md", "index.html"]) out.add(visualiserPageRef(REPO_ROOT, parts, site).replace(/index\.(md|html)$/, f));
   }
   return out;
 }
@@ -1352,6 +1354,14 @@ if (import.meta.main) {
     console.log("  · this instance declares no name — no handler segment to publish under");
     process.exit(0);
   }
+  // THE ROUTE IS DECLARED (owner, 2026-10-09): cat-harness's `auto-docs`
+  // visualiser, rendered by this Tool, at `<harness>/<id>/`. Each auto-doc
+  // TYPE is a declared sub-graph beneath it (`auto-docs.json`).
+  const route = declaredRoute(ROOT, VIEWER_TOOL);
+  if (route === undefined) {
+    console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
+    process.exit(0);
+  }
   const site = join(ROOT, siteDirFor(ROOT));
 
   /** Items indexed per BUILT type — what the level pages below count. */
@@ -1375,26 +1385,18 @@ if (import.meta.main) {
       return { id, path: d?.path ?? "", count: byDir.get(id)!.length };
     });
 
-    // Each page says which directories it draws (#1168 B7a-2): every
-    // populated sub-graph on the type's page, its own on a sub-graph page.
-    const drawn = (ids: readonly string[]): string[] =>
-      ids.flatMap((id) => {
-        const d = dirs.find((x) => x.id === id);
-        return d ? [renderedPath(REPO_ROOT, d.absPath)] : [];
-      });
-    const { pageDir } = viewerPlacement(site, `${handler}/auto-docs/${type.id}`, "auto-docs");
+    const { pageDir } = viewerPlacement(site, `${route}/${type.id}`, "auto-docs");
     const skillPages = skillPagesOf(REPO_ROOT);
     emit(
       join(pageDir, "index.html"),
-      withRendersFrontMatter(autoDocPage(type, items, "", undefined, siblings, codeRefsFor(site, pageDir, REPO_ROOT, skillPages)), drawn(populated), VIEWER_TOOL),
+      withRenderedByFrontMatter(autoDocPage(type, items, "", undefined, siblings, codeRefsFor(site, pageDir, REPO_ROOT, skillPages)), VIEWER_TOOL),
     );
     for (const id of populated) {
-      const sub = viewerPlacement(site, `${handler}/auto-docs/${type.id}/${id}`, "auto-docs");
+      const sub = viewerPlacement(site, `${route}/${type.id}/${id}`, "auto-docs");
       emit(
         join(sub.pageDir, "index.html"),
-        withRendersFrontMatter(
+        withRenderedByFrontMatter(
           autoDocPage(type, byDir.get(id)!, id, dirs.find((d) => d.id === id)?.path, siblings, codeRefsFor(site, sub.pageDir, REPO_ROOT, skillPages)),
-          drawn([id]),
           VIEWER_TOOL,
         ),
       );
@@ -1513,7 +1515,7 @@ if (import.meta.main) {
     }
     for (const [prefix, kids] of levels) {
       kids.sort((a, b) => a.seg.localeCompare(b.seg, "en"));
-      const at = viewerPlacement(site, `${handler}/auto-docs${prefix ? `/${prefix}` : ""}`, "auto-docs");
+      const at = viewerPlacement(site, `${route}${prefix ? `/${prefix}` : ""}`, "auto-docs");
       emit(join(at.pageDir, "index.html"), levelPage(prefix, kids));
       if (!check) console.log(`  ✓ level ${prefix || "auto-docs"}: ${kids.length} child(ren)`);
     }
@@ -1522,7 +1524,7 @@ if (import.meta.main) {
   // The from-within node, at the kind's own root — beside the type directories
   // it names, which is what "from within" means.
   {
-    const at = viewerPlacement(site, `${handler}/auto-docs`, "auto-docs");
+    const at = viewerPlacement(site, route, "auto-docs");
     emitRaw(join(at.pageDir, "auto-docs.json"), autoDocsManifest());
     if (!check) console.log(`  ✓ auto-docs.json: ${TYPES.length} sub-sub-graph(s)`);
   }
