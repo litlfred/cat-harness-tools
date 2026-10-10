@@ -1,7 +1,7 @@
 # QA-sweep nightly — keeps this folio's QA verdicts current on qa-reports
 #
 # Written by `folio_init` from the platform's template
-# (cat-harness/templates/document/github/workflows/qa-sweep-nightly.yml).
+# (cat-harness-tools/templates/document/github/workflows/qa-sweep-nightly.yml).
 #
 # Why this exists
 # ────────────────
@@ -90,7 +90,7 @@ jobs:
           for axis in "${AXIS_LIST[@]}"; do
             axis_trim="$(echo "$axis" | xargs)"
             echo "::group::axis $axis_trim"
-            bun run "{{assistant}}/cat-harness/content/pipeline/qa-sweep.ts" "{{folio}}" --axis "$axis_trim" --ci
+            bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-sweep.ts" "{{folio}}" --axis "$axis_trim" --ci
             echo "::endgroup::"
           done
 
@@ -105,6 +105,6 @@ jobs:
             echo "No QA results to publish — exiting cleanly."
             exit 0
           fi
-          bun run "{{assistant}}/cat-harness/scripts/qa-store.ts" publish \
+          bun run "{{assistant}}/cat-harness-tools/scripts/qa-store.ts" publish \
             --ref "main/$(git rev-parse HEAD)" \
             --root test/results

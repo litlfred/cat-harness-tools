@@ -1,11 +1,11 @@
 ---
 # folio-assistant-zaui
 title: 'CERTIFICATION family in qa-attestations/v1: where test-plan-execution files a signed certification'
-status: in-progress
+status: todo
 type: task
 priority: normal
 created_at: 2026-10-02T05:48:39Z
-updated_at: 2026-10-10T16:50:38Z
+updated_at: 2026-10-10T16:52:27Z
 parent: folio-assistant-3fva
 ---
 
@@ -26,3 +26,9 @@ Follow-up from 3o5b (owner, 2026-10-02: open a bean). test-plan-execution.bpmn's
 - [x] **Schema and store, in cat-harness:** `schemas/qa-attestations.ts` has the `certification` family (`CertificationEntrySchema`, `certificationPath` → `<attestations>/certification/<id>.attestations.json`, `read`/`write`/`fileCertification`), and `schemas/qa-attestations.test.ts` round-trips a certification file. That satisfies done-when #1 on the cat-harness side.
 - [ ] **The filing step is not wired here:** nothing in cat-harness-tools calls `fileCertification`. In `test-plan-execution.test.ts`, `A_FileCertification` completes without writing a file. Next: have the step (or its skill's tool) call `fileCertification` with the signed entry, and refuse with UNKNOWN on a corrupt store.
 - [ ] **Judged, not typed-only:** no `kg-qa` criterion reads `test/attestations/certification/**`. That needs a criterion defined in cat-harness `schemas/kg-qa.ts` (definitions there) with its checker here, then `audit:coverage` stops reporting the family as typed-only. `migrate-qa-attestations.ts` covers kg-qa, block-qa and translation-qa only, so certification needs no migration because it has no derived predecessor.
+
+
+### 2026-10-10: the filing step has a writer (PR, lane B)
+
+- [x] **Done-when #1, on this side too:** `fileSignedCertification` (`scripts/test-plan-execution.ts`) is the writer for `A_FileCertification`. It files only a `certified` decision, needs a report to point at, appends rather than replaces, returns `unknown` on a corrupt store with nothing written, and reads the file back before saying `filed`. `scripts/tests/test-plan-file-certification.test.ts` covers each case (5 tests).
+- [ ] **Done-when #2 is still open:** a `kg-qa` criterion reading `test/attestations/certification/**`, so audit:coverage reports the family as judged. That criterion is defined in cat-harness `schemas/kg-qa.ts` first, and needs a cat-harness PR.

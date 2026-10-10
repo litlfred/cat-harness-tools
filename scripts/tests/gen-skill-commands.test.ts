@@ -76,6 +76,21 @@ describe("both directions", () => {
     expect(kinds(root, pkgs)).toEqual([]);
     expect(readFileSync(join(root, ".claude", "commands", "b.md"), "utf8")).toBe(hand);
   });
+
+  test("a command written before the generator moved (bean 70lx) is still generated: STALE, and refreshed", () => {
+    const { root, pkgs } = repo({ "a.md": skill("a", true) });
+    write(root, pkgs);
+    const a = join(root, ".claude", "commands", "a.md");
+    const old = readFileSync(a, "utf8")
+      .replace("generated: cat-harness-tools/scripts/gen-skill-commands.ts", "generated: cat-harness/scripts/gen-skill-commands.ts")
+      .replaceAll("skills/a.md", "skills/moved-away/a.md");
+    writeFileSync(a, old);
+    expect(isGenerated(old)).toBe(true);
+    expect(kinds(root, pkgs)).toEqual([["stale", "a"]]);
+    write(root, pkgs);
+    expect(kinds(root, pkgs)).toEqual([]);
+    expect(readFileSync(a, "utf8")).not.toContain("moved-away");
+  });
 });
 
 describe("a command is a pointer, never a copy", () => {

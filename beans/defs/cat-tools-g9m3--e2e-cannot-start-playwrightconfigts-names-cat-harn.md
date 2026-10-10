@@ -1,11 +1,11 @@
 ---
 # cat-tools-g9m3
 title: 'E2E CANNOT START: playwright.config.ts names ../cat-harness/test (moved in 70lx), and under it a .js specifier fails to resolve — 0 specs, no job reports it'
-status: in-progress
+status: todo
 type: bug
 priority: high
 created_at: 2026-10-10T16:28:44Z
-updated_at: 2026-10-10T16:28:58Z
+updated_at: 2026-10-10T17:15:53Z
 parent: folio-assistant-1xhc
 ---
 
@@ -21,3 +21,10 @@ This repository's PR workflow runs no e2e job, so nothing reports either failure
 - [ ] `testDir` and `globalSetup` name `./test`.
 - [ ] `--list` collects the 82 specs under the CI-shaped mount (fix the specifier resolution, or run Playwright under Bun).
 - [ ] A PR job runs them, or the reason none does is recorded in the workflow.
+
+
+## 2026-10-10: superseded in part by #65
+
+- [x] Done-when #1 and #2 (the paths, and specs loading) landed through **#65** from another session: the same three `playwright.config.ts` fixes, plus `roots.ts` loading under Node via `import.meta.url`. So `test:e2e` stays plain `playwright test`, and PR #69 (`--bun`) was closed as superseded.
+- **Still 0 collected in the CI-shaped mount,** for a new reason: a spec throws `no instance named who-iris declares a visualiser catalogue`. The `who-iris` pinned in folio-assistant's `index.lock.json` predates that visualiser, so this clears at the next who-iris re-pin.
+- [ ] Done-when #3 is still open: no PR job here runs e2e.

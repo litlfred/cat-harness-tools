@@ -2,7 +2,7 @@
 # machine-readable failure sidecar back to the branch.
 #
 # Written by `folio_init` for PAPER folios, from the platform's template
-# (cat-harness/templates/paper/github/workflows/lean-build-sidecar.yml).
+# (cat-harness-tools/templates/paper/github/workflows/lean-build-sidecar.yml).
 #
 # Why
 # ───
@@ -185,7 +185,7 @@ jobs:
       - name: Generate sidecar
         run: |
           cat build-logs/*.status.tsv > build-logs/_status.tsv
-          python3 "{{assistant}}/cat-harness/scripts/lib/lean-build-sidecar.py" build-logs
+          python3 "{{assistant}}/cat-harness-tools/scripts/lib/lean-build-sidecar.py" build-logs
 
       - name: Commit + push sidecar
         run: |

@@ -351,7 +351,7 @@ function branchRepo(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "harness-dirs-branch-"));
   writeFileSync(
     join(root, "cat-harness.json"),
-    JSON.stringify({ $schema: "folio-harness/v1", name: "cat-harness", directories: dirs }, null, 2),
+    JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "cat-harness", directories: dirs }, null, 2),
   );
   writeFileSync(join(root, ".beans.yml"), "beans:\n    path: beans/defs\n");
   spawnSync("git", ["init", "-q", "-b", "main"], { cwd: root });

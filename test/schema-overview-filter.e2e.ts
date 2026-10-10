@@ -38,9 +38,10 @@ import { dirname, join } from "node:path";
 
 import { serveThemedAt } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPageUrl } from "./support/site-pages.ts";
 
 /** Served from the repository root by `test-server.mjs`. */
-const PAGE = "/cat-harness/docs/cat-harness/schemas/index.html";
+const PAGE = `${declaredPageUrl(HARNESS_ROOT, "schemas")}index.html`;
 const REPO = join(dirname(HARNESS_ROOT));
 
 // The page is THEMED since 2026-10-07: Jekyll front matter and a Liquid raw

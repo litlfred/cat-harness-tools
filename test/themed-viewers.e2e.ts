@@ -17,16 +17,17 @@ import { dirname, join } from "node:path";
 
 import { serveThemedAt, THEME_LINK, type Scheme } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPageDirIn, declaredPageUrl, servedUrl } from "./support/site-pages.ts";
 
 const REPO = join(dirname(HARNESS_ROOT));
 const DOCS = "/cat-harness/docs";
 
 /** A page, the wrapper its CSS is scoped under, and what says its script ran. */
 const PAGES: { name: string; path: string; wrapper: string; ready: string; readyText?: RegExp }[] = [
-  { name: "voices", path: `${DOCS}/cat-harness/voices/index.html`, wrapper: ".vo-page", ready: "#foot", readyText: /voice\(s\)/ },
-  { name: "uploads", path: `${DOCS}/cat-harness/uploads/index.html`, wrapper: ".up-page", ready: "#badges .badge" },
-  { name: "document-kinds", path: `${DOCS}/cat-harness/document-kinds/index.html`, wrapper: ".dk-page", ready: "#dk-title" },
-  { name: "translation-status", path: `${DOCS}/translation-status/index.html`, wrapper: ".ts-page", ready: "#ts-title" },
+  { name: "voices", path: `${declaredPageUrl(HARNESS_ROOT, "voices")}index.html`, wrapper: ".vo-page", ready: "#foot", readyText: /voice\(s\)/ },
+  { name: "uploads", path: `${declaredPageUrl(HARNESS_ROOT, "uploads")}index.html`, wrapper: ".up-page", ready: "#badges .badge" },
+  { name: "document-kinds", path: `${declaredPageUrl(HARNESS_ROOT, "document-kinds")}index.html`, wrapper: ".dk-page", ready: "#dk-title" },
+  { name: "translation-status", path: `${declaredPageUrl(HARNESS_ROOT, "translation-status")}index.html`, wrapper: ".ts-page", ready: "#ts-title" },
   // The node-kind pages: a kind's dashboard, a node, and a renderer's sections.
   { name: "node-kind dashboard", path: `${DOCS}/en/cat-harness/todo/index.html`, wrapper: ".nk-page", ready: "#shown" },
   {
@@ -36,13 +37,13 @@ const PAGES: { name: string; path: string; wrapper: string; ready: string; ready
     ready: "#fields",
   },
   { name: "node-kind renderer", path: `${DOCS}/en/folio-assistant-core/changeset/index.html`, wrapper: ".nk-page", ready: "#nk-title" },
-  { name: "folio", path: `${DOCS}/cat-harness/folio/index.html`, wrapper: ".fo-page", ready: "#badges .badge" },
-  { name: "catalogue", path: `${DOCS}/cat-harness/catalogue/who-iris/index.html`, wrapper: ".ic-page", ready: "#ic-nodes" },
+  { name: "folio", path: `${declaredPageUrl(HARNESS_ROOT, "folio")}index.html`, wrapper: ".fo-page", ready: "#badges .badge" },
+  { name: "catalogue", path: `${servedUrl(REPO, declaredPageDirIn(REPO, "who-iris", "catalogue"))}index.html`, wrapper: ".ic-page", ready: "#ic-nodes" },
   // The todo page draws itself from its JSON-LD: the meta list fills only if the script ran.
   { name: "todo", path: `${DOCS}/todos/what-kick-off-means-for-a-ci-watcher/index.html`, wrapper: ".fa-todo-page", ready: "#fa-todo-meta dt" },
   // Last, and with room: a ~1.9 MB projection and ~1700 list rows, so its
   // load and its axe pass are the slow ones.
-  { name: "schemas", path: `${DOCS}/cat-harness/schemas/index.html`, wrapper: ".sc-page", ready: "#counts", readyText: /declarations/ },
+  { name: "schemas", path: `${declaredPageUrl(HARNESS_ROOT, "schemas")}index.html`, wrapper: ".sc-page", ready: "#counts", readyText: /declarations/ },
 ];
 
 for (const pg of PAGES) {

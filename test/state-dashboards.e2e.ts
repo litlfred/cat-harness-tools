@@ -1,10 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredVisualisers } from "../scripts/viewer-declarations.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 /**
  * Every generated state dashboard, audited — bean `5wrg`.
@@ -28,7 +30,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * A literal list of six would leave a seventh dashboard uncovered on the day
  * it is generated, and nothing would say so — the stale-gap failure
  * `AGENTS.md` opens by warning about. The discriminator is the same one the
- * pruner uses: a directory under the site whose `index.html` carries the
+ * pruner uses: a view this harness declares whose `index.html` carries the
  * generator's marker. Ownership is read off the FILE, never inferred from the
  * directory, because the site also holds `guides/`, `reference/` and much else
  * this must not touch.
@@ -57,34 +59,44 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 
-/** Directories under the site whose `index.html` this generator wrote. */
-function dashboards(): string[] {
-  const site = join(ROOT, SITE);
-  if (!existsSync(site)) return [];
-  return readdirSync(site, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .filter((name) => {
-      const page = join(site, name, "index.html");
-      if (!existsSync(page)) return false;
-      try {
-        const html = readFileSync(page, "utf8");
-        // THEMED pages since #2418 — Jekyll front matter on the default
-        // layout, so the top band reaches them. This server has no Jekyll, so
-        // the body is served in a stand-in for the layout (`shell()` below).
-        // A page with Liquid in it (`todos/`, #1906) is not what a reader gets
-        // until it is built; it is audited after rendering, with the same
-        // tags, in `todos-page-board.e2e.ts`.
-        return html.includes(MARKER) && html.startsWith("---\nlayout: default\n") &&
-          !html.includes("{%");
-      } catch {
-        return false;
-      }
-    })
+/**
+ * The declared views whose `index.html` this generator wrote, by visualiser id.
+ *
+ * Every visualiser THIS harness declares is a candidate, and its page is
+ * where the declaration routes it (`<site>/<locale>/<harness>/<id>/`, see
+ * `support/site-pages.ts`) — a page has no address but its declared one since
+ * the site moved to per-locale, per-instance directories. The marker still
+ * decides membership, so a dashboard declared tomorrow is audited the day it
+ * is generated, with nothing listed here.
+ */
+function dashboards(): Map<string, string> {
+  const repoRoot = repoRootFor(ROOT);
+  const out = new Map<string, string>();
+  const ids = declaredVisualisers(repoRoot)
+    .filter((v) => resolve(v.harnessRoot) === resolve(ROOT))
+    .map((v) => v.id)
     .sort();
+  for (const id of ids) {
+    const page = declaredPagePath(ROOT, id);
+    if (!existsSync(page)) continue;
+    try {
+      const html = readFileSync(page, "utf8");
+      // THEMED pages since #2418 — Jekyll front matter on the default
+      // layout, so the top band reaches them. This server has no Jekyll, so
+      // the body is served in a stand-in for the layout (`shell()` below).
+      // A page with Liquid in it (`todos/`, #1906) is not what a reader gets
+      // until it is built; it is audited after rendering, with the same
+      // tags, in `todos-page-board.e2e.ts`.
+      if (html.includes(MARKER) && html.startsWith("---\nlayout: default\n") && !html.includes("{%")) out.set(id, page);
+    } catch {
+      // unreadable: not a page this generator wrote
+    }
+  }
+  return out;
 }
 
-const IDS = dashboards();
+const PAGES = dashboards();
+const IDS = [...PAGES.keys()];
 
 const asset = (rel: string) => readFileSync(join(ROOT, SITE, rel), "utf8");
 
@@ -97,7 +109,7 @@ const asset = (rel: string) => readFileSync(join(ROOT, SITE, rel), "utf8");
  * own specs.
  */
 function shell(id: string): string {
-  const body = asset(`${id}/index.html`).replace(/^---\n[\s\S]*?\n---\n/, "");
+  const body = readFileSync(PAGES.get(id)!, "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${id}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="fa-beans-src" content="/assets/beans/index.json">
