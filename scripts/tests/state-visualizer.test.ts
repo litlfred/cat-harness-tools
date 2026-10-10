@@ -20,11 +20,18 @@ import {
   declaredVisualiserFor,
   describe as describeText,
   GENERATED_BY,
+  ownVisualiserRefs,
   prunableDashboards,
 } from "../state-visualizer.ts";
 import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
-import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
+import {
+  existingPageDir,
+  forwardingParts,
+  pageParts,
+  visualiserPageDir,
+  visualiserPageRef,
+} from "../viewer-declarations.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -358,6 +365,72 @@ describe("declaredVisualiserFor — the four outcomes, against fixtures", () => 
     const r = roots([rel]);
     expect(declaredVisualiserFor("uploads", rel, r).state).toBe("elsewhere");
     expect(declaredVisualiserFor("uploads", "lib/x/index.html", r).state).toBe("unresolved");
+  });
+});
+
+describe("this generator's own pages are own at EITHER address — the first run after the locale move", () => {
+  // A graph with no projection is told apart from one another visualiser draws
+  // by whether its coverage ref is one of OURS. That ref is
+  // `visualiserPageRef`'s answer, which is whichever address holds the page
+  // NOW. On the first run after the move only the old `<harness>/<vis>/` page
+  // is on disk, so the old address is what the ref names; if own-ness looked
+  // only at the localised address, that run linked a graph to a page the same
+  // run then pruned (`attestations`, `health`, `issue-marks` read `elsewhere`).
+  const SEG = siteDirFor(ROOT);
+  const harness = "cat-harness";
+
+  /** A repo root with a site in it, and the named pages under that site. */
+  function site(pages: string[] = []): { repoRoot: string; site: string } {
+    const repoRoot = mkdtempSync(join(tmpdir(), "sv-own-"));
+    const s = join(repoRoot, "inst", SEG);
+    mkdirSync(s, { recursive: true });
+    for (const abs of pages.map((p) => join(s, p))) {
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, "<html></html>");
+    }
+    return { repoRoot, site: s };
+  }
+  const oldDir = (s: string, visualiser: string) => visualiserPageDir(s, forwardingParts({ harness, visualiser }));
+  const newDir = (s: string, visualiser: string) => visualiserPageDir(s, pageParts({ harness, visualiser }));
+
+  test("only the OLD-address page is on disk: the ref names it, and it is own", () => {
+    const r = site([`${harness}/health/index.html`]);
+    const ref = visualiserPageRef(r.repoRoot, { harness, visualiser: "health" }, r.site);
+    // Discriminating: the ref really is the old address, not the localised one.
+    expect(join(r.repoRoot, ref)).toBe(join(oldDir(r.site, "health"), "index.html"));
+    expect(ownVisualiserRefs(r.repoRoot, r.site, harness, ["health"]).has(ref)).toBe(true);
+  });
+
+  test("the localised page is on disk: the ref names it, and it is own", () => {
+    const r = site([`${harness}/health/index.html`]);
+    const at = join(newDir(r.site, "health"), "index.html");
+    mkdirSync(dirname(at), { recursive: true });
+    writeFileSync(at, "<html></html>");
+    const ref = visualiserPageRef(r.repoRoot, { harness, visualiser: "health" }, r.site);
+    expect(join(r.repoRoot, ref)).toBe(at);
+    expect(ownVisualiserRefs(r.repoRoot, r.site, harness, ["health"]).has(ref)).toBe(true);
+  });
+
+  test("an `index.md` at the old address is own too", () => {
+    const r = site([`${harness}/issue-marks/index.md`]);
+    const ref = visualiserPageRef(r.repoRoot, { harness, visualiser: "issue-marks" }, r.site);
+    expect(ref.endsWith("/index.md")).toBe(true);
+    expect(ownVisualiserRefs(r.repoRoot, r.site, harness, ["issue-marks"]).has(ref)).toBe(true);
+  });
+
+  test("no page yet: the ref is the localised `index.html`, and it is own", () => {
+    const r = site();
+    const ref = visualiserPageRef(r.repoRoot, { harness, visualiser: "health" }, r.site);
+    expect(join(r.repoRoot, ref)).toBe(join(newDir(r.site, "health"), "index.html"));
+    expect(ownVisualiserRefs(r.repoRoot, r.site, harness, ["health"]).has(ref)).toBe(true);
+  });
+
+  test("a visualiser this generator does NOT draw is not own, at either address", () => {
+    const r = site([`${harness}/qa/index.html`]);
+    const own = ownVisualiserRefs(r.repoRoot, r.site, harness, ["health"]);
+    const ref = visualiserPageRef(r.repoRoot, { harness, visualiser: "qa" }, r.site);
+    expect(own.has(ref)).toBe(false);
+    expect(own.has(relative(r.repoRoot, join(newDir(r.site, "qa"), "index.html")).split(sep).join("/"))).toBe(false);
   });
 });
 

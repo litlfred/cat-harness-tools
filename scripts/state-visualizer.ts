@@ -148,6 +148,7 @@ import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.t
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";
 import {
+  forwardingParts,
   pageParts,
   renderedPath,
   siteDirectories,
@@ -184,8 +185,37 @@ let harnessName: string | undefined;
  * declared `name`, read once.
  */
 function pageDirOf(vis: string): string {
-  harnessName ??= readDeclaration(ROOT)?.name ?? basename(ROOT);
-  return visualiserPageDir(SITE, pageParts({ harness: harnessName, visualiser: vis }));
+  return visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: vis }));
+}
+
+/** This instance's declared `name`, read once: the harness segment of every route. */
+function harnessOf(): string {
+  return (harnessName ??= readDeclaration(ROOT)?.name ?? basename(ROOT));
+}
+
+/**
+ * Every ref this generator's OWN pages can be named by, for the visualisers it
+ * draws: each one's page at its localised address (`pageParts`) AND at its old
+ * `<harness>/<vis>/` address (`forwardingParts`), as `index.html` or
+ * `index.md`, repository-relative.
+ *
+ * Both, because a declared visualiser resolves to whichever address holds its
+ * page NOW (`visualiserPageRef`), and on the first run after the locale move
+ * (folio-assistant#2527) that is the old one: this run writes the localised
+ * page and prunes the old one only afterwards. Counting only the localised
+ * address made that first run take its own not-yet-pruned page for ANOTHER
+ * visualiser, so a graph with no projection read `elsewhere`, linking to a
+ * page the same run then deleted; a second run read `declared`.
+ */
+export function ownVisualiserRefs(repoRoot: string, site: string, harness: string, ids: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const visualiser of ids) {
+    const parts = { harness, visualiser };
+    for (const dir of [visualiserPageDir(site, pageParts(parts)), visualiserPageDir(site, forwardingParts(parts))]) {
+      for (const file of ["index.html", "index.md"]) out.add(renderedPath(repoRoot, join(dir, file)));
+    }
+  }
+  return out;
 }
 
 /*
@@ -968,7 +998,7 @@ const checkoutDirs = rootDirs.filter((d) => !ownIds.has(d.id));
 const mine = (declRead?.visualisers ?? []).filter((v) => v.renderedBy === VIEWER_TOOL);
 const visOf = new Map<string, string>();
 for (const v of mine) for (const c of v.covers ?? []) if (!visOf.has(c)) visOf.set(c, v.id);
-const ownRefs = new Set(mine.map((v) => renderedPath(REPO_ROOT, join(pageDirOf(v.id), "index.html"))));
+const ownRefs = ownVisualiserRefs(REPO_ROOT, SITE, harnessOf(), mine.map((v) => v.id));
 const all = [
   ...stateGraphsOf(decl, visOf, ownRefs),
   ...stateGraphsOf({ ...decl, directories: checkoutDirs }, visOf, ownRefs),
