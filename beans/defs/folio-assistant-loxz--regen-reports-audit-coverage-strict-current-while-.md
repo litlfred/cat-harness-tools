@@ -1,12 +1,12 @@
 ---
 # folio-assistant-loxz
 title: 'regen reports audit:coverage:strict current while the artefact on disk differs from what its writer produces'
-status: todo
+status: completed
 type: bug
 parent: folio-assistant-1xhc
 priority: normal
 created_at: 2026-10-04T12:18:57Z
-updated_at: 2026-10-04T12:18:57Z
+updated_at: 2026-10-10T07:30:00Z
 ---
 A verify/write pair whose CHECK is a judge-mode baseline rather than a byte comparison cannot detect a stale artefact, and `regen` counts it as `current`. So "0 unrepaired" is not evidence that every generated artefact matches its writer.
 
@@ -26,7 +26,22 @@ This is the `1xhc` family: a step that did not fire must not look like one that 
 Bean `0qjq` is the sibling for CI (a green PR page is not evidence gates RAN — count runs AND distinct names). This is the same defect inside `regen`.
 
 ## Done when
-- [ ] `regen` distinguishes a pair whose check COMPARES THE ARTEFACT from one whose check is a judge/baseline verdict, and says which in its summary rather than counting both as `current`
-- [ ] for the judge-mode pairs, either a byte comparison is added or the pair is declared as not-a-staleness-check (the same honesty `check:viewer-nav`/`check:harness-dirs` already get with "no writer, by declaration")
-- [ ] a test writes a stale artefact for one judge-mode pair, runs `regen`, and asserts it is NOT reported as `current`
-- [ ] the fsh-guts case specifically: an UNMOUNTED tree must not be able to leave a committed sidecar that a mounted `regen` then blesses
+- [x] `regen` distinguishes a pair whose check COMPARES THE ARTEFACT from one whose check is a judge/baseline verdict, and says which in its summary rather than counting both as `current`
+- [x] for the judge-mode pairs, either a byte comparison is added or the pair is declared as not-a-staleness-check (the same honesty `check:viewer-nav`/`check:harness-dirs` already get with "no writer, by declaration")
+- [x] a test writes a stale artefact for one judge-mode pair, runs `regen`, and asserts it is NOT reported as `current`
+- [x] the fsh-guts case specifically: an UNMOUNTED tree must not be able to leave a committed sidecar that a mounted `regen` then blesses
+
+## Completed on landed evidence (2026-10-10)
+
+Closed by a session that did not write it, on evidence rather than authorship (`bean-coordination` §"Closing a bean whose work has already landed"). The work landed in litlfred/cat-harness `46908602` (2026-10-09, "fix(regen): distinguish judge-mode checks from artefact staleness checks (bean loxz)") and moved here with the code in `d8d42ab` (70lx stage 1a). Nobody updated the status.
+
+Each Done-when item, checked against `main` at `0d5841e`:
+
+- **regen distinguishes the two kinds of pair.** It now has a separate `judged` outcome. The summary reports "N judged" and prints "passed (judge mode, wrote nothing)" for those checks. That is in `scripts/regen-after-merge.ts`, in the `Outcome` type, `isJudge` and the summary line.
+- **Judge-mode pairs are declared as not staleness checks.** `audit:coverage:strict` and `audit:coverage:require-all` sit in the no-writer declarations, each with its reason ("judge-mode baseline check against qa-reports, not an artefact staleness check").
+- **A test proves it.** In `scripts/tests/regen-after-merge.test.ts`, under "judge-mode pairs are distinguished from artefact staleness checks — bean loxz", a passing judge-mode check is reported as `judged`, never `current`.
+- **The fsh-guts case is handled.** `audit-coverage.ts` refuses to write `audit-coverage.qa-results.json` when any declared graph is undetermined, which is the unmounted case. Its message tells the user to mount the required remotes first.
+
+Verified 2026-10-10: `bun test ./cat-harness-tools/scripts/tests/regen-after-merge.test.ts -t loxz` gives 6 pass, 0 fail. This ran in an index checkout with cat-harness and cat-harness-tools both at their `main`.
+
+The full file gave 51 pass and 14 fail. The 14 failures are all script-table lookups (a writer resolves as `undefined`), not loxz. They come from that mixed checkout: the index's other instances are mounted at their locked refs while these two are at `main`. They are not evidence about this bean.
