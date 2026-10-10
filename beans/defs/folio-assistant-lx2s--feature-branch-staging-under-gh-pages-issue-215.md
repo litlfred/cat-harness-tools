@@ -1,11 +1,11 @@
 ---
 # folio-assistant-lx2s
 title: 'Feature-branch staging under gh-pages (issue #215)'
-status: todo
+status: scrapped
 type: task
 priority: normal
 created_at: 2026-09-17T22:29:53Z
-updated_at: 2026-09-29T20:50:33Z
+updated_at: 2026-10-10T16:44:10Z
 parent: folio-assistant-1xhc
 ---
 
@@ -179,3 +179,9 @@ what the earlier correction established and why *"it works"* was too fast.
 ## Claim released 2026-09-29
 
 Released `in-progress` → `todo` on the owner's instruction (review session https://claude.ai/code/session_014Qj8wncQhqV52QGN1yZDnj). No git change to this bean since before 2026-09-26, no holder recorded, and no open working branch touches it; the sessions that held theme B (CI reliability, QA instruments, process) work stopped on the 2026-09-25 weekly usage limit. Nothing in the body was changed: re-claim with `bun run cat beans:claim <id>`.
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It tracks litlfred/folio-assistant issue #215 and that repository's `.github/workflows/feature-staging.yml`; its done-when is the issue's author closing it. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
