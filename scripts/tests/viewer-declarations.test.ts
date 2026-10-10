@@ -163,7 +163,7 @@ describe("collisions are declaration errors", () => {
 describe("the locale goes in front of every visualiser page (folio-assistant#2527)", () => {
   test("the page locale is cat-harness's default, supplied in ONE place", () => {
     expect(PAGE_LOCALE).toBe(DEFAULT_LOCALE);
-    expect(PUBLISHED_LOCALES).toContain(PAGE_LOCALE);
+    expect(PUBLISHED_LOCALES as readonly string[]).toContain(PAGE_LOCALE);
     expect(pageParts({ harness: "h", visualiser: "v" })).toEqual({ harness: "h", visualiser: "v", locale: PAGE_LOCALE });
     // A locale the caller names is kept, and dropping it gives the old address.
     expect(pageParts({ harness: "h", visualiser: "v", locale: "fr" }).locale).toBe("fr");
