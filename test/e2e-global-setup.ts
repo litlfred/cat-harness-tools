@@ -29,8 +29,8 @@ export default function globalSetup(): void {
   // The same resolution both specs use: the instance directory above `test/`.
   const stub = artefactStubFor(join(HARNESS_ROOT));
   for (const [file, script] of [
-    [`_kg/${stub}.jsonld`, "cat-harness/scripts/kg-export.ts"],
-    [`_kg/${stub}/index.html`, "cat-harness/scripts/kg-viewer.ts"],
+    [`_kg/${stub}.jsonld`, "cat-harness-tools/scripts/kg-export.ts"],
+    [`_kg/${stub}/index.html`, "cat-harness-tools/scripts/kg-viewer.ts"],
   ] as const) {
     if (!existsSync(file)) execFileSync("bun", ["run", script], { stdio: "inherit" });
   }

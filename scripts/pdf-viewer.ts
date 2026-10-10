@@ -342,9 +342,9 @@ function all(argv: string[], flag: string): string[] {
  * Two modes, one script — the two Tool nodes `pdf-viewer-install` and
  * `pdf-viewer-embed` in `cat-harness/tools/index.ts`:
  *
- * `bun run cat-harness/scripts/pdf-viewer.ts --site ./_site --allow <prefix> [--allow …] [--zip <file>]`
+ * `bun run cat-harness-tools/scripts/pdf-viewer.ts --site ./_site --allow <prefix> [--allow …] [--zip <file>]`
  *
- * `echo '{"src":…,"title":…,"route":…,"page":3}' | bun run cat-harness/scripts/pdf-viewer.ts --embed`
+ * `echo '{"src":…,"title":…,"route":…,"page":3}' | bun run cat-harness-tools/scripts/pdf-viewer.ts --embed`
  * prints the fragment {@link embed} returns, for a generator that is not
  * TypeScript or a person pasting it into a page by hand.
  *

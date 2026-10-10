@@ -40,7 +40,7 @@
  * `strip-preview-seo` uses, and for the same reason.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-maintained-artefacts.ts ./_site
+ *   bun run cat-harness-tools/scripts/check-maintained-artefacts.ts ./_site
  *   bun run cat check:maintained-artefacts -- ./_site
  */
 import { existsSync, statSync } from "node:fs";

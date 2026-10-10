@@ -74,7 +74,7 @@
  * nobody built the site is green exactly where it is blind.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-escaped-markup.ts ./_site
+ *   bun run cat-harness-tools/scripts/check-escaped-markup.ts ./_site
  *   bun run cat check:escaped-markup -- ./_site
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";

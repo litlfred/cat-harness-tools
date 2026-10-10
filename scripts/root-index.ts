@@ -38,7 +38,7 @@
  * is the defect this index exists to end.
  *
  * Usage:
- *   bun run cat-harness/scripts/root-index.ts --site ./_site [--base-url URL]
+ *   bun run cat-harness-tools/scripts/root-index.ts --site ./_site [--base-url URL]
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

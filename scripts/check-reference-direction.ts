@@ -126,7 +126,7 @@
  * here. `--check` reads, compares and returns; the plain run is the writer.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-reference-direction.ts            # summary, and WRITE the sidecar
+ *   bun run cat-harness-tools/scripts/check-reference-direction.ts            # summary, and WRITE the sidecar
  *   … --findings           # every wrong-direction occurrence
  *   … --undetermined       # what it declined to judge, and why
  *   … --check              # do NOT write; fail ONLY on a graded state NEW against the baseline

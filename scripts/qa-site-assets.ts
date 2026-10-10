@@ -52,9 +52,9 @@
  * rather fail.
  *
  * Usage:
- *   bun run cat-harness/scripts/qa-site-assets.ts fetch --ref <ref> [--fallback <ref>]... \
+ *   bun run cat-harness-tools/scripts/qa-site-assets.ts fetch --ref <ref> [--fallback <ref>]... \
  *       --results <dir> [--state FILE] [--require]
- *   bun run cat-harness/scripts/qa-site-assets.ts verify --site <dir> --results <dir> [--state FILE]
+ *   bun run cat-harness-tools/scripts/qa-site-assets.ts verify --site <dir> --results <dir> [--state FILE]
  *
  * Exit: 0 ok (or `unavailable`, stated) · 1 a shortfall, or `unavailable` under
  * `--require` · 2 usage, or `verify` with no fetch state to judge against.

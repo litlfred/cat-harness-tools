@@ -18,8 +18,8 @@
  * without writing.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/migrate-bib-verifier.ts          # apply
- *   bun run cat-harness/content/pipeline/migrate-bib-verifier.ts --dry-run
+ *   bun run cat-harness-tools/content/pipeline/migrate-bib-verifier.ts          # apply
+ *   bun run cat-harness-tools/content/pipeline/migrate-bib-verifier.ts --dry-run
  */
 
 import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";

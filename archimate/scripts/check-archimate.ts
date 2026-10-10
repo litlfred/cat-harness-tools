@@ -7,7 +7,7 @@
  * @covers archimate
  *
  * Usage:
- *   bun run cat-harness/archimate/scripts/check-archimate.ts --instance <instance-dir>
+ *   bun run cat-harness-tools/archimate/scripts/check-archimate.ts --instance <instance-dir>
  *
  * The `openapi` subgraph's `ingest-openapi.ts --check`, for models that are
  * authored in place rather than ingested: every configured model is present

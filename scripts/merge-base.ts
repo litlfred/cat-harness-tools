@@ -31,9 +31,9 @@
  *   bun run cat merge:main                 # merge origin/main, resolve, regenerate, commit
  *   bun run cat merge:main -- --full-regen # ...asking every pair, not only those the merge touched
  *   bun run cat merge:main -- --dry-run    # classify the conflicts, change nothing
- *   bun run cat-harness/scripts/merge-base.ts --base origin/<branch>
- *   bun run cat-harness/scripts/merge-base.ts --root <worktree> --base <sha> --dry-run
- *   bun run cat-harness/scripts/merge-base.ts --root <worktree> --base <sha> --no-regen  # a train member
+ *   bun run cat-harness-tools/scripts/merge-base.ts --base origin/<branch>
+ *   bun run cat-harness-tools/scripts/merge-base.ts --root <worktree> --base <sha> --dry-run
+ *   bun run cat-harness-tools/scripts/merge-base.ts --root <worktree> --base <sha> --no-regen  # a train member
  *
  * Exit 0 merged (or already up to date) · 1 refused or unproven, tree restored ·
  * 2 could not start (dirty tree, no such base).

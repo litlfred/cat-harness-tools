@@ -32,7 +32,7 @@
  * is exactly the default-masquerading-as-a-decision this bean exists to end.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-model-languages.ts [--instance ROOT]
+ *   bun run cat-harness-tools/scripts/check-model-languages.ts [--instance ROOT]
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

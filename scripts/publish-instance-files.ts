@@ -26,7 +26,7 @@
  * its Jekyll build and Pages renders nothing written into it then — the navbar
  * tab points at `README.html`. Rendering a hosted copy is the host's job.
  *
- * Usage: bun run cat-harness/scripts/publish-instance-files.ts --instance ./bootstrap --out ./_site/bootstrap
+ * Usage: bun run cat-harness-tools/scripts/publish-instance-files.ts --instance ./bootstrap --out ./_site/bootstrap
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";

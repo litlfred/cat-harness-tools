@@ -66,8 +66,8 @@
  * inferred, per `3srh`.
  *
  * Usage:
- *   bun run cat-harness/scripts/set-html-lang.ts --site ./_site
- *   bun run cat-harness/scripts/set-html-lang.ts --site ./_site --check
+ *   bun run cat-harness-tools/scripts/set-html-lang.ts --site ./_site
+ *   bun run cat-harness-tools/scripts/set-html-lang.ts --site ./_site --check
  *
  * @covers tools
  * @graphNode tool

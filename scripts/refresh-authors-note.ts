@@ -13,8 +13,8 @@
  * exits 1 rather than silently corrupting the prose.
  *
  * Usage:
- *   bun run cat-harness/scripts/refresh-authors-note.ts             # apply in place
- *   bun run cat-harness/scripts/refresh-authors-note.ts --check     # exit 1 if stale
+ *   bun run cat-harness-tools/scripts/refresh-authors-note.ts             # apply in place
+ *   bun run cat-harness-tools/scripts/refresh-authors-note.ts --check     # exit 1 if stale
  */
 
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -129,7 +129,7 @@ function main(): number {
   }
 
   if (check) {
-    console.error("authors-note.md is STALE. Run: bun run cat-harness/scripts/refresh-authors-note.ts");
+    console.error("authors-note.md is STALE. Run: bun run cat-harness-tools/scripts/refresh-authors-note.ts");
     console.error("");
     console.error("Expected:");
     console.error(`  ${provableNew}`);

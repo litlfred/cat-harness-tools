@@ -7,7 +7,7 @@
  * @covers none — a WRITER the deploy calls, not an audit: it removes previews over the cap, and judges nothing else
  *
  * ```sh
- * bun run cat-harness/scripts/staging-rotate.ts --dir pages --current "$STAGING_SLUG" --summary-out rotated.txt
+ * bun run cat-harness-tools/scripts/staging-rotate.ts --dir pages --current "$STAGING_SLUG" --summary-out rotated.txt
  * ```
  *
  * ## Why this exists — issue #1868

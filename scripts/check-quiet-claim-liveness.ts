@@ -35,9 +35,9 @@
  * unmeasurable ref age is NOT reported as "no signal found", which would turn
  * could-not-look into the shape of nothing-was-there.
  *
- *   bun run cat-harness/scripts/check-quiet-claim-liveness.ts
- *   bun run cat-harness/scripts/check-quiet-claim-liveness.ts --no-fetch
- *   bun run cat-harness/scripts/check-quiet-claim-liveness.ts --json
+ *   bun run cat-harness-tools/scripts/check-quiet-claim-liveness.ts
+ *   bun run cat-harness-tools/scripts/check-quiet-claim-liveness.ts --no-fetch
+ *   bun run cat-harness-tools/scripts/check-quiet-claim-liveness.ts --json
  */
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";

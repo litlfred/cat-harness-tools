@@ -20,8 +20,8 @@
  * - 2 = could not determine (store is unreachable / threw an error)
  *
  * Usage:
- *   bun run cat-harness/scripts/check-bean-issues.ts
- *   bun run cat-harness/scripts/check-bean-issues.ts --json
+ *   bun run cat-harness-tools/scripts/check-bean-issues.ts
+ *   bun run cat-harness-tools/scripts/check-bean-issues.ts --json
  *
  * @module scripts/check-bean-issues
  * @covers bean-defs, beans

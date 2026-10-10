@@ -10,7 +10,7 @@
  * source should be part of a node/asset"*, published through the existing
  * SKOS tooling. The shape is `schemas/code-list.ts`; this is its gate.
  *
- *   bun run cat-harness/scripts/code-lists.ts --check
+ *   bun run cat-harness-tools/scripts/code-lists.ts --check
  *
  * Exit 0 clean · 1 a finding · 2 nothing to check (no code list anywhere is
  * `could not determine`, never a pass).

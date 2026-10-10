@@ -24,8 +24,8 @@
  * This audit catches all of the above before pdflatex sees the source.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/audit-tex-source.ts
- *   bun run cat-harness/content/pipeline/audit-tex-source.ts --strict   (exit 1 on any finding)
+ *   bun run cat-harness-tools/content/pipeline/audit-tex-source.ts
+ *   bun run cat-harness-tools/content/pipeline/audit-tex-source.ts --strict   (exit 1 on any finding)
  *
  * @module content/pipeline/audit-tex-source
  */

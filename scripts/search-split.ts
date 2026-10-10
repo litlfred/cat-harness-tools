@@ -52,8 +52,8 @@
  * index's bytes, downloaded on top of the entries (0.4–2.9 MB gzipped).
  *
  * Usage:
- *   bun run cat-harness/scripts/search-split.ts --dir <built site>          # write
- *   bun run cat-harness/scripts/search-split.ts --dir <built site> --check  # verify only
+ *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site>          # write
+ *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site> --check  # verify only
  *
  * @module scripts/search-split
  */

@@ -9,7 +9,7 @@
  * @conformsTo w3c-hydra
  *
  * Usage:
- *   bun run cat-harness/openapi/scripts/gen-openapi-pages.ts --instance <instance-dir> [--check]
+ *   bun run cat-harness-tools/openapi/scripts/gen-openapi-pages.ts --instance <instance-dir> [--check]
  *
  * ## What is written, INSIDE the instance's `openapi` graph
  *

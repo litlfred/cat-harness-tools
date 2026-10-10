@@ -33,7 +33,7 @@
  *   anyone can recompute it from a checkout without this code.
  *
  * Usage:
- *   bun run cat-harness/scripts/text-structure.ts -o <library-dir> --doc-id <id> \
+ *   bun run cat-harness-tools/scripts/text-structure.ts -o <library-dir> --doc-id <id> \
  *     --base <dir> [--title <t>] [--name <display>] [--upstream <upstream.json>] \
  *     [--image <file>]... <file>...
  *

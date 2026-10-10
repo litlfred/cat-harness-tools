@@ -29,7 +29,7 @@
  * render turns on.
  *
  * Usage:
- *   bun run cat-harness/scripts/declared-dirs.ts schemas cat-harness tools
+ *   bun run cat-harness-tools/scripts/declared-dirs.ts schemas cat-harness tools
  */
 import { relative, sep } from "node:path";
 

@@ -9,7 +9,7 @@
  * and says nothing about the workflows, and the workflows invoke generators
  * DIRECTLY:
  *
- *     run: bun run cat-harness/scripts/gen-skill-docs.ts --check
+ *     run: bun run cat-harness-tools/scripts/gen-skill-docs.ts --check
  *
  * Measured 2026-09-20: **seven** such invocations across
  * `code-quality-gates.yml` and `docs-site.yml`, none reachable from

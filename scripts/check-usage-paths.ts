@@ -122,9 +122,9 @@
  * rendered as a failure costs somebody a minute's reading.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-usage-paths.ts          # report, exit 1 on a finding
- *   bun run cat-harness/scripts/check-usage-paths.ts --list    # every self-reference and its verdict
- *   bun run cat-harness/scripts/check-usage-paths.ts --fix     # rewrite each to the file's own path
+ *   bun run cat-harness-tools/scripts/check-usage-paths.ts          # report, exit 1 on a finding
+ *   bun run cat-harness-tools/scripts/check-usage-paths.ts --list    # every self-reference and its verdict
+ *   bun run cat-harness-tools/scripts/check-usage-paths.ts --fix     # rewrite each to the file's own path
  *
  * @covers none — it audits usage strings in SOURCE comments, which are not the
  *   content of any declared graph. A `.ts` file under `skills/` is scanned

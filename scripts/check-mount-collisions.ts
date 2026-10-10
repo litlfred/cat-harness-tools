@@ -14,8 +14,8 @@
  *    - A reserved site route (names both claimants)
  *
  * Usage:
- *   bun run cat-harness/scripts/check-mount-collisions.ts
- *   bun run cat-harness/scripts/check-mount-collisions.ts --root <dir>
+ *   bun run cat-harness-tools/scripts/check-mount-collisions.ts
+ *   bun run cat-harness-tools/scripts/check-mount-collisions.ts --root <dir>
  *   bun run cat check:mount-collisions
  *
  * @module scripts/check-mount-collisions

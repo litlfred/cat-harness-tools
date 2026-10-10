@@ -36,7 +36,7 @@
  * more than that.
  *
  * Usage:
- *   bun run cat-harness/scripts/pin-spdx-license-list.ts --from <license-list-data checkout>
+ *   bun run cat-harness-tools/scripts/pin-spdx-license-list.ts --from <license-list-data checkout>
  *
  * @module scripts/pin-spdx-license-list
  */
@@ -89,7 +89,7 @@ export function snapshotOf(pinVersion: string, licenses: LicensesFile, exception
 function main(): number {
   const from = arg("--from");
   if (!from) {
-    console.error("usage: bun run cat-harness/scripts/pin-spdx-license-list.ts --from <license-list-data checkout at the pinned tag>");
+    console.error("usage: bun run cat-harness-tools/scripts/pin-spdx-license-list.ts --from <license-list-data checkout at the pinned tag>");
     return 2;
   }
   const pin = JSON.parse(readFileSync(join(ROOT, SPDX_LICENSE_LIST_PIN), "utf-8")) as { version: string };

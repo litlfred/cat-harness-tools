@@ -101,8 +101,8 @@
  * document than a 404.
  *
  * Usage:
- *   bun run cat-harness/scripts/kg-locale-export.ts [--instance ROOT] [--out-dir DIR]
- *   bun run cat-harness/scripts/kg-locale-export.ts --check
+ *   bun run cat-harness-tools/scripts/kg-locale-export.ts [--instance ROOT] [--out-dir DIR]
+ *   bun run cat-harness-tools/scripts/kg-locale-export.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";

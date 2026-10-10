@@ -17,8 +17,8 @@
  * ## Usage
  *
  * ```sh
- * bun run cat-harness/scripts/check-spec.ts --issue 730
- * bun run cat-harness/scripts/check-spec.ts --file path/to/spec.md
+ * bun run cat-harness-tools/scripts/check-spec.ts --issue 730
+ * bun run cat-harness-tools/scripts/check-spec.ts --file path/to/spec.md
  * ```
  *
  * @covers schemas
@@ -394,7 +394,7 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
 
   if (args.includes("--help") || args.length === 0) {
-    console.log(`usage: bun run cat-harness/scripts/check-spec.ts [--issue <number>] [--file <path>] [--spec-before-code] [--bean <path>] [--require-adjudicated]
+    console.log(`usage: bun run cat-harness-tools/scripts/check-spec.ts [--issue <number>] [--file <path>] [--spec-before-code] [--bean <path>] [--require-adjudicated]
 
 Validates that a spec adheres to the declared spec-kit template:
 - All mandatory sections present ("User Scenarios & Testing", "Requirements", "Success Criteria")

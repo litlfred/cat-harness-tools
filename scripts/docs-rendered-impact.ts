@@ -44,7 +44,7 @@
  * is what then says which pages actually moved.
  *
  * Usage:
- *   bun run cat-harness/scripts/docs-rendered-impact.ts (--changed a,b | --base <ref> [--head <ref>])
+ *   bun run cat-harness-tools/scripts/docs-rendered-impact.ts (--changed a,b | --base <ref> [--head <ref>])
  *     [--site <prefix>] [--out impact.json]
  *
  * @module cat-harness/scripts/docs-rendered-impact

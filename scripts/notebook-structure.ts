@@ -22,7 +22,7 @@
  *   that no structure was found; the schema refuses the pair otherwise.
  *
  * Usage:
- *   bun run cat-harness/scripts/notebook-structure.ts -o <library-dir> <file.ipynb> [--doc-id <id>]
+ *   bun run cat-harness-tools/scripts/notebook-structure.ts -o <library-dir> <file.ipynb> [--doc-id <id>]
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";

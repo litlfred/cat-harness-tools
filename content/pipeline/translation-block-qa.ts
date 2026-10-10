@@ -56,9 +56,9 @@
  * absence: no sidecar, and the icon reads `TR ·` — not swept.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/translation-block-qa.ts                 # write
- *   bun run cat-harness/content/pipeline/translation-block-qa.ts --check [--against <ref>]   # judge, write nothing
- *   bun run cat-harness/content/pipeline/translation-block-qa.ts --root <dir> --locales fr,es
+ *   bun run cat-harness-tools/content/pipeline/translation-block-qa.ts                 # write
+ *   bun run cat-harness-tools/content/pipeline/translation-block-qa.ts --check [--against <ref>]   # judge, write nothing
+ *   bun run cat-harness-tools/content/pipeline/translation-block-qa.ts --root <dir> --locales fr,es
  *
  * ## `--check` computes and judges (bean `oqe3`)
  *

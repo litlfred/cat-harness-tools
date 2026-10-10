@@ -336,7 +336,7 @@ export function injectBlockActions(
   return { html: out, inserted };
 }
 
-/** `bun run cat-harness/src/core/edit-links.ts --write-asset` regenerates the published runtime. */
+/** `bun run cat-harness-tools/src/core/edit-links.ts --write-asset` regenerates the published runtime. */
 if (import.meta.main && process.argv.includes("--write-asset")) {
   const { writeFileSync } = await import("node:fs");
   const { readDeclaration, siteDir } = await import("@litlfred/cat-harness/schemas/cat-harness.js");

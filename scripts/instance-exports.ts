@@ -43,8 +43,8 @@
  * export does. Policy: `instance-publication` §"The schema".
  *
  * Usage:
- *   bun run cat-harness/scripts/instance-exports.ts --out-dir ./_site [--base-url URL]
- *   bun run cat-harness/scripts/instance-exports.ts --list
+ *   bun run cat-harness-tools/scripts/instance-exports.ts --out-dir ./_site [--base-url URL]
+ *   bun run cat-harness-tools/scripts/instance-exports.ts --list
  */
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

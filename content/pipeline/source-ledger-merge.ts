@@ -34,9 +34,9 @@
  *
  * ## Usage
  *
- *   bun run cat-harness/content/pipeline/source-ledger-merge.ts findings/*.json
- *   bun run cat-harness/content/pipeline/source-ledger-merge.ts findings/*.json --write
- *   bun run cat-harness/content/pipeline/source-ledger-merge.ts findings/*.json --write --create-beans
+ *   bun run cat-harness-tools/content/pipeline/source-ledger-merge.ts findings/*.json
+ *   bun run cat-harness-tools/content/pipeline/source-ledger-merge.ts findings/*.json --write
+ *   bun run cat-harness-tools/content/pipeline/source-ledger-merge.ts findings/*.json --write --create-beans
  *
  * @module content/pipeline/source-ledger-merge
  */

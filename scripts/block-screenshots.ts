@@ -242,7 +242,7 @@ export async function run(o: { changeset: string; base: string; head: string; ou
   return file;
 }
 
-const USAGE = `usage: bun run cat-harness/scripts/block-screenshots.ts
+const USAGE = `usage: bun run cat-harness-tools/scripts/block-screenshots.ts
   --changeset <changeset.json> --base <main site dir> --head <preview site dir> --out <site dir>
   --changeset <changeset.json> --count   print how many changed blocks would be pictured, and stop
                                           (so a caller installs a browser only when there is work)

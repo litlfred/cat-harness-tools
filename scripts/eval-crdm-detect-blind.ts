@@ -24,8 +24,8 @@
  *     agreement, Cohen's kappa, and each disagreement with both reasons.
  *
  * Usage:
- *   bun run cat-harness/scripts/eval-crdm-detect-blind.ts pack /tmp/blind
- *   bun run cat-harness/scripts/eval-crdm-detect-blind.ts agree /tmp/blind /tmp/blind/labels.json
+ *   bun run cat-harness-tools/scripts/eval-crdm-detect-blind.ts pack /tmp/blind
+ *   bun run cat-harness-tools/scripts/eval-crdm-detect-blind.ts agree /tmp/blind /tmp/blind/labels.json
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

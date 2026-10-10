@@ -45,8 +45,8 @@
  *   failure this generator exists to have made impossible.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-upload-step-docs.ts
- *   bun run cat-harness/scripts/gen-upload-step-docs.ts --check
+ *   bun run cat-harness-tools/scripts/gen-upload-step-docs.ts
+ *   bun run cat-harness-tools/scripts/gen-upload-step-docs.ts --check
  *
  * @module cat-harness/scripts/gen-upload-step-docs
  * @covers tools, processes
@@ -265,7 +265,7 @@ export function render(model: ProcessModel, step: ProcessNode, matched: ToolDefi
   L.push(
     "> Generated from the **Tool documentation** and from the process diagram. " +
       "Nothing here is authored on this page: edit the Tool node or the `.bpmn` and re-run " +
-      "`bun run cat-harness/scripts/gen-upload-step-docs.ts`.",
+      "`bun run cat-harness-tools/scripts/gen-upload-step-docs.ts`.",
   );
   L.push("");
   L.push("## Where this step sits");
@@ -330,7 +330,7 @@ async function main(): Promise<void> {
     }
     console.error(
       `✗ ${OUT} is ${current === null ? "missing" : "stale"}.\n` +
-        `Run \`bun run cat-harness/scripts/gen-upload-step-docs.ts\` and commit.`,
+        `Run \`bun run cat-harness-tools/scripts/gen-upload-step-docs.ts\` and commit.`,
     );
     process.exitCode = 1;
     return;

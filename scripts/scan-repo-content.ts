@@ -50,8 +50,8 @@
  * diagram (`document-ingestion.bpmn`) and its own gate.
  *
  * Usage:
- *   bun run cat-harness/scripts/scan-repo-content.ts [dir]           # report
- *   bun run cat-harness/scripts/scan-repo-content.ts [dir] --json    # facts
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir]           # report
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --json    # facts
  *
  * @module scripts/scan-repo-content
  */

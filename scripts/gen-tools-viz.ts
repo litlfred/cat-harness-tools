@@ -42,8 +42,8 @@
  * which would then be free to disagree with the one the server uses.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-tools-viz.ts
- *   bun run cat-harness/scripts/gen-tools-viz.ts --check
+ *   bun run cat-harness-tools/scripts/gen-tools-viz.ts
+ *   bun run cat-harness-tools/scripts/gen-tools-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";

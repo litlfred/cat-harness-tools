@@ -28,7 +28,7 @@
  * It refuses a site that would write into a reserved path, before touching
  * anything.
  *
- * Usage: bun run cat-harness/scripts/publish-main-site.ts --site _site --pages pages
+ * Usage: bun run cat-harness-tools/scripts/publish-main-site.ts --site _site --pages pages
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";

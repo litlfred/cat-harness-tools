@@ -7,8 +7,8 @@
  * @covers none — a GATE the deploy waits on, not an audit: it decides when the stage job may push, and judges nothing else
  *
  * ```sh
- * bun run cat-harness/scripts/staging-push-gate.ts gate --dir pages --queued-at "$QUEUED_AT"
- * bun run cat-harness/scripts/staging-push-gate.ts comment --state queued --dir pages --out body.md
+ * bun run cat-harness-tools/scripts/staging-push-gate.ts gate --dir pages --queued-at "$QUEUED_AT"
+ * bun run cat-harness-tools/scripts/staging-push-gate.ts comment --state queued --dir pages --out body.md
  * ```
  *
  * ## Why this exists — issues #1868 and #1956, bean `j27s`

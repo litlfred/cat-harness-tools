@@ -11,7 +11,7 @@
  * `schemas/tool-profile.ts`; this is their gate. It resolves nothing and
  * downloads nothing — the resolver is step 2.
  *
- *   bun run cat-harness/scripts/tool-releases.ts --check
+ *   bun run cat-harness-tools/scripts/tool-releases.ts --check
  *
  * Exit 0 clean · 1 a finding · 2 nothing to check (no release anywhere is
  * `could not determine`, never a pass).

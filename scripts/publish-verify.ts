@@ -11,7 +11,7 @@
  * `processes/sdlc/publish-alert.bpmn`, which every failing step after the publish
  * button shares.
  *
- *   bun run cat-harness/scripts/publish-verify.ts --dir ./_site [--report out.md] [--base <url>]... [--instance <dir>] [--search-index borrowed]
+ *   bun run cat-harness-tools/scripts/publish-verify.ts --dir ./_site [--report out.md] [--base <url>]... [--instance <dir>] [--search-index borrowed]
  *
  * Exit 0 every in-scope document passed · 1 a verifier found a failure ·
  * 2 could not tell (nothing to verify, or a verifier could not run). The

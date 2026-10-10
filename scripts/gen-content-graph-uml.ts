@@ -31,7 +31,7 @@
  * ```
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-content-graph-uml.ts --root <content dir> --out <dir> \
+ *   bun run cat-harness-tools/scripts/gen-content-graph-uml.ts --root <content dir> --out <dir> \
  *     [--status proof-objects.json] [--check]
  *
  * The platform carries no paper, so it is run from a folio, against that
