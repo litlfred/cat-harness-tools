@@ -54,7 +54,7 @@ function instance(dirs: Array<Record<string, unknown>>): string {
   writeFileSync(
     join(root, "fixture.json"),
     JSON.stringify(
-      { $schema: "folio-harness/v1", name: "fixture", directories: dirs },
+      { $schema: "cat-harness-declaration/1.0.0", name: "fixture", directories: dirs },
       null,
       2,
     ),
