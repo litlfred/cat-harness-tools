@@ -138,6 +138,17 @@ export interface RailOptions {
    */
   navbarRow?: unknown;
   /**
+   * THE ICON ROW'S DATA FROM A SHARED FILE, not inlined — with
+   * {@link emitRailData} only. The row is the same on every page a pass rails
+   * alike (measured on a folio site, 2026-10-10: 1,956 B of byte-identical
+   * JSON on each of 434 pages, 849 KB of the 1.76 MB of railed HTML), so it is
+   * written once as `assets/navbar/row-<hash>.js`, beside the rail's own
+   * shared data, and the page keeps an EMPTY `#fa-navbar-row` that names it.
+   * The same class `kg-render.js`'s header records for the translation index.
+   * See {@link withNavbarRow} for what a reader sees when that file fails.
+   */
+  shareNavbarRow?: boolean;
+  /**
    * What the page's own section is CALLED — the visualiser's name, `todos` on
    * `/todos/`. Absent on a mounted document, whose section is its "Contents".
    */
@@ -237,7 +248,13 @@ export function injectRail(html: string, o: RailOptions): string | undefined {
   const root = o.assetRoot ?? o.toRoot;
   if (o.emitRailData) {
     const railed = withSharedRail(html, o, root, documentIndex);
-    return railed === undefined ? undefined : withNavbarRow(railed, o.navbarRow, { root, ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}) });
+    return railed === undefined
+      ? undefined
+      : withNavbarRow(railed, o.navbarRow, {
+          root,
+          ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}),
+          ...(o.shareNavbarRow ? { shared: { emit: o.emitRailData, toRoot: o.toRoot } } : {}),
+        });
   }
   // A page that asked for LINKED assets gets them linked, whatever the caller
   // would otherwise inline: the page's declaration is the decision.
@@ -264,6 +281,39 @@ export const NAVBAR_ROW_JS = "assets/js/navbar-row.js";
 export const NAVBAR_ROW_CSS = "assets/css/navbar-row.css";
 /** The attribute an INLINED copy of the row's script and style carries. */
 export const NAVBAR_ROW_INLINE = "data-fa-navbar-row-inline";
+/** The attribute an EMPTY `#fa-navbar-row` carries: the shared file that fills it. */
+export const NAVBAR_ROW_SRC = "data-fa-row-src";
+
+/**
+ * The row's shared file: a script that fills the page's empty island with the
+ * row's JSON (as text — the readers parse it, exactly as they parse an inlined
+ * one) and drops the name, so a filled island and an inlined one look alike.
+ */
+export function navbarRowAsset(json: string): { name: string; file: string; body: string } {
+  const name = `row-${contentHash(json)}`;
+  const body =
+    `(function(n){if(n&&n.getAttribute(${JSON.stringify(NAVBAR_ROW_SRC)})===${JSON.stringify(name)}&&!n.textContent)` +
+    `{n.textContent=${JSON.stringify(json)};n.removeAttribute(${JSON.stringify(NAVBAR_ROW_SRC)})}})` +
+    `(document.getElementById(${JSON.stringify(NAVBAR_ROW_ID)}));\n`;
+  return { name, file: `${RAIL_DATA_DIR}/${name}.js`, body };
+}
+
+/**
+ * The row's JSON as a browser sees it once the shared file ran — for an AUDIT
+ * or a test. Inlined, it is the island's text; shared, `readFile(file)` returns
+ * the file `navbarRowAsset` wrote. `undefined` when the page has no island or
+ * the file cannot be read.
+ */
+export function navbarRowJsonOf(html: string, readFile: (file: string) => string | undefined): string | undefined {
+  const m = new RegExp(`<script type="application/json" id="${NAVBAR_ROW_ID}"([^>]*)>([\\s\\S]*?)</script>`).exec(html);
+  if (!m) return undefined;
+  const src = new RegExp(`${NAVBAR_ROW_SRC}="([^"]+)"`).exec(m[1]!);
+  if (!src) return m[2];
+  const body = readFile(`${RAIL_DATA_DIR}/${src[1]}.js`);
+  if (body === undefined) return undefined;
+  const lit = /n\.textContent=("(?:[^"\\]|\\.)*")/.exec(body);
+  return lit ? (JSON.parse(lit[1]!) as string) : undefined;
+}
 
 /**
  * The navbar row's data block, written right after the opening `<body>` —
@@ -282,10 +332,17 @@ export const NAVBAR_ROW_INLINE = "data-fa-navbar-row-inline";
 export function withNavbarRow(
   html: string,
   row: unknown,
-  at?: { root: string; dataRoot?: string; inline?: { js: string; css: string } },
+  at?: {
+    root: string;
+    dataRoot?: string;
+    inline?: { js: string; css: string };
+    /** Write the row's data ONCE as a shared file — {@link RailOptions.shareNavbarRow}. */
+    shared?: { emit: (file: string, body: string) => void; toRoot: string };
+  },
 ): string {
   if (row === undefined) return html;
   let out = html;
+  let sharedTag = "";
   if (!out.includes(`id="${NAVBAR_ROW_ID}"`)) {
     const body = /<body\b[^>]*>/i.exec(out);
     if (!body) return html;
@@ -296,7 +353,28 @@ export function withNavbarRow(
     // INLINED script has no address of its own to derive one from. `dataRoot`
     // when the row's own paths live on a different site from its code.
     const root = at ? ` data-fa-root="${(at.dataRoot ?? at.root).replace(/"/g, "&quot;")}"` : "";
-    out = out.slice(0, pos) + `<script type="application/json" id="${NAVBAR_ROW_ID}"${root}>${json}</script>` + out.slice(pos);
+    if (at?.shared) {
+      // The island stays — every reader finds the row where it always did, and
+      // `data-fa-root` stays per page — but EMPTY, naming the file that fills
+      // it. That file is a deferred script placed ahead of every reader, so
+      // by the time `navbar-row.js` or `docs-ui.js` reads the island it holds
+      // the row. Left empty WITH the name, the load failed, and the readers
+      // say so instead of reading it as "declared none" (an empty island).
+      const asset = navbarRowAsset(json);
+      at.shared.emit(asset.file, asset.body);
+      out = out.slice(0, pos) + `<script type="application/json" id="${NAVBAR_ROW_ID}"${root} ${NAVBAR_ROW_SRC}="${asset.name}"></script>` + out.slice(pos);
+      sharedTag = `<script src="${at.shared.toRoot}/${asset.file}" defer></script>`;
+    } else {
+      out = out.slice(0, pos) + `<script type="application/json" id="${NAVBAR_ROW_ID}"${root}>${json}</script>` + out.slice(pos);
+    }
+  }
+  if (sharedTag) {
+    // AHEAD of any reader already linked, else before `</head>`: deferred
+    // scripts run in document order, and the readers are deferred too.
+    const reader = out.search(/<script\b[^>]*(navbar-row\.js|docs-ui\.js)/i);
+    const head = /<\/head\s*>/i.exec(out);
+    const at2 = reader >= 0 ? reader : head ? head.index : -1;
+    if (at2 >= 0) out = out.slice(0, at2) + sharedTag + out.slice(at2);
   }
   if (at === undefined || out.includes(NAVBAR_ROW_JS) || out.includes(NAVBAR_ROW_INLINE)) return out;
   const tags = at.inline
