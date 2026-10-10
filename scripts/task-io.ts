@@ -256,6 +256,11 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "kg:detangle:direction": TREE_READER,
   "kg:schema:check": READ_ONLY,
   "kg:subscribe:check": READ_ONLY,
+  // read: `--check` never writes; `beans:retag` is the writer. Not skippable —
+  // the store is the mount, which the tracked-tree digest does not cover.
+  "beans:retag:check": READ_ONLY,
+  // read: `--check` compares each declaration's first key; `declarations:retag` writes.
+  "declarations:retag:check": READ_ONLY,
   "beans:notes:check": READ_ONLY, // read: `checkNotes` only reads; the writer is `beans:notes`
   "landing:data:check": TREE_READER,
   "landing:sticky:check": READ_ONLY,

@@ -42,7 +42,19 @@
  *
  * On `conflict` or `failed` the mount is left exactly as it is: the edits are
  * the only copy.
+ *
+ * ## It retags the beans first
+ *
+ * Before the splice, every bean in the mounted store gets back its
+ * `$schema: bean/1.0.0` (`beans-retag.ts`, bean `ujiv`). The `beans` CLI drops
+ * that key whenever it rewrites a bean, so without this step every claimed or
+ * updated bean would reach the branch untagged. The retag only edits files in
+ * the mount; the splice then carries them like any other edit. It is skipped on
+ * `--dry-run`, which must not write, and a retag that cannot run is reported
+ * and does not stop the push.
  */
+
+import { isAbsolute, relative, resolve } from "node:path";
 
 import {
   mountedIds,
@@ -56,6 +68,7 @@ import {
   type WriteResult,
 } from "./branch-store.js";
 import { repoRootOf } from "./state-mount.js";
+import { locateStore, retagDir } from "./beans-retag.ts";
 
 export interface PushOptions {
   repoRoot?: string;
@@ -66,7 +79,17 @@ export interface PushOptions {
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;
+  /** Retag the mounted beans before splicing (default true). */
+  retag?: boolean;
 }
+
+/**
+ * What the pre-push retag did. `skipped` says why it did not run; a store that
+ * is not among the graphs being pushed is not reported at all.
+ */
+export type RetagStep =
+  | { dir: string; added: number; foreign: string[] }
+  | { skipped: string };
 
 /**
  * One declared graph's splice, in the fan-out — the write half of
@@ -96,7 +119,35 @@ export type PushResult = {
   state: "no-mount" | "nothing" | "would-push" | "pushed" | "failed" | "partial";
   reason: string;
   graphs: GraphPush[];
+  /** The pre-push bean retag, when the bean store is one of the graphs pushed. */
+  retag?: RetagStep;
 };
+
+/**
+ * Retag the bean store when it lies inside one of `locations`. Returns
+ * `undefined` when no location being pushed holds it.
+ */
+export function retagBeansBeforePush(root: string, locations: readonly TipLocation[]): RetagStep | undefined {
+  let where: ReturnType<typeof locateStore>;
+  try {
+    where = locateStore(root);
+  } catch (e) {
+    return { skipped: `could not locate the bean store: ${(e as Error).message}` };
+  }
+  if (!("dir" in where)) return undefined;
+  const dir = resolve(where.dir);
+  const inside = locations.some((l) => {
+    const rel = relative(resolve(root, l.path), dir);
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  });
+  if (!inside) return undefined;
+  try {
+    const r = retagDir(dir, { write: true });
+    return { dir, added: r.added.length, foreign: r.foreign.map((f) => f.file) };
+  } catch (e) {
+    return { skipped: `retag failed: ${(e as Error).message}` };
+  }
+}
 
 /**
  * Splice back every declared tip-keyed graph, each to the branch its own
@@ -184,7 +235,12 @@ export function pushState(opts: PushOptions = {}): PushResult {
     const what = opts.id === undefined ? "no graph is declared at a branch tip or mounted here" : `\`${opts.id}\` is neither declared at a branch tip nor mounted here`;
     return { state: "no-mount", reason: `${what}; run \`bun run cat state:mount\` first`, graphs: [] };
   }
-  return pushFanOut(root, locations, opts);
+  // Only a mounted graph has files to retag; an unmounted one is refused by
+  // the fan-out below with its own remedy.
+  const mounted = new Set(mountedIds(root));
+  const retag = opts.dryRun || opts.retag === false ? undefined : retagBeansBeforePush(root, locations.filter((l) => mounted.has(l.id)));
+  const result = pushFanOut(root, locations, opts);
+  return retag ? { ...result, retag } : result;
 }
 
 /** One row per graph, so a reader sees WHICH branch a splice landed on. */
@@ -197,8 +253,18 @@ function graphTable(graphs: GraphPush[]): string[] {
   return L;
 }
 
+/** One line on the pre-push retag, or none when it had nothing to say. */
+function retagLine(t: RetagStep | undefined): string[] {
+  if (t === undefined) return [];
+  if ("skipped" in t) return [`⚠️ Bean retag did not run: ${t.skipped}.`, ""];
+  const out: string[] = [];
+  if (t.added > 0) out.push(`Retagged ${t.added} bean(s) with \`$schema: bean/1.0.0\` before the splice.`);
+  if (t.foreign.length > 0) out.push(`⚠️ ${t.foreign.length} bean(s) carry a foreign \`$schema\`, left as they are: ${t.foreign.join(", ")}.`);
+  return out.length ? [...out, ""] : [];
+}
+
 export function report(r: PushResult): string {
-  const L: string[] = ["## State push", ""];
+  const L: string[] = ["## State push", "", ...retagLine(r.retag)];
   // The fan-out: one splice per declared graph, each to its own branch.
   if (r.graphs.length) {
     const stuck = r.graphs.filter((g) => !isSettled(g));

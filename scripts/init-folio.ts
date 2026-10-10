@@ -36,7 +36,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { INDEX_CONFIG_FILENAME, INDEX_CONFIG_SCHEMA, formatIndexConfig, withIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
@@ -432,6 +432,8 @@ function instanceDeclaration(o: MaybeFolio): string {
   const state = INSTANCE_STATE_GRAPHS.map((g) => stateEntry(o.slug, g));
   return JSON.stringify(
     {
+      // First, so a reader sees what the file is before what it says (bean `ujiv`).
+      $schema: CAT_HARNESS_DECLARATION_SCHEMA_TAG,
       name: o.slug,
       title: o.title,
       // A contentless instance declares no `folio` directory: declaring one it
@@ -1846,6 +1848,7 @@ export function initStaged(options: InitStagedOptions): InitFolioResult {
   }
 
   const declaration = {
+    $schema: CAT_HARNESS_DECLARATION_SCHEMA_TAG,
     name: o.slug,
     title: o.title,
     repository: o.repository,
