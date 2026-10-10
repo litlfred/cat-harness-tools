@@ -29,6 +29,23 @@
  * through it. `check:visualiser-routes` uses it to refuse a generator that
  * wrote OUTSIDE the routes its Tool is declared to render.
  *
+ * ## The locale segment (folio-assistant#2527)
+ *
+ * The owner, 2026-10-05: *"ALL rendered visualizer pages for the CDN need to
+ * follow /<locale>/<declaring>/<kind>/…"*. So a visualiser's pages are written
+ * at `<site>/<locale>/<harness>/<visualiser>/…`, and {@link pageParts} is the
+ * ONE place the locale is supplied: every helper here that answers "where is
+ * this page" goes through it, and so does every generator that builds its own
+ * route parts. A second locale is one change there, not one per caller.
+ *
+ * The address without the locale, `<harness>/<visualiser>/…`, keeps working
+ * (bean `t4xb`: it "always works"): `compose-docs.ts` writes a forwarding page
+ * there for every page under the localised route ({@link forwardingParts}).
+ *
+ * A page committed at that old address and not yet regenerated is still READ
+ * where it is ({@link existingPageDir}), so a tile keeps opening a page that
+ * exists while its writer has not run since the move.
+ *
  * @module scripts/viewer-declarations
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -49,6 +66,7 @@ import {
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
@@ -244,19 +262,67 @@ export function siteOwnerDir(repoRoot: string): string {
   }
 }
 
-/** The absolute directory a visualiser view is written into: `<site>/<route>`. */
+// ── Where a page is ───────────────────────────────────────────────────────
+
+/**
+ * The locale the platform's visualiser pages are written in: today only
+ * `DEFAULT_LOCALE` (`en`), because the pages' chrome is English and a locale
+ * segment with nothing translated behind it would claim a translation that
+ * does not exist.
+ */
+export const PAGE_LOCALE: string = DEFAULT_LOCALE;
+
+/**
+ * A view's route parts WITH its locale — `parts` as given when they name one,
+ * else under {@link PAGE_LOCALE}. The one place a page's locale is supplied
+ * (see the module comment); `visualiserRoute` of the result is
+ * `en/<harness>/<visualiser>/…`.
+ */
+export function pageParts<T extends VisualiserRouteParts>(parts: T): T & { locale: string } {
+  return { ...parts, locale: parts.locale ?? PAGE_LOCALE };
+}
+
+/**
+ * The same view's route WITHOUT the locale: the address its page had before
+ * the locale segment, `<harness>/<visualiser>/…`, where `compose-docs.ts`
+ * writes a forwarding page so that address keeps working (bean `t4xb`).
+ */
+export function forwardingParts<T extends VisualiserRouteParts>(parts: T): Omit<T, "locale"> {
+  const { locale: _locale, ...rest } = parts;
+  return rest;
+}
+
+/** The absolute directory a visualiser view is written into: `<site>/<route>`, the route exactly as `parts` give it. */
 export function visualiserPageDir(site: string, parts: VisualiserRouteParts): string {
   return join(site, ...visualiserRoute(parts).split("/").filter(Boolean));
+}
+
+const holdsPage = (dir: string): boolean => existsSync(join(dir, "index.html")) || existsSync(join(dir, "index.md"));
+
+/**
+ * The directory a view's page IS in under `site`: its localised directory
+ * ({@link pageParts}) when that holds an index page, else the directory at its
+ * old address ({@link forwardingParts}) when THAT does — a page committed
+ * before the locale segment whose writer has not run since. `undefined` when
+ * neither holds one.
+ */
+export function existingPageDir(site: string, parts: VisualiserRouteParts): string | undefined {
+  const at = visualiserPageDir(site, pageParts(parts));
+  if (holdsPage(at)) return at;
+  const old = visualiserPageDir(site, forwardingParts(parts));
+  return holdsPage(old) ? old : undefined;
 }
 
 /**
  * The page file of a view, REPOSITORY-relative — `index.html`, or `index.md`
  * when that is what is on disk (Jekyll builds both to the same URL).
  * `index.html` when neither is there, which is what a publish-time page
- * (`writer`, bean `0b8c`) will be.
+ * (`writer`, bean `0b8c`) will be. Under the localised route
+ * ({@link pageParts}), unless only the old address holds the page
+ * ({@link existingPageDir}).
  */
 export function visualiserPageRef(repoRoot: string, parts: VisualiserRouteParts, site: string = siteOwnerDir(repoRoot)): string {
-  const dir = visualiserPageDir(site, parts);
+  const dir = existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
   const file = existsSync(join(dir, "index.md")) && !existsSync(join(dir, "index.html")) ? "index.md" : "index.html";
   return renderedPath(repoRoot, join(dir, file));
 }
@@ -277,37 +343,57 @@ export function handledDirectories(
 
 /**
  * The directory a one-page viewer writes into, for the visualiser `tool`
- * draws for this harness: `<site>/<harness>/<id>/`. Replaces the old
+ * draws for this harness: `<site>/<locale>/<harness>/<id>/`. Replaces the old
  * `conventionalPage`, which composed `<directory basename>/index.md` from the
  * handled directory — a URL the generator chose rather than the declaration.
  */
 export function visualiserPageFor(harnessRoot: string, tool: string, site: string): { dir: string; visualiser: DeclaredVisualiser } {
   const v = visualiserFor(harnessRoot, tool);
-  return { dir: visualiserPageDir(site, { harness: v.harness, visualiser: v.id }), visualiser: v };
+  return { dir: visualiserPageDir(site, pageParts({ harness: v.harness, visualiser: v.id })), visualiser: v };
 }
 
 /**
  * Where a one-page viewer writes, RELATIVE TO THE SITE DIRECTORY, and the
  * relative path back to the site root from there: the visualiser `tool`
- * draws for the harness at `harnessRoot`, at `<harness>/<id>/<file>`.
+ * draws for the harness at `harnessRoot`, at `<locale>/<harness>/<id>/<file>`.
+ * `up` counts the locale segment, so it is `../../../` for the full view.
  */
 export function visualiserSitePath(harnessRoot: string, tool: string, file = "index.md"): { rel: string; up: string; visualiser: DeclaredVisualiser } {
   const v = visualiserFor(harnessRoot, tool);
-  const parts = { harness: v.harness, visualiser: v.id };
+  const parts = pageParts({ harness: v.harness, visualiser: v.id });
   return { rel: visualiserRoute({ ...parts, asset: file }), up: siteRootFrom(parts), visualiser: v };
 }
 
 /**
- * The SITE-RELATIVE route prefix, `<harness>/<id>`, of the visualiser `tool`
- * draws for the harness at `harnessRoot` — for a generator that places a full
- * view and per-sub-graph views beneath it (`viewerPlacement(site, route)`,
- * `${route}/${subject}`). `undefined` when the harness declares none: a
- * generator then writes nothing, because no declaration means no route.
+ * The SITE-RELATIVE route prefix of the visualiser `tool` draws for the
+ * harness at `harnessRoot`, WITHOUT the locale: `<harness>/<id>`. That is the
+ * address its forwarding page sits at, and what a writer that lays its pages
+ * out per locale itself prefixes with each locale (core's `glossary-page.ts`
+ * writes `<locale>/<route>/` for every locale it has). A generator writing the
+ * platform's pages asks {@link declaredPageRoute}. `undefined` when the
+ * harness declares none.
  */
 export function declaredRoute(harnessRoot: string, tool: string): string | undefined {
   try {
     const v = visualiserFor(harnessRoot, tool);
     return visualiserRoute({ harness: v.harness, visualiser: v.id }).replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The SITE-RELATIVE route prefix a generator writes the visualiser `tool`
+ * draws for the harness at `harnessRoot` under, `<locale>/<harness>/<id>` — for
+ * a generator that places a full view and per-sub-graph views beneath it
+ * (`viewerPlacement(site, route)`, `${route}/${subject}`). `undefined` when
+ * the harness declares none: a generator then writes nothing, because no
+ * declaration means no route.
+ */
+export function declaredPageRoute(harnessRoot: string, tool: string): string | undefined {
+  try {
+    const v = visualiserFor(harnessRoot, tool);
+    return visualiserRoute(pageParts({ harness: v.harness, visualiser: v.id })).replace(/\/$/, "");
   } catch {
     return undefined;
   }
@@ -386,7 +472,7 @@ export function viewersOf(
   for (const v of declaredVisualisers(repoRoot)) {
     if (!covers(v, d, owner, absDir, repoRoot)) continue;
     site ??= siteOwnerDir(repoRoot);
-    const full = { harness: v.harness, visualiser: v.id };
+    const full = pageParts({ harness: v.harness, visualiser: v.id });
     // The sub-graph a directory's tile opens. `instance`: the owner's name.
     // `directory`: the directory id — qualified by its instance first when
     // another harness owns the visualiser, because a corpus-wide view keeps
