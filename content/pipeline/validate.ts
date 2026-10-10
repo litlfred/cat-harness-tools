@@ -593,6 +593,23 @@ function checkMathLinks(
  * @param objectsDir - Paper directory or flat directory with .ts + .md + .lean files
  * @returns Validation result with issues
  */
+/**
+ * Every section label in a chapter, at every depth. A section's
+ * `subsections` hold sections in their own right, so a cross-reference
+ * may name a nested one; collecting only the top level reported a
+ * resolvable `#sec:` link as undefined.
+ */
+export function sectionLabels(sections: Chapter["sections"]): string[] {
+  const out: string[] = [];
+  for (const sec of sections) {
+    if (!("label" in sec)) continue;
+    if (sec.label) out.push(sec.label);
+    const subs = (sec as Section).subsections;
+    if (subs?.length) out.push(...sectionLabels(subs));
+  }
+  return out;
+}
+
 export async function validateObjects(
   objectsDir: string,
   opts: { strict?: boolean } = {},
@@ -653,11 +670,11 @@ export async function validateObjects(
         allLabels.add(chapter.label);
       }
     }
-    for (const sec of chapter.sections) {
-      if ("label" in sec && sec.label) {
-        // Intentional aliasing with intro-block labels — skip-add only.
-        allLabels.add(sec.label);
-      }
+    // Every section label, subsections included: a `[text](#sec:…)` link may
+    // target a nested section, and the blocks loop above already descends.
+    for (const label of sectionLabels(chapter.sections)) {
+      // Intentional aliasing with intro-block labels — skip-add only.
+      allLabels.add(label);
     }
   } else if (manifestKind === "paper" && manifestPath && manifestData) {
     // ── Paper mode: manifest already validated by detectManifestKind ──
@@ -733,11 +750,7 @@ export async function validateObjects(
             allLabels.add(chapter.label);
           }
         }
-        for (const sec of chapter.sections) {
-          if ("label" in sec && sec.label) {
-            allLabels.add(sec.label);
-          }
-        }
+        for (const label of sectionLabels(chapter.sections)) allLabels.add(label);
       } catch (e) {
         issues.push({
           level: "error",
