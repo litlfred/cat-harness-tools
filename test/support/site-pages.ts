@@ -19,6 +19,7 @@ import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 import {
   declaredVisualisers,
+  existingPageDir,
   pageParts,
   siteOwnerDir,
   visualiserPageDir,
@@ -27,7 +28,9 @@ import {
 /**
  * The absolute directory of the visualiser `id` declared by the harness at
  * `harnessRoot`, under the page locale: `<site>/<locale>/<harness>/<id>/`,
- * or a sub-graph or asset below it when `rest` names one.
+ * or a sub-graph below it when `rest` names one. A page committed at its old,
+ * unlocalised address whose writer has not run since is found there, as
+ * `visualiserPageRef` finds it (`existingPageDir`).
  */
 export function declaredPageDir(
   harnessRoot: string,
@@ -39,7 +42,9 @@ export function declaredPageDir(
   if (v === undefined) {
     throw new Error(`${harnessRoot}: declares no visualiser \`${id}\` (its \`visualisers\` in the instance declaration)`);
   }
-  return visualiserPageDir(siteOwnerDir(repoRoot), pageParts({ harness: v.harness, visualiser: v.id, ...rest }));
+  const site = siteOwnerDir(repoRoot);
+  const parts = { harness: v.harness, visualiser: v.id, ...rest };
+  return existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
 }
 
 /** The absolute path of `file` (default `index.html`) in {@link declaredPageDir}. */

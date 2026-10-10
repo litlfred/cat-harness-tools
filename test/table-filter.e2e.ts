@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 /**
  * The site-wide table filter, as a browser builds it (bean 0fua).
@@ -113,7 +114,7 @@ test.describe("table filter", () => {
  * inherit. The light one is the theme's (#7253ed, about 5.0:1 on white).
  */
 const GLOSSARY = readFileSync(
-  join(ROOT, SITE, "cat-harness/auto-docs/glossary/swimlane-glossary/index.html"),
+  declaredPagePath(ROOT, "auto-docs", "index.html", { subgraph: "glossary/swimlane-glossary" }),
   "utf8",
 );
 /** What Jekyll leaves of the themed page: no front matter, no raw tags. */
