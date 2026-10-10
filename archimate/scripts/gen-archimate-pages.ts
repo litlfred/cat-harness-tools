@@ -15,11 +15,16 @@
  * staging build uses it, since a large model is thousands of nodes and nobody
  * should commit them. The DATA (every `.jsonld`, `.json`, `model.json`, drawn
  * view and the loader) is at the path the graph has in the instance,
- * `<site>/<graph path>/…`, so no IRI moves; the PAGES are under the locale,
- * `<site>/en/<graph path>/…` (folio-assistant#2527: every rendered page is
- * under `/<locale>/`). Each page reaches its data, and each drawn view its
- * pages, by a relative link across the two trees, so a preview under a
- * staging slug works the same.
+ * `<site>/<graph path>/…`, so no IRI moves. The PAGES are at the route of the
+ * visualiser the instance DECLARES for this Tool, `<site>/en/<harness>/<id>/…`
+ * (`visualiserRoute`; owner 2026-10-09, every visualiser page at
+ * `<base>/<harness>/<visualiser>`, and folio-assistant#2527, under the
+ * locale). An instance that declares none gets no site pages: the run stops
+ * and says so, because a generator writing to a route nobody declared is what
+ * the routes gate exists to end. Each page carries `rendered-by`, so
+ * `check:visualiser-routes` can see it. Each page reaches its data, and each
+ * drawn view its pages, by a relative link across the two trees, so a preview
+ * under a staging slug works the same.
  *
  * Without `--out` they are written into the graph itself, as
  * `gen-openapi-pages.ts` does, and `--check` gates them: pages beside their
@@ -61,10 +66,13 @@ import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archim
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
-import { PAGE_LOCALE } from "../../scripts/viewer-declarations.ts";
+import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "archimate-page";
+/** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which an instance names in its `visualisers`. */
+export const TOOL_ID = "archimate-pages";
 const LOADER = "assets/archimate.js";
 const STYLE = "assets/archimate.css";
 const TEMPLATES = join(TOOLS_ROOT, "archimate", "scripts", "templates");
@@ -79,23 +87,56 @@ export interface Written {
   /** Path under the graph's directory. */
   path: string;
   content: string;
-  /** A rendered page (an `index.html`), as opposed to data or the loader: what moves under the locale in a site. */
+  /** A rendered page (an `index.html`), as opposed to data or the loader: what goes to the declared route in a site. */
   page?: true;
+}
+
+/** Where a run's files go: the data at the graph's path, and the pages — in a site — at the declared route. */
+export interface Layout {
+  /** The graph's path in the instance, with no trailing slash: where the data is, in the graph and in a site. */
+  graphPath: string;
+  /**
+   * Site-relative, with no trailing slash: where the PAGES are in a site,
+   * `<locale>/<harness>/<visualiser id>`. In the graph (no site) it is the
+   * graph's path, since the pages sit beside their data.
+   */
+  pageRoot: string;
 }
 
 /**
  * Where a written file goes in a SITE being built (`--out`), site-relative:
- * a page under the locale, `<locale>/<graph path>/<path>`; data at the graph's
- * own path, `<graph path>/<path>` (folio-assistant#2527).
+ * a page at the declared route, `<pageRoot>/<path>`; data at the graph's own
+ * path, `<graph path>/<path>`.
  */
-export function sitePathOf(graphPath: string, f: Written): string {
-  return posix.join(...(f.page ? [PAGE_LOCALE] : []), graphPath, f.path);
+export function sitePathOf(layout: Layout, f: Written): string {
+  return posix.join(f.page ? layout.pageRoot : layout.graphPath, f.path);
 }
 
 interface Declaration {
   name: string;
   iriBase?: string;
   directories: Array<{ id: string; served?: boolean; path: string }>;
+  visualisers?: Array<{ id: string; renderedBy: string; covers?: string[] }>;
+}
+
+/**
+ * The route an instance declares for these pages: its one visualiser
+ * `renderedBy` {@link TOOL_ID}, or — when it declares several — the one that
+ * covers the archimate directory. Throws when there is none to choose, and
+ * says what to declare.
+ */
+export function declaredPageRoot(decl: Declaration, directory: string): string {
+  const mine = (decl.visualisers ?? []).filter((v) => v.renderedBy === TOOL_ID);
+  const chosen = mine.length === 1 ? mine[0] : mine.find((v) => v.covers?.includes(directory));
+  if (chosen === undefined) {
+    throw new Error(
+      `${decl.name}: declares ${mine.length === 0 ? "no" : mine.length} visualiser(s) rendered by \`${TOOL_ID}\`` +
+        `${mine.length > 1 ? `, and none covers "${directory}"` : ""} — declare one in its \`visualisers\`, ` +
+        `e.g. { "id": "archimate", "renderedBy": "${TOOL_ID}", "covers": ["${directory}"] } ` +
+        "(cat-harness/schemas/cat-harness.ts, HarnessVisualiserSchema); the pages are written at its route",
+    );
+  }
+  return visualiserRoute(pageParts({ harness: decl.name, visualiser: chosen.id })).replace(/\/$/, "");
 }
 
 /** Where the instance's IRIs start: its own `iriBase`, else the platform's site under its name. */
@@ -110,7 +151,7 @@ export function iriBaseOf(decl: Declaration): string {
  * its data and loader, and each drawn view its pages, across the locale (see
  * {@link sitePathOf}); otherwise everything sits together in the graph.
  */
-export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; site?: boolean } = {}): { graphPath: string; files: Written[] } {
+export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; site?: boolean } = {}): Layout & { files: Written[] } {
   const config = readConfig(instanceRoot);
   const dir = archimateDir(instanceRoot, config);
   const declFile = findDeclarationFile(instanceRoot);
@@ -127,19 +168,23 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     );
   }
   const graphPath = localDirOf(instanceRoot, dir).replace(/\/$/, "");
+  const site = opts.site === true;
+  const pageRoot = site ? declaredPageRoot(decl, config.directory) : graphPath;
   const base = `${iriBaseOf(decl)}${graphPath}/`;
   const files: Written[] = [];
-  const site = opts.site === true;
   // A link from a page in directory `from` (graph-relative) to `rel`, written
   // relative to that directory in the GRAPH — which is where a site keeps the
-  // data, while the page itself is under the locale.
+  // data, while the page itself is at the declared route.
   const toData = (from: string, rel: string): string =>
-    site ? posix.relative(posix.join(PAGE_LOCALE, graphPath, from), posix.join(graphPath, from, rel)) : rel;
+    site ? posix.relative(posix.join(pageRoot, from), posix.join(graphPath, from, rel)) : rel;
   // A link from a drawn view (data, in `<m>/views/`) to a page, the reverse way.
   const toPage = (from: string, rel: string): string =>
-    site ? `${posix.relative(posix.join(graphPath, from), posix.join(PAGE_LOCALE, graphPath, from, rel))}/` : rel;
+    site ? `${posix.relative(posix.join(graphPath, from), posix.join(pageRoot, from, rel))}/` : rel;
+  // In a site, every page names the Tool that drew it, which is what lets
+  // `check:visualiser-routes` hold it to the declared route.
+  const stamp = (w: Written): Written => (site ? { ...w, content: withRenderedBy(w.content, TOOL_ID) } : w);
   const page = (path: string, depth: number, title: string, jsonld: string, config: Record<string, unknown>, body: string, tail?: string): Written =>
-    thinPage(path, depth, title, jsonld, config, body, tail, toData);
+    stamp(thinPage(path, depth, title, jsonld, config, body, tail, toData));
   const json = (path: string, node: object) => {
     const text = `${JSON.stringify(node, null, 2)}\n`;
     files.push({ path: `${path}.jsonld`, content: text }, { path: `${path}.json`, content: text });
@@ -254,7 +299,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     }
   }
 
-  files.push({
+  files.push(stamp({
     path: "index.html",
     page: true,
     content:
@@ -265,12 +310,12 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       `</ul></main>\n` +
       visualiserNavDeclaration([{ label: "ArchiMate models", href: "./", items: listed.map((l): VisualiserNavEntry => ({ label: l.title, href: `${encodeURI(l.id)}/` })) }]) +
       `\n</body></html>\n`,
-  });
+  }));
   files.push(
     { path: LOADER, content: readFileSync(join(TEMPLATES, "archimate.js"), "utf8") },
     { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") },
   );
-  return { graphPath, files };
+  return { graphPath, pageRoot, files };
 }
 
 /**
@@ -385,11 +430,11 @@ if (import.meta.main) {
   const out = arg("out");
   const check = process.argv.includes("--check");
   const root = resolve(instance);
-  const { graphPath, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined });
+  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined });
   const target = out ? join(resolve(out), graphPath) : archimateDir(root, readConfig(root));
   if (out) {
     for (const f of files) {
-      const p = join(resolve(out), sitePathOf(graphPath, f));
+      const p = join(resolve(out), sitePathOf({ graphPath, pageRoot }, f));
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.content);
     }
@@ -421,6 +466,6 @@ if (import.meta.main) {
   }
   const pages = files.filter((f) => f.path.endsWith("/index.html")).length;
   const svgs = files.filter((f) => f.path.endsWith(".svg")).length;
-  const where = out ? `${relative(process.cwd(), join(resolve(out), PAGE_LOCALE, graphPath))}/ (pages) and ${relative(process.cwd(), target)}/ (data)` : `${relative(process.cwd(), target)}/`;
+  const where = out ? `${relative(process.cwd(), join(resolve(out), pageRoot))}/ (pages) and ${relative(process.cwd(), target)}/ (data)` : `${relative(process.cwd(), target)}/`;
   console.log(`${check ? "✓ current" : "wrote"}: ${instance} — ${pages} page(s), ${svgs} view drawing(s) in ${where}`);
 }
