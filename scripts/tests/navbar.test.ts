@@ -222,6 +222,16 @@ describe("the exploding menu", () => {
     expect(html).toContain(">B</span>"); // bootstrap, no avatar declared
   });
 
+  it("does not repeat a label that is its own initial (\"A A\")", () => {
+    // A glossary's letter headings put rows labelled "A", "B" … in Contents;
+    // the mark already shows the letter (owner, 2026-10-10: "don't duplicate").
+    const one: NavbarModel = { instance: "x", root: { href: "#letter-A", label: "A" } };
+    const html = navbarHtml(one);
+    expect(html).toContain('<span class="fa-nav-label"><span class="fa-nav-sr">A</span></span>');
+    // A longer label keeps its visible text beside its initial.
+    expect(navbarHtml(model)).toContain('<span class="fa-nav-label">bootstrap</span>');
+  });
+
   it("carries a declared tone through to the mark", () => {
     expect(navbarHtml(model)).toContain("hsl(268 45% 28%)");
   });
