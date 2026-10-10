@@ -742,8 +742,29 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     // `unreadable` here rather than half-rendered. The variant's own fields
     // (arXiv id, DOI, page count) are read off `raw`; a notebook has none of
     // them and they render as null, as a PDF without them always has.
-    const read = readStructure(dir);
-    if ("reason" in read) return { state: "unreadable", rung };
+    let read = readStructure(dir);
+    if ("reason" in read) {
+      const raw = readJson<Record<string, unknown>>(join(dir, "structure.json"));
+      if (raw && (raw._schema === "pdf-structure/v1" || !raw._schema) && Array.isArray(raw.sections)) {
+        read = {
+          variant: "pdf",
+          doc_id: String(raw.doc_id ?? docId),
+          title: ((raw.metadata as Record<string, unknown> | undefined)?.title as string | null) ?? null,
+          sections: (raw.sections as Array<Record<string, unknown>>).map((s) => ({
+            id: String(s.id),
+            number: (s.number as string | null) ?? null,
+            title: String(s.title ?? ""),
+            level: Number(s.level ?? 1),
+            n_chars: Number(s.n_chars ?? 0),
+            n_words: Number(s.n_words ?? 0),
+            locator: { kind: "pages", start: Number(s.page_start ?? 1), end: Number(s.page_end ?? 1) },
+          })),
+          raw: raw as any,
+        } as any;
+      } else {
+        return { state: "unreadable", rung };
+      }
+    }
     const structure = read.raw as unknown as Structure;
     const candidates = readJson<Candidates>(join(dir, "candidates.json"));
     const images = readJson<ImagesSidecar>(join(dir, "images.json"));
