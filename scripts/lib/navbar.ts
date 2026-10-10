@@ -600,6 +600,13 @@ function railTipCss(): string[] {
   ];
 }
 
+/** The TEXT an item's mark shows, when the mark is a text glyph rather than an image, a blank or a drawn path. */
+function initialOf(i: NavItem): string | undefined {
+  if (i.avatar || i.blank || i.glyphPath === BLANK_AVATAR.glyph) return undefined;
+  if (i.glyphPath && !i.icon) return undefined;
+  return i.icon ?? i.label.slice(0, 1).toUpperCase();
+}
+
 /** An item's mark: its avatar when it has one, its glyph otherwise. */
 function mark(i: NavItem, c: Ctx): string {
   // No tone behind an image that declares its ground `none` (issue #46, gap 5).
@@ -655,7 +662,14 @@ function itemHtml(i: NavItem, c: Ctx): string {
   // joins the accessible name without widening the strip.
   const sr = i.description ? `<span class="fa-nav-sr"> — ${esc(i.description)}</span>` : "";
   const q = i.qualifier ? `<span class="fa-nav-qualifier"> · ${esc(i.qualifier)}</span>` : "";
-  const body = `${mark(i, c)}<span class="fa-nav-label">${esc(i.label)}${q}${sr}</span>`;
+  // A label that IS its own initial ("A" under a glossary's letter headings, a
+  // one-letter section) would read "A A": the mark already shows it. Its text
+  // then stays for assistive technology only, so the row shows the letter once
+  // (owner, 2026-10-10: "TOC looks weird when code = title. don't duplicate").
+  const shown = initialOf(i);
+  const same = !i.qualifier && shown !== undefined && shown.toLowerCase() === i.label.trim().toLowerCase();
+  const text = same ? `<span class="fa-nav-sr">${esc(i.label)}</span>` : esc(i.label);
+  const body = `${mark(i, c)}<span class="fa-nav-label">${text}${q}${sr}</span>`;
   const named = i.qualifier ? `${i.label} · ${i.qualifier}` : i.label;
   const title = i.description ? ` title="${esc(`${named} — ${i.description}`)}"` : "";
   // Indent by PADDING rather than by a nested list: a nested `<ul>` would make
