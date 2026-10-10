@@ -55,13 +55,15 @@ export interface SectionBadges {
 /**
  * The outline as a `<nav>` of nested lists. A section with something to
  * review is a button that moves focus to it in the list below; any other
- * section is a link to it on the preview.
+ * section is a link to it on the preview. `root` is the site root as seen
+ * from the review page (`reviewSiteRoot`); a document's `page` is relative to it.
  */
 export function renderOutline(
   doc: Document,
   outline: NavOutline,
   badges: (key: string) => SectionBadges | null,
   jump: (key: string) => void,
+  root = "../",
 ): HTMLElement {
   const nav = doc.createElement("nav");
   nav.setAttribute("aria-label", "Outline");
@@ -98,7 +100,7 @@ export function renderOutline(
           target = btn;
         } else {
           const a = doc.createElement("a");
-          a.href = "../" + d.page;
+          a.href = root + d.page;
           target = a;
         }
         target.textContent = s.title;
@@ -130,13 +132,15 @@ export function renderOutline(
  * gives one level of rows under a section, and a chapter is where its sections
  * are, not a place to go. A section with something to review jumps to it in
  * the list; any other links to its anchor on the document page, which the
- * section key carries after `::` when it is a label (`sec:1-1`).
+ * section key carries after `::` when it is a label (`sec:1-1`). `root` is
+ * as for {@link renderOutline}.
  */
 export function railOutline(
   doc: Document,
   outline: NavOutline,
   badges: (key: string) => SectionBadges | null,
   jump: (key: string) => void,
+  root = "../",
 ): HTMLElement {
   const group = doc.createElement("details");
   group.className = "fa-nav-group";
@@ -174,7 +178,7 @@ export function railOutline(
         if (b && b.qaFailing) words.push("QA failing");
         const a = doc.createElement("a");
         const anchor = s.key.indexOf("::") >= 0 ? s.key.slice(s.key.indexOf("::") + 2) : "";
-        a.href = "../" + d.page + (anchor.indexOf(":") > 0 ? "#" + encodeURIComponent(anchor) : "");
+        a.href = root + d.page + (anchor.indexOf(":") > 0 ? "#" + encodeURIComponent(anchor) : "");
         a.appendChild(label(s.title));
         if (words.length) {
           const q = doc.createElement("span");

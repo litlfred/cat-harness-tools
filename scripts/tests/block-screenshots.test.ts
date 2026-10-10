@@ -1,8 +1,11 @@
 /** The visual diff Tool's pure parts (bean 0rxe). The browser run is in cat-harness/test/block-screenshots.e2e.ts. */
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/diff-renderers.js";
-import { VISUAL_KINDS, comparePixels, pageOf, safeName, visualChanges } from "../block-screenshots.js";
+import { VISUAL_KINDS, comparePixels, pageIn, pageOf, safeName, visualChanges } from "../block-screenshots.js";
 
 const img = (w: number, h: number, rgba: [number, number, number, number]) => ({
   width: w,
@@ -57,6 +60,19 @@ describe("which blocks get a picture", () => {
     expect(pageOf({ file: "../evil/x.ts" })).toBeNull();
     expect(pageOf(undefined)).toBeNull();
     expect(safeName("fig:dose-curve")).toBe("fig_dose-curve");
+  });
+
+  test("in a site, the page under the locale when it is there, else the old address (#2527)", () => {
+    const site = mkdtempSync(join(tmpdir(), "shots-"));
+    try {
+      expect(pageIn(site, { file: "handbook/ch1/fig.ts" })).toBe("handbook/index.html");
+      mkdirSync(join(site, "en", "handbook"), { recursive: true });
+      writeFileSync(join(site, "en", "handbook", "index.html"), "<p>x</p>");
+      expect(pageIn(site, { file: "handbook/ch1/fig.ts" })).toBe("en/handbook/index.html");
+      expect(pageIn(site, { file: "../evil/x.ts" })).toBeNull();
+    } finally {
+      rmSync(site, { recursive: true, force: true });
+    }
   });
 
   test("the visual renderer defaults for exactly the kinds the Tool pictures", () => {

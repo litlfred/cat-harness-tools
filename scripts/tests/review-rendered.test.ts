@@ -37,6 +37,16 @@ describe("renderedModel", () => {
     expect(m.unknown).toEqual([{ renderer: "document-site", input: "dpi-h-ra.config.json", reason: "site-wide", scope: "all" }]);
   });
 
+  test("links each page from the site root the review page found, under the locale since #2527", () => {
+    const deep = renderedModel([{ ...impacts[0], files: [{ path: "en/dpi-h-ra/index.html", change: "changed", role: "content", via: [], anchors: ["prose:a"] }] }], "https://x.github.io/smart-ra", "../../");
+    expect(deep.rows.map((r) => [r.after, r.before])).toEqual([
+      ["../../en/dpi-h-ra/index.html#prose%3Aa", "https://x.github.io/smart-ra/en/dpi-h-ra/index.html#prose%3Aa"],
+    ]);
+    expect(measuredModel({ status: "known", measured: { files: [] }, check: { missed: ["en/x/index.html"] } }, "../../").missed).toEqual([
+      { path: "en/x/index.html", change: "changed", after: "../../en/x/index.html" },
+    ]);
+  });
+
   test("a single impact object is accepted as well as an array; no main site means no before links", () => {
     const one = renderedModel(impacts[0], null);
     expect(one.rows.length).toBe(3);

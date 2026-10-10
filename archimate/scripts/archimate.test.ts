@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
-import { PAGE_CONFIG_ID, pagesFor } from "./gen-archimate-pages.ts";
+import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
 
 /** A small Archi model: two elements in a group, a serving and an access relationship, a note. */
@@ -224,6 +224,38 @@ describe("an instance", () => {
       expect(navOf("1.0.0/index.html")[0].items).toEqual([{ label: "Overview", href: "./views/id-v1/" }]);
       expect(navOf("1.0.0/views/id-v1/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../views/id-v1/" }] });
       expect(navOf("index.html")[0].items).toEqual([{ label: "Tiny <RA>", href: "1.0.0/" }]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("in a site, puts the pages under the locale and leaves the data where its IRIs are (folio-assistant#2527)", () => {
+    const root = make(config);
+    try {
+      const { graphPath, files } = pagesFor(root, { site: true });
+      const at = (f: Written) => sitePathOf(graphPath, f);
+      // Pages under en/, every other file at the graph's own path.
+      for (const f of files) expect(at(f).startsWith(f.page ? "en/archimate/" : "archimate/")).toBe(true);
+      expect(files.filter((f) => f.page).map(at).sort()).toEqual(
+        pagesFor(root).files.filter((f) => f.path.endsWith("index.html")).map((f) => `en/archimate/${f.path}`).sort(),
+      );
+      // Every link a page or a drawing makes reaches a file the run writes, or a page's directory.
+      const written = new Set(files.map(at));
+      const resolves = (from: string, ref: string) => {
+        const target = posix.normalize(posix.join(posix.dirname(from), ref));
+        return written.has(target) || written.has(posix.join(target, "index.html"));
+      };
+      for (const f of files.filter((x) => x.page || x.path.endsWith(".svg"))) {
+        const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
+        const cfg = f.page && f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
+        for (const k of ["node", "model", "svg"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
+        for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
+      }
+      // The page reaches the model in the data tree, not beside itself.
+      const view = files.find((f) => f.path === "1.0.0/views/id-v1/index.html")!;
+      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../archimate/1.0.0/model.json");
+      // In the graph (no site), nothing changes: pages beside their data.
+      expect(pagesFor(root).files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/id-a/"');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
