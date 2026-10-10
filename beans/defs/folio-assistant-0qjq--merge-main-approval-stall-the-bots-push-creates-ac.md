@@ -1,11 +1,11 @@
 ---
 # folio-assistant-0qjq
 title: 'MERGE-MAIN APPROVAL STALL — CORRECTED: already handled by design; the only gap is `stage`, deliberately preview-only, and the real fix is #1829 D1'
-status: todo
+status: scrapped
 type: bug
 priority: low
 created_at: 2026-10-02T14:10:55Z
-updated_at: 2026-10-08T05:42:00Z
+updated_at: 2026-10-10T16:43:49Z
 parent: folio-assistant-hfag
 ---
 
@@ -203,3 +203,9 @@ The full local suite on `915370757a0`: **14,296 pass · 57 skip · 0 fail · 96,
 calls across 701 files** (635s). So the content is verified; it is the *gate evidence* that
 is missing, and those are different claims. Recording both rather than letting the passing
 suite stand in for a gate run.
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/merge-main.yml` and the `stage` (Feature Staging) run, and its own correction names the remaining fix as the GitHub App token (folio-assistant #1829, D1). The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
