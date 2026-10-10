@@ -5,11 +5,12 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-01T08:48:11Z
+updated_at: 2026-10-10T16:49:34Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-oqe3
-    - folio-assistant-2ae2
+    - folio-assistant-tfqf
+    - folio-assistant-8wj1
 ---
 
 Arc `3fva`, proposal §4 items 3.5 and 3.6. Blocked on the gates and readers beans.
