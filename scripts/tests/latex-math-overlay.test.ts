@@ -136,6 +136,19 @@ describe("latex-math-overlay", () => {
     expect(section(f, 0)).toContain("sublinearly");
   });
 
+  test("a LaTeX 2.09 source (\\documentstyle) is read; AMS-TeX is not", () => {
+    const f = fixture({ "Rational maps, torus knots and links": KNOTS });
+    const tex = (head: string) => {
+      const p = join(f.root, `old-${head.length}.tex`);
+      writeFileSync(p, `${head}\n\\begin{document}\n\\section{Rational maps, torus knots and links}\n${KNOTS}\n\\end{document}\n`);
+      return p;
+    };
+    expect(overlay(f.entry, "--source", tex("\\documentstyle[12pt]{article}"), "--dry-run").out[0]?.sections[0]?.result).toBe("overlaid");
+    const amstex = join(f.root, "amstex.tex");
+    writeFileSync(amstex, `\\input amstex\n\\documentstyle{amsppt}\n\\head Rational maps\\endhead\n${KNOTS}\n\\enddocument\n`);
+    expect(overlay(f.entry, "--source", amstex, "--dry-run").out[0]?.reason).toContain("none with");
+  });
+
   test("a section is never paired by position", () => {
     const f = fixture({ "Something else entirely": KNOTS });
     const { out } = overlay(f.entry, "--source", f.tgz);
