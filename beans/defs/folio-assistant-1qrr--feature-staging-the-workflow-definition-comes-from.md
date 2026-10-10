@@ -1,11 +1,12 @@
 ---
 # folio-assistant-1qrr
 title: 'FEATURE-STAGING: the workflow definition comes from the BASE but the checkout is the PR HEAD, so a newly-added step fails every branch that predates it'
-status: todo
-parent: folio-assistant-1xhc
+status: scrapped
 type: bug
+priority: normal
 created_at: 2026-10-03T15:33:32Z
-updated_at: 2026-10-03T15:33:32Z
+updated_at: 2026-10-10T16:43:49Z
+parent: folio-assistant-1xhc
 ---
 
 ## The split
@@ -77,3 +78,9 @@ Option 1 changes the meaning of a preview and that is a decision, not a fix.
       its author never touched
 - [ ] the hazard is written where somebody debugging a red `stage` will find
       it, not only in this bean
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/feature-staging.yml` (definition from BASE, checkout from HEAD), and its first done-when is the owner choosing one of its three shapes for that workflow. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
