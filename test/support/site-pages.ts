@@ -13,7 +13,7 @@
  *
  * @module test/support/site-pages
  */
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
@@ -50,4 +50,14 @@ export function declaredPageDir(
 /** The absolute path of `file` (default `index.html`) in {@link declaredPageDir}. */
 export function declaredPagePath(harnessRoot: string, id: string, file = "index.html", rest: Pick<VisualiserRouteParts, "subgraph" | "locale"> = {}): string {
   return join(declaredPageDir(harnessRoot, id, rest), file);
+}
+
+/**
+ * The same directory as the URL path `test-server.mjs` serves it at — it
+ * serves the REPOSITORY root, so this is `/` plus the directory's path from
+ * there, with a trailing slash: `/cat-harness/docs/en/cat-harness/library/`.
+ */
+export function declaredPageUrl(harnessRoot: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale"> = {}): string {
+  const rel = relative(repoRootFor(harnessRoot), declaredPageDir(harnessRoot, id, rest)).split(sep).join("/");
+  return `/${rel}/`;
 }
