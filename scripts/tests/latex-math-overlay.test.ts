@@ -112,6 +112,30 @@ describe("latex-math-overlay", () => {
     expect(section(f)).toBe(before);
   });
 
+  test("a PDF section that is a \\subsection pairs with it, and its parent stops where it starts", () => {
+    // A font-size rung reports subsections as sections of their own. Splitting
+    // the LaTeX only at \\section left every one of them unpaired, and made the
+    // parent's LaTeX body hold its subsections' text, failing the prose gate.
+    const SOL = "Higher charge solitons form linked loops whose energy grows sublinearly with their charge.";
+    const f = fixture({ "Rational maps, torus knots and links": `${KNOTS}\n\\subsection{Higher charge solitons}\n${SOL}` }, {
+      pdfText: { "Rational maps, torus knots and links": KNOTS, "Higher charge solitons": SOL },
+    });
+    const { out } = overlay(f.entry, "--source", f.tgz);
+    expect(out[0]?.sections.map((s) => s.result)).toEqual(["overlaid", "overlaid"]);
+    expect(section(f, 0)).not.toContain("sublinearly");
+    expect(section(f, 1)).toContain("sublinearly");
+  });
+
+  test("a \\subsection the PDF did not report stays inside its parent", () => {
+    const SOL = "Higher charge solitons form linked loops whose energy grows sublinearly with their charge.";
+    const f = fixture({ "Rational maps, torus knots and links": `${KNOTS}\n\\subsection{Higher charge solitons}\n${SOL}` }, {
+      pdfText: { "Rational maps, torus knots and links": `${KNOTS} Higher charge solitons ${SOL}` },
+    });
+    const { out } = overlay(f.entry, "--source", f.tgz);
+    expect(out[0]?.sections[0]?.result).toBe("overlaid");
+    expect(section(f, 0)).toContain("sublinearly");
+  });
+
   test("a section is never paired by position", () => {
     const f = fixture({ "Something else entirely": KNOTS });
     const { out } = overlay(f.entry, "--source", f.tgz);
