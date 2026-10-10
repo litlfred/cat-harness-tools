@@ -42,9 +42,36 @@ export function declaredPageDir(
   if (v === undefined) {
     throw new Error(`${harnessRoot}: declares no visualiser \`${id}\` (its \`visualisers\` in the instance declaration)`);
   }
+  return pageDirOf(repoRoot, v.harness, v.id, rest);
+}
+
+/**
+ * {@link declaredPageDir} for a visualiser of ANOTHER harness in the checkout,
+ * named by its declared `name` — who-iris's `catalogue`, say — rather than by
+ * a root the spec would have to spell.
+ */
+export function declaredPageDirIn(
+  repoRoot: string,
+  harness: string,
+  id: string,
+  rest: Pick<VisualiserRouteParts, "subgraph" | "locale"> = {},
+): string {
+  const v = declaredVisualisers(repoRoot).find((d) => d.id === id && d.harness === harness);
+  if (v === undefined) {
+    throw new Error(`${repoRoot}: no instance named \`${harness}\` declares a visualiser \`${id}\``);
+  }
+  return pageDirOf(repoRoot, v.harness, v.id, rest);
+}
+
+function pageDirOf(repoRoot: string, harness: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale">): string {
   const site = siteOwnerDir(repoRoot);
-  const parts = { harness: v.harness, visualiser: v.id, ...rest };
+  const parts = { harness, visualiser: id, ...rest };
   return existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
+}
+
+/** The URL path `test-server.mjs` serves an absolute directory under the repository root at, with a trailing slash. */
+export function servedUrl(repoRoot: string, absDir: string): string {
+  return `/${relative(repoRoot, absDir).split(sep).join("/")}/`;
 }
 
 /** The absolute path of `file` (default `index.html`) in {@link declaredPageDir}. */
@@ -58,6 +85,5 @@ export function declaredPagePath(harnessRoot: string, id: string, file = "index.
  * there, with a trailing slash: `/cat-harness/docs/en/cat-harness/library/`.
  */
 export function declaredPageUrl(harnessRoot: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale"> = {}): string {
-  const rel = relative(repoRootFor(harnessRoot), declaredPageDir(harnessRoot, id, rest)).split(sep).join("/");
-  return `/${rel}/`;
+  return servedUrl(repoRootFor(harnessRoot), declaredPageDir(harnessRoot, id, rest));
 }
