@@ -1,11 +1,11 @@
 ---
 # folio-assistant-xqdi
 title: 'MERGE GATE (b): content-type compile gates - Lean builds, SUSHI/IG AST compiles, JSON-LD + schema validate; site renders advisory'
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-03T08:11:59Z
+updated_at: 2026-10-10T16:47:25Z
 parent: folio-assistant-nok9
 ---
 
@@ -23,3 +23,13 @@ Downstream renders (just-the-docs, the Pages site, PDF) are **advisory**, by own
 - [ ] each gate has a test that fails it on purpose
 - [ ] an `unknown` (toolchain absent, or cache cold and timed out) blocks; it is never reported as green
 - [ ] each gate runs on the merge-train result, not only on each PR head
+
+
+## Summary of Changes
+
+Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence. `scripts/tests/content-compile-gates.test.ts` has one `describe` per done-when, and all 29 tests pass in the CI-shaped mount:
+
+- [x] (1) The path → gate map is declared as data and read by `gates.ts`.
+- [x] (2) Each gate has a test that fails it on purpose.
+- [x] (3) `unknown` (toolchain absent, or cache cold and timed out) blocks and is never green.
+- [x] (4) Each gate runs on the merge-train result, not only on the PR head.
