@@ -43,12 +43,17 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The harness's machine name, as its declaration states it. */
 export const HARNESS_NAME = "cat-harness";
 
-/** This layer's root: `cat-harness-tools/`, two levels above this file. */
-export const TOOLS_ROOT: string = resolve(import.meta.dir, "..", "..");
+/**
+ * This layer's root: `cat-harness-tools/`, two levels above this file.
+ * `import.meta.dir` is Bun's; Playwright loads this module under Node, which
+ * has only `import.meta.url`.
+ */
+export const TOOLS_ROOT: string = resolve(import.meta.dir ?? dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Where a harness root came from — reported, so a surprise is diagnosable. */
 export type HarnessRootSource = "flag" | "env" | "sibling";

@@ -28,7 +28,7 @@ describe("a new folio is QA'd from its first commit", () => {
     const root = join(repo, "doc");
     initFolio({ targetDir: root, contentType: "document", slug: "qa-doc", title: "QA Doc", authors: ["A"], link: "sibling", assistantPath: "folio-assistant", skipVcs: true });
     const agents = readFileSync(join(root, "AGENTS.md"), "utf-8");
-    expect(agents).toContain("bun run folio-assistant/cat-harness/content/pipeline/qa-sweep.ts folio");
+    expect(agents).toContain("bun run folio-assistant/cat-harness-tools/content/pipeline/qa-sweep.ts folio");
     expect(agents).toContain("test/results/block-qa/");
     // The old sibling layout is no longer taught.
     expect(agents).not.toContain("<chapter>/<root>.qa.json");

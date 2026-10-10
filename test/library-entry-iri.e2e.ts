@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { serveThemed, type Scheme } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPageUrl } from "./support/site-pages.ts";
 
 /**
  * Every library entry has its own IRI, and the page there renders it.
@@ -29,8 +30,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 const SITE = process.env.FA_SITE_URL ?? "http://127.0.0.1:8080";
 const DOCS = "/cat-harness/docs";
-const LIB = `${DOCS}/cat-harness/library`;
 const HARNESS = join(HARNESS_ROOT);
+const LIB = declaredPageUrl(HARNESS, "library").replace(/\/$/, "");
 
 /** Serve the committed themed pages under the docs prefix in the layout stand-in. */
 async function themed(page: Page, scheme: Scheme = "dark"): Promise<void> {

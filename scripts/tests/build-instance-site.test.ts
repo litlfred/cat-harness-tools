@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { SCRIPT_NAME, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf } from "../build-instance-site.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -47,5 +47,12 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
   test("--pre and --source-step take package script names, never commands", () => {
     for (const ok of ["check:catalogue", "site:catalogue", "iris.pages-check_2"]) expect(SCRIPT_NAME.test(ok)).toBe(true);
     for (const bad of ["bun run x", "a;rm -rf /", "$(id)", "a && b", "-x", ""]) expect(SCRIPT_NAME.test(bad)).toBe(false);
+  });
+
+  test("the declaration is read for name, title and description only, whatever kinds it names (bean qump)", () => {
+    const text = JSON.stringify({ name: "x", title: "X", description: "d", directories: [{ id: "c", path: "c/", graphTypologies: ["not-registered-here"] }] });
+    expect(siteFields(text, "x.json")).toEqual({ name: "x", title: "X", description: "d" });
+    expect(() => siteFields("{", "x.json")).toThrow(/not valid JSON/);
+    expect(() => siteFields("{}", "x.json")).toThrow(/declares no name/);
   });
 });

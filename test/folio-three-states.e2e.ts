@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutStandIn, parseThemed } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 /**
  * R30's THREE STATES, bean `j2if`. Owner, 2026-09-21:
@@ -431,7 +432,7 @@ test.describe("the REAL generated library view, not a fixture", () => {
    * So this reads the page `gen-library-viz` actually wrote, with the rows
    * it actually emits, rendered by its own client-side code.
    */
-  const VIEW = join(SITE_ABS, "cat-harness", "library", "who-iris", "index.html");
+  const VIEW = declaredPagePath(ROOT, "library", "index.html", { subgraph: "who-iris" });
   // Read from the page's OWN `DATA_HREF` rather than guessed: the first
 // version guessed `assets/cat-harness/library/who-iris/`, the real path is
 // `assets/library/`, and a wrong guess serves `{}` — which renders an empty
@@ -530,7 +531,7 @@ test.describe("an asset's address is its own path IRI", () => {
    * asset has too much drift"*. cat-harness owns this viewer, so the viewer
    * IS the address, and the fragment names the asset.
    */
-  const VIEW2 = join(SITE_ABS, "cat-harness", "library", "who-iris", "index.html");
+  const VIEW2 = declaredPagePath(ROOT, "library", "index.html", { subgraph: "who-iris" });
   const DATA2 = join(SITE_ABS, "assets", "library", "index.json");
 
   const serveView = async (page: import("@playwright/test").Page, hash = "") => {
@@ -629,7 +630,7 @@ test.describe("the folio viewer page RUNS — not just 'the bytes are current'",
    * empty table over a graph that has nodes. Those are the consumer's
    * questions and only a browser answers them. Bean `7ofc`.
    */
-  const PAGE_F = join(SITE_ABS, "cat-harness", "folio", "index.html");
+  const PAGE_F = declaredPagePath(ROOT, "folio");
   const DATA_F = join(SITE_ABS, "assets", "folio", "index.json");
 
   const serveFolio = async (page: import("@playwright/test").Page, data?: string) => {

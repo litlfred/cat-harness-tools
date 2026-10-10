@@ -83,7 +83,7 @@ function fixture(subs: Subgraph[]) {
     join(work, "fixture.json"),
     JSON.stringify(
       {
-        $schema: "folio-harness/v1",
+        $schema: "cat-harness-declaration/1.0.0",
         name: "fixture",
         directories: subs.map((s) => ({
           id: s.id,

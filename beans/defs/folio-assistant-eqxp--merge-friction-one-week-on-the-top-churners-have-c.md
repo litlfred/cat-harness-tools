@@ -1,11 +1,11 @@
 ---
 # folio-assistant-eqxp
 title: 'MERGE FRICTION, one week on: the top churners have changed and four more pass 1swy''s test'
-status: todo
+status: scrapped
 type: task
 priority: normal
 created_at: 2026-09-30T23:35:24Z
-updated_at: 2026-10-01T08:00:56Z
+updated_at: 2026-10-10T16:48:58Z
 parent: folio-assistant-1swy
 ---
 
@@ -241,3 +241,14 @@ measurements and the three negative results (`beans/README.md` and these two).
 
 
 _2026-10-01_ — Now feeds arc `3fva` (issue #1763, `cat-harness/docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md`).
+
+
+## Reasons for Scrapping
+
+Obsolete after the separation (lane B drain, 2026-10-10). The bean re-measured churn in the **monorepo's** `origin/main`, and that distribution no longer exists in any one repository:
+
+- The top churners were `cat-harness/test/results/**` (LSI, skill-register, audit-coverage, tool-runs, subgraph-readmes). Derived results left main entirely: they are gitignored and published to `qa-reports` (`5hox`, arc `3fva`), so they cannot conflict.
+- `beans/README.md`: beans now live on `cat/<harness>/beans` state branches, not on main.
+- `cat-harness/docs/**` (glossary, `_data/harness.json`, lsi): those paths are in litlfred/cat-harness, and whether its generated docs stay on main is `34cm`'s open decision in that store.
+
+If merge friction recurs, it should be re-measured per repository against that repository's own `.gitattributes`, with 1swy's three-part test applied unchanged. That would be a new bean in the store of whichever repository it is.

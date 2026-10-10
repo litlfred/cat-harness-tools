@@ -1,11 +1,11 @@
 ---
 # folio-assistant-abmq
 title: 'MERGE GATE (c): RED FLAG taxonomy, verdict sidecar shape, and the recorded override path'
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-03T08:11:58Z
+updated_at: 2026-10-10T16:47:06Z
 parent: folio-assistant-nok9
 ---
 
@@ -63,3 +63,14 @@ should be this repository's own recorded defects (`plj1`, `dh4f`, `w4tq`,
 
 Design: `merge-gate-2026-10-02.md` §1.1, §6. Tracking bean: `5ge1`.
 
+
+## Summary of Changes
+
+Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence.
+
+- [x] **Closed taxonomy:** `cat-harness/schemas/red-flag.ts` defines `RED_FLAG_CATEGORIES`, 8 categories (security, data-loss, correctness, false-green, provenance, scope-breach, irreversible-action, licence). Each has a `definition` and a `historicalExample` from this repository's history in `RED_FLAG_DEFINITIONS`.
+- [x] **Sidecar shape:** `AdversarialFindingSchema` (a blocking finding requires a category and evidence), `AdversarialReviewSchema` and `MergeReviewSchema` (`merge-review/v1`, bound to commit SHAs). `kg-qa/v1` accepts optional `adversarial_reviews[]`.
+- [x] **Override path:** `OverrideDecisionSchema` and `applyRedFlagOverride`. Only a human may override; the finding becomes `overridden` and is never deleted.
+- [x] **Gate behaviour for every state,** `RED_FLAG_GATE_STATES`: would-have-blocked (the warn-only ruling of 2026-10-03), open, resolved, overridden, unknown, stale. Evaluated by `evaluateFinding/Review/MergeReviewGateState`.
+- **Tests:** `scripts/tests/red-flag-taxonomy.test.ts` covers each item above, and passes in the CI-shaped mount.
+- Not part of this bean: 3 failures in the audit-coverage "Adversarial Integration" tests (`adversarial-review-gate.test.ts`). Two are 5-second timeouts and one is an assertion on `adversarialCoverageByGraph`. They belong to the gate's wiring (sibling w8jq).

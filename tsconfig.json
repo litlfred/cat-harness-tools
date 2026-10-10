@@ -24,7 +24,9 @@
     "templates/**/*.ts",
     "ui/**/*.ts",
     "viewer/**/*.ts",
-    "deploy/**/*.ts"
+    "deploy/**/*.ts",
+    "id-lookup/**/*.d.ts",
+    "playwright.config.ts"
   ],
   "exclude": [
     "dist",

@@ -1,11 +1,11 @@
 ---
 # folio-assistant-2ae2
 title: 'Readers: docs site, feature staging, review heat map and MCP tools fetch QA from qa-reports'
-status: todo
+status: scrapped
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-01T08:48:11Z
+updated_at: 2026-10-10T16:49:26Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-16ei
@@ -35,3 +35,14 @@ Verify by building `preview:site` and looking at a badge and the heat map (`rend
 - `src/tools/degradation.ts` stopped running `kg-detangle.ts` with bean `ymsu`.
 
 `src/qa-agent-write.ts` is a reader, but of the LEGACY beside-block path. That is a live defect, queued in `folio-assistant-r7v6`.
+
+
+## Reasons for Scrapping
+
+Superseded by the reader audit's fix beans (lane B drain, 2026-10-10), as `gxvk` intended ("the fix beans refine and split `oqe3` and `2ae2`"):
+
+- **Docs site, feature staging, badges, review heat map** (`publish-block-qa.ts`, `review-heat.ts`, `gen-review-page.ts`): owned by `folio-assistant-tfqf` (QA READERS F6, in progress), which says it "refines and supersedes the docs-site and staging half of `2ae2`". Its rendered-verification done-when (before/after screenshots) is this bean's.
+- **MCP: `lsi_query`, `src/tools/degradation.ts`, the `tools/index.ts` lsi entry**: not readers of committed QA (gxvk §5.4), so there is nothing to migrate.
+- **`src/qa-agent-write.ts`**: agent verdicts are attestations (D2), and that writer is owned by `folio-assistant-8wj1` (QA READERS F4).
+
+`7mwa`'s blocked-by on 2ae2 is cleared by this scrap. Its real blockers are tfqf and 8wj1.

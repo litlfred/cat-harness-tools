@@ -1,11 +1,11 @@
 ---
 # folio-assistant-sopq
 title: Mine the WHO IG starter kit SOPs for DAK QA criteria
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-08-26T19:15:00Z
-updated_at: 2026-08-26T19:15:00Z
+updated_at: 2026-10-10T16:53:38Z
 parent: folio-assistant-1swy
 ---
 
@@ -72,3 +72,36 @@ Highest-value first, by apparent fit to existing QA machinery:
 
 Authoring folio content. This repo is the platform; anything WHO-domain that
 turns out to be subject matter belongs in a DAK repo as data, per AGENTS.md.
+
+
+## Summary of Changes
+
+Mined 2026-10-10 (lane B drain) from `WorldHealthOrganization/smart-ig-starter-kit` (`input/pagecontent/`): `checklist.md` (297 lines), `qa_check.md` (28) and `authoring_conventions.md` (78), the three files the bean ranked highest. The source was read as data.
+
+**Already covered** by smart-base's `content/pipeline/qa-checkers-dak.ts`: `dak-companion-present`, `dak-bpmn-has-process`, `dak-dmn-has-decision-table`, `dak-fsh-declares-kind`, `dak-label-prefix-matches-kind`. None of the checklist's IG-structure rows below is covered.
+
+**Candidate criteria, each a rule WHO already holds DAK authors to** (✓ = mechanically checkable over the IG source):
+
+| source row | candidate criterion | check |
+|---|---|---|
+| L1 Home.Summary | `dak-home-links-guidance`: home page links its L1/L2 guidance documents | ✓ ≥1 external link with a description |
+| L1 Home.Providing Feedback | `dak-feedback-section` | ✓ section present on the home page |
+| L1 Adapting Guidelines | `dak-adapting-page` (`adapting_guidelines`) | ✓ page exists |
+| L2 Business Requirements (8 pages) | `dak-l2-pages-present`: concepts, personas, usecases, business_process, dictionary, decision_support, functional, nonfunctional; indicators only if indicators are defined | ✓ each page exists (conditional rule for indicators) |
+| L3 Logical Models | `dak-logical-model-per-dataset`: one logical model per L2 data-dictionary asset | ✓ given the dictionary list |
+| L3 Sequence Diagram | `dak-sequence-diagram` | ✓ page exists |
+| L3 Mappings | `dak-map-per-dataset`: a StructureMap per data set, IPS as source | ✓ per data set |
+| L3 QA Report (×3) | `dak-qa-no-profile-errors`: no shareable/publishable/computable/executable profile errors | ✓ from the IG Publisher `qa.json` |
+| L4 Testing | `dak-example-per-profile`: every non-abstract profile has an example | ✓ |
+| L4 Test Data (optional) | `dak-cql-has-test-library` | ✓, advisory |
+| Global STU note | `dak-stu-maturity`: home page states maturity and version | ✓ |
+| Global footer | `dak-qa-warnings-reasoned`: no errors, and every suppressed warning carries a reason | ✓ from `qa.json` |
+| Global Home.Changes | `dak-changes-page` | ✓ page exists |
+| qa_check: every artefact | `dak-title-description`: every artefact has a title and a description | ✓ |
+| qa_check: logical model elements | `dak-lm-internal-code`: each element maps to an internal code (LOINC/SNOMED optional) | ✓ |
+| conventions: ids | `dak-resource-id`: `[A-Za-z0-9\-.]{1,64}`, no underscore | ✓ |
+| conventions: names | `dak-resource-name`: `^[A-Z][A-Za-z0-9_]{1,254}$`, underscores discouraged | ✓ (warn on `_`) |
+| conventions: files | `dak-file-matches-id`: FSH at `ResourceType/resourceid.fsh`, JSON/XML `ResourceType-resourceid`, no two names differing only in case, aliases in `fsh/Aliases.fsh` | ✓ |
+| conventions: locations | `dak-input-folder`: each resource sits in its declared `input/[fsh/]<kind>` folder | ✓ |
+
+**Where this goes next:** the criteria are DAK-adapter rules, so the implementing bean belongs to **smart-base's store**, beside `qa-checkers-dak.ts`. That was handed to the coordinating session to file. Still unread and worth a second pass there: the ~12 `l3_*.md` per-artefact SOPs (~3,600 lines).
