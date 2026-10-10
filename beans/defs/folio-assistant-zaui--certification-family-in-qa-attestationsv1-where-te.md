@@ -1,11 +1,11 @@
 ---
 # folio-assistant-zaui
 title: 'CERTIFICATION family in qa-attestations/v1: where test-plan-execution files a signed certification'
-status: todo
+status: in-progress
 type: task
 priority: normal
 created_at: 2026-10-02T05:48:39Z
-updated_at: 2026-10-10T16:46:13Z
+updated_at: 2026-10-10T16:50:38Z
 parent: folio-assistant-3fva
 ---
 
