@@ -1,12 +1,12 @@
 ---
 # folio-assistant-5xfr
 title: qou's pin bump must rename folio.config.json AND add qaAxes in the same commit, or it silently loses both
-status: todo
+status: scrapped
 type: task
 priority: normal
-parent: folio-assistant-1swy
 created_at: 2026-09-20T14:37:58Z
-updated_at: 2026-09-20T14:37:58Z
+updated_at: 2026-10-10T16:44:10Z
+parent: folio-assistant-1swy
 ---
 
 
@@ -345,3 +345,9 @@ A STATIC read of the gate expressions, not a runtime before/after count:
 runtime flip needs a synthetic folio tree. The gates are exact and directly
 readable, so the static read is the better evidence here — but it is a
 different kind of evidence and the PR says so.
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns litlfred/qou's `.folio-assistant-pin` bump (renaming `folio.config.json` and adding `qaAxes` in the same commit), a change made in qou. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.

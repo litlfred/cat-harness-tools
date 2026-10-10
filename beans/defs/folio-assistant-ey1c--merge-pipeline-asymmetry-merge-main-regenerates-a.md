@@ -3,9 +3,10 @@
 title: 'MERGE PIPELINE ASYMMETRY: merge-main regenerates a PR branch, but nothing regenerates main after a PR merges into it'
 status: todo
 type: bug
+priority: normal
 created_at: 2026-10-03T01:05:37Z
+updated_at: 2026-10-10T16:43:49Z
 parent: folio-assistant-hfag
-updated_at: 2026-10-08T05:42:00Z
 ---
 
 `.github/workflows/merge-main.yml` runs `bun run cat merge:main` on an opted-in **PR branch**
@@ -78,3 +79,19 @@ produce, this is the whole base doing so.
       finds it — a green on a derived gate must not be read as "was never broken"
 - [ ] NEGATIVE control: a merge that changes nothing counted does not trigger a repair PR,
       so the mechanism cannot become a source of churn (bean `do70`)
+
+
+## Re-triage 2026-10-10 (lane B drain)
+
+The repair half is in this repository: `scripts/post-merge-regen.ts` detects a stale derived artefact after a merge and generates a repair **PR**, never a push. It has a negative control (no counted change → no PR) and reports honestly (no writer → unrepaired, exit 1). **Nothing calls it:** no workflow in litlfred/folio-assistant mentions `post-merge-regen`, so main going stale is still only reported. The wiring belongs in folio-assistant's workflows; the decision belongs to the owner.
+
+## Owner decision
+
+How should post-merge regeneration run?
+
+1. **(Recommended)** Add a folio-assistant workflow on `push: main` that runs `post-merge-regen.ts` and opens the repair PR. The steward procedure then needs no extra step.
+2. Add a post-merge regen check to the merge steward's procedure, run by whoever merges, with no automation.
+3. Do both: the workflow, plus the steward checks that its PR landed.
+4. Leave it report-only (CI goes red; nobody is assigned).
+
+**Default if no answer:** option 2. It is a procedure note and adds no new automation that opens PRs.
