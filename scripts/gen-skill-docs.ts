@@ -462,6 +462,10 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // Placement PR6 (bean `apcg`): the cataloguing methods that moved up out of
   // the harness's `library-core`.
   cataloguing: "Cataloguing methods (cataloguing)",
+  // folio-assistant-core 6fc33b4 (bean `0jtl`): a pointer package naming the
+  // review skills in reading order. Without a heading `skills:docs` throws and
+  // `skill:register` stops.
+  review: "Where to start reviewing a large folio (review)",
   // Declared directories that hold their skills DIRECTLY, so they are keyed by
   // the declaration's id, like `crdm` and `bootstrap` below. All three were
   // declared in `cat-harness.json` with no label here, which made
