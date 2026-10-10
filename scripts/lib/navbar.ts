@@ -607,6 +607,17 @@ function initialOf(i: NavItem): string | undefined {
   return i.icon ?? i.label.slice(0, 1).toUpperCase();
 }
 
+/**
+ * Every avatar image is LAZY. A mark is a crop of a full landing-card picture
+ * (the declared `mark.src` of three harnesses, 100–355 KB each), and most marks
+ * sit in the Harnesses disclosure, which arrives folded: measured on a folio
+ * page, 2026-10-10, three card images (685 KB) were fetched for a section of
+ * 5.9 KB of content, two of them for rows nobody had opened. Lazy, a folded
+ * row's image is fetched when it is opened; one already in view loads as
+ * before. What a mark SHOWS is unchanged — only when its bytes arrive.
+ */
+const IMG_LAZY = ` loading="lazy" decoding="async"`;
+
 /** An item's mark: its avatar when it has one, its glyph otherwise. */
 function mark(i: NavItem, c: Ctx): string {
   // No tone behind an image that declares its ground `none` (issue #46, gap 5).
@@ -617,7 +628,7 @@ function mark(i: NavItem, c: Ctx): string {
     if (!r) {
       return (
         `<span class="fa-nav-glyph fa-nav-tone"${tone}>` +
-        `<img src="${href(i.avatar.src, c)}" alt=""${t}></span>`
+        `<img src="${href(i.avatar.src, c)}" alt=""${t}${IMG_LAZY}></span>`
       );
     }
     // THE CROP, and the arithmetic is `603s`'s. The frame shows `r` scaled to
@@ -633,7 +644,7 @@ function mark(i: NavItem, c: Ctx): string {
     const pct = (n: number) => `${+(n * 100).toFixed(4)}%`;
     return (
       `<span class="fa-nav-glyph fa-nav-tone fa-nav-crop"${tone}>` +
-      `<img src="${href(i.avatar.src, c)}" alt=""${t} style="` +
+      `<img src="${href(i.avatar.src, c)}" alt=""${t}${IMG_LAZY} style="` +
       `width:${pct(1 / r.w)};height:${pct(1 / r.h)};` +
       `left:${pct(-r.x / r.w)};top:${pct(-r.y / r.h)}"></span>`
     );
