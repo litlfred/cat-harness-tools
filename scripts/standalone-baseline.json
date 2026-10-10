@@ -2,9 +2,8 @@
   "_comment": "Tests that fail when a layer runs alone beside its declared closure (bean `ho66`), keyed `<test file> > <test>`, with `bun test`'s own fail count, which also counts errors between tests. A RATCHET: a failure not listed here is red; a listed one that now passes is reported, with this command, so the list only goes down. WRITTEN by `bun run cat standalone:baseline`; a longer list is a diff somebody reviews. See the module header of cat-harness-tools/scripts/check-standalone.ts.",
   "layers": {
     "cat-harness": {
-      "failed": 15,
+      "failed": 14,
       "failing": [
-        "openapi/scripts/openapi.test.ts > (load-time error) cat-openapi.config.json: no cat-openapi.config.json — this instance does not instantiate cat-harness's openapi subgraph",
         "openapi/scripts/openapi.test.ts > cat-openapi.config.json > smart-trust's config is found, and parses",
         "openapi/scripts/openapi.test.ts > the committed gateway API > a config kept INSIDE the declared openapi directory is found, and one at the root wins",
         "openapi/scripts/openapi.test.ts > the committed gateway API > a hand edit to the document is caught",
@@ -17,7 +16,6 @@
         "scripts/tests/beans-query.test.ts > beans-query > CLI --sparql executes arbitrary SPARQL 1.1 query",
         "scripts/tests/beans-query.test.ts > beans-query > buildBeanStore loads the repository's real bean store cleanly",
         "scripts/tests/check-environment.test.ts > this repository, right now > is not distorted — otherwise `bun run cat gates` refuses for everyone",
-        "scripts/tests/check-spec.test.ts > spec-template — declared artefact and section extraction > loadDeclaredSpecTemplate loads mandatory sections from declared template markdown",
         "scripts/tests/folio-root-is-asked.test.ts > (load-time error) ENOENT: no such file or directory, open 'cat-harness-tools\u0000'",
         "scripts/tests/fsh-guts-export.test.ts > (load-time error) ENOENT: no such file or directory, open 'docs-site.yml'",
         "scripts/tests/infrastructure.test.ts > (load-time error) ENOENT: no such file or directory, open '.gitignore'",
