@@ -7,6 +7,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { instanceRootsIn, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { serveThemed, type Scheme } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPageUrl } from "./support/site-pages.ts";
 
 /**
  * A scoped library viewer renders ITS SUBJECT's entries.
@@ -129,7 +130,7 @@ test("a scoped library viewer renders its subject's entries", async ({ page }) =
     ).toBeGreaterThan(0);
 
     // 2. The PAGE must render them, scoped to itself.
-    await page.goto(`${SITE}${DOCS}/cat-harness/library/${name}/`, { waitUntil: "networkidle" });
+    await page.goto(`${SITE}${declaredPageUrl(HARNESS, "library", { subgraph: name })}`, { waitUntil: "networkidle" });
     const status = (await page.locator("#status").textContent()) ?? "";
     expect(status, `${name}: the status line must name its own subject`).toContain(name);
     expect(status, `${name}: reports a different entry count than its data`).toContain(
@@ -159,7 +160,7 @@ for (const scheme of ["dark", "light"] as const) {
     const subject = declaredLibrarySubjects()[0];
     expect(subject, "no declared library subject to open").toBeDefined();
     await themed(page, scheme);
-    await page.goto(`${SITE}${DOCS}/cat-harness/library/${subject!.name}/`, { waitUntil: "networkidle" });
+    await page.goto(`${SITE}${declaredPageUrl(HARNESS, "library", { subgraph: subject!.name })}`, { waitUntil: "networkidle" });
     await expect(page.locator("#listing [data-fa-library-item]").first()).toBeVisible();
     const audit = async (): Promise<string[]> =>
       (
@@ -194,7 +195,7 @@ test("every listing link is a 24 px target even where its cell wraps", async ({ 
   const subject = declaredLibrarySubjects()[0];
   expect(subject, "no declared library subject to open").toBeDefined();
   await themed(page, "dark");
-  await page.goto(`${SITE}${DOCS}/cat-harness/library/${subject!.name}/`, { waitUntil: "networkidle" });
+  await page.goto(`${SITE}${declaredPageUrl(HARNESS, "library", { subgraph: subject!.name })}`, { waitUntil: "networkidle" });
   await expect(page.locator("#listing [data-fa-library-item]").first()).toBeVisible();
   await page.addStyleTag({
     content:

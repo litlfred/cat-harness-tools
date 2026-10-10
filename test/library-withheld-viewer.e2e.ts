@@ -5,6 +5,7 @@ import { test, expect } from "@playwright/test";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { serveThemed } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPageUrl } from "./support/site-pages.ts";
 
 /**
  * A WITHHELD library entry says so in the rendered viewer — issue #1794.
@@ -78,7 +79,7 @@ for (const slug of listed) {
     page.on("pageerror", (e) => errors.push(e.message));
     await themed(page);
     await withFixture(page);
-    await page.goto(`${SITE}${DOCS}/cat-harness/library/who-iris/#${encodeURIComponent(`who-iris/${slug}`)}`);
+    await page.goto(`${SITE}${declaredPageUrl(HARNESS, "library", { subgraph: "who-iris" })}#${encodeURIComponent(`who-iris/${slug}`)}`);
     const blocks = page.locator("#blocks");
     await expect(blocks.locator("table")).toBeVisible();
 
@@ -118,7 +119,7 @@ test("an entry that is not withheld gets no banner", async ({ page }) => {
   test.skip(open === undefined, "who-iris holds no entry beside the fixture's");
   await themed(page);
   await withFixture(page);
-  await page.goto(`${SITE}${DOCS}/cat-harness/library/who-iris/#${encodeURIComponent(`who-iris/${open!.id}`)}`);
+  await page.goto(`${SITE}${declaredPageUrl(HARNESS, "library", { subgraph: "who-iris" })}#${encodeURIComponent(`who-iris/${open!.id}`)}`);
   await expect(page.locator("#blocks h2")).toBeVisible();
   await expect(page.locator("#blocks .wh-banner")).toHaveCount(0);
   await expect(page.locator("#blocks .wh-line")).toHaveCount(0);

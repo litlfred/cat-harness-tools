@@ -1,4 +1,14 @@
 import { test, expect } from "@playwright/test";
+import { basename } from "node:path";
+
+import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
+
+/**
+ * Where this layer is under the root the server serves. `playwright.config.ts`
+ * starts it with `cwd: '..'` — the directory holding this layer — so the
+ * layer is one segment in, named whatever its directory is called.
+ */
+const TOOLS = `/${basename(TOOLS_ROOT)}`;
 
 /**
  * The test server itself.
@@ -17,16 +27,17 @@ test.describe("test-server", () => {
     // Rooting at the repo rather than one subtree is what lets a spec reach
     // ui/, viewer/ or a built _site/ without the server having to guess.
     //
-    // `/cat-harness/ui/…` since the move (bean `wggr`): the server still serves
-    // the REPOSITORY root — that is the property under test — and `ui/` is now
-    // one level in. Prefixing the URL rather than re-rooting the server keeps
-    // the assertion about what it claims to be about.
-    const res = await page.goto("/cat-harness/ui/index.html");
+    // `ui/` is one level in — under `cat-harness/` since the move (bean
+    // `wggr`), and under this layer since bean `70lx` moved it here: the
+    // server still serves the REPOSITORY root, which is the property under
+    // test. Prefixing the URL rather than re-rooting the server keeps the
+    // assertion about what it claims to be about.
+    const res = await page.goto(`${TOOLS}/ui/index.html`);
     expect(res?.status()).toBe(200);
   });
 
   test("serves a directory's index.html", async ({ page }) => {
-    const res = await page.goto("/cat-harness/viewer/");
+    const res = await page.goto(`${TOOLS}/viewer/`);
     expect(res?.status()).toBe(200);
   });
 
@@ -47,7 +58,7 @@ test.describe("test-server", () => {
   });
 
   test("sets a usable content type rather than octet-stream for known kinds", async ({ request }) => {
-    const res = await request.get("/cat-harness/ui/styles.css");
+    const res = await request.get(`${TOOLS}/ui/styles.css`);
     expect(res.status()).toBe(200);
     expect(res.headers()["content-type"]).toContain("text/css");
   });

@@ -8,7 +8,7 @@
  *
  * ## What is real here and what is not
  *
- * Real: the COMMITTED generated page (`docs/beans/index.html`, written by
+ * Real: the COMMITTED generated page (`docs/en/cat-harness/beans/index.html`, written by
  * `state-visualizer.ts`), the real `kg-render.js`, `work-plan.js` and
  * `work-plan.css`, and the real bean projection.
  *
@@ -26,12 +26,13 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 const read = (rel: string) => readFileSync(join(SITE, rel), "utf8");
 
-const PAGE = read("beans/index.html").replace(/^---\n[\s\S]*?\n---\n/, "");
+const PAGE = readFileSync(declaredPagePath(ROOT, "beans"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
 const CSS = read("assets/css/work-plan.css");
 const KG = read("assets/js/kg-render.js");
 const WP = read("assets/js/work-plan.js");
