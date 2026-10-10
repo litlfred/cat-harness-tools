@@ -1,11 +1,11 @@
 ---
 # folio-assistant-5qy8
 title: 'QA SIDECAR LOCATION CONTRADICTION: the folio_init template commits *.qa.json while AGENTS.md puts QA on the qa-reports branch'
-status: todo
+status: in-progress
 type: bug
 priority: normal
 created_at: 2026-10-04T15:10:09Z
-updated_at: 2026-10-04T15:10:09Z
+updated_at: 2026-10-10T16:36:18Z
 parent: folio-assistant-3fva
 ---
 

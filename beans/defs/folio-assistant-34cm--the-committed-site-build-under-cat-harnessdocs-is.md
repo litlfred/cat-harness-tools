@@ -1,11 +1,11 @@
 ---
 # folio-assistant-34cm
 title: The committed site build under cat-harness/docs/ is 44% of all merge conflicts, and the publish workflow rebuilds it anyway
-status: todo
+status: scrapped
 type: bug
 priority: normal
 created_at: 2026-10-03T08:34:21Z
-updated_at: 2026-10-04T13:29:55Z
+updated_at: 2026-10-10T16:43:49Z
 parent: folio-assistant-hfag
 ---
 
@@ -204,3 +204,9 @@ this long: the files are cheap to move and the gates are not.
 - Within `docs/`, **`cat-harness/auto-docs/` alone is 118**; then `lsi/` and `glossary/` (with its locales), `reference/skill-instructions/`, and the site data (`assets/`, `_data`, `qa/`).
 
 **The decision this bean asked for already exists:** the owner's 2026-10-03 ruling, *"auto-docs is one declared subgraph, with declared sub-sub-graphs per writer"*, is implemented by `xsrv` (route-keyed branch storage). On 2026-10-04 the owner said *"take the auto-docs part and coordinate on the beans"*. The auto-docs family is held by session_01Jf39Vh4B8EQT6TBYzTtMCA; see `xsrv`. This bean's Done-when boxes stay open until the cutover lands and the re-measurement after it is taken.
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the committed site build under `cat-harness/docs/` in litlfred/cat-harness and the publish workflow that rebuilds it; every done-when is a decision about that repository's tree. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.

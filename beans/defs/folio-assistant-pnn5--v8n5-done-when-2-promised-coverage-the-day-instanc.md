@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-09-30T21:24:19Z
-updated_at: 2026-09-30T21:24:41Z
+updated_at: 2026-10-10T16:44:25Z
 parent: folio-assistant-1xhc
 ---
 
@@ -83,3 +83,15 @@ Whether any surface currently DOES fall back to the platform default for an
 instance that declares its own theme. Nobody has measured it — which is the
 whole point of the missing check, and why this bean does not assert a defect
 in the rendering, only in the coverage.
+
+
+## Owner decision
+
+(Lane B drain, 2026-10-10: put in pick-one form so it is answerable without reading the whole bean.) What should `check-navbar-consistency.ts` compare for an instance that declares its own theme?
+
+1. **(Recommended)** **Kind for kind:** a surface of kind K on that instance's pages must use the instance's own K-kind theme whenever it declares one (webpage → webpage, publication → publication). Boards and cards fall back only because no `sticky` theme is declared. Falsified by an instance with a webpage theme rendering a page in the platform default.
+2. **Webpage only:** compare just the `webpage` surface, the one kind both declaring instances (who-iris, smart-trust) have.
+3. **Any declared theme may style any surface:** fall back to the platform default only when the instance declares none at all.
+4. **Retire v8n5 Done-when #2,** and remove the pinning test with a reason.
+
+**Default if no answer:** no change. The pinning test (`the size-1 NOTE is gone, and its PROMISE is NOT yet kept`) stays, and nothing is compared.
