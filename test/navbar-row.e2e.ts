@@ -401,7 +401,7 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     expect(errors).toEqual([]);
     await expect(page.locator(".fa-tiles-toggle")).toHaveCount(1);
     await expect(page.locator(".fa-tiles-toggle")).toHaveAttribute("aria-expanded", "false");
-    await page.locator('.fa-nav-icons [aria-label="More actions"]').click();
+    await page.locator('.fa-nav-icons [aria-label^="More actions"]').click();
     await expect(page.locator(".fa-tiles-toggle")).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator(".fa-tiles")).toBeVisible();
   });
