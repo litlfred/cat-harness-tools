@@ -160,6 +160,24 @@ function reportCollisions(): void {
 }
 
 /**
+ * The index row's summary: the first 100 characters of a skill's opening
+ * paragraph, never ending inside a link.
+ *
+ * A plain cut at 100 lands inside a `](...)` target often enough to publish a
+ * dead link in the index (`../../en/cat-harness/proces`). When the cut falls
+ * inside a link target, it is extended to that link's closing parenthesis, so
+ * the row keeps the link whole.
+ */
+export function indexSummary(line: string, max = 100): string {
+  const cut = line.slice(0, max);
+  if (cut.length === line.length) return cut;
+  const open = cut.lastIndexOf("](");
+  if (open === -1 || cut.includes(")", open)) return cut;
+  const close = line.indexOf(")", open);
+  return close === -1 ? cut : line.slice(0, close + 1);
+}
+
+/**
  * Pages sitting in the output directory that THIS RUN did not produce.
  *
  * `index.md` is the generator's own, so it is never an orphan.
@@ -1150,7 +1168,7 @@ async function main(): Promise<void> {
       emit(join(OUT_DIR, `${published}.md`), page.join("\n"));
       written.set(published, group.category);
 
-      const desc = escapePipes((body.match(/^#\s+.+\n+([^\n#].*)$/m)?.[1] ?? "").slice(0, 100));
+      const desc = escapePipes(indexSummary(body.match(/^#\s+.+\n+([^\n#].*)$/m)?.[1] ?? ""));
       const schemaCell = hasSchema ? `[schema](../skills/${name}.html)` : "—";
       indexRows[group.category].push(`| [${title}](${published}.html) | \`${name}\` | ${schemaCell} | ${desc} |`);
       console.log(`  ✓ ${published}.md (${group.category})`);

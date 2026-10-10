@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
-import { orphanPages, unpublishedTwins } from "../gen-skill-docs.ts";
+import { indexSummary, orphanPages, unpublishedTwins } from "../gen-skill-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
@@ -103,6 +103,21 @@ describe("generated skill instruction pages", () => {
       }
     }
     expect(unrebased).toEqual([]);
+  });
+});
+
+describe("indexSummary", () => {
+  test("a short line is kept whole", () => {
+    expect(indexSummary("A short summary.")).toBe("A short summary.");
+  });
+  test("a cut inside a link target is extended to the link's end", () => {
+    const line = `Process: [\`a/b.bpmn\`](../../en/cat-harness/processes/getting-started.html) and more text after it.`;
+    const got = indexSummary(line, 40);
+    expect(got).toBe("Process: [`a/b.bpmn`](../../en/cat-harness/processes/getting-started.html)");
+  });
+  test("a cut outside any link stays at the limit", () => {
+    const line = "[a](b.html) " + "x".repeat(200);
+    expect(indexSummary(line, 30)).toBe(line.slice(0, 30));
   });
 });
 
