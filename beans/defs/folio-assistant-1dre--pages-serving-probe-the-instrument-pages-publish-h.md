@@ -3,8 +3,9 @@
 title: 'PAGES SERVING PROBE: the instrument pages-publish-health counts, and it can only be built in CI because egress refuses every route from an agent'
 status: todo
 type: feature
+priority: normal
 created_at: 2026-09-26T03:55:45Z
-updated_at: 2026-09-26T03:55:45Z
+updated_at: 2026-10-10T16:53:55Z
 parent: folio-assistant-1xhc
 ---
 
@@ -89,3 +90,17 @@ check names a person.
 - [ ] The enforcement question above is answered from evidence, and
       `STAGING_WARN_BYTES`' basis says which of the two readings is true
 - [ ] It is NOT wired into `gates`, and the exemption states why
+
+
+## Owner decision
+
+(Lane B drain, 2026-10-10.) The bean asks for the probe's observation to be **committed**, but since arc `3fva` and `5hox` health and QA results stay off main (`test/health/results/` is gitignored), so it is unclear where the observation should live. The reader, `pagesPublishHealthCheck` in cat-harness-tools `test/health/checks.ts`, is here. The writer is a CI job in folio-assistant's `health-check.yml`, which has the network access.
+
+Where should the CI job record the pages-serving observation?
+
+1. **(Recommended)** **On `qa-reports`**, under `main/<sha>/health/pages-serving.json`, using the existing qa-store publish. The health check reads it with `qa:fetch`, stays offline at sweep time, and treats a missing or old entry as `unknown` with its date.
+2. **Committed on main** as a small dated file (e.g. `test/health/observations/pages-serving.json`): one deliberate exception to results-off-main, because it is an instrument reading, not a verdict.
+3. **As a workflow artifact plus a tracking-issue comment**, with the check reading the issue. That needs the API at sweep time, which the bean rules out.
+4. **Not built:** keep `instruments = 0` and the `major` finding as the standing reminder.
+
+**Default if no answer:** option 4. Nothing is built, and the finding stays as it is today.
