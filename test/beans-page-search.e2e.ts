@@ -26,7 +26,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
-import { declaredPagePath } from "./support/site-pages.ts";
+import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "./support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -44,10 +44,11 @@ function shell(): string {
 <meta name="fa-beans-src" content="/assets/beans/index.json">
 <meta name="fa-todo-src" content="/assets/todos/index.json">
 <style>${CSS}</style>
-<!-- The theme's dark ground, as head_custom.html's first-paint block paints it:
-     the board's inks are written for that ground, and an unstyled white page
-     would fail contrast for a reason no reader ever sees. -->
-<style>html,body{background:#27262b;color:#fff}</style></head><body>
+<!-- The theme's ground, from head_custom.html's own first-paint block: the
+     scheme the board's inks resolve to and the ground under them are one, as
+     on the site. An unstyled white page, or the dark ground under light inks,
+     fails contrast for a reason no reader ever sees. -->
+${firstPaintBlock(SITE)}${SCHEME_INK}</head><body>
 <main class="main-content" id="main-content">
 ${PAGE}
 </main>

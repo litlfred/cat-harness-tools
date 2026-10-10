@@ -13,6 +13,7 @@
  *
  * @module test/support/site-pages
  */
+import { readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
@@ -87,3 +88,23 @@ export function declaredPagePath(harnessRoot: string, id: string, file = "index.
 export function declaredPageUrl(harnessRoot: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale"> = {}): string {
   return servedUrl(repoRootFor(harnessRoot), declaredPageDir(harnessRoot, id, rest));
 }
+
+/**
+ * The site's first-paint block from `_includes/head_custom.html`: the script
+ * that sets `data-fa-scheme` from the stored or OS preference, and the ground
+ * it paints for each scheme. A spec that stands in for the default layout
+ * carries it, so the scheme the inks resolve to and the ground under them are
+ * the same one, as on the site. Painting the dark ground alone, under
+ * Playwright's default light emulation, put the light-scheme inks on the dark
+ * ground: a contrast failure no reader sees. Throws when the markers are gone,
+ * rather than serving a page with no scheme.
+ */
+export function firstPaintBlock(siteDir: string): string {
+  const head = readFileSync(join(siteDir, "_includes", "head_custom.html"), "utf8");
+  const m = /<!-- fa-first-paint:begin -->([\s\S]*?)<!-- fa-first-paint:end -->/.exec(head);
+  if (!m) throw new Error(`no fa-first-paint block in ${join(siteDir, "_includes", "head_custom.html")}`);
+  return m[1]!;
+}
+
+/** Body ink for each scheme's ground, so text outside the board is legible in both. */
+export const SCHEME_INK = `<style>body{color:#fff}html[data-fa-scheme="light"] body{color:#0b0b0b}</style>`;
