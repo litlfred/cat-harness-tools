@@ -93,6 +93,26 @@ jobs:
           ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
       - *unnest
       - *install
+      - name: Mount the graphs kept on branches
+        # beans, todos and fsh-guts live on `cat/cat-harness/<id>` branches,
+        # not on main, as in the index's own CI (`state:mount`). Many tests read
+        # them and refuse an unmounted copy. Mounted one id at a time with
+        # --json, which skips the tools-graph report that fails on lock skew,
+        # and each must come back `mounted`.
+        working-directory: fa
+        run: |
+          for id in beans todos fsh-guts; do
+            bun cat-harness-tools/scripts/state-mount.ts --id "$id" --json > "$RUNNER_TEMP/mount-$id.json"
+            python3 - "$RUNNER_TEMP/mount-$id.json" "$id" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          bad = [g for g in d.get("graphs", []) if g.get("state") != "mounted"]
+          if d.get("state") != "mounted" or bad or not d.get("graphs"):
+              print(f"::error::{sys.argv[2]} did not mount: {json.dumps(d)}")
+              sys.exit(1)
+          print(f"{sys.argv[2]}: mounted")
+          PY
+          done
       - name: bun test
         working-directory: fa
         # The result is judged by the compare job, not by this exit code.
