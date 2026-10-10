@@ -16,7 +16,7 @@
  * cat-harness has none of it.
  */
 import { describe, test, expect, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync, statSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 
@@ -361,13 +361,39 @@ describe("workflow templates (52dz)", () => {
       // ...and the substitution happened: the platform path the caller chose
       // is the one the QA sweep runs from.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain(
-        "vendor/fa/cat-harness/content/pipeline/qa-sweep.ts",
+        "vendor/fa/cat-harness-tools/content/pipeline/qa-sweep.ts",
       );
       // GitHub's own `${{ … }}` expressions survive substitution untouched.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep-nightly.yml"), "utf-8")).toContain(
         "${{ github.run_id }}",
       );
     }
+  });
+
+  test("every platform file a scaffolded folio runs EXISTS in the index (bean cat-tools-yylt)", () => {
+    // The test above checks that the placeholder was SUBSTITUTED. It went on
+    // passing while every path it substituted pointed at
+    // `cat-harness/content/…` and `cat-harness/scripts/…`, which 70lx had
+    // emptied. So resolve each one against the index this test runs in.
+    for (const contentType of ["document", "paper"] as const) {
+      const d = tmp();
+      const r = initFolio(opts(d, { contentType, assistantPath: "vendor/fa" }));
+      const named = new Set<string>();
+      for (const f of r.created) {
+        const abs = join(d, f);
+        if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
+        for (const m of readFileSync(abs, "utf-8").matchAll(/vendor\/fa\/([\w./-]+?\.(?:ts|py|sh|bat|mjs))\b/g)) named.add(m[1]!);
+      }
+      expect(named.size, `${contentType}: no platform path found to check`).toBeGreaterThan(0);
+      const missing = [...named].filter((p) => !existsSync(join(REPO_ROOT, p)));
+      expect(missing, `${contentType} names platform files that do not exist`).toEqual([]);
+    }
+  });
+
+  test("the QA working copy is ignored, so a folio commits no derived verdict (bean 5qy8)", () => {
+    const d = tmp();
+    initFolio(opts(d, { contentType: "document" }));
+    expect(readFileSync(join(d, ".gitignore"), "utf-8")).toMatch(/^test\/results\/$/m);
   });
 
   test("an unknown placeholder is refused, not written through", () => {
