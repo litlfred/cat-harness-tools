@@ -88,7 +88,8 @@ import {
 } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
-import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -832,7 +833,8 @@ function up(repo = REPO): string {
   try {
     return visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL).up;
   } catch {
-    return "../../";
+    // No declaration (a fixture checkout): the depth the declared route has.
+    return siteRootFrom(pageParts({ harness: "cat-harness", visualiser: "processes" }));
   }
 }
 

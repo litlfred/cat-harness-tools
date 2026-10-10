@@ -35,7 +35,7 @@ import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { stripInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
-import { visualiserSitePath } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
@@ -72,13 +72,14 @@ const EDIT_GLYPH = "\u270E";
 /**
  * Where the process pages are: the route of the visualiser cat-harness
  * DECLARES rendered by `processes-viewer` (owner, 2026-10-09:
- * `<base>/<harness>/<visualizer>`), read rather than spelled.
+ * `<base>/<harness>/<visualizer>`, under the page locale — folio-assistant#2527),
+ * read rather than spelled.
  */
 const PROCESSES_ROUTE = ((): string => {
   try {
     return dirname(visualiserSitePath(INSTANCE_ROOT, "processes-viewer").rel);
   } catch {
-    return "cat-harness/processes";
+    return `${PAGE_LOCALE}/cat-harness/processes`;
   }
 })();
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "reference", "skill-instructions");

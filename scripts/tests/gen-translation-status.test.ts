@@ -217,6 +217,17 @@ describe("the date on the page is when the numbers CHANGED", () => {
     expect(html).not.toContain("<script");
   });
 
+  test("the skill link climbs to the SITE ROOT from the page's own depth (folio-assistant#2527)", () => {
+    // The page is `<locale>/<harness>/translation-status/`, three directories
+    // deep; the reference pages are at the site root. A hand-counted `../`
+    // resolved to `<harness>/reference/…`, which does not exist.
+    const html = statusPage({ locales, changedAt: "2026-01-05", scope: "x" });
+    expect(html).toContain('href="../../../reference/skill-instructions/translation-manager.html"');
+    expect(html).not.toContain('href="../reference/');
+    const given = statusPage({ locales, changedAt: "2026-01-05", scope: "x", siteRoot: "../../" });
+    expect(given).toContain('href="../../reference/skill-instructions/translation-manager.html"');
+  });
+
   test("the SCOPE is on the page, so a number cannot be read as covering everything", () => {
     const html = statusPage({ locales, changedAt: "2026-01-05", scope: "cat-harness/translations" });
     expect(html).toContain("cat-harness/translations");
@@ -308,7 +319,9 @@ describe("translation status visualiser wireframe findings (bgrz)", () => {
 
   test("finding 5: onward links to translation-manager skill and source files", () => {
     const html = statusPage({ locales: sampleLocales, changedAt: "2026-10-09", scope: "cat-harness/translations" });
-    expect(html).toContain('href="../reference/skill-instructions/translation-manager.html"');
+    // From the site root, which the page is three directories below
+    // (`<locale>/<harness>/translation-status/`, folio-assistant#2527).
+    expect(html).toContain('href="../../../reference/skill-instructions/translation-manager.html"');
     expect(html).toContain('id="onward-links"');
     expect(html).toContain("https://github.com/litlfred/folio-assistant/tree/main/cat-harness/translations");
     expect(html).toContain("https://github.com/litlfred/folio-assistant/tree/main/cat-harness/translations/fr");

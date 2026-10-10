@@ -26,7 +26,7 @@ import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 
 import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
-import { visualiserSitePath } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -115,7 +115,7 @@ export function processTarget(home: string, presentations: readonly Presentation
 let route: string | undefined;
 /**
  * Where the process pages are: the route of the visualiser cat-harness
- * DECLARES rendered by `processes-viewer` — `cat-harness/processes` (owner,
+ * DECLARES rendered by `processes-viewer` — `en/cat-harness/processes` (owner,
  * 2026-10-09: `<base>/<harness>/<visualizer>`). Read once, never spelled.
  */
 function processesRoute(): string {
@@ -124,7 +124,7 @@ function processesRoute(): string {
   try {
     route = dirname(visualiserSitePath(harness, "processes-viewer").rel);
   } catch {
-    route = "cat-harness/processes";
+    route = `${PAGE_LOCALE}/cat-harness/processes`;
   }
   return route;
 }

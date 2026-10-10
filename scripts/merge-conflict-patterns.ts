@@ -125,8 +125,10 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "glossary",
     // At their DECLARED routes since 2026-10-09 (`<harness>/<visualiser>/`):
-    // core's `glossary` visualiser and cat-harness's `lsi`.
-    globs: ["cat-harness/docs/folio-assistant-core/glossary/**", "cat-harness/docs/cat-harness/lsi/**"],
+    // core's `glossary` visualiser and cat-harness's `lsi` — the latter under
+    // the page locale since folio-assistant#2527, and at its old address until
+    // the site is regenerated.
+    globs: ["cat-harness/docs/folio-assistant-core/glossary/**", "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
     strategy: "take-base",
     why:
       "the generated glossary and LSI pages (173 + 34). Whole-corpus aggregates; concurrent term additions always collide. " +
@@ -142,8 +144,11 @@ export const PATTERNS: readonly ConflictPattern[] = [
     id: "viewer-pages",
     globs: [
       // Each at the route of the visualiser cat-harness DECLARES for it,
-      // `<harness>/<visualiser>/` (owner, 2026-10-09) — they were at the site
-      // root until then.
+      // `<locale>/<harness>/<visualiser>/` (owner, 2026-10-09; the locale in
+      // front since folio-assistant#2527) — they were at the site root until
+      // 2026-10-09, and stay at `<harness>/<visualiser>/` until regenerated.
+      "cat-harness/docs/en/cat-harness/{external-schemas,methodologies,tools}/index.md",
+      "cat-harness/docs/en/cat-harness/processes/*.md",
       "cat-harness/docs/cat-harness/external-schemas/index.md",
       "cat-harness/docs/cat-harness/methodologies/index.md",
       "cat-harness/docs/cat-harness/tools/index.md",
@@ -173,7 +178,11 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "viewer-namespace",
     // declared-path-literal: a GLOB matched against conflicted paths.
-    globs: ["cat-harness/docs/cat-harness/{folio,library,schemas,uploads,voices}/**", "cat-harness/docs/who-iris/catalogue/**"],
+    globs: [
+      "cat-harness/docs/en/cat-harness/{folio,library,schemas,uploads,voices}/**",
+      "cat-harness/docs/cat-harness/{folio,library,schemas,uploads,voices}/**",
+      "cat-harness/docs/who-iris/catalogue/**",
+    ],
     strategy: "take-base",
     why: "the viewer namespace that gen-library-viz, gen-folio-viz and gen-schema-viz place through viewerPlacement(site, \"<handler>/<seg>/<subject>\"); every page is rewritten whole from the corpus and checked by its :viz --check. Its uploads/ pages render uploads/, they are not uploads, so this must precede the `uploads` refusal. Found 2026-10-01 when #1775 refused on four of them.",
   },

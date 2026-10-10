@@ -56,7 +56,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { visualiserSitePath } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { buildQaResult, writeQaResult } from "./qa-results.ts";
 import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "@litlfred/cat-harness/schemas/tool-run.ts";
 import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
@@ -87,16 +87,23 @@ export const LSI_TOOL_ID = "lsi-index";
 /**
  * Where `gen-lsi-viz.ts` writes; never a unit of any index (see `unitsOf`).
  * The route cat-harness DECLARES for the `lsi-viewer` visualiser
- * (`<site>/cat-harness/lsi/`, owner 2026-10-09) — read, never spelled here.
+ * (`<site>/<locale>/cat-harness/lsi/`, owner 2026-10-09; folio-assistant#2527)
+ * — read, never spelled here.
  */
 export const VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute()) + "/";
+/**
+ * The same viewer's OLD address, `<site>/cat-harness/lsi/` (folio-assistant#2527):
+ * where a site not yet regenerated still holds the page. Excluded from every
+ * index for the same reason {@link VIEWER_DIR} is.
+ */
+const OLD_VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute().replace(new RegExp(`^${PAGE_LOCALE}/`), "")) + "/";
 
 function lsiViewerRoute(): string {
   try {
     return dirname(visualiserSitePath(HARNESS, "lsi-viewer").rel);
   } catch {
     // No declaration (a fixture checkout): the route the declaration would give.
-    return "cat-harness/lsi";
+    return `${PAGE_LOCALE}/cat-harness/lsi`;
   }
 }
 
@@ -157,7 +164,7 @@ export function unitsOf(absPath: string, graphTypologies: string[], docs?: strin
     // The index viewer's own page reports on the indexes; indexing it would
     // make every regeneration stale the index it reports on, and the page
     // would never reach a fixed point (the self-reference class of bean 1xrg).
-    .filter((f) => !f.startsWith(VIEWER_DIR))
+    .filter((f) => !f.startsWith(VIEWER_DIR) && !f.startsWith(OLD_VIEWER_DIR))
     .map((f) => ({ id: relative(REPO, f), text: readFileSync(f, "utf8") }))
     .filter((u) => tokenize(u.text).length >= MIN_TOKENS);
 }

@@ -18,6 +18,7 @@ import { join } from "node:path";
 
 import { siteDir, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { harnessTiles, inertNote, ownStatePage, subgraphsOf, subjectPage } from "../harness-tiles.js";
+import { PAGE_LOCALE } from "../viewer-declarations.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -293,7 +294,9 @@ describe("the published paths are the OTHER generators' rules, read rather than 
     // `gen-library-viz.ts` is emphatic: `<base>/who-iris/` is who-iris
     // presenting itself, and a viewer parked there would squat on the
     // instance's own site.
-    expect(subjectPage("cat-harness", "library", "who-iris")).toBe("/cat-harness/library/who-iris/");
+    // Under the page locale (folio-assistant#2527): the old address is a
+    // forwarding page, and nothing we publish links one.
+    expect(subjectPage("cat-harness", "library", "who-iris")).toBe(`/${PAGE_LOCALE}/cat-harness/library/who-iris/`);
   });
 
   test("an alias is the bare segment, and only that", () => {

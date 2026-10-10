@@ -53,7 +53,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
-import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -407,7 +408,16 @@ export function statusPage(doc: {
   scope: string;
   /** Every other instance's declared directory, each its own table. */
   instances?: InstanceStatus[];
+  /**
+   * The prefix that climbs from this page's directory to the SITE ROOT, where
+   * the reference pages live (`reference/skill-instructions/…`). It is the
+   * page's declared route that fixes it — `<locale>/<harness>/<visualiser>/`
+   * is three directories deep — so `main` passes `visualiserSitePath(…).up`;
+   * the default is that same shape, never a hand-counted `../`.
+   */
+  siteRoot?: string;
 }): string {
+  const siteRoot = doc.siteRoot ?? siteRootFrom(pageParts({ harness: "harness", visualiser: "visualiser" }));
   const others = (doc.instances ?? [])
     .map(
       (i) => `
@@ -512,7 +522,7 @@ ${localeTable(i.locales, `${i.instance}-`, i.scope)}`,
 <h1 id="ts-title">translations — status</h1>
 <p class="ts-sub">The gettext side of the <code>translation-sources</code> graph, measured from the files in
 <code>${esc(doc.scope)}</code>. Every number here is derived on each run; none is written down. Governed by the
-<a href="../reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>. These
+<a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>. These
 numbers last <strong>changed</strong> on ${esc(doc.changedAt)}.</p>
 
 <div class="ts-questions-legend">
@@ -544,7 +554,7 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
 <div class="ts-onward">
 <h2 id="onward-links">Onward links</h2>
 <ul>
-  <li><strong>Skill:</strong> <a href="../reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a> — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
+  <li><strong>Skill:</strong> <a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a> — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
   <li><strong>Sources:</strong> <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(doc.scope)}"><code>${esc(doc.scope)}</code> on GitHub</a> — catalogues (<code>.po</code>) and extractable templates (<code>.pot</code>).</li>
 </ul>
 </div>
@@ -608,7 +618,8 @@ function main(): void {
   const assetDir = join(site, "assets", "translation-status");
   // The route cat-harness DECLARES for this Tool's visualiser — never chosen
   // here (owner, 2026-10-09: `<base>/<harness>/<visualizer>`).
-  const pageDir = join(site, dirname(visualiserSitePath(ROOT, VIEWER_TOOL).rel));
+  const sitePath = visualiserSitePath(ROOT, VIEWER_TOOL);
+  const pageDir = join(site, dirname(sitePath.rel));
   const assetPath = join(assetDir, "index.json");
   const pagePath = join(pageDir, "index.html");
 
@@ -616,7 +627,7 @@ function main(): void {
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
   // front matter.
   const page = (changedAt: string) =>
-    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances }), VIEWER_TOOL);
+    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up }), VIEWER_TOOL);
   const json = (changedAt: string) => `${JSON.stringify({ ...doc, changedAt }, null, 2)}\n`;
 
   // The date the NUMBERS last changed is the projection's to say. When the

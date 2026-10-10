@@ -82,7 +82,7 @@ import {
   instanceDirectories,
   nestedDirectories,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { declaredVisualisers, visualiserPageDir, withViewers } from "./viewer-declarations.js";
+import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
@@ -489,12 +489,13 @@ function siteDirMount(
 
 /**
  * Where a visualiser's sub-graph page for one instance is published:
- * `/<harness>/<visualiser>/<subject>/` — `visualiserRoute`, the ONE function
- * every route is computed with (owner, 2026-10-09). The subject never comes
- * first: `<base>/who-iris/` is who-iris presenting itself.
+ * `/<locale>/<harness>/<visualiser>/<subject>/` — `visualiserRoute`, the ONE
+ * function every route is computed with (owner, 2026-10-09), under the page
+ * locale (`pageParts`, folio-assistant#2527). The subject never comes first:
+ * `<base>/who-iris/` is who-iris presenting itself.
  */
 export function subjectPage(handler: string, visualiser: string, subject: string): string {
-  return `/${visualiserRoute({ harness: handler, visualiser, subgraph: subject })}`;
+  return `/${visualiserRoute(pageParts({ harness: handler, visualiser, subgraph: subject }))}`;
 }
 
 /**
@@ -725,7 +726,7 @@ function tileFor(
 
   // THE DECLARATION ALONE (owner, 2026-10-09). A kind's page is the route of
   // a visualiser some harness DECLARES over one of this instance's
-  // directories of that kind — `<base>/<harness>/<visualiser>/[<sub-graph>/]`
+  // directories of that kind — `<base>/<locale>/<harness>/<visualiser>/[<sub-graph>/]`
   // from `visualiserRoute` — and nothing else. Until then this probed two
   // CONVENTIONS first (`/<handler>/<kind>/<name>/`, and `/<kind>/` for the
   // site owner) and fell back to the declaration; a convention is a URL the
@@ -976,9 +977,11 @@ function tileFor(
   const linked = new Set(visualisations.map((v) => v.path).filter((p): p is string => p !== undefined));
   for (const v of declaredVisualisers(repoRoot)) {
     if (v.subgraphs !== "instance") continue;
-    const parts = { harness: v.harness, visualiser: v.id, subgraph: decl.name };
-    if (!existsSync(join(visualiserPageDir(siteDir, parts), "index.html"))) continue;
-    const url = `/${visualiserRoute(parts)}`;
+    // The page under the locale, or at the old address on a site not yet
+    // regenerated (folio-assistant#2527) — the URL is wherever it IS.
+    const at = existingPageDir(siteDir, { harness: v.harness, visualiser: v.id, subgraph: decl.name });
+    if (at === undefined || !existsSync(join(at, "index.html"))) continue;
+    const url = `/${relative(siteDir, at).split(sep).join("/")}/`;
     if (linked.has(url)) continue;
     findings.push(
       `${decl.name}: a viewer is published at ${url} by ${v.harness}'s \`${v.id}\` visualiser, ` +
