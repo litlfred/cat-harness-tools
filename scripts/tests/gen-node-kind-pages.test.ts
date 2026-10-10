@@ -6,9 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, nodeHtml, nodeSection, PAGE_MARK, plannedPages,
+  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, plannedPages,
   unresolvedPages, type FieldInfo,
 } from "../gen-node-kind-pages.ts";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import type { NodeKindEntry } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import type { KindNode } from "@litlfred/cat-harness/schemas/node-kind-nodes.ts";
@@ -132,6 +133,14 @@ describe("plannedPages", () => {
     const pages = plannedPages(index, (id) => (id === "todo" ? [node("todo", "alpha", "t/a", {})] : []));
     expect(pages).toEqual(["en/core/todo", "en/core/todo/alpha", "en/core/todo/alpha/t/a"]);
     expect(kindDir("en", kind("todo"))).toBe("en/core/todo");
+  });
+
+  test("the locales are cat-harness's PUBLISHED_LOCALES — one list, not a second copy (folio-assistant#2527)", () => {
+    // The SAME array, so adding a locale there adds it here with no edit.
+    expect(LOCALES).toBe(PUBLISHED_LOCALES);
+    const index = { kinds: [kind("todo")], unkinded: [], collisions: [] };
+    const pages = plannedPages(index, () => []);
+    expect(pages).toEqual(PUBLISHED_LOCALES.map((l) => `${l}/core/todo`));
   });
 
   test("a subclass's node gets its page under its own kind only, though its parent's pages list it", () => {

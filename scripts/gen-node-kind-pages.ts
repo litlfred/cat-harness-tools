@@ -47,14 +47,20 @@ import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from
 import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import { kindDirectories, nodesOfKind, type KindNode } from "@litlfred/cat-harness/schemas/node-kind-nodes.ts";
 import { isNodeKind } from "@litlfred/cat-harness/schemas/node-kind.ts";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
 import { darkRules } from "./lib/scheme-css.ts";
 import type { VisualiserNavEntry } from "./lib/navbar.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { makeEmit, subjectSection, type ViewerNav } from "./viewer-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The locales a page is written for. See the module comment for why only `en`. */
-export const LOCALES = ["en"] as const;
+/**
+ * The locales a page is written for: cat-harness's `PUBLISHED_LOCALES`, the
+ * one list every page generator reads (folio-assistant#2527), so a locale is
+ * added there once rather than here and in every other generator. See the
+ * module comment for why it is only `en` today.
+ */
+export const LOCALES: readonly string[] = PUBLISHED_LOCALES;
 
 /** Marks a page this generator wrote, so pruning never touches anyone else's. */
 export const PAGE_MARK = "data-fa-node-kind-page";
