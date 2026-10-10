@@ -12,7 +12,7 @@
  *
  * Bean `0mpw`. Schema and the owner's rulings: `schemas/remote-mount.ts`.
  *
- *   bun run cat mount:remote              # plan, fetch, mount, write the lock
+ *   bun run cat mount:remote              # plan, fetch, mount, write the lock, re-render the agent surface if it changed
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *
@@ -38,6 +38,22 @@
  * read is the third, not "nothing mounted". The process exits 0 only when
  * every instance is mounted or local (or nothing is declared), 1 when any is
  * missing, 2 when any could not be determined.
+ *
+ * ## A changed lock re-renders the agent surface
+ *
+ * A mount is not done when the bytes are on disk. A newly pinned layer can
+ * bring new skills, renamed skills and new agent-memory entries, and what an
+ * agent actually reads is the GENERATED surface: `.claude/commands/` (from
+ * the skills, `skill:commands`) and `.claude/agent-memory/` plus the
+ * `.agents/` copies (from the memory nodes, `agent-memory`). Left to a
+ * separate, remembered step, a re-pin commit ships the new layer with the old
+ * surface; that is how folio-assistant#2526 went red on three agent-memory
+ * tests. So when this run CHANGES the lock, it runs both generators from the
+ * checkout root before exiting, and a generator that fails fails the run.
+ * `--no-agent-surface` skips it; `--check`, `--plan` and `--staging` never
+ * run it. Owner, 2026-10-10: *"that should be a part of process/skills/tools
+ * when a new/updated subgraph is mounted... it may have new agentic skills to
+ * re-render and add. same for memory."*
  *
  * ## It never discards work
  *
@@ -953,13 +969,55 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?:
   return { state, text: parts.join("\n\n") };
 }
 
+/**
+ * The generators whose output an agent reads, re-run after a mount changed
+ * the lock. Each finds its own roots, so they run from the checkout root.
+ * Kept to the two that DERIVE the agent surface from mounted layers; adding a
+ * third here is the place to do it, and `remote-mount.md` names the list.
+ */
+export const AGENT_SURFACE_GENERATORS = ["gen-skill-commands.ts", "agent-memory.ts"] as const;
+
+/** Run every {@link AGENT_SURFACE_GENERATORS} entry from `root`; `ok` is false if any exits non-zero. */
+export function regenerateAgentSurface(root: string): { ok: boolean; lines: string[] } {
+  const lines: string[] = [];
+  let ok = true;
+  for (const g of AGENT_SURFACE_GENERATORS) {
+    const r = spawnSync(process.execPath, [join(import.meta.dir, g)], { cwd: root, encoding: "utf-8" });
+    const pass = r.status === 0;
+    ok &&= pass;
+    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" | ")}`}`);
+  }
+  return { ok, lines };
+}
+
+/** The lock's bytes, or `undefined` when there is none — compared before and after a mount. */
+function lockBytes(root: string): string | undefined {
+  const f = join(root, mountLockFilename());
+  return existsSync(f) ? readFileSync(f, "utf-8") : undefined;
+}
+
+/**
+ * After a mount: when the lock changed and the caller did not opt out,
+ * re-render the agent surface and fold its outcome into the exit code.
+ */
+function afterMount(root: string, before: string | undefined, argv: string[], code: number): number {
+  if (argv.includes("--no-agent-surface") || lockBytes(root) === before) return code;
+  const r = regenerateAgentSurface(root);
+  console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
+  if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  return r.ok ? code : Math.max(code, 1);
+}
+
 if (import.meta.main) {
   const argv = process.argv.slice(2);
   const at = argv.indexOf("--instance");
   if (at === -1) {
-    const r = remoteFanOut(checkoutRootFor(process.cwd()), { check: argv.includes("--check"), purpose: argv.includes("--staging") ? "staging" : "mount" });
+    const root = checkoutRootFor(process.cwd());
+    const mounting = !argv.includes("--check") && !argv.includes("--staging");
+    const before = lockBytes(root);
+    const r = remoteFanOut(root, { check: argv.includes("--check"), purpose: argv.includes("--staging") ? "staging" : "mount" });
     console.log(r.text);
-    process.exit(exitCode(r.state));
+    process.exit(mounting ? afterMount(root, before, argv, exitCode(r.state)) : exitCode(r.state));
   }
   const instanceRoot = resolve(argv[at + 1]!);
   if (argv.includes("--check")) {
@@ -972,9 +1030,10 @@ if (import.meta.main) {
     console.log(JSON.stringify({ instances: p.instances, outcomes: p.outcomes }, null, 2));
     process.exit(exitCode(p.mounts.length ? summarise(p.outcomes).state : "not-enabled"));
   }
+  const before = lockBytes(instanceRoot);
   const r = mountRemote({ instanceRoot, purpose: argv.includes("--staging") ? "staging" : "mount" });
   const state = r.plan.mounts.length ? summarise(r.plan.outcomes).state : "not-enabled";
   console.log(reportOutcomes("Remote mounts", state, state === "not-enabled" ? "no `remoteMounts` declared" : summarise(r.plan.outcomes).reason, r.plan.outcomes));
   if (r.excluded.length) console.log(`\nAdded to this worktree's info/exclude (not committed): ${r.excluded.map((p) => `\`${p}/\``).join(", ")}.`);
-  process.exit(exitCode(state));
+  process.exit(argv.includes("--staging") ? exitCode(state) : afterMount(instanceRoot, before, argv, exitCode(state)));
 }
