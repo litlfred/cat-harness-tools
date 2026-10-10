@@ -112,7 +112,21 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
   test("every committed kg-audit sidecar, in every instance, validates", async () => {
     const byInstance = sidecarsByInstance();
     const others = [...byInstance.keys()].filter((k) => k !== "cat-harness");
-    expect(others.length, `sidecars found only in: ${[...byInstance.keys()].join(", ")}`).toBeGreaterThanOrEqual(5);
+    // ANTI-VACUITY, DERIVED rather than counted (owner, 2026-10-10: "derive
+    // the floor"). The floor was a literal 5; smart-base stopped committing
+    // kg-audit sidecars when QA results moved to the `qa-reports` branch,
+    // only 4 instances remained, and the test failed with nothing broken.
+    // What an instance commits says whether it commits sidecars: `kg:audit`
+    // writes `kg-qa.manifest.json` beside them. So every instance whose home
+    // holds a manifest must ALSO hold sidecars (a manifest with none is the
+    // regression this guards), and the sweep must reach at least one instance
+    // other than the auditor, which is the population bean `676g` is about.
+    const declaring = instanceRootsIn(REPO)
+      .filter((inst) => existsSync(join(kgQaHomeFor(inst, HARNESS).root, "kg-qa.manifest.json")))
+      .map((inst) => relative(REPO, inst) || ".");
+    const withoutSidecars = declaring.filter((k) => !(byInstance.get(k) ?? []).some((f) => f.endsWith(".kg-qa.json")));
+    expect(withoutSidecars, "instances with a kg-qa manifest but no kg-audit sidecars").toEqual([]);
+    expect(others.length, `sidecars found only in: ${[...byInstance.keys()].join(", ")}`).toBeGreaterThanOrEqual(1);
 
     const offences: string[] = [];
     let n = 0;
