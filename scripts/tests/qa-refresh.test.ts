@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { QA_WRITERS, assess, claimants, globToRegExp, mayRestore, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
+import { QA_WRITERS, assess, carriedByMount, claimants, globToRegExp, mayRestore, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
 import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "../qa-store.ts";
 import { movedRoots, type MovedInventory } from "../qa-verify-moved.ts";
 import { TOOLS_ROOT } from "../lib/roots.ts";
@@ -406,5 +406,35 @@ describe("only what a writer declares it rewrites is restored, and each restore 
       ["docs:pages", "cat-harness/skills/sdlc/sdlc-core/rendered-impact.md"],
     ];
     for (const [w, path] of lostThen) expect([w, mayRestore(by.get(w)!, path)]).toEqual([w, false]);
+  });
+});
+
+describe("carriedByMount — a mounted instance's committed qa files are not `unclaimed`", () => {
+  test("only paths under a mounted root are carried, and a prefix is not a root", () => {
+    const paths = [
+      "who-iris/test/results/translation-roundtrip/agents/adjudication-ar.tsv",
+      "who-iris-extra/test/results/x.json",
+      "test/results/root.json",
+      "cat-harness/test/results/kg-qa/a.json",
+    ];
+    expect(carriedByMount(paths, ["who-iris", "cat-harness/"])).toEqual([
+      "who-iris/test/results/translation-roundtrip/agents/adjudication-ar.tsv",
+      "cat-harness/test/results/kg-qa/a.json",
+    ]);
+  });
+
+  test("no mounts carries nothing", () => {
+    expect(carriedByMount(["who-iris/test/results/a.json"], [])).toEqual([]);
+  });
+
+  test("a carried path passed as tracked is not reported unclaimed", () => {
+    const inventory: MovedInventory = {
+      directories: [{ path: "who-iris/test/results", files: [{ path: "who-iris/test/results/translation-roundtrip/iris-catalogues.qa-results.json", bytes: 1 }] }],
+      files: 1,
+      bytes: 1,
+    };
+    const carried = carriedByMount(inventory.directories[0]!.files.map((f) => f.path), ["who-iris"]);
+    const report = assess({ mode: "computed", inventory, runs: [], commit: "abc", tracked: carried });
+    expect(report.unclaimed).toEqual([]);
   });
 });

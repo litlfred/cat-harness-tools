@@ -97,6 +97,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 
 export { REFRESH_SCHEMA, refreshReportComplete };
 export const REFRESH_EXIT = { complete: 0, incomplete: 1, unknown: 2 } as const;
@@ -405,6 +406,20 @@ export function trackedQaFiles(repoRoot: string, roots: readonly string[]): stri
   return git(repoRoot, ["ls-files", "-z", "--", ...roots]).split("\0").filter(Boolean);
 }
 
+/**
+ * The qa files a REMOTE MOUNT laid down: paths under a mounted instance's root,
+ * on disk before any writer runs. In a composed checkout a mount is ignored by
+ * the aggregate's git, so `trackedQaFiles` names none of its files, but each one
+ * was laid down from the mount's pinned commit and checked against its lock. Its
+ * provenance is that commit, the same reason a tracked file is not `unclaimed`.
+ * Measured 2026-10-10: who-iris's committed `test/results/translation-roundtrip/`
+ * results were read as 11 `unclaimed` files, which failed every QA working copy.
+ */
+export function carriedByMount(paths: readonly string[], mountedRoots: readonly string[]): string[] {
+  const prefixes = mountedRoots.map((r) => r.replace(/\/+$/, "") + "/");
+  return paths.filter((p) => prefixes.some((pre) => p.startsWith(pre)));
+}
+
 /** Tracked paths that differ from HEAD, in the index or the working tree. */
 function dirtyTracked(repoRoot: string): Set<string> {
   return new Set(
@@ -572,6 +587,11 @@ function main(argv: string[]): number {
   // in CI on #2080 for exactly this. On main the directories exist because their
   // sidecars are committed; this restores that, nothing more.
   for (const r of roots) mkdirSync(join(repoRoot, r), { recursive: true });
+  const mounted = [...mountedInstanceRoots(repoRoot).values()].map((abs) => relative(repoRoot, abs));
+  const carried = carriedByMount(
+    movedInventory(repoRoot, roots).directories.flatMap((d) => d.files.map((f) => f.path)),
+    mounted,
+  );
   // A writer may rewrite committed files beside its QA output (bean `72a8`);
   // restore those so the gates judge the tree that was committed.
   // Each restore is backed up first, so a wrong guess costs nothing: the file
@@ -604,7 +624,7 @@ function main(argv: string[]): number {
     console.log(`qa:refresh: LEFT ${left.length} changed committed file(s) in place — the writer running does not declare it rewrites them, so they may be somebody's edit:`);
     for (const { p, w } of left) console.log(`  left ${p}  (changed while ${w} ran; add it to that writer's \`rewrites\` if the writer did it)`);
   }
-  const report = assess({ mode, inventory: movedInventory(repoRoot, roots), runs, commit, tracked });
+  const report = assess({ mode, inventory: movedInventory(repoRoot, roots), runs, commit, tracked: [...tracked, ...carried] });
   const out = resolve(one("report") ?? join(repoRoot, "build", "qa-refresh.json"));
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(report, null, 2) + "\n");
