@@ -42,12 +42,13 @@ export default defineConfig({
   // `test/results/`, `tests/` because this one line pointed here. An id in a
   // declaration is the expensive thing to move, a `testDir` is one line, so
   // the specs came to the declaration rather than the other way round.
-  // `cat-harness/test`: the specs moved with the instance (bean `wggr`) while
-  // this config stays at the REPOSITORY root, beside `package.json`, because
-  // `playwright test` is run from there. A stale `testDir` does not error — it
-  // collects ZERO specs and reports a clean run, which is the `dh4f` shape and
-  // exactly what a green e2e job over nothing would have looked like.
-  testDir: '../cat-harness/test',
+  // `./test`: the specs moved from `cat-harness/test` to this layer with the
+  // code (bean 70lx), and this config moved beside them. It still named
+  // `../cat-harness/test` until bean `cat-tools-g9m3`, and so did
+  // `globalSetup` and the web server below. A stale `testDir` does not error —
+  // it collects ZERO specs and reports a clean run, which is the `dh4f` shape
+  // and exactly what a green e2e job over nothing would have looked like.
+  testDir: './test',
   // `*.e2e.ts`, not `*.spec.ts`: `bun test` collects `*.spec.*` anywhere in
   // the tree and chokes on Playwright's `test.describe()`. Keeping the two
   // runners on separate conventions is what stops an e2e spec reddening the
@@ -73,7 +74,7 @@ export default defineConfig({
   // with no shell, so an interpolation there reaches the local gate run as
   // literal text (the bean `9zok` shape). Unset means the whole suite.
   shard: parseShard(process.env.E2E_SHARD),
-  globalSetup: '../cat-harness/test/e2e-global-setup.ts',
+  globalSetup: './test/e2e-global-setup.ts',
   // `list` prints to the job log; on CI an HTML report is written BESIDE it so
   // the workflow can keep it as an artifact.
   //
@@ -115,7 +116,7 @@ export default defineConfig({
   // root until 2026-10-06 and moved beside the e2e specs it serves (bean
   // `ar1s`, phase 3); it still serves the REPOSITORY root, two levels up.
   webServer: {
-    command: 'node cat-harness/test/test-server.mjs',
+    command: 'node cat-harness-tools/test/test-server.mjs',
     // The command runs in `cwd`, which defaults to this file's directory.
     cwd: '..',
     port: 8080,

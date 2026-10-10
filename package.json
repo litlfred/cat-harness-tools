@@ -268,7 +268,7 @@
     "start:stdio": "bun run cat-harness-tools/src/index.ts --stdio",
     "state:push": "bun run cat-harness-tools/scripts/state-push.ts",
     "state:seed": "bun run cat-harness-tools/scripts/state-seed.ts",
-    "test:e2e": "playwright test -c cat-harness-tools/playwright.config.ts",
+    "test:e2e": "bunx --bun playwright test -c cat-harness-tools/playwright.config.ts",
     "translation:catalogue:check": "bun run cat-harness-tools/scripts/check-translation-catalogue.ts",
     "translated-links:check": "bun run cat-harness-tools/scripts/check-translated-link-depth.ts --check",
     "translated-links:fix": "bun run cat-harness-tools/scripts/check-translated-link-depth.ts",
