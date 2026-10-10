@@ -183,7 +183,7 @@ test("without docs-ui.js the launcher is LEFT OUT and fsh-guts is a link — own
   await serve(page, railedBare(LIVE));
   const row = page.locator("nav.fa-nav .fa-nav-icons");
   await expect(row).toHaveCount(1);
-  await expect(row.locator('[aria-label="More actions"]')).toHaveCount(0);
+  await expect(row.locator('[aria-label^="More actions"]')).toHaveCount(0);
   await expect(row.locator(".fa-nav-scheme")).toHaveCount(0);
   if (LIVE.icons.includes("fsh-guts")) {
     await expect(row.locator("button[data-fa-fsh-guts-open]")).toHaveCount(0);

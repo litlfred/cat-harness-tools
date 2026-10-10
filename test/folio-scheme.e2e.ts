@@ -96,7 +96,7 @@ test.describe("a folio's page, with no just-the-docs", () => {
   test("the launcher is LEFT OUT where there is no panel for it to open", async ({ page }) => {
     await load(page);
     await expect(page.locator(".fa-nav-icons")).toHaveAttribute("data-fa-row", "full");
-    await expect(page.locator('.fa-nav-icons [aria-label="More actions"]')).toHaveCount(0);
+    await expect(page.locator('.fa-nav-icons [aria-label^="More actions"]')).toHaveCount(0);
     await expect(page.locator('.fa-nav-icons a[href="https://example.org/beans/"]')).toHaveCount(1);
   });
 });
