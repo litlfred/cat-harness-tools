@@ -944,7 +944,7 @@ if (import.meta.main) {
 
   const paths = args.filter((a) => !a.startsWith("--"));
   if (paths.length === 0) {
-    console.log("Usage: bun run scripts/content-compile-gates.ts [--list] <path1> <path2> ...");
+    console.log("Usage: bun run cat-harness-tools/scripts/content-compile-gates.ts [--list] <path1> <path2> ...");
     process.exit(0);
   }
 

@@ -217,7 +217,7 @@ export function formatParityReport(report: ToolParityReport): string {
     `# MCP-vs-CLI Tool Parity Report`,
     ``,
     `- **Measurement Date**: ${report.date}`,
-    `- **Measurement Command**: \`bun run cat check:tool-parity\` (or \`bun run scripts/check-tool-parity.ts\`)`,
+    `- **Measurement Command**: \`bun run cat check:tool-parity\` (or \`bun run cat-harness-tools/scripts/check-tool-parity.ts\`)`,
     `- **Total Declared Tools**: ${report.totalTools}`,
     ``,
     `## Tool Surface Distribution`,
