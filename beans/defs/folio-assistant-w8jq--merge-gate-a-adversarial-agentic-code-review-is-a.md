@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-03T08:11:58Z
+updated_at: 2026-10-10T17:01:51Z
 parent: folio-assistant-nok9
 ---
 
@@ -79,3 +79,12 @@ found-nothing is the defect this repo keeps paying for (beans `0qjq`, `zjm1`,
 Design: `merge-gate-2026-10-02.md` §1.1 and §5.1 (rows G3/G4). Tracking bean:
 `5ge1`.
 
+
+## Progress 2026-10-10 (lane B drain re-triage)
+
+- [x] **Provenance, with the negative case:** `detectAgentProvenance` reads trailers (Co-Authored-By Claude, Claude-Session), agent branch prefixes, bot actors and PR markers. A human-only PR requires nothing. All covered in `scripts/tests/adversarial-review-gate.test.ts`.
+- [x] **Independence and head SHA:** a review by the same session is rejected, an agent reviewer without a model is incomplete, and a moved head makes the review `stale`. Tested.
+- [x] **Whole diff:** truncated coverage, or a changed file left unreviewed, is `unknown`, never a pass, and (warn-only) not blocking. Open red flags report `would-have-blocked`. Tested.
+- [~] **Sidecar and required check:** the verdict shape (`merge-review/v1`, `adversarial_reviews[]`) is done (abmq), and `check:adversarial-review` (`scripts/check-adversarial-review.ts`) reads it. **Not wired:** no folio-assistant workflow runs it as a check, so nothing reads the verdict on a PR. That wiring belongs to folio-assistant.
+- [ ] **Merge-train composition:** not verified here.
+- [ ] **BPMN:** `code-change-review.bpmn` `Task_Review` documents the adversarial review but its `skill ref` is `code-node-review`, and no `prepare-merge` step checks the verdict. Those edits belong to cat-harness (process definitions).
