@@ -23,7 +23,6 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { readBeans, type BeanNode } from "./beans.ts";
 import { walkBlocks } from "../content/pipeline/qa-utils.ts";
-import { BeanFrontMatterSchema } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { KNOWN_LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 
@@ -121,22 +120,6 @@ export interface TraceOptions {
   blocks?: TraceableBlock[];
 }
 
-const COMMON_DISALLOWED_PREFIXES = new Set([
-  "http",
-  "https",
-  "file",
-  "status",
-  "type",
-  "priority",
-  "parent",
-  "blocking",
-  "blocked_by",
-  "tags",
-  "targets",
-  "created_at",
-  "updated_at",
-]);
-
 /**
  * Extract explicit targets from bean front-matter or bean node.
  */
@@ -195,7 +178,7 @@ export function extractInferredTargets(text: string, explicitTargets: string[] =
   // 2. Package-qualified Lean declaration URIs: pkg:Namespace.Decl
   const leanRefRe = /\b([a-zA-Z0-9_-]+:[A-Z][a-zA-Z0-9_]*(?:\.[A-Za-z0-9_]+)+)\b/g;
   while ((match = leanRefRe.exec(text)) !== null) {
-    let candidate = match[1]!.replace(/[.,;:!?)\]'"-]+$/, "");
+    const candidate = match[1]!.replace(/[.,;:!?)\]'"-]+$/, "");
     if (!explicitSet.has(candidate) && !found.includes(candidate)) {
       found.push(candidate);
     }
@@ -204,7 +187,7 @@ export function extractInferredTargets(text: string, explicitTargets: string[] =
   // 3. Bare qualified Lean declarations: Namespace.Decl e.g. QOU.QuantumUniverse or QOU.TransferMatrix.lifting_exists
   const bareLeanRe = /\b([A-Z][a-zA-Z0-9_]*(?:\.[A-Za-z0-9_]+)+)\b/g;
   while ((match = bareLeanRe.exec(text)) !== null) {
-    let candidate = match[1]!.replace(/[.,;:!?)\]'"-]+$/, "");
+    const candidate = match[1]!.replace(/[.,;:!?)\]'"-]+$/, "");
     // Avoid matching typical file extensions like Math.MD
     if (/\.(md|ts|js|json|jsonld|lean)$/i.test(candidate)) continue;
     // Don't add if already captured as part of a package-qualified ref e.g. pkg:candidate
@@ -557,7 +540,7 @@ export function evaluateTraceabilityAudit(options: TraceOptions = {}): KgCriteri
 
 /** Format human-readable CLI summary. */
 export function formatTraceabilityReport(report: TraceabilityReport): string {
-  const { coverage, beans, blocks } = report;
+  const { coverage, beans } = report;
   const lines: string[] = [];
 
   lines.push("=== Work Traceability Report ===");

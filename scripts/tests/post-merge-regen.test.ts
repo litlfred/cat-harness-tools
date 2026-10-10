@@ -13,7 +13,6 @@ import {
   resolveRepoRoot,
   type GhExecutor,
   type GitExecutor,
-  type PostMergeRegenReport,
 } from "../post-merge-regen.ts";
 import type { Runner } from "../regen-after-merge.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

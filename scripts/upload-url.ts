@@ -43,7 +43,6 @@ import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import {
-  instanceRootFor,
   readDeclaration,
   repoRootFor,
   rootForScope,

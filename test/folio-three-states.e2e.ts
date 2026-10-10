@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutStandIn, parseThemed } from "./support/themed-page.ts";
@@ -33,7 +32,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * it is reachable from a DIFFERENT surface than the one that closed it."*
  */
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 // The published site directory, ABSOLUTE. Named for what it holds: the first

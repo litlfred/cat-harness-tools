@@ -24,8 +24,7 @@
 import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -40,7 +39,6 @@ interface QrModel {
 }
 type QrFactory = (typeNumber: number, errorCorrectionLevel: string) => QrModel;
 
-const here = dirname(fileURLToPath(import.meta.url));
 const ctx: { qrcode?: QrFactory } = {};
 createContext(ctx);
 runInContext(readFileSync(join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets/js/vendor/qrcode.js"), "utf8"), ctx);

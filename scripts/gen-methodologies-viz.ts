@@ -56,8 +56,7 @@
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, posix } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, join, relative, resolve, posix } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
 import {

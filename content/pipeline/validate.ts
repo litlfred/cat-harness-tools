@@ -35,7 +35,6 @@ import { validateSimulatorAssets } from "./validate-simulator";
 import { findContentRepoRoot, findPapers } from "./repo-root";
 import { blockQaPath, blockOfQaPath, BLOCK_QA_SUFFIX } from "./qa-paths";
 import { referenceRegistryConfigured, getReferenceRegistry } from "./references-registry-di";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 // ── File discovery ───────────────────────────────────────────────
 

@@ -35,11 +35,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { join } from "node:path";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const ROOT = join(HARNESS_ROOT);
 const SPEC_DIR = join(TOOLS_ROOT, "test");  // bean 70lx: the specs moved here
 
 /**

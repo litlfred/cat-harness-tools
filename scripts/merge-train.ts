@@ -58,7 +58,7 @@ import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { plan } from "./merge-base.ts";
 import { git, parseMemberSpec, resolveMember, type GitResult } from "./merge-pipeline-git.ts";
 import { TASK_IO, type ScriptIO } from "./task-io.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 export type MemberStatus = "merged" | "already-contained" | "refused" | "would-merge" | "would-refuse";
 

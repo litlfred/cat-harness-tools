@@ -5,10 +5,6 @@ import { join } from "node:path";
 import {
   auditBlockReferences,
   auditFolioBlocks,
-  checkComputationScript,
-  checkMacroTemplates,
-  checkRelativeLink,
-  checkSingleBlock,
   parseBlockManifest,
   resolveBlockReferences,
   BLOCK_REFERENCE_RESOLVES_CRITERION,

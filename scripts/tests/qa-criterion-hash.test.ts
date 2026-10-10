@@ -1,31 +1,13 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { join } from "path";
 import {
   criterionSourceHash,
   _resetCriterionHashCache,
 } from "../../content/pipeline/qa-criterion-hash";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
-/**
- * The INSTANCE_ROOT checkout — this file's own location, NOT `process.cwd()`.
- *
- * The real-module guard at the bottom of this file used to build its path with
- * `join(process.cwd(), ...)`, and `run-tests.sh` does `cd "$SCRIPT_DIR"` before
- * `bun test`. So under the canonical runner the guard looked for the checker at
- * `scripts/tests/content/pipeline/qa-checkers-voice.ts`, `parseFile` hit ENOENT
- * and returned null, and the assertion failed on a null that had nothing to do
- * with how checkers are written — the one thing the guard exists to watch. It
- * resolved only when the suite happened to be invoked from the repo root.
- *
- * Same anchor as `helpers.ts`'s `REPO_ROOT`, and the right one for a INSTANCE_ROOT
- * file even when a folio embeds this repo as a `folio-assistant/` symlink:
- * `import.meta.dir` resolves back through the symlink to the real platform
- * path. (Anchoring CONTENT paths here would be the opposite mistake — see the
- * `FOLIO_ROOT` note in `helpers.ts`.)
- */
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 const VOICE_CHECKERS = join(TOOLS_ROOT, "content", "pipeline", "qa-checkers-voice.ts");
 
 // Each case writes a throwaway checker module. Hashes are memoized by absolute

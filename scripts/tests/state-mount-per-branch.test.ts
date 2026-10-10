@@ -34,7 +34,7 @@ import { dirname, join } from "node:path";
 
 import { mountState, report } from "../state-mount.js";
 import { pushState, report as pushReport } from "../state-push.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const MANIFEST = JSON.stringify({ $schema: "state-manifest/v1", status: "seed", authoritative: false, keyedBy: "tip" });

@@ -32,7 +32,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { isTranslatable } from "@litlfred/cat-harness/schemas/translation-tools.ts";
 import {

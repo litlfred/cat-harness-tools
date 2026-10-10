@@ -62,7 +62,7 @@ import {
   pathContextRanges,
   stripComments,
 } from "./check-declared-paths.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");

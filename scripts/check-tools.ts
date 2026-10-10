@@ -30,8 +30,7 @@
  * @covers tools, skills
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
 import { TOOL_TYPES, isInjectionSafe } from "@litlfred/cat-harness/schemas/tool-types.js";

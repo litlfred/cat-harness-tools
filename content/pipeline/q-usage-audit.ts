@@ -27,7 +27,6 @@ import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/cat-harn
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   Q_USAGE_AUTOMATED_CHECKERS,
   Q_USAGE_CRITERION_IDS,
@@ -60,16 +59,7 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 // as having none).
 import { blockQaPath, existingBlockQaPath } from "./qa-paths.ts";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
-
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Root of the PLATFORM checkout (folio-assistant). Correct anchor for the
- * *checker script* hash below — `qa-checkers-q-usage.ts` genuinely lives
- * here — and for nothing else.
- */
-const PLATFORM_ROOT = resolve(HARNESS_ROOT);
+import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /**
  * Root of the CONTENT repo being audited.

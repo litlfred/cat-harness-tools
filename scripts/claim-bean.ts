@@ -83,14 +83,13 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import { CLOSED_STATUSES } from "./bean-store-read.ts";
 import { appendNoteToText, findBean, noteBean, setFieldInText, updateBean } from "./beans-fallback.js";
 import { BranchStore, resolveTipLocation, type BranchStoreOptions } from "./branch-store.ts";
 import { graphReadPath } from "./graph-read.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 /** The claim line `noteBean` just appended, exactly as it was written. */
 const CLAIM_NOTE = /^_\d{4}-\d{2}-\d{2}T[\d:]+Z_ — Claimed by \S+ —.*$/m;
@@ -168,19 +167,6 @@ export function mirrorClaimNote(repo: string, work: string, id: string): "mirror
   writeFileSync(onto.path, `${local.replace(/\s*$/, "")}\n\n${note}\n`, "utf-8");
   return "mirrored";
 }
-
-/**
- * Where the platform's own code lives — NOT where the beans are.
- *
- * Kept only so the module can name itself in errors. The bean store defaults to
- * `process.cwd()`, because `AGENTS.md` is explicit that "folio-assistant is the
- * platform, not the content": this script ships in the platform and is run
- * inside a FOLIO, whose `beans/` is the store being claimed against. Defaulting
- * to the platform root looked right and was measured wrong immediately — run
- * from a folio it reported `no bean matching "<id>" in this store` for a bean
- * sitting in front of it.
- */
-const PLATFORM_ROOT = join(HARNESS_ROOT);
 
 /** How many times a non-fast-forward is re-tried before giving up. */
 export const MAX_ATTEMPTS = 3;

@@ -38,13 +38,10 @@ import { loadGates } from "./gates.ts";
 import {
   DEFAULT_MAX_PASSES,
   UNGATED_INPUTS,
-  isJudgeCheck,
   regenPass,
   regenToFixpoint,
   repairableGates,
-  type Outcome,
   type Pair,
-  type Result,
   type Runner,
 } from "./regen-after-merge.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";

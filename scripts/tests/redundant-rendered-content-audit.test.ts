@@ -19,15 +19,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  auditRenderedBloat,
-  classifyCandidate,
-  extractHtmlBlocks,
-  loadCommittedKgFiles,
-  matchKgFile,
-  CRITERION_ID,
-  type ExtractedBlock,
-} from "../audit-rendered-bloat.js";
+import { auditRenderedBloat, classifyCandidate, extractHtmlBlocks, CRITERION_ID } from "../audit-rendered-bloat.js";
 import { KgQaReportSchema, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
 
 describe("redundant-rendered-content-audit registration", () => {

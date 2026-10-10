@@ -22,7 +22,7 @@ import {
 import { checkPythonDeps, scanImports } from "../check-python-deps.ts";
 import { dockerfileFindings, dockerfileOf, generatedPaths, imageFindings, requirementsBody, staleTiers } from "../gen-python-deps.ts";
 import { tools } from "../../tools/discover.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 // TWO ROOTS, because this file asks two questions of two different trees.
 //

@@ -35,7 +35,6 @@
  */
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { basename, dirname, join, posix, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { z } from "zod";
 import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.ts";
 

@@ -31,7 +31,7 @@ import { join, resolve } from "node:path";
 import { QA_WRITERS, assess, claimants, globToRegExp, mayRestore, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
 import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "../qa-store.ts";
 import { movedRoots, type MovedInventory } from "../qa-verify-moved.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");

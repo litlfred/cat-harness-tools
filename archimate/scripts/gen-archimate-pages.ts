@@ -65,7 +65,7 @@ import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.t
 import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 

@@ -40,8 +40,7 @@
  *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, resolve, sep } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
 import {

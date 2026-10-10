@@ -44,9 +44,8 @@ import { readDeclaredFolioProfile, readFolioProfile } from "../../content/pipeli
 import { initFolio } from "../init-folio";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const PLATFORM_ROOT = join(HARNESS_ROOT);
 const SWEEP = join(TOOLS_ROOT, "content", "pipeline", "qa-sweep.ts");
 
 /** A criterion that opts out of the document profile, and one that does not. */
