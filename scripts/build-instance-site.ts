@@ -12,18 +12,27 @@
  * one command, the same for an agent, a person or a Routine:
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
- *     --instance <name> --title "<label>" --home <page.md> \
- *     --pre "<the instance's own gate>" --source-step "<generator> --into {docs}" \
+ *     --instance <name> --home <page.md> \
+ *     --pre <package script> --source-step <package script> \
  *     [--staging <branch>] [--publish --remote <git url>]
  *
  * Steps, each a stop on failure (never a skip):
  *
- *  1. mount the closure `index.config.json` pins (`remote-mount.ts`), unless `--no-mount`
- *  2. `bun install` in the checkout and in every mounted instance with a package.json
- *  3. each `--pre` command, in the checkout (the instance's own gates)
+ *  1. mount the closure `index.config.json` pins (`remote-mount.ts`), unless `--no-mount`.
+ *     A build writes into its mounts (the harness's `_data/harness.json`, `node_modules`), and
+ *     remote-mount rightly refuses to overwrite a mount that no longer hashes to its lock. So
+ *     `--fresh` first removes exactly the paths the lock names, and only paths the checkout
+ *     itself does not track: an explicit choice, never a default
+ *  2. `bun install --no-save` in the checkout and in every mounted instance
+ *     with a package.json, so a mount still hashes to its lock and the next mount can verify it
+ *  3. each `--pre` package script (`bun run <name>`), in the checkout: the instance's own gates
  *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, compose-docs --shell,
- *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` runs
- *     with `{docs}` replaced by the site source
+ *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
+ *     script runs as `bun run <name> <site source>`
+ *
+ * `--pre` and `--source-step` take package SCRIPT NAMES, never commands: the
+ * Tool contract admits no input that can carry a shell payload (check:tools),
+ * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
  *     everywhere), title and description from the instance's declaration, baseurl from the
  *     git remote (`/<repo>`, or `/<repo>/STAGING/<branch>` for a preview)
@@ -51,7 +60,6 @@ const TOOLS = "cat-harness-tools/scripts";
 export interface BuildOptions {
   root: string;
   instance: string;
-  title?: string;
   linkRoot: string;
   out: string;
   home?: string;
@@ -59,6 +67,8 @@ export interface BuildOptions {
   sourceSteps: string[];
   staging?: string;
   mount: boolean;
+  /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
+  fresh: boolean;
   publish: boolean;
   remote?: string;
   message?: string;
@@ -70,6 +80,9 @@ export function stagingDir(branch: string): string {
   if (seg === "" || seg === "." || seg === "..") throw new Error(`branch ${JSON.stringify(branch)} gives no usable STAGING/ segment`);
   return `STAGING/${seg}`;
 }
+
+/** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
+export const SCRIPT_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
 /** owner and repository name from a GitHub remote URL (https or ssh). */
 export function ownerRepo(url: string): { owner: string; repo: string } | undefined {
@@ -211,20 +224,33 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const remote = capture("git remote get-url origin", root);
   const gh = ownerRepo(remote);
   if (!gh) throw new Error(`origin ${remote} is not a GitHub repository: the base path cannot be read`);
-  const title = o.title ?? decl.title ?? decl.name;
+  const title = decl.title ?? decl.name;
+  for (const n of [...o.pre, ...o.sourceSteps]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
   const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
   const out = resolve(o.out);
   const docs = join(out, "site-source");
   const site = join(out, "_site");
 
+  if (o.fresh) {
+    const lockPath = join(root, "index.lock.json");
+    const paths: string[] = existsSync(lockPath)
+      ? (JSON.parse(readFileSync(lockPath, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
+      : [];
+    for (const p of paths) {
+      if (p === "" || p === "." || p.startsWith("/") || p.split("/").includes("..")) throw new Error(`lock path ${JSON.stringify(p)} is not a subdirectory of the checkout`);
+      if (capture(`git ls-files -- ${JSON.stringify(p)} | head -1`, root) !== "") throw new Error(`${p} holds files the checkout tracks; --fresh removes only mounts`);
+      rmSync(join(root, p), { recursive: true, force: true });
+    }
+    console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
+  }
   if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
   const lockFile = join(root, "index.lock.json");
   const mounted: string[] = existsSync(lockFile)
     ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
     : [];
-  run("install", ["bun install >/dev/null", ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install >/dev/null)`)].join(" && "), root);
-  for (const p of o.pre) run(`pre: ${p}`, p, root);
+  run("install", ["bun install --no-save >/dev/null", ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
+  for (const p of o.pre) run(`pre: ${p}`, `bun run ${p}`, root);
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -234,11 +260,15 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
   run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
   if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-  for (const s of o.sourceSteps) run(`source: ${s}`, s.replaceAll("{docs}", JSON.stringify(docs)), root);
+  for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
 
   // The Gemfile is the mounted harness's, in the site directory its declaration names.
   const harness = join(root, "cat-harness");
-  const gemDir = join(harness, siteDirFor(harness));
+  const harnessSite = join(harness, siteDirFor(harness));
+  // Bundler writes Gemfile.lock beside the Gemfile: copy it out, so the mount stays as pinned.
+  const gemDir = join(out, "gems");
+  mkdirSync(gemDir, { recursive: true });
+  for (const f of ["Gemfile", "Gemfile.lock"]) if (existsSync(join(harnessSite, f))) copyFileSync(join(harnessSite, f), join(gemDir, f));
   writeFileSync(join(out, "build-config.yml"), buildConfig(readFileSync(join(docs, "_config.yml"), "utf-8")));
   writeFileSync(
     join(out, "override.yml"),
@@ -269,11 +299,18 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");
     const message = o.message ?? `Publish ${o.instance} ${capture("git rev-parse --short HEAD", root)}${staging ? ` preview of ${o.staging}` : ""}`;
-    const r = publishSite(
-      staging
-        ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
-        : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" },
-    );
+    // `into` and `keep` arrived in bootstrap-tools#16 (adea857). An older
+    // bootstrap-tools ignores unknown options, so a preview would REPLACE THE
+    // WHOLE BRANCH and a root publish would delete every preview. Refuse
+    // rather than guess: the options are typed locally so this compiles
+    // against either version, and the running one is checked for support.
+    if (!publishSite.toString().includes("o.into")) {
+      throw new Error("the mounted bootstrap-tools' publish-site predates --into/--keep (bootstrap-tools#16): publishing would replace the whole branch; re-pin bootstrap-tools to adea857 or later");
+    }
+    const opts: Parameters<typeof publishSite>[0] & { into?: string; keep?: string[] } = staging
+      ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
+      : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" };
+    const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);
     console.log(r.state === "published" ? `published ${r.commit} (attempt ${r.attempt})` : "branch already current");
   } else {
@@ -293,8 +330,8 @@ if (import.meta.main) {
   const instance = one("--instance");
   if (!instance) {
     console.error(
-      "usage: build-instance-site.ts --root <checkout> --instance <name> [--title <t>] [--link-root <url>] [--out <dir>] [--home <md>]\n" +
-        "         [--pre <cmd>]... [--source-step <cmd with {docs}>]... [--staging <branch>] [--no-mount] [--publish --remote <git url>] [--message <m>]",
+      "usage: build-instance-site.ts --root <checkout> --instance <name> [--link-root <url>] [--out <dir>] [--home <md>]\n" +
+        "         [--pre <script>]... [--source-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]",
     );
     process.exit(2);
   }
@@ -302,7 +339,6 @@ if (import.meta.main) {
     await buildInstanceSite({
       root,
       instance,
-      title: one("--title"),
       linkRoot: one("--link-root") ?? "https://litlfred.github.io/folio-assistant",
       out: one("--out") ?? join(resolve(root), "..", `${instance}-site`),
       home: one("--home"),
@@ -310,6 +346,7 @@ if (import.meta.main) {
       sourceSteps: many("--source-step"),
       staging: one("--staging"),
       mount: !a.includes("--no-mount"),
+      fresh: a.includes("--fresh"),
       publish: a.includes("--publish"),
       remote: one("--remote"),
       message: one("--message"),
