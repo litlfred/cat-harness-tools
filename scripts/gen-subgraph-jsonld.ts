@@ -89,8 +89,8 @@
  * sorted — so `--check` can compare bytes.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-subgraph-jsonld.ts            # write
- *   bun run cat-harness/scripts/gen-subgraph-jsonld.ts --check    # verify
+ *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts            # write
+ *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts --check    # verify
  *
  * Output: `docs/subgraph/<HARNESS>/<PATH>/index[.hydrated].jsonld` (served at
  * `<BASE_URL>/subgraph/…`, since `docs/` is the site root) and

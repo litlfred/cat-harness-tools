@@ -25,8 +25,8 @@
  *     corpus is right to coin.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-term-mapping.ts
- *   bun run cat-harness/scripts/check-term-mapping.ts --check   # compute and judge; write nothing
+ *   bun run cat-harness-tools/scripts/check-term-mapping.ts
+ *   bun run cat-harness-tools/scripts/check-term-mapping.ts --check   # compute and judge; write nothing
  *   … --check --against <ref>   # ...and say what moved against a qa-reports baseline
  *
  * @module scripts/check-term-mapping

@@ -11,9 +11,9 @@
  * the sweep has been run and what it found.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/translation-qa-sweep.ts          # run + write
- *   bun run cat-harness/content/pipeline/translation-qa-sweep.ts --check  # check only
- *   bun run cat-harness/content/pipeline/translation-qa-sweep.ts --json   # JSON output
+ *   bun run cat-harness-tools/content/pipeline/translation-qa-sweep.ts          # run + write
+ *   bun run cat-harness-tools/content/pipeline/translation-qa-sweep.ts --check  # check only
+ *   bun run cat-harness-tools/content/pipeline/translation-qa-sweep.ts --json   # JSON output
  *
  * @module content/pipeline/translation-qa-sweep
  */

@@ -15,7 +15,7 @@
  * ## Usage
  *
  * ```sh
- * bun run cat-harness/scripts/check-change-size.ts [--against origin/main] [--strict]
+ * bun run cat-harness-tools/scripts/check-change-size.ts [--against origin/main] [--strict]
  * ```
  *
  * @covers schemas
@@ -131,7 +131,7 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
 
   if (args.includes("--help")) {
-    console.log(`usage: bun run cat-harness/scripts/check-change-size.ts [--against <ref>] [--strict] [--history <N>]
+    console.log(`usage: bun run cat-harness-tools/scripts/check-change-size.ts [--against <ref>] [--strict] [--history <N>]
 
 Evaluates change size against the ~400 effective lines advisory threshold (FR-009):
 - Code lines: 1.0x weight

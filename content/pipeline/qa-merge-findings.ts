@@ -24,8 +24,8 @@
  *
  * Usage:
  *
- *   bun run cat-harness/content/pipeline/qa-merge-findings.ts --file findings.json
- *   bun run cat-harness/content/pipeline/qa-merge-findings.ts < findings.json
+ *   bun run cat-harness-tools/content/pipeline/qa-merge-findings.ts --file findings.json
+ *   bun run cat-harness-tools/content/pipeline/qa-merge-findings.ts < findings.json
  *
  * @module content/pipeline/qa-merge-findings
  */

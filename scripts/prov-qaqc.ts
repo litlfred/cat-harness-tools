@@ -42,7 +42,7 @@
  * `prov:Activity` that does not validate, or an internal error (a process
  * model that cannot be loaded). `unknown` is never read as permit.
  *
- * Usage:  bun run cat-harness/scripts/prov-qaqc.ts [--check]
+ * Usage:  bun run cat-harness-tools/scripts/prov-qaqc.ts [--check]
  *
  * @module cat-harness/scripts/prov-qaqc
  * @covers workflow-state, policies, scenarios — it re-checks the ODRL policy AFTER the fact

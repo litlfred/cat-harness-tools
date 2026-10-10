@@ -56,12 +56,12 @@
  * pushed a branch that Pages was never told to serve.
  *
  * Usage:
- *   bun run cat-harness/scripts/pages-bootstrap.ts               # derive + report, no probe
- *   bun run cat-harness/scripts/pages-bootstrap.ts --wait        # probe until live, bounded
- *   bun run cat-harness/scripts/pages-bootstrap.ts --wait --timeout 300
- *   bun run cat-harness/scripts/pages-bootstrap.ts --json        # facts for the DMN gate
- *   bun run cat-harness/scripts/pages-bootstrap.ts --provision   # create gh-pages if absent, then report
- *   bun run cat-harness/scripts/pages-bootstrap.ts --remote upstream   # a remote other than origin
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts               # derive + report, no probe
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts --wait        # probe until live, bounded
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts --wait --timeout 300
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts --json        # facts for the DMN gate
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts --provision   # create gh-pages if absent, then report
+ *   bun run cat-harness-tools/scripts/pages-bootstrap.ts --remote upstream   # a remote other than origin
  *
  * Exit codes: 0 live, 0 not-yet (it is not an error to be early), 2 unknown,
  * 3 unprovisioned (no gh-pages branch — run with --provision), 4 --provision
@@ -283,7 +283,7 @@ export function ghPagesBranchState(root: string, remote = "origin"): { state: "p
 /** The command `--provision` runs, for an author who would rather run it by hand. */
 export function provisionCommand(remote = "origin"): string {
   return (
-    `bun run cat-harness/scripts/pages-bootstrap.ts --provision${remote === "origin" ? "" : ` --remote ${remote}`}` +
+    `bun run cat-harness-tools/scripts/pages-bootstrap.ts --provision${remote === "origin" ? "" : ` --remote ${remote}`}` +
     `   # or by hand: git checkout --orphan gh-pages && git rm -rfq . && echo placeholder > index.html && touch .nojekyll && git add index.html .nojekyll && git commit -m "Create gh-pages" && git push ${remote} gh-pages`
   );
 }

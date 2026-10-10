@@ -58,7 +58,7 @@
  * enforcement and which only compares two labels is worse than none.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-read-only-graphs.ts
+ *   bun run cat-harness-tools/scripts/check-read-only-graphs.ts
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";

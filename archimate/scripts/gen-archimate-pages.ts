@@ -8,8 +8,8 @@
  * @covers archimate
  *
  * Usage:
- *   bun run cat-harness/archimate/scripts/gen-archimate-pages.ts --instance <dir> --out <site-dir>
- *   bun run cat-harness/archimate/scripts/gen-archimate-pages.ts --instance <dir> [--check]
+ *   bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts --instance <dir> --out <site-dir>
+ *   bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts --instance <dir> [--check]
  *
  * With `--out`, they are written into a site being built — the way a folio's
  * staging build uses it, since a large model is thousands of nodes and nobody

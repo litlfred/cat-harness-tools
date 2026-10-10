@@ -8,7 +8,7 @@
  * @covers none — a PUBLISHER, not an audit: it builds and deploys one preview and judges nothing
  *
  * ```sh
- * bun run cat-harness/scripts/stage-local.ts --repo ../smart-ra [--branch B] [--dry-run]
+ * bun run cat-harness-tools/scripts/stage-local.ts --repo ../smart-ra [--branch B] [--dry-run]
  * ```
  *
  * ## Why this exists

@@ -83,7 +83,7 @@ for attempt in 1 2 3; do
   # that branch — so this refused to publish and then exited 0, a green step
   # that published nothing (bean `0s6w`).
   rc=0
-  bun run cat-harness/scripts/restore-staging.ts --site "$SITE" --state "$STATE" || rc=$?
+  bun run cat-harness-tools/scripts/restore-staging.ts --site "$SITE" --state "$STATE" || rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "::error::publish-gh-pages: restore-staging exited $rc — refusing to publish a site whose preview set is unknown" >&2
     exit "$rc"
@@ -113,5 +113,5 @@ for attempt in 1 2 3; do
   # The ONE backoff implementation (`06kg`). Path is relative to the job root,
   # which is where this script runs — `7iog` is the check that would catch it
   # if that ever stops being true.
-  bun run cat-harness/scripts/backoff-sleep.ts --attempt "$attempt"
+  bun run cat-harness-tools/scripts/backoff-sleep.ts --attempt "$attempt"
 done

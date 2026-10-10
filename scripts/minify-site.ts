@@ -127,7 +127,7 @@
  * be indistinguishable from a tree already minified. Same rule as
  * `strip-preview-seo.ts`.
  *
- *   bun run cat-harness/scripts/minify-site.ts --site ./_site [--check]
+ *   bun run cat-harness-tools/scripts/minify-site.ts --site ./_site [--check]
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";

@@ -66,8 +66,8 @@
  * `workflow-state` names explicitly.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-processes-viz.ts
- *   bun run cat-harness/scripts/gen-processes-viz.ts --check
+ *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
+ *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";

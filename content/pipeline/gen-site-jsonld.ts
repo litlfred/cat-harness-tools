@@ -34,8 +34,8 @@
  *     keep.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/gen-site-jsonld.ts            # write
- *   bun run cat-harness/content/pipeline/gen-site-jsonld.ts --check    # CI gate
+ *   bun run cat-harness-tools/content/pipeline/gen-site-jsonld.ts            # write
+ *   bun run cat-harness-tools/content/pipeline/gen-site-jsonld.ts --check    # CI gate
  *
  * @covers docs
  */
@@ -238,7 +238,7 @@ if (check) {
       `\n${stale.length} site .jsonld file(s) are stale or missing:\n` +
         stale.slice(0, 40).map((s) => `  ${s}`).join("\n") +
         (stale.length > 40 ? `\n  … and ${stale.length - 40} more` : "") +
-        `\n\nRun: bun run cat-harness/content/pipeline/gen-site-jsonld.ts`,
+        `\n\nRun: bun run cat-harness-tools/content/pipeline/gen-site-jsonld.ts`,
     );
     process.exit(1);
   }

@@ -32,7 +32,7 @@
  * that literal against this function, so the two cannot drift silently.
  *
  * Usage (prints the route and nothing else, for `ROUTE=$(…)`):
- *   bun run cat-harness/scripts/docs-route.ts --built cat-harness
+ *   bun run cat-harness-tools/scripts/docs-route.ts --built cat-harness
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";

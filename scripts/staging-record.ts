@@ -39,9 +39,9 @@
  * would have to guess.
  *
  * Usage:
- *   bun run cat-harness/scripts/staging-record.ts create --out FILE --slug S --branch B \
+ *   bun run cat-harness-tools/scripts/staging-record.ts create --out FILE --slug S --branch B \
  *     --commit C [--pr N] [--issue N] [--host URL]
- *   bun run cat-harness/scripts/staging-record.ts retire --out FILE --reason "..."
+ *   bun run cat-harness-tools/scripts/staging-record.ts retire --out FILE --reason "..."
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

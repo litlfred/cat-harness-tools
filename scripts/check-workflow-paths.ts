@@ -58,7 +58,7 @@
  * which made the check strictly more permissive: a path under a checkout
  * resolved, and a path that was not under one resolved too, because it fell
  * through to the repository. So `feature-staging.yml`'s `cleanup` job — which
- * checks out to `source/` — ran `bun run cat-harness/scripts/backoff-sleep.ts`
+ * checks out to `source/` — ran `bun run cat-harness-tools/scripts/backoff-sleep.ts`
  * from the workspace root and passed, while at run time that directory is
  * empty. `run:` blocks are `bash -e`, so the step aborted, and **the retry
  * loops those calls exist to provide never ran**: the first lost push race

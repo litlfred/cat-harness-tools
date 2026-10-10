@@ -52,8 +52,8 @@
  * empty sweep and a clean sweep must not share a spelling.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-methodologies-viz.ts
- *   bun run cat-harness/scripts/gen-methodologies-viz.ts --check
+ *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts
+ *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, posix } from "node:path";

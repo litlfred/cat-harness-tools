@@ -215,7 +215,7 @@ if (import.meta.main) {
     return i >= 0 ? args[i + 1] : undefined;
   };
   if (args.includes("--help") || !opt("folio") || !opt("out")) {
-    console.error("usage: bun run cat-harness/scripts/publish-block-qa.ts --folio <folio dir> --out <block-qa.json> [--repo <folio instance root; default: found from --folio, as the sweep finds it>]");
+    console.error("usage: bun run cat-harness-tools/scripts/publish-block-qa.ts --folio <folio dir> --out <block-qa.json> [--repo <folio instance root; default: found from --folio, as the sweep finds it>]");
     process.exit(args.includes("--help") ? 0 : 2);
   }
   // declared-path-literal: "folio" is the COMMAND-LINE FLAG's name, not a

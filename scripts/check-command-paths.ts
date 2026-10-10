@@ -312,7 +312,7 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): Co
  * `docs:harness:check` printed **while failing** read:
  *
  * ```
- * Run `bun run cat-harness/scripts/sync-docs-harness.ts` and commit the result.
+ * Run `bun run cat-harness-tools/scripts/sync-docs-harness.ts` and commit the result.
  * ```
  *
  * There is no root `scripts/`. The instruction telling a reader how to fix the
@@ -332,7 +332,7 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): Co
  * | | example | correct relative to |
  * |---|---|---|
  * | a cross-reference in prose | ``see `scripts/known-skills.ts` `` | the INSTANCE — and it resolves |
- * | a command in a header or a message | `bun run cat-harness/scripts/lean-audit.ts` | the REPOSITORY — where a person stands |
+ * | a command in a header or a message | `bun run cat-harness-tools/scripts/lean-audit.ts` | the REPOSITORY — where a person stands |
  *
  * Only the second is wrong. `bun run`, `bunx`, `bash`, `npx`, `python3`,
  * `deno run` say a human is about to execute this, and nothing else does.

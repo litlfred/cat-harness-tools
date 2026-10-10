@@ -29,7 +29,7 @@
  * mount pass railed earlier are left byte-identical here.
  *
  * Usage:
- *   bun run cat-harness/scripts/rail-standalone-pages.ts --site ./_site --built cat-harness
+ *   bun run cat-harness-tools/scripts/rail-standalone-pages.ts --site ./_site --built cat-harness
  *
  * @module scripts/rail-standalone-pages
  */

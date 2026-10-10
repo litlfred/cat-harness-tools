@@ -29,7 +29,7 @@
  * banner names the commit, so every page would differ.
  *
  * Usage:
- *   bun run cat-harness/scripts/measure-rendered-impact.ts --before pages --after _site
+ *   bun run cat-harness-tools/scripts/measure-rendered-impact.ts --before pages --after _site
  *     --predicted _site/rendered-impact.json --base <sha> --out _site/rendered-measured.json
  *
  * @module cat-harness/scripts/measure-rendered-impact

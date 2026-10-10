@@ -47,8 +47,8 @@
  * anywhere else in this repository.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-fsh-guts-viz.ts
- *   bun run cat-harness/scripts/gen-fsh-guts-viz.ts --check
+ *   bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts
+ *   bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

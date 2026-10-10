@@ -32,8 +32,8 @@
  * without a definition a reader can reach.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-object-model-uml.ts           # write
- *   bun run cat-harness/scripts/gen-object-model-uml.ts --check   # stale?
+ *   bun run cat-harness-tools/scripts/gen-object-model-uml.ts           # write
+ *   bun run cat-harness-tools/scripts/gen-object-model-uml.ts --check   # stale?
  *
  * `--check` needs the `beans` CLI for the Bean class; without it the result is
  * "could not check" (exit 2), never a pass.
@@ -485,7 +485,7 @@ function main(): void {
     }
     const current = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
     if (current !== text) {
-      console.error(`${OUT} is stale — run: bun run cat-harness/scripts/gen-object-model-uml.ts`);
+      console.error(`${OUT} is stale — run: bun run cat-harness-tools/scripts/gen-object-model-uml.ts`);
       process.exit(1);
     }
     console.log("harness-object-model.puml is current");

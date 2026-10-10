@@ -14,9 +14,9 @@
  * from what the code does the first time somebody adds an element.
  *
  * Usage:
- *   bun run cat-harness/scripts/external-schemas.ts            # report
- *   bun run cat-harness/scripts/external-schemas.ts --write    # refresh terms
- *   bun run cat-harness/scripts/external-schemas.ts --check    # CI
+ *   bun run cat-harness-tools/scripts/external-schemas.ts            # report
+ *   bun run cat-harness-tools/scripts/external-schemas.ts --write    # refresh terms
+ *   bun run cat-harness-tools/scripts/external-schemas.ts --check    # CI
  *
  * @module scripts/external-schemas
  * @covers external-schema

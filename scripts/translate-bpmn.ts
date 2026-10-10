@@ -408,7 +408,7 @@ if (wantCheck) {
     // for every run, which for a `--instance ./bootstrap` check is a command
     // that refreshes the OTHER instance's templates and leaves these red.
     const scope = instanceFlag ? ` --instance ${instanceFlag}` : "";
-    console.log(`\n${bad} template(s) need attention: bun run cat-harness/scripts/translate-bpmn.ts${scope} --extract`);
+    console.log(`\n${bad} template(s) need attention: bun run cat-harness-tools/scripts/translate-bpmn.ts${scope} --extract`);
     process.exit(1);
   }
   console.log("\nEvery diagram has a current .pot in every locale, and every template has a diagram.");

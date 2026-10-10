@@ -25,10 +25,10 @@
  * that then has to be deleted.
  *
  * Usage:
- *   bun run cat-harness/scripts/init-folio.ts --dir . --type document --slug my-guidance \
+ *   bun run cat-harness-tools/scripts/init-folio.ts --dir . --type document --slug my-guidance \
  *       --title "My Guidance Note" --author "A. Author"
  *
- *   bun run cat-harness/scripts/init-folio.ts --help
+ *   bun run cat-harness-tools/scripts/init-folio.ts --help
  *
  * @module scripts/init-folio
  */
@@ -1903,7 +1903,7 @@ export function formatStagedResult(result: InitFolioResult, o: InitStagedOptions
 const USAGE = `init-folio — scaffold a new folio repository
 
 Usage:
-  bun run cat-harness/scripts/init-folio.ts [options]
+  bun run cat-harness-tools/scripts/init-folio.ts [options]
 
 Options:
   --dir <path>        Folio root to scaffold into            (default: .)

@@ -97,8 +97,8 @@
  * do not have and a layout they do not want.
  *
  * Usage:
- *   bun run cat-harness/scripts/mount-instance-docs.ts --site ./_site
- *   bun run cat-harness/scripts/mount-instance-docs.ts --site ./_site --built cat-harness
+ *   bun run cat-harness-tools/scripts/mount-instance-docs.ts --site ./_site
+ *   bun run cat-harness-tools/scripts/mount-instance-docs.ts --site ./_site --built cat-harness
  */
 import { VIEWER_DIR } from "./pdf-viewer.ts";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "fs";

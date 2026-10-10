@@ -85,9 +85,9 @@
  * make this script unusable for the raster work it already does. The gate that
  * says what is still uncovered is `image-descriptions`, which names them.
  *
- *   bun run cat-harness/scripts/apply-image-verdicts.ts            # apply
- *   bun run cat-harness/scripts/apply-image-verdicts.ts --check    # report only
- *   bun run cat-harness/scripts/apply-image-verdicts.ts \
+ *   bun run cat-harness-tools/scripts/apply-image-verdicts.ts            # apply
+ *   bun run cat-harness-tools/scripts/apply-image-verdicts.ts --check    # report only
+ *   bun run cat-harness-tools/scripts/apply-image-verdicts.ts \
  *     --staging ingest-staging/<doc-id> --library ../agent-skills/library
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

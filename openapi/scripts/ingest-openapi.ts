@@ -8,8 +8,8 @@
  * @covers openapi
  *
  * Usage:
- *   bun run cat-harness/openapi/scripts/ingest-openapi.ts --instance <instance-dir> --source <checkout>
- *   bun run cat-harness/openapi/scripts/ingest-openapi.ts --instance <instance-dir> --check
+ *   bun run cat-harness-tools/openapi/scripts/ingest-openapi.ts --instance <instance-dir> --source <checkout>
+ *   bun run cat-harness-tools/openapi/scripts/ingest-openapi.ts --instance <instance-dir> --check
  *
  * `--source` is a local checkout of the document's repository (one config may
  * name several documents from one repository; documents from different

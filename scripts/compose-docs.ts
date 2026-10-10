@@ -103,8 +103,8 @@
  * untouched, exactly as before. `compose-docs.test.ts` pins both halves.
  *
  * Usage:
- *   bun run cat-harness/scripts/compose-docs.ts --out <dir>
- *   bun run cat-harness/scripts/compose-docs.ts --out <dir> --check
+ *   bun run cat-harness-tools/scripts/compose-docs.ts --out <dir>
+ *   bun run cat-harness-tools/scripts/compose-docs.ts --out <dir> --check
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";

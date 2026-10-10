@@ -61,13 +61,13 @@
  * merge-main's in-place comment" (bean `obhe`).
  *
  * Usage (from the workflow; inputs in the environment, as the step sets them):
- *   bun run cat-harness/scripts/merge-main-comment.ts --log <merge.log> [--plan-out <plan.json>]
+ *   bun run cat-harness-tools/scripts/merge-main-comment.ts --log <merge.log> [--plan-out <plan.json>]
  * prints one JSON object: {"action":"leave","reason":…} or
  * {"action":"write","body":…,"signature":…};
- *   bun run cat-harness/scripts/merge-main-comment.ts --verdict <verdict.json>
+ *   bun run cat-harness-tools/scripts/merge-main-comment.ts --verdict <verdict.json>
  * classifies this member for the run, writes it, and reports it (always exit 0:
  * the member's own redness is decided by the workflow's failure step, not here);
- *   bun run cat-harness/scripts/merge-main-comment.ts --aggregate <dir>
+ *   bun run cat-harness-tools/scripts/merge-main-comment.ts --aggregate <dir>
  * reads every member's verdict and exits 1 only if the run should notify.
  */
 import { spawnSync } from "node:child_process";

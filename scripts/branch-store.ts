@@ -88,11 +88,11 @@
  * the mechanism lands before 49 gated checks move.
  *
  * Usage:
- *   bun run cat-harness/scripts/branch-store.ts read --branch B <path>
- *   bun run cat-harness/scripts/branch-store.ts ls   --branch B [<dir>]
- *   bun run cat-harness/scripts/branch-store.ts where --id <directory-id>
- *   bun run cat-harness/scripts/branch-store.ts mount --id <directory-id> [--into <path>]
- *   bun run cat-harness/scripts/branch-store.ts push  --id <directory-id> [--message <m>]
+ *   bun run cat-harness-tools/scripts/branch-store.ts read --branch B <path>
+ *   bun run cat-harness-tools/scripts/branch-store.ts ls   --branch B [<dir>]
+ *   bun run cat-harness-tools/scripts/branch-store.ts where --id <directory-id>
+ *   bun run cat-harness-tools/scripts/branch-store.ts mount --id <directory-id> [--into <path>]
+ *   bun run cat-harness-tools/scripts/branch-store.ts push  --id <directory-id> [--message <m>]
  *
  * @module scripts/branch-store
  * @covers beans

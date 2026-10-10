@@ -36,8 +36,8 @@
  * lists those, and a declaration naming a spec no record has is a finding.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-external-schemas-viz.ts
- *   bun run cat-harness/scripts/gen-external-schemas-viz.ts --check
+ *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts
+ *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";

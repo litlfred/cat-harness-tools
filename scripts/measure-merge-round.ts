@@ -36,7 +36,7 @@
  * inspection and its path printed; nothing outside it is written.
  *
  * Usage:
- *   bun run cat-harness/scripts/measure-merge-round.ts --base <sha> --target <sha> [--recipe manual|merge-main] [--dir <path>]
+ *   bun run cat-harness-tools/scripts/measure-merge-round.ts --base <sha> --target <sha> [--recipe manual|merge-main] [--dir <path>]
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

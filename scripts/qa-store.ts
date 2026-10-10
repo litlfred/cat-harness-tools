@@ -63,8 +63,8 @@
  *   bun run cat qa:publish --github --completeness FILE [--gates-result R]   # CI: derive the key, skip forks,
  *                                                       # refuse an incomplete qa:refresh report (bean 3hk4)
  *   bun run cat qa:prune [--apply] [--pr-states FILE]       # dry run unless --apply
- *   bun run cat-harness/scripts/qa-store.ts read --ref R <path>
- *   bun run cat-harness/scripts/qa-store.ts where
+ *   bun run cat-harness-tools/scripts/qa-store.ts read --ref R <path>
+ *   bun run cat-harness-tools/scripts/qa-store.ts where
  *
  * @module scripts/qa-store
  * @covers qa

@@ -116,8 +116,8 @@
  * ledgering 157 occurrences would bury the 36 records that matter.
  *
  * Usage:
- *   bun run cat-harness/scripts/glossary-export.ts [--instance ROOT] [--out FILE]
- *   bun run cat-harness/scripts/glossary-export.ts --check
+ *   bun run cat-harness-tools/scripts/glossary-export.ts [--instance ROOT] [--out FILE]
+ *   bun run cat-harness-tools/scripts/glossary-export.ts --check
  *
  * @conformsTo w3c-owl2
  * @conformsTo w3c-rdfs

@@ -41,7 +41,7 @@
  * to sit in this checkout is not a harness this repository renders, so it is
  * not owed a board either. One signal, used by the navbar and by this.
  *
- * Usage:  bun run cat-harness/scripts/gen-default-boards.ts [--check]
+ * Usage:  bun run cat-harness-tools/scripts/gen-default-boards.ts [--check]
  *
  * `--check` writes nothing and exits 1 when a board is missing or stale.
  */

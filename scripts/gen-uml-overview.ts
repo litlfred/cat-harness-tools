@@ -48,8 +48,8 @@
  * neither can say something the other does not.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-uml-overview.ts           # write
- *   bun run cat-harness/scripts/gen-uml-overview.ts --check   # stale or orphaned?
+ *   bun run cat-harness-tools/scripts/gen-uml-overview.ts           # write
+ *   bun run cat-harness-tools/scripts/gen-uml-overview.ts --check   # stale or orphaned?
  *   ... --ref main|<sha>|pr/<n>   # which qa-reports entry a qa directory missing from the checkout is drawn from
  *
  * Two inputs are QA results (bean `oq1j`). The detangle numbers are read
@@ -999,7 +999,7 @@ async function build(): Promise<Map<string, string>> {
     "",
     "## The full object model",
     "",
-    "The same classes plus the state family, Todo and Bean, and the edges that reach them: Task's `folio:bean` op, and Todo's tags on Role, Process, Task and Actor. Bean is read from the `beans` CLI's GraphQL schema, so this file is regenerated only where that CLI is installed (`bun run cat-harness/scripts/gen-object-model-uml.ts`).",
+    "The same classes plus the state family, Todo and Bean, and the edges that reach them: Task's `folio:bean` op, and Todo's tags on Role, Process, Task and Actor. Bean is read from the `beans` CLI's GraphQL schema, so this file is regenerated only where that CLI is installed (`bun run cat-harness-tools/scripts/gen-object-model-uml.ts`).",
     "",
     `**Source:** [PlantUML](${REPO_URL}/blob/main/${relative(REPO, OBJECT_MODEL_PUML)})`,
     "",

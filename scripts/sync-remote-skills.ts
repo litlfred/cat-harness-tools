@@ -46,8 +46,8 @@
  *   is ours rather than upstream's and so carries no fixity.
  *
  * Usage:
- *   bun run cat-harness/scripts/sync-remote-skills.ts            # fetch + write
- *   bun run cat-harness/scripts/sync-remote-skills.ts --check    # offline: is every declared skill materialized at its pin?
+ *   bun run cat-harness-tools/scripts/sync-remote-skills.ts            # fetch + write
+ *   bun run cat-harness-tools/scripts/sync-remote-skills.ts --check    # offline: is every declared skill materialized at its pin?
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";

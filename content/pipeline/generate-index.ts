@@ -7,7 +7,7 @@
  * then writes a markdown table with links to each block's location.
  *
  * Usage:
- *   bun run cat-harness/content/pipeline/generate-index.ts [paper-name]
+ *   bun run cat-harness-tools/content/pipeline/generate-index.ts [paper-name]
  */
 
 import { BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";

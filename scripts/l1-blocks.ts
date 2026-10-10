@@ -29,8 +29,8 @@
  * would be `6xaz` one layer up. Deliberate, not a stub.
  *
  * Usage:
- *   bun run cat-harness/scripts/l1-blocks.ts -o <staged-entry-dir>
- *   bun run cat-harness/scripts/l1-blocks.ts -o <dir> --check   # write nothing
+ *   bun run cat-harness-tools/scripts/l1-blocks.ts -o <staged-entry-dir>
+ *   bun run cat-harness-tools/scripts/l1-blocks.ts -o <dir> --check   # write nothing
  *
  * Exit: 0 written (or check passed), 1 refused, 2 could not determine.
  *

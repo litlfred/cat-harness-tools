@@ -48,8 +48,8 @@
  * had the same blind spot before this one was written.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-process-documentation.ts
- *   bun run cat-harness/scripts/check-process-documentation.ts --strict
+ *   bun run cat-harness-tools/scripts/check-process-documentation.ts
+ *   bun run cat-harness-tools/scripts/check-process-documentation.ts --strict
  */
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";

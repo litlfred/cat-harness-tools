@@ -16,8 +16,8 @@
  * in prose is left alone — prose that names an old tag is history, and
  * rewriting it would make the record say something that was never true.
  *
- *   bun run cat-harness/scripts/retag-schemas.ts <dir>...            rewrite
- *   bun run cat-harness/scripts/retag-schemas.ts --check <dir>...    fail if any file still carries an old tag
+ *   bun run cat-harness-tools/scripts/retag-schemas.ts <dir>...            rewrite
+ *   bun run cat-harness-tools/scripts/retag-schemas.ts --check <dir>...    fail if any file still carries an old tag
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

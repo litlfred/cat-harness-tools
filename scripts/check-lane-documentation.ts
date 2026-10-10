@@ -66,8 +66,8 @@
  * source text is.
  *
  * Usage:
- *   bun run cat-harness/scripts/check-lane-documentation.ts
- *   bun run cat-harness/scripts/check-lane-documentation.ts --json
+ *   bun run cat-harness-tools/scripts/check-lane-documentation.ts
+ *   bun run cat-harness-tools/scripts/check-lane-documentation.ts --json
  *   bun run cat check:lane-documentation:check   # JUDGE: compute and judge, write nothing (the gate)
  *
  * Exit (writer): 0 clean, 1 any finding — or zero diagrams, which it has

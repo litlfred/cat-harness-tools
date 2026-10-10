@@ -10,8 +10,8 @@
  * Output: `ns/content/v1.jsonld`, served at the URL in `CONTENT_CONTEXT_URL`.
  *
  * Usage:
- *   bun run cat-harness/scripts/gen-jsonld-context.ts
- *   bun run cat-harness/scripts/gen-jsonld-context.ts --check
+ *   bun run cat-harness-tools/scripts/gen-jsonld-context.ts
+ *   bun run cat-harness-tools/scripts/gen-jsonld-context.ts --check
  *
  * @module scripts/gen-jsonld-context
  * @covers schemas
@@ -39,7 +39,7 @@ function main(): number {
     }
     console.error(
       "ns/content/v1.jsonld is stale or missing.\n" +
-        "Run: bun run cat-harness/scripts/gen-jsonld-context.ts",
+        "Run: bun run cat-harness-tools/scripts/gen-jsonld-context.ts",
     );
     return 1;
   }

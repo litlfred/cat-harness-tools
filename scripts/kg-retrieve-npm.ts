@@ -242,7 +242,7 @@ if (import.meta.main) {
   const nonFlag = argv.filter((a) => !a.startsWith("-"));
   const pkg = nonFlag[0];
   if (!pkg) {
-    console.error("Usage: bun run cat-harness/scripts/kg-retrieve-npm.ts <package-or-tarball> [--destination <dir>] [--view <unhydrated|hydrated|both>] [--release <file>]");
+    console.error("Usage: bun run cat-harness-tools/scripts/kg-retrieve-npm.ts <package-or-tarball> [--destination <dir>] [--view <unhydrated|hydrated|both>] [--release <file>]");
     process.exit(1);
   }
 
