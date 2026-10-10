@@ -64,6 +64,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { execSync } from "child_process";
 import { join, relative, resolve } from "path";
 import { globSync } from "glob";
+import { HARNESS_ROOT } from "./lib/roots.ts";
 
 type MoveEntry = [oldPath: string, newPath: string];
 type MoveTable = MoveEntry[];
@@ -156,7 +157,7 @@ function main(argv: string[]): number {
   const movePath = args[0];
   const write = args.includes("--write");
 
-  const INSTANCE_ROOT = resolve(__dirname, "..");
+  const INSTANCE_ROOT = HARNESS_ROOT;  // the computations are the harness's; this script moved out of it (bean 70lx)
   const branch = getCurrentBranch(INSTANCE_ROOT);
   if (branch === "main" || branch === "master") {
     console.error(`refusing to run on protected branch: ${branch}`);
