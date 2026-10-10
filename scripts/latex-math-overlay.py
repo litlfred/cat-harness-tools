@@ -84,7 +84,9 @@ COVERAGE_RATIO = 0.5
 SOURCE_DIRNAME = "source"
 OVERLAY_SCHEMA = "latex-math-overlay/v1"
 
-_SECTION = re.compile(r"\\section\*?\s*(?:\[[^\]]*\])?\s*\{")
+# Every sectioning level a PDF rung may report: its contents come from font
+# sizes, so a "section" there is often a \subsection here.
+_SECTION = re.compile(r"\\((?:sub){0,2})section\*?\s*(?:\[[^\]]*\])?\s*\{")
 _INPUT = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
 _COMMENT = re.compile(r"(?<!\\)%.*")
 _MATH = re.compile(
@@ -136,10 +138,15 @@ def read_source(path: str) -> dict[str, str]:
 def main_tex(files: dict[str, str]) -> str | None:
     """The file that holds `\\documentclass` and `\\begin{document}`.
 
+    LaTeX 2.09's `\\documentstyle` counts too: much of 1990s arXiv is written
+    in it, and its `\\section`s are the same. AMS-TeX also says
+    `\\documentstyle`, but has no `\\begin{document}`, so it stays out.
+
     More than one candidate is resolved by size, the largest being the paper
     rather than a standalone figure; none is `None`, never a guess.
     """
-    cands = [k for k, v in files.items() if "\\documentclass" in v and "\\begin{document}" in v]
+    cands = [k for k, v in files.items()
+             if ("\\documentclass" in v or "\\documentstyle" in v) and "\\begin{document}" in v]
     if not cands:
         return None
     return max(cands, key=lambda k: len(files[k]))
@@ -183,10 +190,18 @@ def balanced(text: str, start: int) -> tuple[str, int]:
 class TexSection:
     title: str
     body: str
+    level: int = 1
+    start: int = 0
+    end: int = 0
 
 
 def tex_sections(full: str) -> tuple[str, list[TexSection]]:
-    """The preamble, and each top-level `\\section` with everything up to the next."""
+    """The preamble, and every `\\section`, `\\subsection` and `\\subsubsection`.
+
+    Each `body` runs to the next heading of ANY level, so it is the text a PDF
+    rung holds when it reports both levels. When the PDF reports only some of
+    them, `bodies_for` widens each paired heading over the ones it did not.
+    """
     pre, _, doc = full.partition("\\begin{document}")
     doc = doc.split("\\end{document}")[0]
     doc = re.split(r"\\(?:bibliography\{|begin\{thebibliography\}|appendix\b)", doc)[0]
@@ -195,8 +210,30 @@ def tex_sections(full: str) -> tuple[str, list[TexSection]]:
     for k, m in enumerate(heads):
         title, end = balanced(doc, m.end())
         stop = heads[k + 1].start() if k + 1 < len(heads) else len(doc)
-        out.append(TexSection(title=title, body=doc[end:stop]))
+        out.append(TexSection(title=title, body=doc[end:stop], level=1 + len(m.group(1)) // 3, start=m.start(), end=end))
     return pre, out
+
+
+def bodies_for(secs: list[TexSection], paired: set[int]) -> dict[int, str]:
+    """The body of each paired heading: everything up to the next PAIRED heading.
+
+    A heading the PDF has no section for (a subsection the font-size rung did
+    not see) belongs to the paired heading above it, as it does in the PDF's
+    text. The prose and coverage gates then decide whether that widened body
+    really is the PDF section's text.
+    """
+    out: dict[int, str] = {}
+    for i in sorted(paired):
+        stop_at = len(secs)
+        for j in range(i + 1, len(secs)):
+            if j in paired:
+                stop_at = j
+                break
+        text = "".join(
+            (("\n\\" + ("sub" * (secs[j].level - 1)) + "section{" + secs[j].title + "}") if j > i else "") + secs[j].body
+            for j in range(i, stop_at))
+        out[i] = text
+    return out
 
 
 # ── conversion ──────────────────────────────────────────────────────────────
@@ -315,20 +352,27 @@ def overlay_entry(entry: str, source: str | None, dry_run: bool, library: str | 
         rep.reason = f"{main} has no \\section"
         return rep
 
-    by_title = {norm_title(t.title): t for t in secs}
+    by_title: dict[str, int] = {}
+    for k, sec in enumerate(secs):
+        by_title.setdefault(norm_title(sec.title), k)
     sdir = os.path.join(entry, "sections")
     applied = 0
+    pairs: list[tuple[dict, dict, int | None]] = []
     for s in structure.get("sections", []):
         row: dict = {"id": s["id"], "title": s.get("title", "")}
         rep.sections.append(row)
         want = norm_title(s.get("title", ""))
-        tex = by_title.get(want)
-        if tex is None and want:
+        k = by_title.get(want)
+        if k is None and want:
             close = difflib.get_close_matches(want, list(by_title), n=1, cutoff=TITLE_RATIO)
-            tex = by_title[close[0]] if close else None
-        if tex is None:
+            k = by_title[close[0]] if close else None
+        pairs.append((s, row, k))
+    body = bodies_for(secs, {k for _, _, k in pairs if k is not None})
+    for s, row, k in pairs:
+        if k is None:
             row["result"] = "no matching \\section"
             continue
+        tex = TexSection(title=secs[k].title, body=body[k], level=secs[k].level)
         mdpath = os.path.join(sdir, f"{s['id']}.md")
         if not os.path.exists(mdpath):
             row["result"] = "section file missing"
