@@ -48,6 +48,20 @@
       "why": "The text-layer rung of pdf-extract's ladder."
     },
     {
+      "name": "pandoc",
+      "provides": {
+        "command": "pandoc"
+      },
+      "apt": [
+        "pandoc"
+      ],
+      "licence": "GPL-2.0-or-later",
+      "usedBy": [
+        "scripts/latex-math-overlay.py"
+      ],
+      "why": "Converts an arXiv paper's own LaTeX sections to markdown with the mathematics kept as $...$. Without it the overlay keeps the raw LaTeX, which still carries the maths."
+    },
+    {
       "name": "pymupdf",
       "provides": {
         "python": "pymupdf"
