@@ -65,9 +65,29 @@ describe("viewer Tools declare what they render", () => {
     expect(pages.filter((p) => p.renderedBy === undefined || !ids.has(p.renderedBy)).map((p) => p.page)).toEqual([]);
   });
 
+  /**
+   * Kinds a Tool here renders whose only holders are instances this index does
+   * not mount — each with the instance that holds it. Listed rather than
+   * waived: an entry whose kind starts being declared in the checkout fails
+   * below, so the list can only shrink to what is still true.
+   */
+  const HELD_OUTSIDE: Record<string, string> = {
+    // Owner, 2026-10-09: the `archimate` subgraph of cat-harness, whose first
+    // instance is smart-ra's DPI-H reference architecture models.
+    archimate: "litlfred/smart-ra",
+  };
+
   it("every rendered kind is declared by some directory", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
-    expect([...rendered].filter((k) => !declared.has(k))).toEqual([]);
+    expect([...rendered].filter((k) => !declared.has(k) && !(k in HELD_OUTSIDE))).toEqual([]);
+  });
+
+  it("every kind listed as held outside is still rendered here and still not held here", () => {
+    const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
+    for (const k of Object.keys(HELD_OUTSIDE)) {
+      expect(rendered.has(k), `${k} is no longer rendered by any Tool — drop it from HELD_OUTSIDE`).toBe(true);
+      expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
+    }
   });
 
   it("no Tool renders an unpublished kind — the Tool graph is published", () => {
