@@ -85,7 +85,7 @@ import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import type { SourceLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
 import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   readTitleCandidates,
   resolveLibraryTitle,
@@ -274,6 +274,20 @@ export function libraryInstanceOf(entryDir: string): string | undefined {
   return readDeclaration(instanceRoot) !== undefined ? basename(instanceRoot) : undefined;
 }
 
+/**
+ * Where an entry's `library` subgraph is looked up: the instance whose library
+ * holds it, when that instance declares a `library` of its own, so an entry in
+ * a sibling's library is a member of THAT library. Asked from the content repo
+ * root instead, every instance's manifests named cat-harness's. An instance
+ * that only inherits the entry keeps the content repo root's answer: asked
+ * from there, the several instances declaring it are ambiguous.
+ */
+export function librarySubgraphStart(locatedAt: string): string {
+  const root = dirname(dirname(locatedAt));
+  const decl = libraryInstanceOf(locatedAt) !== undefined ? readDeclaration(root) : undefined;
+  return decl && instanceDirectories(root, decl).some((d) => d.id === "library") ? root : findContentRepoRoot();
+}
+
 /** Everything one document contributes, as files to write. */
 export function buildDocumentNodes(
   docId: string,
@@ -284,6 +298,7 @@ export function buildDocumentNodes(
   licence?: unknown,
   titled?: ManifestTitle,
   instance?: string,
+  subgraphStart: string = findContentRepoRoot(),
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -452,7 +467,7 @@ export function buildDocumentNodes(
     });
   }
 
-  const librarySubgraph = declaredSubgraphNode(findContentRepoRoot(), "library");
+  const librarySubgraph = declaredSubgraphNode(subgraphStart, "library");
   out.push({
     path: "manifest.jsonld",
     content: node({
@@ -669,7 +684,8 @@ function entryTitle(
 export function buildEntryNodes(docId: string, dir: string, locatedAt: string = dir): EntryOutcome {
   const instance = libraryInstanceOf(locatedAt);
   const iri = iriFor(docId, instance);
-  const librarySubgraph = declaredSubgraphNode(findContentRepoRoot(), "library");
+  const subgraphStart = librarySubgraphStart(locatedAt);
+  const librarySubgraph = declaredSubgraphNode(subgraphStart, "library");
   // Two ingest rungs reach this walk, and a tabular entry has no Stage A
   // output at all — no `structure.json`, no `sections/*.md` — so it is not a
   // `buildDocumentNodes` with different arguments. Its own branch, which is
@@ -703,6 +719,7 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
         licence,
         titled,
         instance,
+        subgraphStart,
       ),
     };
   }
