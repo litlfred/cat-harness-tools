@@ -5,11 +5,12 @@
  * workflows' own steps and scripts, tested where they live.
  */
 import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chooseTarget, composeIg, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage } from "../stage-local.ts";
+import { chooseTarget, composeIg, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage, stageLocal } from "../stage-local.ts";
 import {
   applyIgDeploy,
   branchDirOf,
@@ -335,4 +336,82 @@ describe("stage-local: the IG build is the workflow's own steps, planned", () =>
     expect(splitArgs(`-c "mkdir -p ./x && chown 1001:127 ./x"`)).toEqual(["-c", "mkdir -p ./x && chown 1001:127 ./x"]);
     expect(splitArgs("curl -L u -o ./p.jar")).toEqual(["curl", "-L", "u", "-o", "./p.jar"]);
   });
+});
+
+describe("stage-local end to end: an IG published to a local origin, preview then main", () => {
+  const sh = (cwd: string, ...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf-8" }).trim();
+
+  test("runs the workflow's steps, lays the output where its deploy steps say, and pushes with its commit message", async () => {
+    const bare = tmp("stage-local-origin-");
+    sh(bare, "init", "-q", "--bare", "-b", "main");
+    const repo = tmp("stage-local-ig-repo-");
+    sh(repo, "init", "-q", "-b", "main");
+    sh(repo, "config", "user.name", "t");
+    sh(repo, "config", "user.email", "t@example.org");
+    sh(repo, "remote", "add", "origin", "https://github.com/o/r");
+    sh(repo, "config", `url.file://${bare}.insteadOf`, "https://github.com/o/r");
+    put(repo, ".github/workflows/fhirbuild.yml", IG_CALLER.replace("WorldHealthOrganization/smart-base", "o/sb"));
+    sh(repo, "add", "-A");
+    sh(repo, "commit", "-q", "-m", "ig");
+    sh(repo, "push", "-q", "origin", "main");
+
+    // gh-pages already holds another branch's build and a stale root page.
+    const seed = tmp("stage-local-seed-");
+    sh(seed, "init", "-q", "-b", "gh-pages");
+    put(seed, "branches/other/index.html", "other");
+    put(seed, "stale.html", "stale");
+    sh(seed, "add", "-A");
+    sh(seed, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "seed");
+    sh(seed, "push", "-q", `file://${bare}`, "gh-pages");
+
+    // The reusable workflows, as a local checkout: fhirbuild.yml deploys nothing, ghbuild.yml is the Pages build.
+    const src = tmp("stage-local-wfsrc-");
+    put(src, ".github/workflows/fhirbuild.yml", "on:\n  workflow_call:\njobs:\n  trigger:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo trigger\n");
+    put(src, ".github/workflows/ghbuild.yml", `on:
+  workflow_call:
+    inputs:
+      deploy:
+        type: boolean
+        default: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get branch name
+        env:
+          GH_REF_NAME: \${{ github.ref_name }}
+        run: echo "BRANCH_DIR=\${GH_REF_NAME##*/}" >> "$GITHUB_ENV"
+      - name: Default branch
+        run: |
+          D=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+          if [ "$GITHUB_REF_NAME" = "$D" ]; then echo "IS_DEFAULT_BRANCH=true" >> $GITHUB_ENV; else echo "IS_DEFAULT_BRANCH=false" >> $GITHUB_ENV; fi
+      - name: Build
+        run: mkdir -p output && echo "$GITHUB_SHA" > output/index.html
+${IG_WORKFLOW.slice(IG_WORKFLOW.indexOf("      - name: Deploy candidate\n"), IG_WORKFLOW.indexOf("      - name: Commit README.md"))}`);
+
+    const quiet = () => {};
+    sh(repo, "checkout", "-q", "-b", "claude/feat");
+    const dry = await stageLocal({ repo, workflowSource: src, dryRun: true, log: quiet });
+    expect(dry).toMatchObject({ kind: "ig", target: "preview", pushed: false });
+    expect(dry.composed).toMatch(/1 file changed/);
+    expect(sh(bare, "log", "-1", "--format=%s", "gh-pages")).toBe("seed");
+
+    const pre = await stageLocal({ repo, workflowSource: src, log: quiet });
+    expect(pre).toMatchObject({ kind: "ig", target: "preview", pushed: true, url: "https://o.github.io/r/branches/feat/" });
+    expect(sh(bare, "log", "-1", "--format=%s", "gh-pages")).toBe("Deploy candidate branch");
+    expect(sh(bare, "show", "gh-pages:branches/feat/index.html")).toBe(sh(repo, "rev-parse", "HEAD"));
+    expect(sh(bare, "show", "gh-pages:branches/other/index.html")).toBe("other");
+    expect(sh(bare, "show", "gh-pages:stale.html")).toBe("stale");
+
+    sh(repo, "checkout", "-q", "main");
+    const main = await stageLocal({ repo, workflowSource: src, log: quiet });
+    expect(main).toMatchObject({ kind: "ig", target: "main", pushed: true, url: "https://o.github.io/r/" });
+    expect(sh(bare, "log", "-1", "--format=%s", "gh-pages")).toBe("Deploy main branch");
+    expect(sh(bare, "log", "-1", "--format=%b", "gh-pages")).toContain(`from ${sh(repo, "rev-parse", "HEAD")}`);
+    const root = sh(bare, "ls-tree", "--name-only", "gh-pages").split("\n");
+    expect(root.sort()).toEqual(["branches", "index.html"]);
+    expect(sh(bare, "show", "gh-pages:branches/feat/index.html")).toBeTruthy();
+    // Never a force push: the seed is still in the branch's history.
+    expect(sh(bare, "log", "--format=%s", "gh-pages")).toContain("seed");
+  }, 60_000);
 });

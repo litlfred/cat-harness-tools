@@ -622,7 +622,9 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   const detected = detectPublisher(readWorkflows(repo), o.publisher);
   const branch = o.branch ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const sha = git(repo, ["rev-parse", "HEAD"]);
-  const ownerRepo = ownerRepoOf(git(repo, ["remote", "get-url", "origin"]));
+  // The CONFIGURED url, not `remote get-url`: an `insteadOf` rewrite (a mirror,
+  // a proxy) changes where git talks to, not which repository this is.
+  const ownerRepo = ownerRepoOf(git(repo, ["config", "--get", "remote.origin.url"]));
   if (!ownerRepo) throw new Error("origin is not a GitHub remote");
   const [owner, name] = ownerRepo.split("/") as [string, string];
   const pagesRoot = `https://${owner}.github.io/${name}`;
