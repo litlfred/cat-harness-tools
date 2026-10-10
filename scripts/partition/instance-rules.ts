@@ -259,6 +259,8 @@ export const RULES: Rule[] = [
       "scripts/beans-query.ts",              // Oxigraph in-memory SPARQL query engine for bean store
       "scripts/check-spec.ts",               // validates spec templates for mandatory sections and unresolved clarification markers
       "scripts/check-change-size.ts",        // advisory change-size limit checker (issue #754)
+      "scripts/check-bean-issues.ts",        // which work-plan beans owe an issue link; reads beans, never content (bean `xeer`)
+      "scripts/ensure-software.ts",          // gets the programs the harness's own scripts check for (skill `finding-software`)
       // HARNESS, and the reasoning is the same as `check-ci-health` above:
       // it reasons about INSTANCES and their declarations — which harness
       // instantiated which directory, and where that mounts on the published

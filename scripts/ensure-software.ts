@@ -32,7 +32,7 @@
  *
  * Usage:
  *   bun run cat software:ensure tesseract pdftoppm     # get these
- *   bun run cat software:ensure --for scripts/pdf-ocr.py
+ *   bun run cat software:ensure --for cat-harness-tools/scripts/pdf-ocr.py
  *   bun run cat software:ensure --check                # report only, every entry
  *
  * Exit: 0 everything asked for is present, 1 something is still missing,

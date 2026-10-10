@@ -18,6 +18,9 @@ import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, unlinkSy
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+
 export interface OptimizeOptions {
   dirs?: string[];
   dryRun?: boolean;
@@ -247,12 +250,12 @@ export async function optimizeLibraryPngs(opts: OptimizeOptions = {}): Promise<O
   const targetDirs =
     opts.dirs && opts.dirs.length > 0
       ? opts.dirs
-      : [
-          "cat-harness/library",
-          "smart-base/library",
-          "who-iris/library",
-          "folio-assistant-core/library",
-        ].filter((d) => existsSync(d));
+      : // Every instance's own `library` directory, read from its declaration
+        // rather than spelled: the four this listed were a monorepo's, and a
+        // literal here names another instance's directory (check:foreign-paths).
+        instanceRootsIn(process.cwd())
+          .flatMap((root) => instanceDirectoriesForGraph(root, "library"))
+          .filter((d) => existsSync(d));
 
   const allFiles: string[] = [];
   for (const d of targetDirs) {

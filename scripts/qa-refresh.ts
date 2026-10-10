@@ -172,6 +172,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },
   {
     id: "qa-sweep:docs",
+    // declared-path-literal: the sweep's target is cat-harness's authored docs tree, one fixed directory of the harness this step refreshes, passed as the CLI argument qa-sweep.ts takes.
     run: ["cat-harness-tools/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
     // The script sidecars it stamps live under test/results since cat-harness 70lx (qa-utils.ts
     // `SCRIPT_SIDECAR_DIR`), so they are this writer's OUTPUT, not committed files it rewrites: left

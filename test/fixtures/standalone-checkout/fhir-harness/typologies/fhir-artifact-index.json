@@ -14,7 +14,7 @@
       "external": "JSON Schema 2020-12"
     }
   },
-  "summary": "The artefact index of a published FHIR Implementation Guide, reconstructed from its published output — every artefact by canonical URL and published representation, with the DAK API's JSON Schema / JSON-LD sidecars as an overlay where the IG publishes one. No IG publishes such an index itself, so every field records which file it came out of.",
+  "summary": "The artefact index of a published FHIR Implementation Guide, reconstructed from its published output — every artefact by canonical URL and published representation, with the IG API's JSON Schema / JSON-LD sidecars as an overlay where the IG publishes them. No IG publishes such an index itself, so every field records which file it came out of.",
   "avatar": {
     "glyph": "M4 6h12v12H4zM4 10h12M10 6v12M19 7c-1 0-1 2-2 2 1 0 1 2 2 2",
     "tone": 168,
