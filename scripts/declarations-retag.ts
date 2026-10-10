@@ -24,6 +24,13 @@
  * their tags land through PRs to those repositories, so `--check` there names
  * each one rather than passing.
  *
+ * Not tagged: the instances the harness is composed ON TOP of — everything
+ * cat-harness transitively `needs` (bootstrap, bootstrap-tools). Their own rule
+ * is that nothing in them refers to a harness, and a `cat-harness-…` tag would
+ * be the first such reference. They are read with the same schema, which keeps
+ * `$schema` optional; this script reports them as below the harness and leaves
+ * them alone (bean `ujiv`, decided 2026-10-10).
+ *
  * Exit codes follow the bean gates: 0 every declaration tagged, 1 a defect
  * (untagged under `--check`, or a foreign tag), 2 could not check.
  *
@@ -41,7 +48,7 @@ import {
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
 
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The command a person runs to fix what `--check` finds, named once. */
 export const RETAG_COMMAND = "bun run cat declarations:retag";
@@ -88,22 +95,61 @@ export function retagDeclarationText(text: string): DeclarationRetag {
 }
 
 export interface DeclarationsReport {
+  /** Declarations checked: those below the harness are not counted. */
   files: number;
+  /** Declarations of instances below the harness, left untagged on purpose. */
+  below: string[];
   tagged: number;
   added: string[];
   foreign: { file: string; tag: string }[];
   unparseable: string[];
 }
 
+/** The `name` and `needs` a declaration states, or undefined if it cannot be read. */
+function nameAndNeeds(text: string): { name: string; needs: string[] } | undefined {
+  try {
+    const o = JSON.parse(text) as { name?: unknown; needs?: unknown };
+    if (typeof o.name !== "string") return undefined;
+    return { name: o.name, needs: Array.isArray(o.needs) ? o.needs.filter((n): n is string => typeof n === "string") : [] };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Every instance `of` transitively needs, by name, over the declarations given. */
+export function belowOf(of: string, declared: ReadonlyMap<string, readonly string[]>): Set<string> {
+  const below = new Set<string>();
+  const todo = [...(declared.get(of) ?? [])];
+  while (todo.length > 0) {
+    const n = todo.pop()!;
+    if (below.has(n)) continue;
+    below.add(n);
+    todo.push(...(declared.get(n) ?? []));
+  }
+  return below;
+}
+
 /** Retag the declaration in each of `roots`. `write: false` changes nothing. */
 export function retagDeclarations(roots: readonly string[], base: string, opts: { write: boolean }): DeclarationsReport {
-  const report: DeclarationsReport = { files: 0, tagged: 0, added: [], foreign: [], unparseable: [] };
-  for (const root of roots) {
+  const report: DeclarationsReport = { files: 0, below: [], tagged: 0, added: [], foreign: [], unparseable: [] };
+  const found = roots.flatMap((root) => {
     const name = findDeclarationFile(root);
-    if (name === undefined) continue;
-    const path = join(root, name);
+    return name === undefined ? [] : [{ path: join(root, name), name }];
+  });
+  const texts = new Map(found.map((f) => [f.path, readFileSync(f.path, "utf-8")]));
+  const declared = new Map<string, string[]>();
+  for (const t of texts.values()) {
+    const d = nameAndNeeds(t);
+    if (d) declared.set(d.name, d.needs);
+  }
+  const below = belowOf(HARNESS_NAME, declared);
+  for (const { path, name } of found) {
     const shown = relative(base, path) || name;
-    const before = readFileSync(path, "utf-8");
+    const before = texts.get(path)!;
+    if (below.has(nameAndNeeds(before)?.name ?? "")) {
+      report.below.push(shown);
+      continue;
+    }
     const r = retagDeclarationText(before);
     report.files++;
     if (r.outcome === "tagged") report.tagged++;
@@ -157,12 +203,16 @@ function main(argv: readonly string[]): void {
       );
       process.exit(1);
     }
-    console.log(`Declaration tags — all ${r.tagged} of ${r.files} declaration(s) carry ${CAT_HARNESS_DECLARATION_SCHEMA_TAG}`);
+    console.log(
+      `Declaration tags — all ${r.tagged} of ${r.files} declaration(s) carry ${CAT_HARNESS_DECLARATION_SCHEMA_TAG}` +
+        `${r.below.length ? `; ${r.below.length} below the harness left untagged (${r.below.join(", ")})` : ""}`,
+    );
     process.exit(bad > 0 ? 1 : 0);
   }
   console.log(
     `Declaration tags — added ${CAT_HARNESS_DECLARATION_SCHEMA_TAG} to ${r.added.length} declaration(s)` +
-      `${r.added.length ? ` (${r.added.join(", ")})` : ""}; ${r.tagged} already carried it`,
+      `${r.added.length ? ` (${r.added.join(", ")})` : ""}; ${r.tagged} already carried it` +
+      `${r.below.length ? `; ${r.below.length} below the harness left untagged (${r.below.join(", ")})` : ""}`,
   );
   process.exit(bad > 0 ? 1 : 0);
 }
