@@ -11,11 +11,19 @@
  *   bun run cat-harness/archimate/scripts/gen-archimate-pages.ts --instance <dir> --out <site-dir>
  *   bun run cat-harness/archimate/scripts/gen-archimate-pages.ts --instance <dir> [--check]
  *
- * With `--out`, the pages are written into a site being built, at the same
- * path the graph has in the instance (`<site>/<graph path>/…`) — the way a
- * folio's staging build uses it, since a large model is thousands of nodes
- * and nobody should commit them. Without it they are written into the graph
- * itself, as `gen-openapi-pages.ts` does, and `--check` gates them.
+ * With `--out`, they are written into a site being built — the way a folio's
+ * staging build uses it, since a large model is thousands of nodes and nobody
+ * should commit them. The DATA (every `.jsonld`, `.json`, `model.json`, drawn
+ * view and the loader) is at the path the graph has in the instance,
+ * `<site>/<graph path>/…`, so no IRI moves; the PAGES are under the locale,
+ * `<site>/en/<graph path>/…` (folio-assistant#2527: every rendered page is
+ * under `/<locale>/`). Each page reaches its data, and each drawn view its
+ * pages, by a relative link across the two trees, so a preview under a
+ * staging slug works the same.
+ *
+ * Without `--out` they are written into the graph itself, as
+ * `gen-openapi-pages.ts` does, and `--check` gates them: pages beside their
+ * data, as the directory is served verbatim at its own path.
  *
  * ## What is written, under the graph's path
  *
@@ -44,7 +52,7 @@
  * `schema:` and `dcterms:`. Nothing is minted in this project's namespaces.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, posix, relative, resolve } from "node:path";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
 import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts/lib/navbar.ts";
@@ -53,6 +61,7 @@ import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archim
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { PAGE_LOCALE } from "../../scripts/viewer-declarations.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "archimate-page";
@@ -70,6 +79,17 @@ export interface Written {
   /** Path under the graph's directory. */
   path: string;
   content: string;
+  /** A rendered page (an `index.html`), as opposed to data or the loader: what moves under the locale in a site. */
+  page?: true;
+}
+
+/**
+ * Where a written file goes in a SITE being built (`--out`), site-relative:
+ * a page under the locale, `<locale>/<graph path>/<path>`; data at the graph's
+ * own path, `<graph path>/<path>` (folio-assistant#2527).
+ */
+export function sitePathOf(graphPath: string, f: Written): string {
+  return posix.join(...(f.page ? [PAGE_LOCALE] : []), graphPath, f.path);
 }
 
 interface Declaration {
@@ -84,8 +104,13 @@ export function iriBaseOf(decl: Declaration): string {
   return b.endsWith("/") ? b : `${b}/`;
 }
 
-/** Every file a run writes for one instance, keyed by its path under the graph. */
-export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean } = {}): { graphPath: string; files: Written[] } {
+/**
+ * Every file a run writes for one instance, keyed by its path under the graph.
+ * `site`: the files are for a site being built (`--out`), so each page links
+ * its data and loader, and each drawn view its pages, across the locale (see
+ * {@link sitePathOf}); otherwise everything sits together in the graph.
+ */
+export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; site?: boolean } = {}): { graphPath: string; files: Written[] } {
   const config = readConfig(instanceRoot);
   const dir = archimateDir(instanceRoot, config);
   const declFile = findDeclarationFile(instanceRoot);
@@ -104,6 +129,17 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
   const graphPath = localDirOf(instanceRoot, dir).replace(/\/$/, "");
   const base = `${iriBaseOf(decl)}${graphPath}/`;
   const files: Written[] = [];
+  const site = opts.site === true;
+  // A link from a page in directory `from` (graph-relative) to `rel`, written
+  // relative to that directory in the GRAPH — which is where a site keeps the
+  // data, while the page itself is under the locale.
+  const toData = (from: string, rel: string): string =>
+    site ? posix.relative(posix.join(PAGE_LOCALE, graphPath, from), posix.join(graphPath, from, rel)) : rel;
+  // A link from a drawn view (data, in `<m>/views/`) to a page, the reverse way.
+  const toPage = (from: string, rel: string): string =>
+    site ? `${posix.relative(posix.join(graphPath, from), posix.join(PAGE_LOCALE, graphPath, from, rel))}/` : rel;
+  const page = (path: string, depth: number, title: string, jsonld: string, config: Record<string, unknown>, body: string, tail?: string): Written =>
+    thinPage(path, depth, title, jsonld, config, body, tail, toData);
   const json = (path: string, node: object) => {
     const text = `${JSON.stringify(node, null, 2)}\n`;
     files.push({ path: `${path}.jsonld`, content: text }, { path: `${path}.json`, content: text });
@@ -141,7 +177,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
         { label: title, href: toModel, items: model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${v.id}/` })) },
         { label: "ArchiMate models", href: `${toModel}../` },
       ]);
-    files.push(page(`${m}/index.html`, 1, title, `../${m}.jsonld`, { kind: "model", node: `../${m}.jsonld`, model: "./model.json" },
+    files.push(page(`${m}/index.html`, 1, title, toData(m, `../${m}.jsonld`), { kind: "model", node: toData(m, `../${m}.jsonld`), model: toData(m, "./model.json") },
       `<main class="am"><p class="am-up"><a href="../">← ArchiMate models</a></p><h1>${escHtml(title)}</h1>` +
         `<div class="am-body" aria-live="polite"><p>Loading the model…</p></div></main>`, nav("./")));
 
@@ -161,16 +197,20 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
       });
       // Relative to the SVG's own address (`<m>/views/`), so it links correctly
       // standalone, embedded as a figure, or in its page's <object>.
+      // In a site the pages are under the locale and the drawing is not, so
+      // there each link crosses to the page (`toPage`).
+      const vd = `${m}/views`;
       files.push({
         path: `${m}/views/${v.id}.svg`,
         content: renderViewSvg(model, v, {
-          elementHref: (id) => `../elements/${id}/`,
-          relationshipHref: (id) => `../relationships/${id}/`,
-          viewHref: (id) => `./${id}/`,
+          elementHref: (id) => toPage(vd, `../elements/${id}/`),
+          relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
+          viewHref: (id) => toPage(vd, `./${id}/`),
         }),
       });
-      files.push(page(`${m}/views/${v.id}/index.html`, 3, `${v.name} — ${title}`, `../${v.id}.jsonld`,
-        { kind: "view", node: `../${v.id}.jsonld`, model: "../../model.json", id: v.id, svg: `../${v.id}.svg` },
+      const vp = `${m}/views/${v.id}`;
+      files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`),
+        { kind: "view", node: toData(vp, `../${v.id}.jsonld`), model: toData(vp, "../../model.json"), id: v.id, svg: toData(vp, `../${v.id}.svg`) },
         `<main class="am am-wide"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
           `<p class="am-kind">View</p><div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
     }
@@ -186,8 +226,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
         "schema:category": e.layer,
         "dcterms:isPartOf": modelIri,
       });
-      files.push(page(`${m}/elements/${e.id}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, `../${e.id}.jsonld`,
-        { kind: "element", node: `../${e.id}.jsonld`, model: "../../model.json", id: e.id },
+      const ep = `${m}/elements/${e.id}`;
+      files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`),
+        { kind: "element", node: toData(ep, `../${e.id}.jsonld`), model: toData(ep, "../../model.json"), id: e.id },
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(e.type))} · ${escHtml(e.layer)}</p><div class="am-body" aria-live="polite"><p>Loading the element…</p></div></main>`));
     }
@@ -205,8 +246,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
         "dcterms:isPartOf": modelIri,
       });
       const label = `${typeLabel(r.type)}: ${elements.get(r.source)?.name ?? r.source} → ${elements.get(r.target)?.name ?? r.target}`;
-      files.push(page(`${m}/relationships/${r.id}/index.html`, 3, `${label} — ${title}`, `../${r.id}.jsonld`,
-        { kind: "relationship", node: `../${r.id}.jsonld`, model: "../../model.json", id: r.id },
+      const rp = `${m}/relationships/${r.id}`;
+      files.push(page(`${rp}/index.html`, 3, `${label} — ${title}`, toData(rp, `../${r.id}.jsonld`),
+        { kind: "relationship", node: toData(rp, `../${r.id}.jsonld`), model: toData(rp, "../../model.json"), id: r.id },
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
@@ -214,9 +256,10 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
 
   files.push({
     path: "index.html",
+    page: true,
     content:
       `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-      `<title>ArchiMate models — ${escHtml(decl.name)}</title><link rel="stylesheet" href="${STYLE}"></head>\n<body><main class="am">` +
+      `<title>ArchiMate models — ${escHtml(decl.name)}</title><link rel="stylesheet" href="${toData("", STYLE)}"></head>\n<body><main class="am">` +
       `<h1>ArchiMate models</h1><ul>` +
       listed.map((l) => `<li><a href="${encodeURI(l.id)}/">${escHtml(l.title)}</a> <code>${escHtml(l.id)}</code> — ${l.views} view(s), ${l.elements} element(s)</li>`).join("") +
       `</ul></main>\n` +
@@ -230,16 +273,31 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean }
   return { graphPath, files };
 }
 
-/** A thin page `depth` directories below the graph's root; `tail`, a declaration after its script. */
-function page(path: string, depth: number, title: string, jsonld: string, config: Record<string, unknown>, body: string, tail?: string): Written {
+/**
+ * A thin page `depth` directories below the graph's root; `tail`, a
+ * declaration after its script. `toData` links the page's directory to the
+ * loader, wherever the run keeps it (`pagesFor`).
+ */
+function thinPage(
+  path: string,
+  depth: number,
+  title: string,
+  jsonld: string,
+  config: Record<string, unknown>,
+  body: string,
+  tail: string | undefined,
+  toData: (from: string, rel: string) => string,
+): Written {
   const up = "../".repeat(depth);
+  const dir = posix.dirname(path);
   return {
     path,
+    page: true,
     content: thinPageHtml({
       title,
       jsonld,
-      script: `${up}${LOADER}`,
-      stylesheet: `${up}${STYLE}`,
+      script: toData(dir, `${up}${LOADER}`),
+      stylesheet: toData(dir, `${up}${STYLE}`),
       configId: PAGE_CONFIG_ID,
       config,
       body,
@@ -327,11 +385,11 @@ if (import.meta.main) {
   const out = arg("out");
   const check = process.argv.includes("--check");
   const root = resolve(instance);
-  const { graphPath, files } = pagesFor(root, { requireServed: out === undefined });
+  const { graphPath, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined });
   const target = out ? join(resolve(out), graphPath) : archimateDir(root, readConfig(root));
   if (out) {
     for (const f of files) {
-      const p = join(target, f.path);
+      const p = join(resolve(out), sitePathOf(graphPath, f));
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.content);
     }
@@ -363,5 +421,6 @@ if (import.meta.main) {
   }
   const pages = files.filter((f) => f.path.endsWith("/index.html")).length;
   const svgs = files.filter((f) => f.path.endsWith(".svg")).length;
-  console.log(`${check ? "✓ current" : "wrote"}: ${instance} — ${pages} page(s), ${svgs} view drawing(s) in ${relative(process.cwd(), target)}/`);
+  const where = out ? `${relative(process.cwd(), join(resolve(out), PAGE_LOCALE, graphPath))}/ (pages) and ${relative(process.cwd(), target)}/ (data)` : `${relative(process.cwd(), target)}/`;
+  console.log(`${check ? "✓ current" : "wrote"}: ${instance} — ${pages} page(s), ${svgs} view drawing(s) in ${where}`);
 }
