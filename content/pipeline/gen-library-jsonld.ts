@@ -804,6 +804,7 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
       licence,
       titled,
       instance,
+      subgraphStart,
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
