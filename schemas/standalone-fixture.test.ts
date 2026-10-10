@@ -45,7 +45,7 @@ describe("the standalone fixture copies the real nodes", () => {
   test("it carries the paper vocabulary and core's kinds", () => {
     const rels = copies.map((f) => relative(FIXTURE, f));
     expect(rels).toContain("folio-assistant-sci/content-adapters/paper.json");
-    expect(rels.filter((r) => r.includes("/block-kinds/") && r.endsWith(".json")).length).toBe(16);
+    expect(rels.filter((r) => r.includes("/block-kinds/") && r.endsWith(".json")).length).toBe(17);
     expect(rels).toContain("folio-assistant-core/typologies/review-verdicts.json");
     expect(rels).toContain("fhir-harness/typologies/ig-metadata-index.json");
   });
