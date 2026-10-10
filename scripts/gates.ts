@@ -1342,6 +1342,22 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "software:check",
+    kind: "report",
+    reason:
+      "A PROPERTY OF THE MACHINE, not of the commit: it asks whether the programs the harness's scripts check for " +
+      "(`scripts/software.json`) are on PATH here, so the same tree passes on one runner and fails on another. Its use is " +
+      "the `finding-software` skill's ladder before a run that needs them; as a CI gate it would judge the runner image",
+  },
+  {
+    script: "check:bean-issues",
+    kind: "report",
+    reason:
+      "IT JUDGES THE WORK PLAN, which lives on its state branch rather than in the commit under review (bean `xeer`): a PR " +
+      "that touches no bean would go red when somebody else files one. On 2026-10-10 it reported 131 beans owing an issue " +
+      "link; wiring it as a gate is for after that drain, by an owner's decision, with the work plan's own CI as its home",
+  },
+  {
     script: "check:change-size",
     kind: "report",
     reason:

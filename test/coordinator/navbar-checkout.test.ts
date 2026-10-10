@@ -55,7 +55,9 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // TWELVE since 2026-10-09: `tools` joined when who-iris declared its own
     // Tool node (`iris-pages`), the one its catalogue visualiser is
     // `renderedBy` (owner: "Need harness to declare visualizer is renderedBy").
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "glossary", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // FOURTEEN with `folio`, which joined when who-iris's landing sticky moved
+    // into its own `folio/` (bean `1yd7`). Same reason as every one above.
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -68,6 +70,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `code` is declared and publishes no page — which is exactly the state
       // this assertion exists to keep visible, rather than a gap to hide.
       "code",
+      // `folio` (bean `1yd7`) holds the landing sticky; no page is passed in here.
+      "folio",
       // `glossary` and `voices` arrived with the style guide (bean `qsx4`); no
       // page is passed in here, so both are declared-and-unlinked.
       "glossary",

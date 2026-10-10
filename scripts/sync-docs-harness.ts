@@ -692,9 +692,36 @@ const payload = {
 const next = `${JSON.stringify(payload, null, 2)}\n`;
 const current = existsSync(OUT) ? readFileSync(OUT, "utf-8") : "";
 
+/**
+ * The file with every tile's live COUNT removed: what a commit determines.
+ *
+ * A tile's `count` and `unit` are read from the projections under `assets/`
+ * (`scanTileCounts`), and some of those are LIVE: the beans tile counts open
+ * beans on the work-plan tip, which moves whenever anyone files or closes a
+ * bean. A committed copy therefore went stale between the commit and its CI
+ * run (188 at the commit, 189 in CI: folio-assistant#2526), and the check
+ * failed on whichever PR happened to be running. The count is BUILD-TIME data:
+ * the site build re-runs this generator after `gen-docs-pages` refreshes the
+ * projections, so a published page shows the live number. The check compares
+ * everything else. Owner, 2026-10-10: "regenerate at build".
+ */
+function withoutTileCounts(text: string): string {
+  if (!text) return text;
+  try {
+    const d = JSON.parse(text) as { tiles?: Array<Record<string, unknown>> };
+    for (const t of d.tiles ?? []) {
+      delete t.count;
+      delete t.unit;
+    }
+    return JSON.stringify(d);
+  } catch {
+    return text; // unreadable: compared as-is, and so reported stale
+  }
+}
+
 if (check) {
-  if (current === next) {
-    console.log(`${relative(ROOT, OUT)} is up to date`);
+  if (withoutTileCounts(current) === withoutTileCounts(next)) {
+    console.log(`${relative(ROOT, OUT)} is up to date (tile counts are build-time data and not compared)`);
     process.exit(0);
   }
   console.error(

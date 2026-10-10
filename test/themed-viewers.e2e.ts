@@ -31,7 +31,7 @@ const PAGES: { name: string; path: string; wrapper: string; ready: string; ready
   { name: "node-kind dashboard", path: `${DOCS}/en/cat-harness/todo/index.html`, wrapper: ".nk-page", ready: "#shown" },
   {
     name: "node-kind node",
-    path: `${DOCS}/en/cat-harness/todo/folio-assistant/todos/items/what-kick-off-means-for-a-ci-watcher/index.html`,
+    path: `${DOCS}/en/cat-harness/todo/todos/items/what-kick-off-means-for-a-ci-watcher/index.html`,
     wrapper: ".nk-page",
     ready: "#fields",
   },
