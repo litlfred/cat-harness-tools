@@ -750,7 +750,7 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     if (!("reason" in parsed)) {
       read = parsed;
     } else {
-      const raw = readJson<Record<string, unknown>>(join(dir, "structure.json"));
+      const raw = readJson<Record<string, unknown>>(join(dir, STRUCTURE_FILENAME));
       if (raw && (raw._schema === "pdf-structure/v1" || !raw._schema) && Array.isArray(raw.sections)) {
         read = {
           variant: "pdf",
