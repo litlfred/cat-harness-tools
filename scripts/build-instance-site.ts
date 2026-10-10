@@ -299,11 +299,18 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");
     const message = o.message ?? `Publish ${o.instance} ${capture("git rev-parse --short HEAD", root)}${staging ? ` preview of ${o.staging}` : ""}`;
-    const r = publishSite(
-      staging
-        ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
-        : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" },
-    );
+    // `into` and `keep` arrived in bootstrap-tools#16 (adea857). An older
+    // bootstrap-tools ignores unknown options, so a preview would REPLACE THE
+    // WHOLE BRANCH and a root publish would delete every preview. Refuse
+    // rather than guess: the options are typed locally so this compiles
+    // against either version, and the running one is checked for support.
+    if (!publishSite.toString().includes("o.into")) {
+      throw new Error("the mounted bootstrap-tools' publish-site predates --into/--keep (bootstrap-tools#16): publishing would replace the whole branch; re-pin bootstrap-tools to adea857 or later");
+    }
+    const opts: Parameters<typeof publishSite>[0] & { into?: string; keep?: string[] } = staging
+      ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
+      : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" };
+    const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);
     console.log(r.state === "published" ? `published ${r.commit} (attempt ${r.attempt})` : "branch already current");
   } else {
