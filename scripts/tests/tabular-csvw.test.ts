@@ -216,6 +216,17 @@ describe("the QA catches ABSENCE — and can actually fail", () => {
     expect(declared.size).toBeLessThan(tools().length);
   });
 
+  test("a working tool with nothing to install is NOT a stub (cat-tools-1wre)", () => {
+    // `install: { none: true }` is also how a runnable, install-free tool is
+    // declared (`dublin-core-render`). Only "nothing to install AND only a
+    // person can invoke it" is a stub.
+    const set = stubbedTools([
+      { id: "unbuilt", install: { none: true }, invoke: { manual: true } },
+      { id: "install-free", install: { none: true }, invoke: { shell: "bun run x.ts" } },
+    ]);
+    expect([...set]).toEqual(["unbuilt"]);
+  });
+
   test("both tools name the skill they satisfy", () => {
     // A Tool that satisfies nothing is a mechanism with no stated capability.
     const t = tools().filter((x) => x.id.startsWith("tabular-"));
