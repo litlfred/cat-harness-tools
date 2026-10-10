@@ -117,7 +117,7 @@ import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { foreignScopeFor, isHostProjection, scopeHarnessData, scopeSiteConfig, scopeStickies } from "./lib/foreign-site-scope.ts";
 import { subscribedTrees } from "./subscribed-trees.ts";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
-import { declaredVisualisers } from "./viewer-declarations.ts";
+import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -464,11 +464,16 @@ export function withheldPathFor(rel: string): string {
 export function withheldFromCanonical(repo = REPO): string[] {
   const out = new Set<string>();
   // A visualiser's page is at its ROUTE in the base docs layer, which is the
-  // composed tree's own path for it: `cat-harness/fsh-guts/`. Withheld as a
-  // DIRECTORY, because a viewer is a page plus whatever it loads.
+  // composed tree's own path for it: `en/cat-harness/fsh-guts/`. Withheld as a
+  // DIRECTORY, because a viewer is a page plus whatever it loads — and at BOTH
+  // addresses (folio-assistant#2527): the localised one, and the old one,
+  // where a site not yet regenerated still holds the page and where its
+  // forwarding page would otherwise go.
   for (const v of declaredVisualisers(repo)) {
     if (v.publish !== "staging-only") continue;
-    out.add(visualiserRoute({ harness: v.harness, visualiser: v.id }));
+    const parts = { harness: v.harness, visualiser: v.id };
+    out.add(visualiserRoute(pageParts(parts)));
+    out.add(visualiserRoute(forwardingParts(parts)));
     // Its alias redirect too: a redirect to a withheld page is the page's
     // address published on a deploy that withholds it.
     if (v.alias !== undefined) out.add(aliasRoute(v.alias));
@@ -477,9 +482,37 @@ export function withheldFromCanonical(repo = REPO): string[] {
 }
 
 /**
+ * Where a visualiser's pages ARE in the composed tree: its localised route,
+ * `<locale>/<harness>/<visualiser>/` (folio-assistant#2527), or — a site not
+ * yet regenerated — its old one. `undefined` when it has neither.
+ */
+function pagesRouteIn(out: string, v: { harness: string; id: string }): string | undefined {
+  const parts = { harness: v.harness, visualiser: v.id };
+  for (const route of [visualiserRoute(pageParts(parts)), visualiserRoute(forwardingParts(parts))]) {
+    if (existsSync(join(out, route))) return route;
+  }
+  return undefined;
+}
+
+/** Every `.md` / `.html` page under `route`, as `[htmlRel, stub target from <at><htmlRel>]`. */
+function pagesToForward(out: string, route: string, at: string): [string, string][] {
+  const pages: [string, string][] = [];
+  for (const rel of filesUnder(join(out, route))) {
+    // PAGES only. A data file (`.json`, `.jsonld`, an image) is fetched by a
+    // script that would not follow a redirect page, so none gets a stub.
+    if (!/\.(md|html)$/.test(rel)) continue;
+    const htmlRel = rel.replace(/\.md$/, ".html");
+    const target = relative(join(out, at, htmlRel, ".."), join(out, route, htmlRel)).split(sep).join("/").replace(/(^|\/)index\.html$/, "$1");
+    pages.push([htmlRel, target || "./"]);
+  }
+  return pages;
+}
+
+/**
  * The opt-in `<base>/<alias>/` redirects (bean `t4xb`): for every page under
  * a visualiser's canonical route, a one-file redirect at the same path under
- * its alias.
+ * its alias. The redirect targets the page where it IS — under the locale
+ * once drawn there — never the forwarding page at the old address.
  *
  * Written AFTER every layer and composed instance, and REFUSED over anything
  * already in the tree: an alias that would replace a page is a collision, and
@@ -496,35 +529,86 @@ export function writeAliasRedirects(
   const collisions: string[] = [];
   for (const v of declaredVisualisers(repo)) {
     if (v.alias === undefined) continue;
-    const route = visualiserRoute({ harness: v.harness, visualiser: v.id });
     const alias = aliasRoute(v.alias);
     if (isWithheld(alias, withheld)) continue;
-    const from = join(out, route);
-    if (!existsSync(from)) continue;
-    for (const rel of filesUnder(from)) {
-      if (!/\.(md|html)$/.test(rel)) continue;
-      const htmlRel = rel.replace(/\.md$/, ".html");
+    const route = pagesRouteIn(out, v);
+    if (route === undefined) continue;
+    for (const [htmlRel, target] of pagesToForward(out, route, alias)) {
       const stubRel = `${alias}${htmlRel}`;
       const dest = join(out, stubRel);
       if (existsSync(dest) || existsSync(dest.replace(/\.html$/, ".md"))) {
         collisions.push(`${stubRel} — alias of ${v.harness}.visualisers[${v.id}] would replace a page the site already carries`);
         continue;
       }
-      const target = relative(join(out, alias, htmlRel, ".."), join(out, route, htmlRel)).split(sep).join("/").replace(/(^|\/)index\.html$/, "$1");
       mkdirSync(join(dest, ".."), { recursive: true });
-      writeFileSync(dest, redirectStub(target || "./"));
+      writeFileSync(dest, redirectStub(target));
       written.push(stubRel);
     }
   }
   return { written: written.sort(), collisions: collisions.sort() };
 }
 
-/** A redirect page: no layout, no front matter, so Jekyll copies it verbatim. */
+/**
+ * The FORWARDING pages at the old addresses (folio-assistant#2527): for every
+ * page under a visualiser's localised route `<locale>/<harness>/<visualiser>/`,
+ * a one-file redirect at the same path under `<harness>/<visualiser>/`, where
+ * the page was published until it moved. A bookmark, a link from another site
+ * or a `#fragment` someone shared keeps working — `redirectStub` carries the
+ * query and the fragment across.
+ *
+ * The same machinery as the aliases, and the same refusal to replace a page:
+ * a page still sitting at the old address — a site whose generators have not
+ * been re-run since the move — stands, and is reported as `superseded` (its
+ * forwarding page is not written) rather than overwritten. That keeps the
+ * canonical compose byte-identical to its layers for every file they carry.
+ *
+ * Pages only: a data file is never given a stub (see `pagesToForward`).
+ */
+export function writeForwardingPages(
+  out: string,
+  repo = REPO,
+  withheld: readonly string[] = [],
+): { written: string[]; superseded: string[] } {
+  const written: string[] = [];
+  const superseded: string[] = [];
+  for (const v of declaredVisualisers(repo)) {
+    const parts = { harness: v.harness, visualiser: v.id };
+    const route = visualiserRoute(pageParts(parts));
+    const old = visualiserRoute(forwardingParts(parts));
+    if (route === old || isWithheld(old, withheld) || isWithheld(route, withheld)) continue;
+    if (!existsSync(join(out, route))) continue;
+    for (const [htmlRel, target] of pagesToForward(out, route, old)) {
+      const stubRel = `${old}${htmlRel}`;
+      const dest = join(out, stubRel);
+      if (existsSync(dest) || existsSync(dest.replace(/\.html$/, ".md"))) {
+        superseded.push(stubRel);
+        continue;
+      }
+      mkdirSync(join(dest, ".."), { recursive: true });
+      writeFileSync(dest, redirectStub(target));
+      written.push(stubRel);
+    }
+  }
+  return { written: written.sort(), superseded: superseded.sort() };
+}
+
+/**
+ * A redirect page: no layout, no front matter, so Jekyll copies it verbatim.
+ *
+ * The script runs first and carries the `?query` and `#fragment` across
+ * (folio-assistant#2527): a viewer opened on an item (`#<instance>/<id>`) must
+ * still open on it at the new address, and a meta refresh drops both. The
+ * meta refresh stays as the fallback for a reader without scripts.
+ */
 export function redirectStub(target: string): string {
   const t = target.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  // A JS string literal that cannot close the script element it sits in.
+  const js = JSON.stringify(target).replace(/</g, "\\u003c");
   return (
     `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Redirecting…</title>\n` +
-    `<link rel="canonical" href="${t}"><meta http-equiv="refresh" content="0; url=${t}"><meta name="robots" content="noindex">\n` +
+    `<link rel="canonical" href="${t}">\n` +
+    `<script>location.replace(${js} + location.search + location.hash);</script>\n` +
+    `<meta http-equiv="refresh" content="0; url=${t}"><meta name="robots" content="noindex">\n` +
     `</head><body><p>This page is at <a href="${t}">${t}</a>.</p></body></html>\n`
   );
 }
@@ -607,6 +691,12 @@ export interface ComposeReport {
   readonly carried: CarryDecision[];
   /** The `<alias>/` redirect stubs written (bean `t4xb`), and every one refused over an existing page. */
   readonly aliases: { written: string[]; collisions: string[] };
+  /**
+   * The forwarding pages written at the old `<harness>/<visualiser>/`
+   * addresses (folio-assistant#2527), and each one NOT written because a page
+   * the site carries still stands there (a site not yet regenerated).
+   */
+  readonly forwards: { written: string[]; superseded: string[] };
 }
 
 /**
@@ -882,6 +972,9 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   // THE ALIASES, last, over the finished tree — so a collision with any page,
   // from any layer or instance, is seen. Not on a shell: it carries no page.
   const aliases = opts.shell ? { written: [], collisions: [] } : writeAliasRedirects(out, repo, withheld);
+  // THE FORWARDING PAGES at the old addresses, after the aliases, so neither
+  // ever writes over the other or over a page.
+  const forwards = opts.shell ? { written: [], superseded: [] } : writeForwardingPages(out, repo, withheld);
 
   // DEDUPED. A path present in two layers is withheld once per layer, and a
   // report listing it twice made `withheld.length` stop meaning "files this
@@ -898,6 +991,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     composed: composedInst,
     carried: carry,
     aliases,
+    forwards,
     ...(scoped ? { scoped } : {}),
   };
 }
@@ -1010,6 +1104,10 @@ if (import.meta.main) {
   }
 
   console.log(`  ${r.aliases.written.length} alias redirect(s) written`);
+  console.log(
+    `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +
+      (r.forwards.superseded.length > 0 ? `, ${r.forwards.superseded.length} not written over a page still there` : ""),
+  );
   for (const c of r.aliases.collisions) console.error(`::error::compose-docs: alias collision: ${c}`);
 
   if (r.missing.length > 0 || r.aliases.collisions.length > 0) process.exit(1);
