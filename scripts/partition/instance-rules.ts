@@ -1483,6 +1483,25 @@ const PERMITTED_EDGES: readonly PermittedEdge[] = [
       "into folio-assistant-core\"). One entry per endpoint pair, as this list's rule requires; " +
       "it goes away with the folio entry when the split lands (#223).",
   },
+  // Owner, 2026-10-10 (session_01UC1NuEuSy1MBNpEhnDuiGj), answering "record
+  // both edges as known exceptions … so the placement is decided in that
+  // audit": "ok". Both targets live in cat-harness/schemas/ and are imported
+  // by harness schemas; the keyword rules classify them core. Where they
+  // belong is the placement audit's question (bean `lthi`), not this one's.
+  {
+    from: "schemas/role-graph.ts",
+    to: "schemas/model-capabilities.ts",
+    reason:
+      "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
+      "role-graph.ts reads the model-capability schema; whether that schema is the harness's or core's is undecided.",
+  },
+  {
+    from: "schemas/kg-qa.ts",
+    to: "schemas/qa-review.ts",
+    reason:
+      "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
+      "kg-qa.ts reads the review-verdict shape; whether qa-review.ts is the harness's or core's is undecided.",
+  },
 ];
 
 export const SPEC: PartitionSpec = {
