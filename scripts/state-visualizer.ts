@@ -1024,7 +1024,9 @@ for (const g of graphs) {
 // three are safe for the same reason: only a page carrying GENERATED_BY is ever
 // a candidate.
 const harnessSegment = harnessName ?? basename(ROOT);
-const localisedSegment = relative(SITE, dirname(pageDirOf("_")));
+// `<locale>/<harness>`: the directory every dashboard of this harness sits in,
+// read off the route of any one of them (the segment name is immaterial).
+const localisedSegment = dirname(relative(SITE, pageDirOf("dashboard")));
 const orphans = [
   ...prunableDashboards(join(SITE, localisedSegment), graphs.map((g) => g.vis)).map((o) => join(localisedSegment, o)),
   ...(localisedSegment === harnessSegment
