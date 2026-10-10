@@ -6,7 +6,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredVisualisers } from "../scripts/viewer-declarations.ts";
-import { declaredPagePath } from "./support/site-pages.ts";
+import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "./support/site-pages.ts";
 
 /**
  * Every generated state dashboard, audited — bean `5wrg`.
@@ -103,9 +103,9 @@ const asset = (rel: string) => readFileSync(join(ROOT, SITE, rel), "utf8");
 /**
  * A stand-in for the default layout: what it contributes to these pages and
  * nothing more — both data metas from `head_custom.html`, the work-plan
- * renderer and its styles, and the theme's dark ground, because the inks are
- * written for that ground and an unstyled white page would fail contrast for
- * a reason no reader sees. The band itself is `docs-ui.js`'s, covered by its
+ * renderer and its styles, and the theme's first-paint block (scheme and
+ * ground), because the inks are written for the ground of their own scheme
+ * and an unstyled white page would fail contrast for a reason no reader sees. The band itself is `docs-ui.js`'s, covered by its
  * own specs.
  */
 function shell(id: string): string {
@@ -115,7 +115,7 @@ function shell(id: string): string {
 <meta name="fa-beans-src" content="/assets/beans/index.json">
 <meta name="fa-todo-src" content="/assets/todos/index.json">
 <style>${asset("assets/css/work-plan.css")}</style>
-<style>html,body{background:#27262b;color:#fff;margin:0}main{padding:0 16px}</style></head><body>
+${firstPaintBlock(join(ROOT, SITE))}${SCHEME_INK}<style>html,body{margin:0}main{padding:0 16px}</style></head><body>
 <main class="main-content" id="main-content">
 ${body}
 </main>
