@@ -93,7 +93,7 @@ import {
 } from "../content/pipeline/library-title.ts";
 import { tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.
 const ROOT = HARNESS_ROOT;
@@ -501,7 +501,7 @@ export function judge(entries: readonly LibraryEntry[], repoRoot: string): Judge
 export function resultOf(j: Judgement, root: string = ROOT): QaResult {
   return buildQaResult({
     script: SCRIPT,
-    scriptAbsPath: join(root, SCRIPT),
+    scriptAbsPath: join(TOOLS_ROOT, SCRIPT),  // the producer is code, here since 70lx; `root` is the content
     subject: { kind: "library", id: "library-entries" },
     families: j.families,
   });
