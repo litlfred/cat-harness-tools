@@ -1986,6 +1986,17 @@ async function main(): Promise<number> {
       redirectProblems.push(`/${r.route}/ is declared a redirect, but the site already serves a page there`);
       continue;
     }
+    // A redirect to a page THIS site does not carry is a link to a 404. The
+    // viewer is declared (the harness draws one for every directory of its
+    // kind since the 2026-10-09 visualiser ruling) but not built into every
+    // site: who-iris's own site carries no library viewer, while the
+    // folio-assistant site does. Not owed here, exactly as when no viewer is
+    // declared at all — said, never silent.
+    const lands = resolve(dirname(at), r.target.split("#")[0]!);
+    if (!r.target.startsWith("http") && !existsSync(lands.endsWith(".html") ? lands : join(lands, "index.html"))) {
+      console.log(`  redirect not owed: /${r.route}/ — its viewer ${r.target} is not built into this site`);
+      continue;
+    }
     mkdirSync(dirname(at), { recursive: true });
     writeFileSync(at, redirectHtml(r.route, r.target));
     written.push(r);
