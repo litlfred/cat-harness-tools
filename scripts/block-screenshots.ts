@@ -46,6 +46,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { PAGE_LOCALE } from "./viewer-declarations.ts";
+
 export const VISUAL_DIFF_SCHEMA = "folio-visual-diff/v1" as const;
 
 /** Block kinds whose change is visual. Kept equal to the `visual` renderer's `defaultFor`. */
@@ -83,11 +85,28 @@ export function visualChanges(changes: ReadonlyArray<{ change: string; label: st
   return changes.filter((c) => (VISUAL_KINDS as readonly string[]).includes((c.head ?? c.base)?.kind ?? ""));
 }
 
-/** The page a block is on: its manifest's first path segment, as `build-document-site` writes it. */
+/**
+ * The page a block is on, before the locale: its manifest's first path
+ * segment, `<doc>/index.html`, where `build-document-site` wrote it until
+ * folio-assistant#2527. {@link pageIn} is the page in a given site.
+ */
 export function pageOf(at: { file: string } | undefined): string | null {
   const seg = (at?.file ?? "").split("/")[0] ?? "";
   // `.` and `..` match the character class, and would climb out of the site.
   return /^[A-Za-z0-9._-]+$/.test(seg) && !/^\.+$/.test(seg) ? `${seg}/index.html` : null;
+}
+
+/**
+ * The page a block is on IN `site`: under the locale, `en/<doc>/index.html`
+ * (folio-assistant#2527), when that site has it; else `<doc>/index.html`. The
+ * before side is main's published site, which keeps the old layout until it
+ * is rebuilt, so each side is looked up on its own.
+ */
+export function pageIn(site: string, at: { file: string } | undefined): string | null {
+  const old = pageOf(at);
+  if (old === null) return null;
+  const localised = `${PAGE_LOCALE}/${old}`;
+  return existsSync(join(site, localised)) ? localised : old;
 }
 
 /** A file name for a label: labels contain `:`, which a Windows checkout cannot hold. */
@@ -202,8 +221,8 @@ export async function run(o: { changeset: string; base: string; head: string; ou
       for (const c of todo) {
         const name = safeName(c.label);
         const rel = (p: string) => `visual/${name}.${p}.png`;
-        const before = c.change === "added" ? null : await shoot(page, o.base, pageOf(c.base), c.from ?? c.label, join(o.out, rel("before")));
-        const after = c.change === "removed" ? null : await shoot(page, o.head, pageOf(c.head), c.label, join(o.out, rel("after")));
+        const before = c.change === "added" ? null : await shoot(page, o.base, pageIn(o.base, c.base), c.from ?? c.label, join(o.out, rel("before")));
+        const after = c.change === "removed" ? null : await shoot(page, o.head, pageIn(o.head, c.head), c.label, join(o.out, rel("after")));
         let changed: number | null = null;
         let diff: string | null = null;
         if (before?.png && after?.png) {
