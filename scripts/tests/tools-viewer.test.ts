@@ -35,6 +35,7 @@ import { join, resolve } from "node:path";
 import { docsLayers } from "../compose-docs.js";
 import { page, pageRelPath, skillIds, toolRows } from "../gen-tools-viz.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { PAGE_LOCALE } from "../viewer-declarations.js";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -116,7 +117,11 @@ describe("the generator writes where the declaration says", () => {
   it("resolves its page path from the declaration, not a literal", () => {
     const rel = pageRelPath(REPO);
     expect(rel).toBeDefined();
-    expect(existsSync(join(DOCS, rel!))).toBe(true);
+    // Declared under the page locale. Until the committed site is regenerated
+    // (folio-assistant#2527) the page is still at the address without it.
+    expect(rel!.startsWith(`${PAGE_LOCALE}/`)).toBe(true);
+    const committed = [rel!, rel!.slice(`${PAGE_LOCALE}/`.length)];
+    expect(committed.some((r) => existsSync(join(DOCS, r)))).toBe(true);
   });
 });
 
@@ -135,8 +140,10 @@ describe("satisfies links what resolves (qgjh)", () => {
       .split("|")[4]!;
 
   it("links a skill whose page exists, relative to the page it sits on", () => {
+    // One `../` per directory of the page's route, back to the site root.
+    const up = "../".repeat(TOOLS_PAGE.split("/").length - 1);
     expect(satisfiesCell(page(rows, new Set([s]), new Set([s]), TOOLS_PAGE))).toContain(
-      `[\`${s}\`](../../reference/skill-instructions/${s}.html)`,
+      `[\`${s}\`](${up}reference/skill-instructions/${s}.html)`,
     );
   });
 

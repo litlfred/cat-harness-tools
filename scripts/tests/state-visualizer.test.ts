@@ -14,7 +14,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 
 import {
   declaredVisualiserFor,
@@ -24,6 +24,7 @@ import {
 } from "../state-visualizer.ts";
 import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -35,8 +36,20 @@ const SITE = join(ROOT, siteDirFor(ROOT));
  */
 const VIS: Record<string, string> = { uploads: "uploads-queue" };
 const visOf = (graph: string) => VIS[graph] ?? graph;
-/** Where a dashboard is drawn: the declared route, `<site>/cat-harness/<vis>/`. */
-const pageDir = (graph: string) => join(SITE, "cat-harness", visOf(graph));
+/**
+ * Where a dashboard is drawn: the declared route under the page locale,
+ * `<site>/en/cat-harness/<vis>/`. Until the committed site is regenerated the
+ * page is still at `<site>/cat-harness/<vis>/`, and `existingPageDir` answers
+ * whichever holds it.
+ */
+const pageDir = (graph: string) => {
+  const parts = { harness: "cat-harness", visualiser: visOf(graph) };
+  return existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
+};
+/** The directory every dashboard of this harness sits in. */
+const dashboardsDir = () => dirname(pageDir("beans"));
+/** `../` once per route segment of a dashboard: its way back to the site root. */
+const upFrom = (graph: string) => "../".repeat(relative(SITE, pageDir(graph)).split(sep).length);
 /** A dashboard's committed page. */
 const read = (graph: string) =>
   readFileSync(join(pageDir(graph), "index.html"), "utf-8");
@@ -73,7 +86,7 @@ describe("the route is the policy, not this generator's choice", () => {
     // would silently overwrite the other.
     expect(has("qa")).toBe(true);
     expect(has("health")).toBe(true);
-    expect(existsSync(join(SITE, "cat-harness", "results", "index.html"))).toBe(false);
+    expect(existsSync(join(dashboardsDir(), "results", "index.html"))).toBe(false);
   });
 });
 
@@ -82,8 +95,8 @@ describe("each page reads the projection that already exists", () => {
     // `beans` is a THEMED page (#2418): `fa-beans-src` is the layout's own,
     // through `relative_url`. The no-JS fallback still links the projection,
     // relative to the page.
-    // Two levels down now, `<harness>/<visualiser>/`, so two `../`.
-    expect(read("beans")).toContain('href="../../assets/beans/index.json"');
+    // One `../` per route segment: `<locale>/<harness>/<visualiser>/`.
+    expect(read("beans")).toContain(`href="${upFrom("beans")}assets/beans/index.json"`);
     // `todos` is a THEMED page (#1906): its `fa-todo-src` is the site's own,
     // written by `head_custom.html` through `relative_url`, so the page
     // carries no path of its own to get wrong.
@@ -462,7 +475,7 @@ describe("orphan dashboards — a page that answers to no declaration", () => {
     // wanted — and assert the answer is exactly this generator's own pages,
     // never one of the site's other directories.
     const ours = ["beans", "todos", "qa", "attestations", "health", "issue-marks", "uploads", "swimlane-glossary"].map(visOf);
-    const selected = prunableDashboards(join(SITE, "cat-harness"), []);
+    const selected = prunableDashboards(dashboardsDir(), []);
     expect(selected.sort()).toEqual(ours.map((g) => join(g, "index.html")).sort());
     // And the site root holds none: every dashboard moved to its route.
     expect(prunableDashboards(SITE, [])).toEqual([]);

@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { declarationPathIn, instanceRootsIn, visualisationResolves } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { declaredVisualisers, viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
+import { declaredVisualisers, PAGE_LOCALE, viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -46,15 +46,20 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
       const row = dirs.find((d) => d.instance === instance && d.dir.id === id)!;
       return viewersOf(row.dir, row.root, REPO)[0]?.ref;
     };
-    expect(resolveFor("cat-harness", "tools")).toBe("cat-harness/docs/cat-harness/tools/index.md");
-    expect(resolveFor("cat-harness", "processes")).toBe("cat-harness/docs/cat-harness/processes/index.md");
+    // A committed page under the page locale — or, until the committed site is
+    // regenerated (folio-assistant#2527), at the address without it.
+    const committed = (route: string) => new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?${route.replace(/\./g, "\\.")}$`);
+    expect(resolveFor("cat-harness", "tools")).toMatch(committed("cat-harness/tools/index.md"));
+    expect(resolveFor("cat-harness", "processes")).toMatch(committed("cat-harness/processes/index.md"));
     // A corpus-wide visualiser with per-instance sub-graphs opens the subject's view.
-    expect(resolveFor("who-iris", "library")).toBe("cat-harness/docs/cat-harness/library/who-iris/index.html");
+    expect(resolveFor("who-iris", "library")).toMatch(committed("cat-harness/library/who-iris/index.html"));
     // A declared nested sub-graph path (`subgraphUnder`), never one inferred from the pages.
     expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
-    expect(resolveFor("cat-harness", "beans")).toBe("cat-harness/docs/cat-harness/beans/index.html");
-    // Built at publish, never committed: still its declared route.
-    expect(resolveFor("cat-harness", "fsh-guts")).toMatch(/^cat-harness\/docs\/cat-harness\/fsh-guts\/index\.(html|md)$/);
+    expect(resolveFor("cat-harness", "beans")).toMatch(committed("cat-harness/beans/index.html"));
+    // Built at publish, never committed: its declared route, under the page locale.
+    expect(resolveFor("cat-harness", "fsh-guts")).toMatch(
+      new RegExp(`^cat-harness/docs/${PAGE_LOCALE}/cat-harness/fsh-guts/index\\.(html|md)$`),
+    );
   });
 
   // "Exists" includes a page BUILT AT PUBLISH (bean 0b8c): never committed,

@@ -38,6 +38,8 @@ import { docsLayers } from "../compose-docs.js";
 import { page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { PAGE_LOCALE, pageParts } from "../viewer-declarations.js";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -237,7 +239,11 @@ describe("the committed page is current", () => {
   it("resolves its path from the declaration", () => {
     const rel = pageRelPath(REPO);
     expect(rel).toBeDefined();
-    expect(existsSync(join(DOCS, rel!))).toBe(true);
+    // Declared under the page locale. Until the committed site is regenerated
+    // (folio-assistant#2527) the page is still at the address without it.
+    expect(rel!.startsWith(`${PAGE_LOCALE}/`)).toBe(true);
+    const committed = [rel!, rel!.slice(`${PAGE_LOCALE}/`.length)];
+    expect(committed.some((r) => existsSync(join(DOCS, r)))).toBe(true);
   });
 });
 
@@ -254,7 +260,9 @@ describe("the skill → run-by table links what resolves (qgjh)", () => {
 
   it("links a skill that has a page, and each diagram to its process page", () => {
     const line = tableRow(page(rows, new Set([skill])));
-    expect(line).toContain(`[\`${skill}\`](../../reference/skill-instructions/${skill}.html)`);
+    // Back to the site root from the processes page, `<locale>/cat-harness/processes/`.
+    const up = siteRootFrom(pageParts({ harness: "cat-harness", visualiser: "processes" }));
+    expect(line).toContain(`[\`${skill}\`](${up}reference/skill-instructions/${skill}.html)`);
     const stem = ok.find((r) => r.file === files[0])!.stem;
     expect(line).toContain(`](${stem}.html)`);
   });

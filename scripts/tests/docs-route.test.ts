@@ -31,7 +31,8 @@ import {
   scopeApplies,
 } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { dirname } from "node:path";
+import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
+import { dirname, relative, sep } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE = join(REPO, "cat-harness");
@@ -43,6 +44,16 @@ const config = parseYaml(readFileSync(join(SITE, "_config.yml"), "utf-8")) as {
   available_locales?: unknown;
 };
 const LOCALES = ["ar", "es", "fr", "ru", "zh"];
+
+/**
+ * A platform visualiser's page, site-relative: under the page locale, or — on
+ * a site not yet regenerated since folio-assistant#2527 — at its old address.
+ */
+const visualiserPage = (visualiser: string): string => {
+  const parts = { harness: "cat-harness", visualiser };
+  const dir = existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
+  return `${relative(SITE, dir).split(sep).join("/")}/index.md`;
+};
 
 const url = (rel: string): string => {
   const text = readFileSync(join(SITE, rel), "utf-8");
@@ -118,11 +129,11 @@ describe("what moves and what stays — read off the real tree", () => {
   test("kind directories and viewers stay where they are", () => {
     for (const rel of [
       // Visualisers at their DECLARED routes (owner, 2026-10-09).
-      "cat-harness/processes/index.md",
+      visualiserPage("processes"),
       "folio-assistant-core/glossary/index.md",
       "proposals/index.md",
       "requirements/index.md",
-      "cat-harness/methodologies/index.md",
+      visualiserPage("methodologies"),
       "bootstrap/initialization.md",
       "fr/folio-assistant-core/glossary/index.md",
     ]) {
