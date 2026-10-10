@@ -10,6 +10,7 @@
  * bun run cat health -- --strict     # also fail on `minor` findings
  * bun run cat health -- --no-write   # do not touch test/health/results/
  * bun run cat health -- --out F      # write the markdown to F, KEEP the exit code
+ * bun run cat health -- --instance D # check D's repository instead of cat-harness's
  * ```
  *
  * ## Exit codes, and why there are three
@@ -54,7 +55,19 @@ import { checkoutRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { graphReadPath } from "../../scripts/graph-read.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
-const ROOT = resolve(HARNESS_ROOT);
+/**
+ * The instance whose REPOSITORY is checked: cat-harness by default, any
+ * instance by `--instance <dir>`. Every repository the separation made is
+ * its own clone with its own size, branches and stores, so each gets its own
+ * report, written under its own declared `health` directory.
+ */
+const INSTANCE_ARG = ((): string | undefined => {
+  const i = process.argv.findIndex((a) => a === "--instance" || a.startsWith("--instance="));
+  if (i < 0) return undefined;
+  const v = process.argv[i]!.startsWith("--instance=") ? process.argv[i]!.slice("--instance=".length) : process.argv[i + 1];
+  return v ? resolve(v) : undefined;
+})();
+const ROOT = INSTANCE_ARG ?? resolve(HARNESS_ROOT);
 
 /** Short content hash of the checker, so a report can be told from a stale one. */
 export function checkerHash(root: string = TOOLS_ROOT): string {
