@@ -53,7 +53,7 @@ import {
   localeName,
   potEntries,
 } from "./kg-viewer-strings.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
 
@@ -318,7 +318,7 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  const sourceText = readFileSync(join(root, STRINGS_SOURCE), "utf-8");
+  const sourceText = readFileSync(join(TOOLS_ROOT, STRINGS_SOURCE), "utf-8");  // the table is code, here since 70lx
   const entries = potEntries(sourceText);
   const sourceHash = createHash("sha256").update(sourceText).digest("hex").slice(0, 12);
 

@@ -99,7 +99,7 @@ import {
 import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, type FreshSidecar } from "../../scripts/qa-results.ts";
 import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
@@ -457,7 +457,7 @@ function reviewer(): QaReviewer {
     // WHO it acted as — `qa-reporting` is checked against this, not `id`.
     actor: sweepActor(),
     version: "v1",
-    script_hash: hashFile(join(INSTANCE_ROOT, SELF)),
+    script_hash: hashFile(join(TOOLS_ROOT, SELF)),  // this file, here since 70lx
     script_commit_sha: gitFileCommitSha(SELF, INSTANCE_ROOT),
   };
 }

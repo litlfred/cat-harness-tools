@@ -60,7 +60,7 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 // as having none).
 import { blockQaPath, existingBlockQaPath } from "./qa-paths.ts";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -261,7 +261,7 @@ const CRITERION_SEVERITY: Record<string, "critical" | "major" | "minor"> = {
 const SCRIPT_PATH = "content/pipeline/qa-checkers-q-usage.ts";
 // Anchored at PLATFORM_ROOT, not REPO_ROOT: the checker source lives in
 // folio-assistant, not in the content repo being audited.
-const SCRIPT_HASH = hashFile(join(PLATFORM_ROOT, SCRIPT_PATH));
+const SCRIPT_HASH = hashFile(join(TOOLS_ROOT, SCRIPT_PATH));  // the checker is code, here since 70lx
 const NOW_ISO = new Date().toISOString();
 const REVIEWER_ID = "q-usage-audit";
 
