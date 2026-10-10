@@ -2,7 +2,7 @@
 # Lean package in this paper folio.
 #
 # Written by `folio_init` for PAPER folios, from the platform's template
-# (cat-harness/templates/paper/github/workflows/lean_ci.yml).
+# (cat-harness-tools/templates/paper/github/workflows/lean_ci.yml).
 #
 # Names no paper: a `discover` job finds every `{{folio}}/<paper>/lean/`
 # holding a lakefile and every phase below runs once per package.
@@ -144,7 +144,7 @@ jobs:
       - name: Build content objects to LaTeX chapters
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness/content/pipeline/build.ts" \
+          bun run "{{assistant}}/cat-harness-tools/content/pipeline/build.ts" \
             "{{folio}}/$PAPER/$PAPER.ts" \
             --out-dir "$FOLIO_BUILD_DIR/chapters" \
             --generate-main \

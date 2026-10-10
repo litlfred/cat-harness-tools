@@ -3,7 +3,7 @@
 # this folio's blocks.
 #
 # Written by `folio_init` from the platform's template
-# (cat-harness/templates/document/github/workflows/qa-sweep.yml). The
+# (cat-harness-tools/templates/document/github/workflows/qa-sweep.yml). The
 # scripts it runs are the PLATFORM's, from the checkout at `{{assistant}}/`;
 # the blocks it sweeps are this folio's, under `{{folio}}/`.
 #
@@ -83,7 +83,7 @@ jobs:
       - name: QA sweep (warn-only on baseline criticals)
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness/content/pipeline/qa-sweep.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-sweep.log
+          bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-sweep.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-sweep.log
           echo ""
           echo "Sweep exit code: ${PIPESTATUS[0]}"
 
@@ -96,16 +96,16 @@ jobs:
           for axis in one-voice proof canonical compute detangler bibliography; do
             echo ""
             echo "── axis: $axis ─────────────────────────────────"
-            bun run "{{assistant}}/cat-harness/content/pipeline/qa-sweep.ts" "{{folio}}" \
+            bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-sweep.ts" "{{folio}}" \
               --axis "$axis" --json 2>/dev/null \
-              | python3 "{{assistant}}/cat-harness/scripts/ci/qa-axis-summary.py" \
+              | python3 "{{assistant}}/cat-harness-tools/scripts/ci/qa-axis-summary.py" \
                 2>&1 | tee "/tmp/qa-axis-$axis.log"
           done
 
       - name: QA staleness map
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness/content/pipeline/qa-staleness.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-staleness.log
+          bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-staleness.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-staleness.log
 
       # Schema sanity — every .qa.json sidecar must declare the v1 schema
       # marker. Derived verdicts are transient working-copy outputs under

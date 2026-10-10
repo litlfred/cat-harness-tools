@@ -1,5 +1,5 @@
 # Written by `folio_init` for PAPER folios, from the platform's template
-# (cat-harness/templates/paper/github/actions/lake-cache-restore/action.yml).
+# (cat-harness-tools/templates/paper/github/actions/lake-cache-restore/action.yml).
 # Tier 2 runs the platform's lake-cache.sh from the checkout at {{assistant}}/.
 
 name: 'Lake cache restore (hybrid)'
@@ -125,7 +125,7 @@ runs:
         # The service script is the PLATFORM's, at the path `folio_init`
         # wrote when it scaffolded this folio. The cache branches live in
         # this (the folio's) repository.
-        SVC="{{assistant}}/cat-harness/scripts/lake-cache.sh"
+        SVC="{{assistant}}/cat-harness-tools/scripts/lake-cache.sh"
         if [ ! -f "$SVC" ]; then
           echo "::warning::$SVC not found (is the platform checked out?) — skipping Tier 2"
           echo "hit=false" >> "$GITHUB_OUTPUT"
