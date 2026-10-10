@@ -1,11 +1,11 @@
 ---
 # folio-assistant-89wq
 title: Four QA checkers are unconditional n/a stubs — 8949 sidecar entries indistinguishable from a correct decline, two of them proof-build-green / proof-no-axiom-growth
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-27T10:37:00Z
-updated_at: 2026-10-10T16:41:14Z
+updated_at: 2026-10-10T16:42:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -137,3 +137,14 @@ stubs in authored content. Four of the checkers doing the detecting are
 themselves placeholder stubs, and nothing detects that. A registry-level
 `implemented` flag plus a test asserting every `automated: true` criterion has a
 non-trivial checker would close it as a class.
+
+
+## Summary of Changes
+
+Done with option 3, the bean's recommendation: stubs get a sentinel distinct from a decline.
+
+- The four stubs already returned `notes: "not implemented: stub checker"`, pinned by `scripts/tests/qa-checkers-stub-sentinels.test.ts`, so a reader or aggregator can tell them from a correct decline.
+- **Added the class guard** the bean asked for: `scripts/tests/qa-checkers-no-silent-stub.test.ts` parses every `content/pipeline/qa-checkers*.ts` and fails if an exported `check*` whose whole body is one `return` of `n/a` lacks the `not implemented:` note. It reads source rather than calling the checkers, so it covers stubs nobody has named. Verified: removing the note from `checkProofBuildGreen` fails it and names that checker.
+- Options 1 and 2 (implement from cached artefacts, or retire) stay open. They are no longer urgent, because the sentinel removes the ambiguity.
+- Found on the way, outside this repository: `qa-checkers-stub-sentinels.test.ts` **fails to load on main**. Importing `qa-checkers-extended` reaches folio-assistant-sci's `content/pipeline/qa-checkers-cost.ts`, which imports `../../../cat-harness/content/pipeline/content-graph`, a path 70lx emptied. That fix belongs to folio-assistant-sci.
+- The consumer-side metric dilution (qou's M5 has no n/a filter) is qou's to fix, as the bean says.
