@@ -172,6 +172,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },
   {
     id: "qa-sweep:docs",
+    // declared-path-literal: the sweep's target is cat-harness's authored docs tree, one fixed directory of the harness this step refreshes, passed as the CLI argument qa-sweep.ts takes.
     run: ["cat-harness/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
     writes: [`${R}/block-qa/**`],
     // declared-path-literal: the script sidecars the sweep restamps, measured from the 2026-10-07 restore log (65 of them).
