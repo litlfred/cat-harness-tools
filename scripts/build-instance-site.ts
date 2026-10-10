@@ -53,7 +53,8 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -79,6 +80,30 @@ export function stagingDir(branch: string): string {
   const seg = branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   if (seg === "" || seg === "." || seg === "..") throw new Error(`branch ${JSON.stringify(branch)} gives no usable STAGING/ segment`);
   return `STAGING/${seg}`;
+}
+
+/**
+ * The fields of the instance's declaration this tool reads: name, title and
+ * description, and only those. Read STRUCTURALLY, as remote-mount reads mount
+ * fields (bean qump): a full read needs every graph typology the declaration
+ * names to be registered, and some are registered by the layers the mount
+ * lays down (who-iris names core's `catalogue`). Run from a sibling toolset,
+ * the full read refused a declaration the build could otherwise serve.
+ */
+export function siteFields(text: string, file: string): { name: string; title?: string; description?: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${file} is not valid JSON: ${(e as Error).message}`);
+  }
+  const r = raw as { name?: unknown; title?: unknown; description?: unknown };
+  if (typeof r?.name !== "string" || r.name === "") throw new Error(`${file} declares no name`);
+  return {
+    name: r.name,
+    title: typeof r.title === "string" ? r.title : undefined,
+    description: typeof r.description === "string" ? r.description : undefined,
+  };
 }
 
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
@@ -218,7 +243,8 @@ function jekyllExe(): string {
 
 export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string; base: string }> {
   const root = resolve(o.root);
-  const decl = readDeclaration(root);
+  const declFile = findDeclarationFile(root);
+  const decl = declFile === undefined ? undefined : siteFields(readFileSync(join(root, declFile), "utf-8"), join(root, declFile));
   if (!decl) throw new Error(`${root} holds no instance declaration`);
   if (decl.name !== o.instance) throw new Error(`${root} declares ${decl.name}, not ${o.instance}`);
   const remote = capture("git remote get-url origin", root);
@@ -272,7 +298,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   writeFileSync(join(out, "build-config.yml"), buildConfig(readFileSync(join(docs, "_config.yml"), "utf-8")));
   writeFileSync(
     join(out, "override.yml"),
-    overrideConfig({ title, description: typeof decl.description === "string" ? decl.description : undefined, baseurl, url: `https://${gh.owner}.github.io` }),
+    overrideConfig({ title, description: decl.description, baseurl, url: `https://${gh.owner}.github.io` }),
   );
   run("bundle install", "bundle install >/dev/null", gemDir);
   run(
