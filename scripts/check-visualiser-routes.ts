@@ -345,7 +345,7 @@ function main(): number {
     console.error(
       `check:visualiser-routes: ${r.legacyPages.length} page(s) still at the old unlocalised address, under ${r.legacyRoutes.length} route(s) ` +
         `(${r.legacyRoutes.join(", ")}) — ` +
-        `regenerate them under ${PUBLISHED_LOCALES.map((l) => `${l}/`).join(", ")}; compose-docs leaves them standing until then.`,
+        `not yet written under ${PUBLISHED_LOCALES.map((l) => `${l}/`).join(", ")}; compose-docs serves them where they are and forwards nothing over them.`,
     );
   }
   if (r.findings.length === 0) {
