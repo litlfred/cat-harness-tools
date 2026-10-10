@@ -18,9 +18,12 @@ fi
 # (`bun run readme:subgraphs`). A commit that changes the tree without
 # regenerating them is refused here, as it would be in CI.
 if command -v bun >/dev/null 2>&1; then
-    if ! bun run --silent readme:subgraphs:check >/dev/null 2>&1; then
+    # Through the runner: since the scripts left the root `package.json`,
+    # `bun run readme:subgraphs:check` names no script there and fails on every
+    # commit, which read as a stale README.
+    if ! bun run --silent cat readme:subgraphs:check >/dev/null 2>&1; then
         echo ""
-        echo "⚠  A directory README is stale. Run:  bun run readme:subgraphs"
+        echo "⚠  A directory README is stale. Run:  bun run cat readme:subgraphs"
         echo "   then stage the result. To commit anyway: git commit --no-verify"
         echo ""
         exit 1
@@ -31,8 +34,21 @@ if command -v bun >/dev/null 2>&1; then
     # carried to its branch by `state:push` and needs nothing from git.
     # Exit 2 is "could not check" — no store on disk here, so nothing staged
     # can be a bean; say so and go on rather than block every commit.
-    retagged="$(bun run --silent beans:retag --print-paths 2>/dev/null)"
-    retag_rc=$?
+    #
+    # The script is run by its path, not through `bun run cat`, so a broken
+    # runner cannot read as an untaggable bean and block every commit. The
+    # path is the index layout first, then cat-harness-tools on its own.
+    retag_script=""
+    for p in cat-harness-tools/scripts/beans-retag.ts scripts/beans-retag.ts; do
+        if [ -f "$p" ]; then retag_script="$p"; break; fi
+    done
+    if [ -z "$retag_script" ]; then
+        retag_rc=2
+        retagged=""
+    else
+        retagged="$(bun run "$retag_script" --print-paths 2>/dev/null)"
+        retag_rc=$?
+    fi
     if [ "$retag_rc" -eq 2 ]; then
         echo "note: the bean store is not on disk here, so no bean was retagged (bun run cat state:mount)"
     elif [ "$retag_rc" -eq 0 ]; then
@@ -44,7 +60,7 @@ if command -v bun >/dev/null 2>&1; then
         done
         if [ -n "$staged" ]; then
             echo ""
-            echo "⚠  bun run beans:retag put \$schema: bean/1.0.0 back into beans this commit stages."
+            echo "⚠  bun run cat beans:retag put \$schema: bean/1.0.0 back into beans this commit stages."
             echo "   Stage them again:  git add$staged"
             echo "   then commit again. To commit anyway: git commit --no-verify"
             echo ""
@@ -52,7 +68,7 @@ if command -v bun >/dev/null 2>&1; then
         fi
     else
         echo ""
-        echo "⚠  A bean's tag could not be restored. Run:  bun run beans:retag"
+        echo "⚠  A bean's tag could not be restored. Run:  bun run cat beans:retag"
         echo "   To commit anyway: git commit --no-verify"
         echo ""
         exit 1

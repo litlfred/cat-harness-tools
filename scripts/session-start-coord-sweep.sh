@@ -636,8 +636,11 @@ fi
 # `beans create` never writes it. So the tag is put back here, AFTER the mount
 # above has put the store on disk, and again by the pre-commit hook and by
 # `state:push`. Quiet unless it changed something or could not run.
-if command -v bun >/dev/null 2>&1 && [ -f "$REPO_ROOT/scripts/beans-retag.ts" ]; then
-  retag_out="$(cd "$CHECKOUT_ROOT" && bun run "$REPO_ROOT/scripts/beans-retag.ts" --quiet 2>&1)" || true
+# Beside this script, not under `$REPO_ROOT`: that is the HARNESS root, and
+# since 70lx the scripts live in cat-harness-tools.
+retag_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/beans-retag.ts"
+if command -v bun >/dev/null 2>&1 && [ -f "$retag_script" ]; then
+  retag_out="$(cd "$CHECKOUT_ROOT" && bun run "$retag_script" --quiet 2>&1)" || true
   if [ -n "$retag_out" ]; then
     printf '%s\n\n' "$retag_out"
   fi

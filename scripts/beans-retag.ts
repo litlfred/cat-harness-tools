@@ -7,7 +7,7 @@
  *
  * ## Why the tag is restored rather than trusted
  *
- * A bean is a node kind (`bean/1.0.0`, `schemas/bean-graph.ts#BeanNodeKind`)
+ * A bean is a node kind (`bean/1.0.0`, `schemas/bean-graph.ts#BeanKind`)
  * and says so in its own front matter, as every node-kind file does. But the
  * `beans` CLI owns that front matter. `beans update` rewrites it and drops every
  * key it does not know, `$schema` included (measured 2026-10-06 on a scratch
@@ -49,15 +49,24 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { BEAN_SCHEMA_TAG, BeanNodeKind } from "@litlfred/cat-harness/schemas/bean-graph.ts";
+import { BEAN_SCHEMA_TAG, BeanKind } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
 
 import { NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The command a person runs to fix what `--check` finds, named once. */
-export const RETAG_COMMAND = "bun run beans:retag";
+/**
+ * The command a person runs to fix what `--check` finds, named once.
+ *
+ * Bean `ujiv` asked for `bun run beans:retag` word for word. That spelling was
+ * written before the scripts left the root `package.json` (`ar1s` phase 4):
+ * `bun run <name>` now finds only the root's own few scripts, and declaring
+ * `beans:retag` at the root as well would make `bun run cat` refuse every name
+ * (`scriptTable` throws on a name declared twice). So the remedy is spelled
+ * the way every other gate here spells one, through the runner.
+ */
+export const RETAG_COMMAND = "bun run cat beans:retag";
 
 /** What one bean file needs. */
 export type RetagOutcome =
@@ -95,7 +104,7 @@ export function retagBeanText(text: string): RetagResult {
   const found = SCHEMA_LINE.exec(fm);
   if (found) {
     const tag = found[1]!.trim().replace(/^['"]|['"]$/g, "");
-    return acceptsSchemaTag(BeanNodeKind, tag) ? { outcome: "tagged", text } : { outcome: "foreign", text, tag };
+    return acceptsSchemaTag(BeanKind, tag) ? { outcome: "tagged", text } : { outcome: "foreign", text, tag };
   }
   const lines = fm.split("\n");
   const at = lines[0]!.startsWith("#") ? 1 : 0;

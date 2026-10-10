@@ -44,7 +44,7 @@ import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The command a person runs to fix what `--check` finds, named once. */
-export const RETAG_COMMAND = "bun run declarations:retag";
+export const RETAG_COMMAND = "bun run cat declarations:retag";
 
 export type DeclarationOutcome = "tagged" | "added" | "foreign" | "unparseable";
 

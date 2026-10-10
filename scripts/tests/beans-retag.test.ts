@@ -94,8 +94,8 @@ describe("retagDir", () => {
     expect(retagDir(dir, { write: false }).added).toEqual([]);
   });
 
-  test("the gate's remedy is the command, word for word", () => {
-    expect(RETAG_COMMAND).toBe("bun run beans:retag");
+  test("the gate's remedy is the command, spelled through the runner", () => {
+    expect(RETAG_COMMAND).toBe("bun run cat beans:retag");
   });
 });
 
