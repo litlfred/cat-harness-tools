@@ -1,0 +1,107 @@
+# PR checks for cat-harness-tools (issue #32).
+#
+# This repository's tests run inside the folio-assistant index, where the other
+# instances are mounted beside it: most of them read the index's workflows,
+# `bootstrap/`, `smart-base/` and so on. So each run checks out folio-assistant
+# main, mounts every instance from its `index.lock.json`, then puts this
+# repository (at the ref under test) and cat-harness main in place of their
+# locked mounts, since this repository's main tracks cat-harness main.
+#
+# Many tests already fail on main. Rather than skipping them, the `tests` job
+# runs the whole suite twice, on main and on the PR, and fails only on tests the
+# PR newly breaks. The step summary lists every failure, old and new.
+
+name: PR checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - &checkout-index
+        name: Check out the folio-assistant index
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/folio-assistant
+          path: fa
+      - &setup-bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - &mount
+        name: Mount every instance from the index lock
+        run: bash fa/.github/mount-from-lock.sh --root fa
+      - &cat-harness-main
+        name: Use cat-harness main
+        run: |
+          rm -rf fa/cat-harness
+          git clone -q --depth 1 https://github.com/litlfred/cat-harness fa/cat-harness
+      - name: Put the PR in place of the locked cat-harness-tools
+        run: rm -rf fa/cat-harness-tools
+      - uses: actions/checkout@v4
+        with:
+          path: fa/cat-harness-tools
+      - &install
+        name: Install
+        working-directory: fa
+        run: bun install
+      - name: tsc --noEmit
+        working-directory: fa/cat-harness-tools
+        run: bunx tsc --noEmit -p tsconfig.json
+
+  run-tests:
+    name: bun test (${{ matrix.side }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
+    steps:
+      - *checkout-index
+      - *setup-bun
+      - *mount
+      - *cat-harness-main
+      - name: Put cat-harness-tools in place of the locked mount
+        run: rm -rf fa/cat-harness-tools
+      - uses: actions/checkout@v4
+        with:
+          path: fa/cat-harness-tools
+          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+      - *install
+      - name: bun test
+        working-directory: fa
+        # The result is judged by the compare job, not by this exit code.
+        run: |
+          bun test ./cat-harness-tools --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
+          test -s "$RUNNER_TEMP/junit.xml"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.side }}
+          path: ${{ runner.temp }}/junit.xml
+
+  tests:
+    name: Tests (no new failures)
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          path: junit
+      - name: Compare PR failures with main
+        run: python3 .github/scripts/compare-test-failures.py junit/junit-base/junit.xml junit/junit-head/junit.xml
