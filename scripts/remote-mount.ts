@@ -55,7 +55,7 @@ import { z } from "zod";
 
 import { mountTrust, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
 import { checkoutRootFor, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, syncIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
   MountDefaultsSchema,
@@ -220,7 +220,8 @@ function findInstance(tree: RemoteTree, name: string): { root: string; file: str
 /** The downstream's own declaration and its `remoteMounts`, or why not. */
 function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: string; mounts: RemoteMount[]; approvers?: string[] } {
   const instanceRoot = resolve(opts.instanceRoot ?? checkoutRootFor(process.cwd()));
-  const decl = readDeclaration(instanceRoot);
+  // Only the mount fields: a full read needs kinds the mounts themselves supply (bean qump).
+  const decl = readMountFields(instanceRoot);
   const idx = readIndexConfig(instanceRoot);
   if (!decl && idx.state !== "ok") throw new Error(`${instanceRoot} holds no instance declaration or index.config.json`);
   // `index.config.json` when the checkout has one, else the declaration's
@@ -356,7 +357,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
         plan.outcomes.push({ instance: q.name, state: "could-not-determine", detail: `mount path \`${path}\` is not a repository-relative directory` });
         continue;
       }
-      const dsDecl = readDeclaration(ds.instanceRoot);
+      const dsDecl = readMountFields(ds.instanceRoot);
       const declaredDirs = [
         ...(dsDecl?.directories ?? []).map((d) => d.path),
         ...[...local.entries()].map(([n, r]) => relative(ds.instanceRoot, r) || n).filter((p) => p && p !== "."),
