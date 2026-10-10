@@ -44,7 +44,7 @@ function fixture(text: Record<string, string>, tex: Record<string, string>, fm: 
   return { root, entry, tgz: join(root, "e-print.tgz") };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: a JSON report
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a JSON report, read by path in the assertions
 function bench(f: Fixture, ...args: string[]): { code: number; out: any; err: string } {
   const r = Bun.spawnSync(["python3", join(SCRIPTS, "formula-benchmark.py"), f.entry, "--source", f.tgz, "--stdout-json", ...args], {
     cwd: f.root,
