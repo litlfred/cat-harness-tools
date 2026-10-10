@@ -24,7 +24,7 @@ import { memberOf, subgraphContainer, subgraphIri, subgraphPublicationFindings }
 import { buildFshGutsExport } from "../fsh-guts-export.ts";
 import { todoGraphDocument } from "../todo-graph.ts";
 import { buildGlossary } from "../glossary-export.ts";
-import { buildDocumentNodes } from "../../content/pipeline/gen-library-jsonld.ts";
+import { buildDocumentNodes, librarySubgraphStart } from "../../content/pipeline/gen-library-jsonld.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -121,6 +121,16 @@ describe("converted publishers follow the declared subgraph pattern", () => {
     const manifestFile = nodes.find((n) => n.path === "manifest.jsonld");
     expect(manifestFile).toBeDefined();
     const manifest = JSON.parse(manifestFile!.content) as Record<string, unknown>;
+    expect(manifest["inSubgraph"]).toBe(sub!.iri);
+  });
+
+  test("members publisher: a library entry's subgraph is looked up from the instance that holds it", () => {
+    // Asked from the content repo root, every instance's manifests named the
+    // first `library` subgraph in the checkout — who-iris's named cat-harness's.
+    expect(librarySubgraphStart(join(ROOT, "library", "doc-sample"))).toBe(ROOT);
+    const sub = declaredSubgraphNode(ROOT, "library");
+    const nodes = buildDocumentNodes("doc-sample", { doc_id: "doc-sample", sections: [] }, undefined, () => false, undefined, undefined, undefined, undefined, ROOT);
+    const manifest = JSON.parse(nodes.find((n) => n.path === "manifest.jsonld")!.content) as Record<string, unknown>;
     expect(manifest["inSubgraph"]).toBe(sub!.iri);
   });
 
