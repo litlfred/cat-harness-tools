@@ -17,7 +17,20 @@
  *
  * The route is `visualiserRoute({ harness, visualiser })`
  * (`schemas/visualiser-route.ts`). This gate is what makes a collision a
- * DECLARATION error rather than a page that silently wins:
+ * DECLARATION error rather than a page that silently wins.
+ *
+ * ## The locale goes in front (folio-assistant#2527)
+ *
+ * Owner, 2026-10-05: *"ALL rendered visualizer pages for the CDN need to
+ * follow /<locale>/<declaring>/<kind>/…"*. A page is drawn at
+ * `<locale>/<harness>/<visualiser>/` for each published locale
+ * (`PUBLISHED_LOCALES`), and the old `<harness>/<visualiser>/` address is
+ * where compose-docs writes a forwarding page. So the routes claimed and
+ * checked here are the LOCALISED ones; a locale's top-level segment is a claim
+ * an alias may not take; and a page still committed at the old address — a
+ * site not yet regenerated — is COUNTED and printed (`legacyPages`), never a
+ * finding, because the generators that move it run in the site's own
+ * repository.
  *
  * | finding | what it means |
  * |---|---|
@@ -44,12 +57,15 @@ import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { declarationPathIn, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
 import { aliasRoute, routeCollisions, routeOf, visualiserRoute, type RouteClaim } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { discoverTools } from "../tools/discover.js";
 import {
   carriesRenders,
   checkoutInstanceRoots,
   declaredVisualisers,
+  forwardingParts,
+  pageParts,
   renderedByOf,
   siteOwnerDir,
   type DeclaredVisualiser,
@@ -73,6 +89,15 @@ export interface RouteFinding {
 export interface RouteReport {
   visualisers: number;
   pages: number;
+  /**
+   * Pages a visualiser's own Tool drew at the OLD, unlocalised address
+   * `<harness>/<visualiser>/` (folio-assistant#2527). Not a finding: the site
+   * has not been regenerated yet, and compose-docs leaves such a page standing
+   * instead of writing its forwarding page there. Repo-relative.
+   */
+  legacyPages: string[];
+  /** The old routes those pages lie under, `<harness>/<visualiser>/`. */
+  legacyRoutes: string[];
   findings: RouteFinding[];
   undetermined?: string;
 }
@@ -86,22 +111,69 @@ export function declarationFindings(
   harnessNames: readonly string[],
 ): RouteFinding[] {
   const out: RouteFinding[] = [];
-  const routes: RouteClaim[] = vis.map((v) => ({ route: visualiserRoute({ harness: v.harness, visualiser: v.id }), by: label(v) }));
+  const routes: RouteClaim[] = vis.map((v) => ({ route: visualiserRoute(pageParts({ harness: v.harness, visualiser: v.id })), by: label(v) }));
   for (const c of routeCollisions(routes)) {
     out.push({ kind: "route-collision", subject: c.route, detail: `${c.kind === "same" ? "claimed by" : "nested claims"}: ${c.claimants.join(", ")}` });
   }
-  // Aliases share the site's TOP LEVEL with every harness route and every
-  // top-level path the site already carries, so all three are claims there.
+  // Aliases share the site's TOP LEVEL with every harness route (where the
+  // forwarding pages sit), every published locale (where the pages sit), and
+  // every top-level path the site already carries, so all four are claims there.
+  const locales: readonly string[] = PUBLISHED_LOCALES;
   const top: RouteClaim[] = [
     ...vis.filter((v) => v.alias !== undefined).map((v) => ({ route: aliasRoute(v.alias!), by: `alias of ${label(v)}` })),
     ...harnessNames.map((h) => ({ route: `${h}/`, by: `harness ${h}` })),
-    ...siteTopLevel.filter((s) => !harnessNames.includes(s)).map((s) => ({ route: `${s}/`, by: `site: ${s}/` })),
+    ...locales.map((l) => ({ route: `${l}/`, by: `locale ${l}` })),
+    ...siteTopLevel.filter((s) => !harnessNames.includes(s) && !locales.includes(s)).map((s) => ({ route: `${s}/`, by: `site: ${s}/` })),
   ];
   for (const c of routeCollisions(top)) {
     if (!c.claimants.some((x) => x.startsWith("alias of "))) continue; // only an alias is this gate's to refuse
     out.push({ kind: "alias-collision", subject: c.route, detail: `claimed by: ${c.claimants.join(", ")}` });
   }
   return out;
+}
+
+/** Where one page sits relative to the declared routes — see {@link pagePlacement}. */
+export type PagePlacement =
+  | { kind: "ok" }
+  | { kind: "legacy"; route: string }
+  | { kind: "outside-route" | "foreign-page"; detail: string };
+
+/**
+ * Where a page drawn by Tool `by` sits, given the declared visualisers — pure,
+ * so a test can hand it any layout.
+ *
+ * A page under `<locale>/<harness>/<visualiser>/` for a published locale is
+ * placed (`ok`) when that visualiser is rendered by `by`. The same page at the
+ * OLD `<harness>/<visualiser>/` is `legacy`: a site not yet regenerated since
+ * the locale moved in front (folio-assistant#2527), counted rather than
+ * failed. A page that names no Tool, or names one nothing discovered, is not
+ * this gate's to place.
+ */
+export function pagePlacement(
+  rel: string,
+  by: string | undefined,
+  vis: readonly DeclaredVisualiser[],
+  toolIds: ReadonlySet<string>,
+): PagePlacement {
+  if (by === undefined || !toolIds.has(by)) return { kind: "ok" };
+  // The FIRST route a page lies under: localised before legacy, because a
+  // locale segment is never a harness name (`declarationFindings`).
+  const routes = vis.flatMap((v) => [
+    ...PUBLISHED_LOCALES.map((locale) => ({ parts: pageParts({ harness: v.harness, visualiser: v.id, locale }), v, legacy: false })),
+    { parts: forwardingParts({ harness: v.harness, visualiser: v.id }), v, legacy: true },
+  ]);
+  const hit = routes.find((r) => routeOf(rel, [r.parts]) !== undefined);
+  if (hit === undefined) {
+    const allowed = vis.filter((v) => v.renderedBy === by).map((v) => visualiserRoute(pageParts({ harness: v.harness, visualiser: v.id })));
+    return {
+      kind: "outside-route",
+      detail: `drawn by ${by}, outside every route it is declared to render${allowed.length ? ` (${allowed.join(", ")})` : " — it renders no declared visualiser"}`,
+    };
+  }
+  if (hit.v.renderedBy !== by) {
+    return { kind: "foreign-page", detail: `drawn by ${by} under ${label(hit.v)}, which is rendered by ${hit.v.renderedBy}` };
+  }
+  return hit.legacy ? { kind: "legacy", route: visualiserRoute(hit.parts) } : { kind: "ok" };
 }
 
 /** Every `.md` / `.html` file under `dir`, `/`-separated and relative to it. */
@@ -143,7 +215,7 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
   };
   const harnessNames = roots.map((r) => declOf(r)?.name).filter((n): n is string => typeof n === "string");
   if (vis.length === 0) {
-    return { visualisers: 0, pages: 0, findings: [], undetermined: "no instance in this checkout declares a visualiser" };
+    return { visualisers: 0, pages: 0, legacyPages: [], legacyRoutes: [], findings: [], undetermined: "no instance in this checkout declares a visualiser" };
   }
 
   const site = siteOwnerDir(repoRoot);
@@ -163,7 +235,7 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
   // Tools: every `renderedBy` resolves, and covers only what its Tool renders.
   const disc = discoverTools(repoRoot);
   if (disc.tools.length === 0) {
-    return { visualisers: vis.length, pages: 0, findings, undetermined: `no Tool loaded (${disc.failures.length} failure(s))` };
+    return { visualisers: vis.length, pages: 0, legacyPages: [], legacyRoutes: [], findings, undetermined: `no Tool loaded (${disc.failures.length} failure(s))` };
   }
   const byId = new Map(disc.tools.map((t) => [t.id, t]));
   for (const v of vis) {
@@ -211,9 +283,12 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
     }
   }
 
-  // Pages: placement, provenance, and the retired page-side declaration.
+  // Pages: placement, provenance, and the retired page-side declaration. A
+  // page belongs under a localised route — one per published locale — or, not
+  // yet regenerated, under the old unlocalised one (`legacy`).
   const toolIds = new Set(disc.tools.map((t) => t.id));
-  const routes = vis.map((v) => ({ harness: v.harness, visualiser: v.id, v }));
+  const legacyPages: string[] = [];
+  const legacyRoutes = new Set<string>();
   const pages = pagesUnder(site);
   for (const rel of pages) {
     let text: string;
@@ -226,20 +301,12 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
     if (carriesRenders(text)) {
       findings.push({ kind: "page-declares-renders", subject: where, detail: "a page no longer says what it renders; the harness declares it (`visualisers`)" });
     }
-    const by = renderedByOf(text);
-    const under = routeOf(rel, routes);
-    const owner = under === undefined ? undefined : routes.find((r) => r.harness === under.harness && r.visualiser === under.visualiser)?.v;
-    if (by !== undefined && toolIds.has(by)) {
-      if (owner === undefined) {
-        const allowed = vis.filter((v) => v.renderedBy === by).map((v) => visualiserRoute({ harness: v.harness, visualiser: v.id }));
-        findings.push({
-          kind: "outside-route",
-          subject: where,
-          detail: `drawn by ${by}, outside every route it is declared to render${allowed.length ? ` (${allowed.join(", ")})` : " — it renders no declared visualiser"}`,
-        });
-      } else if (owner.renderedBy !== by) {
-        findings.push({ kind: "foreign-page", subject: where, detail: `drawn by ${by} under ${label(owner)}, which is rendered by ${owner.renderedBy}` });
-      }
+    const placed = pagePlacement(rel, renderedByOf(text), vis, toolIds);
+    if (placed.kind === "legacy") {
+      legacyPages.push(where);
+      legacyRoutes.add(placed.route);
+    } else if (placed.kind !== "ok") {
+      findings.push({ kind: placed.kind, subject: where, detail: placed.detail });
     }
   }
 
@@ -258,7 +325,7 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
     }
   }
 
-  return { visualisers: vis.length, pages: pages.length, findings };
+  return { visualisers: vis.length, pages: pages.length, legacyPages, legacyRoutes: [...legacyRoutes].sort(), findings };
 }
 
 function main(): number {
@@ -270,6 +337,16 @@ function main(): number {
   if (r.undetermined !== undefined) {
     console.error(`check:visualiser-routes: UNDETERMINED — ${r.undetermined}. This is not a pass.`);
     return 2;
+  }
+  // Counted, never failed: a page at the OLD address is a site not yet
+  // regenerated (folio-assistant#2527), and compose-docs keeps it rather than
+  // write its forwarding page over it.
+  if (r.legacyPages.length > 0 && !process.argv.includes("--json")) {
+    console.error(
+      `check:visualiser-routes: ${r.legacyPages.length} page(s) still at the old unlocalised address, under ${r.legacyRoutes.length} route(s) ` +
+        `(${r.legacyRoutes.join(", ")}) — ` +
+        `regenerate them under ${PUBLISHED_LOCALES.map((l) => `${l}/`).join(", ")}; compose-docs leaves them standing until then.`,
+    );
   }
   if (r.findings.length === 0) {
     if (!process.argv.includes("--json")) {
