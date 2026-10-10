@@ -51,13 +51,22 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 
 export const GENERATED_BY = "cat-harness-tools/scripts/gen-skill-commands.ts";
+/**
+ * Where this generator lived before bean `70lx` moved it out of cat-harness.
+ * Commands written then carry this marker; reading them as hand-written left
+ * all of them unrefreshed, with links to skills that had since moved.
+ */
+export const LEGACY_GENERATED_BY = ["cat-harness/scripts/gen-skill-commands.ts"];
 export const COMMANDS_DIR = join(".claude", "commands");
 
-/** True when a command file was written by this generator. */
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** True when a command file was written by this generator, at its current path or a former one. */
 export function isGenerated(text: string): boolean {
   if (!text.startsWith("---")) return false;
   const end = text.indexOf("\n---", 3);
-  return end !== -1 && new RegExp(`^generated:\\s*${GENERATED_BY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").test(text.slice(3, end));
+  const markers = [GENERATED_BY, ...LEGACY_GENERATED_BY].map(escape).join("|");
+  return end !== -1 && new RegExp(`^generated:\\s*(?:${markers})\\s*$`, "m").test(text.slice(3, end));
 }
 
 /** One line, YAML-safe: the description a host shows in its command menu. */
