@@ -78,6 +78,7 @@ import {
   type NavItem,
   type NavbarModel,
 } from "./lib/navbar.js";
+import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // THE SITE ROOT IS ASKED FOR, never written down. `site-dir-single-answer`
 // refuses the literal in source, and rightly: this generator writes into the
@@ -85,7 +86,8 @@ import {
 // is. It caught this file on its first run.
 // The instance this generator belongs to, found by its declaration: in the
 // monorepo `<repo>/cat-harness`, standalone the repository root (bean `uxn1`).
-const INSTANCE = instanceRootFor(dirname(new URL(import.meta.url).pathname));
+// The site is the harness's, and this script moved out of it (bean 70lx).
+const INSTANCE = HARNESS_ROOT;
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
 const DATA = join(SITE, "_data", "harness.json");
 const OUT = join(SITE, "_includes", "generated", "navbar-footer.html");

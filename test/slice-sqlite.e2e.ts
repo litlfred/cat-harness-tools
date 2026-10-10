@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
  * Every SQLite slice in a real Chromium, through the ONE search page. Bean `q8ar`.
@@ -26,7 +27,7 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
  * importing it: Playwright runs specs under Node, which cannot load
  * `bun:sqlite`, and spawning makes this the same command the deploy runs.
  */
-const INSTANCE = join(import.meta.dirname, "..");
+const INSTANCE = HARNESS_ROOT;  // the site and the beans are the harness's checkout's (bean 70lx)
 const REPO = join(INSTANCE, "..");
 const DOCS = join(INSTANCE, siteDirFor(INSTANCE));
 const DEFS = join(REPO, "beans", "defs");
@@ -66,7 +67,7 @@ test.beforeAll(async () => {
   const committed = join(DOCS, "payload", "sha256");
   if (existsSync(committed)) for (const f of readdirSync(committed)) symlinkSync(join(committed, f), join(payloads, f));
   execFileSync("bun", [
-    "run", join(INSTANCE, "scripts", "gen-slice-sqlite.ts"),
+    "run", join(TOOLS_ROOT, "scripts", "gen-slice-sqlite.ts"),
     "--out", join(site, "assets", "slices"),
     "--payload-out", payloads,
   ], { stdio: "inherit" });
