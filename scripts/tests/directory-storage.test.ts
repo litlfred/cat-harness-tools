@@ -93,7 +93,7 @@ function marker(root: string, id: string, into: string): void {
 function instance(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "dir-storage-"));
   made.push(root);
-  writeFileSync(join(root, "fixture.json"), JSON.stringify({ $schema: "folio-harness/v1", name: "fixture", directories: dirs }, null, 2));
+  writeFileSync(join(root, "fixture.json"), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "fixture", directories: dirs }, null, 2));
   return root;
 }
 

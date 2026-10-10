@@ -135,6 +135,20 @@ describe("retagDeclarationText", () => {
     expect(r.added).toEqual(["demo/demo.json"]);
     expect(readFileSync(join(inst, "demo.config.json"), "utf-8")).toBe('{\n  "site": {}\n}\n');
   });
+
+  test("instances below the harness — what cat-harness transitively needs — are left untagged", () => {
+    const root = scratch();
+    const decl = (name: string, needs: string[]) => {
+      mkdirSync(join(root, name));
+      writeFileSync(join(root, name, `${name}.json`), `{\n  "name": "${name}",\n  "needs": ${JSON.stringify(needs)}\n}\n`);
+      return join(root, name);
+    };
+    const roots = [decl("boot", []), decl("boot-tools", ["boot"]), decl("cat-harness", ["boot-tools"]), decl("above", ["cat-harness"])];
+    const r = retagDeclarations(roots, root, { write: true });
+    expect(r.below.sort()).toEqual(["boot-tools/boot-tools.json", "boot/boot.json"]);
+    expect(r.added.sort()).toEqual(["above/above.json", "cat-harness/cat-harness.json"]);
+    expect(readFileSync(join(root, "boot", "boot.json"), "utf-8")).not.toContain("$schema");
+  });
 });
 
 describe("state:push retags the beans it is about to splice", () => {

@@ -102,7 +102,7 @@ function fixture(
   writeFileSync(
     join(root, "fixture.json"),
     JSON.stringify({
-      $schema: "folio-harness/v1",
+      $schema: "cat-harness-declaration/1.0.0",
       name: "fixture",
       directories: [{ id: ID, path: ROUTE, graphTypologies: ["auto-docs"], storage: { branch: BRANCH, keyedBy } }],
     }),

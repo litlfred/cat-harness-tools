@@ -1116,6 +1116,21 @@ export function renderBlock(
       break;
     }
 
+    case "recommendation": {
+      // Bean `55ao`. A document folio's recommendation is not a theorem-like
+      // environment: no preamble in a document profile defines one, and
+      // borrowing `remark` would print the wrong word. So it is a run-in
+      // heading in the document's own words, anchored like a labelled prose
+      // block, with the body unchanged.
+      const title = "title" in block && block.title ? ` ${escapeLatex(block.title)}` : "";
+      lines.push(`\\paragraph{Recommendation.${title}}`);
+      if ("label" in block && block.label && block.label !== enclosingSectionLabel) {
+        lines.push(`\\phantomsection\\label{${block.label}}`);
+      }
+      lines.push(markdownToLatex(mdContent));
+      break;
+    }
+
     case "equation": {
       // Use extractMathContent (not markdownToLatex) to avoid list
       // environments inside math mode.

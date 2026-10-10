@@ -38,7 +38,7 @@ function instance(dirs: unknown[], nested?: Record<string, unknown[]>): string {
   made.push(root);
   writeFileSync(
     join(root, "fixture.json"),
-    JSON.stringify({ $schema: "folio-harness/v1", name: "fixture", directories: dirs }, null, 2),
+    JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "fixture", directories: dirs }, null, 2),
   );
   for (const [dir, entries] of Object.entries(nested ?? {})) {
     mkdirSync(join(root, dir), { recursive: true });
@@ -193,7 +193,7 @@ describe("stateDirectories reads the declaration, not the disk", () => {
     writeFileSync(
       join(inst, "fixture.json"),
       JSON.stringify({
-        $schema: "folio-harness/v1",
+        $schema: "cat-harness-declaration/1.0.0",
         name: "fixture",
         directories: [
           { id: "checkout-uploads", path: "uploads/", graphTypologies: ["uploads"], scope: "repository" },

@@ -21,6 +21,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -54,7 +55,7 @@ const data = {
 };
 
 async function body(): Promise<string> {
-  const src = readFileSync(join(SITE, "todos/index.html"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+  const src = readFileSync(declaredPagePath(ROOT, "todos"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return engine.parseAndRender(src, { site: { data } });
 }
 

@@ -9,7 +9,7 @@
  *
  * ## What is real here and what is not
  *
- * Real: the COMMITTED generated page (`docs/todos/index.html`, written by
+ * Real: the COMMITTED generated page (`docs/en/cat-harness/todos/index.html`, written by
  * `state-visualizer.ts`), the real `_includes/landing.html` it includes, the
  * real `_data/stickies.json` that include iterates, the real `docs-ui.js` and
  * `docs-ui.css`, and the real todo projection. The landing page is rendered
@@ -29,15 +29,18 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Liquid } from "liquidjs";
 import { AxeBuilder } from "@axe-core/playwright";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredPagePath } from "./support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
+/** The page under test, at the route the harness declares for `todos`. */
+const TODOS_PAGE = declaredPagePath(ROOT, "todos");
 const CSS = readFileSync(join(SITE, "assets/css/docs-ui.css"), "utf8");
 const JS = readFileSync(join(SITE, "assets/js/docs-ui.js"), "utf8");
 const TODOS = readFileSync(join(SITE, "assets/todos/index.json"), "utf8");
@@ -57,9 +60,9 @@ const data = {
   stickies: JSON.parse(readFileSync(join(SITE, "_data/stickies.json"), "utf8")),
 };
 
-/** A page's body with its front matter removed, through Liquid. */
+/** A page's body with its front matter removed, through Liquid. `rel` is site-relative, or absolute. */
 async function render(rel: string): Promise<string> {
-  const src = readFileSync(join(SITE, rel), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+  const src = readFileSync(resolve(SITE, rel), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return engine.parseAndRender(src, { site: { data } });
 }
 
@@ -122,7 +125,7 @@ async function boardShape(p: Page): Promise<string[]> {
 test.describe("/todos/ is the stickies panel (#1906)", () => {
   test("the panel is mounted, open, and carries every todo as a sticky", async ({ page: p }) => {
     expect(ITEM_COUNT).toBeGreaterThan(0);
-    await open(p, "todos/index.html");
+    await open(p, TODOS_PAGE);
     await expect(p.locator("details.fa-sticky-panel")).toHaveCount(1);
     await expect(p.locator("details.fa-sticky-panel")).toHaveAttribute("open", "");
     const board = p.locator('.fa-landing-board [data-fa-home-panel="todos"]');
@@ -134,7 +137,7 @@ test.describe("/todos/ is the stickies panel (#1906)", () => {
   });
 
   test("it is the SAME board the landing page mounts", async ({ page: p }) => {
-    await open(p, "todos/index.html");
+    await open(p, TODOS_PAGE);
     const onTodos = await boardShape(p);
     await p.unrouteAll();
     await open(p, "index.md", true);
@@ -149,7 +152,7 @@ test.describe("/todos/ is the stickies panel (#1906)", () => {
     // The audit `state-dashboards.e2e.ts` runs over every standalone state
     // page, at the same tags. This page is themed, so it is audited here,
     // AFTER rendering, rather than as the unbuilt source that spec serves.
-    await open(p, "todos/index.html");
+    await open(p, TODOS_PAGE);
     const { violations } = await new AxeBuilder({ page: p })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
@@ -163,7 +166,7 @@ test.describe("/todos/ is the stickies panel (#1906)", () => {
   });
 
   test("no state-graph list and no plain-text by-node list", async ({ page: p }) => {
-    await open(p, "todos/index.html");
+    await open(p, TODOS_PAGE);
     const text = await p.locator("body").innerText();
     expect(text).not.toMatch(/State graphs this harness declares/i);
     expect(text).not.toMatch(/Todos by the node they are attached to/i);
@@ -174,7 +177,7 @@ test.describe("/todos/ is the stickies panel (#1906)", () => {
     // not functional for more info or anything". That list is gone; the
     // listing on this page is the floor, and every item in it must be a way
     // IN — not a line of text.
-    await open(p, "todos/index.html");
+    await open(p, TODOS_PAGE);
     // Collapsed into a disclosure once the board mounts, never removed.
     const floor = p.locator("details.fa-todo-listing-details");
     await expect(floor).toHaveCount(1);

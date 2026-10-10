@@ -106,6 +106,10 @@ const BLOCK_KINDS: Array<Pick<BlockModuleEntry, "kind" | "displayName" | "viewer
   // `BLOCK_KINDS` by `scripts/tests/block-kinds.test.ts`, which is what caught
   // `algorithm` and `table` going unrendered and what caught this one.
   { kind: "figure", displayName: "Figure" },
+  // `recommendation` — a document folio's normative statement, bean `55ao`.
+  // Its node is folio-assistant-core's; registered ahead of it so the kind is
+  // never discovered without a renderer.
+  { kind: "recommendation", displayName: "Recommendation" },
 ];
 
 // Register all built-in kinds with stub loaders.

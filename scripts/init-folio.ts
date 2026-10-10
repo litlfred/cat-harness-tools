@@ -177,6 +177,18 @@ function platformDir(assistant: string): string {
 }
 
 /**
+ * Where the platform's CODE sits: `src/`, `content/pipeline/`, `scripts/`,
+ * `viewer/`. It moved from `cat-harness/` to this layer in 70lx, and a folio
+ * scaffolded afterwards still ran it from `cat-harness/`, where nothing is
+ * any more (bean `cat-tools-yylt`). `platformDir` stays for what cat-harness
+ * still holds: `schemas/` and the harness declaration.
+ */
+const TOOLS_SUBDIR = "cat-harness-tools";
+function toolsDir(assistant: string): string {
+  return `${assistant}/${TOOLS_SUBDIR}`;
+}
+
+/**
  * Where a content type's adapter module sits, from the folio's own root.
  *
  * **This is a LOOKUP and must not go back to being a composition.** It read
@@ -483,7 +495,7 @@ function instanceConfig(o: MaybeFolio, assistant: string): string {
       dependencies: { folioAssistant: [standsOn(assistant, o.contentType)] },
       feedbackDir: ".folio-feedback",
       skills: ".claude/skills/local",
-      viewer: { dir: `${platformDir(assistant)}/viewer`, port: 8080 },
+      viewer: { dir: `${toolsDir(assistant)}/viewer`, port: 8080 },
       // `blob` rather than `pages`: it is the only link style that resolves
       // for a PRIVATE folio, and a folio is private by default. Switching to
       // `pages` once a public Pages site exists is a one-word edit; a README
@@ -693,9 +705,9 @@ todos/                    people's outstanding items (mounted likewise)
 ## Commands
 
 \`\`\`sh
-bun run ${platformDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
-bun run ${platformDir(assistant)}/src/index.ts --check-deps       # what's installed
-bun run ${platformDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
+bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
+bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
 \`\`\`
 
 ## QA — every block is checked from the first commit
@@ -723,7 +735,7 @@ the plan survives a fresh container and a sibling session sees it. Claim before
 you work; never resolve a sibling's bean.
 
 \`\`\`sh
-${platformDir(assistant)}/scripts/install-beans.sh
+${toolsDir(assistant)}/scripts/install-beans.sh
 beans list
 beans create "<title>"
 beans <id> --status in-progress
@@ -756,7 +768,7 @@ function mcpJson(assistant: string): string {
       mcpServers: {
         "folio-assistant": {
           command: "bun",
-          args: ["run", `${platformDir(assistant)}/src/index.ts`, "--stdio", "--repo", "."],
+          args: ["run", `${toolsDir(assistant)}/src/index.ts`, "--stdio", "--repo", "."],
         },
       },
     },
@@ -775,7 +787,7 @@ function claudeSettings(assistant: string): string {
             hooks: [
               {
                 type: "command",
-                command: `${platformDir(assistant)}/scripts/session-start-coord-sweep.sh`,
+                command: `${toolsDir(assistant)}/scripts/session-start-coord-sweep.sh`,
               },
             ],
           },
@@ -801,6 +813,11 @@ node_modules/
 
 # Generated QA reports
 bib-qa.json
+
+# The QA working copy: machine-written, and recorded on the orphan qa-reports
+# branch, not on main (skills/sdlc/sdlc-core/qa-reports.md). Attestations
+# under test/attestations/ ARE committed. (bean 5qy8)
+test/results/
 
 # Editor / OS
 .DS_Store
@@ -1400,7 +1417,7 @@ function writeInstanceFiles(s: Scaffold): void {
       s.result.notes.push(
         `${g.path} is declared on branch ${g.source.branch} (keyedBy ${g.source.keyedBy}) and was NOT written into the checkout. ` +
           `No platform command creates a new state branch, so seed it once, from this repository, with:\n${g.seed}\n` +
-          `then mount it: bun run ${platformDir(assistant)}/scripts/state-mount.ts`,
+          `then mount it: bun run ${toolsDir(assistant)}/scripts/state-mount.ts`,
       );
     } else {
       s.result.notes.push(`${g.path} resolves to a ${g.source.kind} source and was NOT written into the checkout.`);

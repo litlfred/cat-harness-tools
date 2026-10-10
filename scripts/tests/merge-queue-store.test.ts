@@ -39,7 +39,7 @@ function git(root: string, ...args: string[]): void {
 function repo(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "mq-store-"));
   made.push(root);
-  writeFileSync(join(root, "fixture.json"), JSON.stringify({ $schema: "folio-harness/v1", name: "fixture", directories: dirs }, null, 2));
+  writeFileSync(join(root, "fixture.json"), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "fixture", directories: dirs }, null, 2));
   git(root, "init", "-q", "-b", "main");
   git(root, "config", "user.email", "t@t");
   git(root, "config", "user.name", "t");
