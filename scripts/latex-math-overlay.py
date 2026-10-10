@@ -138,10 +138,15 @@ def read_source(path: str) -> dict[str, str]:
 def main_tex(files: dict[str, str]) -> str | None:
     """The file that holds `\\documentclass` and `\\begin{document}`.
 
+    LaTeX 2.09's `\\documentstyle` counts too: much of 1990s arXiv is written
+    in it, and its `\\section`s are the same. AMS-TeX also says
+    `\\documentstyle`, but has no `\\begin{document}`, so it stays out.
+
     More than one candidate is resolved by size, the largest being the paper
     rather than a standalone figure; none is `None`, never a guess.
     """
-    cands = [k for k, v in files.items() if "\\documentclass" in v and "\\begin{document}" in v]
+    cands = [k for k, v in files.items()
+             if ("\\documentclass" in v or "\\documentstyle" in v) and "\\begin{document}" in v]
     if not cands:
         return None
     return max(cands, key=lambda k: len(files[k]))
