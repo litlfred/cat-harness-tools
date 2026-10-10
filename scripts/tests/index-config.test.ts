@@ -33,10 +33,12 @@ import {
   ignoreBlockLines,
   readDeclaredMounts,
   readIndexConfig,
+  readMountFields,
   syncIgnoreBlock,
   writeDeclaredMounts,
   type IndexConfig,
 } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile, instanceRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { mountLockPathFor, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { applyMigration, planMigration } from "../index-config-migrate.ts";
@@ -236,6 +238,22 @@ describe("remote mounts: one read path, one write path", () => {
     expect(d.from).toBe("declaration");
     expect(d.mounts.map((m) => m.harness)).toEqual(["m"]);
     expect(readDeclaredMounts(root({ "down.json": decl("down") })).from).toBe("none");
+  });
+
+  test("a declaration naming a kind only its mounts supply still yields its mounts (bean qump)", () => {
+    // who-iris names core's `catalogue`, and core is one of its mounts: in an
+    // empty checkout the kind is not registered until the mount has run.
+    const unknown = { id: "lib", path: "lib/", description: "x", graphTypologies: ["qump-not-yet-mounted"] };
+    const r = root({ "down.json": decl("down", { directories: [unknown], remoteMounts: [{ harness: "m", ...remote("o/m") }] }) });
+    expect(() => readDeclaration(r)).toThrow(/unknown graph typology "qump-not-yet-mounted"/);
+    expect(readDeclaredMounts(r).mounts.map((m) => m.harness)).toEqual(["m"]);
+    expect(readMountFields(r)?.name).toBe("down");
+    expect(readMountFields(r)?.directories.map((d) => d.path)).toEqual(["lib/"]);
+  });
+
+  test("a mount field that does not parse still throws, naming the file", () => {
+    const r = root({ "down.json": decl("down", { remoteMounts: [{ harness: "m" }] }) });
+    expect(() => readDeclaredMounts(r)).toThrow(/down\.json: remoteMounts/);
   });
 
   test("both carrying mounts is an error naming both files", () => {
