@@ -28,19 +28,24 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import { defaultGraphTypologies, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { newUnkinded, nodeKindIndex, unkindedKey, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.js";
+import { NodeKindIndexFileKind, newUnkinded, nodeKindIndex, unkindedKey, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
 const repoRoot = REPO_ROOT ?? join(HARNESS_ROOT, "..");
 export const INDEX_PATH = join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "node-kinds.json");
 
-/** What is committed: the index, under a schema tag a reader can check. */
+/**
+ * What is committed: the index, under a schema tag a reader can check. The
+ * tag is the kind's own, read from `NodeKindIndexFileKind`, so a version bump
+ * there (1.1.0 added `foundBy`, bean `ujiv`) cannot leave this writer stamping
+ * the old one.
+ */
 export interface NodeKindIndexFile extends NodeKindIndex {
-  $schema: "node-kind-index/1.0.0";
+  $schema: string;
 }
 
 export function render(index: NodeKindIndex): string {
-  const file: NodeKindIndexFile = { $schema: "node-kind-index/1.0.0", ...index };
+  const file: NodeKindIndexFile = { $schema: NodeKindIndexFileKind.tag!, ...index };
   return JSON.stringify(file, null, 2) + "\n";
 }
 

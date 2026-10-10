@@ -438,6 +438,7 @@ export const BEAN_STORE_READERS: readonly string[] = [
   "check:bean-rollup",
   "check:bean-bodies",
   "check:bean-front-matter",
+  "beans:retag:check",
   "check:bean-issue-links",
   "check:bean-restates-skill",
   "beans:notes:check",

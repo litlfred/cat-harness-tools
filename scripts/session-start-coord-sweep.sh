@@ -630,6 +630,19 @@ if command -v bun >/dev/null 2>&1 && [ -f "$REPO_ROOT/scripts/state-mount.ts" ];
   fi
 fi
 
+# ── 3.55 Bean tags ──────────────────────────────────────────────────────────
+# Bean `ujiv` (cat-harness#88). Every bean is a `bean/1.0.0` node kind and says
+# so in its front matter, but `beans update` drops the `$schema` key and
+# `beans create` never writes it. So the tag is put back here, AFTER the mount
+# above has put the store on disk, and again by the pre-commit hook and by
+# `state:push`. Quiet unless it changed something or could not run.
+if command -v bun >/dev/null 2>&1 && [ -f "$REPO_ROOT/scripts/beans-retag.ts" ]; then
+  retag_out="$(cd "$CHECKOUT_ROOT" && bun run "$REPO_ROOT/scripts/beans-retag.ts" --quiet 2>&1)" || true
+  if [ -n "$retag_out" ]; then
+    printf '%s\n\n' "$retag_out"
+  fi
+fi
+
 # ── 3.6 The seeds' freshness ────────────────────────────────────────────────
 # Bean `9ofm`, row C. Owner, 2026-10-03: wire it here rather than into CI.
 #

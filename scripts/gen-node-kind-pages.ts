@@ -570,9 +570,15 @@ export function unresolvedPages(site: string, pages: readonly string[]): string[
 /**
  * What this generator READS when it builds a folio's site (bean `ehh6`): the
  * directories {@link kindDirectories} names under `--root`, repo-relative.
- * The document predictor asks it so a changed file outside them (a folio's
- * `beans/`) is not "may change any page"; `todos/` is read, since todo pages
- * are rendered. `args` are the ones the build command passes.
+ * The document predictor asks it so a changed file outside them is not "may
+ * change any page". `args` are the ones the build command passes.
+ *
+ * Since bean `ujiv` a bean is a node kind, so a `bean-defs` directory IS read
+ * and its pages are rendered. A directory whose content is kept on a branch
+ * (a `todos/` or `beans/` cut over to `cat/<instance>/<graph>`) is NOT read,
+ * because the checkout does not hold it: measured on the index 2026-10-10,
+ * the list names `cat-harness-tools/beans/defs` and
+ * `folio-assistant-core/beans/defs` and no `todos/` at all.
  */
 export async function siteReads(repoRoot: string, args: string[] = []): Promise<string[]> {
   const i = args.indexOf("--root");
