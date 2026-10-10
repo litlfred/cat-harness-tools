@@ -24,6 +24,11 @@ import { loadDecisionTable, evaluate, type DecisionTable } from "../src/workflow
 import { complete, type InstanceState, type AuthzOptions } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
 import type { TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
+import {
+  fileCertification,
+  readCertificationAttestations,
+  type CertificationEntry,
+} from "@litlfred/cat-harness/schemas/qa-attestations.js";
 
 export interface ResolvedPlanDmn {
   ok: true;
@@ -168,4 +173,65 @@ export async function completeExitCriteriaGateway(
     actor: opts.actor,
     authz: opts.authz,
   });
+}
+
+// ── A_FileCertification (bean `folio-assistant-zaui`) ─────────────────────
+
+export interface FileCertificationInput {
+  /** The plan certified — its `id` keys the store file. */
+  plan: Pick<TestPlan, "id"> & { version?: string };
+  /** The gateway's outcome. Only `certified` is filed: the refused path ends at `End_Refused` and signs nothing. */
+  decision: string;
+  /** Who signed (the attestation-service lane), as `qa-report-signing.bpmn` returned it. */
+  signer: CertificationEntry["signer"];
+  signature?: CertificationEntry["signature"];
+  /** The report this certifies, relative to the instance. Required: a certification points at what it certifies. */
+  reportPath: string;
+  reqId?: CertificationEntry["reqId"];
+  /** ISO time of signing; defaults to now. */
+  timestamp?: string;
+}
+
+export type FileCertificationOutcome =
+  | { state: "filed"; path: string; written: boolean }
+  | { state: "refused"; reason: string }
+  | { state: "unknown"; path: string; reason: string };
+
+/**
+ * File a signed certification under the instance's declared `attestations`
+ * graph — the step `A_FileCertification` names, which had no writer until
+ * this (bean `zaui`). A judgement, so it goes on main (D2 (a), D5 default),
+ * never to `qa-reports`.
+ *
+ * A corrupt or unreadable store is `unknown` and NOTHING is written, as for
+ * every other family; a decision other than `certified` is refused rather than
+ * filed, because a refusal filed as a certification is the false-green this
+ * process exists to prevent. The written file is read back, so `filed` means
+ * the store now holds it — not merely that a write was attempted.
+ */
+export function fileSignedCertification(instanceRoot: string, input: FileCertificationInput): FileCertificationOutcome {
+  if (input.decision !== "certified") {
+    return { state: "refused", reason: `decision is "${input.decision}", not "certified" — nothing is filed on that path` };
+  }
+  if (!input.reportPath) return { state: "refused", reason: "no reportPath — a certification must point at the report it certifies" };
+  const entry: CertificationEntry = {
+    signer: input.signer,
+    timestamp: input.timestamp ?? new Date().toISOString(),
+    decision: input.decision,
+    testPlanId: input.plan.id,
+    evidence: input.reportPath,
+    ...(input.signature !== undefined ? { signature: input.signature } : {}),
+    ...(input.reqId !== undefined ? { reqId: input.reqId } : {}),
+    ...(input.plan.version !== undefined ? { notes: `plan version ${input.plan.version}` } : {}),
+  };
+  const r = fileCertification(instanceRoot, input.plan.id, {
+    subject: { kind: "test-plan", id: input.plan.id, path: input.reportPath },
+    certification: entry,
+  });
+  if (!r.ok) return { state: "unknown", path: r.path, reason: `${r.state}: ${r.reason}` };
+  const back = readCertificationAttestations(instanceRoot, input.plan.id);
+  if (back.state !== "hit" || !back.file.certifications.some((c) => c.timestamp === entry.timestamp && c.testPlanId === entry.testPlanId)) {
+    return { state: "unknown", path: r.path, reason: `written, but reading it back gave ${back.state}` };
+  }
+  return { state: "filed", path: r.path, written: r.written };
 }
