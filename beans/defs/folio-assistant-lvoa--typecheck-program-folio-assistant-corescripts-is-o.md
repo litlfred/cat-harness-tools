@@ -1,11 +1,11 @@
 ---
 # folio-assistant-lvoa
 title: 'TYPECHECK PROGRAM: folio-assistant-core/scripts is outside it — 33 files, and every instance-boundary move adds more while typecheck stays green'
-status: todo
+status: in-progress
 type: bug
 priority: high
 created_at: 2026-09-30T11:13:35Z
-updated_at: 2026-09-30T11:13:35Z
+updated_at: 2026-10-10T15:44:45Z
 parent: folio-assistant-1xhc
 ---
 
