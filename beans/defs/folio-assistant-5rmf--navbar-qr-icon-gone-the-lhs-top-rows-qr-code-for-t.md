@@ -5,8 +5,10 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-06T06:51:27Z
-updated_at: 2026-10-06T06:51:27Z
+updated_at: 2026-10-10T16:28:58Z
 parent: folio-assistant-9rq1
+blocked_by:
+    - cat-tools-g9m3
 ---
 
 Owner, 2026-10-06 (https://claude.ai/code/session_012qoycyCSGidZqW245vXhze), verbatim:
@@ -25,3 +27,10 @@ Owner, 2026-10-06 (https://claude.ai/code/session_012qoycyCSGidZqW245vXhze), ver
 - [ ] screenshots at desktop and phone width, sent to the owner (`rendered-verification`)
 
 Queued for later, or for an idle agent. Not separation work.
+
+
+## Re-triage 2026-10-10 (lane B drain)
+
+- [x] The icon is back as a declared navbar capability. `cat-harness/docs/assets/js/navbar-row.js` (`.fa-nav-qr` → `.fa-qr-panel`) has it, and `test/navbar-qr.test.ts` passes 7/7 in the CI-shaped mount. The test checks the button, its accessible attributes, the open → hide toggle (l4zi), Escape, and the hashchange update.
+- [ ] The e2e check (`test/navbar-row.e2e.ts`, "QR icon button toggles…") exists, but **the e2e suite cannot start** (cat-tools-g9m3), so it has never fired, and the screenshots for rendered verification can't come from it yet. Now blocked by g9m3.
+- [ ] Not done: the commit that dropped the icon is still unnamed. The history before the move lives in the folio-assistant monorepo.

@@ -1,11 +1,11 @@
 ---
 # folio-assistant-197s
 title: 'Dependabot cannot run Bun here: ''could not run Bun … configuration error'' on #908, and the npm ecosystem never touches bun.lock'
-status: todo
+status: scrapped
 type: bug
 priority: normal
 created_at: 2026-09-26T16:58:15Z
-updated_at: 2026-09-26T16:58:15Z
+updated_at: 2026-10-10T16:28:58Z
 parent: folio-assistant-1xhc
 ---
 
@@ -27,3 +27,8 @@ Measured 2026-09-26.
 - [ ] one weekly dependabot run after the upstream failure clears, observed: does it open PRs, and do they touch bun.lock?
 - [ ] if not: try `package-ecosystem: bun` in one PR, verified by the next weekly run, not asserted
 - [ ] the header comment in `.github/dependabot.yml` updated with the answer
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): the subject is not in this repository. The bean is about folio-assistant's `.github/dependabot.yml` (its npm-vs-bun ecosystem choice), and every remaining done-when is an observation of that repository's weekly Dependabot run. cat-harness-tools has no `dependabot.yml`. The copy of this bean in the folio-assistant store (`cat/cat-harness/beans`) is the live one; it should stay open there and not be closed as a mirror.
