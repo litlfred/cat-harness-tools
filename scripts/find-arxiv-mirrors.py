@@ -36,7 +36,6 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from pathlib import Path
 
 
 def _harness_root():
