@@ -49,6 +49,7 @@ const WRITERS = [
 const BENCHMARK_RUNNERS = [
   "toc-benchmark.py",
   "page-label-benchmark.py",
+  "formula-benchmark.py",
 ];
 
 describe("audit output paths", () => {

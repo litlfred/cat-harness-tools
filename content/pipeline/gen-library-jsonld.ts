@@ -79,7 +79,7 @@ import { memberOf } from "../../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
-import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
@@ -221,6 +221,67 @@ export function licenceProperties(record: unknown): Record<string, unknown> {
   const license = r?.status === "stated" && typeof r.id === "string" && r.id.trim() !== "" ? r.id : undefined;
   licenceNaming ??= vocabMapping(INSTANCE_ROOT, "licence-naming");
   return applyVocabMapping(licenceNaming, { license, licenceRecord: record });
+}
+
+/**
+ * The LaTeX source `arxiv-source.py` fetched beside an entry, as it records it
+ * in `source/source.json`: the e-print's own provenance, and the files it
+ * unpacked into `source/files/` (`.tex`, `.bib`, `.bbl`, `.sty`, `.cls`, and a
+ * licence file when the bundle carries one).
+ */
+export interface LatexSource {
+  url?: string;
+  content_type?: string;
+  sha256?: string;
+  bytes?: number;
+  fetched?: string;
+  files?: Array<{ path: string; role: string; sha256: string; bytes: number }>;
+}
+
+export const LATEX_SOURCE_RECORD = "source/source.json";
+
+/**
+ * The LaTeX source as its own `SourceDocument`, `partOf` the paper's manifest.
+ *
+ * It IS a source the library holds and blocks are ingested from: the overlay
+ * (`latex-math-overlay.py`) takes section text from it. So it is typed the way
+ * the PDF is, rather than with a term minted for it, and told apart by its
+ * `@id` and by `partOf`. The files are listed in `meta` with their digests, so
+ * each one is addressable from the graph and checkable against the disk.
+ *
+ * The licence is the paper's, one record for both renditions: arXiv states it
+ * per submission, not per format.
+ */
+export function latexSourceNode(
+  docId: string,
+  src: LatexSource,
+  title: string,
+  licence: unknown,
+  instance?: string,
+): { path: string; content: string } {
+  const iri = iriFor(docId, instance);
+  return {
+    path: "source/manifest.jsonld",
+    content: node({
+      "@id": iri("source/manifest"),
+      "@type": [termCurie("SourceDocument")],
+      title: `${title} (LaTeX source)`,
+      partOf: iri("manifest"),
+      provenance: "ingested",
+      ...licenceProperties(licence),
+      meta: {
+        doc_id: docId,
+        format: "latex",
+        url: src.url,
+        content_type: src.content_type,
+        sha256: src.sha256,
+        bytes: src.bytes,
+        fetched: src.fetched,
+        files: (src.files ?? []).map((f) => ({ ...f, path: `source/${f.path}` })),
+        disposition: "ingested source material — the authors' LaTeX, attributed to its document, not folio content",
+      },
+    }),
+  };
 }
 
 /** `sec-000-1-introduction` → `sec-000`, the stable part of a section id. */
@@ -697,8 +758,35 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     // `unreadable` here rather than half-rendered. The variant's own fields
     // (arXiv id, DOI, page count) are read off `raw`; a notebook has none of
     // them and they render as null, as a PDF without them always has.
-    const read = readStructure(dir);
-    if ("reason" in read) return { state: "unreadable", rung };
+    const parsed = readStructure(dir);
+    // A legacy or overlaid record that predates the `_schema` union is read
+    // as a PDF directly; its `raw` is the file as found, not a validated
+    // `DocumentStructure`, which is what the cast below says.
+    let read: BaseStructure;
+    if (!("reason" in parsed)) {
+      read = parsed;
+    } else {
+      const raw = readJson<Record<string, unknown>>(join(dir, STRUCTURE_FILENAME));
+      if (raw && (raw._schema === "pdf-structure/v1" || !raw._schema) && Array.isArray(raw.sections)) {
+        read = {
+          variant: "pdf",
+          doc_id: String(raw.doc_id ?? docId),
+          title: ((raw.metadata as Record<string, unknown> | undefined)?.title as string | null) ?? null,
+          sections: (raw.sections as Array<Record<string, unknown>>).map((s) => ({
+            id: String(s.id),
+            number: (s.number as string | null) ?? null,
+            title: String(s.title ?? ""),
+            level: Number(s.level ?? 1),
+            n_chars: Number(s.n_chars ?? 0),
+            n_words: Number(s.n_words ?? 0),
+            locator: { kind: "pages" as const, start: Number(s.page_start ?? 1), end: Number(s.page_end ?? 1) },
+          })),
+          raw: raw as unknown as DocumentStructure,
+        };
+      } else {
+        return { state: "unreadable", rung };
+      }
+    }
     const structure = read.raw as unknown as Structure;
     const candidates = readJson<Candidates>(join(dir, "candidates.json"));
     const images = readJson<ImagesSidecar>(join(dir, "images.json"));
@@ -707,21 +795,19 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     // determined, and the slug over a record that exists is the R8 defect.
     const titled = entryTitle(dir, docId, { structure: read.raw as Record<string, unknown> }, locatedAt);
     if (!titled) return { state: "unreadable", rung };
-    return {
-      state: "built",
-      rung,
-      files: buildDocumentNodes(
-        docId,
-        structure,
-        candidates,
-        (sid) => existsSync(join(dir, "sections", `${sid}.md`)),
-        images,
-        licence,
-        titled,
-        instance,
-        subgraphStart,
-      ),
-    };
+    const files = buildDocumentNodes(
+      docId,
+      structure,
+      candidates,
+      (sid) => existsSync(join(dir, "sections", `${sid}.md`)),
+      images,
+      licence,
+      titled,
+      instance,
+    );
+    const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
+    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
+    return { state: "built", rung, files };
   }
 
   if (rung === "tabular") {

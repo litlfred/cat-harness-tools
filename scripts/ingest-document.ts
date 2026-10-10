@@ -363,6 +363,16 @@ export function withDerivedArms(
     ...plan,
     steps: [
       ...plan.steps,
+      // The author's LaTeX over the text layer, where the two provably say the
+      // same thing — `latex-math-overlay.py`'s three gates. Straight after the
+      // rung, because it rewrites the `sections/` the rung wrote and every arm
+      // below that reads them should read the overlaid text. It takes the
+      // ENTRY, and the library so that a re-ingest finds the `source/`
+      // `arxiv-source.py` fetched into the promoted entry (staging is fresh,
+      // and promotion's `cpSync` merges rather than replaces, so the source
+      // survives). No source, or page granularity, is a reported skip and
+      // exits 0: most uploads are not arXiv papers.
+      ["python3", pyHelper("latex-math-overlay.py"), staging, "--library", library],
       // `pdf-images.py` reads the PDF, so it takes the SOURCE and the library
       // ROOT. `pdf` is passed in rather than read back off `plan.steps[0]`:
       // the rung's last argument happens to be the PDF today, and a sequencer

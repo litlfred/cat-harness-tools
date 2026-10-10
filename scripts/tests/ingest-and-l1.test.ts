@@ -634,11 +634,21 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // uploads/ -> library/ in two commands.
     const base = { rung: "pdf-pages" as const, why: "", steps: [["python3", "pdf-pages.py"]] };
     const armed = withDerivedArms(base, "/tmp/x.pdf", "/stage", "/stage/slug", "/lib");
-    expect(armed.steps).toHaveLength(6);
-    expect(armed.steps[1]).toEqual(["python3", expect.stringContaining("pdf-images.py"), "-o", "/stage", "/tmp/x.pdf"]);
+    expect(armed.steps).toHaveLength(7);
+    // The LaTeX overlay straight after the rung, so every arm that reads
+    // `sections/` reads the overlaid text. It takes the ENTRY and the
+    // destination LIBRARY, where a fetched `source/` lives.
+    expect(armed.steps[1]).toEqual([
+      "python3",
+      expect.stringContaining("latex-math-overlay.py"),
+      "/stage/slug",
+      "--library",
+      "/lib",
+    ]);
+    expect(armed.steps[2]).toEqual(["python3", expect.stringContaining("pdf-images.py"), "-o", "/stage", "/tmp/x.pdf"]);
     // The vector arm — bean `a8wy`. Same two arguments as the raster arm: it
     // reads the PDF, so it takes the source and the library ROOT.
-    expect(armed.steps[2]).toEqual([
+    expect(armed.steps[3]).toEqual([
       "python3",
       expect.stringContaining("pdf-vector-labels.py"),
       "-o",
@@ -648,18 +658,18 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // The vector FIGURE arm — bean `ay3x`. Same arguments again, and it must
     // precede the verdict arm, which re-applies the `vfig-` judgements its
     // `"w"` open would otherwise erase.
-    expect(armed.steps[3]).toEqual([
+    expect(armed.steps[4]).toEqual([
       "python3",
       expect.stringContaining("pdf-vector-figures.py"),
       "-o",
       "/stage",
       "/tmp/x.pdf",
     ]);
-    expect(armed.steps[4]).toEqual(["bun", "run", expect.stringContaining("l1-blocks.ts"), "-o", "/stage/slug"]);
+    expect(armed.steps[5]).toEqual(["bun", "run", expect.stringContaining("l1-blocks.ts"), "-o", "/stage/slug"]);
     // The verdict arm — bean `8suc`. It takes the ENTRY directory and the
     // DESTINATION LIBRARY, because the judgement lives in the library and a
     // staging directory does not say which one that is.
-    expect(armed.steps[5]).toEqual([
+    expect(armed.steps[6]).toEqual([
       "bun",
       "run",
       expect.stringContaining("apply-image-verdicts.ts"),
@@ -691,7 +701,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
       "/stage/slug",
       "/lib",
     );
-    expect(armed.steps[1]?.at(-1)).toBe("/real.pdf");
+    expect(armed.steps.find((st) => st.some((a) => a.includes("pdf-images.py")))?.at(-1)).toBe("/real.pdf");
   });
 
   test("the arms are pointed at STAGING, never at the library", () => {
