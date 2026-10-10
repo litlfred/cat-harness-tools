@@ -72,9 +72,17 @@ describe("latex-math-overlay", () => {
     expect(out[0]?.sections[0]?.result).toBe("overlaid");
     const md = section(f);
     expect(md).toContain("$3_1$");
-    // The paper's own `\newcommand` expanded, which is why the preamble's
-    // macros are handed to pandoc with each section.
-    expect(md).toContain("\\mathbb{R}^3");
+    // With pandoc, the paper's own `\newcommand` expands, which is why the
+    // preamble's macros are handed to it with each section. Without pandoc
+    // (a stock CI runner) the section keeps the author's LaTeX verbatim and
+    // says so; both branches are checked, whichever this machine takes.
+    const converter = out[0]?.sections[0]?.converter;
+    if (converter === "pandoc") {
+      expect(md).toContain("\\mathbb{R}^3");
+    } else {
+      expect(converter).toBe("latex");
+      expect(md).toContain("\\phi:\\R^3\\to S^2");
+    }
     expect(md).toContain("text_source: latex");
     // The rung's frontmatter is kept, not rewritten.
     expect(md).toContain("doc_id: arxiv-0705.1468v1");
