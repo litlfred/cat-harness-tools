@@ -50,7 +50,7 @@ import {
 } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { HEALTH_CHECKS, formatBytes, runHealthChecks, type HealthContext } from "./checks.ts";
 import { gatherContext } from "./probes.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { graphReadPath } from "../../scripts/graph-read.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
@@ -214,7 +214,12 @@ if (import.meta.main) {
   // Every other consumer runs `git(repoRoot, …)`, which resolves the
   // repository from any directory inside it, so the true root is correct for
   // them too rather than merely tolerated.
-  const ctx = await gatherContext({ repoRoot: repoRootFor(ROOT) });
+  //
+  // `checkoutRootFor`, not `repoRootFor`, since cat-harness stands alone (bean
+  // 70lx): `repoRootFor` is `dirname`, which from a standalone checkout is a
+  // directory with no repository in it, and every git probe then reported
+  // "origin does not appear to be a git repository". Nested, the two agree.
+  const ctx = await gatherContext({ repoRoot: checkoutRootFor(ROOT) });
   const results = runHealthChecks(ctx);
   const report = buildReport(ctx, results, {
     hash: checkerHash(),
