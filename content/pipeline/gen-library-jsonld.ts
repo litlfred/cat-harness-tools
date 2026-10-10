@@ -79,7 +79,7 @@ import { memberOf } from "../../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
-import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
@@ -742,8 +742,14 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     // `unreadable` here rather than half-rendered. The variant's own fields
     // (arXiv id, DOI, page count) are read off `raw`; a notebook has none of
     // them and they render as null, as a PDF without them always has.
-    let read = readStructure(dir);
-    if ("reason" in read) {
+    const parsed = readStructure(dir);
+    // A legacy or overlaid record that predates the `_schema` union is read
+    // as a PDF directly; its `raw` is the file as found, not a validated
+    // `DocumentStructure`, which is what the cast below says.
+    let read: BaseStructure;
+    if (!("reason" in parsed)) {
+      read = parsed;
+    } else {
       const raw = readJson<Record<string, unknown>>(join(dir, "structure.json"));
       if (raw && (raw._schema === "pdf-structure/v1" || !raw._schema) && Array.isArray(raw.sections)) {
         read = {
@@ -757,10 +763,10 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
             level: Number(s.level ?? 1),
             n_chars: Number(s.n_chars ?? 0),
             n_words: Number(s.n_words ?? 0),
-            locator: { kind: "pages", start: Number(s.page_start ?? 1), end: Number(s.page_end ?? 1) },
+            locator: { kind: "pages" as const, start: Number(s.page_start ?? 1), end: Number(s.page_end ?? 1) },
           })),
-          raw: raw as any,
-        } as any;
+          raw: raw as unknown as DocumentStructure,
+        };
       } else {
         return { state: "unreadable", rung };
       }
