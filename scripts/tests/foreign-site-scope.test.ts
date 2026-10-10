@@ -49,6 +49,7 @@ import {
   type ForeignScope,
 } from "../lib/foreign-site-scope.ts";
 import { railStandalonePages } from "../mount-instance-docs.js";
+import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -350,9 +351,10 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     const r = railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-trust", instance: "smart-trust" });
     expect(r.injected).toBe(1);
     const html = readFileSync(join(root, "doc", "index.html"), "utf-8");
-    const m = /<script type="application\/json" id="fa-navbar-row"[^>]*>([\s\S]*?)<\/script>/.exec(html);
-    expect(m).not.toBeNull();
-    const row = JSON.parse(m![1]!) as { hrefs: Record<string, string>; notes: Record<string, string> };
+    // The row is written ONCE beside the rail's data (2026-10-10); read it as a browser would.
+    const json = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
+    expect(json).toBeDefined();
+    const row = JSON.parse(json!) as { hrefs: Record<string, string>; notes: Record<string, string> };
     expect(row.hrefs.beans).toBeUndefined();
     expect(row.hrefs.todos).toBeUndefined();
     expect(row.notes.todos).toBe("smart-trust declares no todos graph");
