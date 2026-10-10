@@ -8,6 +8,7 @@ import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
 import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
 /** A small Archi model: two elements in a group, a serving and an access relationship, a note. */
 const XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -147,9 +148,15 @@ describe("drawing a view", () => {
 });
 
 describe("an instance", () => {
-  const make = (config: object, extra?: (dir: string) => void) => {
+  const declaration = {
+    name: "tiny",
+    iriBase: "https://example.org/tiny/",
+    directories: [{ id: "archimate", path: "archimate/", graphTypologies: ["archimate"] }],
+    visualisers: [{ id: "archimate", renderedBy: "archimate-pages", covers: ["archimate"] }],
+  };
+  const make = (config: object, extra?: (dir: string) => void, decl: object = declaration) => {
     const root = mkdtempSync(join(tmpdir(), "archimate-"));
-    writeFileSync(join(root, "tiny.json"), JSON.stringify({ name: "tiny", iriBase: "https://example.org/tiny/", directories: [{ id: "archimate", path: "archimate/", graphTypologies: ["archimate"] }] }));
+    writeFileSync(join(root, "tiny.json"), JSON.stringify(decl));
     mkdirSync(join(root, "archimate", "1.0.0"), { recursive: true });
     writeFileSync(join(root, "archimate", "1.0.0", "model.archimate"), XML);
     writeFileSync(join(root, "archimate", "cat-archimate.config.json"), JSON.stringify(config));
@@ -229,16 +236,20 @@ describe("an instance", () => {
     }
   });
 
-  it("in a site, puts the pages under the locale and leaves the data where its IRIs are (folio-assistant#2527)", () => {
+  it("in a site, puts the pages at the declared route and leaves the data where its IRIs are (folio-assistant#2527)", () => {
     const root = make(config);
     try {
-      const { graphPath, files } = pagesFor(root, { site: true });
-      const at = (f: Written) => sitePathOf(graphPath, f);
-      // Pages under en/, every other file at the graph's own path.
-      for (const f of files) expect(at(f).startsWith(f.page ? "en/archimate/" : "archimate/")).toBe(true);
+      const { graphPath, pageRoot, files } = pagesFor(root, { site: true });
+      // `<locale>/<harness>/<visualiser>`: the route the instance declares for this Tool.
+      expect(pageRoot).toBe("en/tiny/archimate");
+      const at = (f: Written) => sitePathOf({ graphPath, pageRoot }, f);
+      // Pages at the route, every other file at the graph's own path.
+      for (const f of files) expect(at(f).startsWith(f.page ? "en/tiny/archimate/" : "archimate/")).toBe(true);
       expect(files.filter((f) => f.page).map(at).sort()).toEqual(
-        pagesFor(root).files.filter((f) => f.path.endsWith("index.html")).map((f) => `en/archimate/${f.path}`).sort(),
+        pagesFor(root).files.filter((f) => f.path.endsWith("index.html")).map((f) => `en/tiny/archimate/${f.path}`).sort(),
       );
+      // Every page names the Tool that drew it, so the routes gate can hold it to the route.
+      for (const f of files.filter((x) => x.page)) expect({ page: f.path, by: renderedByOf(f.content) }).toEqual({ page: f.path, by: "archimate-pages" });
       // Every link a page or a drawing makes reaches a file the run writes, or a page's directory.
       const written = new Set(files.map(at));
       const resolves = (from: string, ref: string) => {
@@ -253,9 +264,40 @@ describe("an instance", () => {
       }
       // The page reaches the model in the data tree, not beside itself.
       const view = files.find((f) => f.path === "1.0.0/views/id-v1/index.html")!;
-      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../archimate/1.0.0/model.json");
-      // In the graph (no site), nothing changes: pages beside their data.
-      expect(pagesFor(root).files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/id-a/"');
+      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../../archimate/1.0.0/model.json");
+      // In the graph (no site), nothing changes: pages beside their data, and no route to name.
+      const inGraph = pagesFor(root);
+      expect(inGraph.pageRoot).toBe("archimate");
+      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/id-a/"');
+      expect(inGraph.files.filter((f) => f.page).map((f) => renderedByOf(f.content)).filter(Boolean)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("in a site, writes nothing for an instance that declares no route for these pages", () => {
+    const { visualisers: _v, ...undeclared } = declaration;
+    const root = make(config, undefined, undeclared);
+    try {
+      expect(() => pagesFor(root, { site: true })).toThrow(/declares no visualiser\(s\) rendered by `archimate-pages`/);
+      // The graph needs no route: its pages sit beside their data.
+      expect(pagesFor(root).pageRoot).toBe("archimate");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("in a site, picks the visualiser that covers the directory when several draw these pages", () => {
+    const several = {
+      ...declaration,
+      visualisers: [
+        { id: "elsewhere", renderedBy: "archimate-pages", covers: ["other"] },
+        { id: "models", renderedBy: "archimate-pages", covers: ["archimate"] },
+      ],
+    };
+    const root = make(config, undefined, several);
+    try {
+      expect(pagesFor(root, { site: true }).pageRoot).toBe("en/tiny/models");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
