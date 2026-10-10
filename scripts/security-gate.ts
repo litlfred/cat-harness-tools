@@ -94,7 +94,7 @@ export const PINNED_CHECK_COMMANDS: Readonly<Record<string, string>> = {
   "check:workflow-injection": "bun run cat-harness-tools/scripts/check-workflow-injection.ts",
   "check:secret-leaks": "bun run cat-harness-tools/scripts/check-secret-leaks.ts",
   "check:lockfile-pinning": "bun run cat-harness-tools/scripts/check-lockfile-pinning.ts",
-  "check:bun-pin": "bun run cat-harness/scripts/check-bun-pin.ts",
+  "check:bun-pin": "bun run cat-harness-tools/scripts/check-bun-pin.ts",
   "check:qa-reviewer-permission": "bun run cat-harness-tools/scripts/check-qa-reviewer-permission.ts",
   "check:materialized-fixity": "bun run folio-assistant-core/scripts/check-materialized-fixity.ts",
   "check:dependency-advisories": "bun run cat-harness-tools/scripts/check-dependency-advisories.ts",

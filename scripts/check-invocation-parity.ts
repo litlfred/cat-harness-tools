@@ -49,13 +49,13 @@ import { join, resolve } from "node:path";
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const WORKFLOW_DIR = join(REPO_ROOT, ".github", "workflows");
 
-/** A `bun run cat-harness/scripts/<name>.ts` (or `bootstrap-tools/scripts/…`) call and the rest of its line. */
+/** A `bun run cat-harness-tools/scripts/<name>.ts` (pre-70lx: `cat-harness/scripts/…`) (or `bootstrap-tools/scripts/…`) call and the rest of its line. */
 // bootstrap-tools' scripts count too, under their repository's name: since
 // 2026-09-30 (bean `xsqm`) bootstrap's own graph is written by
 // `bootstrap-tools/scripts/export-graph.ts --root ./bootstrap`, and a matcher
 // that saw only cat-harness would be blind to the one foreign-instance export
 // `3jhq` exists to protect.
-const INVOCATION = /(?:cat-harness\/|(bootstrap-tools\/))scripts\/([a-z0-9-]+)\.ts([^\n]*)/g;
+const INVOCATION = /(?:cat-harness(?:-tools)?\/|(bootstrap-tools\/))scripts\/([a-z0-9-]+)\.ts([^\n]*)/g;
 
 /**
  * A `bun run check:<name>` call: a CHECK the deploy runs over its built tree.
@@ -154,7 +154,7 @@ export function invocations(workflowText: string): Invocation[] {
 /** Does this workflow publish at the canonical base — i.e. is it the deploy? */
 export function isDeploy(workflowText: string): boolean {
   const code = withoutComments(workflowText);
-  const m = /cat-harness\/scripts\/kg-export\.ts([^\n]*)/.exec(code);
+  const m = /cat-harness(?:-tools)?\/scripts\/kg-export\.ts([^\n]*)/.exec(code);
   return m !== null && !/--base-url/.test(m[1] ?? "");
 }
 
@@ -182,7 +182,7 @@ export function checkInvocationParity(): ParityReport {
     // and invoke no generator, so they publish something else and owe nothing
     // here; reporting them would be noise about a question nobody asked.
     if (!/\.\/_site/.test(text)) continue;
-    if (!/cat-harness\/scripts\/kg-export\.ts/.test(withoutComments(text))) continue;
+    if (!/cat-harness(?:-tools)?\/scripts\/kg-export\.ts/.test(withoutComments(text))) continue;
     graphWorkflows.push({ name: f, text });
   }
 

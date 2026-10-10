@@ -411,7 +411,7 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
   const args =
     inv.tool === "export-graph"
       ? ["run", join("bootstrap-tools", "scripts", "export-graph.ts"), "--root", inv.instance, "--base-url", `${PLACEHOLDER_BASE}/instance/`]
-      : ["run", join("cat-harness", "scripts", "kg-export.ts"), "--instance", inv.instance];
+      : ["run", join("cat-harness-tools", "scripts", "kg-export.ts"), "--instance", inv.instance];
   // Only when the workflow passes one. Supplying a base where the workflow
   // does not would skip the declaration fallback entirely — the exact path
   // that broke the deploy — and report a pass over it. (export-graph always
@@ -520,7 +520,7 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
         detail:
           `the committed \`${qaStem}.qa-results.json\` is ${qaSidecar.toUpperCase()} against this export — ` +
           "this gate no longer rewrites it on its way past (bean `ymsu`). Run " +
-          `\`bun run cat-harness/scripts/kg-export.ts --instance ${inv.instance}\` and commit the result`,
+          `\`bun run cat-harness-tools/scripts/kg-export.ts --instance ${inv.instance}\` and commit the result`,
       };
     }
     return { ...inv, nodes, ok: true, qaSidecar };
