@@ -223,6 +223,67 @@ export function licenceProperties(record: unknown): Record<string, unknown> {
   return applyVocabMapping(licenceNaming, { license, licenceRecord: record });
 }
 
+/**
+ * The LaTeX source `arxiv-source.py` fetched beside an entry, as it records it
+ * in `source/source.json`: the e-print's own provenance, and the files it
+ * unpacked into `source/files/` (`.tex`, `.bib`, `.bbl`, `.sty`, `.cls`, and a
+ * licence file when the bundle carries one).
+ */
+export interface LatexSource {
+  url?: string;
+  content_type?: string;
+  sha256?: string;
+  bytes?: number;
+  fetched?: string;
+  files?: Array<{ path: string; role: string; sha256: string; bytes: number }>;
+}
+
+export const LATEX_SOURCE_RECORD = "source/source.json";
+
+/**
+ * The LaTeX source as its own `SourceDocument`, `partOf` the paper's manifest.
+ *
+ * It IS a source the library holds and blocks are ingested from: the overlay
+ * (`latex-math-overlay.py`) takes section text from it. So it is typed the way
+ * the PDF is, rather than with a term minted for it, and told apart by its
+ * `@id` and by `partOf`. The files are listed in `meta` with their digests, so
+ * each one is addressable from the graph and checkable against the disk.
+ *
+ * The licence is the paper's, one record for both renditions: arXiv states it
+ * per submission, not per format.
+ */
+export function latexSourceNode(
+  docId: string,
+  src: LatexSource,
+  title: string,
+  licence: unknown,
+  instance?: string,
+): { path: string; content: string } {
+  const iri = iriFor(docId, instance);
+  return {
+    path: "source/manifest.jsonld",
+    content: node({
+      "@id": iri("source/manifest"),
+      "@type": [termCurie("SourceDocument")],
+      title: `${title} (LaTeX source)`,
+      partOf: iri("manifest"),
+      provenance: "ingested",
+      ...licenceProperties(licence),
+      meta: {
+        doc_id: docId,
+        format: "latex",
+        url: src.url,
+        content_type: src.content_type,
+        sha256: src.sha256,
+        bytes: src.bytes,
+        fetched: src.fetched,
+        files: (src.files ?? []).map((f) => ({ ...f, path: `source/${f.path}` })),
+        disposition: "ingested source material — the authors' LaTeX, attributed to its document, not folio content",
+      },
+    }),
+  };
+}
+
 /** `sec-000-1-introduction` → `sec-000`, the stable part of a section id. */
 export function sectionKey(sectionId: string): string {
   const m = sectionId.match(/^(sec-\d+)/);
@@ -691,20 +752,19 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     // determined, and the slug over a record that exists is the R8 defect.
     const titled = entryTitle(dir, docId, { structure: read.raw as Record<string, unknown> }, locatedAt);
     if (!titled) return { state: "unreadable", rung };
-    return {
-      state: "built",
-      rung,
-      files: buildDocumentNodes(
-        docId,
-        structure,
-        candidates,
-        (sid) => existsSync(join(dir, "sections", `${sid}.md`)),
-        images,
-        licence,
-        titled,
-        instance,
-      ),
-    };
+    const files = buildDocumentNodes(
+      docId,
+      structure,
+      candidates,
+      (sid) => existsSync(join(dir, "sections", `${sid}.md`)),
+      images,
+      licence,
+      titled,
+      instance,
+    );
+    const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
+    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
+    return { state: "built", rung, files };
   }
 
   if (rung === "tabular") {
