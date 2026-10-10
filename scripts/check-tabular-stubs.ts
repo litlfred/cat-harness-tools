@@ -52,13 +52,21 @@ export interface StubFinding {
   detail: string;
 }
 
-/** Tools that are declared but have no way to run — read, never restated. */
-export function stubbedTools(tools: readonly { id: string; install?: unknown }[]): Set<string> {
+/**
+ * Tools that are declared but have no way to run — read, never restated.
+ *
+ * Nothing to install AND nothing to invoke but a person. `install: { none: true }`
+ * alone cannot mean "stub": a working tool with no install step carries it
+ * too (`dublin-core-render` in folio-assistant-core), and would read as an
+ * unbuilt tool the moment its declarations join this set (bean `cat-tools-1wre`).
+ */
+export function stubbedTools(tools: readonly { id: string; install?: unknown; invoke?: unknown }[]): Set<string> {
   return new Set(
     tools
       .filter((t) => {
         const i = t.install as { none?: boolean } | undefined;
-        return i?.none === true;
+        const v = t.invoke as { manual?: boolean } | undefined;
+        return i?.none === true && v?.manual === true;
       })
       .map((t) => t.id),
   );
