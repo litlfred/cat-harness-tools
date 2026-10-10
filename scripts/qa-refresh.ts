@@ -173,8 +173,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
   {
     id: "qa-sweep:docs",
     run: ["cat-harness-tools/content/pipeline/qa-sweep.ts", "cat-harness/docs/source"],
-    writes: [`${R}/block-qa/**`],
-    // declared-path-literal: the script sidecars the sweep restamps, measured from the 2026-10-07 restore log (65 of them).
+    // The script sidecars it stamps live under test/results since cat-harness 70lx (qa-utils.ts
+    // `SCRIPT_SIDECAR_DIR`), so they are this writer's OUTPUT, not committed files it rewrites: left
+    // out of `writes`, the 86 of them in the composed checkout were `unclaimed` (2026-10-10).
+    writes: [`${R}/block-qa/**`, `${R}/script-sidecars/*.script.json`],
+    // declared-path-literal: the script sidecars the sweep restamped where they were committed before 70lx, measured from the 2026-10-07 restore log (65 of them).
     rewrites: ["cat-harness/content/pipeline/script-sidecars/*.script.json"],
     because: "script block verdicts over the docs tree; agent verdicts are composed from test/attestations/, which stays on main. Read by the witnesses below",
   },
@@ -237,7 +240,6 @@ export const QA_WRITERS: readonly QaWriter[] = [
             "cat-harness/docs/uml/**",
             "cat-harness/uml/**",
             "cat-harness/docs/*/glossary/**",
-            "cat-harness/docs/glossary/**",
             "cat-harness/docs/assets/glossary/**",
             "cat-harness/docs/cat-harness/auto-docs/**",
             "cat-harness/docs/reference/skill-instructions/**",

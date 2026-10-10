@@ -59,6 +59,7 @@ import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 /** Colours from `uml.css`, the one place they are declared. */
@@ -84,7 +85,13 @@ const BPMN_RECORD = join(
  */
 const OWN = readDeclaration(HARNESS);
 if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find the glossary page in`);
-const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), "glossary", "index.md");
+// The page sits at the ROUTE folio-assistant-core declares for its glossary visualiser
+// (`folio-assistant-core.json` `visualisers`, computed by `visualiserRoute`), inside this
+// harness's site: cat-harness f999d7f6 moved it from `glossary/` to that route, and the
+// bare `/glossary/` is now only its declared alias. Read from the sibling mount when it is
+// there; the fallback is the route core declares today, the same one glossary-page.ts uses.
+const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
+const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
 
 // ── JSON Schema, reduced to what a class box shows ────────────────────────
 
