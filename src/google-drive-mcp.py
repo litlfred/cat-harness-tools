@@ -489,7 +489,7 @@ def handle_tool_call(name: str, arguments: dict) -> str:
 
     if name == "drive_sync_block_pdfs":
         import os as _os
-        repo_root = str(_harness_root()  # bean 70lx: the harness, now a sibling of this layer)
+        repo_root = str(_harness_root())  # bean 70lx: the harness, now a sibling of this layer
         local_dir = arguments.get("local_dir", _os.path.join(repo_root, "build", "block-pdfs"))
         root = arguments.get("root_folder", GDRIVE_FOLDER_ENV)
         folder = f"{root}/blocks"
