@@ -18,7 +18,7 @@ and the copy is wrong* — and nothing could read it.
 ## The defect, already paid for
 
 `kn0t` held a second copy of
-[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md).
+[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md).
 It had drifted in four places; the P1 exit criterion turned *"the derived navigation
 is **diffed**, and the difference is empty or explained entry by entry"* into
 *"navigation matches the Publisher's"*. **"Matches" is an impression; a diff that is
