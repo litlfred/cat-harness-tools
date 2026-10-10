@@ -36,6 +36,7 @@ import {
 } from "@litlfred/cat-harness/schemas/spec-template.ts";
 
 /** Default path to the declared spec template relative to repo root. */
+// declared-path-literal: the spec template is one fixed FILE inside cat-harness's own spec-kit skill, not a directory any instance declares; the two spellings are the composed and standalone layouts.
 export const DEFAULT_TEMPLATE_PATH = existsSync(
   join("cat-harness", "skills", "sdlc", "spec-kit", "spec-template.md")
 )
