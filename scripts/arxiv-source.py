@@ -141,6 +141,20 @@ def unpack(entry: str) -> list[dict]:
     return sorted(out, key=lambda r: r["path"])
 
 
+ASSUMED_LICENCE = "http://arxiv.org/licenses/assumed-1991-2003/"
+
+
+def is_pre_2004(created: str | None, ident: str) -> bool:
+    if created:
+        return created < "2004-01-01"
+    if "/" in ident:
+        m = re.search(r"/(\d{2})", ident)
+        if m:
+            yy = int(m.group(1))
+            return yy >= 91 or yy <= 3
+    return False
+
+
 def licence_record(ident: str, files: list[dict], today: str) -> tuple[dict | None, str]:
     """The arXiv licence as a `source-licence` record, or `(None, why)` when
     arXiv's metadata could not be read at all (no record is better than a
@@ -160,6 +174,7 @@ def licence_record(ident: str, files: list[dict], today: str) -> tuple[dict | No
     if not any(el.tag.endswith("}arXiv") for el in root.iter()):
         err = next((el.text for el in root.iter() if el.tag.endswith("}error")), None)
         return None, f"{url}: no arXiv metadata record" + (f" ({err.strip()})" if err else "")
+    created = next((el.text.strip() for el in root.iter() if el.tag.endswith("}created") and el.text and el.text.strip()), None)
     lic = next((el.text.strip() for el in root.iter() if el.tag.endswith("}license") and el.text and el.text.strip()), None)
     in_bundle = [f["path"] for f in files if f["role"] == "licence"]
     bundle_note = (f" The source bundle also carries {', '.join('source/' + p for p in in_bundle)}; "
@@ -169,6 +184,12 @@ def licence_record(ident: str, files: list[dict], today: str) -> tuple[dict | No
                "basis": f"arXiv metadata record ({url}), <license> element, read {today}"}
         if bundle_note:
             rec["note"] = bundle_note.strip()
+    elif is_pre_2004(created, ident):
+        date_str = f"submitted {created}" if created else "pre-2004 submission"
+        rec = {"status": "stated", "id": ASSUMED_LICENCE,
+               "basis": f"arXiv metadata record ({url}), {date_str}, assumed licence per {ASSUMED_LICENCE}"}
+        if bundle_note:
+            rec["note"] = bundle_note.strip()
     else:
         rec = {"status": "unknown",
                "searched": [{"where": url, "result": "the arXiv metadata record has no <license> element", "on": today}]
@@ -176,7 +197,7 @@ def licence_record(ident: str, files: list[dict], today: str) -> tuple[dict | No
                "note": "arXiv records no licence for this submission. Whether it may be republished is NOT established "
                        "here; do not assume arXiv's default distribution licence grants it." + bundle_note}
     rec["written_by"] = WRITTEN_BY
-    return rec, "stated" if lic else "unknown"
+    return rec, "stated" if (lic or is_pre_2004(created, ident)) else "unknown"
 
 
 def write_licence(entry: str, rec: dict) -> str:
@@ -290,7 +311,7 @@ def main() -> int:
         if asked:
             time.sleep(args.delay)
         status, detail = fetch(e, args.refetch)
-        asked = status in ("fetched", "pdf-only", "failed", "unreachable") or "licence" in detail
+        asked = status in ("fetched", "pdf-only", "failed", "unreachable") or ("licence stated" in detail or "licence unknown" in detail)
         print(f"{status:<11} {os.path.basename(e.rstrip('/')):<34} {detail}")
         if status == "unreachable":
             return 2

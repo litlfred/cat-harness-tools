@@ -225,6 +225,14 @@ def bench_entry(entry: str, source: str | None, threshold: float, library: str |
     return rep
 
 
+def _bench_worker(item: tuple[str, str | None, float, str | None]) -> dict:
+    e, source, threshold, library = item
+    try:
+        return bench_entry(e.rstrip("/"), source, threshold, library)
+    except Exception as exc:  # one bad bundle must not stop a library run
+        return {"entry": e, "status": "failed", "reason": f"{type(exc).__name__}: {exc}", "sections": []}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="score ingested section text against the paper's LaTeX formulas")
     ap.add_argument("entries", nargs="+", help="library/<bib-slug>/ directories")
@@ -234,18 +242,20 @@ def main() -> int:
     ap.add_argument("--json", default="build/benchmarks/formula-benchmark.json",
                     help="write the full report here (default: build/benchmarks/formula-benchmark.json; never a graph directory)")
     ap.add_argument("--stdout-json", action="store_true", help="print the report as JSON instead of a table")
+    ap.add_argument("--jobs", "-j", type=int, default=1, help="worker processes (default 1)")
     args = ap.parse_args()
     if args.source and len(args.entries) > 1:
         ap.error("--source names one entry's source; give one entry")
     if args.json:
         assert_not_declared_graph_path(args.json, os.getcwd())
 
-    reports = []
-    for e in args.entries:
-        try:
-            reports.append(bench_entry(e.rstrip("/"), args.source, args.threshold, args.library))
-        except Exception as exc:  # one bad bundle must not stop a library run
-            reports.append({"entry": e, "status": "failed", "reason": f"{type(exc).__name__}: {exc}", "sections": []})
+    items = [(e, args.source, args.threshold, args.library) for e in args.entries]
+    if args.jobs > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(max_workers=args.jobs) as ex:
+            reports = list(ex.map(_bench_worker, items))
+    else:
+        reports = [_bench_worker(it) for it in items]
 
     scored = [r for r in reports if r["status"] == "scored" and r.get("formulas")]
     n = sum(r["formulas"] for r in scored)
