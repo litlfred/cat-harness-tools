@@ -182,7 +182,7 @@ function instanceDeclarations(repo: string): string[] {
  */
 export function pageRelPath(repo = REPO): string | undefined {
   // The route cat-harness DECLARES for this Tool's visualiser (owner,
-  // 2026-10-09): `<harness>/<id>/index.md`, never chosen here.
+  // 2026-10-09): `<locale>/<harness>/<id>/index.md`, never chosen here.
   try {
     return visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL).rel;
   } catch {

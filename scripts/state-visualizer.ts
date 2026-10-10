@@ -148,6 +148,7 @@ import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.t
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";
 import {
+  pageParts,
   renderedPath,
   siteDirectories,
   visualiserPageDir,
@@ -177,13 +178,14 @@ const check = process.argv.slice(2).includes("--check");
 
 let harnessName: string | undefined;
 /**
- * Where a dashboard is drawn: `<site>/<harness>/<vis>/`, the declared route
- * (`visualiserRoute`, owner 2026-10-09). The harness segment is this
- * instance's declared `name`, read once.
+ * Where a dashboard is drawn: `<site>/<locale>/<harness>/<vis>/`, the declared
+ * route (`visualiserRoute`, owner 2026-10-09) under the page locale
+ * (`pageParts`, folio-assistant#2527). The harness segment is this instance's
+ * declared `name`, read once.
  */
 function pageDirOf(vis: string): string {
   harnessName ??= readDeclaration(ROOT)?.name ?? basename(ROOT);
-  return visualiserPageDir(SITE, { harness: harnessName, visualiser: vis });
+  return visualiserPageDir(SITE, pageParts({ harness: harnessName, visualiser: vis }));
 }
 
 /*
@@ -962,7 +964,7 @@ const rootDirs = rootRead ? withViewers(rootRead.directories ?? [], REPO_ROOT, R
 const ownIds = new Set((decl.directories ?? []).map((d) => d.id));
 const checkoutDirs = rootDirs.filter((d) => !ownIds.has(d.id));
 // THE DECLARED VISUALISERS this Tool draws for this harness — the only pages
-// it writes, each at `<harness>/<id>/` (owner, 2026-10-09).
+// it writes, each at `<locale>/<harness>/<id>/` (owner, 2026-10-09; #2527).
 const mine = (declRead?.visualisers ?? []).filter((v) => v.renderedBy === VIEWER_TOOL);
 const visOf = new Map<string, string>();
 for (const v of mine) for (const c of v.covers ?? []) if (!visOf.has(c)) visOf.set(c, v.id);
@@ -1015,11 +1017,19 @@ for (const g of graphs) {
 // Reported by name rather than counted: a deletion nobody is told about is the
 // shape `deletion-requires-confirmation` exists to stop, and a bare number
 // would not let a reader check the tool picked the right files.
-// Under the harness's own segment, and — once, for the move of 2026-10-09 —
-// at the site root, where every dashboard was drawn before. Both are safe for
-// the same reason: only a page carrying GENERATED_BY is ever a candidate.
+// Under the harness's own segment of the page locale, and — once each, for the
+// two moves — at the unlocalised `<harness>/` segment (folio-assistant#2527:
+// compose-docs writes a forwarding page there once the old copy is gone) and
+// at the site root, where every dashboard was drawn before 2026-10-09. All
+// three are safe for the same reason: only a page carrying GENERATED_BY is ever
+// a candidate.
+const harnessSegment = harnessName ?? basename(ROOT);
+const localisedSegment = relative(SITE, dirname(pageDirOf("_")));
 const orphans = [
-  ...prunableDashboards(join(SITE, harnessName ?? basename(ROOT)), graphs.map((g) => g.vis)).map((o) => join(harnessName ?? basename(ROOT), o)),
+  ...prunableDashboards(join(SITE, localisedSegment), graphs.map((g) => g.vis)).map((o) => join(localisedSegment, o)),
+  ...(localisedSegment === harnessSegment
+    ? []
+    : prunableDashboards(join(SITE, harnessSegment), []).map((o) => join(harnessSegment, o))),
   ...prunableDashboards(SITE, []),
 ].sort();
 for (const o of orphans) {
