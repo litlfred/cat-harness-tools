@@ -54,6 +54,14 @@ import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 
 /** A gathered fact, or the reason it could not be gathered. Never both, never neither. */
 export type Probe<T> = { state: "ok"; value: T } | { state: "unknown"; reason: string };
+/**
+ * A STORE's probe: a {@link Probe}, or `absent` — the repository declares no
+ * such store at all. A DETERMINED answer, not a missing one: since the
+ * separation every repository is checked on its own, and most hold no bean
+ * or todo store, so "could not determine" there would make every report
+ * permanently unknown — noise that teaches a reader to ignore the state.
+ */
+export type StoreProbe<T> = Probe<T> | { state: "absent"; reason: string };
 
 /** One preview directory on the publish branch. */
 export interface StagingPreview {
@@ -215,8 +223,8 @@ export interface HealthContext {
    */
   branches: Probe<BranchEvidenceSet>;
   repoSize: Probe<RepoSizeEvidence>;
-  beans: Probe<BeanEvidence[]>;
-  todos: Probe<TodoEvidence[]>;
+  beans: StoreProbe<BeanEvidence[]>;
+  todos: StoreProbe<TodoEvidence[]>;
   /** Every special branch the declaration names, with its budget and tip size. */
   specialBranches: Probe<SpecialBranchEvidence>;
 }
@@ -286,6 +294,11 @@ export function stagingSlug(branch: string): string {
 }
 
 /** Build an `unknown` result for a check whose evidence did not arrive. */
+/** A check over a store this repository does not declare: ok, and says why there was nothing to check. */
+function absentResult(id: string, summary: string, thresholds: HealthThreshold[], reason: string): HealthCheckResult {
+  return { id, state: "ok", summary, thresholds, measurements: [], findings: [], reason: `not applicable: ${reason}` };
+}
+
 function unknownResult(
   id: string,
   summary: string,
@@ -902,6 +915,13 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
     "unmerged work, no recent commit. Retained by policy, not by mistake: this is the list a person " +
     "needs in order to decide, never a list to act on unasked.";
   if (ctx.staging.state === "unknown") return unknownResult(id, summary, ORPHAN_THRESHOLDS, ctx.staging.reason);
+  // NO PREVIEWS, NO ORPHANS — determined without the liveness signals. Every
+  // signal below exists to keep a preview from being called orphaned; with no
+  // preview there is nothing to keep, so a repository whose pull requests the
+  // API will not list (a private one, unauthenticated) is not thereby unknown.
+  if (ctx.staging.value.previews.length === 0) {
+    return { id, state: "ok", summary, thresholds: ORPHAN_THRESHOLDS, measurements: [], findings: [], reason: `no previews on the publish branch (${ctx.staging.value.branch}), so none can be orphaned` };
+  }
   if (ctx.openPrHeads.state === "unknown") {
     return unknownResult(
       id,
@@ -1415,6 +1435,7 @@ export function beanStoreCheck(ctx: HealthContext): HealthCheckResult {
     "The work-plan store itself: duplicates, claims nobody is honouring, resolved items still inline, " +
     "the size of the open backlog, decision records that list fewer than two real options, and session " +
     "logs typed as roadmap roots.";
+  if (ctx.beans.state === "absent") return absentResult(id, summary, BEAN_THRESHOLDS, ctx.beans.reason);
   if (ctx.beans.state === "unknown") return unknownResult(id, summary, BEAN_THRESHOLDS, ctx.beans.reason);
   const beans = ctx.beans.value;
 
@@ -1853,6 +1874,7 @@ export function pagesPublishHealthCheck(_ctx: HealthContext): HealthCheckResult 
 export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
   const id = "todo-store";
   const summary = "The human todo store: how many items are open, and whether any have gone stale.";
+  if (ctx.todos.state === "absent") return absentResult(id, summary, TODO_THRESHOLDS, ctx.todos.reason);
   if (ctx.todos.state === "unknown") return unknownResult(id, summary, TODO_THRESHOLDS, ctx.todos.reason);
   const todos = ctx.todos.value;
   const open = todos.filter((t) => !CLOSED_TODO_STATUSES.has(t.status));

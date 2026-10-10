@@ -55,6 +55,7 @@ import type {
   DoneWhenState,
   HealthContext,
   Probe,
+  StoreProbe,
   RepoSizeEvidence,
   SpecialBranchBudget,
   SpecialBranchEvidence,
@@ -560,6 +561,25 @@ export function probeRepoSize(repoRoot: string): Probe<RepoSizeEvidence> {
 // ── Stores ──────────────────────────────────────────────────────
 
 /** Resolve a declared store directory, falling back to the documented default. */
+/**
+ * Does the repository at `repoRoot` declare a graph of `kind` anywhere — its
+ * store's own graph file, or a directory of that kind in its instance
+ * declaration? `false` is the determined answer "this repository has none".
+ */
+function declaresStore(repoRoot: string, graphFile: string, kind: string): boolean {
+  if (existsSync(graphFile)) return true;
+  for (const f of readdirSync(repoRoot)) {
+    if (!f.endsWith(".json") || f.endsWith(".config.json") || f === "package.json" || f.endsWith(".lock.json")) continue;
+    try {
+      const d = JSON.parse(readFileSync(join(repoRoot, f), "utf-8")) as { directories?: { graphTypologies?: string[] }[] };
+      if (Array.isArray(d.directories) && d.directories.some((x) => (x.graphTypologies ?? []).includes(kind))) return true;
+    } catch {
+      // not a declaration
+    }
+  }
+  return false;
+}
+
 function declaredDir(
   repoRoot: string,
   root: string,
@@ -787,7 +807,10 @@ export function beanDefsDirRelative(repoRoot: string): string | undefined {
   return relative(repoRoot, found.dir) || ".";
 }
 
-export function probeBeans(repoRoot: string): Probe<BeanEvidence[]> {
+export function probeBeans(repoRoot: string): StoreProbe<BeanEvidence[]> {
+  if (!declaresStore(repoRoot, join(repoRoot, DEFAULT_BEAN_GRAPH_ROOT, BEAN_GRAPH_FILE), "beans")) {
+    return { state: "absent", reason: `this repository declares no \`beans\` store` };
+  }
   const found = declaredDir(
     repoRoot,
     DEFAULT_BEAN_GRAPH_ROOT,
@@ -841,7 +864,10 @@ export function probeBeans(repoRoot: string): Probe<BeanEvidence[]> {
   return { state: "ok", value: beans };
 }
 
-export function probeTodos(repoRoot: string): Probe<TodoEvidence[]> {
+export function probeTodos(repoRoot: string): StoreProbe<TodoEvidence[]> {
+  if (!declaresStore(repoRoot, join(repoRoot, DEFAULT_TODO_GRAPH_ROOT, TODO_GRAPH_FILE), "todos")) {
+    return { state: "absent", reason: `this repository declares no \`todos\` store` };
+  }
   const found = declaredDir(
     repoRoot,
     DEFAULT_TODO_GRAPH_ROOT,
