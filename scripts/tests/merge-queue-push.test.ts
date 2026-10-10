@@ -70,7 +70,7 @@ function world(): { repo: string; url: string; storeDir: string; base: string } 
   git(repo, "remote", "add", "origin", url);
   writeFileSync(
     join(repo, "fixture.json"),
-    JSON.stringify({ $schema: "folio-harness/v1", name: "fixture", directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }] }, null, 2),
+    JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "fixture", directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }] }, null, 2),
   );
   mkdirSync(join(repo, "beans"), { recursive: true });
   writeFileSync(
