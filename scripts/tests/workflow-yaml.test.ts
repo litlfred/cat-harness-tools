@@ -154,7 +154,11 @@ describe("GitHub Actions workflows", () => {
       .join("\n");
     expect(runs).toContain("bun test");
     expect(runs).toContain("bun run cat lint");
-    expect(runs).toContain("tsc --noEmit");
+    // In the index checkout `tsc --noEmit` runs per instance through
+    // `typecheck:instances` (the root has no tsconfig.json); the check is that
+    // script, so the step names the script and the script must run tsc.
+    expect(runs).toContain("bun run cat typecheck:instances");
+    expect(readFileSync(join(import.meta.dir, "..", "typecheck-instances.ts"), "utf-8")).toContain("--noEmit");
     // Every shard still runs: the matrix is what branch protection names.
     expect(doc.jobs["typescript-test"]?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
     expect(doc.jobs["e2e-shard"]?.strategy?.matrix?.shard).toEqual([1, 2, 3]);

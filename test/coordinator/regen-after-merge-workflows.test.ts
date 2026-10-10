@@ -39,10 +39,17 @@ const REPO = repoRootFor(INSTANCE);
 const SCRIPTS = scriptsOf(REPO);
 
 describe("a writer that is not <check minus :check> is DECLARED (bean eowd)", () => {
-  test("the audit-coverage gates are offered, with audit:coverage as their writer", () => {
-    const pairs = repairableGates(loadGates(REPO, {}), SCRIPTS);
+  // Bean `loxz` (cat-harness 4690860) reversed the eowd pairing: both gates
+  // are judge-mode checks against qa-reports, so a pass says nothing about
+  // whether `audit-coverage.qa-results.json` is current. Regen must not
+  // offer `audit:coverage` as their repair; NO_WRITER says why.
+  test("the audit-coverage gates run in CI and are NOT offered for repair — bean loxz", () => {
+    const gates = loadGates(REPO, {});
+    const pairs = repairableGates(gates, SCRIPTS);
     for (const gate of ["audit:coverage:strict", "audit:coverage:require-all"]) {
-      expect(pairs.find((p) => p.check === gate)?.writer).toBe("audit:coverage");
+      expect(gates.some((g) => g.command.includes(gate)), `${gate} is no longer a CI gate`).toBe(true);
+      expect(pairs.find((p) => p.check === gate)).toBeUndefined();
+      expect(NO_WRITER[gate]).toContain("judge-mode");
     }
   });
 

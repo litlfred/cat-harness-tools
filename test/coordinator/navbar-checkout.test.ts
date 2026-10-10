@@ -52,7 +52,9 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // when the WHO style guide was folded into who-iris as a subgraph (bean
     // `qsx4`) — the voices declared from within `skills/skills.json`, the
     // glossary in who-iris.json. Same reason as both above.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "glossary", "library", "qa", "schemas", "skills", "themes", "translation-sources", "uploads", "voices"].map(K));
+    // THIRTEEN since 2026-10-09: `folio` joined when who-iris's landing sticky
+    // moved into its own `folio/` (bean `1yd7`). Same reason as every one above.
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "library", "qa", "schemas", "skills", "themes", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -65,6 +67,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `code` is declared and publishes no page — which is exactly the state
       // this assertion exists to keep visible, rather than a gap to hide.
       "code",
+      // `folio` (bean `1yd7`) holds the landing sticky; no page is passed in here.
+      "folio",
       // `glossary` and `voices` arrived with the style guide (bean `qsx4`); no
       // page is passed in here, so both are declared-and-unlinked.
       "glossary",

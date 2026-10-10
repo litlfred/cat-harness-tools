@@ -134,7 +134,7 @@ object: `conclusion` says whether the run executed. "Was this gate green on its
 own merits, or repaired under it" is not in the run at all — answering it needs
 the history of the generated file and which commit last touched it. Adding a
 fifth state on a guess would be the failure
-[`audit-coverage`](../../cat-harness/skills/kg/kg-core/audit-coverage.md) names:
+[`audit-coverage`](../../../cat-harness/skills/kg/kg-core/audit-coverage.md) names:
 a measurement must not become a term in itself. So it is written down with its
 evidence and left for the owner to scope.
 
@@ -175,7 +175,7 @@ report these two heads as findings, verified: exit **1**, `! Code-quality gates
 required — DID NOT EXECUTE`. Teaching the broad sweep to answer the same
 question a second way, in an unattended CI job, is the *"two answers to one
 question are free to disagree"* failure that
-[`github-state-inspection`](../../cat-harness/skills/sdlc/sdlc-core/github-state-inspection.md)
+[`github-state-inspection`](../../../cat-harness/skills/sdlc/sdlc-core/github-state-inspection.md)
 §"A clean check set and a COMPLETE check set are different questions" names
 explicitly — *"Do not build a second reconciliation"*. The sweep's own docblock
 scopes it to *"no CI run of any kind"*, and that scope is deliberate: it is a

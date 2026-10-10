@@ -18,7 +18,7 @@ Issue: #1187. Worked example of the correct post-repair shape: `kn0t` on `main`,
 ## Why — the defect, already paid for
 
 `kn0t` held a second copy of the contract in
-[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md),
+[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md),
 drifted in four places. The worst: the bean's P1 exit criterion read *"navigation matches the
 Publisher's for one IG"* where the skill requires the derived navigation be **diffed** against
 the Publisher's with the difference **empty or explained entry by entry**. "Matches" is an
