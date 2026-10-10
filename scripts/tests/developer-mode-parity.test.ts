@@ -33,7 +33,6 @@ import {
   reasoningTierGte,
   checkModelCapabilities,
   validateLaneModelCapabilities,
-  validateWorkflowModel,
   WorkflowCapabilityRefusalError,
   type ModelConfig,
   type ModelCapabilities,

@@ -41,7 +41,6 @@ import { instanceRootNamed } from "@litlfred/cat-harness/schemas/instance-roots.
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import {
   checkoutRootFor,
-  instanceRootFor,
   publishedAssetPath,
   readDeclaration,
   repoRootFor,

@@ -80,7 +80,12 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
-import type { CompanionRole, QaCriterionEntry, QaFieldHash, QaReviewer, UntaintedDispatch } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type {
+  CompanionRole,
+  QaCriterionEntry,
+  QaReviewer,
+  UntaintedDispatch,
+} from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { parsePo, parsePoEntries } from "./po-inject.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";

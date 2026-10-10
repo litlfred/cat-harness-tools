@@ -38,7 +38,6 @@ import { findContentRepoRoot, findPapers, soleFolioPaper } from "./repo-root";
 import { mergeCitations } from "./citations";
 import { isWitnessed } from "./witness-address";
 import { leanPackageByName, parseLeanRef } from "@litlfred/cat-harness/schemas/lean-packages.ts";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 // The FOLIO's root, not the platform's. `resolve(HARNESS_ROOT)`
 // lands in folio-assistant, which holds no papers — and the symlinked

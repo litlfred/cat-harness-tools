@@ -57,7 +57,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

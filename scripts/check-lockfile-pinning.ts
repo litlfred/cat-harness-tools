@@ -69,7 +69,7 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");

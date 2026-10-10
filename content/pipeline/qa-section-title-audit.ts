@@ -62,7 +62,6 @@ import { resolve, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { findContentRepoRoot } from "./repo-root";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 // Was `resolve(HARNESS_ROOT)` — this file's own location, so
 // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.

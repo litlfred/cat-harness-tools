@@ -41,7 +41,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { instanceRootFor, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { pageThemeCssVars, themeCssVars, type ResolvedTheme } from "@litlfred/cat-harness/schemas/theme.js";
 import {
   explainStickyThemeConflict,

@@ -60,7 +60,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootFor, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { THEME_LAYOUTS, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import type { ImageRegion, KgImage } from "@litlfred/cat-harness/schemas/kg-node.js";

@@ -5,11 +5,7 @@ import {
   extractTrailersFromMessage,
   type CommitInfo,
 } from "../agent-provenance.ts";
-import {
-  evaluateAdversarialGate,
-  renderAdversarialGateReport,
-  type AdversarialGateCheckInput,
-} from "../check-adversarial-review.ts";
+import { evaluateAdversarialGate, renderAdversarialGateReport } from "../check-adversarial-review.ts";
 import {
   MERGE_REVIEW_SCHEMA,
   type AdversarialReview,

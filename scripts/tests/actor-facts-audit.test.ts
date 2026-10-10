@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { evaluateActorFactConsumers, matchesToken } from "../actor-facts.js";
-import { KG_CRITERIA, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { readActors, actorsDir, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { readPolicyGrants, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
 import { workflowFiles, corpusScopeFor } from "../known-skills.js";
@@ -59,15 +59,6 @@ describe("consumer detection", () => {
       permissions: ["role-management"],
       path: "/signer.json",
     };
-
-    const dummyBpmn = `
-      <bpmn:definitions>
-        <bpmn:serviceTask id="Task_1" name="Call signing-api" />
-        <bpmn:task id="Task_2" name="Manage roles">
-          <bpmn:documentation>Exercises role-management for actors.</bpmn:documentation>
-        </bpmn:task>
-      </bpmn:definitions>
-    `;
 
     const res = evaluateActorFactConsumers({
       actors: [actor],

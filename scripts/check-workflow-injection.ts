@@ -129,7 +129,7 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

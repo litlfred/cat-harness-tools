@@ -72,7 +72,7 @@ import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { BASELINE, type BindingBaselineEntry } from "./process-bindings.baseline.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");

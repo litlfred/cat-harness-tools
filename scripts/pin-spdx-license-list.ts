@@ -42,7 +42,6 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { PinnedTerminologySchema, PINNED_TERMINOLOGY_TAG, type PinnedConcept } from "@litlfred/cat-harness/schemas/pinned-terminology.ts";
 import { SPDX_LICENSE_LIST_PIN, SPDX_LICENSE_LIST_SNAPSHOT } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";

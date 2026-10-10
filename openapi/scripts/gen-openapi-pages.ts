@@ -65,7 +65,7 @@ import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page
 import { OpenApiDocumentSchema, OpenApiProvenanceSchema, operationsOf, type OpenApiOperation } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
 import { CONFIG_FILE, localDirOf, openapiDir, readConfig } from "./ingest-openapi.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "openapi-page";

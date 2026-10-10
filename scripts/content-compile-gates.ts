@@ -32,7 +32,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename } from "node:path";
 import jsonld from "jsonld";
 
 // ── Path Patterns ────────────────────────────────────────────────────────────

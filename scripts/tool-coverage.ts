@@ -67,8 +67,7 @@
  */
 import { skillContracts } from "./skill-contracts.js";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative } from "node:path";
 
 import { tools } from "../tools/discover.js";
 import { loadProcessModel } from "../src/workflow/process-model.js";

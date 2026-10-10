@@ -49,7 +49,7 @@ import {
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TOOLS_ROOT } from "./lib/roots.ts";
 
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";

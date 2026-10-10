@@ -43,7 +43,7 @@ import {
   withGeometry,
 } from "../gen-navbar-geometry-css.js";
 import { publishedUrlOf, solveCrop } from "../harness-tiles.js";
-import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declaredGraphs, toRootFor, visualiserHref } from "../mount-instance-docs.js";
 import { kindTitle } from "../lib/nav-label.js";
 import { graphTypologyRowDecor } from "../lib/graph-typology-nav.js";

@@ -29,37 +29,24 @@
  * @covers tools, schemas, skills, processes — the four content kinds with adversarial checklists
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import {
-  ADVERSARIAL_CHECKLISTS,
   getChecklistForKind,
-  type AdversarialChecklistItem,
   type AdversarialContentKind,
 } from "@litlfred/cat-harness/schemas/adversarial-checklist.js";
 import {
   AdversarialFindingSchema,
-  AdversarialReviewSchema,
   type AdversarialFinding,
   type AdversarialReview,
 } from "@litlfred/cat-harness/schemas/red-flag.js";
-import {
-  KG_QA_SCHEMA,
-  KG_SUBJECT_GRAPH_TYPOLOGIES,
-  kgQaSidecarPath,
-  KgQaReportSchema,
-  type KgQaReport,
-  type KgSubjectKind,
-} from "@litlfred/cat-harness/schemas/kg-qa.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const REPO = repoRootFor(ROOT);
 
 export interface CandidateNode {
   id: string;
@@ -190,7 +177,7 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
         seenIds.add(id);
         const scPath = join(scDir, f);
         let hasReview = false;
-        let isStale = false;
+        const isStale = false;
         let srcHash = "";
         try {
           const sc = JSON.parse(readFileSync(scPath, "utf-8")) as KgQaReport;
@@ -264,7 +251,7 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
  * Rank candidate nodes by risk score:
  * riskScore = gatePathPriority * 1000 + unreviewedBonus (500) + staleBonus (250) + fanIn * 10 + commitCount
  */
-export function rankCandidateNodes(candidates: CandidateNode[], repoRoot: string = ROOT): RankedNode[] {
+export function rankCandidateNodes(candidates: CandidateNode[], _repoRoot: string = ROOT): RankedNode[] {
   return candidates
     .map((c) => {
       let riskScore = c.gatePathPriority * 1000;

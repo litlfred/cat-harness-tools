@@ -70,7 +70,6 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 import { pagePermalink, permalinkDefaultsIn, type PermalinkDefault } from "../../scripts/lib/jekyll-permalink.ts";
@@ -83,7 +82,6 @@ import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/translatio
 import { isTranslatable } from "@litlfred/cat-harness/schemas/translation-tools.ts";
 import { ownDirectoryById, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HARNESS_ROOT);
 
 /**

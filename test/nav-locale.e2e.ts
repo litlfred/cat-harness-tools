@@ -1,7 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { publishedPagePath } from "../scripts/lib/jekyll-permalink.ts";
 import { pageKey } from "../content/pipeline/translation-index.ts";

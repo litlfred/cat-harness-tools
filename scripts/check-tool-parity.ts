@@ -20,8 +20,7 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { tools } from "@litlfred/cat-harness/tools/index.js";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
@@ -81,7 +80,7 @@ export function measureToolParity(
   toolList: ToolDefinition[] = tools(),
   packageJsonPath: string = join(HARNESS_ROOT, "package.json"),
 ): ToolParityReport {
-  let pkgScripts = new Set<string>();
+  const pkgScripts = new Set<string>();
   if (existsSync(packageJsonPath)) {
     try {
       const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {

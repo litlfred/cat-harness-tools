@@ -21,8 +21,7 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";

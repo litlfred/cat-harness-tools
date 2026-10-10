@@ -67,7 +67,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { instanceRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";

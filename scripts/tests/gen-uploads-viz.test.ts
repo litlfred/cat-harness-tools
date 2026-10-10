@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { itemState, viewerHtml } from "../gen-uploads-viz.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { readLibraryGraph } from "../library-graph.ts";
-import { checkoutRootFor, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutRootFor, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import type { UploadItem } from "../library-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

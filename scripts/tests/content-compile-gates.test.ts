@@ -16,7 +16,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   CONTENT_COMPILE_GATES,
-  compileGatesForPaths,
   compileGatesForPrHead,
   compileGatesForMergeTrain,
   unionOfChangedPaths,
@@ -27,14 +26,10 @@ import {
   evaluateIgPublisherGate,
   evaluateCompileGates,
   evaluateCompileGatesForMergeTrain,
-  checkJsonLdExpansion,
-  extractSorriesFromContent,
-  extractAxiomsFromContent,
   isLeanPath,
   isFhirIgPath,
   isKgPath,
   isRenderPath,
-  type ContentCompileGate,
 } from "../content-compile-gates.ts";
 import {
   CONTENT_COMPILE_GATES as GATES_TS_MAP,

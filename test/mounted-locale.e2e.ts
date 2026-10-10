@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { TRANSLATION_META_ID, translationMetaBlock, withTranslationMeta } from "../scripts/lib/translation-meta.ts";
@@ -35,7 +34,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * `nav-locale.e2e.ts` paid for three times.
  */
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 const SITE = siteDirFor(ROOT);

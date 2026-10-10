@@ -23,11 +23,6 @@ import { join } from "node:path";
 import { codeWithoutComments } from "../repo-files.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
-/** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
-const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
-
-const ROOT = join(ORIGIN_DIR, "../..");
-
 describe("the reason the allowance was closed is still true", () => {
   // The evidence `nup0` rests on. If it stops holding — somebody teaches
   // `skill_fetch` or the registry to read the directory — then
