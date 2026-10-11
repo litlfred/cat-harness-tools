@@ -718,8 +718,11 @@ export function blockedRequiredAdvice(blocked: string[]): string {
     "  a different run of a different ref resolution, and on #1819 the dispatched\n" +
     "  `Code-quality gates` FAILED while this script still printed a checkmark.\n" +
     "\n  The fix is a push credential whose pushes trigger the PR's own runs —\n" +
-    "  issue #1829 D1, bean `0qjq`. `merge-main.yml` already branches on\n" +
-    "  `secrets.MERGE_MAIN_TOKEN`, so SETTING THE SECRET is the whole change, and\n" +
+    "  issue #1829 D1, bean `0qjq`. `merge-main.yml` mints one from the harness\n" +
+    "  GitHub App when it is installed (`vars.HARNESS_BOT_ID` +\n" +
+    "  `secrets.HARNESS_BOT_PRIVATE_KEY`), else uses\n" +
+    "  `secrets.PUSH_BRANCH_TRIGGERING_CI` (bean `8mlt`). So INSTALL THE HARNESS\n" +
+    "  APP OR SET PUSH_BRANCH_TRIGGERING_CI: that is the whole change, and\n" +
     "  it is the repository owner's to make. Until then this head cannot be\n" +
     "  judged by its own gates, and that is a report, not something to work around."
   );
