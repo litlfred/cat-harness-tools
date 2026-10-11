@@ -2,7 +2,7 @@
 #
 # This repository's tests run inside the folio-assistant index, where the other
 # instances are mounted beside it: most of them read the index's workflows,
-# `bootstrap/`, `smart-base/` and so on. So each run checks out folio-assistant
+# `bootstrap/`, the content instances' directories and so on. So each run checks out folio-assistant
 # main, mounts every instance from its `index.lock.json`, then puts this
 # repository (at the ref under test) and cat-harness main in place of their
 # locked mounts, since this repository's main tracks cat-harness main. Their

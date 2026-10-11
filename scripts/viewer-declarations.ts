@@ -424,7 +424,7 @@ export interface ViewedDirectory {
  * - `coversKinds`: every declared directory of those kinds in the checkout —
  *   the "full KG" the owner's rule names, which is what a corpus-wide viewer
  *   (the library, schemas, processes) draws: it lists bootstrap's processes
- *   as readily as smart-base's.
+ *   as readily as a content instance's.
  */
 export function covers(v: DeclaredVisualiser, d: ViewedDirectory, owner: string, absDir?: string, repoRoot?: string): boolean {
   if (v.harness === owner && (v.covers ?? []).includes(d.id)) return true;

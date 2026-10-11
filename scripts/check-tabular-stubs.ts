@@ -57,7 +57,7 @@ export interface StubFinding {
  *
  * Nothing to install AND nothing to invoke but a person. `install: { none: true }`
  * alone cannot mean "stub": a working tool with no install step carries it
- * too (`dublin-core-render` in folio-assistant-core), and would read as an
+ * too (`dublin-core-render`, declared by the content core), and would read as an
  * unbuilt tool the moment its declarations join this set (bean `cat-tools-1wre`).
  */
 export function stubbedTools(tools: readonly { id: string; install?: unknown; invoke?: unknown }[]): Set<string> {

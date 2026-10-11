@@ -87,7 +87,8 @@ export function stagingDir(branch: string): string {
  * description, and only those. Read STRUCTURALLY, as remote-mount reads mount
  * fields (bean qump): a full read needs every graph typology the declaration
  * names to be registered, and some are registered by the layers the mount
- * lays down (who-iris names core's `catalogue`). Run from a sibling toolset,
+ * lays down (an instance may name a kind, such as `catalogue`, that a layer it
+ * mounts registers). Run from a sibling toolset,
  * the full read refused a declaration the build could otherwise serve.
  */
 export function siteFields(text: string, file: string): { name: string; title?: string; description?: string } {

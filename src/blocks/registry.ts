@@ -107,8 +107,8 @@ const BLOCK_KINDS: Array<Pick<BlockModuleEntry, "kind" | "displayName" | "viewer
   // `algorithm` and `table` going unrendered and what caught this one.
   { kind: "figure", displayName: "Figure" },
   // `recommendation` — a document folio's normative statement, bean `55ao`.
-  // Its node is folio-assistant-core's; registered ahead of it so the kind is
-  // never discovered without a renderer.
+  // Its node is declared by the content core above this layer; registered
+  // ahead of it so the kind is never discovered without a renderer.
   { kind: "recommendation", displayName: "Recommendation" },
 ];
 

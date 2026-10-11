@@ -583,8 +583,8 @@ export function unresolvedPages(site: string, pages: readonly string[]): string[
  * and its pages are rendered. A directory whose content is kept on a branch
  * (a `todos/` or `beans/` cut over to `cat/<instance>/<graph>`) is NOT read,
  * because the checkout does not hold it: measured on the index 2026-10-10,
- * the list names `cat-harness-tools/beans/defs` and
- * `folio-assistant-core/beans/defs` and no `todos/` at all.
+ * the list names `cat-harness-tools/beans/defs` and the content core's
+ * `beans/defs` and no `todos/` at all.
  */
 export async function siteReads(repoRoot: string, args: string[] = []): Promise<string[]> {
   const i = args.indexOf("--root");
