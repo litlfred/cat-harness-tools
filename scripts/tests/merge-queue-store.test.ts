@@ -157,13 +157,15 @@ describe("the live shape: declared FROM WITHIN, and cut over", () => {
     mount(root, "queue", "beans/queue", into);
 
     // The composed id is what `nestedDirectories` reports under, and
-    // `markerPath` refuses it outright — so asking with it is "could not
-    // determine", rendered as `unmounted`. That was the defect.
+    // `markerPath` refuses it outright. Asking with it used to be "could not
+    // determine", rendered as `unmounted` — the defect. `tipPresence` now finds
+    // a mount by its declared PATH first (an id several instances share is
+    // filed under `<instance>.<id>`), so even the composed id sees the mount.
     const nested = nestedDirectories(root, readDeclaration(root)!)!.find((n) => n.ownId === "queue")!;
     expect(nested.id).toBe("beans/queue");
     expect(nested.ownId).toBe("queue");
     expect(nested.subgraph).toBe(true);
-    expect(tipPresence({ id: nested.id, branch: BRANCH, keyedBy: "tip" }, into, root).state).toBe("unmounted");
+    expect(tipPresence({ id: nested.id, branch: BRANCH, keyedBy: "tip" }, into, root)).toEqual({ state: "mounted", into });
     // Asked with the id the MOUNT is keyed on, it is seen for what it is.
     expect(tipPresence({ id: nested.id, branch: BRANCH, keyedBy: "tip" }, into, root, nested.ownId)).toEqual({
       state: "mounted",

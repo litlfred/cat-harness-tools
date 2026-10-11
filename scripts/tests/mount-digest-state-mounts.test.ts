@@ -60,6 +60,12 @@ describe("stateMountedDirs", () => {
     put(".git/branch-mounts/broken.json", "{ not json");
     expect(stateMountedDirs(ROOT)).toEqual([MOUNT]);
   });
+
+  test("markers keyed `<instance>.<id>` — one id declared by several instances — are read too", () => {
+    const other = join(ROOT, "inst2/test/health/results");
+    put(".git/branch-mounts/inst2.health.json", JSON.stringify({ $schema: "branch-mount/v1", id: "health", key: "inst2.health", into: other }));
+    expect(stateMountedDirs(ROOT).sort()).toEqual([MOUNT, other].sort());
+  });
 });
 
 describe("digestOf", () => {

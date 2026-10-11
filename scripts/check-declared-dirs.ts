@@ -132,7 +132,7 @@ import {
 // `existsSync` on a path it spelled itself would be a second, and the two
 // would drift the first time the marker moved — which it already did once,
 // from `--git-common-dir` to the per-worktree git dir (review on #1957).
-import { readMarker } from "./branch-store.ts";
+import { markerAtPath, readMarker } from "./branch-store.ts";
 // The `folio` graph typology is registered by CORE as a load-time side effect, so
 // the harness alone does not know it exists and `readDeclaration` throws on a
 // perfectly valid declaration that uses it. Same import, same reason, as
@@ -238,7 +238,16 @@ export function tipPresence(
   }
   let marker;
   try {
-    marker = readMarker(repoRoot, markerId);
+    // By PATH first. An id several instances of an index declare (`health`,
+    // four times on 2026-10-11) is filed under `<instance>.<id>`, so the id
+    // alone either finds none or finds another instance's mount; the declared
+    // path is what says which graph this is. Then the id, as before — but a
+    // marker for a DIFFERENT declared path is another graph's, not this one's.
+    marker = markerAtPath(repoRoot, rel);
+    if (!marker) {
+      const byId = readMarker(repoRoot, markerId);
+      if (byId && (byId.path === undefined || byId.path === rel)) marker = byId;
+    }
     if (!marker && abs) {
       try {
         marker = readMarker(dirname(abs), markerId);

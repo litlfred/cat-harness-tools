@@ -101,9 +101,11 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { lockFilesIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { mountScopeFor, readMountLock } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
@@ -112,6 +114,7 @@ import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -178,6 +181,13 @@ export interface BranchStoreOptions {
   repoRoot?: string;
   /** The remote URL or path. Default: env `BRANCH_STORE_REMOTE`, else the checkout's `origin`. */
   remote?: string;
+  /**
+   * How a location's `repository` (`owner/repo`, from the index lock) becomes a
+   * fetch URL — the same injection `remote-mount.ts` takes, so a test serves a
+   * local bare repository per instance. Only consulted for a location kept in
+   * ANOTHER repository (see {@link TipLocation.repository}); default GitHub.
+   */
+  urlFor?: UrlFor;
   /** The private bare repository. Default: env `BRANCH_STORE_DIR`, else `<git-common-dir>/branch-store.git`. */
   storeDir?: string;
   /** Injected for tests; default sleeps the backoff synchronously. */
@@ -211,11 +221,47 @@ export class BranchStoreUsageError extends Error {
 
 export interface TipLocation {
   id: string;
-  /** Repository-relative, no trailing slash — the path on the branch too. */
+  /** Repository-relative, no trailing slash — where the files go in THIS checkout. */
   path: string;
   branch: string;
   /** The declared keying this location was resolved for. */
   keyedBy: BranchKeying;
+  /**
+   * The key its mount marker is filed under, when that is not `id`.
+   *
+   * An index composes instances that each declare their own state graph, and
+   * nothing stops two of them choosing the same id: on 2026-10-11 four
+   * instances declared `health`. Keyed by id alone, `tipLocations` kept the
+   * first and the other three were never mounted — silently, so
+   * `audit:coverage` read them as undetermined. An id that more than one
+   * location declares is therefore keyed `<instance>.<id>`, every one of them
+   * (not "all but the first", which would make a marker's name depend on the
+   * order instances are scanned). Absent for an id only one location declares,
+   * so a checkout without a collision keeps the `<id>.json` markers it has.
+   */
+  key?: string;
+  /** The instance the declaration belongs to, when the location is keyed by it. */
+  instance?: string;
+  /**
+   * The repository whose branch keeps this graph (`owner/repo`), when it is not
+   * this checkout's `origin`: a directory declared INSIDE a remote-mounted
+   * instance of an index is that instance's state, and its branch lives in the
+   * instance's own repository with instance-relative paths. Read from the
+   * index lock. Absent for the checkout's own graphs.
+   */
+  repository?: string;
+  /** The directory's path ON THE BRANCH, when it differs from {@link path} (instance-relative in its own repository). */
+  branchPath?: string;
+}
+
+/** The marker key of a location: its {@link TipLocation.key}, else its id. */
+export function locationKey(loc: Pick<TipLocation, "id" | "key">): string {
+  return loc.key ?? loc.id;
+}
+
+/** Where a location's files are on its branch. */
+export function branchPathOf(loc: Pick<TipLocation, "path" | "branchPath">): string {
+  return loc.branchPath ?? loc.path;
 }
 
 /**
@@ -279,17 +325,87 @@ function repoRelative(repoRoot: string, abs: string): string {
  * Returns them sorted by id so a caller's output is stable.
  */
 export function tipLocations(repoRoot: string = gitTopLevel(), keyedBy: BranchKeying | "any" = "tip"): TipLocation[] {
-  const out: TipLocation[] = [];
+  // Keys are assigned over EVERY branch keying before the filter, so a
+  // location's key does not depend on which keying the caller asked for.
+  return allBranchLocations(repoRoot).filter((l) => keyedBy === "any" || l.keyedBy === keyedBy);
+}
+
+/**
+ * Every branch-kept location (`tip`, `route`, `route-family`), one per declared
+ * PATH, keyed uniquely. Sorted by id, then path, so output is stable.
+ *
+ * Until 2026-10-11 this kept the first location per id, which in an index
+ * mounted cat-harness's `health` and silently dropped cat-harness-tools',
+ * folio-assistant-core's and who-iris'. One per path is the real identity: two
+ * declarations of one path are one directory, two paths are two graphs.
+ */
+function allBranchLocations(repoRoot: string): TipLocation[] {
+  const found: Array<TipLocation & { instRoot: string }> = [];
+  const remotes = new Map<string, RemoteInstance | undefined>();
   for (const inst of instanceRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       const at = keptAt(inst, repoRoot, d);
       const k = at?.keyedBy;
       if (k !== "tip" && k !== "route" && k !== "route-family") continue;
-      if (keyedBy !== "any" && k !== keyedBy) continue;
-      if (!out.some((o) => o.id === d.id)) out.push({ id: d.id, path: repoRelative(repoRoot, d.absPath), branch: at!.branch, keyedBy: k });
+      const path = repoRelative(repoRoot, d.absPath);
+      if (found.some((o) => o.path === path)) continue;
+      const loc: TipLocation & { instRoot: string } = { id: d.id, path, branch: at!.branch, keyedBy: k, instRoot: inst };
+      // A TIP graph declared inside a remote-mounted instance is read from that
+      // instance's repository. Route stores are published by the checkout's own
+      // generators and stay on its origin.
+      if (k === "tip") {
+        if (!remotes.has(inst)) remotes.set(inst, remoteInstanceOf(inst, repoRoot));
+        const ri = remotes.get(inst);
+        const within = relative(inst, d.absPath).split(sep).join("/").replace(/\/+$/, "");
+        if (ri && within !== "" && !within.startsWith("..") && !isAbsolute(within)) {
+          loc.repository = ri.repository;
+          loc.instance = ri.instance;
+          const onBranch = ri.upstreamRoot ? posix.join(ri.upstreamRoot, within) : within;
+          if (onBranch !== path) loc.branchPath = onBranch;
+        }
+      }
+      found.push(loc);
     }
   }
-  return out.sort((a, b) => a.id.localeCompare(b.id));
+  const perId = new Map<string, number>();
+  for (const l of found) perId.set(l.id, (perId.get(l.id) ?? 0) + 1);
+  const out: TipLocation[] = found.map(({ instRoot, ...l }) => {
+    if ((perId.get(l.id) ?? 0) < 2) return l;
+    const instance = l.instance ?? (repoRelative(repoRoot, instRoot).split("/").join(".") || "root");
+    return { ...l, instance, key: `${instance}.${l.id}` };
+  });
+  return out.sort((a, b) => a.id.localeCompare(b.id) || a.path.localeCompare(b.path));
+}
+
+/** A remote-mounted instance as the index lock records it. */
+export interface RemoteInstance {
+  instance: string;
+  /** `owner/repo`. */
+  repository: string;
+  /** The instance's root inside that repository; `""` is its root. */
+  upstreamRoot: string;
+}
+
+/**
+ * The lock entry that put `instRoot` where it is, or undefined for an instance
+ * no remote mount placed (the checkout's own, or a plain directory). Reads only
+ * lock files: `mountScopeFor` finds the scope, and the lock there names the
+ * repository. A lock that does not parse contributes nothing — `mount:remote:check`
+ * is where that is reported — and the graph then falls back to `origin`.
+ */
+export function remoteInstanceOf(instRoot: string, repoRoot: string): RemoteInstance | undefined {
+  const abs = resolve(instRoot);
+  if (abs === resolve(repoRoot)) return undefined;
+  const scope = mountScopeFor(abs);
+  if (!scope) return undefined;
+  for (const name of lockFilesIn(scope).files) {
+    const r = readMountLock(join(scope, name));
+    if (!r.ok) continue;
+    for (const i of r.lock.instances) {
+      if (resolve(scope, i.path) === abs) return { instance: i.instance, repository: i.repository, upstreamRoot: i.upstreamRoot.replace(/^\/+|\/+$/g, "") };
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -303,6 +419,22 @@ export function resolveTipLocation(
   repoRoot: string = gitTopLevel(),
   keyedBy: BranchKeying | "any" = "any",
 ): TipLocation {
+  // A location KEY (`who-iris.health`) names one graph exactly; an id more
+  // than one location declares names several, and guessing among them is how
+  // the wrong instance's state gets read or pushed.
+  const all = allBranchLocations(repoRoot);
+  const byKey = all.find((l) => l.key === id);
+  const pick = byKey ? [byKey] : all.filter((l) => l.id === id);
+  if (pick.length > 1) {
+    throw new BranchStoreUsageError(
+      `${pick.length} declared directories have id ${id} (${pick.map((l) => `${l.path} → ${locationKey(l)}`).join(", ")}); name one by its key`,
+    );
+  }
+  if (pick.length === 1) {
+    const l = pick[0]!;
+    if (keyedBy !== "any" && l.keyedBy !== keyedBy) throw new BranchStoreUsageError(`directory ${id} is keyed by ${l.keyedBy}, not ${keyedBy}`);
+    return l;
+  }
   for (const inst of instanceRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       if (d.id !== id) continue;
@@ -958,9 +1090,15 @@ export function gitBlobId(bytes: Buffer): string {
 export interface MountMarker {
   $schema: typeof MOUNT_MARKER_SCHEMA;
   id: string;
+  /** The file this marker is kept in, when it is not `<id>.json` — see {@link TipLocation.key}. */
+  key?: string;
   branch: string;
-  /** The directory's path on the branch (= its declared, repository-relative path). */
+  /** The declared, repository-relative path of the directory in this checkout. */
   path: string;
+  /** The directory's path ON THE BRANCH, when it differs from `path` (see {@link TipLocation.branchPath}). */
+  branchPath?: string;
+  /** The repository the branch was read from, when it is not this checkout's `origin` (see {@link TipLocation.repository}). */
+  repository?: string;
   /** The absolute local mount. */
   into: string;
   /**
@@ -1004,21 +1142,78 @@ function worktreeGitDir(repoRoot: string): string {
   return c.stdout.trim();
 }
 
-/** Where `id`'s mount marker lives: `<this worktree's git-dir>/branch-mounts/<id>.json`. */
-export function markerPath(repoRoot: string, id: string): string {
-  if (!/^[A-Za-z0-9._-]+$/.test(id)) throw new BranchStoreUsageError(`not a directory id: ${id}`);
-  return join(worktreeGitDir(repoRoot), "branch-mounts", `${id}.json`);
+/**
+ * Where the marker filed under `key` lives: `<this worktree's git-dir>/branch-mounts/<key>.json`.
+ * The key is a directory id, or `<instance>.<id>` for an id several instances
+ * declare ({@link TipLocation.key}).
+ */
+export function markerPath(repoRoot: string, key: string): string {
+  if (!/^[A-Za-z0-9._-]+$/.test(key)) throw new BranchStoreUsageError(`not a directory id: ${key}`);
+  return join(worktreeGitDir(repoRoot), "branch-mounts", `${key}.json`);
 }
 
-export function readMarker(repoRoot: string, id: string): MountMarker | undefined {
-  const p = markerPath(repoRoot, id);
-  if (!existsSync(p)) return undefined;
+function readMarkerFile(p: string): MountMarker {
   const m = JSON.parse(readFileSync(p, "utf-8")) as MountMarker;
   if (m.$schema !== MOUNT_MARKER_SCHEMA) throw new BranchStoreUsageError(`${p} is not a ${MOUNT_MARKER_SCHEMA} marker`);
   return m;
 }
 
-/** The ids mounted in THIS worktree, one marker each — what `state:push` sends, declared or not. */
+/**
+ * The marker filed under `key` — a directory id, or a location key. When no
+ * file has that name and `key` is a bare id, the one marker whose `id` it is
+ * answers (a graph whose id is shared is filed under `<instance>.<id>`, and a
+ * caller holding only the id still finds it while it is the only one mounted).
+ * Several is ambiguous and refused, never resolved by picking one.
+ */
+export function readMarker(repoRoot: string, key: string): MountMarker | undefined {
+  const p = markerPath(repoRoot, key);
+  if (existsSync(p)) return readMarkerFile(p);
+  const same = allMarkers(repoRoot).filter(({ marker }) => marker.id === key);
+  if (same.length > 1) {
+    throw new BranchStoreUsageError(`${same.length} mounts have id ${key} (${same.map(({ file }) => file).join(", ")}); name one by its key`);
+  }
+  return same[0]?.marker;
+}
+
+/** Every readable marker in this worktree, with the key it is filed under. Unreadable ones are skipped. */
+function allMarkers(repoRoot: string): Array<{ file: string; marker: MountMarker }> {
+  const dir = dirname(markerPath(repoRoot, "x"));
+  if (!existsSync(dir)) return [];
+  const out: Array<{ file: string; marker: MountMarker }> = [];
+  for (const n of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    try {
+      out.push({ file: n.slice(0, -".json".length), marker: readMarkerFile(join(dir, n)) });
+    } catch {
+      // Not ours to judge here: `readMarker` by its name reports it.
+    }
+  }
+  return out;
+}
+
+/**
+ * The marker of one LOCATION: the file its key names, else a marker for the
+ * same declared path under any other name.
+ *
+ * The second half is what keeps a marker written before {@link TipLocation.key}
+ * existed from stranding its edits: in an index, cat-harness's `health` was
+ * mounted as `health.json`, and the location is now keyed
+ * `cat-harness.health`. Matching on the PATH, never on the id, is what keeps
+ * who-iris's `health` from adopting cat-harness's marker.
+ */
+export function markerFor(repoRoot: string, loc: Pick<TipLocation, "id" | "key" | "path">): MountMarker | undefined {
+  const key = locationKey(loc);
+  const p = markerPath(repoRoot, key);
+  if (existsSync(p)) return readMarkerFile(p);
+  return markerAtPath(repoRoot, loc.path);
+}
+
+/** The marker of whatever is mounted for the declared, repository-relative `path`, under any key. */
+export function markerAtPath(repoRoot: string, path: string): MountMarker | undefined {
+  const want = path.replace(/^\/+|\/+$/g, "");
+  return allMarkers(repoRoot).find(({ marker }) => marker.path === want)?.marker;
+}
+
+/** The keys mounted in THIS worktree, one marker each — what `state:push` sends, declared or not. */
 export function mountedIds(repoRoot: string = gitTopLevel()): string[] {
   const dir = dirname(markerPath(repoRoot, "x"));
   if (!existsSync(dir)) return [];
@@ -1026,9 +1221,36 @@ export function mountedIds(repoRoot: string = gitTopLevel()): string[] {
 }
 
 function writeMarker(repoRoot: string, m: MountMarker): void {
-  const p = markerPath(repoRoot, m.id);
+  const p = markerPath(repoRoot, m.key ?? m.id);
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+}
+
+/**
+ * The options that open the store a location is kept in. A location kept in
+ * ANOTHER repository ({@link TipLocation.repository}) is fetched from that
+ * repository — unless the caller named a remote outright (`remote`, or
+ * `BRANCH_STORE_REMOTE`), which still means "this remote, for everything".
+ * Its objects go in a bare store of their own, so two repositories' branches
+ * of the same name never share one private store's `origin`.
+ */
+export function storeOptionsFor(
+  loc: { repository?: string },
+  repoRoot: string,
+  base: BranchStoreOptions = {},
+): BranchStoreOptions {
+  // input-site: store #d45e3da7 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
+  if (!loc.repository || base.remote || process.env.BRANCH_STORE_REMOTE) return base;
+  const remote = (base.urlFor ?? githubUrlFor)(loc.repository);
+  // input-site: store #60dfed75 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
+  let storeDir = base.storeDir ?? process.env.BRANCH_STORE_DIR;
+  if (!storeDir) {
+    // input-site: store #f48bd6b7 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
+    const c = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: repoRoot, encoding: "utf-8" });
+    if (c.status !== 0) throw new BranchStoreUsageError(`cannot find the git directory of ${repoRoot}`);
+    storeDir = join(c.stdout.trim(), "branch-store", `${loc.repository.replace(/[^A-Za-z0-9._-]+/g, "__")}.git`);
+  }
+  return { ...base, remote, storeDir };
 }
 
 /**
@@ -1056,6 +1278,7 @@ function localEntry(abs: string): { bytes: Buffer; mode: "100644" | "100755" | "
 
 /** The local edits since the mount: what a push would send. */
 function localChanges(m: MountMarker, repoRoot: string): Change[] {
+  const onBranch = m.branchPath ?? m.path;
   const local = new Set(walkFiles(m.into));
   const changes: Change[] = [];
   const fresh = [...local].filter((r) => !m.files[r]);
@@ -1065,10 +1288,10 @@ function localChanges(m: MountMarker, repoRoot: string): Change[] {
     const { bytes, mode } = localEntry(join(m.into, rel));
     const prev = m.files[rel];
     if (prev && prev.blob === gitBlobId(bytes) && prev.mode === mode) continue;
-    changes.push({ path: `${m.path}/${rel}`, content: bytes, expect: prev ? prev.blob : null, mode });
+    changes.push({ path: `${onBranch}/${rel}`, content: bytes, expect: prev ? prev.blob : null, mode });
   }
   for (const [rel, prev] of Object.entries(m.files)) {
-    if (!local.has(rel)) changes.push({ path: `${m.path}/${rel}`, content: null, expect: prev.blob });
+    if (!local.has(rel)) changes.push({ path: `${onBranch}/${rel}`, content: null, expect: prev.blob });
   }
   return changes;
 }
@@ -1117,8 +1340,8 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
       return { state: "refused", reason: `${relInto} is still tracked on this checkout's branch, so ${loc.id} has not been cut over to ${loc.branch}; mount it elsewhere with --into` };
     }
   }
-  const store = BranchStore.open(loc.branch, { repoRoot, ...opts.store });
-  const prior = readMarker(repoRoot, loc.id);
+  const store = BranchStore.open(loc.branch, { repoRoot, ...storeOptionsFor(loc, repoRoot, opts.store) });
+  const prior = markerFor(repoRoot, loc);
   if (prior) {
     const pending = localChanges(prior, repoRoot);
     if (pending.length) return { state: "refused", reason: `${prior.into} has ${pending.length} unpushed change(s); push or discard them before re-mounting` };
@@ -1132,14 +1355,15 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
     const competing = present.filter((rel) => !ignored.has(rel));
     if (competing.length) return { state: "refused", reason: `${into} holds ${competing.length} file(s) and is not a mount of ${loc.id}` };
   }
-  const r = store.readTreeEntries(loc.path);
+  const onBranch = branchPathOf(loc);
+  const r = store.readTreeEntries(onBranch);
   if (r.state !== "hit") return r;
   if (prior) for (const rel of Object.keys(prior.files)) rmSync(join(prior.into, rel), { force: true });
   const unsupported = [...r.files].filter(([, f]) => !["100644", "100755", "120000"].includes(f.mode));
   if (unsupported.length) return { state: "corrupt", reason: `${unsupported[0]![0]} has mode ${unsupported[0]![1].mode}, which a mount cannot hold` };
   const files: MountMarker["files"] = {};
   for (const [p, f] of r.files) {
-    const rel = p.slice(loc.path.length + 1);
+    const rel = p.slice(onBranch.length + 1);
     const abs = join(into, rel);
     mkdirSync(dirname(abs), { recursive: true });
     if (f.mode === "120000") {
@@ -1150,7 +1374,25 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
     }
     files[rel] = { blob: f.blob, mode: f.mode };
   }
-  writeMarker(repoRoot, { $schema: MOUNT_MARKER_SCHEMA, id: loc.id, branch: r.branch, path: loc.path, into, tip: r.tip, files });
+  const key = locationKey(loc);
+  writeMarker(repoRoot, {
+    $schema: MOUNT_MARKER_SCHEMA,
+    id: loc.id,
+    ...(key !== loc.id ? { key } : {}),
+    branch: r.branch,
+    path: loc.path,
+    ...(onBranch !== loc.path ? { branchPath: onBranch } : {}),
+    // Recorded only when the store was really opened on it (no remote override), so a push goes back where the read came from.
+    // input-site: store #db8f72f8 — records which remote the branch-store read used; the read itself goes through TreeStore.git(), which is traced
+    ...(loc.repository && !opts.store?.remote && !process.env.BRANCH_STORE_REMOTE ? { repository: loc.repository } : {}),
+    into,
+    tip: r.tip,
+    files,
+  });
+  // A marker read under another name (written before the location was keyed)
+  // is replaced by the one just written, never left beside it: two markers for
+  // one mount would push its edits twice.
+  if (prior && (prior.key ?? prior.id) !== key) rmSync(markerPath(repoRoot, prior.key ?? prior.id), { force: true });
   return { state: "mounted", into, tip: r.tip, branch: r.branch, files: r.files.size };
 }
 
@@ -1163,9 +1405,9 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
  * the diff from the marker, and a second implementation of "what changed"
  * is how a dry run comes to disagree with the push it is previewing.
  */
-export function pendingMountChanges(id: string, opts: MountOptions = {}): Change[] | undefined {
+export function pendingMountChanges(id: string | TipLocation, opts: MountOptions = {}): Change[] | undefined {
   const repoRoot = opts.repoRoot ?? gitTopLevel();
-  const m = readMarker(repoRoot, id);
+  const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
   return m ? localChanges(m, repoRoot) : undefined;
 }
 
@@ -1189,7 +1431,9 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
       const dir = d.absPath.replace(/[/\\]+$/, "");
       const at = keptAt(inst, repoRoot, d);
       if (!at) return { state: "present", dir, via: "checkout" };
-      const m = readMarker(repoRoot, id);
+      // By PATH first: an id several instances declare is filed under
+      // `<instance>.<id>`, and only the path says which of them this is.
+      const m = markerAtPath(repoRoot, repoRelative(repoRoot, d.absPath)) ?? readMarker(repoRoot, id);
       if (m) return { state: "present", dir: m.into, via: "mount" };
       return {
         state: "not-mounted",
@@ -1220,17 +1464,21 @@ export function exitUnlessMounted(id: string, tool: string, repoRoot: string = g
  * `conflict` and nothing is pushed. On `pushed`, the marker moves to the new
  * tip, so the next push compares against what landed.
  */
-export function pushMount(id: string, message: string, opts: MountOptions = {}): PushResult {
+export function pushMount(id: string | TipLocation, message: string, opts: MountOptions = {}): PushResult {
   const repoRoot = opts.repoRoot ?? gitTopLevel();
-  const m = readMarker(repoRoot, id);
-  if (!m) return { state: "refused", reason: `${id} is not mounted in ${repoRoot}` };
-  const store = BranchStore.open(m.branch, { repoRoot, ...opts.store });
+  const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
+  const name = typeof id === "string" ? id : locationKey(id);
+  if (!m) return { state: "refused", reason: `${name} is not mounted in ${repoRoot}` };
+  // The MARKER says where the mount came from, not the declaration: a mount
+  // pushes back to the repository it was read from.
+  const store = BranchStore.open(m.branch, { repoRoot, ...storeOptionsFor(m, repoRoot, opts.store) });
   const changes = localChanges(m, repoRoot);
   if (!changes.length) return { state: "unchanged", reason: `no local edits under ${m.into}`, branch: m.branch, attempts: 0 };
   const w = store.write(changes, message);
   if (w.state === "pushed" && w.commit) {
+    const onBranch = m.branchPath ?? m.path;
     for (const c of changes) {
-      const rel = c.path.slice(m.path.length + 1);
+      const rel = c.path.slice(onBranch.length + 1);
       if (c.content === null) delete m.files[rel];
       else m.files[rel] = { blob: gitBlobId(Buffer.from(c.content)), mode: c.mode ?? "100644" };
     }

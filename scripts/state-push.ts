@@ -57,6 +57,8 @@
 import { isAbsolute, relative, resolve } from "node:path";
 
 import {
+  locationKey,
+  markerFor,
   mountedIds,
   pendingMountChanges,
   pushMount,
@@ -75,7 +77,7 @@ export interface PushOptions {
   message?: string;
   /** Report what would be sent and send nothing. */
   dryRun?: boolean;
-  /** Push only this graph id. */
+  /** Push only the graphs with this id — every one of them — or the one with this key (`who-iris.health`). */
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;
@@ -166,25 +168,26 @@ export function retagBeansBeforePush(root: string, locations: readonly TipLocati
 function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): PushResult {
   const graphs: GraphPush[] = [];
   for (const loc of locations) {
-    const base = { id: loc.id, branch: loc.branch, path: loc.path };
+    const key = locationKey(loc);
+    const base = { id: key, branch: loc.repository ? `${loc.repository}:${loc.branch}` : loc.branch, path: loc.path };
     try {
       if (opts.dryRun) {
-        const changes = pendingMountChanges(loc.id, { repoRoot: root });
+        const changes = pendingMountChanges(loc, { repoRoot: root });
         if (changes === undefined) {
-          graphs.push({ ...base, state: "refused", reason: `${loc.id} is not mounted; run \`bun run cat state:mount\` first` });
+          graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
         } else {
           graphs.push({ ...base, state: "would-push", reason: `${changes.length} path(s) would be spliced onto the tip`, changes });
         }
         continue;
       }
-      const changes = pendingMountChanges(loc.id, { repoRoot: root });
+      const changes = pendingMountChanges(loc, { repoRoot: root });
       const message = opts.message ?? `state: ${loc.id} from its mount`;
-      const w = pushMount(loc.id, message, { repoRoot: root, store: opts.store });
+      const w = pushMount(loc, message, { repoRoot: root, store: opts.store });
       if (w.state === "refused") graphs.push({ ...base, state: "refused", reason: w.reason });
       else graphs.push({ ...base, state: w.state, reason: w.reason, write: w, changes });
     } catch (e) {
       // A throw for ONE graph must not take the others' pushes with it.
-      graphs.push({ ...base, state: "failed", reason: `pushing ${loc.id} threw: ${(e as Error).message}` });
+      graphs.push({ ...base, state: "failed", reason: `pushing ${key} threw: ${(e as Error).message}` });
     }
   }
 
@@ -224,23 +227,42 @@ export function pushState(opts: PushOptions = {}): PushResult {
   } catch (e) {
     return { state: "failed", reason: `could not read the directory declarations: ${(e as Error).message}`, graphs: [] };
   }
-  // A mount whose declaration has gone still pushes, to the branch its marker recorded.
-  for (const id of mountedIds(root)) {
-    if (locations.some((l) => l.id === id)) continue;
-    const m = readMarker(root, id);
-    if (m) locations.push({ id, path: m.path, branch: m.branch, keyedBy: "tip" });
+  // A mount whose declaration has gone still pushes, to the branch (and the
+  // repository) its marker recorded. A marker filed under a location's key, or
+  // one for a location's path under an older name, belongs to that location.
+  for (const k of mountedIds(root)) {
+    if (locations.some((l) => locationKey(l) === k)) continue;
+    const m = readMarker(root, k);
+    if (!m || locations.some((l) => l.path === m.path)) continue;
+    locations.push({
+      id: m.id,
+      ...(k !== m.id ? { key: k } : {}),
+      path: m.path,
+      branch: m.branch,
+      keyedBy: "tip",
+      ...(m.repository ? { repository: m.repository } : {}),
+      ...(m.branchPath ? { branchPath: m.branchPath } : {}),
+    });
   }
-  if (opts.id !== undefined) locations = locations.filter((l) => l.id === opts.id);
+  if (opts.id !== undefined) locations = locations.filter((l) => l.id === opts.id || l.key === opts.id);
   if (locations.length === 0) {
     const what = opts.id === undefined ? "no graph is declared at a branch tip or mounted here" : `\`${opts.id}\` is neither declared at a branch tip nor mounted here`;
     return { state: "no-mount", reason: `${what}; run \`bun run cat state:mount\` first`, graphs: [] };
   }
   // Only a mounted graph has files to retag; an unmounted one is refused by
   // the fan-out below with its own remedy.
-  const mounted = new Set(mountedIds(root));
-  const retag = opts.dryRun || opts.retag === false ? undefined : retagBeansBeforePush(root, locations.filter((l) => mounted.has(l.id)));
+  const retag = opts.dryRun || opts.retag === false ? undefined : retagBeansBeforePush(root, locations.filter((l) => isMounted(root, l)));
   const result = pushFanOut(root, locations, opts);
   return retag ? { ...result, retag } : result;
+}
+
+/** Whether `loc` has a mount here; a marker that cannot be read is not one (the fan-out reports it). */
+function isMounted(root: string, loc: TipLocation): boolean {
+  try {
+    return markerFor(root, loc) !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 /** One row per graph, so a reader sees WHICH branch a splice landed on. */
