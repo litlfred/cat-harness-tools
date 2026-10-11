@@ -85,7 +85,7 @@
  * `--check` (or `--strict`) with one · 2 could not determine, which includes
  * a declaration that will not load.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
@@ -93,6 +93,9 @@ import {
   readDeclaration,
   siteDirFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { THEME_KINDS, type ThemeKind } from "@litlfred/cat-harness/schemas/theme.js";
+import { instanceThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
+import { instanceThemesDataPath } from "./gen-themes-css.js";
 import { KIND_TILE_ICONS } from "./graph-tiles.js";
 
 /**
@@ -207,6 +210,136 @@ interface Finding {
   readonly blocking: boolean;
   readonly subject: string;
   readonly detail: string;
+}
+
+/**
+ * What one themed instance declares, by kind — or why it could not be read.
+ *
+ * `unreadable` is the third state rather than an empty list: an instance whose
+ * `themes.ts` will not load has not been shown to declare nothing, and judging
+ * it as themeless would clear exactly the instance that may be falling back.
+ */
+export type DeclaredThemes =
+  | { readonly instance: string; readonly themes: readonly { readonly kind: ThemeKind; readonly id: string }[] }
+  | { readonly instance: string; readonly unreadable: string };
+
+/**
+ * What the platform's surfaces actually SELECT per instance, read off the
+ * artefacts they render from.
+ *
+ * Only `webpage` has an instance-scoped consumer today: `head_custom.html`
+ * matches `page.url` against `_data/instance-themes.json` (bean `7h3u`).
+ * `webpageData` is `undefined` when that file could not be read, which is a
+ * could-not-determine, not an empty map.
+ */
+export interface ThemeWiring {
+  readonly webpageData: ReadonlyMap<string, string> | undefined;
+  readonly headConsumesData: boolean;
+}
+
+/** One instance × kind the comparison could not judge. */
+export interface ThemeUnknown {
+  readonly subject: string;
+  readonly reason: string;
+}
+
+/**
+ * Kind for kind — the owner's ruling on `pnn5` (option 1): *a surface of kind K
+ * on an instance's pages uses that instance's K-kind theme when it declares
+ * one, and falls back to the default only for kinds it doesn't declare.*
+ *
+ * So the domain is (instance, declared kind), and for each pair the question
+ * is whether the surface of that kind selects the instance's theme:
+ *
+ * - **`webpage`** has a consumer, so a miss is a defect in wiring that exists —
+ *   the data entry is absent, names another theme, or `head_custom.html` no
+ *   longer reads it. BLOCKING (`theme-fallback`).
+ * - **A kind with no instance-scoped consumer** (`sticky`, `publication` today)
+ *   falls back on every instance's pages by construction: `themes.css` emits
+ *   an instance's sticky theme by id, but an unselected board takes the
+ *   platform default under `.fa-sticky-board:not([data-fa-sticky-theme])`.
+ *   That is the ruling's violation, and it is REPORTED for each instance
+ *   declaring the kind — advisory (`theme-kind-unconsumed`), because the
+ *   repair is a platform surface to build, not a declaration to correct, and
+ *   no instance can clear it by editing its own files.
+ *
+ * Kinds an instance does not declare are not judged: falling back there is
+ * what the ruling permits.
+ */
+export function judgeThemeKinds(
+  declared: readonly DeclaredThemes[],
+  wiring: ThemeWiring,
+): { findings: Finding[]; unknowns: ThemeUnknown[]; pairs: number } {
+  const findings: Finding[] = [];
+  const unknowns: ThemeUnknown[] = [];
+  let pairs = 0;
+  for (const d of declared) {
+    if ("unreadable" in d) {
+      unknowns.push({ subject: d.instance, reason: `its themes module would not load: ${d.unreadable}` });
+      continue;
+    }
+    for (const kind of THEME_KINDS) {
+      const own = d.themes.filter((t) => t.kind === kind);
+      if (own.length === 0) continue;
+      pairs++;
+      const subject = `${d.instance} · ${kind}`;
+      const ids = own.map((t) => `"${t.id}"`).join(", ");
+      if (kind !== "webpage") {
+        findings.push({
+          family: "theme-kind-unconsumed",
+          blocking: false,
+          subject,
+          detail:
+            `declares ${kind} theme ${ids}, and no ${kind} surface selects a theme by instance, ` +
+            `so this instance's ${kind} surfaces wear the platform default`,
+        });
+        continue;
+      }
+      if (wiring.webpageData === undefined) {
+        unknowns.push({ subject, reason: "the instance webpage-theme data could not be read" });
+        continue;
+      }
+      const selected = wiring.webpageData.get(d.instance);
+      if (!wiring.headConsumesData) {
+        findings.push({
+          family: "theme-fallback",
+          blocking: true,
+          subject,
+          detail: `declares webpage theme ${ids}, but head_custom.html no longer reads site.data.instance-themes, so every page wears the default`,
+        });
+      } else if (selected === undefined) {
+        findings.push({
+          family: "theme-fallback",
+          blocking: true,
+          subject,
+          detail: `declares webpage theme ${ids}, and the generated instance-themes data has no entry for it — its pages wear the default (bun run cat themes:css)`,
+        });
+      } else if (!own.some((t) => t.id === selected)) {
+        findings.push({
+          family: "theme-fallback",
+          blocking: true,
+          subject,
+          detail: `declares webpage theme ${ids}, but its pages are dressed in "${selected}" — the generated data is stale (bun run cat themes:css)`,
+        });
+      }
+    }
+  }
+  return { findings, unknowns, pairs };
+}
+
+/** `instance → themeId` from the generated data, or `undefined` when it cannot be read. */
+function readWebpageData(path: string): ReadonlyMap<string, string> | undefined {
+  try {
+    const doc = JSON.parse(readFileSync(path, "utf8")) as { instances?: { instance?: unknown; themeId?: unknown }[] };
+    if (!Array.isArray(doc.instances)) return undefined;
+    return new Map(
+      doc.instances.flatMap((e) =>
+        typeof e.instance === "string" && typeof e.themeId === "string" ? [[e.instance, e.themeId] as const] : [],
+      ),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 function main(): number {
@@ -415,19 +548,31 @@ function main(): number {
   const themed = art.filter((a) => a.themeDirs.length > 0);
   console.log(`  declaring a themes graph    ${themed.length} of ${art.length}` +
     (themed.length > 0 ? `  (${themed.map((a) => a.instance).join(", ")})` : ""));
-  if (themed.length <= 1) {
-    console.log("  NOTE: `v8n5`'s Done-when #2 — a surface must not fall back to the");
-    console.log("        platform default for an instance that declares its own theme —");
-    console.log("        is read over this set. At a set size of 1 there is nothing to");
-    console.log("        COMPARE, so this reports the denominator and issues no verdict.");
-    console.log("        The set is iterated rather than hardcoded, so instance #2 is");
-    console.log("        covered the day it declares one.");
-  }
-  // And deliberately NO assertion about which theme may style a given surface.
-  // PR #1584 left exactly that open for the owner: the board styles a card only
-  // from `sticky`-kind themes, and who-iris owns a `webpage` and a
-  // `publication` theme and no `sticky` one. Picking one here would answer a
-  // question the owner held, which is not a check's to answer.
+  // KIND FOR KIND (`pnn5`, owner's option 1) — `v8n5`'s Done-when #2, now a
+  // comparison rather than a denominator. Each themed instance's themes are read
+  // the way every generator reads them (`instanceThemes`), and each declared
+  // kind is held to what its surface actually selects.
+  const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
+  const siteRoot = join(instanceRoot, siteDirFor(instanceRoot));
+  const headFile = join(siteRoot, "_includes", "head_custom.html");
+  const wiring: ThemeWiring = {
+    webpageData: readWebpageData(join(instanceRoot, instanceThemesDataPath(instanceRoot))),
+    headConsumesData: existsSync(headFile) && readFileSync(headFile, "utf8").includes("site.data.instance-themes"),
+  };
+  const declared: DeclaredThemes[] = themed.map((a) => {
+    try {
+      const found = instanceThemes(repoRoot, a.instance);
+      return found.ok
+        ? { instance: a.instance, themes: found.themes.map((t) => ({ kind: t.kind, id: t.id })) }
+        : { instance: a.instance, unreadable: found.miss.kind };
+    } catch (e) {
+      return { instance: a.instance, unreadable: e instanceof Error ? e.message.split("\n")[0]! : String(e) };
+    }
+  });
+  const kinds = judgeThemeKinds(declared, wiring);
+  findings.push(...kinds.findings);
+  console.log(`  kind for kind               ${kinds.pairs} (instance, kind) pair(s) judged, ${kinds.unknowns.length} could not be`);
+  for (const u of kinds.unknowns) console.log(`  ❔ ${u.subject}: ${u.reason}`);
   console.log();
 
   const blocking = findings.filter((f) => f.blocking);
@@ -441,7 +586,9 @@ function main(): number {
   }
   if (findings.length > 0) console.log();
 
-  if (blocking.length === 0 && advisory.length === 0) {
+  if (blocking.length === 0 && advisory.length === 0 && kinds.unknowns.length > 0) {
+    console.log("no finding over what could be read — but see ❔ above: that is not a clean result.");
+  } else if (blocking.length === 0 && advisory.length === 0) {
     console.log("✓ no finding — every declared icon resolves and the registries agree.");
   } else {
     console.log(
@@ -450,8 +597,17 @@ function main(): number {
     );
   }
 
+  // A DEFECT FOUND is 1 even when a theme comparison was blind: what was
+  // established stays established, and the planted-defect tests above rely on
+  // a finding reading as a finding. Blind with nothing failing is 2, never 0 —
+  // a comparison that could not read an instance has not cleared it.
   const fail = blocking.length > 0 || (strict && advisory.length > 0);
-  return (check || strict) && fail ? 1 : 0;
+  if ((check || strict) && fail) return 1;
+  if ((check || strict) && kinds.unknowns.length > 0) {
+    console.log(`${kinds.unknowns.length} theme comparison(s) could not be made — not a clean result.`);
+    return 2;
+  }
+  return 0;
 }
 
 // GUARDED so the module can be imported. Without this, a test importing an
