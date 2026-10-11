@@ -97,6 +97,9 @@ describe("review page", () => {
     expect(html).toContain("badgesOf, jumpSection, ROOT)");
     expect(html).toContain("window.location.href = ROOT + page");
     expect(html).toContain('allDocs.href = ROOT + "index.html"');
+    // Before the script runs (and for a link check), the page's one writer puts it under a locale.
+    expect(html).toContain('<a id="all-documents" href="../../index.html">');
+    expect(reviewPageHtml("../")).toContain('<a id="all-documents" href="../index.html">');
     // A document's page is the outline's, under the locale; <doc>/index.html only without one.
     expect(html).toContain("function docPage(doc)");
     expect(html).toContain("base + docPage(doc)");
