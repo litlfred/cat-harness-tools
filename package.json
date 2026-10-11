@@ -122,6 +122,7 @@
     "check:bean-archive": "bun run cat-harness-tools/scripts/check-bean-archive.ts",
     "check:bean-restates-skill": "bun run cat-harness-tools/scripts/check-bean-restates-skill.ts",
     "check:ci-health": "bun run cat-harness-tools/scripts/check-ci-health.ts",
+    "secrets:check": "bun run cat-harness-tools/scripts/secrets-check.ts",
     "seed:ready": "bun run cat-harness-tools/scripts/seed-ready.ts",
     "sub-kg:verify-clone": "bun run cat-harness-tools/scripts/verify-clone.ts",
     "check:published-packages": "bun run cat-harness-tools/scripts/check-published-packages.ts",
