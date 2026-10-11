@@ -647,6 +647,10 @@ export function buildContext(): Record<string, unknown> {
     detection: { "@id": termIri("detection"), "@type": "@json" },
     meta: { "@id": termIri("meta"), "@type": "@json" },
     assignments: { "@id": termIri("assignments"), "@type": "@json" },
+    // An actor's `systemUnderTest` facet (`{ kind, version }`, role-graph.ts):
+    // which kind of system a test-plan actor exercises. Kept verbatim, like
+    // the values above, until the test-plan join is modelled as edges.
+    systemUnderTest: { "@id": termIri("systemUnderTest"), "@type": "@json" },
     // A Tool's environment requirements -- `{ runtime: ["go"], network: true }`.
     // NOT `requiresCapability`: `go` is not a capability id (0 of 1 runtime
     // names match a Capability node), so these are two relations wearing one
