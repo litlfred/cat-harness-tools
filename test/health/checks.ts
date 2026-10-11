@@ -47,6 +47,7 @@ import type {
   HealthFinding,
   HealthMeasurement,
   HealthThreshold,
+  PagesServingObservation,
 } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 
@@ -227,6 +228,18 @@ export interface HealthContext {
   todos: StoreProbe<TodoEvidence[]>;
   /** Every special branch the declaration names, with its budget and tip size. */
   specialBranches: Probe<SpecialBranchEvidence>;
+  /**
+   * The pages-serving observation a CI job with egress published on
+   * `qa-reports` (bean `1dre`), read offline through the qa-store.
+   */
+  pagesServing: Probe<PagesServingEvidence>;
+}
+
+/** The observation, and the qa-store entry it was read from. */
+export interface PagesServingEvidence {
+  /** `main/<sha>` — the entry, so a reader can fetch the same file. */
+  key: string;
+  observation: PagesServingObservation;
 }
 
 /** A special branch's size budget, as `branch-budgets.json` states it. */
@@ -1808,6 +1821,17 @@ const TODO_THRESHOLDS: HealthThreshold[] = [
  */
 export const PAGES_INSTRUMENTS_REQUIRED = 1;
 
+/**
+ * How old an observation may be and still count as one.
+ *
+ * Bean `1dre`: *"a recorded observation is a measurement with a date … an
+ * observation older than N is not an observation — same rule `check:ci-health`
+ * applies to a red that has not re-run in a week."* So N is that week. The
+ * writer runs daily in `health-check.yml`, so a week is six missed runs, not
+ * one late one.
+ */
+export const PAGES_OBSERVATION_HORIZON_DAYS = 7;
+
 export const PAGES_PUBLISH_THRESHOLDS: HealthThreshold[] = [
   {
     metric: "pages-serving-instruments",
@@ -1816,58 +1840,81 @@ export const PAGES_PUBLISH_THRESHOLDS: HealthThreshold[] = [
     severity: "major",
     basis:
       "ONE is the floor, not a calibration: a claim about the published site needs at least one way " +
-      "to look at it, and zero ways is the state bean `qj9a` measured. `major` rather than " +
-      "`critical` because nothing is being lost — GitHub's documented 1 GB Pages limit was exceeded " +
-      "continuously from 2026-09-23 (1.46 GB) to at least 2026-09-26 (2.67 GB served, measured off " +
-      "`origin/gh-pages`) with every deploy succeeding, so if the ceiling is enforced at all it is " +
-      "not enforced as a hard refusal on push. WHETHER IT IS ENFORCED REMAINS UNKNOWN and is exactly " +
-      "what an instrument would settle; until one exists, no check here may say a publish is about " +
-      "to fail. `critical` on this scale means something is about to be lost, and asserting that " +
-      "again without an instrument is the defect this check was split out to prevent.",
+      "to look at it. The instrument is the observation a CI job with egress publishes on " +
+      "`qa-reports` (bean `1dre`, owner's option 1); a missing or out-of-date one reads as " +
+      "`unknown`, never as zero and never as clean. `major` rather than `critical` because " +
+      "GitHub's documented 1 GB Pages limit was exceeded continuously from 2026-09-23 (1.46 GB) to at " +
+      "least 2026-09-26 (2.67 GB served) with every deploy succeeding, so if the ceiling is enforced at " +
+      "all it is not enforced as a hard refusal on push. WHETHER IT IS ENFORCED REMAINS UNKNOWN until " +
+      "the observations say so.",
+  },
+  {
+    metric: "pages-serving-observation-age-days",
+    value: PAGES_OBSERVATION_HORIZON_DAYS,
+    unit: "days",
+    severity: "major",
+    basis:
+      "past this an observation is not an observation (bean `1dre`, after `check:ci-health`'s week). " +
+      "Reported as `unknown` with the observation's date, not as a finding: an old reading has not " +
+      "established anything about the site today.",
+  },
+  {
+    metric: "pages-serving-failing",
+    value: 0,
+    unit: "count",
+    severity: "major",
+    basis:
+      "a published URL that did not serve its own page — a non-200 status, or Pages' own 404 document " +
+      "— is a page a reader cannot open. `major`, not `critical`: nothing is lost by it, and every " +
+      "remedy names a person (`deletion-requires-confirmation`).",
   },
 ];
 
-export function pagesPublishHealthCheck(_ctx: HealthContext): HealthCheckResult {
+export function pagesPublishHealthCheck(ctx: HealthContext): HealthCheckResult {
   const id = "pages-publish-health";
   const summary =
-    "Whether this repository can OBSERVE its own published site. It deliberately does not judge " +
-    "the site — see this module's note on why a check whose subject is unobservable would take " +
-    "the whole report to `unknown`, correctly and uselessly.";
+    "What the published site served, as the CI pages-serving observation recorded it — read offline " +
+    "from `qa-reports`, so the sweep never reaches the network itself.";
 
-  // Zero, and a LITERAL rather than a probe, deliberately. A probe that tries
-  // the network and fails would report `unknown` — the state this check exists
-  // to avoid — and would make a daily sweep depend on an egress policy it
-  // cannot influence. When an instrument lands it registers itself here, and
-  // the count becomes a fact about the repository rather than about one run's
-  // connectivity.
-  const instruments = 0;
+  // Owner, 2026-10-11 (bean `1dre`, option 1): missing or old is `unknown`,
+  // with its date. That supersedes this check's earlier "never unknown" rule,
+  // which held only while there was no instrument to be blind about.
+  if (ctx.pagesServing.state === "unknown") {
+    return unknownResult(id, summary, PAGES_PUBLISH_THRESHOLDS, `no pages-serving observation could be read: ${ctx.pagesServing.reason}`);
+  }
+  const { key, observation } = ctx.pagesServing.value;
+  const observed = new Date(observation.observedAt);
+  const age = (ctx.now.getTime() - observed.getTime()) / 86_400_000;
+  if (!(age <= PAGES_OBSERVATION_HORIZON_DAYS)) {
+    return unknownResult(
+      id,
+      summary,
+      PAGES_PUBLISH_THRESHOLDS,
+      `the pages-serving observation in qa-reports:${key} is dated ${observation.observedAt}, ` +
+        (Number.isNaN(age) ? "which is not a date" : `${Math.floor(age)} days old — past the ${PAGES_OBSERVATION_HORIZON_DAYS}-day horizon`) +
+        ", so it says nothing about the site today",
+    );
+  }
+  const failing = observation.urls.filter((u) => u.status !== 200 || !u.expectedPage);
+  const cmd = `qa:fetch ${key} health/pages-serving.json`;
   const measurements: HealthMeasurement[] = [
-    {
-      metric: "pages-serving-instruments",
-      value: instruments,
-      unit: "count",
-      command: "none registered — see PAGES_PUBLISH_THRESHOLDS",
-    },
+    { metric: "pages-serving-instruments", value: 1, unit: "count", command: cmd },
+    { metric: "pages-serving-observation-age-days", value: Math.floor(Math.max(0, age)), unit: "days", command: cmd },
+    { metric: "pages-serving-urls", value: observation.urls.length, unit: "count", command: cmd },
+    { metric: "pages-serving-failing", value: failing.length, unit: "count", command: cmd },
   ];
-  const findings: HealthFinding[] =
-    instruments >= PAGES_INSTRUMENTS_REQUIRED
-      ? []
-      : [
-          {
-            metric: "pages-serving-instruments",
-            severity: "major",
-            summary:
-              "Nothing in this repository can observe the published site, so no check may claim a " +
-              "publish is failing or about to fail.",
-            action:
-              "Build the probe, and build it in CI rather than here: every route from an agent's " +
-              "container is refused by egress policy, so it cannot be written or tested locally. It " +
-              "needs to fetch the published site and record HTTP status and served size, then " +
-              "register itself as the instrument this check counts. Until then, a person opening " +
-              "the site is the only observation available, and `staging-preview-size` reports the " +
-              "owner's budget without claiming anything about serving.",
-          },
-        ];
+  const findings: HealthFinding[] = failing.map((u) => ({
+    metric: "pages-serving-failing",
+    severity: "major",
+    summary: u.expectedPage
+      ? `${u.url} answered HTTP ${u.status} on ${observation.observedAt}.`
+      : `${u.url} served Pages' own 404 document (HTTP ${u.status}, ${u.bytes} bytes) on ${observation.observedAt}, not its page.`,
+    action:
+      "Open the URL and the publishing run" +
+      (observation.run ? ` (${observation.run})` : "") +
+      ", and decide whether the page should exist. Nothing here removes or republishes anything: " +
+      "a person decides, and a removal goes through `deletion-requires-confirmation`.",
+  }));
   return settle(id, summary, PAGES_PUBLISH_THRESHOLDS, measurements, findings);
 }
 
@@ -1946,8 +1993,8 @@ export const HEALTH_CHECKS: readonly {
   {
     id: "pages-publish-health",
     summary:
-      "Whether anything here can observe the published site. Split from `staging-preview-size` " +
-      "(bean `qj9a`) so a claim about publishing has to establish it can see first.",
+      "What the published site served, read offline from the CI pages-serving observation on " +
+      "`qa-reports` (bean `1dre`). Missing or older than a week is `unknown`, with its date.",
     run: pagesPublishHealthCheck,
   },
   {

@@ -23,12 +23,14 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
-import { HealthReportSchema, healthVerdict } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "@litlfred/cat-harness/schemas/health-report.ts";
+import type { QaTreeRead } from "../../scripts/qa-store.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import {
   BEAN_OPEN_LIMIT,
   BEAN_RESOLVED_INLINE_LIMIT,
   HEALTH_CHECKS,
+  PAGES_OBSERVATION_HORIZON_DAYS,
   pagesPublishHealthCheck,
   ORPHAN_THRESHOLDS,
   RECENT_COMMIT_MINUTES,
@@ -52,7 +54,7 @@ import {
   type SpecialBranchMeasure,
   type StagingPreview,
 } from "./checks.ts";
-import { hasRenderedDecision, membersFor, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
+import { hasRenderedDecision, membersFor, probePagesServing, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
 
 const MB = 1024 * 1024;
 
@@ -74,6 +76,18 @@ function healthyContext(over: Partial<HealthContext> = {}): HealthContext {
     },
     todos: { state: "ok", value: [{ id: "t1", status: "open", createdAt: "2026-09-18" }] },
     specialBranches: { state: "ok", value: { rows: [], command: "fixture" } },
+    pagesServing: {
+      state: "ok",
+      value: {
+        key: "main/0000000000000000000000000000000000000000",
+        observation: {
+          $schema: "pages-serving/v1",
+          observedAt: "2026-09-19T06:00:00Z",
+          site: "https://example.github.io/fixture/",
+          urls: [{ url: "https://example.github.io/fixture/", status: 200, bytes: 18000, expectedPage: true }],
+        },
+      },
+    },
     ...over,
   };
 }
@@ -1268,65 +1282,128 @@ describe("the registry and the report", () => {
   });
 });
 
-describe("pages-publish-health — the split, bean `qj9a`", () => {
-  it("reports a finding, because zero instruments is a determined answer", () => {
-    const r = pagesPublishHealthCheck(healthyContext({}));
+describe("pages-publish-health — reads the CI observation, bean `1dre`", () => {
+  const obs = (over: Partial<PagesServingObservation> = {}): HealthContext["pagesServing"] => ({
+    state: "ok",
+    value: {
+      key: "main/0000000000000000000000000000000000000000",
+      observation: {
+        $schema: "pages-serving/v1",
+        observedAt: "2026-09-19T06:00:00Z",
+        site: "https://example.github.io/fixture/",
+        urls: [{ url: "https://example.github.io/fixture/", status: 200, bytes: 18000, expectedPage: true }],
+        ...over,
+      },
+    },
+  });
+
+  it("a fresh observation of served pages is `ok`, and counts as the one instrument", () => {
+    const r = pagesPublishHealthCheck(healthyContext({ pagesServing: obs() }));
+    expect(r.state).toBe("ok");
+    expect(r.measurements.find((m) => m.metric === "pages-serving-instruments")?.value).toBe(1);
+    expect(r.measurements.find((m) => m.metric === "pages-serving-urls")?.value).toBe(1);
+  });
+
+  it("MISSING is `unknown`, with the store's reason — never zero, never clean (owner's option 1)", () => {
+    const r = pagesPublishHealthCheck(
+      healthyContext({ pagesServing: { state: "unknown", reason: "qa-reports:main/abc — miss: nothing under health" } }),
+    );
+    expect(r.state).toBe("unknown");
+    expect(r.reason).toContain("miss: nothing under health");
+  });
+
+  it("OLD is `unknown`, and says its date — an observation past the horizon is not one", () => {
+    const r = pagesPublishHealthCheck(healthyContext({ pagesServing: obs({ observedAt: "2026-09-01T06:00:00Z" }) }));
+    expect(r.state).toBe("unknown");
+    expect(r.reason).toContain("2026-09-01T06:00:00Z");
+    expect(r.reason).toContain(`${PAGES_OBSERVATION_HORIZON_DAYS}-day horizon`);
+  });
+
+  it("the horizon is inclusive: exactly a week old still counts", () => {
+    const r = pagesPublishHealthCheck(healthyContext({ pagesServing: obs({ observedAt: "2026-09-12T12:00:00Z" }) }));
+    expect(r.state).toBe("ok");
+  });
+
+  it("FALSIFICATION: Pages' own 404 is a finding even when the status were 200", () => {
+    const r = pagesPublishHealthCheck(
+      healthyContext({
+        pagesServing: obs({
+          urls: [
+            { url: "https://example.github.io/fixture/", status: 200, bytes: 18000, expectedPage: true },
+            { url: "https://example.github.io/fixture/STAGING/x/", status: 200, bytes: 9000, expectedPage: false },
+          ],
+        }),
+      }),
+    );
     expect(r.state).toBe("finding");
     expect(r.findings).toHaveLength(1);
+    expect(r.findings[0].summary).toContain("Pages' own 404");
+    expect(r.measurements.find((m) => m.metric === "pages-serving-failing")?.value).toBe(1);
+  });
+
+  it("FALSIFICATION: a non-200 is a finding, and the action names a person, not a deletion", () => {
+    const r = pagesPublishHealthCheck(
+      healthyContext({ pagesServing: obs({ urls: [{ url: "https://example.github.io/fixture/", status: 503, bytes: 0, expectedPage: true }] }) }),
+    );
     expect(r.findings[0].severity).toBe("major");
-    expect(r.measurements.find((m) => m.metric === "pages-serving-instruments")?.value).toBe(0);
+    expect(r.findings[0].summary).toContain("HTTP 503");
+    expect(r.findings[0].action).toContain("deletion-requires-confirmation");
   });
 
-  it("NEVER reports `unknown` — a blind check here would break the whole family", () => {
-    // THE FALSIFIER, and it is the reason this check's subject is the instrument
-    // rather than the site. `healthVerdict` takes the ENTIRE report to `unknown`
-    // on a single `unknown` check, `run.ts` exits 2, and the tracking issue is
-    // left untouched — `health-check.yml`'s own comment calls that "correctly,
-    // and uselessly". A check that is permanently blind about its subject would
-    // make the daily sweep permanently useless.
-    //
-    // Asserted across a range of contexts, including ones where OTHER probes
-    // failed, because the tempting implementation reaches for the network and
-    // inherits its failures.
-    for (const ctx of [
-      healthyContext({}),
-      healthyContext({ staging: { state: "unknown", reason: "no branch" } }),
-      healthyContext({ openPrHeads: { state: "unknown", reason: "403" } }),
-    ]) {
-      expect(pagesPublishHealthCheck(ctx).state).not.toBe("unknown");
-    }
-  });
-
-  it("does not read `ok` while it cannot see — the dh4f defect this exists to prevent", () => {
-    // The other direction of the same rule. `ok` would mean "the published site
-    // is fine", which is precisely what nothing here can establish.
-    expect(pagesPublishHealthCheck(healthyContext({})).state).not.toBe("ok");
-  });
-
-  it("the action says to build the probe IN CI, not here", () => {
-    // Because it cannot be written or tested locally: every route from an
-    // agent's container is refused by egress policy. An action that read "write
-    // a probe" would send the next session into the same wall.
-    const a = pagesPublishHealthCheck(healthyContext({})).findings[0].action;
-    expect(a).toContain("in CI");
-    expect(a).toContain("egress");
-  });
-
-  it("its threshold refuses `critical`, and says why", () => {
-    // The severity ceiling is the whole point of the split. `critical` on this
-    // scale means something is about to be lost, and re-asserting that without
-    // an instrument is the defect that was live for two and a half days.
+  it("its thresholds refuse `critical`, and the basis still says enforcement is unknown", () => {
     const r = pagesPublishHealthCheck(healthyContext({}));
     expect(r.thresholds.some((t) => t.severity === "critical")).toBe(false);
-    const t = r.thresholds.find((m) => m.metric === "pages-serving-instruments");
-    expect(t?.severity).toBe("major");
-    expect(t?.basis).toContain("REMAINS UNKNOWN");
+    expect(r.thresholds.find((m) => m.metric === "pages-serving-instruments")?.basis).toContain("REMAINS UNKNOWN");
   });
 
   it("is registered, so it actually runs", () => {
-    // A check absent from the registry is a check that never fires — the
-    // `1xhc` shape, and the reason this is asserted rather than assumed.
     expect(HEALTH_CHECKS.map((c) => c.id)).toContain("pages-publish-health");
+  });
+});
+
+describe("probePagesServing — offline, through the qa-store reader", () => {
+  const HEAD = "a".repeat(40);
+  const body = JSON.stringify({
+    $schema: "pages-serving/v1",
+    observedAt: "2026-09-19T06:00:00Z",
+    site: "https://example.github.io/fixture/",
+    urls: [{ url: "https://example.github.io/fixture/", status: 200, bytes: 1, expectedPage: true }],
+  });
+  const hit = (files: Record<string, string>): QaTreeRead => ({
+    state: "hit",
+    key: `main/${HEAD}`,
+    tip: "t",
+    prefix: "health",
+    files: new Map(Object.entries(files)),
+  });
+
+  it("asks for THIS commit's entry under health/", () => {
+    let asked: string[] = [];
+    probePagesServing({ repoRoot: "/x", head: HEAD, read: (ref, prefix) => ((asked = [ref, prefix]), hit({})) });
+    expect(asked).toEqual([`main/${HEAD}`, "health"]);
+  });
+
+  it("reads a valid observation", () => {
+    const p = probePagesServing({ repoRoot: "/x", head: HEAD, read: () => hit({ "health/pages-serving.json": body }) });
+    expect(p.state).toBe("ok");
+  });
+
+  it("a store miss, an absent file, bad JSON and a wrong shape are each `unknown` with a reason", () => {
+    const cases: QaTreeRead[] = [
+      { state: "miss", reason: "nothing under health" },
+      hit({ "health/other.json": "{}" }),
+      hit({ "health/pages-serving.json": "{" }),
+      hit({ "health/pages-serving.json": JSON.stringify({ $schema: "pages-serving/v1" }) }),
+    ];
+    for (const c of cases) {
+      const p = probePagesServing({ repoRoot: "/x", head: HEAD, read: () => c });
+      expect(p.state).toBe("unknown");
+      if (p.state === "unknown") expect(p.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("an unreadable HEAD is `unknown`, not a guessed key", () => {
+    expect(probePagesServing({ repoRoot: "/x", head: "", read: () => hit({}) }).state).toBe("unknown");
   });
 });
 
