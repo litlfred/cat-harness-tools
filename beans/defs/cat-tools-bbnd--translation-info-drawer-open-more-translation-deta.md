@@ -55,3 +55,12 @@ Owner, 2026-10-10: *"i want to see in the translations warning somewhere the abi
 ## Owner decision
 (1) **Recommended:** a (sub)graph-scope drawer per harness instance, one per instance landing. (2) One per declared sub-graph directory. (3) Per locale only.
 **Default if no answer:** option 1.
+
+## Owner ruling 2026-10-11: one drawer per harness instance
+
+Chosen directly by the owner (lane C session): **option 1**. The
+(sub)graph-scope drawer sits on each harness instance's landing page and
+summarises everything that instance translates: per-locale coverage,
+officiality per catalogue, round-trip results, and a link to the
+translation-status page. Sub-graph pages show no drawer of their own. A
+per-sub-graph drawer (option 2) can be added later without undoing this.
