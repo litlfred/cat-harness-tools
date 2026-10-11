@@ -123,7 +123,9 @@ export function itemState(u: UploadItem): "waiting" | "ingested" {
  * restyle the theme. The two state hues are keyed on the site's own scheme
  * switch (`data-fa-scheme`, which `head_custom.html` always sets), dark
  * first because the site's ground is; everything else is neutral and
- * translucent, so it reads on either ground. `subjects` is the family's
+ * translucent, so it reads on either ground. Secondary text is secondary
+ * by SIZE, never by opacity: an opacity lowers its contrast, and axe failed
+ * the lead tag, the kind and the raw-capture rows on both grounds for it. `subjects` is the family's
  * subject pages, listed in the page because the theme's sidebar does not.
  */
 export function viewerHtml(dataHref: string, scope = "", subjects: readonly string[] = []): string {
@@ -136,30 +138,29 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
       --wait:#e3b341;--waitbg:rgba(210,153,34,.18);--ing:#56d364;--ingbg:rgba(63,185,80,.16)}
 :root[data-fa-scheme="light"] .up-page{--wait:#7d5300;--waitbg:#fff8c5;--ing:#116329;--ingbg:#dafbe1}
 .up-page h1{margin:0 0 .25rem}
-.up-page .sub{opacity:.9;margin:0 0 1.25rem}
+.up-page .sub{margin:0 0 1.25rem}
 .up-page .badges{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1.5rem}
 .up-page .badge{background:var(--card);border:1px solid var(--line);border-radius:.5rem;padding:.6rem .9rem;min-width:7rem}
 .up-page .badge b{display:block;font-size:1.6rem;line-height:1.1}
-.up-page .badge span{opacity:.9;font-size:.8rem}
+.up-page .badge span{font-size:.8rem}
 .up-page .badge.lead{border:2px solid var(--wait);background:var(--waitbg)}
 .up-page .badge.lead b{color:var(--wait)}
 .up-page .badge.lead .lead-tag{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:.08rem .35rem;border-radius:.25rem;border:1px solid var(--wait);background:var(--card);vertical-align:middle;margin-left:.4rem}
 .up-page table{display:table;border-collapse:collapse;width:100%;font-size:.9rem}
 .up-page th,.up-page td{text-align:left;padding:.45rem .6rem;border:0;border-bottom:1px solid var(--line);vertical-align:top;background:transparent}
-.up-page th{user-select:none;white-space:nowrap;opacity:.9;font-weight:600}
+.up-page th{user-select:none;white-space:nowrap;font-weight:600}
 .up-page th button{border:0;background:transparent;padding:0;font:inherit;font-weight:600;color:inherit;cursor:pointer;text-align:inherit;white-space:nowrap}
 .up-page th button:hover{text-decoration:underline;opacity:1}
 .up-page th button:focus-visible{outline:2px solid var(--wait);outline-offset:2px;border-radius:.2rem}
 .up-page td.num,.up-page th.num{text-align:right;font-variant-numeric:tabular-nums}
 .up-page td.size,.up-page th.size,.up-page .size{white-space:nowrap;min-width:6rem}
 .up-page tr.group-row th,.up-page tr.group-row td{background:var(--card);font-size:.82rem;font-weight:600;padding:.35rem .6rem;border-top:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left}
-.up-page .capture-tag{display:inline-block;font-size:.7rem;font-weight:600;padding:.05rem .35rem;border-radius:.25rem;background:var(--card);border:1px solid var(--line);color:inherit;opacity:.85;vertical-align:middle;margin-left:.35rem}
-.up-page .capture-name{opacity:.85;font-style:italic}
-.up-page tr.raw-capture td{opacity:.88}
+.up-page .capture-tag{display:inline-block;font-size:.7rem;font-weight:600;padding:.05rem .35rem;border-radius:.25rem;background:var(--card);border:1px solid var(--line);color:inherit;vertical-align:middle;margin-left:.35rem}
+.up-page .capture-name{font-style:italic}
 .up-page .pill{display:inline-block;border-radius:1rem;padding:.05rem .55rem;font-size:.78rem;font-weight:600}
 .up-page .pill.waiting{background:var(--waitbg);color:var(--wait)}
 .up-page .pill.ingested{background:var(--ingbg);color:var(--ing)}
-.up-page .kind{opacity:.9;font-size:.78rem}
+.up-page .kind{font-size:.78rem}
 .up-page .empty{background:var(--card);border:1px dashed var(--line);border-radius:.5rem;padding:1.5rem}
 .up-page .add{background:var(--card);border:1px solid var(--line);border-radius:.5rem;padding:.9rem 1.1rem;margin:1rem 0}
 .up-page .add h2{font-size:1rem;margin:0 0 .4rem}

@@ -289,7 +289,11 @@ describe("blockedRequiredAdvice", () => {
   test("it names the one change that fixes the class, and whose it is", () => {
     const s = blockedRequiredAdvice(["Code-quality gates"]);
     expect(s).toContain("#1829");
-    expect(s).toContain("MERGE_MAIN_TOKEN");
+    // The credential was renamed (bean `8mlt`, folio-assistant#2532): the
+    // harness App first, the named secret as the fallback, and never the old name.
+    expect(s).toContain("INSTALL THE HARNESS");
+    expect(s).toContain("PUSH_BRANCH_TRIGGERING_CI");
+    expect(s).not.toContain("MERGE_MAIN_TOKEN");
     expect(s).toContain("owner's to make");
   });
 

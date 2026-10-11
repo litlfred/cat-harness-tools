@@ -1,11 +1,11 @@
 ---
 # folio-assistant-68k7
 title: 'resolveDirectories climbs the checkout''s PARENT: is that intended for the ROOT instance?'
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-30T19:48:10Z
-updated_at: 2026-09-30T19:48:28Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-1xhc
 ---
 
@@ -80,3 +80,13 @@ larger than it looks, and aimed by guess.
 ## Explicitly out of scope
 
 Re-litigating `8zsb`'s two fixes. They landed and are verified.
+
+
+## Owner ruling 2026-10-11 (relayed by lane A)
+
+Never look outside the checkout. Sibling lookup for the ROOT instance stops at the checkout root, and the two callers that compose `repoRootFor` unconditionally are fixed to honour that.
+
+## Summary of Changes
+
+- cat-harness#136 (merged): `siblingScopeFor` now returns the instance itself when it is its own checkout (`isForeignCheckout`: its own `.git`, not a declared submodule), instead of `dirname`. Tests cover the `/tmp` case and the submodule case.
+- The two callers this bean named, `rootForScope("repository")` and `declaredKindsEntryRoot`, already went through `checkoutRootFor` since g43f. Verified, no change needed.

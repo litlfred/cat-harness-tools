@@ -80,6 +80,7 @@ const ROOT = resolve(dirname(HARNESS_ROOT));
  * An entry naming a directory that does not exist is REPORTED as a determined
  * empty and left alone — removing it is a person's edit, not this script's.
  */
+// declared-path-literal: the scan list is REPO-relative (see the comment on the last entry): which cat-harness directories detangle walks. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const LITERAL_SCAN: Array<{ path: string }> = [
   { path: "cat-harness/skills" },
   { path: "cat-harness/processes" },

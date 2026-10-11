@@ -29,10 +29,13 @@ const PAGES: { name: string; path: string; wrapper: string; ready: string; ready
   { name: "document-kinds", path: `${declaredPageUrl(HARNESS_ROOT, "document-kinds")}index.html`, wrapper: ".dk-page", ready: "#dk-title" },
   { name: "translation-status", path: `${declaredPageUrl(HARNESS_ROOT, "translation-status")}index.html`, wrapper: ".ts-page", ready: "#ts-title" },
   // The node-kind pages: a kind's dashboard, a node, and a renderer's sections.
-  { name: "node-kind dashboard", path: `${DOCS}/en/cat-harness/todo/index.html`, wrapper: ".nk-page", ready: "#shown" },
+  // A kind whose nodes are ON the checkout: `todos/` and `beans/` are kept on
+  // state branches, so the committed site renders none of their nodes and its
+  // `todo` dashboard is the empty one, which has no `#shown`.
+  { name: "node-kind dashboard", path: `${DOCS}/en/cat-harness/cat-harness-declaration/index.html`, wrapper: ".nk-page", ready: "#shown" },
   {
     name: "node-kind node",
-    path: `${DOCS}/en/cat-harness/todo/todos/items/what-kick-off-means-for-a-ci-watcher/index.html`,
+    path: `${DOCS}/en/cat-harness/cat-harness-declaration/cat-harness/cat-harness/index.html`,
     wrapper: ".nk-page",
     ready: "#fields",
   },
