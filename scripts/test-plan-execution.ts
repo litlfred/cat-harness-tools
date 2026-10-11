@@ -190,6 +190,8 @@ export interface FileCertificationInput {
   reqId?: CertificationEntry["reqId"];
   /** ISO time of signing; defaults to now. */
   timestamp?: string;
+  /** Who decided and how it reached the filer — e.g. a decision relayed from another session. Kept beside the plan version. */
+  notes?: string;
 }
 
 export type FileCertificationOutcome =
@@ -222,7 +224,10 @@ export function fileSignedCertification(instanceRoot: string, input: FileCertifi
     evidence: input.reportPath,
     ...(input.signature !== undefined ? { signature: input.signature } : {}),
     ...(input.reqId !== undefined ? { reqId: input.reqId } : {}),
-    ...(input.plan.version !== undefined ? { notes: `plan version ${input.plan.version}` } : {}),
+    ...((): { notes?: string } => {
+      const parts = [input.plan.version !== undefined ? `plan version ${input.plan.version}` : undefined, input.notes].filter((x): x is string => !!x);
+      return parts.length > 0 ? { notes: parts.join("; ") } : {};
+    })(),
   };
   const r = fileCertification(instanceRoot, input.plan.id, {
     subject: { kind: "test-plan", id: input.plan.id, path: input.reportPath },
