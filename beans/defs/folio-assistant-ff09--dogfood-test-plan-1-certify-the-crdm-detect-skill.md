@@ -1,11 +1,11 @@
 ---
 # folio-assistant-ff09
 title: 'DOGFOOD test plan #1: certify the crdm-detect skill against a plan built from its existing 27-case run'
-status: todo
+status: in-progress
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:47Z
-updated_at: 2026-10-11T06:16:33Z
+updated_at: 2026-10-11T06:53:30Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-3o5b
@@ -46,3 +46,14 @@ The owner ruled 2026-10-01 that a requirement comes first. What must crdm-detect
 ## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 4, no threshold:** the certification records the numbers and certifies only that the test plan was executed.
+
+
+
+## Progress 2026-10-11 (lane B), owner option 4 (no threshold)
+- [x] `req:crdm-detect-evaluation`, the plan `test/plans/crdm-detect-evaluation.test-plan.json` and the `test-plans` directory declaration (cat-harness#145). The system under test is the `crdm-detect-signals` actor (cat-harness#146).
+- [x] Executed through test-plan-execution.bpmn (cat-harness-tools#122).
+  - Run r-3554a15543fc-54762ece6646: 25 pass, 2 warn, 0 fail; P = R = F1 = 0.9545, recorded; the checker agrees on 6 of 27.
+  - All four test-plan audit criteria pass.
+  - The report renders as test-report.md, with a badge that links to the run.
+- [ ] **A_RecordCertification is a user task.** I sent it to the owner through lane A as a numbered choice (default 3: publish first, then ask). The instance waits in beans/workflows/.
+- [ ] Signing (human route) and filing with fileSignedCertification; publishing the run directory to qa-reports.
