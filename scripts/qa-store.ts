@@ -273,7 +273,7 @@ export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation 
         });
       }
     } catch {
-      // An instance in the checkout might declare typologies from unimported packages (e.g. smart-base needing fhir-harness)
+      // An instance in the checkout might declare typologies from unimported packages (e.g. an IG instance needing the IG pipeline layer's typologies)
       continue;
     }
   }
