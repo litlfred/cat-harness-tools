@@ -38,4 +38,13 @@ describe("matching outline headings to page lines", () => {
       ["End", 4, 4],
     ]);
   });
+
+  test("an appendix letter on its own line still opens its section", () => {
+    const got = py(
+      "pages = ['1 Intro\\nbody', 'A\\nProperties of analytic functions\\ntext\\nB.1\\nPolarization\\nmore']\n" +
+      "toc = [ps.TocEntry(1, t, p, 'outline', None) for t, p in [('1 Intro',1),('A Properties of analytic functions',2),('B.1 Polarization',2)]]\n" +
+      "print(json.dumps([[s.title, s.page_start] for s in ps.split_sections(pages, toc)]))",
+    );
+    expect(got).toEqual([["1 Intro", 1], ["A Properties of analytic functions", 2], ["B.1 Polarization", 2]]);
+  });
 });
