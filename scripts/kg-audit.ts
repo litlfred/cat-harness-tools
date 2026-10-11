@@ -43,9 +43,11 @@
  * written as a pass.
  *
  * @module scripts/kg-audit
- * @covers processes, scenarios, skills, tools, cat-harness, attestations — the graph typologies
+ * @covers processes, scenarios, skills, tools, cat-harness, attestations, test-plan — the graph typologies
  *   `KG_SUBJECT_GRAPH_TYPOLOGIES` maps its seven subject kinds onto, plus the
- *   attestation store it reads and `--check`s (bean `2gst`)
+ *   attestation store it reads and `--check`s (bean `2gst`), plus the declared
+ *   `test-plan` directories `testPlanCriteria` reads and judges (beans `3o5b`,
+ *   `ff09`) — which audit:coverage otherwise reports as typed-only
  */
 
 import { createHash } from "node:crypto";
