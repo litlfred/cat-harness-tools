@@ -1,11 +1,11 @@
 ---
 # folio-assistant-5qy8
 title: 'QA SIDECAR LOCATION CONTRADICTION: the folio_init template commits *.qa.json while AGENTS.md puts QA on the qa-reports branch'
-status: todo
+status: in-progress
 type: bug
 priority: normal
 created_at: 2026-10-04T15:10:09Z
-updated_at: 2026-10-11T06:16:33Z
+updated_at: 2026-10-11T06:39:01Z
 parent: folio-assistant-3fva
 ---
 
@@ -34,3 +34,9 @@ Where do section-title-audit's agent verdicts live?
 ## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1:** move section-title-audit's agent slots to `test/attestations/section-title/…`, make the sidecar a derived working copy published to `qa-reports`, and replace its freshness gate with compute-and-judge.
+
+
+
+## Progress 2026-10-11 (lane B), owner option 1
+- [x] cat-harness#142 (merged): the `section-title` family in qa-attestations/v1.
+- [x] cat-harness-tools#119: verdicts go to `<attestations>/section-title/<paper>/section-title-audit.attestations.json`. The derived copy goes to `test/results/section-title/<paper>/section-title-audit.json`. A legacy sidecar's verdicts are auto-moved. The template gate is now compute-and-judge.
