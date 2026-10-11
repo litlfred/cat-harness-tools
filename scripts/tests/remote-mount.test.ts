@@ -385,6 +385,31 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
   });
 
+  test("19b. a re-mount keeps a STATE mount inside the instance — never re-lays over it", () => {
+    // folio-assistant#2529: each instance's `health` is state-mounted inside
+    // the instance, and a re-mount that removed the instance's directories
+    // removed it too — unpushed edits and all — leaving its marker describing
+    // files that were gone. The marker is the state store's record of what it
+    // put down; that directory is set aside and put back.
+    const root = downstream({ overrides: { boot: { whole: true } } });
+    mountRemote({ instanceRoot: root, urlFor });
+    const into = join(root, "boot/test/health/results");
+    mkdirSync(into, { recursive: true });
+    writeFileSync(join(into, "report.json"), '{"edited":true}\n');
+    mkdirSync(join(root, ".git/branch-mounts"), { recursive: true });
+    writeFileSync(
+      join(root, ".git/branch-mounts/boot.health.json"),
+      JSON.stringify({ $schema: "branch-mount/v1", id: "health", key: "boot.health", path: "boot/test/health/results", into, files: {} }),
+    );
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    const again = mountRemote({ instanceRoot: root, urlFor });
+    expect(Object.fromEntries(again.plan.outcomes.map((o) => [o.instance, o.state])).boot).toBe("mounted");
+    expect(readFileSync(join(into, "report.json"), "utf-8")).toBe('{"edited":true}\n');
+    expect(existsSync(join(root, "boot/schemas/floor.ts"))).toBe(true);
+    // The lock hashed only what the mount laid down, so the check stays clean.
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
   // From EITHER name (owner, 2026-10-07): `index.lock.json`, and the legacy
   // `<name>.mount-lock.json` a downstream folio or an old branch still carries.
   test.each(["index.lock.json", "down.mount-lock.json"])("20. a committed lock (%s) replays on a fresh clone with no declaration reader, and verifies digests", (lockName) => {

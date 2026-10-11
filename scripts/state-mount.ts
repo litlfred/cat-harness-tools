@@ -96,7 +96,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { mountTip, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
+import { locationKey, mountTip, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
@@ -117,6 +117,7 @@ import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
  * that the path is still tracked, and that graph is not mounted at all.
  */
 interface GraphMountBase {
+  /** The graph's marker key: its id, or `<instance>.<id>` when several instances declare that id. */
   id: string;
   /** Repository-relative, as declared — where the files were put. */
   path: string;
@@ -150,7 +151,7 @@ export type MountResult =
 
 export interface MountOptions {
   repoRoot?: string;
-  /** Mount only this declared directory id. */
+  /** Mount only the graphs with this declared directory id — every one of them — or the one with this key (`who-iris.health`). */
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;
@@ -183,7 +184,7 @@ export function mountState(opts: MountOptions = {}): MountResult {
     return { state: "failed", reason: `could not read the directory declarations: ${(e as Error).message}`, locations: [], graphs: [] };
   }
   if (opts.id !== undefined) {
-    locations = locations.filter((l) => l.id === opts.id);
+    locations = locations.filter((l) => l.id === opts.id || l.key === opts.id);
     if (locations.length === 0) {
       return { state: "failed", reason: `no declared directory \`${opts.id}\` is kept at a branch tip`, locations, graphs: [] };
     }
@@ -266,11 +267,11 @@ export function syncStateIgnores(root: string, locations: readonly Pick<TipLocat
 function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptions): MountResult {
   const graphs: GraphMount[] = [];
   for (const loc of locations) {
-    const base = { id: loc.id, path: loc.path, branch: loc.branch };
+    const base = { id: locationKey(loc), path: loc.path, branch: loc.repository ? `${loc.repository}:${loc.branch}` : loc.branch };
     try {
       // A prior mount holding unpushed edits is somebody's work: on disk,
       // readable, and left untouched. Asked BEFORE mounting, never inferred.
-      const pending = pendingMountChanges(loc.id, { repoRoot: root });
+      const pending = pendingMountChanges(loc, { repoRoot: root });
       if (pending !== undefined && pending.length > 0) {
         graphs.push({ ...base, state: "stale", reason: `${pending.length} unpushed change(s) left untouched; push them with \`bun run cat state:push\`` });
         continue;
@@ -446,12 +447,17 @@ export function delegatedReport(stores: readonly DelegatedStore[]): string {
 if (import.meta.main) {
   const argv = process.argv.slice(2);
   const at = argv.indexOf("--id");
-  const r = mountState({ id: at === -1 ? undefined : argv[at + 1] });
   // REMOTE MOUNTS (bean `0mpw`) ride the same entry point, so the
   // session-start hook and CI need no second step: a dependency layer that is
   // not on disk is the same "do not trust an empty read" as a state graph.
   // Skipped for `--id`, which names one branch-kept graph.
+  //
+  // FIRST, because a state graph can be declared INSIDE a remote-mounted
+  // instance (cat-harness's, who-iris' … `health`): the instance is laid down,
+  // then its graphs are mounted into it. The other order mounted the graphs
+  // and then re-laid the instance over them.
   const remote = at === -1 ? remoteFanOut(repoRootOf()) : undefined;
+  const r = mountState({ id: at === -1 ? undefined : argv[at + 1] });
   if (argv.includes("--json")) console.log(JSON.stringify(remote ? { ...r, remote: { state: remote.state } } : r, null, 2));
   else console.log(report(r) + delegatedReport(delegatedStores()) + (remote ? `\n\n${remote.text}` : ""));
   if (remote && remoteExitCode(remote.state) !== 0) process.exit(remoteExitCode(remote.state));

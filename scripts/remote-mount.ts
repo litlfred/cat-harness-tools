@@ -64,7 +64,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
@@ -89,6 +89,38 @@ import { contentIsOffCheckout, type SubgraphSource } from "@litlfred/cat-harness
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { stateMountedDirs, withoutStateMounts } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
+
+/**
+ * Move every state mount under `target` (per `stateMountedDirs`) out of the
+ * way, and return how to put them back. The hold is in the git directory, so
+ * nothing scanning the checkout sees it, and on the same filesystem, so a
+ * rename moves it. `restore` replaces whatever the re-lay put at those paths.
+ */
+function holdStateMounts(checkout: string, target: string): { restore: () => void } {
+  const under = resolve(target) + "/";
+  const inside = stateMountedDirs(checkout).filter((d) => (resolve(d) + "/").startsWith(under) && existsSync(d));
+  if (inside.length === 0) return { restore: () => {} };
+  // input-site: inert #8ef446b5 — where a re-lay parks a state mount for a moment; it is put back before the mount returns
+  const gitPath = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "branch-mount-hold"], { cwd: checkout, encoding: "utf-8" });
+  const base = gitPath.status === 0 ? gitPath.stdout.trim() : join(checkout, ".branch-mount-hold");
+  mkdirSync(base, { recursive: true });
+  const hold = mkdtempSync(join(base, "relay-"));
+  const moved = inside.map((d, i) => {
+    const to = join(hold, String(i));
+    renameSync(d, to);
+    return { d, to };
+  });
+  return {
+    restore: () => {
+      for (const { d, to } of moved) {
+        rmSync(d, { recursive: true, force: true });
+        mkdirSync(dirname(d), { recursive: true });
+        renameSync(to, d);
+      }
+      rmSync(hold, { recursive: true, force: true });
+    },
+  };
+}
 
 // ── Reading an upstream declaration STRUCTURALLY ─────────────────────────────
 
@@ -667,49 +699,61 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           ...(p.assets ?? []).map((a) => joinRel(p.upstreamRoot, a)),
         ]);
 
-        // Replace what THIS mount put there before — only that.
-        if (before) {
-          for (const d of before.directories) rmSync(join(plan.instanceRoot, d.path), { recursive: true, force: true });
-          rmSync(join(plan.instanceRoot, before.path, `${before.instance}.json`), { force: true });
-          for (const a of before.assets ?? []) rmSync(join(plan.instanceRoot, before.path, a.src), { force: true });
-        }
-        mkdirSync(target, { recursive: true });
-        const declText = readFileSync(join(work, p.declarationFile));
-        writeFileSync(join(target, `${p.instance}.json`), declText);
+        // A STATE mount inside the instance (its `health`, say) is not this
+        // mount's to replace: its files come from a state branch, may hold
+        // unpushed edits, and a re-lay that deleted them left the marker
+        // describing files that were gone — the next `state:push` would have
+        // sent their deletion. Set aside here, put back after the digest, so
+        // the lock hashes only what this mount laid down.
+        const held = holdStateMounts(plan.instanceRoot, target);
         const dirs: LockedInstance["directories"] = [];
         const absent: string[] = [];
-        for (const d of p.directories) {
-          const src = join(work, d.upstreamPath);
-          if (!existsSync(src)) {
-            absent.push(d.id);
-            continue;
-          }
-          const dst = join(plan.instanceRoot, d.path);
-          mkdirSync(dirname(dst), { recursive: true });
-          // A whole-instance mount at the upstream's root copies the fetch's
-          // own work tree: its `.git` is the temporary repository, never content.
-          cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true, filter: (from) => !(d.upstreamPath === "." && from === join(src, ".git")) });
-        }
-        // The declared assets: single files, each locked by its own hash.
         const assets: NonNullable<LockedInstance["assets"]> = [];
-        for (const a of p.assets ?? []) {
-          const src = join(work, p.upstreamRoot, a);
-          if (!existsSync(src) || !statSync(src).isFile()) {
-            absent.push(`asset ${a}`);
-            continue;
+        let declText: Buffer;
+        try {
+          // Replace what THIS mount put there before — only that.
+          if (before) {
+            for (const d of before.directories) rmSync(join(plan.instanceRoot, d.path), { recursive: true, force: true });
+            rmSync(join(plan.instanceRoot, before.path, `${before.instance}.json`), { force: true });
+            for (const a of before.assets ?? []) rmSync(join(plan.instanceRoot, before.path, a.src), { force: true });
           }
-          const dst = join(target, a);
-          mkdirSync(dirname(dst), { recursive: true });
-          cpSync(src, dst, { force: true });
-        }
-        // Digest AFTER every copy, so a nested directory's digest covers what is on disk.
-        for (const d of p.directories) {
-          if (absent.includes(d.id)) continue;
-          dirs.push({ id: d.id, path: d.path, upstreamPath: d.upstreamPath, ...digestOf(join(plan.instanceRoot, d.path)) });
-        }
-        for (const a of p.assets ?? []) {
-          if (absent.includes(`asset ${a}`)) continue;
-          assets.push({ src: a, sha256: sha256Text(readFileSync(join(target, a))) });
+          mkdirSync(target, { recursive: true });
+          declText = readFileSync(join(work, p.declarationFile));
+          writeFileSync(join(target, `${p.instance}.json`), declText);
+          for (const d of p.directories) {
+            const src = join(work, d.upstreamPath);
+            if (!existsSync(src)) {
+              absent.push(d.id);
+              continue;
+            }
+            const dst = join(plan.instanceRoot, d.path);
+            mkdirSync(dirname(dst), { recursive: true });
+            // A whole-instance mount at the upstream's root copies the fetch's
+            // own work tree: its `.git` is the temporary repository, never content.
+            cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true, filter: (from) => !(d.upstreamPath === "." && from === join(src, ".git")) });
+          }
+          // The declared assets: single files, each locked by its own hash.
+          for (const a of p.assets ?? []) {
+            const src = join(work, p.upstreamRoot, a);
+            if (!existsSync(src) || !statSync(src).isFile()) {
+              absent.push(`asset ${a}`);
+              continue;
+            }
+            const dst = join(target, a);
+            mkdirSync(dirname(dst), { recursive: true });
+            cpSync(src, dst, { force: true });
+          }
+          // Digest AFTER every copy, so a nested directory's digest covers what is on disk.
+          for (const d of p.directories) {
+            if (absent.includes(d.id)) continue;
+            dirs.push({ id: d.id, path: d.path, upstreamPath: d.upstreamPath, ...digestOf(join(plan.instanceRoot, d.path)) });
+          }
+          for (const a of p.assets ?? []) {
+            if (absent.includes(`asset ${a}`)) continue;
+            assets.push({ src: a, sha256: sha256Text(readFileSync(join(target, a))) });
+          }
+        } finally {
+          held.restore();
         }
         const ignored = ensureIgnored(plan.instanceRoot, p.path, true);
         if (ignored === "excluded") excluded.push(p.path);
