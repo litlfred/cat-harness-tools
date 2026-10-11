@@ -1150,13 +1150,32 @@ def parse_front_matter(pages: list[str]) -> dict[str, Any]:
     return meta
 
 
+# Spacing accents a TeX text layer emits BESIDE the letter rather than on it:
+# pdftotext and PyMuPDF both give "L\u00a8ubeck" for an outline's "L\u00fcbeck".
+_SPACING_ACCENTS = dict.fromkeys(map(ord, "\u00a8\u00b4\u0060\u02c6\u02dc\u00b8\u02d8\u02d9\u02da\u02db\u02dd\u02c7\u00af"))
+
+
+def _heading_key(text: str) -> str:
+    """`text` lower-cased with accents dropped, combining or spacing, so an
+    outline title and the page line that prints it compare equal.
+
+    Measured on arxiv-2504.18825v2 (2026-10-11): the outline's "7. Application
+    II: L\u00fcbeck\u2013Prasad\u2013\u2026" is printed "L\u00a8ubeck" on page 34, the
+    needle never matched, and section 7 was dropped silently into section 6
+    (pp. 25\u201343).
+    """
+    t = unicodedata.normalize("NFKD", text.translate(_SPACING_ACCENTS))
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
     """Slice the document text at heading boundaries."""
     marks: list[tuple[int, int, TocEntry]] = []  # (page_idx, line_idx, entry)
     used: set[int] = set()
 
     for e in toc:
-        needle = e.title.lower()[:44]
+        needle = _heading_key(e.title)[:44]
         if not needle:
             continue
         lo = max(0, (e.page or 1) - 2)
@@ -1164,7 +1183,7 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
         found = None
         for pi in range(lo, hi):
             for li, line in enumerate(pages[pi].splitlines()):
-                cand = re.sub(r"\s+", " ", line).strip().lower()
+                cand = _heading_key(line)
                 if needle in cand and len(cand) < 120:
                     found = (pi, li)
                     break
