@@ -62,6 +62,14 @@ import { resolve, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { findContentRepoRoot } from "./repo-root";
+import {
+  derivedCopyPath,
+  loadVerdicts,
+  saveVerdicts,
+  slotFor,
+  verdictStorePath,
+  type SlotView,
+} from "./section-title-attestations";
 
 // Was `resolve(HARNESS_ROOT)` — this file's own location, so
 // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
@@ -76,9 +84,9 @@ process.chdir(findContentRepoRoot());
 
 const args = process.argv.slice(2);
 const reportOnly = args.includes("--report-only");
-// Emit committed per-paper sidecars (machine findings + manifest hash +
-// agent-review slots). CI regenerates then `git diff --exit-code`s them,
-// so a chapter-manifest edit without a re-run fails CI ("sidecars stale").
+// Compute the per-paper derived copy (machine findings + manifest hash +
+// every slot's state) under test/results/, from the live manifests and the
+// verdicts in the attestations store (bean `5qy8`).
 const writeSidecar = args.includes("--write-sidecar");
 // `--toc [chapterDir]` prints the chapter→section→subsection tree with
 // per-node block weights + framework flags (for dynamic reorg review),
@@ -90,9 +98,9 @@ const maxLenIdx = args.indexOf("--max-len");
 const MAX_LEN = maxLenIdx >= 0 ? Number(args[maxLenIdx + 1]) : 72;
 const paperArg = args.find((a) => !a.startsWith("--") && a !== String(MAX_LEN));
 
-// `--verdict` records (or lists) an agent title-coherence verdict in a
-// chapter's committed sidecar agent slot. Run `--write-sidecar` first to
-// create the slots, then:
+// `--verdict` records (or lists) an agent title-coherence verdict in the
+// attestations store. Run `--write-sidecar` first to compute the slots,
+// then:
 //   --verdict --chapter <paper>/<dir> --list
 //   --verdict --chapter <paper>/<dir> --section <label|title>
 //             --result <pass|revise|accept> [--reviewer <who>] [--note "why"]
@@ -332,19 +340,28 @@ function chapterStaleKeys(
   return { manifestHash, keyOf: (k) => perNode.get(k) ?? manifestHash };
 }
 
-/** Emit committed per-paper title/structure audit sidecars. The
- *  `machine` block is regenerated each run; `agent` review verdicts are
- *  carried forward only while their staleness key is unchanged. The gate
- *  is the chapter-manifest hash by default, or — under `--thorough` — a
- *  per-node subtree hash that also folds in contained block content +
- *  descendant subsections (see `subtreeStalenessHash`). Each slot records
- *  its `stale_mode`, and carry-forward gates each slot against the hash
- *  matching its own mode, so a thorough verdict is never silently
- *  re-validated by a shallow run (or vice-versa). */
+/** Emit the per-paper title/structure audit — bean `5qy8`, owner's option 1.
+ *
+ *  Two outputs, split by provenance (see `section-title-attestations.ts`):
+ *  - the DERIVED working copy under `test/results/section-title/<paper>/`,
+ *    regenerated every run: machine findings, the manifest hash, and every
+ *    slot's current state;
+ *  - the decided VERDICTS in the attestations store, which this never edits —
+ *    except to move them there, once, from the legacy committed sidecar.
+ *
+ *  A stored verdict counts only while the hash matching ITS recorded mode is
+ *  unchanged (the chapter manifest, or under `--thorough` the section's subtree
+ *  hash), so a thorough verdict is never re-validated by a shallow run or the
+ *  reverse. Otherwise the slot is `pending` and shows the stale verdict.
+ *
+ *  Returns the tallies, and refusals: a store that cannot be read is never
+ *  written over, and the run reports it as could-not-determine. */
 function writeSidecars(
   allNodes: TitleNode[], flags: Flag[], structureFlags: StructFlag[],
   rawSectionsByChapter: Map<string, unknown>, thoroughMode: boolean,
-): void {
+): { decided: number; pending: number; stale: number; moved: number; refused: string[] } {
+  const tally = { decided: 0, pending: 0, stale: 0, moved: 0, refused: [] as string[] };
+  const root = process.cwd();
   const byPaper = new Map<string, Map<string, TitleNode[]>>();
   for (const n of allNodes) {
     const p = byPaper.get(n.paper) ?? (byPaper.set(n.paper, new Map()), byPaper.get(n.paper)!);
@@ -352,17 +369,27 @@ function writeSidecars(
     arr.push(n);
   }
   for (const [paper, chapters] of byPaper) {
-    // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-    const sidecarPath = resolve("folio", paper, "section-title-audit.qa.json");
-    let prev: { chapters?: Record<string, { agent?: Record<string, { reviewed_hash?: string; stale_mode?: string }> }> } = {};
-    try { prev = JSON.parse(readFileSync(sidecarPath, "utf8")); } catch { /* first run */ }
-    const out: Record<string, unknown> = { criterion: "voice-section-title-coherence", paper, chapters: {} };
+    const loaded = loadVerdicts(root, paper);
+    if (loaded.state === "refused") { tally.refused.push(loaded.reason); continue; }
+    // The store is written BEFORE anything derived, so a moved verdict is
+    // never in neither place.
+    if (loaded.moved > 0) {
+      const at = saveVerdicts(root, paper, loaded.verdicts);
+      tally.moved += loaded.moved;
+      console.log(`  moved ${loaded.moved} verdict(s) from ${loaded.from} → ${at}`);
+      console.log("    the committed sidecar now holds nothing the store does not; removing it from main is a person's call (git rm).");
+    }
+    const out: Record<string, unknown> = {
+      criterion: "voice-section-title-coherence",
+      paper,
+      derived: "regenerated by qa-section-title-audit.ts --write-sidecar; decided verdicts live in the attestations store, not here",
+      verdicts: verdictStorePath(root, paper).path.slice(root.length + 1),
+      chapters: {},
+    };
     const chOut = out.chapters as Record<string, unknown>;
     for (const [chapterDir, nodes] of [...chapters].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const prevAgent = prev?.chapters?.[chapterDir]?.agent ?? {};
-      // Compute subtree hashes if this run is thorough OR any carried
-      // verdict was reviewed in thorough mode (so we can re-validate it).
-      const anyThorough = thoroughMode || Object.values(prevAgent).some((s) => s?.stale_mode === "thorough");
+      const stored = loaded.verdicts[chapterDir] ?? {};
+      const anyThorough = thoroughMode || Object.values(stored).some((v) => v.stale_mode === "thorough");
       const sections = rawSectionsByChapter.get(`${paper}/${chapterDir}`);
       const { manifestHash, keyOf } = chapterStaleKeys(paper, chapterDir, sections, anyThorough);
       const titleFindings = flags
@@ -371,20 +398,14 @@ function writeSidecars(
       const struct = structureFlags
         .filter((f) => f.paper === paper && f.chapterDir === chapterDir)
         .map((f) => ({ kind: f.kind, label: f.label, title: f.title, detail: f.detail }));
-      const agent: Record<string, unknown> = {};
+      const agent: Record<string, SlotView> = {};
       for (const n of nodes.filter((x) => x.depth >= 1)) {
         const key = n.label ?? n.title;
-        const carried = prevAgent[key];
-        // Gate each carried slot against the hash matching ITS recorded
-        // mode; legacy slots without `stale_mode` are manifest-mode (the
-        // pre-thorough default) — NOT this run's mode, else a --thorough
-        // run would spuriously stale every manifest-mode verdict. A
-        // brand-new slot adopts this run's mode.
-        const mode = carried ? (carried.stale_mode ?? "manifest") : (thoroughMode ? "thorough" : "manifest");
-        const sk = mode === "thorough" ? keyOf(key) : manifestHash;
-        agent[key] = carried && carried.reviewed_hash === sk
-          ? carried
-          : { title: n.title, depth: n.depth, result: "pending", reviewer: null, reviewed_hash: null, stale_mode: thoroughMode ? "thorough" : "manifest" };
+        const slot = slotFor(n, stored[key], (mode) => (mode === "thorough" ? keyOf(key) : manifestHash), thoroughMode ? "thorough" : "manifest");
+        agent[key] = slot;
+        if (slot.result !== "pending") tally.decided++;
+        else if ("stale_verdict" in slot) tally.stale++;
+        else tally.pending++;
       }
       chOut[chapterDir] = {
         manifest_hash: manifestHash,
@@ -393,39 +414,43 @@ function writeSidecars(
         agent,
       };
     }
-    writeFileSync(sidecarPath, JSON.stringify(out, null, 2) + "\n");
+    const derived = derivedCopyPath(root, paper);
+    mkdirSync(dirname(derived), { recursive: true });
+    writeFileSync(derived, JSON.stringify(out, null, 2) + "\n");
   }
+  return tally;
 }
 
-/** Agent-verdict writer: stamp a title-coherence result into the chapter
- *  sidecar's `agent[key]` slot (or list the chapter's slots with
- *  `--list`). Slots are created by `writeSidecars`; this updates only the
- *  agent half, leaving the machine findings untouched. The verdict carries
- *  forward through later `--write-sidecar` runs only while the live
- *  manifest hash matches `reviewed_hash`. */
+/** Agent-verdict writer: record a title-coherence result in the attestations
+ *  store (or list the chapter's slots with `--list`). The slots — which
+ *  sections exist and what each currently reads — come from the derived copy
+ *  `--write-sidecar` writes; the verdict goes to the store, never to that copy.
+ *  It is stamped with the live staleness key, so it counts only while the
+ *  chapter manifest (or, under `--thorough`, the section's subtree) is
+ *  unchanged. */
 async function recordVerdict(): Promise<void> {
   if (!vChapter || !vChapter.includes("/")) {
     console.error("--verdict requires --chapter <paper>/<chapterDir>");
     process.exit(2);
   }
   const [paper, chapterDir] = vChapter.split("/");
-  // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-  const sidecarPath = resolve("folio", paper, "section-title-audit.qa.json");
-  let sidecar: {
+  const root = process.cwd();
+  const derivedPath = derivedCopyPath(root, paper);
+  let derived: {
     chapters?: Record<string, {
       manifest_hash?: string;
       machine?: { title_defects?: unknown[]; structure_findings?: unknown[] };
       agent?: Record<string, Record<string, unknown>>;
     }>;
   };
-  try { sidecar = JSON.parse(readFileSync(sidecarPath, "utf8")); }
+  try { derived = JSON.parse(readFileSync(derivedPath, "utf8")); }
   catch {
-    console.error(`no sidecar at ${sidecarPath}\n  → run \`--write-sidecar\` first to create the agent slots.`);
+    console.error(`no derived copy at ${derivedPath}\n  → run \`--write-sidecar\` first to compute the slots.`);
     process.exit(2);
   }
-  const chEntry = sidecar.chapters?.[chapterDir];
+  const chEntry = derived.chapters?.[chapterDir];
   if (!chEntry?.agent) {
-    console.error(`no agent slots for "${chapterDir}" in ${sidecarPath}\n  → run \`--write-sidecar\` first.`);
+    console.error(`no slots for "${chapterDir}" in ${derivedPath}\n  → run \`--write-sidecar\` first.`);
     process.exit(2);
   }
   const agent = chEntry.agent;
@@ -437,6 +462,7 @@ async function recordVerdict(): Promise<void> {
       const s = agent[k];
       console.log(`  [${(s.result as string) ?? "pending"}] ${k}  "${s.title as string}"`
         + (s.reviewer ? `  · by ${s.reviewer as string}` : "")
+        + (s.stale_verdict ? "  · stale verdict on record" : "")
         + (s.note ? `  — ${s.note as string}` : ""));
     }
     const md = chEntry.machine ?? {};
@@ -452,6 +478,10 @@ async function recordVerdict(): Promise<void> {
     console.error("--verdict needs --section <label|title> --result <pass|revise|accept>  (or --list)");
     process.exit(2);
   }
+  if (vResult === "pending") {
+    console.error("`pending` is the absence of a verdict, not one — nothing recorded.");
+    process.exit(2);
+  }
   if (!VERDICT_RESULTS.has(vResult))
     console.error(`  note: result "${vResult}" is not one of pass|revise|accept (recorded anyway)`);
 
@@ -464,9 +494,6 @@ async function recordVerdict(): Promise<void> {
     process.exit(2);
   }
 
-  // Compute the staleness key the verdict is gated on — manifest hash, or
-  // (under --thorough) this section's subtree hash incl. block content +
-  // descendant subsections. Import the manifest for its section tree.
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
   const manifestPath = resolve("folio", paper, chapterDir, `${chapterDir}.ts`);
   let sections: unknown = [];
@@ -477,20 +504,29 @@ async function recordVerdict(): Promise<void> {
   const { manifestHash, keyOf } = chapterStaleKeys(paper, chapterDir, sections, thorough);
   const staleKey = keyOf(key);
   if (chEntry.manifest_hash && chEntry.manifest_hash !== manifestHash)
-    console.error(`  warning: sidecar machine block is stale (hash ${chEntry.manifest_hash} ≠ live ${manifestHash}); re-run \`--write-sidecar\`${thorough ? " --thorough" : ""} to refresh findings.`);
+    console.error(`  warning: the derived copy is stale (hash ${chEntry.manifest_hash} ≠ live ${manifestHash}); re-run \`--write-sidecar\`${thorough ? " --thorough" : ""} to refresh findings.`);
 
-  agent[key] = {
-    ...agent[key],
+  const loaded = loadVerdicts(root, paper);
+  if (loaded.state === "refused") {
+    console.error(`✗ ${loaded.reason}`);
+    process.exit(2);
+  }
+  const verdicts = loaded.verdicts;
+  const prior = verdicts[chapterDir]?.[key];
+  (verdicts[chapterDir] ??= {})[key] = {
+    title: agent[key].title as string,
+    depth: agent[key].depth as number,
     result: vResult,
     reviewer: vReviewer,
-    note: vNote ?? agent[key].note ?? null,
+    note: vNote ?? prior?.note ?? null,
     reviewed_hash: staleKey,
     stale_mode: thorough ? "thorough" : "manifest",
     reviewed_at: new Date().toISOString(),
   };
-  writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + "\n");
+  const at = saveVerdicts(root, paper, verdicts);
   console.log(`✓ verdict: ${paper}/${chapterDir} · ${key} → ${vResult} (by ${vReviewer})${vNote ? ` — ${vNote}` : ""}`);
-  console.log(`  reviewed_hash ${staleKey} · mode ${thorough ? "thorough" : "manifest"} → ${sidecarPath}`);
+  console.log(`  reviewed_hash ${staleKey} · mode ${thorough ? "thorough" : "manifest"} → ${at}`);
+  if (loaded.moved > 0) console.log(`  (and ${loaded.moved} verdict(s) moved from ${loaded.from} into the store)`);
 }
 
 /** Print the chapter→section→subsection TOC with block weights +
@@ -646,13 +682,23 @@ async function main(): Promise<void> {
     { generated: new Date().toISOString(), max_len: MAX_LEN, total_titles: allNodes.length, hard_defects: hard.length, soft_warnings: soft.length, structure_findings: structureFlags, chapters: worklist }, null, 2));
   console.log(`\n  worklist → ${worklistOut} (review each title for conciseness + coherence against its parent)`);
 
+  // COMPUTE AND JUDGE (bean `5qy8`). The derived copy is computed from the
+  // live manifests and the stored verdicts every run — there is no committed
+  // file to keep fresh, so nothing to `git diff`. What is judged: a verdict
+  // store that cannot be read is could-not-determine (exit 2), never a clean
+  // run; open and stale slots are reported, and are a reviewer's worklist.
+  let refused = 0;
   if (writeSidecar) {
-    writeSidecars(allNodes, flags, structureFlags, rawSectionsByChapter, thorough);
-    console.log(`  sidecars → folio/<paper>/section-title-audit.qa.json (machine findings + agent slots${thorough ? "; thorough subtree-hash gate" : ""}; CI git-diff-gated)`);
+    const t = writeSidecars(allNodes, flags, structureFlags, rawSectionsByChapter, thorough);
+    console.log(`  derived → test/results/section-title/<paper>/section-title-audit.json${thorough ? " (thorough subtree-hash staleness)" : ""}`);
+    console.log(`  verdicts: ${t.decided} decided, ${t.stale} stale (re-opened), ${t.pending} never reviewed` + (t.moved ? ` · ${t.moved} moved into the store` : ""));
+    for (const r of t.refused) console.error(`  ✗ ${r}`);
+    refused = t.refused.length;
   }
 
   const depthViolations = structureFlags.filter((f) => f.kind === "depth").length;
   if ((hard.length > 0 || depthViolations > 0) && !reportOnly) process.exit(1);
+  if (refused > 0) process.exit(2);
 }
 
 main();
