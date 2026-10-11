@@ -75,7 +75,7 @@
     "Call_Sign": {
       "id": "crdm-detect-evaluation-r-3554a15543fc-54762ece6646/Call_Sign",
       "processId": "Process_QaReportSigning",
-      "source": "/home/user/ws/fa/cat-harness/processes/sdlc/qa-report-signing.bpmn",
+      "source": "../cat-harness/processes/sdlc/qa-report-signing.bpmn",
       "subject": "crdm-detect-evaluation@1 vs crdm-detect-signals",
       "bean": "folio-assistant-ff09",
       "carriedBeans": [
