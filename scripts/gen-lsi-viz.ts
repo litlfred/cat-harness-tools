@@ -108,6 +108,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 const VIEWER_TOOL = "lsi-viewer";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
+// declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
 const OUT = join(VIEWER_DIR, "index.md");
 const DIMS_SHOWN = 8;
