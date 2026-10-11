@@ -5,7 +5,7 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-03T01:05:37Z
-updated_at: 2026-10-10T16:43:49Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-hfag
 ---
 
@@ -95,3 +95,9 @@ How should post-merge regeneration run?
 4. Leave it report-only (CI goes red; nobody is assigned).
 
 **Default if no answer:** option 2. It is a procedure note and adds no new automation that opens PRs.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+
+**Option 1:** a folio-assistant workflow on `push: main` runs `post-merge-regen.ts` and opens the repair PR. That workflow file belongs to folio-assistant, so lane A takes it. cat-harness already carries its own `post-merge-regen.yml` as a model.

@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-09-30T21:24:19Z
-updated_at: 2026-10-10T16:44:25Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-1xhc
 ---
 
@@ -95,3 +95,9 @@ in the rendering, only in the coverage.
 4. **Retire v8n5 Done-when #2,** and remove the pinning test with a reason.
 
 **Default if no answer:** no change. The pinning test (`the size-1 NOTE is gone, and its PROMISE is NOT yet kept`) stays, and nothing is compared.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+
+**Option 1, kind for kind:** a surface of kind K on an instance's pages uses that instance's K-kind theme when it declares one, and falls back to the platform default only for kinds it doesn't declare.
