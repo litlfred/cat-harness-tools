@@ -128,6 +128,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
     // core's `glossary` visualiser and cat-harness's `lsi` — the latter under
     // the page locale since folio-assistant#2527, and at its old address until
     // the site is regenerated.
+    // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
     globs: ["cat-harness/docs/folio-assistant-core/glossary/**", "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
     strategy: "take-base",
     why:
@@ -136,12 +137,14 @@ export const PATTERNS: readonly ConflictPattern[] = [
   },
   {
     id: "translated-glossary",
+    // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
     globs: ["cat-harness/docs/{ar,es,fr,ru,zh}/folio-assistant-core/glossary/index.md"],
     strategy: "take-base",
     why: "the translated glossary pages, one per locale, written whole by glossary-page.ts beside the English one (check:glossary). Same aggregate, so the same collision; found 2026-10-01 when a merge refused on all five. The rest of each locale directory is authored translation and stays refused.",
   },
   {
     id: "viewer-pages",
+    // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
     globs: [
       // Each at the route of the visualiser cat-harness DECLARES for it,
       // `<locale>/<harness>/<visualiser>/` (owner, 2026-10-09; the locale in

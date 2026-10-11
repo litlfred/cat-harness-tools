@@ -63,6 +63,7 @@ const ROOT = resolve(dirname(HARNESS_ROOT));
 const STEM = "term-mapping";
 
 /** The pinned published IG the `fhir` half resolves against — owner, 2026-09-30. */
+// declared-path-literal: the two pinned IG records in cat-harness's `external-schemas/` registry, named by file because the pin is a decision about THESE two records, not a scan of the directory. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 export const FHIR_PIN = "cat-harness/external-schemas/who-smart-base.json";
 export const FHIR_SNAPSHOT = "cat-harness/external-schemas/who-smart-base.terminology.json";
 
@@ -596,6 +597,7 @@ function main(): number {
   const result = buildQaResult({
     script: "cat-harness-tools/scripts/check-term-mapping.ts",
     scriptAbsPath: import.meta.path,
+    // declared-path-literal: a QA subject ID (the glossary's declared route), recorded in the sidecar; nothing reads it as a filesystem path.
     subject: { kind: "glossary", id: "folio-assistant-core/glossary" },
     families: Object.fromEntries(
       MAPPING_TARGETS.map((t) => [

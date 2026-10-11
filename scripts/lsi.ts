@@ -79,6 +79,7 @@ import type { LsiSidecar } from "@litlfred/cat-harness/schemas/qa-record-shapes.
 export type { LsiSidecar };
 
 const REPO = resolve(dirname(HARNESS_ROOT));
+// declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
 /** The instance whose Tool graph declares `lsi-index`; its run records live under its `qa` directory. */
 const HARNESS = join(REPO, "cat-harness");
@@ -90,12 +91,14 @@ export const LSI_TOOL_ID = "lsi-index";
  * (`<site>/<locale>/cat-harness/lsi/`, owner 2026-10-09; folio-assistant#2527)
  * — read, never spelled here.
  */
+// declared-path-literal: the LSI viewer page under cat-harness's docs site, at the route the visualiser declares. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 export const VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute()) + "/";
 /**
  * The same viewer's OLD address, `<site>/cat-harness/lsi/` (folio-assistant#2527):
  * where a site not yet regenerated still holds the page. Excluded from every
  * index for the same reason {@link VIEWER_DIR} is.
  */
+// declared-path-literal: the viewer's pre-locale address, kept so a stale page there is found and reported. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const OLD_VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute().replace(new RegExp(`^${PAGE_LOCALE}/`), "")) + "/";
 
 function lsiViewerRoute(): string {
@@ -260,6 +263,7 @@ export function computeIndex(t: GraphTarget, docs?: string[], opts: LsiOptions =
   const f = findings(ix);
   const sidecar: LsiSidecar = {
     $schema: "folio-lsi-index/v1",
+    // declared-path-literal: a provenance field in the sidecar naming the methodology node; recorded, not read from disk.
     method: "cat-harness/methodologies/lsi.md",
     instance: t.instance,
     graph: t.id,

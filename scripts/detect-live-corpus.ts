@@ -87,6 +87,7 @@ const REPO = repoRootFor(INSTANCE_ROOT);
  * The extensions are the ones this repository's scanners actually filter on —
  * a probe in a format nothing reads would make every writer look latent.
  */
+// declared-path-literal: probe locations planted on purpose, to see which scanners pick up a file there; they must be the literal paths those scanners watch, or the probe measures nothing.
 const PLANT_DIRS = ["_kg/__probe__", "cat-harness/schemas/block-qa-schema/dist/__probe__"] as const;
 const PLANT_FILES: Record<string, string> = {
   "probe.ts": "export const probe = 1;\n",
