@@ -64,3 +64,15 @@ summarises everything that instance translates: per-locale coverage,
 officiality per catalogue, round-trip results, and a link to the
 translation-status page. Sub-graph pages show no drawer of their own. A
 per-sub-graph drawer (option 2) can be added later without undoing this.
+
+## Progress 2026-10-11 (lane C)
+
+- [x] **Officiality agreement check**, part 1 of the drawer (PR #102):
+  `check:translation-officiality` compares each catalogue's `X-Folio-Official`
+  with `translations/<locale>/status.json` and reports disagreements,
+  "official with nobody named", and unreadable files (exit 2). It found 0
+  findings over 5 locales and 83 catalogues; everything is consistently
+  unofficial today.
+- [ ] **The drawer itself** is not started. It needs new data in the page head
+  (`head_custom.html` and the generators) and a built site to verify in both
+  colour schemes, and the lane C container cannot build the composed site.
