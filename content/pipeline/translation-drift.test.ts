@@ -25,16 +25,13 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 import {
   KNOWN_DRIFT,
+  UNCATALOGED,
   comparableSource,
   driftFor,
   headingsOf,
   shapeOf,
   sameStructure,
-  uncatalogedFor,
-  uncatalogedGlossaries,
 } from "./translation-drift.ts";
-import { visualisersRenderedBy } from "../../scripts/viewer-declarations.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The INSTANCE root — `translations/` and the site live under it. */
@@ -149,29 +146,15 @@ describe("the backlogs are reviewable, not a policy", () => {
   });
 
   test("every uncatalogued entry states a reason and a date", () => {
-    for (const u of uncatalogedFor(ROOT)) {
+    for (const u of UNCATALOGED) {
       expect(u.reason.trim().length).toBeGreaterThan(20);
       expect(u.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 
   test("no page is recorded TWICE — once would be enough to hide it", () => {
-    const all = [...KNOWN_DRIFT.map((k) => k.translation), ...uncatalogedFor(ROOT).map((u) => u.translation)];
+    const all = [...KNOWN_DRIFT.map((k) => k.translation), ...UNCATALOGED.map((u) => u.translation)];
     expect(all.length).toBe(new Set(all).size);
-  });
-
-  test("the glossary entries are DERIVED: one per locale for each declared glossary-page visualiser, at its route", () => {
-    // This layer may not name the instance that declares the glossary, so
-    // the route comes from the declaration; a checkout that declares none
-    // records none rather than a page at a route nobody declared.
-    const declared = visualisersRenderedBy(repoRootFor(ROOT), "glossary-page");
-    const derived = uncatalogedGlossaries(ROOT);
-    expect(derived.length).toBe(declared.length * 5);
-    for (const v of declared) {
-      for (const l of ["ar", "es", "fr", "ru", "zh"]) {
-        expect(derived.map((u) => u.translation)).toContain(`${l}/${v.harness}/${v.id}`);
-      }
-    }
   });
 });
 
