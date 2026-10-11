@@ -1,11 +1,11 @@
 ---
 # folio-assistant-ff09
 title: 'DOGFOOD test plan #1: certify the crdm-detect skill against a plan built from its existing 27-case run'
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:47Z
-updated_at: 2026-10-11T06:53:30Z
+updated_at: 2026-10-11T12:25:34Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-3o5b
@@ -57,3 +57,18 @@ The owner ruled 2026-10-01 that a requirement comes first. What must crdm-detect
   - The report renders as test-report.md, with a badge that links to the run.
 - [ ] **A_RecordCertification is a user task.** I sent it to the owner through lane A as a numbered choice (default 3: publish first, then ask). The instance waits in beans/workflows/.
 - [ ] Signing (human route) and filing with fileSignedCertification; publishing the run directory to qa-reports.
+
+
+
+## Summary of Changes
+
+Built to the owner's option 4 (no threshold).
+- **Requirement and plan:** `req:crdm-detect-evaluation`, the plan `test/plans/crdm-detect-evaluation.test-plan.json` and the `test-plans` directory (cat-harness#145). The system under test is the `crdm-detect-signals` actor (cat-harness#146).
+- **Execution:** run through test-plan-execution.bpmn by scripts/run-crdm-detect-plan.ts (cat-harness-tools#122).
+  - 27 cases: 25 pass, 2 warn, 0 fail.
+  - P = R = F1 = 0.9545, recorded and not graded.
+  - The untainted checker agrees on its sample.
+  - All four test-plan audit criteria pass.
+- **Done-when 1:** the signed certification is filed with fileSignedCertification (cat-harness#151). Signer: the owner, by the human route. The decision was relayed from lane A's session, and the record says so.
+- **Done-when 2:** the report renders (test-report.md) and its badge links to the run (scripts/render-test-report.ts, #122).
+- **Not done:** the signed report is not stored on qa-reports. cat-harness has no qa-reports branch, and bean 3hk4 refuses a one-run entry. So Task_StoreSigned stays open in beans/workflows/, and certification-resolves (zaui) reads this certification as unknown until a full cat-harness qa publish exists.
