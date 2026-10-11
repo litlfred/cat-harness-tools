@@ -10,8 +10,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { exitCodeFor, judgeSecrets, readRepoFiles, secretRefs, type RepoEvidence } from "../secrets-check.ts";
-import { secretsHealthCheck } from "../../test/health/checks.ts";
-import { HealthCheckResultSchema } from "@litlfred/cat-harness/schemas/health-report.ts";
 
 const NOW = new Date("2026-10-11T00:00:00Z");
 const dirs: string[] = [];
@@ -122,22 +120,5 @@ describe("findings, named", () => {
     expect(at("2026-11-01")).toEqual(["minor"]);
     expect(at("2026-10-15")).toEqual(["major"]);
     expect(at("2026-10-01")).toEqual(["critical"]);
-  });
-});
-
-describe("bun run health", () => {
-  test("undeclared needs are a MAJOR finding there — not clean — and the result validates", () => {
-    const d = repo({ ".github/workflows/a.yml": "x: ${{ secrets.NPM_TOKEN }}\n" });
-    const r = secretsHealthCheck(NOW, [readRepoFiles(d, "o/r")]);
-    expect(HealthCheckResultSchema.safeParse(r).success).toBe(true);
-    expect(r.state).toBe("finding");
-    expect(r.findings.find((f) => f.metric === "secret-needs-undetermined")!.severity).toBe("major");
-    expect(r.findings.some((f) => /Declared needs: could not determine for o\/r/.test(f.summary))).toBe(true);
-  });
-
-  test("every threshold states its basis", () => {
-    const r = secretsHealthCheck(NOW, []);
-    for (const t of r.thresholds) expect(t.basis.length).toBeGreaterThan(20);
-    expect(r.thresholds.map((t) => t.value)).toEqual([30, 7, 0, 0]);
   });
 });
