@@ -506,6 +506,21 @@ export function skillMdDirs(root: string, scope: CorpusScope = corpusScopeFor(ro
 
 
 /**
+ * The `.md` file of the skill `name`, found through {@link skillMdDirs} — the
+ * directories the declaration says hold skills — rather than a spelled
+ * `skills/<area>/<pkg>/<name>.md`. `undefined` when no declared skill
+ * directory holds it: a skill that moved is found where it went, and one that
+ * is gone reads as gone rather than as ENOENT on a stale path.
+ */
+export function skillMdFile(root: string, name: string, scope: CorpusScope = corpusScopeFor(root)): string | undefined {
+  for (const dir of skillMdDirs(root, scope)) {
+    const p = join(root, ...dir, `${name}.md`);
+    if (existsSync(p)) return p;
+  }
+  return undefined;
+}
+
+/**
  * Skills a **declared remote package** supplies, which this instance does not hold.
  *
  * Two questions, and they must not be collapsed:

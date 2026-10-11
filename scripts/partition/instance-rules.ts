@@ -1057,8 +1057,8 @@ export const RULES: Rule[] = [
       "schemas/sticky-contribution.ts",
       "schemas/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/python-deps.ts",     // the repository's own Python toolchain
-      "schemas/avatars.ts",         // an avatar for every declared kind
-      "schemas/blank-avatar.ts",    // its blank mark, node-free for the navbar bundle
+      "schemas/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
+      "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kind-validator.ts",  // a graph typology's validator
       "schemas/actor-reach.ts",     // which actors a declaration can reach
@@ -1490,14 +1490,14 @@ const PERMITTED_EDGES: readonly PermittedEdge[] = [
   // belong is the placement audit's question (bean `lthi`), not this one's.
   {
     from: "schemas/role-graph.ts",
-    to: "schemas/model-capabilities.ts",
+    to: "schemas/model-capabilities.ts", // declared-path-literal: an import-direction exception names its endpoints by path
     reason:
       "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
       "role-graph.ts reads the model-capability schema; whether that schema is the harness's or core's is undecided.",
   },
   {
     from: "schemas/kg-qa.ts",
-    to: "schemas/qa-review.ts",
+    to: "schemas/qa-review.ts", // declared-path-literal: an import-direction exception names its endpoints by path
     reason:
       "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
       "kg-qa.ts reads the review-verdict shape; whether qa-review.ts is the harness's or core's is undecided.",

@@ -26,6 +26,7 @@ import { todoGraphDocument } from "../todo-graph.ts";
 import { buildGlossary } from "../glossary-export.ts";
 import { buildDocumentNodes, librarySubgraphStart } from "../../content/pipeline/gen-library-jsonld.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { directoryForGraph, docsSourceDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -138,7 +139,7 @@ describe("converted publishers follow the declared subgraph pattern", () => {
     const sub = declaredSubgraphNode(ROOT, "docs");
     expect(sub).toBeDefined();
     const pagePath = [
-      join(ROOT, "docs/source/guides-writing-a-paper/guides-writing-a-paper.jsonld"),
+      join(docsSourceDirFor(ROOT), "guides-writing-a-paper", "guides-writing-a-paper.jsonld"),
       join(ROOT, "content/docs/guides-writing-a-paper/guides-writing-a-paper.jsonld"),
     ].find(existsSync);
     expect(pagePath).toBeDefined();
@@ -147,9 +148,10 @@ describe("converted publishers follow the declared subgraph pattern", () => {
   });
 
   test("authoring registries: roles.json is an authoring registry projected into KG export, not a standalone published subgraph document", () => {
-    const rolesPath = join(ROOT, "scenarios/roles.json");
+    const scenarios = directoryForGraph(ROOT, "scenarios")!;
+    const rolesPath = join(scenarios, "roles.json");
     expect(existsSync(rolesPath)).toBe(true);
-    const g = readRoleGraph(join(ROOT, "scenarios"));
+    const g = readRoleGraph(scenarios);
     expect(g).toBeDefined();
     expect(g!.roles.length).toBeGreaterThan(0);
   });
