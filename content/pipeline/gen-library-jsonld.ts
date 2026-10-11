@@ -68,7 +68,7 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
-import { basename, dirname, join } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { typesForKind } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import {
   defaultInstancePrefixes,
@@ -335,7 +335,9 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
  * the page the viewer draws name one instance.
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
-  const instanceRoot = dirname(dirname(entryDir));
+  // Resolved first: from `library/<id>` the folder above is ".", whose
+  // basename would mint an IRI under ".../jsonld/./<id>/".
+  const instanceRoot = dirname(dirname(resolve(entryDir)));
   return readDeclaration(instanceRoot) !== undefined ? basename(instanceRoot) : undefined;
 }
 

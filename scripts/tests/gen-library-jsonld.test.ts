@@ -29,6 +29,7 @@ import {
   readLicence,
   licenceProperties,
   LICENCE_FILENAME,
+  libraryInstanceOf,
 } from "../../content/pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.ts";
@@ -583,5 +584,27 @@ describe("D4: a library item's licence is dcterms:license, by the row a glossary
     expect(expand(ctx.license!["@id"])).toBe(bound.license!);
     expect(bound.license).toBe("http://purl.org/dc/terms/license");
     expect(expand(ctx.licenceRecord!["@id"])).toBe(bound.licenceRecord!);
+  });
+});
+
+describe("the instance an entry belongs to", () => {
+  test("a relative entry path names the instance, not \".\"", () => {
+    // Measured 2026-10-11: `--entry library/<id>` run from the instance root
+    // minted manifests under `.../jsonld/./<id>/`, since the folder above
+    // `library` is "." until the path is resolved.
+    const root = mkdtempSync(join(tmpdir(), "relative-"));
+    mkdirSync(join(root, "inst", "library", "d"), { recursive: true });
+    writeDeclaration(join(root, "inst"), {
+      name: "inst",
+      directories: [{ id: "library", path: "library/", graphTypologies: ["library"] }],
+    });
+    const cwd = process.cwd();
+    try {
+      process.chdir(join(root, "inst"));
+      expect(libraryInstanceOf("library/d")).toBe("inst");
+    } finally {
+      process.chdir(cwd);
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
