@@ -48,6 +48,7 @@ import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { complete, enabled, startInstance, type InstanceState } from "../src/workflow/instance.ts";
 import { saveInstance } from "../src/workflow/store.ts";
 import { completeExitCriteriaGateway } from "./test-plan-execution.ts";
+import { renderTestReport, testReportBadge } from "./render-test-report.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 export interface CorpusItem { number: number; title: string; isFeature: boolean; why: string; text: string }
@@ -198,6 +199,10 @@ if (import.meta.main) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, "test-run.json"), `${JSON.stringify(run, null, 2)}\n`);
   writeFileSync(join(outDir, "test-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  // The page and its badge, beside the records they render: the badge links to
+  // the run (ff09 Done-when 2), and the relative links survive `qa:publish`.
+  writeFileSync(join(outDir, "badge.svg"), testReportBadge(report));
+  writeFileSync(join(outDir, "test-report.md"), renderTestReport(report, run, { exitDecision: plan.exitCriteria.decision }));
 
   // The process instance, driven as `workflow_complete` would drive it.
   const model = await loadProcessModel(join(HARNESS_ROOT, "processes", "sdlc", "test-plan-execution.bpmn"));

@@ -1,6 +1,6 @@
 {
   "$schema": "folio-workflow-instance/v1",
-  "id": "crdm-detect-evaluation-r-3554a15543fc-00051fde91fd",
+  "id": "crdm-detect-evaluation-r-3554a15543fc-54762ece6646",
   "processId": "Process_TestPlanExecution",
   "source": "../cat-harness/processes/sdlc/test-plan-execution.bpmn",
   "subject": "crdm-detect-evaluation@1 vs crdm-detect-signals",
@@ -14,48 +14,48 @@
   "arrivals": {},
   "history": [
     {
-      "at": "2026-10-11T06:47:35.423Z",
+      "at": "2026-10-11T06:52:54.461Z",
       "node": "Start_Request",
       "note": "instance started"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_Request",
       "actor": "ci-pipeline",
       "note": "certify crdm-detect-signals against crdm-detect-evaluation v1"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_ResolvePlan",
       "actor": "ci-pipeline",
       "note": "cat-harness/test/plans/crdm-detect-evaluation.test-plan.json parses; 27 cases"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_BindData",
       "actor": "ci-pipeline",
       "note": "fixed: cat-harness-tools/scripts/eval/crdm-detect-corpus.json (data 3554a15543fc)"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_Execute",
       "actor": "ci-pipeline",
       "note": "27 cases: {\"pass\":25,\"fail\":0,\"warn\":2,\"n/a\":0,\"skipped\":0}"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_WriteRun",
       "actor": "ci-pipeline",
-      "note": "run r-3554a15543fc-00051fde91fd → test/results/tests/crdm-detect-evaluation/crdm-detect-signals/r-3554a15543fc-00051fde91fd"
+      "note": "run r-3554a15543fc-54762ece6646 → test/results/tests/crdm-detect-evaluation/crdm-detect-signals/r-3554a15543fc-54762ece6646"
     },
     {
-      "at": "2026-10-11T06:47:35.424Z",
+      "at": "2026-10-11T06:52:54.462Z",
       "node": "A_ReExecuteSample",
       "actor": "ci-pipeline",
       "note": "checker agree on 6 sampled case(s)"
     },
     {
-      "at": "2026-10-11T06:47:35.427Z",
+      "at": "2026-10-11T06:52:54.465Z",
       "node": "GW_ExitCriteria",
       "outcome": "certified",
       "actor": "ci-pipeline",
@@ -63,6 +63,6 @@
     }
   ],
   "status": "running",
-  "startedAt": "2026-10-11T06:47:35.423Z",
-  "updatedAt": "2026-10-11T06:47:35.427Z"
+  "startedAt": "2026-10-11T06:52:54.461Z",
+  "updatedAt": "2026-10-11T06:52:54.465Z"
 }
