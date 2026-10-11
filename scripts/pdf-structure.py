@@ -1182,8 +1182,14 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
         hi = min(len(pages), (e.page or 1) + 2)
         found = None
         for pi in range(lo, hi):
-            for li, line in enumerate(pages[pi].splitlines()):
+            lines = pages[pi].splitlines()
+            for li, line in enumerate(lines):
                 cand = _heading_key(line)
+                # A label alone on its line ("A", "B.1", "3C1.") is the
+                # heading's number; PyMuPDF puts it above the title, so the
+                # outline's "A Properties of ..." matches only the two joined.
+                if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
+                    cand = _heading_key(line + " " + lines[li + 1])
                 if needle in cand and len(cand) < 120:
                     found = (pi, li)
                     break
