@@ -316,12 +316,13 @@ describe("this repository's five uncatalogued pages", () => {
     // translations (bean `7x8o`) rather than about `pot-extract.ts`.
     const root = resolve(HARNESS_ROOT);
     const r = derive(root, PAGES, LOCALES);
-    // Anti-vacuity, in both directions: some derive, and some still do not. If
-    // either end goes to zero the tool or the corpus changed fundamentally and
-    // the rest of this file's assumptions need re-deriving rather than trusting.
+    // Anti-vacuity on the derived end: some derive. The refused end reached
+    // ZERO on 2026-10-11 — bean `7x8o`, the last refusal (`zh/getting-started`),
+    // was re-translated on the owner's ruling and now aligns at 149 entries — so
+    // it is no longer asserted non-empty. What stays invariant is the shape of
+    // any refusal that comes back: a COUNT difference, never a kind divergence.
     expect(r.derived.length).toBeGreaterThan(0);
-    expect(r.refused.length).toBeGreaterThan(0);
-    expect(new Set(r.refused.map((f) => f.reason))).toEqual(new Set(["count-differs"]));
+    expect(r.refused.every((f) => f.reason === "count-differs")).toBe(true);
   });
 
   it("the same table cell is now translatable in the same way in every script (`6b8u`)", () => {
