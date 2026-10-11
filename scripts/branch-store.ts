@@ -339,11 +339,15 @@ export function tipLocations(repoRoot: string = gitTopLevel(), keyedBy: BranchKe
  * folio-assistant-core's and who-iris'. One per path is the real identity: two
  * declarations of one path are one directory, two paths are two graphs.
  */
-function allBranchLocations(repoRoot: string): TipLocation[] {
+function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = () => true): TipLocation[] {
   const found: Array<TipLocation & { instRoot: string }> = [];
   const remotes = new Map<string, RemoteInstance | undefined>();
   for (const inst of instanceRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
+      // Filtered BEFORE `keptAt`, which reads the instance's config: resolving
+      // every directory of an index costs ~27 s, one id ~0.2 s (measured
+      // 2026-10-11), and `resolveTipLocation` asks about one id.
+      if (!wantId(d.id)) continue;
       const at = keptAt(inst, repoRoot, d);
       const k = at?.keyedBy;
       if (k !== "tip" && k !== "route" && k !== "route-family") continue;
@@ -422,7 +426,10 @@ export function resolveTipLocation(
   // A location KEY (`who-iris.health`) names one graph exactly; an id more
   // than one location declares names several, and guessing among them is how
   // the wrong instance's state gets read or pushed.
-  const all = allBranchLocations(repoRoot);
+  // Only directories that could answer: the id itself, or the `<id>` a key
+  // `<instance>.<id>` ends in. Keys are assigned per id, so a narrowed scan
+  // keys them exactly as the full one does.
+  const all = allBranchLocations(repoRoot, (d) => d === id || id.endsWith(`.${d}`));
   const byKey = all.find((l) => l.key === id);
   const pick = byKey ? [byKey] : all.filter((l) => l.id === id);
   if (pick.length > 1) {
