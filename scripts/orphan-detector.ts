@@ -20,6 +20,7 @@ import { basename, join, relative } from "node:path";
 
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { resolveBeanDefs } from "./beans.ts";
 
 export interface BeanReferenceCandidate {
   id: string;
@@ -168,13 +169,16 @@ export function detectOrphansAcrossGraphs(options?: OrphanDetectorOptions): Orph
     // Resolve beans directory
     let defsDir: string | null = options?.beansDir ?? null;
     if (!defsDir) {
-      const candidates = [
-        join(root, "beans", "defs"),
-        join(repoRoot, "beans", "defs"),
-        join(coordinatorRoot, "beans", "defs"),
-      ];
-      for (const cand of candidates) {
-        if (existsSync(cand)) {
+      // The bean store each root's graph DECLARES (`resolveBeanDefs`), in
+      // the order the old literals tried — never a spelled `beans/defs`.
+      for (const r of [root, repoRoot, coordinatorRoot]) {
+        let cand: string | null = null;
+        try {
+          cand = resolveBeanDefs(r).dir;
+        } catch {
+          continue;
+        }
+        if (cand !== null && existsSync(cand)) {
           defsDir = cand;
           break;
         }

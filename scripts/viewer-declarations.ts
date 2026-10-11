@@ -58,6 +58,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   repoRootFor,
+  siteDir,
   siteDirFor,
   visualisationsOf,
   type HarnessVisualiser,
@@ -257,8 +258,10 @@ export function siteOwnerDir(repoRoot: string): string {
     return join(root, siteDirFor(root));
   } catch {
     // No declaration there at all (a fixture, a bare directory): the
-    // conventional answer `siteDir` gives every instance.
-    return join(root, "docs");
+    // conventional answer `siteDir` gives every instance — asked of it, not
+    // spelled here.
+    const name = basename(root);
+    return join(root, siteDir({ name, stub: name }));
   }
 }
 

@@ -45,6 +45,7 @@ import {
 import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { declaredDirectory } from "./lib/local-site-dir.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -167,8 +168,8 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
   }
 
   // 2. Discover additional tools
-  const toolsDir = join(repoRoot, "tools");
-  if (existsSync(toolsDir)) {
+  const toolsDir = declaredDirectory(repoRoot, "tools");
+  if (toolsDir !== undefined) {
     const scDir = join(repoRoot, "test", "results", "kg-qa", "tools");
     if (existsSync(scDir)) {
       for (const f of readdirSync(scDir).filter((x) => x.endsWith(".kg-qa.json"))) {
@@ -205,8 +206,8 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
   }
 
   // 3. Discover schemas
-  const schemasDir = join(repoRoot, "schemas");
-  if (existsSync(schemasDir)) {
+  const schemasDir = declaredDirectory(repoRoot, "schemas");
+  if (schemasDir !== undefined) {
     for (const f of readdirSync(schemasDir).filter((x) => x.endsWith(".ts") && !x.endsWith(".test.ts"))) {
       const id = f.replace(/\.ts$/, "");
       if (seenIds.has(id)) continue;

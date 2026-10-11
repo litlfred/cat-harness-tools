@@ -19,6 +19,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 export type LeanRefClassification = "built" | "sibling_only" | "dangling" | "unknown";
 
@@ -421,7 +422,7 @@ export function auditLakeTargetLeanResolution(
     blocks = opts.blocks;
   } else {
     const contentDir = join(root, "content");
-    const folioDirPath = join(root, "folio");
+    const folioDirPath = folioDir(root);
     if (existsSync(contentDir)) {
       blocks.push(...scanBlockRefs(contentDir));
     }
@@ -457,7 +458,7 @@ export function auditLakeTargetLeanResolution(
     } else if (existsSync(join(root, "lakefile.toml")) || existsSync(join(root, "lakefile.lean"))) {
       lakeRoot = root;
     } else {
-      for (const d of [join(root, "content"), join(root, "folio")]) {
+      for (const d of [join(root, "content"), folioDir(root)]) {
         if (existsSync(d)) {
           for (const ent of readdirSync(d, { withFileTypes: true })) {
             if (ent.isDirectory()) {

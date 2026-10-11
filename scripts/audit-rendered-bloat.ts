@@ -27,6 +27,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteOwnerDir } from "./viewer-declarations.ts";
 
 import {
   KG_QA_SCHEMA,
@@ -39,7 +41,11 @@ import {
 export const CRITERION_ID = "redundant-rendered-content-audit";
 export const DEFAULT_THRESHOLD_BYTES = 500;
 export const DEFAULT_MIN_OCCURRENCES = 2;
-export const DEFAULT_SIDECAR_PATH = "test/results/kg-qa/rendered-content-bloat.kg-qa.json";
+/**
+ * The sidecar's NAME. Its directory is the instance's declared `qa` tree
+ * (`kgQaHomeFor`) under `kg-qa/`, asked at run time rather than spelled here.
+ */
+export const DEFAULT_SIDECAR_NAME = "rendered-content-bloat.kg-qa.json";
 
 export type BloatAction = "move" | "keep_serverside" | "unsure";
 
@@ -512,10 +518,11 @@ export function classifyCandidate(candidate: {
  */
 export function auditRenderedBloat(options: AuditRenderedBloatOptions = {}): RenderedBloatAuditResult {
   const repoRoot = options.repoRoot ?? process.cwd();
-  const siteDir = options.siteDir ?? (existsSync(join(repoRoot, "_site")) ? join(repoRoot, "_site") : join(repoRoot, "docs"));
+  // A built `_site/` first, else the site the declaration names (`siteOwnerDir`).
+  const siteDir = options.siteDir ?? (existsSync(join(repoRoot, "_site")) ? join(repoRoot, "_site") : siteOwnerDir(repoRoot));
   const threshold = options.threshold ?? DEFAULT_THRESHOLD_BYTES;
   const minOccurrences = options.minOccurrences ?? DEFAULT_MIN_OCCURRENCES;
-  const sidecarRel = options.sidecarPath ?? DEFAULT_SIDECAR_PATH;
+  const sidecarRel = options.sidecarPath ?? join(kgQaHomeFor(repoRoot).root, "kg-qa", DEFAULT_SIDECAR_NAME);
   const sidecarPath = isAbsolute(sidecarRel) ? sidecarRel : join(repoRoot, sidecarRel);
   const writeSidecar = options.writeSidecar ?? true;
 

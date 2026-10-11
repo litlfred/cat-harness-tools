@@ -63,6 +63,7 @@ import { sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { declaredDirectory, localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "external-schemas-viewer";
@@ -95,7 +96,7 @@ export function declaredUsers(specs: readonly ExternalSchema[], repoRoot = REPO)
   );
   const targetRoot = existsSync(join(repoRoot, "cat-harness", "schemas"))
     ? repoRoot
-    : existsSync(join(repoRoot, "schemas"))
+    : declaredDirectory(repoRoot, "schemas") !== undefined
     ? repoRoot
     : INSTANCE_ROOT;
   const kindsInstance = existsSync(join(targetRoot, "cat-harness")) ? "cat-harness" : ".";
@@ -441,9 +442,7 @@ if (import.meta.main) {
     page(specs, users, inUse, fileHref),
     VIEWER_TOOL,
   );
-  const docsBase = existsSync(join(INSTANCE_ROOT, "docs"))
-    ? join(INSTANCE_ROOT, "docs")
-    : baseDocsDir(REPO);
+  const docsBase = localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO);
   const out = join(docsBase, PAGE);
 
   if (check) {

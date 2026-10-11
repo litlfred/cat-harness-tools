@@ -23,6 +23,11 @@ import { join, resolve, relative, isAbsolute, normalize } from "path";
 /**
  * Declared graph directories in cat-harness / folio-assistant.
  * If cat-harness.json is readable, this is augmented from its declared directories.
+ *
+ * declared-path-literal: the FALLBACK list for when no declaration can be read —
+ * the guard must still refuse a benchmark that would write into a graph, and
+ * an unreadable declaration is exactly when it cannot ask. The live list is
+ * the declaration's, merged over this.
  */
 export const DEFAULT_GRAPH_DIRECTORIES = [
   "validators",
