@@ -1155,7 +1155,7 @@ def parse_front_matter(pages: list[str]) -> dict[str, Any]:
 _SPACING_ACCENTS = dict.fromkeys(map(ord, "\u00a8\u00b4\u0060\u02c6\u02dc\u00b8\u02d8\u02d9\u02da\u02db\u02dd\u02c7\u00af"))
 
 
-def _heading_key(text: str) -> str:
+def _match_key(text: str) -> str:
     """`text` lower-cased with accents dropped, combining or spacing, so an
     outline title and the page line that prints it compare equal.
 
@@ -1175,7 +1175,7 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
     used: set[int] = set()
 
     for e in toc:
-        needle = _heading_key(e.title)[:44]
+        needle = _match_key(e.title)[:44]
         if not needle:
             continue
         lo = max(0, (e.page or 1) - 2)
@@ -1184,12 +1184,12 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
         for pi in range(lo, hi):
             lines = pages[pi].splitlines()
             for li, line in enumerate(lines):
-                cand = _heading_key(line)
+                cand = _match_key(line)
                 # A label alone on its line ("A", "B.1", "3C1.") is the
                 # heading's number; PyMuPDF puts it above the title, so the
                 # outline's "A Properties of ..." matches only the two joined.
                 if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
-                    cand = _heading_key(line + " " + lines[li + 1])
+                    cand = _match_key(line + " " + lines[li + 1])
                 if needle in cand and len(cand) < 120:
                     found = (pi, li)
                     break
