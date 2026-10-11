@@ -53,7 +53,7 @@ import { parse as parseYaml } from "yaml";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
-import { auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
+import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
 import { contentCodeFindings, contentInstanceCode } from "./content-holds-code.js";
 import { orphanSubjectResolves } from "./orphan-detector.js";
@@ -73,6 +73,7 @@ import {
   ATTESTATIONS_SUFFIX,
   attestationPathFor,
   attestationsHomeFor,
+  CERTIFICATION_FAMILY,
   KG_QA_SIDECAR_SUFFIX,
   priorKgJudgements,
   QA_ATTESTATIONS_SCHEMA,
@@ -1872,6 +1873,12 @@ function testPlanCriteria(actors: LoadedActor[]): Record<string, KgCriterionEntr
       root,
       plans: planFiles,
       dmnBases: [WORKFLOW_DIR],
+    }),
+    // Bean `zaui`: the certifications `A_FileCertification` files, judged.
+    "certification-resolves": auditCertifications({
+      root,
+      plans: planFiles,
+      files: jsonFilesUnder([join(ATT_HOME.root, CERTIFICATION_FAMILY)]),
     }),
   };
 }

@@ -38,6 +38,7 @@ import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/
 import { TestPlanSchema, TEST_PLAN_SCHEMA_ID, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
 import { TestRunSchema, UNKNOWN_HASH, type SutRef } from "@litlfred/cat-harness/schemas/test-run.js";
 import { TestReportSchema, TEST_REPORT_SCHEMA_ID, checkAgainstPlan } from "@litlfred/cat-harness/schemas/test-report.js";
+import { CertificationAttestationsSchema } from "@litlfred/cat-harness/schemas/qa-attestations.js";
 import type { SutKind } from "@litlfred/cat-harness/schemas/test-plan.js";
 
 /** The four criterion ids, in registry order. */
@@ -328,4 +329,65 @@ export function auditTestPlanExitCriteria(input: TestPlanExitCriteriaAuditInput)
     result: findings.length > 0 ? "fail" : "pass",
     findings,
   };
+}
+
+// ── `certification-resolves` (bean `zaui`, Done-when 2) ─────────────────────
+
+export interface CertificationAuditInput {
+  /** Instance root: evidence paths and findings are relative to it. */
+  root: string;
+  /** Plan files (`test-plan/v1`), from the declared `test-plan` directories. */
+  plans: readonly string[];
+  /** Every file under `<attestations>/certification/`. */
+  files: readonly string[];
+}
+
+/**
+ * Judge every filed certification: it parses as the `certification` family,
+ * each entry records `certified`, names a plan a declared `test-plan`
+ * directory holds, and points at evidence. Evidence that is not in this
+ * checkout (a report kept on `qa-reports`) is `unknown`, never a pass. No
+ * certification filed is `n/a`.
+ */
+export function auditCertifications(input: CertificationAuditInput): KgCriterionEntry {
+  if (input.files.length === 0) return { result: "n/a", findings: [] };
+  const planIds = new Set<string>();
+  for (const p of input.plans) {
+    const raw = readJson(p);
+    const parsed = raw.ok ? TestPlanSchema.safeParse(raw.value) : undefined;
+    if (parsed?.success) planIds.add(parsed.data.id);
+  }
+  const findings: KgFinding[] = [];
+  const unseen: KgFinding[] = [];
+  for (const f of input.files) {
+    const where = relative(input.root, f);
+    const raw = readJson(f);
+    if (!raw.ok) {
+      findings.push({ where, detail: `not JSON: ${raw.error}` });
+      continue;
+    }
+    const parsed = CertificationAttestationsSchema.safeParse(raw.value);
+    if (!parsed.success) {
+      findings.push({ where, detail: `not a qa-attestations/v1 certification file: ${issues(parsed.error)}` });
+      continue;
+    }
+    parsed.data.certifications.forEach((c, i) => {
+      const at = `${where}#certifications[${i}]`;
+      const decision = c.decision ?? c.verdict;
+      if (decision !== "certified") {
+        findings.push({ where: at, detail: `records "${decision}", not "certified" — a refusal filed as a certification reads as a green it is not` });
+      }
+      if (!planIds.has(c.testPlanId)) {
+        findings.push({ where: at, detail: `names test plan \`${c.testPlanId}\`, which no declared test-plan directory holds` });
+      }
+      if (!c.evidence) {
+        findings.push({ where: at, detail: "points at no evidence — a certification must name the report it certifies" });
+      } else if (!existsSync(resolve(input.root, c.evidence))) {
+        unseen.push({ where: at, detail: `evidence \`${c.evidence}\` is not in this checkout — fetch the qa-reports entry (\`bun run cat qa:fetch\`) to judge it` });
+      }
+    });
+  }
+  if (findings.length > 0) return { result: "fail", findings: [...findings, ...unseen] };
+  if (unseen.length > 0) return { result: "unknown", findings: unseen };
+  return { result: "pass", findings: [] };
 }
