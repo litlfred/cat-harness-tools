@@ -44,7 +44,7 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
     expect(await pageUrls(html)).toEqual(["a.html", "i.png", "f/"]);
   });
 
-  test("--pre and --source-step take package script names, never commands", () => {
+  test("--pre, --source-step and --site-step take package script names, never commands", () => {
     for (const ok of ["check:catalogue", "site:catalogue", "iris.pages-check_2"]) expect(SCRIPT_NAME.test(ok)).toBe(true);
     for (const bad of ["bun run x", "a;rm -rf /", "$(id)", "a && b", "-x", ""]) expect(SCRIPT_NAME.test(bad)).toBe(false);
   });

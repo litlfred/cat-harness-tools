@@ -655,8 +655,18 @@ export function reviewSiteRoot(pathname: string, locales: readonly string[]): st
   return segs.length >= 4 && locales.indexOf(segs[segs.length - 3]!) >= 0 ? "../../" : "../";
 }
 
-/** The review page. Static: all of its data is fetched when it is opened. */
-export function reviewPageHtml(): string {
+/**
+ * The review page. Static: all of its data is fetched when it is opened.
+ *
+ * `root` is the site root relative to the page, for the one link written into
+ * the markup: "All documents", before the script corrects it from the page's
+ * own path ({@link reviewSiteRoot}). It is what a link check reads, and what a
+ * reader without scripts follows. The page's one writer, core's
+ * build-document-site, puts it at `<site>/<locale>/review/`, hence `../../`;
+ * the hard-coded `../` it had resolved to `<site>/<locale>/index.html`, which
+ * no build writes.
+ */
+export function reviewPageHtml(root: string = "../../"): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -678,7 +688,7 @@ export function reviewPageHtml(): string {
   <button type="button" id="prevc">Previous with comments (p)</button>
   <button type="button" id="nextc">Next with comments (n)</button>
   <button type="button" id="nextu">Next unreviewed (u)</button>
-  <a id="all-documents" href="../index.html">All documents</a>
+  <a id="all-documents" href="${root}index.html">All documents</a>
 </div>
 <div class="viewrow"><label for="view">Show every change as</label> <select id="view"></select></div>
 <section aria-labelledby="rendered-h"><h2 id="rendered-h">Rendered pages this change alters</h2><div id="rendered" class="muted">Loading the rendered impact…</div></section>
