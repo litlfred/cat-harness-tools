@@ -59,6 +59,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 /** Paths, relative to the scanned tree, that hold records. Matched as globs (`**` any depth, `*` one segment). */
+// declared-path-literal: globs RELATIVE TO WHICHEVER TREE IS SCANNED (`--root`), naming record directories by their conventional names; they are not paths into this checkout's instances.
 export const DEFAULT_RECORD_GLOBS: readonly string[] = [
   "beans/**",
   "todos/**",

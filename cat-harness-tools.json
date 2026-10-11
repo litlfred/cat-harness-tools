@@ -133,7 +133,13 @@
       "description": "Repository health reports for THIS repository: the one `health-report/v1` document `bun run cat-harness-tools/test/health/run.ts --instance <this instance>` writes. Each repository the separation made is its own clone, with its own size, publish branch, branches and stores, so each carries its own report (owner, 2026-10-10: \"All repos need health check\"). The graph typology is cat-harness's; its `health` entry says what separates a health report (about the repository) from a `qa` verdict (about an artefact). It sits at the root, not under `test/health/results/` as in cat-harness, because this instance declares `test/` as code and a declared directory nested inside another is the layout-norms defect (owner, 2026-10-10: option A, move it out of `test/`); at the root a state graph's path equals its id, as `beans/` does.",
       "graphTypologies": [
         "health"
-      ]
+      ],
+      "_source_comment": "MOUNTED, owner 2026-10-11 (session_01UC1NuEuSy1MBNpEhnDuiGj, 05:58:12Z: \"move health to state branch now\"). The report is generated state, not reviewed content, so it is kept on its own per-graph branch (owner, 2026-10-03, bean laqs) and mounted at this path by `bun run cat state:mount`; main dropped it in the same commit that declared this source, because `mountTip` refuses a path the checkout still tracks.",
+      "source": {
+        "kind": "branch",
+        "branch": "cat/cat-harness-tools/health",
+        "keyedBy": "tip"
+      }
     }
   ],
   "assets": [

@@ -205,8 +205,10 @@ describe("the QA catches ABSENCE — and can actually fail", () => {
     // instead of from the thing it probed. `install: { none: true }` is the
     // only honest source for "this tool cannot run".
     const declared = stubbedTools(tools());
-    expect(declared.has("tabular-csv")).toBe(true);
-    expect(declared.has("tabular-xlsx")).toBe(true);
+    // Which tools are stubbed is the DECLARATIONS' answer, so it is not
+    // restated here either: `tabular-csv` and `tabular-xlsx` were stubs until
+    // their extractors landed in folio-assistant-core (bean cat-tools-1wre),
+    // and a test pinning them as stubs would have had to be edited in step.
     // And a tool that CAN run must be outside the set. Without this the
     // predicate could return true for everything and still look right — which
     // it did, until a mutation said so: every stub would then read as
@@ -227,10 +229,11 @@ describe("the QA catches ABSENCE — and can actually fail", () => {
     expect([...set]).toEqual(["unbuilt"]);
   });
 
-  test("both tools name the skill they satisfy", () => {
+  test("a declared stub names the skill it would satisfy", () => {
     // A Tool that satisfies nothing is a mechanism with no stated capability.
-    const t = tools().filter((x) => x.id.startsWith("tabular-"));
-    expect(t).toHaveLength(2);
-    for (const x of t) expect(x.satisfies).toContain("tabular-metadata");
+    // Checked over whatever is stubbed now, which may be nothing.
+    for (const t of tools().filter((x) => stubbedTools(tools()).has(x.id))) {
+      expect(t.satisfies?.length ?? 0, t.id).toBeGreaterThan(0);
+    }
   });
 });

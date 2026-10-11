@@ -150,6 +150,7 @@ const run = buildTestRun({
   processInputs: [
     "cat-harness-tools/scripts/eval-crdm-detect.ts",
     "cat-harness-tools/src/crdm/detect-signals.ts",
+    // declared-path-literal: a provenance record (`processInputs`), written into the evaluation report as repo-relative names; it is not read from disk here.
     "cat-harness/skills/sdlc/crdm/crdm-detect.md",
   ],
   outcome: {

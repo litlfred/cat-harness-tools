@@ -161,12 +161,6 @@ export const UNCATALOGED: UncatalogedTranslation[] = [
       "`count-differs` — source 146 constructs, translation 147. Same shape as `ar/architecture`: longer than its source by one, so no positional alignment is sound",
   },
   {
-    translation: "zh/start/getting-started",
-    since: "2026-09-26",
-    reason:
-      "`count-differs` — source 149 constructs, translation 145. Diagnosed on bean `7x8o`: 20 table cells are dropped by `isTranslatable`, of which `是` and `否` are real words dropped for being one character. That is bean `6b8u`'s own incompleteness, and the obvious CJK-aware rule is measured and deliberately NOT shipped — it takes this pair from short-by-4 to long-by-1",
-  },
-  {
     translation: "ar/process/publication-workflow",
     since: "2026-09-26",
     reason:

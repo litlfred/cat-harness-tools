@@ -109,6 +109,7 @@ from _pdf_title import BROWSER_RE, apply as resolve_title, evidence_from_pdf  # 
 # or from a printed contents page. Measured against held-out outlines by
 # `toc-benchmark.py`; see docs/research-and-analysis/toc-extraction.md.
 import _pdf_headings  # noqa: E402
+import _latex_headings  # noqa: E402
 import _pdf_figures  # noqa: E402
 import _pdf_page_labels  # noqa: E402
 
@@ -577,7 +578,8 @@ def toc_mean_confidence(toc: list["TocEntry"]) -> float:
     return sum(e.confidence or 0.0 for e in toc) / len(toc)
 
 
-def inferred_toc_trust(toc: list["TocEntry"], pages: list[str]) -> tuple[str | None, float | None, float | None]:
+def inferred_toc_trust(toc: list["TocEntry"], pages: list[str],
+                       from_source: bool = False) -> tuple[str | None, float | None, float | None]:
     """(reason it may not be used or None, mean confidence, empty-section
     share) for an inferred TOC over the document's page texts.
 
@@ -586,13 +588,18 @@ def inferred_toc_trust(toc: list["TocEntry"], pages: list[str]) -> tuple[str | N
     (judged from TOC_MIN_ENTRIES_FOR_VERDICT sections up, as concentration
     is). The first reason found is the one recorded. All `None` for an empty
     list — there is nothing to trust or distrust, and nothing to report.
+
+    `from_source` is a TOC taken from the paper's LaTeX: its entries are the
+    author's and not a list found on a page, so the concentration verdict,
+    which exists to catch exactly that, does not apply. The confidence and
+    empty-section tests still do.
     """
     if not toc:
         return None, None, None
     mean = round(toc_mean_confidence(toc), 3)
     share, judged = toc_empty_share(split_sections(pages, toc))
     share = round(share, 3)
-    reason = inferred_toc_verdict(toc, len(pages))
+    reason = None if from_source else inferred_toc_verdict(toc, len(pages))
     if reason is None and mean < TOC_MIN_MEAN_CONFIDENCE:
         reason = (f"{len(toc)} inferred entries with mean confidence {mean:.2f}, "
                   f"below the {TOC_MIN_MEAN_CONFIDENCE} floor — too little evidence agreed")
@@ -769,8 +776,24 @@ def infer_figures(path: str, lines: list | None) -> tuple[list[dict[str, Any]], 
     return [e._asdict() | {"evidence": list(e.evidence)} for e in entries], _pdf_figures.sequence_gaps(entries)
 
 
-def infer_toc(lines: list | None, pages: list[str]) -> tuple[list[TocEntry], str | None]:
+# The share of the LaTeX source's headings the PDF body must confirm before the
+# source is taken as this PDF's contents.
+LATEX_FOUND_SHARE = 0.5
+
+
+def infer_toc(lines: list | None, pages: list[str],
+              tex: list | None = None) -> tuple[list[TocEntry], str | None]:
     """A table of contents for a document with no outline, and the method.
+
+    The paper's own LaTeX comes first when its source is at hand (`tex`, from
+    `_latex_headings`): the author's sectioning commands are the spine and the
+    layout supplies only their pages (`_pdf_headings.latex_headings`). It is
+    used when the body confirms at least half of them; otherwise the source
+    does not describe this PDF (another version, a different file) and the
+    layout is read as if there were none. Measured on 60 qou PDFs that carry
+    both an outline and their arXiv source, outline hidden as the answer key
+    (`toc-benchmark.py`, layout via pymupdf): title F1 0.80 from the source,
+    0.49 from the layout alone, 0.82 with this fallback.
 
     Layout first, text patterns last: the printed contents page cross-checked
     against the body, else heading styles confirmed by numbering, each entry
@@ -782,6 +805,12 @@ def infer_toc(lines: list | None, pages: list[str]) -> tuple[list[TocEntry], str
     OCR'd text, which carries no font metrics, and for a document where the
     layout finds nothing.
     """
+    if lines and tex:
+        scored = _pdf_headings.latex_headings(lines, tex)
+        if scored and _pdf_headings.latex_found_share(scored) >= LATEX_FOUND_SHARE:
+            return [TocEntry(s.heading.level, s.heading.title, s.heading.page, "inferred",
+                             s.heading.number, round(s.confidence, 2), list(s.sources))
+                    for s in scored], "latex"
     if lines:
         scored = _pdf_headings.consensus_headings(lines)
         if scored:
@@ -1480,16 +1509,26 @@ def library_noise_to_stderr():
 
 
 def process(path: str, outdir: str | None = None, use_ocr: bool = False,
-            backend: str = "auto") -> tuple[dict[str, Any], list[Section]]:
+            backend: str = "auto", latex_source: str | None = None) -> tuple[dict[str, Any], list[Section]]:
     # Everything that touches a PDF backend runs under the redirect. `process`
     # writes nothing to stdout itself — it RETURNS the artefact and its caller
     # prints it — so nothing legitimate is caught by this.
     with library_noise_to_stderr():
-        return _process(path, outdir, use_ocr, backend)
+        return _process(path, outdir, use_ocr, backend, latex_source)
+
+
+def latex_source_for(path: str, given: str | None) -> str | None:
+    """The LaTeX source to read headings from: the one named, else the entry's
+    own `source/` beside the PDF (where `arxiv-source.py` puts it), else none.
+    `""` names none, so a caller can switch the lookup off."""
+    if given is not None:
+        return given or None
+    beside = os.path.join(os.path.dirname(os.path.abspath(path)), "source")
+    return beside if os.path.exists(beside) else None
 
 
 def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
-             backend: str = "auto") -> tuple[dict[str, Any], list[Section]]:
+             backend: str = "auto", latex_source: str | None = None) -> tuple[dict[str, Any], list[Section]]:
     reader = open_backend(path, backend)
     pages = reader.page_texts()
     ocr_used = False
@@ -1510,10 +1549,13 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     lines = layout_lines(path, ocr_used)
     inferred: list[TocEntry] = []
     inferred_method: str | None = None
+    tex_source = latex_source_for(path, latex_source)
+    tex = _latex_headings.source_headings(tex_source)[0] if tex_source and not outline else None
     if not outline:
-        inferred, inferred_method = infer_toc(lines, pages)
+        inferred, inferred_method = infer_toc(lines, pages, tex)
     n_inferred = len(inferred)
-    toc_undetermined, mean_confidence, empty_share = inferred_toc_trust(inferred, pages)
+    toc_undetermined, mean_confidence, empty_share = inferred_toc_trust(
+        inferred, pages, from_source=inferred_method == "latex")
     if toc_undetermined:
         inferred = []
     toc = outline or inferred
@@ -1635,8 +1677,9 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             # And the third's: the share of empty sections the tree would cut.
             **({"toc_inferred_empty_share": empty_share} if empty_share is not None else {}),
             # Which inference produced it: "contents" (a printed contents
-            # page), "font" (heading styles) or "regex" (text patterns, the
-            # last resort). Absent when the outline was used.
+            # page), "font" (heading styles), "latex" (the paper's own LaTeX
+            # source, placed on its pages) or "regex" (text patterns, the last
+            # resort). Absent when the outline was used.
             **({"toc_inferred_method": inferred_method} if inferred_method else {}),
             "figure_entries": len(figures),
             # Numbers missing from a caption run ("table 2.1" when there is a
@@ -1697,6 +1740,10 @@ def main() -> int:
     ap.add_argument("--ocr", action="store_true",
                     help="for a PDF whose text layer is absent or mojibake, use the "
                          "cached OCR text written by pdf-ocr.py (which must be run first)")
+    ap.add_argument("--latex-source", default=None,
+                    help="LaTeX source (directory or e-print) whose \\section commands give the "
+                         "headings when the PDF has no outline. Default: the entry's own source/ "
+                         "beside the PDF, if there is one. Pass '' to read none.")
     ap.add_argument("--backend", choices=("auto", "pymupdf", "pypdf"), default="auto",
                     help="PDF reader backend. auto (default) prefers PyMuPDF when "
                          "installed (cleaner text + real embedded outlines) and falls "
@@ -1715,7 +1762,7 @@ def main() -> int:
     ok = failed = 0
     for path in targets:
         try:
-            artefact, sections = process(path, args.outdir, args.ocr, args.backend)
+            artefact, sections = process(path, args.outdir, args.ocr, args.backend, args.latex_source)
         except Exception as exc:
             failed += 1
             print(f"FAIL  {os.path.basename(path)}: {type(exc).__name__}: {exc}",

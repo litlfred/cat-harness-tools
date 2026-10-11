@@ -1159,6 +1159,26 @@ const PROOF: QaCriterionDefinition[] = [
     extra_inputs: ["docs/audits/lean-triviality.json"],
   },
   {
+    id: "recommendation-strength-resolves",
+    domain: "canonical",
+    // The rule is the harness's; the checker is folio-assistant-core's,
+    // because code lists and the `recommendation` kind are content vocabulary
+    // (bean folio-assistant-55ao). See `checker_contributed`.
+    checker_contributed: true,
+    description:
+      "A `recommendation` block's `strength` names an ACTIVE code in a code " +
+      "list its folio can see: core's `code-lists/` (GRADE, BCP 14) or the " +
+      "folio's own. Read from the manifest as text. `n/a` when no strength is " +
+      "declared (the field is optional; whether a folio requires one is the " +
+      "folio's rule); `warn` when the strength is computed rather than literal, " +
+      "so it could not be checked; `fail` naming the list or code that does not " +
+      "resolve.",
+    default_severity: "major",
+    depends_on: ["ts"],
+    automated: true,
+    applies_to: ["recommendation"],
+  },
+  {
     id: "proof-compile-cost",
     domain: "proof",
     // The rule is core's; the checker is `folio-assistant-sci`'s, because

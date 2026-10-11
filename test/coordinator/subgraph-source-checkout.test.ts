@@ -28,6 +28,12 @@ describe("THE GATE — every declared subgraph in this checkout resolves", () =>
   test("the checkout declares subgraphs to check", () => {
     expect(ids.length).toBeGreaterThan(0);
   });
+  // An explicit budget, measured rather than guessed: this resolves EVERY
+  // declared subgraph across every instance in the checkout (one
+  // checkout-wide walk per id), which took ~4.5 s of a 5.47 s file run in the
+  // CI-shaped mount on 2026-10-11 — at Bun's 5 s default, so a loaded runner
+  // timed it out on unrelated PRs (#69, #93) while it passed everywhere else.
+  // The assertion is unchanged; only the time it may take is stated.
   test("each resolves (a branch source needs no table row: the declaration is the authority, bean rva2)", () => {
     const findings: string[] = [];
     for (const id of ids) {
@@ -40,5 +46,5 @@ describe("THE GATE — every declared subgraph in this checkout resolves", () =>
       }
     }
     expect(findings).toEqual([]);
-  });
+  }, 30_000);
 });

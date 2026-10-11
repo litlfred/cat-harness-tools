@@ -13,7 +13,7 @@
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
  *     --instance <name> --home <page.md> \
- *     --pre <package script> --source-step <package script> \
+ *     --pre <package script> --source-step <package script> --site-step <package script> \
  *     [--staging <branch>] [--publish --remote <git url>]
  *
  * Steps, each a stop on failure (never a skip):
@@ -30,13 +30,17 @@
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
  *
- * `--pre` and `--source-step` take package SCRIPT NAMES, never commands: the
+ * `--pre`, `--source-step` and `--site-step` take package SCRIPT NAMES, never commands: the
  * Tool contract admits no input that can carry a shell payload (check:tools),
  * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
  *     everywhere), title and description from the instance's declaration, baseurl from the
  *     git remote (`/<repo>`, or `/<repo>/STAGING/<branch>` for a preview)
- *  6. mount-instance-docs, pdf-viewer, set-html-lang, publish-id-lookup,
+ *  6. each `--site-step` package script, as `bun run <name> <built site>`: a generator that
+ *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
+ *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
+ *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
+ *     mount-instance-docs, pdf-viewer, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages, `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
@@ -66,6 +70,8 @@ export interface BuildOptions {
   home?: string;
   pre: string[];
   sourceSteps: string[];
+  /** Package scripts run as `bun run <name> <built site>` after Jekyll: generators that write finished pages. */
+  siteSteps?: string[];
   staging?: string;
   mount: boolean;
   /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
@@ -252,7 +258,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const gh = ownerRepo(remote);
   if (!gh) throw new Error(`origin ${remote} is not a GitHub repository: the base path cannot be read`);
   const title = decl.title ?? decl.name;
-  for (const n of [...o.pre, ...o.sourceSteps]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+  for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
   const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
   const out = resolve(o.out);
@@ -309,6 +315,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   );
 
   const s = JSON.stringify(site);
+  for (const st of o.siteSteps ?? []) run(`site: ${st}`, `bun run ${st} ${s}`, root);
   run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
   run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
   run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
@@ -358,7 +365,7 @@ if (import.meta.main) {
   if (!instance) {
     console.error(
       "usage: build-instance-site.ts --root <checkout> --instance <name> [--link-root <url>] [--out <dir>] [--home <md>]\n" +
-        "         [--pre <script>]... [--source-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]",
+        "         [--pre <script>]... [--source-step <script>]... [--site-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]",
     );
     process.exit(2);
   }
@@ -371,6 +378,7 @@ if (import.meta.main) {
       home: one("--home"),
       pre: many("--pre"),
       sourceSteps: many("--source-step"),
+      siteSteps: many("--site-step"),
       staging: one("--staging"),
       mount: !a.includes("--no-mount"),
       fresh: a.includes("--fresh"),

@@ -364,6 +364,10 @@ export type Target = "main" | "preview";
  * comparison wrong.
  */
 export function chooseTarget(o: { branch: string; defaultBranch?: string; main?: boolean }): Target {
+  // A detached checkout names no branch: `rev-parse --abbrev-ref HEAD` answers
+  // the literal "HEAD", which would otherwise publish a preview at
+  // STAGING/HEAD/. Say which branch this is rather than guess.
+  if (o.branch === "HEAD") throw new Error("the checkout is detached, so it names no branch; check out the branch, or pass --branch <name>");
   if (o.main) {
     if (o.defaultBranch && o.branch !== o.defaultBranch) throw new Error(`--main publishes the site at the publish root, and '${o.branch}' is not the default branch '${o.defaultBranch}'; refusing`);
     return "main";
