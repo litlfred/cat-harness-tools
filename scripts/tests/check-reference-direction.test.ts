@@ -31,6 +31,10 @@ import {
   CENSUS_FAMILY,
   CHECK_FAIL_ON_NEW,
   declaresTranslationMirror,
+  DEFINITION_NAMES_IMPLEMENTATION,
+  movedTo,
+  rekeyMovedPairs,
+  type MoveEvidence,
   EXEMPTIONS_DECLARED,
   directionCensus,
   directionSidecarState,
@@ -878,4 +882,134 @@ describe("the real tree: a new doc naming two instances above it makes `--check`
     },
     180_000,
   );
+});
+
+// ── Ruling (ii): a harness definition may name its tools script ──
+
+describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (owner, 2026-10-11, ruling (ii))", () => {
+  // cat-harness <- cat-harness-tools <- smart-base: the harness names neither.
+  const LAYERS = new Map<string, readonly string[]>([
+    ["cat-harness", []],
+    ["cat-harness-tools", ["cat-harness"]],
+    ["smart-base", ["cat-harness-tools"]],
+  ]);
+  const LAYER_RULE: LayerRule = {
+    allowed: allowedFromNeeds(
+      LAYERS,
+      ancestorsOf(flattenDependencies([...LAYERS].map(([id, needs]) => ({ id, needs: [...needs], fatal: false }))).order),
+    ),
+  };
+  const verdict = (file: string, text: string, to = "cat-harness-tools") =>
+    classifyReference(occ("cat-harness", to, text, file), LAYER_RULE, never, [DEFINITION_NAMES_IMPLEMENTATION]).verdict;
+  const SKILL = "cat-harness/skills/sdlc/sdlc-core/x.md";
+
+  test("a skill's command line naming a tools script is exempt", () => {
+    expect(verdict(SKILL, "bun run cat-harness-tools/scripts/qa-refresh.ts --check")).toBe("exempt");
+    expect(verdict(SKILL, "see `cat-harness-tools/scripts/partition/engine.ts` and `cat-harness-tools/scripts/gates.ts`")).toBe("exempt");
+    expect(verdict(SKILL, "bun run <platform>/cat-harness-tools/archimate/scripts/check-archimate.ts --instance .")).toBe("exempt");
+    expect(verdict(SKILL, "bun run cat-harness-tools/content/pipeline/graph-search.ts \"<q>\"")).toBe("exempt");
+    // Other harness Markdown, not only skills: the coordinator's scope.
+    expect(verdict("cat-harness/AGENTS.md", "bun run cat-harness-tools/scripts/mount-from-lock.ts")).toBe("exempt");
+  });
+
+  test("FAILS for code and configuration in cat-harness naming the same script", () => {
+    const line = "bun run cat-harness-tools/scripts/qa-refresh.ts --check";
+    expect(verdict("cat-harness/schemas/qa-record-shapes.ts", line)).toBe("wrong-direction");
+    expect(verdict("cat-harness/.github/workflows/post-merge-regen.yml", line)).toBe("wrong-direction");
+    expect(verdict("cat-harness/openapi/typologies/openapi.json", line)).toBe("wrong-direction");
+  });
+
+  test("FAILS for a skill naming a tools path that is not a script or a command", () => {
+    expect(verdict(SKILL, "logic in `cat-harness-tools/src/core/handover-screen.ts`")).toBe("wrong-direction");
+    expect(verdict(SKILL, "`cat-harness-tools/test/review-nav.e2e.ts` drives all of this")).toBe("wrong-direction");
+    expect(verdict(SKILL, "repositories (cat-harness, cat-harness-tools, folio-assistant-core)")).toBe("wrong-direction");
+  });
+
+  test("FAILS when a script on the line sits beside a non-script mention of the layer", () => {
+    expect(
+      verdict(SKILL, "`cat-harness-tools/scripts/gates.ts` reads `cat-harness-tools/src/workflow/prov-record.ts`"),
+    ).toBe("wrong-direction");
+  });
+
+  test("FAILS for a skill naming another layer's scripts, and outside cat-harness", () => {
+    expect(verdict(SKILL, "bun run smart-base/scripts/dak-pdf.ts", "smart-base")).toBe("wrong-direction");
+    expect(
+      classifyReference(
+        occ("cat-harness", "cat-harness-tools", "bun run cat-harness-tools/scripts/x.ts", "bootstrap/skills/x.md"),
+        LAYER_RULE,
+        never,
+        [DEFINITION_NAMES_IMPLEMENTATION],
+      ).verdict,
+    ).toBe("wrong-direction");
+  });
+});
+
+// ── Ruling (i): a moved file keeps its baseline pairs ────────────
+
+describe("ruling (i) — a baseline pair on a MOVED file is compared at the file's new path", () => {
+  const ev = (present: readonly string[], pageMoves: MoveEvidence["pageMoves"] = []): MoveEvidence => ({
+    exists: (p) => present.includes(p),
+    instanceRoots: ["cat-harness", "cat-harness-tools", "smart-base"],
+    pageMoves,
+  });
+  const PAGES = [{ now: "cat-harness/docs/en/cat-harness/processes/", before: ["cat-harness/docs/cat-harness/processes/", "cat-harness/docs/processes/"] }];
+
+  test("between layers: the old path is gone and exactly one other instance holds the same path", () => {
+    expect(movedTo("cat-harness/scripts/a.ts", ev(["cat-harness-tools/scripts/a.ts"]))).toBe("cat-harness-tools/scripts/a.ts");
+  });
+
+  test("a declared visualiser page: from its alias or forwarding address to its localised route", () => {
+    const now = "cat-harness/docs/en/cat-harness/processes/p.md";
+    expect(movedTo("cat-harness/docs/processes/p.md", ev([now], PAGES))).toBe(now);
+    expect(movedTo("cat-harness/docs/cat-harness/processes/p.md", ev([now], PAGES))).toBe(now);
+  });
+
+  test("FAILS to re-key when the old path still exists — a file re-created at its home is a different file", () => {
+    expect(movedTo("cat-harness/scripts/a.ts", ev(["cat-harness/scripts/a.ts", "cat-harness-tools/scripts/a.ts"]))).toBeUndefined();
+  });
+
+  test("FAILS to re-key when nothing exists at a new path, or when two places could be it", () => {
+    expect(movedTo("cat-harness/scripts/a.ts", ev([]))).toBeUndefined();
+    expect(
+      movedTo("cat-harness/scripts/a.ts", ev(["cat-harness-tools/scripts/a.ts", "smart-base/scripts/a.ts"])),
+    ).toBeUndefined();
+  });
+
+  test("end to end: an inherited pair on a moved file passes; a NEW target on it still fails", () => {
+    const base = mkdtempSync(join(tmpdir(), "refdir-moved-"));
+    made.push(base);
+    const mk = (entries: { file: string; target: string }[]): QaResult =>
+      ({
+        $schema: "qa-results/v1",
+        families: { "wrong-direction": { count: entries.length, entries }, "pending-stale": { count: 0, entries: [] }, "instances-undeclared": { count: 0, entries: [] } },
+      }) as unknown as QaResult;
+    writeQaResult(base, SIDECAR_STEM, mk([{ file: "cat-harness/scripts/a.ts", target: "smart-base" }]));
+    const evidence = ev(["cat-harness-tools/scripts/a.ts"]);
+    const judge = (fresh: QaResult, rekey: boolean) => {
+      const log = console.log;
+      console.log = () => {};
+      try {
+        return judgeQaResult({
+          gate: "check:reference-direction:check",
+          fresh,
+          failOnNew: [...CHECK_FAIL_ON_NEW],
+          baseline: { root: base, stem: SIDECAR_STEM, writer: "check:reference-direction" },
+          ...(rekey ? { rekeyBaseline: (b: QaResult) => ({ result: rekeyMovedPairs(b, evidence).result }) } : {}),
+        });
+      } finally {
+        console.log = log;
+      }
+    };
+    const moved = mk([{ file: "cat-harness-tools/scripts/a.ts", target: "smart-base" }]);
+    // Vacuity guard: without the re-key the same move reads as NEW.
+    expect(judge(moved, false).exit).toBe(1);
+    expect(judge(moved, true).exit).toBe(0);
+    const grew = mk([
+      { file: "cat-harness-tools/scripts/a.ts", target: "smart-base" },
+      { file: "cat-harness-tools/scripts/a.ts", target: "who-iris" },
+    ]);
+    const v = judge(grew, true);
+    expect(v.exit).toBe(1);
+    expect(v.diff?.added["wrong-direction"]).toEqual([{ file: "cat-harness-tools/scripts/a.ts", target: "who-iris" }]);
+  });
 });
