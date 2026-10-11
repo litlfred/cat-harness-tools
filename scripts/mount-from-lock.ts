@@ -106,8 +106,50 @@ export function treeFiles(dir: string): string[] {
 
 const sha256 = (b: string | Buffer): string => createHash("sha256").update(b).digest("hex");
 
-export function digestOf(dir: string): { treeDigest: string; files: number } {
-  const files = treeFiles(dir);
+/**
+ * The directories a STATE mount laid down in this worktree, absolute, read
+ * from `state:mount`'s own markers (`<git-dir>/branch-mounts/<id>.json`,
+ * `branch-mount/v1`, written by `branch-store.ts`).
+ *
+ * An instance-scoped state graph sits INSIDE its instance: cat-harness's
+ * `health` is `cat-harness/test/health/results/`, and in an index that is
+ * inside the remote mount of cat-harness. Its files come from the state
+ * branch, not from the pinned tree, so hashing them against the lock reads
+ * every state mount as an edit to the pinned instance ("no longer hash to the
+ * lock") and refuses the remount. They are skipped here, and ONLY them: the
+ * marker is the state store's own record of exactly what it put down, and the
+ * store judges those bytes itself (`state:push` refuses a conflict).
+ *
+ * Restated rather than imported from `branch-store.ts` for the reason the
+ * header gives: this file imports nothing but `node:*`.
+ */
+export function stateMountedDirs(root: string): string[] {
+  const r = spawnSync("git", ["rev-parse", "--git-path", "branch-mounts"], { cwd: root, encoding: "utf-8" });
+  if (r.status !== 0) return [];
+  const dir = resolve(root, r.stdout.trim());
+  if (!existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const n of readdirSync(dir)) {
+    if (!n.endsWith(".json")) continue;
+    try {
+      const m = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; into?: unknown };
+      if (m.$schema === "branch-mount/v1" && typeof m.into === "string") out.push(resolve(m.into));
+    } catch {
+      // An unreadable marker skips nothing: the digest then judges those bytes.
+    }
+  }
+  return out;
+}
+
+/** `files` (relative to `dir`) minus any under one of `skip` (absolute directories). */
+export function withoutStateMounts(dir: string, files: readonly string[], skip: readonly string[]): string[] {
+  if (skip.length === 0) return [...files];
+  const under = skip.map((s) => resolve(s) + "/");
+  return files.filter((f) => !under.some((u) => (resolve(dir, f) + "/").startsWith(u)));
+}
+
+export function digestOf(dir: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
+  const files = withoutStateMounts(dir, treeFiles(dir), skip);
   const listing = files.map((f) => `${sha256(readFileSync(join(dir, f)))}  ${f}\n`).join("");
   return { treeDigest: sha256(listing), files: files.length };
 }
@@ -241,10 +283,11 @@ function drift(root: string, inst: LockInstance): { absent: string[]; changed: s
   const decl = join(root, inst.path, inst.declaration.file);
   if (!existsSync(decl)) absent.push(`${inst.path}/${inst.declaration.file}`);
   else if (sha256(readFileSync(decl)) !== inst.declaration.sha256) changed.push(`${inst.path}/${inst.declaration.file}`);
+  const skip = stateMountedDirs(root);
   for (const d of inst.directories) {
     const abs = join(root, d.path);
     if (!existsSync(abs)) absent.push(d.path);
-    else if (digestOf(abs).treeDigest !== d.treeDigest) changed.push(d.path);
+    else if (digestOf(abs, skip).treeDigest !== d.treeDigest) changed.push(d.path);
   }
   for (const a of inst.assets ?? []) {
     const abs = join(root, inst.path, a.src);
