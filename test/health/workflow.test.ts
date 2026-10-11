@@ -70,6 +70,18 @@ describe("the issue body", () => {
       beans: { state: "ok", value: [{ id: "b1", title: "one", status: "todo" }] },
       todos: { state: "ok", value: [] },
       specialBranches: { state: "ok", value: { rows: [], command: "fixture" } },
+      pagesServing: {
+        state: "ok",
+        value: {
+          key: "main/0000000000000000000000000000000000000000",
+          observation: {
+            $schema: "pages-serving/v1",
+            observedAt: "2026-09-19T06:00:00Z",
+            site: "https://example.github.io/fixture/",
+            urls: [{ url: "https://example.github.io/fixture/", status: 200, bytes: 18000, expectedPage: true }],
+          },
+        },
+      },
     };
   }
 

@@ -1,11 +1,11 @@
 ---
 # folio-assistant-5qy8
 title: 'QA SIDECAR LOCATION CONTRADICTION: the folio_init template commits *.qa.json while AGENTS.md puts QA on the qa-reports branch'
-status: in-progress
+status: completed
 type: bug
 priority: normal
 created_at: 2026-10-04T15:10:09Z
-updated_at: 2026-10-11T06:39:01Z
+updated_at: 2026-10-11T06:53:58Z
 parent: folio-assistant-3fva
 ---
 
@@ -40,3 +40,15 @@ Where do section-title-audit's agent verdicts live?
 ## Progress 2026-10-11 (lane B), owner option 1
 - [x] cat-harness#142 (merged): the `section-title` family in qa-attestations/v1.
 - [x] cat-harness-tools#119: verdicts go to `<attestations>/section-title/<paper>/section-title-audit.attestations.json`. The derived copy goes to `test/results/section-title/<paper>/section-title-audit.json`. A legacy sidecar's verdicts are auto-moved. The template gate is now compute-and-judge.
+
+
+
+## Summary of Changes
+
+Built to the owner's option 1.
+- **cat-harness#142** adds the `section-title` family to qa-attestations/v1. It holds decided verdicts only, each pinned to the hash it reviewed.
+- **cat-harness-tools#119** splits section-title-audit by provenance:
+  - verdicts go to `<attestations>/section-title/<paper>/section-title-audit.attestations.json`, written by `--verdict`;
+  - the derived copy goes to `test/results/section-title/<paper>/section-title-audit.json`. It is not `*.qa.json`, because the template's schema-sanity step requires block-qa/v1 of those.
+- A legacy committed sidecar's decided verdicts move into the store on first save. Removing the legacy file from main is left to a person.
+- The template's git-diff freshness gate is now compute-and-judge: it computes the derived copy, and an unreadable store exits 2.

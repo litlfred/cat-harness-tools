@@ -46,11 +46,17 @@ import {
   parseTodoGraph,
 } from "@litlfred/cat-harness/schemas/todo-graph.ts";
 import {
+  PAGES_SERVING_FILENAME,
+  PagesServingObservationSchema,
+} from "@litlfred/cat-harness/schemas/health-report.ts";
+import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
+import {
   stagingSlug,
   type BranchEvidence,
   type BranchEvidenceSet,
 } from "./checks.ts";
 import type {
+  PagesServingEvidence,
   BeanEvidence,
   DoneWhenState,
   HealthContext,
@@ -901,6 +907,51 @@ export function probeTodos(repoRoot: string): StoreProbe<TodoEvidence[]> {
 
 // ── The whole context ───────────────────────────────────────────
 
+// ── The pages-serving observation (bean `1dre`) ─────────────────
+
+/**
+ * Read the pages-serving observation for THIS commit off `qa-reports`.
+ *
+ * Owner, 2026-10-11 (option 1): the CI writer publishes it under
+ * `main/<sha>/health/pages-serving.json` through the qa-store, and the sweep
+ * reads it with the same reader `qa:fetch` uses. No call to the published site
+ * or to the Pages API is made here — that is the property bean `1dre` asks for.
+ *
+ * The key is the checkout's HEAD: `health-check.yml` runs the writer and the
+ * sweep on one commit, so the entry for HEAD is the one this run published.
+ * Every not-a-hit answer (`miss`, `unknown`, `corrupt`) and an observation that
+ * does not parse are `unknown`, with the store's own reason.
+ */
+export function probePagesServing(o: {
+  repoRoot: string;
+  /** Injected for tests; default the qa-store. */
+  read?: (ref: string, prefix: string) => QaTreeRead;
+  /** Injected for tests; default `git rev-parse HEAD`. */
+  head?: string;
+}): Probe<PagesServingEvidence> {
+  const head = o.head ?? spawnSync("git", ["rev-parse", "HEAD"], { cwd: o.repoRoot, encoding: "utf-8" }).stdout?.trim();
+  if (!head || !/^[0-9a-f]{40}$/.test(head)) return { state: "unknown", reason: "the checkout's HEAD could not be read, so there is no qa-reports key to look under" };
+  const ref = `main/${head}`;
+  let t: QaTreeRead;
+  try {
+    t = (o.read ?? ((r, p) => readQaTree(r, p, { repoRoot: o.repoRoot })))(ref, "health");
+  } catch (e) {
+    return { state: "unknown", reason: `qa-reports:${ref} — ${(e as Error).message}` };
+  }
+  if (t.state !== "hit") return { state: "unknown", reason: `qa-reports:${ref} — ${t.state}: ${t.reason}` };
+  const path = [...t.files.keys()].find((p) => p === `health/${PAGES_SERVING_FILENAME}` || p.endsWith(`/health/${PAGES_SERVING_FILENAME}`));
+  if (path === undefined) return { state: "unknown", reason: `qa-reports:${t.key} holds no health/${PAGES_SERVING_FILENAME}` };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(t.files.get(path)!);
+  } catch {
+    return { state: "unknown", reason: `qa-reports:${t.key} ${path} is not JSON` };
+  }
+  const r = PagesServingObservationSchema.safeParse(parsed);
+  if (!r.success) return { state: "unknown", reason: `qa-reports:${t.key} ${path} is not a pages-serving/v1 observation: ${r.error.issues[0]?.message ?? "invalid"}` };
+  return { state: "ok", value: { key: t.key, observation: r.data } };
+}
+
 export interface GatherOptions {
   repoRoot: string;
   remote?: string;
@@ -1058,5 +1109,6 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
       remote,
       rows: readSpecialBranches(o.specialBranchesPath ?? SPECIAL_BRANCHES_JSON),
     }),
+    pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
   };
 }
