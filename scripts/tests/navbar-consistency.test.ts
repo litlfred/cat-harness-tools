@@ -34,6 +34,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { judgeThemeKinds, type ThemeWiring } from "../check-navbar-consistency.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const SCRIPT = join("cat-harness-tools", "scripts", "check-navbar-consistency.ts");
@@ -115,10 +116,18 @@ function withEdit(file: string, edit: (s: string) => string, body: () => void): 
 }
 
 describe("the repository is clean under the blocking families", () => {
-  test("`--check` passes as committed", () => {
+  test("`--check` finds no blocking defect as committed — and is never 0 while blind", () => {
+    // Two answers are acceptable, and they are NOT the same answer. 0: every
+    // family ran clean. 2: no defect was found, but a kind-for-kind theme
+    // comparison could not be made (`pnn5`) — an instance's `themes.ts` would
+    // not load — and the script says which. 1, a blocking finding, is the
+    // failure this test exists for. What must never happen is 0 printed over a
+    // ❔, which would be the `dh4f` defect.
     const { status, out } = run("--check");
     expect(out).toContain("instances read");
-    expect(status).toBe(0);
+    expect(status).not.toBe(1);
+    if (out.includes("❔")) expect(status).toBe(2);
+    if (status === 2) expect(out).toContain("could not be made");
   });
 
   test("every count in the report carries its denominator", () => {
@@ -255,26 +264,15 @@ describe("the themes set is iterated, not hardcoded", () => {
     expect(status).toBe(0);
   });
 
-  test("the size-1 NOTE is gone, and its PROMISE is NOT yet kept", () => {
-    // The NOTE said: "At a set size of 1 there is nothing to COMPARE, so this
-    // reports the denominator and issues no verdict. The set is iterated
-    // rather than hardcoded, so instance #2 is COVERED THE DAY IT DECLARES
-    // ONE."
-    //
-    // That day arrived. The NOTE correctly stopped printing — and nothing took
-    // its place: past the `themed.length <= 1` branch the script carries a
-    // comment and no comparison, so `v8n5` Done-when #2 ("a surface must not
-    // fall back to the platform default for an instance that declares its own
-    // theme") is still unimplemented.
-    //
-    // A NOTE disappearing is not coverage arriving. This test pins the gap so
-    // it cannot be mistaken for closed by the absence of the excuse — bean
-    // `1xhc`'s shape. It is deliberately NOT a failing test: implementing the
-    // comparison means deciding which theme may style a surface, and PR #1584
-    // held exactly that for the owner.
+  test("the size-1 NOTE is gone, and the comparison it promised now runs", () => {
+    // Until `pnn5` this test PINNED a gap: the NOTE stopped printing at set
+    // size 2 and no comparison took its place. The owner ruled kind for kind
+    // (option 1), so the script now judges every (instance, declared kind)
+    // pair and says how many it judged and how many it could not.
     const { out } = run();
     expect(out).not.toContain("issues no verdict");
     expect(out).not.toContain("covered the day it declares one");
+    expect(out).toMatch(/kind for kind\s+\d+ \(instance, kind\) pair\(s\) judged, \d+ could not be/);
   });
 
   test("the themes denominator is read from `graphTypologies`, not a guessed key", () => {
@@ -306,5 +304,66 @@ describe("the denominator comes from the declared enumerator", () => {
     const n = instanceRootsIn(REPO).length;
     const { out } = run();
     expect(out).toMatch(new RegExp(`instances read\\s+${n}\\b`));
+  });
+});
+
+describe("kind for kind — `pnn5`, the owner's option 1", () => {
+  // "A surface of kind K on an instance's pages uses that instance's K-kind
+  // theme when it declares one, and falls back to the default only for kinds
+  // it doesn't declare." Each test plants one way of breaking that.
+  const wired: ThemeWiring = { webpageData: new Map([["iris", "iris-web"]]), headConsumesData: true };
+  const iris = { instance: "iris", themes: [{ kind: "webpage" as const, id: "iris-web" }] };
+
+  test("a declared webpage theme that the pages select is clean", () => {
+    const r = judgeThemeKinds([iris], wired);
+    expect(r.findings).toEqual([]);
+    expect(r.unknowns).toEqual([]);
+    expect(r.pairs).toBe(1);
+  });
+
+  test("FALSIFICATION: a declared webpage theme with no data entry falls back, and blocks", () => {
+    const r = judgeThemeKinds([iris], { ...wired, webpageData: new Map() });
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ family: "theme-fallback", blocking: true, subject: "iris · webpage" });
+  });
+
+  test("FALSIFICATION: the pages wearing ANOTHER theme is a fallback too", () => {
+    const r = judgeThemeKinds([iris], { ...wired, webpageData: new Map([["iris", "old-web"]]) });
+    expect(r.findings[0]).toMatchObject({ family: "theme-fallback", blocking: true });
+    expect(r.findings[0]!.detail).toContain('"old-web"');
+  });
+
+  test("FALSIFICATION: head_custom no longer reading the data is a fallback for every instance", () => {
+    const r = judgeThemeKinds([iris], { ...wired, headConsumesData: false });
+    expect(r.findings[0]).toMatchObject({ family: "theme-fallback", blocking: true });
+  });
+
+  test("a declared kind with no instance-scoped surface is reported, not passed", () => {
+    const r = judgeThemeKinds(
+      [{ instance: "iris", themes: [...iris.themes, { kind: "sticky", id: "iris-sticky" }, { kind: "publication", id: "wpro" }] }],
+      wired,
+    );
+    expect(r.pairs).toBe(3);
+    expect(r.findings.map((f) => [f.family, f.subject, f.blocking])).toEqual([
+      ["theme-kind-unconsumed", "iris · sticky", false],
+      ["theme-kind-unconsumed", "iris · publication", false],
+    ]);
+  });
+
+  test("a kind the instance does NOT declare is not judged — the default is allowed there", () => {
+    const r = judgeThemeKinds([{ instance: "plain", themes: [] }], wired);
+    expect(r).toEqual({ findings: [], unknowns: [], pairs: 0 });
+  });
+
+  test("an unreadable themes module is UNKNOWN, never clean", () => {
+    const r = judgeThemeKinds([{ instance: "iris", unreadable: "Cannot find module" }], wired);
+    expect(r.findings).toEqual([]);
+    expect(r.unknowns).toEqual([{ subject: "iris", reason: expect.stringContaining("Cannot find module") }]);
+  });
+
+  test("unreadable webpage data is UNKNOWN for a webpage-declaring instance, not a fallback", () => {
+    const r = judgeThemeKinds([iris], { ...wired, webpageData: undefined });
+    expect(r.findings).toEqual([]);
+    expect(r.unknowns).toHaveLength(1);
   });
 });
