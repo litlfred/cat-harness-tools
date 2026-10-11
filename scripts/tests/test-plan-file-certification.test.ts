@@ -61,6 +61,13 @@ describe("A_FileCertification (fileSignedCertification)", () => {
     });
   });
 
+  test("notes say how the decision reached the filer, beside the plan version", () => {
+    const root = instance();
+    fileSignedCertification(root, input({ notes: "decided by the owner in session S, relayed" }));
+    const back = readCertificationAttestations(root, "tiny-workflow-tool");
+    expect(back.state === "hit" && back.file.certifications[0]!.notes).toBe("plan version 1.0.0; decided by the owner in session S, relayed");
+  });
+
   test("a second certification is appended, never replacing the first", () => {
     const root = instance();
     fileSignedCertification(root, input());
