@@ -97,6 +97,15 @@ export interface ThinPage {
   navbar?: boolean;
   /** The tab icon's href. Defaults to {@link DEFAULT_ICON}. */
   icon?: string;
+  /**
+   * The page's own address, relative to itself, for `rel="canonical"`.
+   * Defaults to `./` — right for a page written as `<…>/<id>/index.html`.
+   * A family whose pages are FILES at addresses readers already link
+   * (an IG's `artifact/<Type>-<id>.html`, the IG Publisher's own names)
+   * passes the file's name, so the canonical names the page and not its
+   * directory.
+   */
+  canonical?: string;
 }
 
 /**
@@ -127,7 +136,7 @@ export function thinPageHtml(p: ThinPage): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escHtml(p.title)}</title>
-<link rel="canonical" href="./">
+<link rel="canonical" href="${escHtml(p.canonical ?? "./")}">
 <link rel="icon" href="${escHtml(p.icon ?? DEFAULT_ICON)}">
 ${p.navbar ? "" : `${NAVBAR_LINKED}\n`}${p.jsonld !== undefined ? `<link rel="alternate" type="application/ld+json" href="${escHtml(p.jsonld)}">\n` : ""}${p.stylesheet ? `<link rel="stylesheet" href="${escHtml(p.stylesheet)}">\n` : ""}</head>
 <body>

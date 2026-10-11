@@ -1156,6 +1156,14 @@ describe("a thin page asks for the rail with its style LINKED (bean lnoy)", () =
     expect(wantsLinkedRail('<meta name="folio-navbar" content="none">')).toBe(false);
   });
 
+  it("thinPageHtml names its own address as canonical: `./` by default, the file when given", () => {
+    const base = { title: "x", configId: "x-config", config: {}, body: "<main></main>", script: "x.js", jsonld: "x.jsonld" };
+    expect(thinPageHtml(base)).toContain('<link rel="canonical" href="./">');
+    const file = thinPageHtml({ ...base, canonical: "StructureDefinition-a.html" });
+    expect(file).toContain('<link rel="canonical" href="StructureDefinition-a.html">');
+    expect(file).not.toContain('href="./"');
+  });
+
   it("thinPageHtml writes `linked`, not `none`", () => {
     const html = thinPageHtml({ title: "x", configId: "x-config", config: {}, body: "<main></main>", script: "x.js", jsonld: "x.jsonld" });
     expect(wantsLinkedRail(html)).toBe(true);
