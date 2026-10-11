@@ -1,6 +1,6 @@
 /**
  * `split_sections` finds an outline heading on its page by comparing
- * `_heading_key`s, so a spacing accent in the text layer ("L¨ubeck") must
+ * `_match_key`s, so a spacing accent in the text layer ("L¨ubeck") must
  * not hide a heading the outline spells "Lübeck".
  *
  * @module scripts/tests/heading-key
@@ -21,7 +21,7 @@ function py(code: string): unknown {
 
 describe("matching outline headings to page lines", () => {
   test("spacing and combining accents compare equal to the composed letter", () => {
-    expect(py(`print(json.dumps([ps._heading_key(s) for s in ["L\\u00a8ubeck", "L\\u00fcbeck", "Lu\\u0308beck", "  Erd\\u02ddos  "]]))`))
+    expect(py(`print(json.dumps([ps._match_key(s) for s in ["L\\u00a8ubeck", "L\\u00fcbeck", "Lu\\u0308beck", "  Erd\\u02ddos  "]]))`))
       .toEqual(["lubeck", "lubeck", "lubeck", "erdos"]);
   });
 
