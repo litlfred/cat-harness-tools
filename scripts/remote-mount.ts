@@ -87,6 +87,7 @@ import {
 } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { contentIsOffCheckout, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
+import { stateMountedDirs, withoutStateMounts } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 
 // ── Reading an upstream declaration STRUCTURALLY ─────────────────────────────
@@ -516,8 +517,8 @@ function sha256Text(s: string | Buffer): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
-function digestOf(abs: string): { treeDigest: string; files: number } {
-  const { files } = treeEntries(abs);
+function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
+  const files = withoutStateMounts(abs, treeEntries(abs).files, skip);
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
 
@@ -563,7 +564,7 @@ function ensureIgnored(base: string, rel: string, indexed = false): "ignored" | 
 /** Directories of a previously locked instance whose bytes no longer match the lock. */
 function modifiedSince(base: string, locked: LockedInstance): string[] {
   const out = locked.directories
-    .filter((d) => existsSync(join(base, d.path)) && digestOf(join(base, d.path)).treeDigest !== d.treeDigest)
+    .filter((d) => existsSync(join(base, d.path)) && digestOf(join(base, d.path), stateMountedDirs(base)).treeDigest !== d.treeDigest)
     .map((d) => d.path);
   for (const a of locked.assets ?? []) {
     const abs = join(base, locked.path, a.src);
@@ -848,7 +849,7 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
       for (const d of inst.directories) {
         const abs = join(ds.instanceRoot, d.path);
         if (!existsSync(abs)) bad.push(`${d.path}/ absent`);
-        else if (digestOf(abs).treeDigest !== d.treeDigest) bad.push(`${d.path}/ modified`);
+        else if (digestOf(abs, stateMountedDirs(ds.instanceRoot)).treeDigest !== d.treeDigest) bad.push(`${d.path}/ modified`);
       }
       for (const a of inst.assets ?? []) {
         const abs = join(ds.instanceRoot, inst.path, a.src);
