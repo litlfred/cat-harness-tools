@@ -50,6 +50,17 @@ import type {
   PagesServingObservation,
 } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
+import {
+  EXPIRY_BASIS,
+  EXPIRY_URGENT_DAYS,
+  EXPIRY_WARN_DAYS,
+  INDEX_ROOT,
+  defaultDirs,
+  judgeSecrets,
+  readRepoFiles,
+  repoResolver,
+  type RepoEvidence,
+} from "../../scripts/secrets-check.ts";
 
 // ── Evidence ────────────────────────────────────────────────────
 
@@ -1970,6 +1981,78 @@ export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
  * Order is the order a reader should meet them: the owner's explicit ask
  * first, then what drives it, then the two stores.
  */
+// ── Credentials (bean `folio-assistant-jzba`) ───────────────────────────
+
+export const SECRETS_THRESHOLDS: HealthThreshold[] = [
+  { metric: "secret-expiry-days", value: EXPIRY_WARN_DAYS, unit: "days", basis: EXPIRY_BASIS.warn, severity: "minor" },
+  { metric: "secret-expiry-days", value: EXPIRY_URGENT_DAYS, unit: "days", basis: EXPIRY_BASIS.urgent, severity: "major" },
+  { metric: "secret-expiry-days", value: 0, unit: "days", basis: "an expired credential no longer works: whatever needs it is already failing", severity: "critical" },
+  {
+    metric: "secret-needs-undetermined",
+    value: 0,
+    unit: "count",
+    basis:
+      "a repository whose credential needs are not declared cannot be told from one that needs nothing " +
+      "(credentials proposal §6.2: could-not-determine outranks clean). Reported as a finding, not as " +
+      "`unknown`, so one missing declaration does not take the whole report to `unknown` daily — the " +
+      "precedent `pages-publish-health` sets. `bun run cat secrets:check` itself exits 2.",
+    severity: "major",
+  },
+];
+
+/**
+ * Credential needs against workflow use and recorded expiry, by NAME only.
+ *
+ * Offline: `bun run health` needs no token, so presence on GitHub is NOT
+ * judged here — `bun run cat secrets:check` lists names when a token allows.
+ */
+export function secretsHealthCheck(now: Date, evidence: readonly Omit<RepoEvidence, "present">[]): HealthCheckResult {
+  const id = "credentials";
+  const summary =
+    "Declared credential needs against the secret names workflows use, and recorded expiry at 30 / 7 / 0 days. " +
+    "Names only, never values; presence on GitHub is `secrets:check`'s, which needs a token.";
+  const offline = { reason: "bun run health runs offline" };
+  const r = judgeSecrets(evidence.map((e) => ({ ...e, present: offline })), now);
+  const needsUnknown = r.undetermined.filter((u) => u.part === "declared-needs").map((u) => u.repo);
+  const expiryUnknown = r.undetermined.filter((u) => u.part === "expiry").map((u) => u.repo);
+  const measurements: HealthMeasurement[] = [
+    { metric: "secret-names-used", value: r.usedCount, unit: "count", command: "bun run cat secrets:check --json (usedCount)" },
+    { metric: "secret-needs-undetermined", value: needsUnknown.length, unit: "count", command: "bun run cat secrets:check --json (undetermined, part declared-needs)" },
+  ];
+  const findings: HealthFinding[] = [];
+  if (needsUnknown.length > 0) {
+    findings.push({
+      metric: "secret-needs-undetermined",
+      severity: "major",
+      summary: `Declared needs: could not determine for ${needsUnknown.join(", ")} — no credentials/needs.json, so used-vs-declared is not judged.`,
+      action: "Author `credentials/needs.json` per the credentials proposal §2.3 (bean 9hxd); until then this is not clean.",
+    });
+  }
+  if (expiryUnknown.length > 0) {
+    findings.push({
+      metric: "secret-expiry-days",
+      severity: "minor",
+      summary: `Expiry: no credentials/registry.json records dates for ${expiryUnknown.join(", ")}, so no expiry can be warned of.`,
+      action: "Record issue and expiry dates as credentials are added or rotated (credentials proposal §2.3, registry.json).",
+    });
+  }
+  for (const f of r.findings) {
+    if (f.severity === "advisory") continue;
+    findings.push({
+      metric: f.kind === "expired" || f.kind === "expires-soon" ? "secret-expiry-days" : undefined,
+      severity: f.severity,
+      summary: `${f.repo} · ${f.secret}: ${f.detail}`,
+      action: f.kind === "expired" || f.kind === "expires-soon" ? "Rotate the credential and record the new dates." : "Reconcile the declaration with the workflows.",
+    });
+  }
+  return settle(id, summary, SECRETS_THRESHOLDS, measurements, findings);
+}
+
+function credentialsCheck(ctx: HealthContext): HealthCheckResult {
+  const repoFor = repoResolver();
+  return secretsHealthCheck(ctx.now, defaultDirs(INDEX_ROOT).map((d) => readRepoFiles(d, repoFor(d))));
+}
+
 export const HEALTH_CHECKS: readonly {
   id: string;
   /** One line for `--list`. */
@@ -2003,6 +2086,13 @@ export const HEALTH_CHECKS: readonly {
       "Previews no liveness signal claims — no open PR, no unmerged branch, no recent commit. " +
       "Retained by policy, listed for a person to decide.",
     run: stagingOrphanCheck,
+  },
+  {
+    id: "credentials",
+    summary:
+      "Declared credential needs vs the secret names workflows use, and recorded expiry (bean `jzba`). " +
+      "Names only; `secrets:check` adds presence when a token allows.",
+    run: credentialsCheck,
   },
   {
     id: "repository-size",
