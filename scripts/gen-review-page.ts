@@ -117,6 +117,14 @@ const STYLE = `
   /* Column and gutters belong to main: the harness rail owns body padding-left. */
   main { max-width: 78rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
   .layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 2rem; align-items: start; }
+  /* Bean folio-assistant-xp72: at 2,000 changed blocks the page spent 1.8 s
+     (3.6 s with no change text, two iframes per change) laying out entries
+     nobody could see yet. content-visibility skips style, layout and paint for
+     an entry until it nears the viewport, and keeps it in the DOM, the
+     accessibility tree and find-in-page, so j/k, focus and links are unchanged.
+     The intrinsic size is remembered once an entry has rendered. Measured:
+     0.6-0.8 s for both cases (test/review-budget.e2e.ts). */
+  #changes li[data-label] { content-visibility: auto; contain-intrinsic-size: auto 14rem; }
   .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; }
   @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; } }
   .outline ol { list-style: none; padding-left: .75rem; margin: .25rem 0; }
