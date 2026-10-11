@@ -549,7 +549,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/layout-norms-baseline.json", names: 2 },
   { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
   { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
   { file: "cat-harness/schemas/harness-config.ts", names: 3 },
