@@ -736,11 +736,26 @@ export function judgeQaResult(args: {
   baseline: { root: string; stem: string; writer: string; against?: string; store?: QaStoreOptions };
   /** How many new entries to name per family. Default 10. */
   show?: number;
+  /**
+   * Re-key a READ baseline before it is compared — for a producer whose
+   * entries carry a path that a declared or provable MOVE has changed, so an
+   * inherited entry at its new path is not reported NEW. Applied to a hit only;
+   * it may rename entries, never add or drop one (the caller's contract, and
+   * the reason it receives the whole result rather than a filter). It returns
+   * a note for the report, so a re-keyed comparison is never silent.
+   */
+  rekeyBaseline?: (baseline: QaResult) => { result: QaResult; note?: string };
 }): QaVerdict {
   const failOn = [...(args.failOn ?? [])];
   let failOnNew = (args.failOnNew ?? []).filter((f) => !failOn.includes(f));
   const { root, stem, writer, against, store } = args.baseline;
-  const read = readQaResultFrom(qaResultPath(root, stem), { against, store });
+  const raw = readQaResultFrom(qaResultPath(root, stem), { against, store });
+  let read = raw;
+  if (raw.state === "hit" && args.rekeyBaseline !== undefined) {
+    const { result, note } = args.rekeyBaseline(raw.result);
+    read = { ...raw, result };
+    if (note !== undefined) console.log(`  baseline re-keyed: ${note}`);
+  }
   const unknowns = [...(args.unknowns ?? [])];
   // A `failOnNew` family the baseline does not carry AT ALL was never
   // recorded there, so "new against it" has no subject: every entry would read

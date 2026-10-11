@@ -165,6 +165,8 @@ import {
   type ReferenceExemption,
   type ReferenceVerdict,
 } from "@litlfred/cat-harness/schemas/reference-direction.js";
+import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -391,6 +393,50 @@ const LAYERING_SPECIFICATIONS = [
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/**
+ * X4 — a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z,
+ * session_01UC1NuEuSy1MBNpEhnDuiGj: "2 y", ruling (ii) — *"rule that a harness
+ * skill may name a cat-harness-tools script"*).
+ *
+ * `cat-harness-tools/AGENTS.md`'s one rule is *"definitions there,
+ * implementations here"*: the harness holds the contract and the method, the
+ * tools layer holds the code that runs it (bean `w2gr`, option A). A skill —
+ * or any other Markdown in the harness that tells an agent what to run — has
+ * to say WHICH script carries the method out, and since bean `70lx` moved the
+ * harness's code down a layer that script's path starts with the name of the
+ * layer above. That is the split working, not a dependency of the definition
+ * on its implementation: the definition is complete without the script, and
+ * the line is an instruction to the reader.
+ *
+ * Deliberately narrow, on three axes, each held by a test:
+ *
+ *  - **file** — Markdown under `cat-harness/` only. Code and configuration
+ *    (`.ts`, `.json`, `.yml`) that names a tools script RUNS it or imports it,
+ *    which is a real dependency, and stays `wrong-direction`.
+ *  - **target** — `cat-harness-tools` only. A skill naming any other layer
+ *    above it is unaffected.
+ *  - **line** — EVERY occurrence of the name on the line must be a script or
+ *    command path: a path under a `scripts/` directory of the tools layer, or
+ *    the file a `bun run` command line executes. A line that also names the
+ *    tools layer's source (`src/`, `test/`, …) or the layer as such is not
+ *    excused by the script beside it — the regex is anchored to the whole
+ *    line for that reason.
+ */
+const TOOLS_NAME = "cat-harness-tools";
+const NAME_BOUND = `(?<![A-Za-z0-9_-])${escapeRe(TOOLS_NAME)}(?![A-Za-z0-9_-])`;
+const PATH_CHARS = "[A-Za-z0-9_.-]";
+/** A path inside a `scripts/` directory of the tools layer, at any depth. */
+const TOOLS_SCRIPT_PATH = `(?<![A-Za-z0-9_-])${escapeRe(TOOLS_NAME)}/(?:${PATH_CHARS}+/)*?scripts/(?:${PATH_CHARS}+(?:/${PATH_CHARS}+)*)?`;
+/** The file a `bun run` command executes, optionally behind a `<platform>/` or `./` prefix. */
+const TOOLS_COMMAND_PATH = `(?<=\\bbun run (?:<[a-z-]+>/|\\./)?)${escapeRe(TOOLS_NAME)}/(?:${PATH_CHARS}+/)*${PATH_CHARS}+\\.(?:ts|js|mjs|sh|py)(?![A-Za-z0-9_])`;
+export const DEFINITION_NAMES_IMPLEMENTATION: ReferenceExemption = {
+  file: /^cat-harness\/.+\.md$/,
+  to: TOOLS_NAME,
+  pattern: new RegExp(`^(?:${TOOLS_SCRIPT_PATH}|${TOOLS_COMMAND_PATH}|(?!${NAME_BOUND})[\\s\\S])*$`),
+  reason:
+    "X4, a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z, ruling (ii): \"a harness skill may name a cat-harness-tools script\"): Markdown in the harness telling an agent which tools script to run — \"definitions there, implementations here\" (cat-harness-tools/AGENTS.md). Markdown only, the tools layer only, and only when every mention on the line is a script or command path",
+};
+
 // ── This instance's exemptions ──────────────────────────────────
 //
 // Same contract as `iwtn`'s `ALLOW`: each entry states WHY the text is not a
@@ -422,7 +468,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
     file: new RegExp(`^(${LAYERING_SPECIFICATIONS.map(escapeRe).join("|")})$`),
     reason:
       "X3, a LAYERING SPECIFICATION (owner, Q-B 2026-10-01): the file's subject IS the instance graph — it defines the layers, so it names them. Moved to any one layer it could no longer describe the others. A named list of three, ruled by the owner, never a pattern",
-  },
+  },  DEFINITION_NAMES_IMPLEMENTATION,
 ];
 
 /**
@@ -498,13 +544,12 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
-  { file: "cat-harness/docs/methodologies/index.md", names: 2 },
+  { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
   { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/layout-norms-baseline.json", names: 2 },
-  { file: "cat-harness/tools/discover.ts", names: 2 },
+  { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
   { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
   { file: "cat-harness/schemas/harness-config.ts", names: 3 },
   { file: "cat-harness/docs/source/fhir-ig-publisher/what-it-cannot-be-asked-for.md", names: 2 },
@@ -520,7 +565,7 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
   { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
   { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
-  { file: "cat-harness/docs/processes/index.md", names: 2 },
+  { file: "cat-harness/docs/en/cat-harness/processes/index.md", names: 4 }, // moved by t4xb from docs/processes/ (ruling (i), 2026-10-11)
   { file: "smart-ig/smart-ig.json", names: 2 },
 ];
 
@@ -1055,6 +1100,113 @@ export function directionSidecarState(
   }
 }
 
+// ── Moved files keep their baseline pairs ───────────────────────
+
+/**
+ * Ruling (i) (owner, 2026-10-11T05:58:12Z, session_01UC1NuEuSy1MBNpEhnDuiGj:
+ * "2 y" — *"re-key the baseline for the 233 moved pairs (mechanical rename,
+ * no growth in substance)"*): a wrong-direction pair is keyed by its FILE, so
+ * a file that moved and still says what it said reads as one pair resolved
+ * and one pair NEW. The reference did not change; only the path did.
+ *
+ * The baseline is `qa-reports`, written by `main`, so it re-keys itself the
+ * first time `main` runs after the move lands — but the change that MAKES the
+ * move is judged against the baseline from before it, and every inherited pair
+ * on a moved file fails it. So the comparison maps a baseline pair to the
+ * file's new path, and only on EVIDENCE of a move, never on a list:
+ *
+ *  1. **Between layers** — the rule `rewrite-moved-paths.ts` applies (bean
+ *     `70lx`): the baseline's file `<A>/<rest>` is gone, and `<B>/<rest>`
+ *     exists under exactly one other instance root.
+ *  2. **A visualiser page** — the page's address is DECLARED
+ *     (`visualisers` in the harness's `<instance>.json`, route by
+ *     `schemas/visualiser-route.ts`): a page now at its localised route was,
+ *     before bean `t4xb`, at its forwarding address `<harness>/<visualiser>/`
+ *     or its alias `<alias>/`, the two addresses `compose-docs.ts` still
+ *     forwards. The baseline's file at one of those is gone and the same page
+ *     exists at the localised route.
+ *
+ * In both, the old path must NOT exist (a file re-created at its old home is a
+ * different file) and the new one must, and there must be exactly ONE
+ * candidate — an ambiguous move is not re-keyed, so it reads as resolved plus
+ * new, the conservative direction for a gate. The target is never touched: a
+ * moved file that now names a FURTHER instance above it is still new.
+ */
+export interface MoveEvidence {
+  /** Does this repo-relative path exist in the checkout? */
+  exists: (path: string) => boolean;
+  /** Every instance root, repo-relative (`cat-harness`, `smart-base/…`). */
+  instanceRoots: readonly string[];
+  /** Declared page moves: a page under `now` was at the same path under each of `before`. Repo-relative prefixes ending in `/`. */
+  pageMoves: readonly { now: string; before: readonly string[] }[];
+}
+
+/** Where a baseline file moved to, when the evidence shows exactly one place; else `undefined`. */
+export function movedTo(file: string, ev: MoveEvidence): string | undefined {
+  if (ev.exists(file)) return undefined;
+  const candidates = new Set<string>();
+  const owner = [...ev.instanceRoots]
+    .filter((r) => file.startsWith(`${r}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  if (owner !== undefined) {
+    const rest = file.slice(owner.length + 1);
+    for (const r of ev.instanceRoots) {
+      if (r === owner || r.startsWith(`${owner}/`) || owner.startsWith(`${r}/`)) continue;
+      if (ev.exists(`${r}/${rest}`)) candidates.add(`${r}/${rest}`);
+    }
+  }
+  for (const m of ev.pageMoves) {
+    for (const b of m.before) {
+      if (file.startsWith(b) && ev.exists(m.now + file.slice(b.length))) candidates.add(m.now + file.slice(b.length));
+    }
+  }
+  return candidates.size === 1 ? [...candidates][0] : undefined;
+}
+
+/**
+ * The family re-keyed: `wrong-direction`, whose `file` is where the reference
+ * IS. Not `pending-stale`, whose `file` is what the `PENDING` list SAYS — a
+ * moved file's entry there is fixed by editing the list, which is a diff a
+ * reviewer reads, and re-keying it would hide the stale literal.
+ */
+const REKEYED_FAMILIES = ["wrong-direction"] as const;
+
+/** {@link movedTo} over a baseline: each moved entry takes its file's new path, and nothing is added or dropped. */
+export function rekeyMovedPairs(baseline: QaResult, ev: MoveEvidence): { result: QaResult; rekeyed: number } {
+  let rekeyed = 0;
+  const families = { ...baseline.families };
+  for (const f of REKEYED_FAMILIES) {
+    const fam = families[f];
+    if (fam === undefined) continue;
+    const entries = (fam.entries as { file?: unknown }[]).map((e) => {
+      if (typeof e.file !== "string") return e;
+      const to = movedTo(e.file, ev);
+      if (to === undefined) return e;
+      rekeyed++;
+      return { ...e, file: to };
+    });
+    families[f] = { ...fam, entries };
+  }
+  return { result: { ...baseline, families }, rekeyed };
+}
+
+/** The evidence {@link movedTo} reads, from the checkout at `root`. */
+export function moveEvidence(root = REPO_ROOT): MoveEvidence {
+  const rel = (abs: string) => relative(root, abs).split(sep).join("/");
+  const site = rel(siteOwnerDir(root));
+  const pageMoves = declaredVisualisers(root).map((v) => {
+    const parts = { harness: v.harness, visualiser: v.id };
+    const before = [`${site}/${visualiserRoute(forwardingParts(parts))}`];
+    if (v.alias !== undefined) before.push(`${site}/${aliasRoute(v.alias)}`);
+    return { now: `${site}/${visualiserRoute(pageParts(parts))}`, before };
+  });
+  return {
+    exists: (p) => existsSync(join(root, p)),
+    instanceRoots: instanceRootsIn(root).map(rel).filter((r) => r !== ""),
+    pageMoves,
+  };
+}
+
 // ── Reporting ───────────────────────────────────────────────────
 
 const GATE = "check:reference-direction";
@@ -1222,6 +1374,10 @@ function main(): number {
       fresh,
       failOnNew: [...CHECK_FAIL_ON_NEW],
       baseline: { root: INSTANCE_ROOT, stem: SIDECAR_STEM, writer: GATE, against },
+      rekeyBaseline: (b) => {
+        const { result, rekeyed } = rekeyMovedPairs(b, moveEvidence());
+        return { result, note: `${rekeyed} entr(y/ies) on a moved file compared at the file's new path (ruling (i), 2026-10-11)` };
+      },
     }).exit;
   }
   // Unchanged, and deliberately so: recording a state is not resolving it.
