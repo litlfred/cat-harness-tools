@@ -10,6 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { TestPlanSchema } from "@litlfred/cat-harness/schemas/test-plan.ts";
 import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup } from "@litlfred/cat-harness/schemas/test-report.ts";
 import { detect } from "../../src/crdm/detect-signals.ts";
@@ -23,6 +24,8 @@ const plan = TestPlanSchema.parse(JSON.parse(readFileSync(join(HARNESS_ROOT, "te
 const corpus = JSON.parse(readFileSync(join(TOOLS_ROOT, "scripts", "eval", "crdm-detect-corpus.json"), "utf-8")) as CorpusItem[];
 const outputs = corpus.map((it) => detect(it.text));
 const AT = "2026-10-11T08:00:00Z";
+// The harness's declared processes graph, as the runner asks it.
+const SDLC = join(directoryForGraph(HARNESS_ROOT, "processes")!, "sdlc");
 
 const reportFor = (cases: ReturnType<typeof verdictsFor>) =>
   TestReportSchema.parse({
@@ -92,26 +95,26 @@ describe("the untainted checker", () => {
 
 describe("through test-plan-execution.bpmn", () => {
   test("the plan's own DMN routes to the CERTIFIER's user task — the process does not certify itself", async () => {
-    const model = await loadProcessModel(join(HARNESS_ROOT, "processes", "sdlc", "test-plan-execution.bpmn"));
+    const model = await loadProcessModel(join(SDLC, "test-plan-execution.bpmn"));
     let s = startInstance(model, { id: "ff09-test", subject: plan.id });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       s = complete(model, s, step, { actor: TESTER.actor });
     }
     const report = reportFor(verdictsFor(plan, corpus, outputs, AT));
     const run = { data: { hash: "d", inputs: ["x"] } } as unknown as Parameters<typeof exitFacts>[1];
-    s = await completeExitCriteriaGateway(model, s, plan, exitFacts(plan, run, report, "agree"), [HARNESS_ROOT, join(HARNESS_ROOT, "processes", "sdlc")]);
+    s = await completeExitCriteriaGateway(model, s, plan, exitFacts(plan, run, report, "agree"), [HARNESS_ROOT, SDLC]);
     expect(enabled(model, s).map((e) => e.node)).toEqual(["A_RecordCertification"]);
   });
 
   test("FALSIFICATION: a checker that disagrees is undetermined, not certified", async () => {
-    const model = await loadProcessModel(join(HARNESS_ROOT, "processes", "sdlc", "test-plan-execution.bpmn"));
+    const model = await loadProcessModel(join(SDLC, "test-plan-execution.bpmn"));
     let s = startInstance(model, { id: "ff09-test-2", subject: plan.id });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       s = complete(model, s, step, { actor: TESTER.actor });
     }
     const report = reportFor(verdictsFor(plan, corpus, outputs, AT));
     const run = { data: { hash: "d", inputs: ["x"] } } as unknown as Parameters<typeof exitFacts>[1];
-    s = await completeExitCriteriaGateway(model, s, plan, exitFacts(plan, run, report, "disagree"), [HARNESS_ROOT, join(HARNESS_ROOT, "processes", "sdlc")]);
+    s = await completeExitCriteriaGateway(model, s, plan, exitFacts(plan, run, report, "disagree"), [HARNESS_ROOT, SDLC]);
     expect(enabled(model, s).map((e) => e.node)).toEqual(["A_RecordUndetermined"]);
   });
 });

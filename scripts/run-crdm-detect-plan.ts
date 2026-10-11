@@ -32,6 +32,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.ts";
 import { buildTestRun, UNKNOWN_HASH, type SutRef, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";
 import {
@@ -205,7 +206,11 @@ if (import.meta.main) {
   writeFileSync(join(outDir, "test-report.md"), renderTestReport(report, run, { exitDecision: plan.exitCriteria.decision }));
 
   // The process instance, driven as `workflow_complete` would drive it.
-  const model = await loadProcessModel(join(HARNESS_ROOT, "processes", "sdlc", "test-plan-execution.bpmn"));
+  // The diagram from the harness's DECLARED processes graph, never a spelled path.
+  const processes = directoryForGraph(HARNESS_ROOT, "processes");
+  if (processes === undefined) throw new Error("the harness declares no processes graph, so test-plan-execution.bpmn cannot be found");
+  const sdlc = join(processes, "sdlc");
+  const model = await loadProcessModel(join(sdlc, "test-plan-execution.bpmn"));
   let state: InstanceState = startInstance(model, { id: `${plan.id}-${runId}`, subject: `${plan.id}@${plan.version} vs ${SUT.actor}`, bean: "folio-assistant-ff09" });
   const notes: Record<string, string> = {
     A_Request: `certify ${SUT.actor} against ${plan.id} v${plan.version}`,
@@ -220,7 +225,7 @@ if (import.meta.main) {
     if (!at.includes(step)) throw new Error(`expected ${step} to be enabled, found ${at.join(", ") || "nothing"}`);
     state = complete(model, state, step, { actor: TESTER.actor, note: notes[step] });
   }
-  state = await completeExitCriteriaGateway(model, state, plan, facts, [HARNESS_ROOT, join(HARNESS_ROOT, "processes", "sdlc")], { actor: TESTER.actor });
+  state = await completeExitCriteriaGateway(model, state, plan, facts, [HARNESS_ROOT, sdlc], { actor: TESTER.actor });
   const next = enabled(model, state).map((e) => e.node);
 
   const o = run.outcome as Record<string, number>;
