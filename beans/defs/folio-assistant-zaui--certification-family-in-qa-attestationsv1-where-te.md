@@ -1,11 +1,11 @@
 ---
 # folio-assistant-zaui
 title: 'CERTIFICATION family in qa-attestations/v1: where test-plan-execution files a signed certification'
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-02T05:48:39Z
-updated_at: 2026-10-11T06:59:52Z
+updated_at: 2026-10-11T07:18:30Z
 parent: folio-assistant-3fva
 ---
 
@@ -38,3 +38,14 @@ Follow-up from 3o5b (owner, 2026-10-02: open a bean). test-plan-execution.bpmn's
 ### 2026-10-11: Done-when #2 (lane B)
 - [x] Criterion `certification-resolves` is defined in cat-harness `schemas/kg-qa.ts` (cat-harness#150, merged).
 - [ ] Its checker is `auditCertifications` in `scripts/test-plan-audit.ts`, wired into kg-audit's testPlanCriteria (cat-harness-tools#124, in CI). Complete this bean when that PR merges.
+
+
+
+## Summary of Changes
+- **Done-when #1:** fileSignedCertification round-trips through the store, with tests (2026-10-10).
+- **Done-when #2:** the `certification-resolves` criterion is defined in cat-harness#150. Its checker, `auditCertifications`, is wired into kg-audit's testPlanCriteria (cat-harness-tools#124). The family is now judged, not just typed.
+  - A refusal filed as a certification fails.
+  - A certification naming a plan no directory holds fails.
+  - A certification with no evidence fails.
+  - Evidence kept on qa-reports reads as unknown.
+- **First real filing:** cat-harness#151, crdm-detect (ff09).
