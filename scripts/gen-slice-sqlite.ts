@@ -144,6 +144,7 @@ import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { z } from "zod";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 /** Where a LOCAL build lands — gitignored. The deploy writes into `_site/` instead. */
@@ -1022,6 +1023,29 @@ export const KG_SLICE: SliceDef = {
 
 /** Every slice, in build order. The ONE list — the CLI, the gate and the tests read it. */
 export const SLICES: readonly SliceDef[] = [BEANS_SLICE, TODOS_SLICE, LIBRARY_SLICE, KG_SLICE];
+
+/**
+ * The shape of `slices/index.json` — what {@link sliceIndexText} writes, as a
+ * Zod schema so the `folio-slice-index/v1` family has a validator node
+ * (cat-harness `validators/slice-index.json`). Strict: the writer emits
+ * exactly these keys, so an extra one is a defect.
+ */
+export const SliceIndexSchema = z
+  .object({
+    $schema: z.literal(SLICE_INDEX_SCHEMA),
+    slices: z.array(
+      z
+        .object({
+          slice: z.string().min(1),
+          manifest: z.string().min(1),
+          title: z.string(),
+          bytes: z.number().int().nonnegative(),
+          rows: z.record(z.string(), z.number().int().nonnegative()),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 
 export function sliceIndexText(manifests: SliceManifest[]): string {
   const slices = manifests
