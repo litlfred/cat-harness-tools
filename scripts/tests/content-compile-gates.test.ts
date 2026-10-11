@@ -36,6 +36,9 @@ import {
   contentCompileGates as gatesTsQuery,
 } from "../gates.ts";
 
+// declared-path-literal: a changed-file VECTOR for the path classifier and gates — never read.
+const RENDER_PATH_VECTOR = "docs/index.md";
+
 describe("Done-when (1): path → gate map declared as data, read by gates.ts", () => {
   test("CONTENT_COMPILE_GATES is declared as data array with required gate metadata", () => {
     expect(Array.isArray(CONTENT_COMPILE_GATES)).toBe(true);
@@ -93,7 +96,7 @@ describe("Done-when (1): path → gate map declared as data, read by gates.ts", 
     expect(isKgPath("skills/math/skill.json")).toBe(true);
     expect(isKgPath("processes/lane.bpmn")).toBe(true);
 
-    expect(isRenderPath("docs/index.md")).toBe(true);
+    expect(isRenderPath(RENDER_PATH_VECTOR)).toBe(true);
     expect(isRenderPath("_site/index.html")).toBe(true);
     expect(isRenderPath("paper.pdf")).toBe(true);
   });
@@ -258,7 +261,7 @@ theorem my_thm : 1 + 1 = 2 := by
 
   describe("A1 & A2 (Advisory Downstream Renders & IG Publisher)", () => {
     test("A1 warns on render error but NEVER blocks merge", () => {
-      const evaluation = evaluateDownstreamRendersGate(["docs/index.md"], {
+      const evaluation = evaluateDownstreamRendersGate([RENDER_PATH_VECTOR], {
         renderRunner: () => ({
           ok: false,
           errors: ["Jekyll build error: unclosed Liquid tag"],
@@ -336,7 +339,7 @@ describe("Done-when (3): an unknown (toolchain absent / cache cold timeout) bloc
   });
 
   test("A1 (advisory) with absent renderer reports unknown but does NOT block merge", () => {
-    const evaluation = evaluateDownstreamRendersGate(["docs/index.md"], {
+    const evaluation = evaluateDownstreamRendersGate([RENDER_PATH_VECTOR], {
       rendererAvailable: false,
     });
     expect(evaluation.status).toBe("unknown");

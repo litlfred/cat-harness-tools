@@ -95,7 +95,11 @@ export function computeSourceHash(content: Buffer | string): string {
   return createHash("sha256").update(content).digest("hex").slice(0, 12);
 }
 
-/** The 5 critical gate-path nodes specified in Proposal §7 in mandatory order. */
+/**
+ * The 5 critical gate-path nodes specified in Proposal §7 in mandatory order.
+ * declared-path-literal: the proposal NAMES these five nodes by path; this
+ * list is that specification, not a lookup a declaration could answer.
+ */
 export const GATE_PATH_NODES: readonly { id: string; kind: AdversarialContentKind; path: string }[] = [
   { id: "gates", kind: "tool", path: "scripts/gates.ts" },
   { id: "merge-base", kind: "tool", path: "scripts/merge-base.ts" },

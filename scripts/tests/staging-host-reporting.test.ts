@@ -23,9 +23,11 @@ import { resolve } from "node:path";
 
 import { createStagingPreview, type StagingDeployFacts } from "@litlfred/cat-harness/schemas/staging-preview.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { skillMdFile } from "../known-skills.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const TURN_REPORTING_MD = resolve(ROOT, "skills/sdlc/sdlc-core/turn-reporting.md");
+// Found where the declared skill directories hold it, not at a spelled path.
+const TURN_REPORTING_MD = skillMdFile(ROOT, "turn-reporting")!;
 
 describe("turn-reporting staging host requirements (folio-assistant-1lfx)", () => {
   test("turn-reporting.md exists", () => {

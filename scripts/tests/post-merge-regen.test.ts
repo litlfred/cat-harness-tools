@@ -17,6 +17,9 @@ import {
 import type { Runner } from "../regen-after-merge.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// declared-path-literal: a mocked changed-file name — never read.
+const CHANGED_FILE_VECTOR = "uploads/README.md";
+
 const ROOT = join(HARNESS_ROOT);
 const REPO = resolveRepoRoot(ROOT);
 
@@ -139,7 +142,7 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       const gitCalls: string[] = [];
       const mockGit: GitExecutor = {
         getCurrentSha: () => "8688288494a11111111111111111111111111111",
-        getChangedFiles: () => ["uploads/README.md"],
+        getChangedFiles: () => [CHANGED_FILE_VECTOR],
         createBranch: (branch: string) => {
           gitCalls.push(`createBranch:${branch}`);
         },
@@ -172,7 +175,7 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       expect(report.staleChecks).toContain("readme:subgraphs:check");
       expect(report.repairedChecks).toContain("readme:subgraphs:check");
       expect(report.unrepairedChecks).toEqual([]);
-      expect(report.changedFiles).toEqual(["uploads/README.md"]);
+      expect(report.changedFiles).toEqual([CHANGED_FILE_VECTOR]);
       expect(report.repairBranch).toBe("automation/post-merge-regen-8688288494");
       expect(report.prOpened).toBe(true);
       expect(report.prUrl).toBe("https://github.com/litlfred/cat-harness/pull/1946");
@@ -192,7 +195,7 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       expect(prPayloadPassed?.base).toBe("main");
       expect(prPayloadPassed?.title).toContain("readme:subgraphs:check");
       expect(prPayloadPassed?.body).toContain("folio-assistant-ey1c");
-      expect(prPayloadPassed?.body).toContain("uploads/README.md");
+      expect(prPayloadPassed?.body).toContain(CHANGED_FILE_VECTOR);
     });
 
     test("does not open duplicate PR if PR already exists for the branch", async () => {
@@ -209,7 +212,7 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       let createPrCalled = false;
       const mockGit: GitExecutor = {
         getCurrentSha: () => "8688288494a11111111111111111111111111111",
-        getChangedFiles: () => ["uploads/README.md"],
+        getChangedFiles: () => [CHANGED_FILE_VECTOR],
         createBranch: () => {},
         commitAll: () => {},
         pushBranch: () => {},
