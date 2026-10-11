@@ -70,7 +70,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
 import { typesForKind } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import {
+  defaultInstancePrefixes,
+  documentContext,
+  instancePrefixes,
+} from "@litlfred/cat-harness/schemas/content-context.ts";
 import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
@@ -564,9 +568,33 @@ export function buildDocumentNodes(
   return out;
 }
 
+let contentPrefixes: Map<string, string> | undefined;
+
+/**
+ * The instance prefixes a library node may use: this checkout's, plus every
+ * instance the CONTENT repository declares as a dependency.
+ *
+ * `defaultInstancePrefixes` reads only the checkout this module sits in, so
+ * run from a content repository it could not bind `folio-assistant-sci:` —
+ * the prefix of the `Theorem` and `Definition` types that theorem candidates
+ * carry — and every entry with a candidate threw. Measured on qou 2026-10-11:
+ * 18 entries had no section nodes for that reason. `instancePrefixes` already
+ * takes the content root and walks its declared dependency chain; the
+ * generator simply never passed it.
+ */
+function libraryPrefixes(): Map<string, string> {
+  if (contentPrefixes === undefined) {
+    const root = findContentRepoRoot();
+    contentPrefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
+  }
+  return contentPrefixes;
+}
+
 /** Serialise, dropping undefined so output is byte-stable. */
 function node(doc: Record<string, unknown>): string {
-  const clean: Record<string, unknown> = { "@context": documentContext((doc["@type"] as string[] | undefined) ?? []) };
+  const clean: Record<string, unknown> = {
+    "@context": documentContext((doc["@type"] as string[] | undefined) ?? [], { prefixes: libraryPrefixes() }),
+  };
   for (const [k, v] of Object.entries(doc)) {
     if (v === undefined) continue;
     if (Array.isArray(v) && v.length === 0) continue;
@@ -861,7 +889,7 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
     }, locatedAt);
     if (!titled) return { state: "unreadable", rung };
     const manifest = {
-      "@context": documentContext([termCurie("SourceDocument")]),
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
       "@id": iri("manifest"),
       "@type": [termCurie("SourceDocument")],
       title: titled.title,
