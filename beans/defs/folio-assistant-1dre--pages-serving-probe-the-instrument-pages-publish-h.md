@@ -5,7 +5,7 @@ status: todo
 type: feature
 priority: normal
 created_at: 2026-09-26T03:55:45Z
-updated_at: 2026-10-10T16:53:55Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-1xhc
 ---
 
@@ -104,3 +104,9 @@ Where should the CI job record the pages-serving observation?
 4. **Not built:** keep `instruments = 0` and the `major` finding as the standing reminder.
 
 **Default if no answer:** option 4. Nothing is built, and the finding stays as it is today.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+
+**Option 1:** record the pages-serving observation on `qa-reports` under `main/<sha>/health/pages-serving.json` through the qa-store publish. The health check reads it offline with `qa:fetch`, and a missing or old entry reads as `unknown`, with its date. Lane A takes the CI writer in folio-assistant's `health-check.yml`; the reader is here.

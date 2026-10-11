@@ -7,7 +7,6 @@
     "cat-harness-tools::beans/notes",
     "cat-harness-tools::beans/workflows",
     "cat-harness::attestations",
-    "cat-harness::health",
     "cat-harness::swimlane-glossary",
     "cat-harness::uploads",
     "folio-assistant-core::beans",

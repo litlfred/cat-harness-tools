@@ -203,6 +203,7 @@
     "check:stale-paths": "bun run cat-harness-tools/scripts/check-stale-paths.ts",
     "check:subgraph-coverage": "bun run cat-harness-tools/scripts/check-subgraph-coverage.ts",
     "check:tabular-stubs": "bun run cat-harness-tools/scripts/check-tabular-stubs.ts",
+    "check:translation-officiality": "bun run cat-harness-tools/scripts/check-translation-officiality.ts",
     "check:instance-themes": "bun run cat-harness-tools/scripts/check-instance-themes.ts",
     "check:instance-themes:check": "bun run cat-harness-tools/scripts/check-instance-themes.ts --check",
     "check:nav-names": "bun run cat-harness-tools/scripts/check-nav-names.ts",

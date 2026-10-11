@@ -5,7 +5,7 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-04T15:10:09Z
-updated_at: 2026-10-10T16:39:19Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-3fva
 ---
 
@@ -28,3 +28,9 @@ Where do section-title-audit's agent verdicts live?
 4. Leave it as it is.
 
 **Default if no answer:** option 2. It is documentation only: no data moves and no gate changes.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+
+**Option 1:** move section-title-audit's agent slots to `test/attestations/section-title/…`, make the sidecar a derived working copy published to `qa-reports`, and replace its freshness gate with compute-and-judge.

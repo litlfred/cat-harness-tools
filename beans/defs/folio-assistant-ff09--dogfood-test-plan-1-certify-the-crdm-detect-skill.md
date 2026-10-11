@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:47Z
-updated_at: 2026-10-10T16:50:00Z
+updated_at: 2026-10-11T06:16:33Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-3o5b
@@ -40,3 +40,9 @@ The owner ruled 2026-10-01 that a requirement comes first. What must crdm-detect
 4. **No threshold:** the certification records the numbers and certifies only that the plan was executed.
 
 **Default if no answer:** option 1, written as the `req:` requirement once zaui unblocks the filing.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+
+**Option 4, no threshold:** the certification records the numbers and certifies only that the test plan was executed.

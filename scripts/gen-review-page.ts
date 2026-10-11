@@ -117,6 +117,14 @@ const STYLE = `
   /* Column and gutters belong to main: the harness rail owns body padding-left. */
   main { max-width: 78rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
   .layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 2rem; align-items: start; }
+  /* Bean folio-assistant-xp72: at 2,000 changed blocks the page spent 1.8 s
+     (3.6 s with no change text, two iframes per change) laying out entries
+     nobody could see yet. content-visibility skips style, layout and paint for
+     an entry until it nears the viewport, and keeps it in the DOM, the
+     accessibility tree and find-in-page, so j/k, focus and links are unchanged.
+     The intrinsic size is remembered once an entry has rendered. Measured:
+     0.6-0.8 s for both cases (test/review-budget.e2e.ts). */
+  #changes li[data-label] { content-visibility: auto; contain-intrinsic-size: auto 14rem; }
   .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; }
   @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; } }
   .outline ol { list-style: none; padding-left: .75rem; margin: .25rem 0; }
@@ -655,8 +663,18 @@ export function reviewSiteRoot(pathname: string, locales: readonly string[]): st
   return segs.length >= 4 && locales.indexOf(segs[segs.length - 3]!) >= 0 ? "../../" : "../";
 }
 
-/** The review page. Static: all of its data is fetched when it is opened. */
-export function reviewPageHtml(): string {
+/**
+ * The review page. Static: all of its data is fetched when it is opened.
+ *
+ * `root` is the site root relative to the page, for the one link written into
+ * the markup: "All documents", before the script corrects it from the page's
+ * own path ({@link reviewSiteRoot}). It is what a link check reads, and what a
+ * reader without scripts follows. The page's one writer, core's
+ * build-document-site, puts it at `<site>/<locale>/review/`, hence `../../`;
+ * the hard-coded `../` it had resolved to `<site>/<locale>/index.html`, which
+ * no build writes.
+ */
+export function reviewPageHtml(root: string = "../../"): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -678,7 +696,7 @@ export function reviewPageHtml(): string {
   <button type="button" id="prevc">Previous with comments (p)</button>
   <button type="button" id="nextc">Next with comments (n)</button>
   <button type="button" id="nextu">Next unreviewed (u)</button>
-  <a id="all-documents" href="../index.html">All documents</a>
+  <a id="all-documents" href="${root}index.html">All documents</a>
 </div>
 <div class="viewrow"><label for="view">Show every change as</label> <select id="view"></select></div>
 <section aria-labelledby="rendered-h"><h2 id="rendered-h">Rendered pages this change alters</h2><div id="rendered" class="muted">Loading the rendered impact…</div></section>
