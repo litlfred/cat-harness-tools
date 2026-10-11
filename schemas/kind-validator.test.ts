@@ -198,7 +198,8 @@ describe("per-family node schemas (bean rdkm)", () => {
       // whose files live in another kind's directory is a validator aimed at
       // nothing. The list grew because the KIND did.
       "kg-qa-manifest/v1", "kg-qa/v1",
-      "qa-results/v1", "qa-witness/v1", "translation-qa/v1", "viewer-nav-qa/v1",
+      "qa-results/v1",
+      "qa-script/v1", "qa-witness/v1", "translation-qa/v1", "viewer-nav-qa/v1",
     ]);
     expect(fams.filter((f) => f.state === "unresolvable")).toEqual([]);
     expect(fams.find((f) => f.tag === "kg-qa/v1")?.state).toBe("resolved");
