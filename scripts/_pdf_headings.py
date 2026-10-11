@@ -833,6 +833,80 @@ def consensus_headings(lines: list[Line], others: dict[str, list[Heading]] | Non
     return [s._replace(heading=h) for s, h in zip(kept, relevelled)]
 
 
+# ---------------------------------------------------------------- the author's LaTeX
+
+
+def _key(text: str) -> str:
+    """Comparison form of a title. Mathematics keeps the letters and digits a
+    PDF prints for it (`$\\mathcal N=2$` -> "N 2", as "N=2" reads)."""
+    text = re.sub(r"\$([^$]*)\$", lambda m: re.sub(r"\\[A-Za-z]+", " ", m.group(1)), text)
+    text = re.sub(r"^\s*§\s*", "", text)
+    return norm_title(text)
+
+
+def latex_headings(lines: list[Line], tex: list) -> list[ScoredHeading]:
+    """The headings of the paper's own LaTeX (`_latex_headings.TexHeading`),
+    each found on its PDF page.
+
+    The source is the spine, as a printed contents page is in
+    `consensus_headings`: its entries are the author's, in order, at their
+    real depth, so none is invented and none is re-levelled. The PDF supplies
+    only the PAGE. Each heading is looked for in reading order after the one
+    before it, as its whole title, as the first line of a title that wraps, or
+    as a run-in heading ("1.2. Motivation. In a recent talk ...") whose line
+    goes on into the paragraph. A line set smaller than the body (journal
+    classes print section titles in 9pt capitals) counts only when it starts
+    with a section number, so body text is never taken. A heading found is near certain
+    (`latex`, `body`); one never found keeps the page of the heading before it
+    and is flagged (`latex` alone, 0.5), so the section split stays in order.
+    """
+    if not tex or not lines:
+        return []
+    floor = body_size(lines) - 0.5
+    by_page: dict[int, list[Line]] = defaultdict(list)
+    for l in lines:
+        by_page[l.page].append(l)
+    # A printed contents page lists every title before its section begins.
+    toc_pages = set(contents_pages(by_page))
+    cands = []
+    for l in lines:
+        if l.page in toc_pages:
+            continue
+        number, rest = split_number(l.text.strip())
+        if l.size >= floor or l.bold or number:
+            cands.append((l.page, _key(rest), number))
+    out: list[ScoredHeading] = []
+    pos, page = 0, None
+    for h in tex:
+        want = _key(h.title)
+        if not want:
+            continue
+        hit = None
+        for j in range(pos, len(cands)):
+            k, number = cands[j][1], cands[j][2]
+            if not k:
+                continue
+            if (similar(k, want) >= 0.85 or (len(k) >= 12 and want.startswith(k))
+                    # run-in: the numbered line carries the title, then the text
+                    or (number and len(want) >= 4 and k.startswith(want + " "))):
+                hit = j
+                break
+        if hit is not None:
+            pos, page = hit + 1, cands[hit][0]
+            src, conf = ("latex", "body"), 1.0
+        else:
+            src, conf = ("latex",), 0.5
+        out.append(ScoredHeading(Heading(h.level, h.title, page, h.number), conf, src))
+    first = next((s.heading.page for s in out if s.heading.page is not None), 1)
+    return [s if s.heading.page is not None else s._replace(heading=s.heading._replace(page=first))
+            for s in out]
+
+
+def latex_found_share(scored: list[ScoredHeading]) -> float:
+    """The share of the source's headings the PDF body confirmed."""
+    return sum("body" in s.sources for s in scored) / len(scored) if scored else 0.0
+
+
 # ---------------------------------------------------------------- contents vs body
 
 

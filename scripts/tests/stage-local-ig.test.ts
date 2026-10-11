@@ -177,6 +177,8 @@ describe("stage-local: main site or preview", () => {
   test("--main is refused off the default branch, and the default branch must be known without it", () => {
     expect(() => chooseTarget({ branch: "claude/x", defaultBranch: "main", main: true })).toThrow(/not the default branch/);
     expect(chooseTarget({ branch: "main", main: true })).toBe("main");
+    expect(() => chooseTarget({ branch: "HEAD", defaultBranch: "main" })).toThrow(/detached/);
+    expect(() => chooseTarget({ branch: "HEAD", main: true })).toThrow(/detached/);
     expect(() => chooseTarget({ branch: "main" })).toThrow(/default branch/);
   });
 

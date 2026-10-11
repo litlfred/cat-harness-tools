@@ -202,6 +202,21 @@ def m_consensus(doc: Doc) -> list[H.Heading]:
     return [s.heading for s in H.consensus_headings(doc.lines, others)]
 
 
+def m_latex(doc: Doc) -> list[H.Heading]:
+    """The paper's own LaTeX headings, placed on their pages
+    (`_pdf_headings.latex_headings`), as `pdf-structure.py` uses them: only
+    when the body confirms at least half. Reads the `source/` beside the PDF;
+    a PDF with none scores as empty, so run it on entries that have one."""
+    src = PS.latex_source_for(doc.path, None)
+    if not src:
+        return []
+    tex = PS._latex_headings.source_headings(src)[0]
+    scored = H.latex_headings(doc.lines, tex)
+    if not scored or H.latex_found_share(scored) < PS.LATEX_FOUND_SHARE:
+        return []
+    return [s.heading for s in scored]
+
+
 METHODS = {
     "regex": m_regex,
     "size": m_size,
@@ -209,6 +224,7 @@ METHODS = {
     "contents": m_contents,
     "layout": m_layout,
     "consensus": m_consensus,
+    "latex": m_latex,
     "grobid": m_grobid,
     "nougat": m_nougat,
 }

@@ -1,11 +1,11 @@
 ---
 # folio-assistant-1dre
 title: 'PAGES SERVING PROBE: the instrument pages-publish-health counts, and it can only be built in CI because egress refuses every route from an agent'
-status: todo
+status: in-progress
 type: feature
 priority: normal
 created_at: 2026-09-26T03:55:45Z
-updated_at: 2026-10-11T06:16:33Z
+updated_at: 2026-10-11T06:39:01Z
 parent: folio-assistant-1xhc
 ---
 
@@ -110,3 +110,11 @@ Where should the CI job record the pages-serving observation?
 ## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1:** record the pages-serving observation on `qa-reports` under `main/<sha>/health/pages-serving.json` through the qa-store publish. The health check reads it offline with `qa:fetch`, and a missing or old entry reads as `unknown`, with its date. Lane A takes the CI writer in folio-assistant's `health-check.yml`; the reader is here.
+
+
+
+## Progress 2026-10-11 (lane B)
+- [x] Schema: `PagesServingObservationSchema` in cat-harness `schemas/health-report.ts` (cat-harness#141, merged).
+- [x] Reader: cat-harness-tools#117. `probePagesServing` reads `main/<HEAD>/health/pages-serving.json` through the qa-store, offline. Missing, or older than 7 days, reads as unknown with its date. Each URL that wasn't served is a major finding. **Held unmerged until lane A's writer publishes**, because otherwise every daily health run would read unknown.
+- [ ] Writer: lane A, in folio-assistant health-check.yml. I sent them the contract.
+- [ ] The enforcement question, answered from accumulated observations.
