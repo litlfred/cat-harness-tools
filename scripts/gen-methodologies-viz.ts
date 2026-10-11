@@ -69,6 +69,7 @@ import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "methodologies-viewer";
@@ -454,9 +455,7 @@ if (import.meta.main) {
     page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE),
     VIEWER_TOOL,
   );
-  const docsBase = existsSync(join(INSTANCE_ROOT, "docs"))
-    ? join(INSTANCE_ROOT, "docs")
-    : baseDocsDir(REPO);
+  const docsBase = localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO);
   const out = join(docsBase, PAGE);
 
   if (check) {

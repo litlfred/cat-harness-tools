@@ -21,7 +21,8 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
-import { readBeans, type BeanNode } from "./beans.ts";
+import { readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
+import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { walkBlocks } from "../content/pipeline/qa-utils.ts";
 import { KNOWN_LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";
@@ -209,7 +210,7 @@ export function collectBlocks(root: string, contentDir?: string): TraceableBlock
     dirsToTry.push(resolve(contentDir));
   } else {
     const candidateContent = join(root, "content");
-    const candidateFolio = join(root, "folio");
+    const candidateFolio = folioDir(root);
     if (existsSync(candidateContent)) dirsToTry.push(candidateContent);
     if (existsSync(candidateFolio)) dirsToTry.push(candidateFolio);
     if (dirsToTry.length === 0 && existsSync(root)) {
@@ -320,7 +321,15 @@ export function collectBeans(root: string, beanDefsDir?: string): BeanNode[] {
   }
 
   // Fallback checks
-  const candidates = [join(root, "beans", "defs"), join(root, "beans"), join(root, "defs")];
+  // The store the graph declares first (`resolveBeanDefs`), then a bare
+  // `defs/` beside the root.
+  let declared: string | null = null;
+  try {
+    declared = resolveBeanDefs(root).dir;
+  } catch {
+    declared = null;
+  }
+  const candidates = [...(declared !== null ? [declared] : []), join(root, "defs")];
   for (const dir of candidates) {
     if (existsSync(dir)) {
       const beans = collectBeans(root, dir);

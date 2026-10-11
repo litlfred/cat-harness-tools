@@ -55,6 +55,7 @@ import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
+import { localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "tools-viewer";
@@ -406,8 +407,8 @@ if (import.meta.main) {
     process.exit(1);
   }
   const rendered = publishedPage(rows, skillIds(REPO));
-  const localDocs = join(resolve(HARNESS_ROOT), "docs");
-  const out = existsSync(localDocs) ? join(localDocs, PAGE) : join(baseDocsDir(REPO), PAGE);
+  const localDocs = localSiteDir(resolve(HARNESS_ROOT));
+  const out = localDocs !== undefined ? join(localDocs, PAGE) : join(baseDocsDir(REPO), PAGE);
 
   if (check) {
     const current = existsSync(out) ? readFileSync(out, "utf-8") : "";

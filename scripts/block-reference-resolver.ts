@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir as folioDirOf, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   KG_QA_SCHEMA,
   tally,
@@ -520,7 +520,7 @@ export function auditBlockReferences(
   options: BlockResolverOptions = {},
 ): BlockReferenceResult {
   const dirs = getDeclaredDirectories(instanceRoot, options.declaredDirectories);
-  const folioDir = dirs.get("folio") ?? join(instanceRoot, "folio");
+  const folioDir = dirs.get("folio") ?? folioDirOf(instanceRoot);
 
   if (!existsSync(folioDir)) {
     return {

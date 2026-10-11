@@ -132,6 +132,10 @@ export function isFhirIgPath(path: string): boolean {
 
 export function isKgPath(path: string): boolean {
   const norm = path.replace(/\\/g, "/");
+  // declared-path-literal: a CLASSIFIER over changed-file paths, not a read —
+  // these name the KG directory names a diff may touch in ANY instance, and
+  // no single declaration answers "is this a KG path" for a path from another
+  // instance or a deleted file. `KG_PATH_PATTERNS` extends it by declaration.
   return (
     norm.endsWith(".jsonld") ||
     norm.endsWith(".bpmn") ||
@@ -168,6 +172,9 @@ export function isKgPath(path: string): boolean {
 
 export function isRenderPath(path: string): boolean {
   const norm = path.replace(/\\/g, "/");
+  // declared-path-literal: a CLASSIFIER over changed-file paths, as in
+  // `isKgPath` — the rendered-output directory names any instance's diff may
+  // carry; `RENDER_PATH_PATTERNS` extends it by declaration.
   return (
     norm.startsWith("docs/") ||
     norm.includes("/docs/") ||

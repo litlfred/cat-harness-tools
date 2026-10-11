@@ -51,7 +51,7 @@ import { join, relative, resolve, sep } from "node:path";
 
 import { workflowFiles } from "./known-skills.ts";
 import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { buildSubgraphs, publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
@@ -60,7 +60,7 @@ const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 const OUT = join(ROOT, subgraphOutDir(ROOT));
-const PAGE = join(ROOT, "docs", "source", "process-publication-workflow", "every-workflow-in-the-repo.md");
+const PAGE = join(docsSourceDirFor(ROOT), "process-publication-workflow", "every-workflow-in-the-repo.md");
 
 type Doc = Record<string, unknown>;
 const list = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v : [v]);

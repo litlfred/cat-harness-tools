@@ -45,6 +45,8 @@ import {
   type MergeReview,
   type ReviewGateEvaluation,
 } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { attestationsHomeFor } from "@litlfred/cat-harness/schemas/qa-attestations.js";
 
 export type AdversarialGateState =
   | "clean"
@@ -180,9 +182,11 @@ export function findVerdictFile(headSha: string, verdictDir?: string, cwd?: stri
   const searchDirs = verdictDir
     ? [verdictDir]
     : [
-        join(root, "test/results/qa-review"),
-        join(root, "test/attestations/qa-review"),
-        join(root, "test/results"),
+        // The declared `qa` tree and `attestations` store (`kgQaHomeFor`,
+        // `attestationsHomeFor`), never spelled: a moved tree moves the search.
+        join(kgQaHomeFor(root).root, "qa-review"),
+        join(attestationsHomeFor(root).root, "qa-review"),
+        kgQaHomeFor(root).root,
       ];
 
   const candidateNames = [

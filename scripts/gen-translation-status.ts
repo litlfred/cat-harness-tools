@@ -57,6 +57,7 @@ import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js"
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -579,7 +580,7 @@ function main(): void {
   const ownScope = `${declName}/translations`;
   const locales = localeStatuses(translationsDir);
   const instances = otherInstances(REPO_ROOT, ROOT);
-  const site = existsSync(join(ROOT, "docs")) ? join(ROOT, "docs") : join(ROOT, siteDirFor(ROOT));
+  const site = localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT));
 
   // The projection first, the page second: the page is a rendering OF the
   // projection, and writing them the other way round invites a page whose

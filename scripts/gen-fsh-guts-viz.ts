@@ -59,6 +59,7 @@ import { baseDocsDir } from "./compose-docs.js";
 import { publishPlan } from "./derive-at-publish.js";
 import { visualiserSitePath } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), which cat-harness declares its `fsh-guts` visualiser `renderedBy`. */
 const VIEWER_TOOL = "staging-graph-viewer";
@@ -371,9 +372,7 @@ if (import.meta.main) {
     process.exit(1);
   }
   const INSTANCE_ROOT = HARNESS_ROOT;
-  const docsRoot = existsSync(join(INSTANCE_ROOT, "docs"))
-    ? join(INSTANCE_ROOT, "docs")
-    : baseDocsDir(REPO);
+  const docsRoot = localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO);
   const out = join(docsRoot, PAGE);
 
   let isPublishArtefact = false;
