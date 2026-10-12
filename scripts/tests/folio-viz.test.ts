@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
-import { folioFileList } from "@litlfred/cat-harness/folio/render/file-list.ts";
+import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
