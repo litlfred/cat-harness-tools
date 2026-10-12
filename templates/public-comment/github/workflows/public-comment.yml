@@ -64,7 +64,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Install the platform's dependencies
-        run: cd {{assistant}} && bun install --frozen-lockfile
+        run: cd {{assistant}} && bash .github/mount-from-lock.sh --root . && bun install --frozen-lockfile
 
       - name: Record the event, and bring the issues into line
         # The event's text is untrusted. The tool reads it from the event FILE,
