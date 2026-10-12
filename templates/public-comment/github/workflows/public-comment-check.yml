@@ -34,7 +34,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: cd {{assistant}} && bun install --frozen-lockfile
+      - run: cd {{assistant}} && bash .github/mount-from-lock.sh --root . && bun install --frozen-lockfile
       - run: bun run {{assistant}}/folio-assistant-core/scripts/public-comment-changesets.ts check
 
   reconcile:
@@ -49,7 +49,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: cd {{assistant}} && bun install --frozen-lockfile
+      - run: cd {{assistant}} && bash .github/mount-from-lock.sh --root . && bun install --frozen-lockfile
       - name: Bring every issue into line with its record
         env:
           GITHUB_TOKEN: ${{ github.token }}

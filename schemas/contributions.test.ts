@@ -18,7 +18,7 @@ import {
 } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { CONTENT_ADAPTERS, adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
-import { writeInstanceConfig } from "../test/support/instance-fixture.js";
+import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the
@@ -27,39 +27,51 @@ const TMP = mkdtempSync(join(tmpdir(), "test_contributions-"));
 
 beforeAll(() => {
   // ── The gate fixture: a root folio with one dependency that contributes
-  //    a block kind, a skill and an MCP tool.
+  //    a block kind, an adapter vocabulary and a QA checker — as DECLARED
+  //    NODES (bean riit). Until riit a dependency returned these from a
+  //    `contributes:` module; the loader no longer reads one, and a fixture
+  //    still built that way measured nothing (the four cases below were red on
+  //    main for that reason, not for a loader defect).
   const dep = join(TMP, "dep-sci");
   mkdirSync(join(dep, "skills", "authoring-math"), { recursive: true });
   writeFileSync(join(dep, "skills", "authoring-math", "SKILL.md"), "# math\n", "utf-8");
-
+  for (const d of ["block-kinds", "content-adapters", "qa-checkers", "checks"]) mkdirSync(join(dep, d), { recursive: true });
   writeFileSync(
-    join(dep, "contributions.ts"),
-    `export default function () {
-       return {
-         name: "dep-sci",
-         blockKinds: [{ kind: "knot-diagram", adapter: "sci" }],
-         adapter: { name: "sci", module: "./adapters/sci/index.ts" },
-         tools: [{ name: "lean", register: (s) => { (globalThis).__leanRegistered = s; } }],
-         qaCheckers: [{ criterion: "knot-well-formed", check: () => ({ result: "pass", hits: [] }), sourceFile: "checkers.ts" }],
-         // Claimed by the MODULE, and it must lose to the dependency entry —
-         // a contributor that could name its own root could point the sweep
-         // at bytes it does not own.
-         root: "/somewhere/else",
-       };
-     }`,
-    "utf-8",
+    join(dep, "block-kinds", "knot-diagram.json"),
+    JSON.stringify({ $schema: "folio-block-kind/v1", kind: "knot-diagram", adapter: "sci", labelPrefix: "knot", folioType: "dep-sci:KnotDiagram" }),
   );
-  writeInstanceConfig(dep, JSON.stringify({ contributes: "./contributions.ts" }));
+  writeFileSync(
+    join(dep, "content-adapters", "sci.json"),
+    JSON.stringify({ $schema: "folio-content-adapter/v1", adapter: "sci", typed: false, companionRoles: ["md", "ts"], vocabulary: "adapters/sci/index.ts" }),
+  );
+  writeFileSync(
+    join(dep, "qa-checkers", "knot-well-formed.json"),
+    JSON.stringify({ $schema: "folio-qa-checker/v1", criterion: "knot-well-formed", check: "checks/knots.ts#KNOT_CHECKERS" }),
+  );
+  writeFileSync(join(dep, "checks", "knots.ts"), `export const KNOT_CHECKERS = { "knot-well-formed": () => ({ result: "pass", hits: [] }) };\n`);
+  writeDeclaration(dep, {
+    name: "dep-sci",
+    directories: [
+      { id: "kinds", path: "block-kinds/", graphTypologies: ["block-kinds"] },
+      { id: "adapters", path: "content-adapters/", graphTypologies: ["content-adapters"] },
+      { id: "checkers", path: "qa-checkers/", graphTypologies: ["qa-checkers"] },
+      { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+    ],
+  });
 
   mkdirSync(join(TMP, "skills"), { recursive: true });
   writeInstanceConfig(TMP, JSON.stringify({ contentType: "document", dependencies: { folioAssistant: [{ name: "dep-sci", path: dep }] } }),
     "utf-8",
   );
 
-  // ── A dependency that declares a contributes module which is not there.
+  // ── A dependency whose qa-checker node names a table file that is not there.
   const broken = join(TMP, "dep-broken");
-  mkdirSync(broken, { recursive: true });
-  writeInstanceConfig(broken, JSON.stringify({ contributes: "./nope.ts" }));
+  mkdirSync(join(broken, "qa-checkers"), { recursive: true });
+  writeFileSync(
+    join(broken, "qa-checkers", "gone.json"),
+    JSON.stringify({ $schema: "folio-qa-checker/v1", criterion: "gone", check: "checks/nope.ts#GONE" }),
+  );
+  writeDeclaration(broken, { name: "dep-broken", directories: [{ id: "checkers", path: "qa-checkers/", graphTypologies: ["qa-checkers"] }] });
   const brokenRoot = join(TMP, "root-broken");
   mkdirSync(brokenRoot, { recursive: true });
   writeInstanceConfig(brokenRoot, JSON.stringify({ dependencies: { folioAssistant: [{ name: "dep-broken", path: broken }] } }),
@@ -207,16 +219,21 @@ describe("composedKindOwner", () => {
 });
 
 describe("loadContributions — the Phase 0.1 gate", () => {
-  it("a dependency contributes a block kind, an adapter and an MCP tool", async () => {
+  it("a dependency contributes a block kind, an adapter and a QA checker", async () => {
+    // MCP tools are no longer contributed here: a Tool node declares its own
+    // registrar (bean zmdo), so the loader carries kinds, adapters, checkers
+    // and plugins only.
     const r = await loadContributions<FolioContribution, ContributionRegistry>(TMP, new ContributionRegistry());
     expect(r.kindOwner("knot-diagram")).toBe("sci");
-    expect(r.adapterModule("sci")).toBe("./adapters/sci/index.ts");
-    expect(r.contributedTools()).toEqual(["lean"]);
+    expect(r.adapterModule("sci")).toBe("adapters/sci/index.ts");
+    expect(r.qaCheckerEntry("knot-well-formed")).toBeDefined();
   });
 
   it("the dependency's declared name wins over whatever the module claims", async () => {
     // A contributor that could rename itself could impersonate another
-    // contributor's namespace and turn a collision into a silent merge.
+    // contributor's namespace and turn a collision into a silent merge. Under
+    // nodes there is no module to make the claim; the entry's name is the only
+    // one, and this holds that it stays so.
     const r = await loadContributions<FolioContribution, ContributionRegistry>(TMP, new ContributionRegistry());
     expect(r.contributedKinds()[0]?.contributor).toBe("dep-sci");
   });
@@ -224,14 +241,14 @@ describe("loadContributions — the Phase 0.1 gate", () => {
   it("the dependency entry's ROOT wins too, so a checker hashes the right bytes", async () => {
     // Not the same field as `name`: this one says where the contributor's
     // FILES are, and a contributed checker's source file is resolved against
-    // it to be freshness-hashed. The fixture module claims `/somewhere/else`.
+    // it to be freshness-hashed.
     const r = await loadContributions<FolioContribution, ContributionRegistry>(TMP, new ContributionRegistry());
     const entry = r.qaCheckerEntry("knot-well-formed");
     expect(entry?.root).toBe(join(TMP, "dep-sci"));
-    expect(entry?.label).toBe("dep-sci/checkers.ts");
+    expect(entry?.label).toBe("dep-sci/checks/knots.ts");
   });
 
-  it("a declared-but-missing contributes module fails loudly", async () => {
+  it("a declared checker whose code is missing fails loudly", async () => {
     // A stated intention that silently did nothing is the exact failure mode
     // AGENTS.md records under "move wiring and script together".
     await expect(loadContributions<FolioContribution, ContributionRegistry>(join(TMP, "root-broken"), new ContributionRegistry())).rejects.toThrow(/does not exist/);
