@@ -11,6 +11,11 @@
  * every runner re-typed it and each copy could drift. This is that recipe as
  * one command, the same for an agent, a person or a Routine:
  *
+ *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> --instance <name>
+ *
+ * reads the steps from `<name>.config.json` `site.build` ({@link recipeFromConfig}).
+ * Any step flag below replaces it whole (no merging of flags and recipe):
+ *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
  *     --instance <name> --home <page.md> \
  *     --pre <package script> --source-step <package script> --site-step <package script> \
@@ -115,6 +120,40 @@ export function siteFields(text: string, file: string): { name: string; title?: 
 
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
 export const SCRIPT_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
+
+/** The steps that build an instance's site, as its own package script names. */
+export interface SiteRecipe {
+  home?: string;
+  pre: string[];
+  sourceSteps: string[];
+  siteSteps: string[];
+}
+
+/**
+ * The recipe `<instance>.config.json` declares under `site.build`, or
+ * undefined when it declares none. Owner, 2026-10-10: "i want one
+ * consolidated worfklow". The recipe lived only as prose in a folio's
+ * AGENTS.md, so `stage-local.ts` could not find it and every runner re-typed
+ * it. The cat-harness schema is `HarnessSiteBuildSchema`. It is read here
+ * structurally, so this compiles against a cat-harness pin from before that
+ * schema, and every step is held to {@link SCRIPT_NAME} exactly as the flags are.
+ */
+export function recipeFromConfig(root: string, instance: string): SiteRecipe | undefined {
+  const file = join(resolve(root), `${instance}.config.json`);
+  if (!existsSync(file)) return undefined;
+  const build = (JSON.parse(readFileSync(file, "utf-8")) as { site?: { build?: Record<string, unknown> } }).site?.build;
+  if (build === undefined) return undefined;
+  const list = (k: string): string[] => {
+    const v = build[k] ?? [];
+    if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && SCRIPT_NAME.test(x))) {
+      throw new Error(`${file}: site.build.${k} must be a list of package script names`);
+    }
+    return v as string[];
+  };
+  const home = build.home;
+  if (home !== undefined && typeof home !== "string") throw new Error(`${file}: site.build.home must be a path`);
+  return { ...(home !== undefined ? { home } : {}), pre: list("pre"), sourceSteps: list("sourceSteps"), siteSteps: list("siteSteps") };
+}
 
 /** owner and repository name from a GitHub remote URL (https or ssh). */
 export function ownerRepo(url: string): { owner: string; repo: string } | undefined {
@@ -369,16 +408,22 @@ if (import.meta.main) {
     );
     process.exit(2);
   }
+  // Explicit step flags win. With none, the instance's own `site.build`.
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps"> => {
+    const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step") };
+    if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length > 0) return flags;
+    const r = recipeFromConfig(root, instance);
+    if (r === undefined) return flags;
+    console.log(`steps: from ${instance}.config.json site.build`);
+    return r;
+  };
   try {
     await buildInstanceSite({
       root,
       instance,
       linkRoot: one("--link-root") ?? "https://litlfred.github.io/folio-assistant",
       out: one("--out") ?? join(resolve(root), "..", `${instance}-site`),
-      home: one("--home"),
-      pre: many("--pre"),
-      sourceSteps: many("--source-step"),
-      siteSteps: many("--site-step"),
+      ...stepsOrRecipe(),
       staging: one("--staging"),
       mount: !a.includes("--no-mount"),
       fresh: a.includes("--fresh"),
