@@ -1,13 +1,13 @@
 ---
 # cat-tools-e8vg
 title: 'TOC benchmark: score Nougat on the 13 outline PDFs (needs huggingface.co) (#2302)'
-status: in-progress
+status: completed
 type: task
 priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-12T08:51:28Z
+updated_at: 2026-10-12T12:26:34Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-u9lb`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -41,3 +41,11 @@ the harness owns the harness") puts it outside this store's reach.
 3. Scrap it. The finding no longer matters after the separation.
 
 **Default if no answer:** option 1.
+
+
+
+## Summary of Changes
+- Measured, not assessed. cat-harness#168 (merged `e86fdf9`) adds §"Nougat, measured" to `docs/research-and-analysis/toc-extraction.md`. Nougat-small (`0.1.0-small`, nougat-ocr 0.1.17) ran on CPU only (4 cores) over **10 of the 13** outline PDFs, 3.3 h wall time. The 179-, 254- and 534-page documents were not run, and the section says so.
+- **Title F1 0.81 against layout's 0.87** on the same 10. Link and full F1 are not measurable, because Nougat marks no page boundaries. It wins on the two papers layout over-predicts and fails on the long WHO guideline (0.43, repeated headings).
+- **Correction:** the weights come from nougat's GitHub release assets, not huggingface.co, so the premise of this bean ("needs huggingface.co") was wrong. Also, pypdfium2 must be pinned at 4.20.0, because 5.x dropped `render`.
+- `pdf-toc-layout.test.py` is untouched (doc-only change).

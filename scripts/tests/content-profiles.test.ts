@@ -13,9 +13,9 @@
 import { describe, test, expect } from "bun:test";
 import {
   BLOCK_KINDS,
-  PAPER_BLOCK_KINDS,
   DOCUMENT_BLOCK_KINDS,
   MATH_BLOCK_KINDS,
+  CONTENT_ADAPTERS,
   CONTENT_PROFILES,
   PROFILE_BLOCK_KINDS,
   adapterForKind,
@@ -28,12 +28,12 @@ import { join } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 describe("the profile partition", () => {
-  test("document and math are disjoint and cover the paper vocabulary", () => {
+  test("document and math are disjoint and cover the built-in kinds", () => {
     const doc = new Set<string>(DOCUMENT_BLOCK_KINDS);
     const math = new Set<string>(MATH_BLOCK_KINDS);
     for (const k of math) expect(doc.has(k)).toBe(false);
-    expect(doc.size + math.size).toBe(PAPER_BLOCK_KINDS.length);
-    expect(new Set([...doc, ...math])).toEqual(new Set<string>(PAPER_BLOCK_KINDS));
+    expect(doc.size + math.size).toBe(BLOCK_KINDS.length);
+    expect(new Set([...doc, ...math])).toEqual(new Set<string>(BLOCK_KINDS));
   });
 
   test("a kind added to BLOCK_KINDS cannot go unclassified", () => {
@@ -79,11 +79,13 @@ describe("the profile partition", () => {
 });
 
 describe("profiles do not disturb the adapter axis", () => {
-  test("every paper kind still maps to the paper adapter", () => {
+  test("every built-in kind maps to exactly one built-in vocabulary", () => {
     // The regression this guards: making `document` a third CONTENT_ADAPTER
     // would have made `adapterForKind` ambiguous on all eight shared kinds,
     // and QA criteria are scoped through it.
-    for (const k of BLOCK_KINDS) expect(adapterForKind(k)).toBe("paper");
+    // Since bean bzwk the vocabularies are by layer (core `document`, sci
+    // `mathpaper`), disjoint, so this is unambiguous in either layout.
+    for (const k of BLOCK_KINDS) expect(CONTENT_ADAPTERS as readonly string[]).toContain(adapterForKind(k)!);
   });
 
   // "A DAK kind is in no profile" moved to smart-base/schemas/dak-blocks.test.ts

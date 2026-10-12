@@ -21,7 +21,7 @@ import {
   loadBlockModule,
   loadBlocksUnder,
   verifyEditedBlock,
-} from "../../content/pipeline/block-module";
+} from "../../pipeline/block-module";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const BUILDERS = join(HARNESS_ROOT, "schemas", "builders");

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ContentGraph } from "../../content/pipeline/content-graph";
+import { ContentGraph } from "../../pipeline/content-graph";
 import { buildFiles, contentGraphPuml, formalLegend, modelOf, statusOf, type BlockModel } from "../gen-content-graph-uml";
 import { landscapeOf } from "../plantuml-render";
 

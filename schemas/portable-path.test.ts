@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { scriptSidecarPath } from "../content/pipeline/qa-utils.ts";
+import { scriptSidecarPath } from "../pipeline/qa-utils.ts";
 import { detailFileName, detailRelPath } from "../scripts/agent-memory.ts";
 import { stickyFile } from "../scripts/ensure-landing-sticky.ts";
 import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.ts";

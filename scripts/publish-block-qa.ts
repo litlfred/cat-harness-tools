@@ -68,10 +68,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { BLOCK_QA_RESULTS_DIR, existingBlockQaPath, findContentRepoRoot } from "../content/pipeline/qa-paths.js";
-import { hashBlockFiles, loadQaReport, summariseFreshness, walkBlocks } from "../content/pipeline/qa-utils.js";
-import { usesGraphHash } from "../content/pipeline/uses-graph-hash.js";
-import { qaCriteriaByIdFor, qaCriteriaFor } from "../content/pipeline/qa-criteria-registry.js";
+import { BLOCK_QA_RESULTS_DIR, existingBlockQaPath, findContentRepoRoot } from "../pipeline/qa-paths.js";
+import { hashBlockFiles, loadQaReport, summariseFreshness, walkBlocks } from "../pipeline/qa-utils.js";
+import { usesGraphHash } from "../pipeline/uses-graph-hash.js";
+import { qaCriteriaByIdFor, qaCriteriaFor } from "../pipeline/qa-criteria-registry.js";
 import { voiceExcludesCriterion, type QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.js";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/voices.js";
 

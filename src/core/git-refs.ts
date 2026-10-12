@@ -8,7 +8,7 @@
  * **generic git and configuration facts**. Nothing in any of them is about a
  * README, a folio, or authored content.
  *
- * They lived in `content/pipeline/readme-toc.ts` because that is where the
+ * They lived in `pipeline/readme-toc.ts` because that is where the
  * first caller was, and the cost showed up one layer out: a harness-level
  * link check over `AGENTS.md` reaching `auditLinks` reached `publishedPaths`
  * reached core, so **any** harness check that audits a link inherited a

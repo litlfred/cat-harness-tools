@@ -19,7 +19,7 @@ import { join, resolve } from "node:path";
  * discovery, or a real usage mistake gets reported as "no content repo found".
  */
 
-const SCRIPT = resolve(import.meta.dir, "../../content/pipeline/prune-transitive-deps.ts");
+const SCRIPT = resolve(import.meta.dir, "../../pipeline/prune-transitive-deps.ts");
 let cwd: string;
 
 const run = (args: string[]): { code: number; out: string } => {

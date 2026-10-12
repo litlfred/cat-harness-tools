@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { paperArg, requireFlagValue } from "../../content/pipeline/cli-args";
+import { paperArg, requireFlagValue } from "../../pipeline/cli-args";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /**
@@ -68,9 +68,9 @@ describe("no script re-introduces the unguarded idiom", () => {
     expect(UNGUARDED.test(planted)).toBe(true);
   });
 
-  test("and finds nothing in content/pipeline or scripts", () => {
+  test("and finds nothing in pipeline or scripts", () => {
     const offenders: string[] = [];
-    for (const dir of ["content/pipeline", "scripts"]) {
+    for (const dir of ["pipeline", "scripts"]) {
       for (const f of tsFiles(join(ROOT, dir))) {
         // Two legitimate self-references: cli-args.ts is where the flag name
         // is searched for real, and THIS file necessarily contains the pattern
@@ -94,7 +94,7 @@ describe("q-usage-audit still IMPORTS", () => {
     // the `--paper` sweep moved the read onto the shared helper, so every
     // import threw and it surfaced as two unrelated CLI test failures.
     // Importing it is the whole assertion.
-    const mod = await import("../../content/pipeline/q-usage-audit");
+    const mod = await import("../../pipeline/q-usage-audit");
     expect(mod).toBeDefined();
   });
 });

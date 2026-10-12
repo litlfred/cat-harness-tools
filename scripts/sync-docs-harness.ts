@@ -31,7 +31,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { detectRepoUrl } from "../content/pipeline/readme-toc.js";
+import { detectRepoUrl } from "../pipeline/readme-toc.js";
 import { instanceDeclarationFilename, instanceRootsIn, readDeclaration, resolveInherited, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { imageForRole, imagesForRole } from "@litlfred/cat-harness/schemas/kg-node.js";

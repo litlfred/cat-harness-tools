@@ -12,7 +12,7 @@
  *
  * It stops being harmless when the two copies drift, because a co-located
  * `<block>.lean` wins **candidate 1** of `lean.ref` resolution
- * (`resolveCanonicalLean` / `walkBlocks` in `content/pipeline/qa-utils.ts`),
+ * (`resolveCanonicalLean` / `walkBlocks` in `pipeline/qa-utils.ts`),
  * unconditionally and before any Lake-tree candidate. Every checker aimed at
  * that block then audits the sibling's copy and never sees the declaration
  * `lake build` actually compiles. A file can be green, compile clean, satisfy
@@ -112,8 +112,8 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative, resolve } from "path";
 
 import { LEAN_PACKAGES, type LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.ts";
-import { findContentRepoRoot } from "../content/pipeline/repo-root.ts";
-import { ARCHIMEDEAN_TYPE_RE } from "../content/pipeline/qa-checkers-voice.ts";
+import { findContentRepoRoot } from "../pipeline/repo-root.ts";
+import { ARCHIMEDEAN_TYPE_RE } from "../pipeline/qa-checkers-voice.ts";
 
 // ── Lean surface parsing ─────────────────────────────────────────
 
@@ -133,7 +133,7 @@ interface Decl {
   fields: string[];
   /**
    * True when any field's *type* names a real-field type, by the corpus's own
-   * `ARCHIMEDEAN_TYPE_RE` (`content/pipeline/qa-checkers-voice.ts`).
+   * `ARCHIMEDEAN_TYPE_RE` (`pipeline/qa-checkers-voice.ts`).
    *
    * This is the §7c side of the declaration. Two mirrors can agree on every
    * field *name* and still sit on opposite sides of the substrate→archimedean

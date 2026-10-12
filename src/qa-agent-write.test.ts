@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { blockQaPath, existingBlockQaPath, legacyBlockQaPath } from "../content/pipeline/qa-paths";
+import { blockQaPath, existingBlockQaPath, legacyBlockQaPath } from "../pipeline/qa-paths";
 
 const SCRIPT = resolve(import.meta.dir, "qa-agent-write.ts");
 

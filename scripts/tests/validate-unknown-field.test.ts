@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { validateObjects } from "../../content/pipeline/validate";
+import { validateObjects } from "../../pipeline/validate";
 
 /**
  * The Zod block schemas are non-strict, so a key nothing declares is stripped

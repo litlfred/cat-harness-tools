@@ -2,7 +2,7 @@
 """Extract placed images from a PDF, and say which of them are FIGURES.
 
 Bean `d5f1`. Stage A of the image path: this writes facts, and
-`content/pipeline/gen-library-jsonld.ts` turns them into nodes. The same split
+`pipeline/gen-library-jsonld.ts` turns them into nodes. The same split
 `pdf-structure.py` / `pdf-tables.py` already use.
 
 Why the classification is here rather than left to a consumer

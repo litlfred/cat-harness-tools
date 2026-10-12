@@ -43,12 +43,12 @@
  */
 
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { stripLeanComments } from "../content/pipeline/lean-lexer.js";
-import { refToDecl } from "../content/pipeline/content-graph.js";
+import { stripLeanComments } from "../pipeline/lean-lexer.js";
+import { refToDecl } from "../pipeline/content-graph.js";
 import { readdirSync, readFileSync, existsSync, writeFileSync } from "fs";
 import { join, resolve, relative, dirname, basename } from "path";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
-import { requirePaper } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
+import { requirePaper } from "../pipeline/repo-root";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is

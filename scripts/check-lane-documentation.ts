@@ -99,7 +99,7 @@ const REPO = resolve(INSTANCE_ROOT, "..");
 /**
  * `decodeLabel` and the extractor's own filter, DUPLICATED on purpose.
  *
- * The originals are `content/pipeline/bpmn-translate.ts`, which is
+ * The originals are `pipeline/bpmn-translate.ts`, which is
  * `folio-assist-core`; this module is `agentic-harness`, and
  * `check:partition` refuses the edge because core depends on the harness
  * rather than the other way round. That refusal is right — the alternative

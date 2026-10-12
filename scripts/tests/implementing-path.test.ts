@@ -88,8 +88,8 @@ describe("resolving a declared path", () => {
 
   test("a transitive dependent's copy is not found", () => {
     const root = checkout();
-    put(root, "far/content/pipeline/c.ts");
-    const r = resolveImplementingPath(join(root, "base"), "content/pipeline/c.ts");
+    put(root, "far/pipeline/c.ts");
+    const r = resolveImplementingPath(join(root, "base"), "pipeline/c.ts");
     expect(r.state).toBe("missing");
     if (r.state === "missing") {
       // The declarer first, then each direct implementer; never `far`.

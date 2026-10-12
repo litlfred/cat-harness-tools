@@ -42,10 +42,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { formatPot, potQuote } from "../content/pipeline/pot-extract.js";
-import { parsePo, parsePoEntries } from "../content/pipeline/po-inject.js";
-import type { PoEntry } from "../content/pipeline/po-inject.js";
-import type { PotEntry } from "../content/pipeline/pot-extract.js";
+import { formatPot, potQuote } from "../pipeline/pot-extract.js";
+import { parsePo, parsePoEntries } from "../pipeline/po-inject.js";
+import type { PoEntry } from "../pipeline/po-inject.js";
+import type { PotEntry } from "../pipeline/pot-extract.js";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   STRINGS_SOURCE,

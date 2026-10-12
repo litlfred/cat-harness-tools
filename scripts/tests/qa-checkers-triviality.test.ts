@@ -6,7 +6,7 @@ import {
   checkProofNotMachineTrivial,
   resetTrivialityCache,
   TRIVIAL_STEP_THRESHOLD,
-} from "../../content/pipeline/qa-checkers-triviality";
+} from "../../pipeline/qa-checkers-triviality";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";

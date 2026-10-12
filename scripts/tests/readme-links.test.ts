@@ -20,7 +20,7 @@ import { tmpdir } from "os";
 // through the re-export, so this file fails if the move is ever undone by
 // accident.
 import { auditLinks, classify, parseLinks } from "../../src/core/markdown-links";
-import { runReadmeAudit } from "../../content/pipeline/readme-links";
+import { runReadmeAudit } from "../../pipeline/readme-links";
 
 const dirs: string[] = [];
 afterEach(() => {

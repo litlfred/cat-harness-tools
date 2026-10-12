@@ -7,7 +7,7 @@
  * Library + PlanDefinition + Measure carrying no dependency edges at all. That
  * measurement holds, and the index has no edge field to hold one.
  *
- * `content/pipeline/fsh-cone.ts` measures a different graph of the same IG: the
+ * `pipeline/fsh-cone.ts` measures a different graph of the same IG: the
  * SOURCE (`.fsh` + `.cql`). This script asks whether that second graph covers the
  * logic layer well enough to mark staleness, and reports three numbers side by
  * side, per resource type, because an aggregate hides the answer:
@@ -28,7 +28,7 @@
  *
  * When first measured, pass 2 found **0 logic→logic edges** for all 458
  * artefacts — 8 distinct targets between them, every one a shared `RuleSet`.
- * Two separable causes, both now fixed in `content/pipeline/fsh-cone.ts`:
+ * Two separable causes, both now fixed in `pipeline/fsh-cone.ts`:
  *
  * **(a)** The `Library ↔ cql (by name)` edge was guarded on `node.id`, and
  * every Library instance omits `Id:` and relies on SUSHI's name→id default, so
@@ -70,7 +70,7 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { buildFshGraph, type FshGraph } from "../content/pipeline/fsh-cone.ts";
+import { buildFshGraph, type FshGraph } from "../pipeline/fsh-cone.ts";
 
 /** The three resource types the skill's 61 % is built from. */
 export const LOGIC_TYPES = ["Library", "PlanDefinition", "Measure"] as const;

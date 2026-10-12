@@ -20,7 +20,7 @@ import {
   PIPELINE_PLUGIN_KINDS,
   pipelinePlugin,
   usePipelinePluginRegistry,
-} from "../../content/pipeline/pipeline-plugins.ts";
+} from "../../pipeline/pipeline-plugins.ts";
 
 afterEach(() => usePipelinePluginRegistry(undefined));
 

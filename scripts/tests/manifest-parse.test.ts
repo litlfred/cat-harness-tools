@@ -3,7 +3,7 @@ import {
   maskStringsAndComments,
   parseManifestStringArray,
   parseForeshadows,
-} from "../../content/pipeline/qa-checkers-extended";
+} from "../../pipeline/qa-checkers-extended";
 
 describe("maskStringsAndComments", () => {
   test("preserves length and newlines so indices stay valid", () => {

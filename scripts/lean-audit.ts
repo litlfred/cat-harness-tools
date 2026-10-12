@@ -25,9 +25,9 @@ import { resolve, basename, relative } from "path";
 import { globSync } from "glob";
 import { execSync } from "child_process";
 import { isWitnessed, isStale } from "./lean-witness";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
-import { requirePaper } from "../content/pipeline/repo-root";
-import { leanModuleChapter } from "../content/pipeline/chapter-profile-registry-di";
+import { findContentRepoRoot } from "../pipeline/repo-root";
+import { requirePaper } from "../pipeline/repo-root";
+import { leanModuleChapter } from "../pipeline/chapter-profile-registry-di";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is
 // folio content (`content/**`, `computations/**`), and this is used as the cwd

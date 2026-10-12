@@ -73,7 +73,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { checkQaDirs } from "../content/pipeline/qa-graph-integrity.ts";
+import { checkQaDirs } from "../pipeline/qa-graph-integrity.ts";
 import { directoriesForGraph, instanceRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 // `directoriesForGraph` reads declarations, which throw on the `folio` kind
 // unless core has registered it — the same side-effect import qa-store carries.

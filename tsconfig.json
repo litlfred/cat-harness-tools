@@ -15,7 +15,7 @@
     "scripts/**/*.ts",
     "types/**/*.d.ts",
     "test/**/*.ts",
-    "content/**/*.ts",
+    "pipeline/**/*.ts",
     "archimate/**/*.ts",
     "openapi/**/*.ts",
     "schemas/**/*.ts",

@@ -21,8 +21,8 @@ import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { computeStats } from "./lean-coverage";
-import { findContentRepoRoot, findPapers, soleFolioPaper } from "../content/pipeline/repo-root";
-import { paperArg } from "../content/pipeline/cli-args";
+import { findContentRepoRoot, findPapers, soleFolioPaper } from "../pipeline/repo-root";
+import { paperArg } from "../pipeline/cli-args";
 
 /**
  * The paper to report on, and the folio's `content/` root.

@@ -24,7 +24,7 @@ import { memberOf, subgraphContainer, subgraphIri, subgraphPublicationFindings }
 import { buildFshGutsExport } from "../fsh-guts-export.ts";
 import { todoGraphDocument } from "../todo-graph.ts";
 import { buildGlossary } from "../glossary-export.ts";
-import { buildDocumentNodes, librarySubgraphStart } from "../../content/pipeline/gen-library-jsonld.ts";
+import { buildDocumentNodes, librarySubgraphStart } from "../../pipeline/gen-library-jsonld.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { directoryForGraph, docsSourceDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -35,8 +35,8 @@ export const PUBLISHED = [
   { subgraph: "todos", publisher: "scripts/todo-graph.ts", pattern: "container" },
   { subgraph: "fsh-guts", publisher: "scripts/fsh-guts-export.ts", pattern: "container" },
   { subgraph: "swimlane-glossary", publisher: "scripts/glossary-export.ts", pattern: "scheme" },
-  { subgraph: "library", publisher: "content/pipeline/gen-library-jsonld.ts", pattern: "members" },
-  { subgraph: "docs", publisher: "content/pipeline/gen-site-jsonld.ts", pattern: "members" },
+  { subgraph: "library", publisher: "pipeline/gen-library-jsonld.ts", pattern: "members" },
+  { subgraph: "docs", publisher: "pipeline/gen-site-jsonld.ts", pattern: "members" },
 ] as const;
 
 describe("the IRI is the one kg-export mints the node under", () => {

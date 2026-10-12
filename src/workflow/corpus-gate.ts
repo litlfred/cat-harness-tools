@@ -91,7 +91,7 @@ function manifestFor(repoRoot: string, file: string): string | undefined {
  *
  * **Supplied by the caller, not imported here.** Reading a block manifest is
  * the content pipeline's job, and this gate is harness-layer: importing
- * `content/pipeline/` from `src/workflow/` was two of the six wrong-direction
+ * `pipeline/` from `src/workflow/` was two of the six wrong-direction
  * edges bean `zlmp` is draining, and after the five-repo split each is a
  * circular dependency between repositories. The gate needs a label for a path;
  * it does not need to know what a block manifest is.

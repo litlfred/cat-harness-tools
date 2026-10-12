@@ -31,7 +31,7 @@
  * of 2026-10-02 on #1838) added an editor's `title_correction` above the
  * catalogue and a CORROBORATED extracted title (`title_verified: true`) just
  * above the slug; an unverified one is still the excluded guess.
- * `content/pipeline/library-title.ts` implements the order, and the generator
+ * `pipeline/library-title.ts` implements the order, and the generator
  * records which source won in `manifest.jsonld` `meta.title_source`. These
  * checks read that field. They also re-derive the order from the entry's
  * files, so a manifest that claims one source while a higher one exists is
@@ -90,7 +90,7 @@ import {
   resolveLibraryTitle,
   TITLE_AUTHORITY,
   type LibraryTitleSource,
-} from "../content/pipeline/library-title.ts";
+} from "../pipeline/library-title.ts";
 import { tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";

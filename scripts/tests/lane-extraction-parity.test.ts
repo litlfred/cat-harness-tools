@@ -5,7 +5,7 @@
  *
  * `check-lane-documentation.ts` answers "would a translator ever see this
  * lane's text" and must answer it the way the REAL extractor would. It cannot
- * ask `extractBpmn` directly: that lives in `content/pipeline/`, which is
+ * ask `extractBpmn` directly: that lives in `pipeline/`, which is
  * `folio-assist-core`, while the check is `agentic-harness`, and
  * `check:partition` refuses the edge because core depends on the harness.
  * So `decodeLabel` and the extractor's filter are duplicated there.
@@ -25,7 +25,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { extractBpmn } from "../../content/pipeline/bpmn-translate.js";
+import { extractBpmn } from "../../pipeline/bpmn-translate.js";
 import { checkLanes } from "../check-lane-documentation.js";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
 

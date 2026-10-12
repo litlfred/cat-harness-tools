@@ -104,7 +104,7 @@ export const DELIBERATELY_RED: readonly RedGate[] = [
     script: "bun test",
     why:
       "carries the SAME assertion as `translation:drift:check` — " +
-      "`content/pipeline/translation-drift.test.ts` has a `the real corpus — and the gate " +
+      "`pipeline/translation-drift.test.ts` has a `the real corpus — and the gate " +
       "can actually fail` block whose `no NEW drift, and nothing unreadable` case reads the " +
       "real translations. That is the single failure that made main's typescript job red " +
       "(run 36231943911), so it goes red for the same reason, on the same decision, and for " +

@@ -142,7 +142,7 @@ import {
   type CatHarnessDeclaration,
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { QA_GRAPH_INDEX_SCHEMA } from "../content/pipeline/qa-graph-index.ts";
+import { QA_GRAPH_INDEX_SCHEMA } from "../pipeline/qa-graph-index.ts";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CONSTRAINT_RULES } from "@litlfred/cat-harness/schemas/constraints.ts";
-import { parseForeshadows } from "../../content/pipeline/qa-checkers-extended";
+import { parseForeshadows } from "../../pipeline/qa-checkers-extended";
 
 const resolveRule = CONSTRAINT_RULES.find((r) => r.id === "foreshadows-resolve")!;
 const selfRule = CONSTRAINT_RULES.find((r) => r.id === "foreshadows-not-self")!;

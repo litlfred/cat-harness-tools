@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { blockRefIn, buildDocumentNodes, orphanedBlocks } from "../../content/pipeline/gen-library-jsonld.ts";
+import { blockRefIn, buildDocumentNodes, orphanedBlocks } from "../../pipeline/gen-library-jsonld.ts";
 import {
   DESCRIBABLE_ROLES,
   requiresInspection,

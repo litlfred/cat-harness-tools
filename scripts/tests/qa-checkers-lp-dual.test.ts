@@ -2,7 +2,7 @@ import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { checkComputeLpDualPresent } from "../../content/pipeline/qa-checkers-extended.ts";
+import { checkComputeLpDualPresent } from "../../pipeline/qa-checkers-extended.ts";
 
 /**
  * `compute-lp-dual-present` decides whether a block's OWN witness must carry

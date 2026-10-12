@@ -12,7 +12,7 @@
  * 6 entries against 36 strings, so every string nobody had back-translated
  * scored 0 similarity and was published as semantic drift. `fail: 21` on the
  * French landing page counted absence. The real round trip is a pair of
- * agents — see `content/pipeline/translation-roundtrip.ts` and
+ * agents — see `pipeline/translation-roundtrip.ts` and
  * `skills/library/library-core/translation-manager.md`.
  *
  * Usage:
@@ -23,8 +23,8 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
-import { extractMarkdown, formatPot } from "../../content/pipeline/pot-extract.ts";
-import { parsePo, injectMarkdown } from "../../content/pipeline/po-inject.ts";
+import { extractMarkdown, formatPot } from "../../pipeline/pot-extract.ts";
+import { parsePo, injectMarkdown } from "../../pipeline/po-inject.ts";
 import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -195,7 +195,7 @@ function main() {
   // similarity and was counted as drift, so the `fail: 21` it wrote into
   // `translations/fr/index.ts` was a count of absences. A back-translator that
   // has not seen the original is what the check needs, and that is a pair of
-  // agents rather than a table — `content/pipeline/translation-roundtrip.ts`.
+  // agents rather than a table — `pipeline/translation-roundtrip.ts`.
 
   // ── Write status.json ────────────────────────────────────────
 

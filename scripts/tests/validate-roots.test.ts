@@ -25,7 +25,7 @@ import { describe, test, expect, afterAll } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { validateObjects } from "../../content/pipeline/validate";
+import { validateObjects } from "../../pipeline/validate";
 
 const DIR = mkdtempSync(join(tmpdir(), "validate-roots-"));
 afterAll(() => {

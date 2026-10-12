@@ -19,8 +19,8 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { blockToJsonLd } from "../../content/pipeline/gen-block-jsonld";
-import { loadBlocksUnder, type LoadedBlock } from "../../content/pipeline/block-module";
+import { blockToJsonLd } from "../../pipeline/gen-block-jsonld";
+import { loadBlocksUnder, type LoadedBlock } from "../../pipeline/block-module";
 import { CONTENT_DOCUMENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "gen-block-jsonld-"));

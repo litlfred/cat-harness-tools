@@ -595,7 +595,18 @@ a session in `REQUIRES_ACTION` past 72 h; a `FAILED` session carrying `unread`
 past 24 h; and one whose bucket says `BLOCKED` while its status says `IDLE`,
 which is NAMED separately because waiting and abandoned cannot be told apart
 from the listing.
+
+A run that read a listing leaves a **last-checked mark** on the state branch
+(owner ruling 2026-10-10, bean `rq8s`); commit it with the store, so the next
+sweep can tell "checked" from "skipped". The mark as this sweep reads it:
 SESSIONS
+echo
+# The mark, read back. Bean `rq8s`: without it a skipped step is
+# indistinguishable from a clean one once the terminal scrolls. Every answer
+# but a mark is said as itself -- an unmounted store is "could not determine",
+# never "not checked".
+mark_out="$(cd "$CHECKOUT_ROOT" && timeout 20 bun run "$REPO_ROOT/scripts/sweep-mark.ts" --read session-staleness --root "$CHECKOUT_ROOT" 2>&1)" || true
+echo "> ${mark_out:-Could not determine: the mark reader printed nothing.}"
 echo
 
 # ── 3.5 The state-branch mount ──────────────────────────────────────────────

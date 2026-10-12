@@ -10,7 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { CI_SWEEP_ACTOR, LOCAL_SWEEP_ACTOR, sweepActor } from "../../content/pipeline/qa-utils.ts";
+import { CI_SWEEP_ACTOR, LOCAL_SWEEP_ACTOR, sweepActor } from "../../pipeline/qa-utils.ts";
 import { readActors, reviewerOutcome } from "../check-qa-reviewer-permission.ts";
 
 describe("sweepActor", () => {
@@ -59,7 +59,7 @@ describe("both actors satisfy the permission the gate checks", () => {
   });
 
   test("an unstamped reviewer is still unresolved — the hook is not retroactive", () => {
-    expect(reviewerOutcome({ kind: "script", id: "content/pipeline/qa-checkers-voice.ts" }, actors)).toBe(
+    expect(reviewerOutcome({ kind: "script", id: "pipeline/qa-checkers-voice.ts" }, actors)).toBe(
       "unresolved",
     );
   });

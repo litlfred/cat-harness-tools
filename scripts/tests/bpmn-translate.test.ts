@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { extractBpmn, injectBpmn, decodeLabel } from "../../content/pipeline/bpmn-translate.ts";
+import { extractBpmn, injectBpmn, decodeLabel } from "../../pipeline/bpmn-translate.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

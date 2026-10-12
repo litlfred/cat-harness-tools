@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { blockQaPath } from "../../content/pipeline/qa-paths";
+import { blockQaPath } from "../../pipeline/qa-paths";
 import {
   attestationPath,
   blockAttestationKey,
@@ -41,7 +41,7 @@ import {
   writeCriteriaAttestations as writeAttestations,
   type CriteriaMap,
 } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { mergeWithAttestations } from "../../content/pipeline/translation-block-qa";
+import { mergeWithAttestations } from "../../pipeline/translation-block-qa";
 import { writeDeclaration } from "../../test/support/instance-fixture";
 
 const PIPELINE = resolve(import.meta.dir, "..", "..", "content", "pipeline");
@@ -268,7 +268,7 @@ describe("block, attesting writers — prior ABSENT", () => {
 describe("translation — prior ABSENT", () => {
   const roundtrip = { result: "pass", reviewer: { kind: "agent", id: "roundtrip-adjudicator" }, notes: "r" };
   const fresh = {
-    "translation-coverage": [{ result: "pass", reviewer: { kind: "script", id: "content/pipeline/translation-block-qa.ts" } }],
+    "translation-coverage": [{ result: "pass", reviewer: { kind: "script", id: "pipeline/translation-block-qa.ts" } }],
     // The sweep declares this criterion and writes `[]` — which is how the two real ones were lost.
     "translation-semantic-roundtrip": [],
   } as never;

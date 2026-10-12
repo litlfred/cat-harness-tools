@@ -17,7 +17,7 @@ import {
   type FolioContribution,
 } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { CONTENT_ADAPTERS, adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
@@ -120,7 +120,7 @@ describe("ContributionRegistry", () => {
 
   it("refuses an adapter name the platform already owns", () => {
     const r = new ContributionRegistry();
-    expect(() => r.register({ name: "rogue", adapter: { name: "paper", module: "./x.ts" } }))
+    expect(() => r.register({ name: "rogue", adapter: { name: CONTENT_ADAPTERS[0]!, module: "./x.ts" } }))
       .toThrow(ContributionCollisionError);
   });
 
@@ -195,7 +195,8 @@ describe("composedKindOwner", () => {
   it("consults the platform first, the registry second", () => {
     const r = new ContributionRegistry();
     r.register({ name: "sci", blockKinds: [{ kind: "knot-diagram", adapter: "sci" }] });
-    expect(composedKindOwner("theorem", r, adapterForKind)).toBe("paper");
+    expect(composedKindOwner("theorem", r, adapterForKind)).toBe(adapterForKind("theorem")!);
+    expect(CONTENT_ADAPTERS as readonly string[]).toContain(adapterForKind("theorem")!);
     expect(composedKindOwner("knot-diagram", r, adapterForKind)).toBe("sci");
   });
 
@@ -251,7 +252,7 @@ describe("contributed QA checkers", () => {
   const from = (name: string, criterion: string, result: "pass" | "fail" = "pass") => ({
     name,
     root: `/deps/${name}`,
-    qaCheckers: [{ criterion, check: checker(result), sourceFile: "content/pipeline/checkers.ts" }],
+    qaCheckers: [{ criterion, check: checker(result), sourceFile: "pipeline/checkers.ts" }],
   });
 
   it("a dependency's checker is reachable by the criterion it answers", () => {
@@ -262,7 +263,7 @@ describe("contributed QA checkers", () => {
       {
         criterion: "dak-bpmn-has-process",
         contributor: "smart-base",
-        label: "smart-base/content/pipeline/checkers.ts",
+        label: "smart-base/pipeline/checkers.ts",
       },
     ]);
   });
@@ -280,9 +281,9 @@ describe("contributed QA checkers", () => {
     r.register(from("smart-base", "dak-bpmn-has-process"));
     expect(r.qaCheckerEntry("dak-bpmn-has-process")).toEqual({
       check: expect.any(Function),
-      sourceFile: "content/pipeline/checkers.ts",
+      sourceFile: "pipeline/checkers.ts",
       root: "/deps/smart-base",
-      label: "smart-base/content/pipeline/checkers.ts",
+      label: "smart-base/pipeline/checkers.ts",
     });
   });
 

@@ -7,7 +7,7 @@
  * document folio's README, because a folio opts into a section by carrying
  * its markers.
  *
- * The work lives in `content/pipeline/readme-sections.ts`; this is the MCP
+ * The work lives in `pipeline/readme-sections.ts`; this is the MCP
  * surface over it, so an agent can refresh the README after adding a chapter
  * without knowing the script's path or flag spelling.
  *
@@ -17,7 +17,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { runReadmeSync, SECTIONS } from "../../content/pipeline/readme-sections.ts";
+import { runReadmeSync, SECTIONS } from "../../pipeline/readme-sections.ts";
 
 export function registerReadmeSyncTools(server: McpServer): void {
   const markers = SECTIONS.map((s) => s.marker);

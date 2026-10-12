@@ -12,11 +12,11 @@
 import { describe, test, expect } from "bun:test";
 import { resolve, join } from "path";
 import {
-  PAPER_BLOCK_KINDS,
+  BLOCK_KINDS,
   CONTENT_ADAPTERS,
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {
   ContributionRegistry,
@@ -37,17 +37,20 @@ const contributed = registry.contributedKinds();
 
 describe("adapter partition", () => {
 
-  test("paper is the one built-in adapter — dak is contributed (bean 1335)", () => {
-    expect([...CONTENT_ADAPTERS]).toEqual(["paper"]);
+  test("the built-in vocabularies are the platform's own — dak is contributed (bean 1335)", () => {
+    // One `paper` vocabulary until bean bzwk splits it by layer into core's
+    // `document` and sci's `mathpaper`; either layout may be mounted here.
+    expect([["paper"], ["document", "mathpaper"]]).toContainEqual([...CONTENT_ADAPTERS].sort());
+    expect(CONTENT_ADAPTERS as readonly string[]).not.toContain("dak");
     expect(registry.contributedAdapters()).toContain("dak");
   });
 
   test("a contributed kind never overlaps a built-in one", () => {
     // `register` refuses the collision; this pins that the checkout's real
     // contributors honour it.
-    const paper = new Set<string>(PAPER_BLOCK_KINDS);
+    const builtIn = new Set<string>(BLOCK_KINDS);
     expect(contributed.length).toBeGreaterThan(0);
-    for (const { kind } of contributed) expect(paper.has(kind)).toBe(false);
+    for (const { kind } of contributed) expect(builtIn.has(kind)).toBe(false);
   });
 });
 

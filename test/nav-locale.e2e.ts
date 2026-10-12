@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { publishedPagePath } from "../scripts/lib/jekyll-permalink.ts";
-import { pageKey } from "../content/pipeline/translation-index.ts";
+import { pageKey } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -27,7 +27,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * What is NOT reproduced is the half of the fix that is not JavaScript:
  * `nav_exclude: true` keeps the translated pages out of the static nav in the
  * first place. That is Jekyll's to honour and is checked in the unit tests
- * instead (`content/pipeline/translation-index.test.ts`), which walk for pages
+ * instead (`pipeline/translation-index.test.ts`), which walk for pages
  * declaring a non-source `lang` and fail if any has stopped carrying it. A
  * harness that hand-writes the nav, as this one does, could "verify" that rule
  * by simply not putting the French item in — so it does not try.

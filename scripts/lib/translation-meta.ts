@@ -12,7 +12,7 @@ import { readHarnessConfig, TranslationConfigSchema } from "@litlfred/cat-harnes
 /**
  * The instance's declared translation config, with the SCHEMA's defaults (the
  * six UN languages, source `en`). Read through `schemas/` rather than
- * `content/pipeline/translation-index.ts`: this is harness chrome, and the
+ * `pipeline/translation-index.ts`: this is harness chrome, and the
  * harness may not import the content pipeline (`adapter-layering.test.ts`).
  */
 function declared(instanceDir: string): { defaultLocale: string; supportedLocales: string[] } {

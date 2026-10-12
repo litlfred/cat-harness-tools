@@ -28,8 +28,8 @@ import {
   runReadmeSync,
   syncSections,
   type SectionContext,
-} from "../../content/pipeline/readme-sections";
-import { loadReadmeConfig } from "../../content/pipeline/readme-toc";
+} from "../../pipeline/readme-sections";
+import { loadReadmeConfig } from "../../pipeline/readme-toc";
 import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { FIXTURE_CONFIG, FIXTURE_INSTANCE, declareInstance , writeFixtureFile} from "../../test/support/instance-fixture.js";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";

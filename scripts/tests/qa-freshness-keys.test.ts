@@ -3,8 +3,8 @@ import {
   entryIsFresh,
   freshnessKeys,
   criterionDefHash,
-} from "../../content/pipeline/qa-utils";
-import { QA_CRITERIA_BY_ID } from "../../content/pipeline/qa-criteria-registry";
+} from "../../pipeline/qa-utils";
+import { QA_CRITERIA_BY_ID } from "../../pipeline/qa-criteria-registry";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 /**

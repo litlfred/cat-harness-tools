@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-import { checkFolioProfile, readFolioProfile, formatProfileCheck } from "../../content/pipeline/profile-check";
+import { checkFolioProfile, readFolioProfile, formatProfileCheck } from "../../pipeline/profile-check";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 const dirs: string[] = [];

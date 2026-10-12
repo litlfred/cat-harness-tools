@@ -3,7 +3,7 @@ import {
   CHAPTER_EXPECTED_REGIMES,
   CATEGORICAL_CHAPTERS,
   ARCHIMEDEAN_CHAPTERS,
-} from "../../content/pipeline/qa-checkers-q-usage.ts";
+} from "../../pipeline/qa-checkers-q-usage.ts";
 
 /**
  * `q-usage-narrative-chapter-mismatch` flags a block whose detected q-regime

@@ -5,7 +5,7 @@ import { join } from "path";
 import {
   criterionSourceHash,
   _resetCriterionHashCache,
-} from "../../content/pipeline/qa-criterion-hash";
+} from "../../pipeline/qa-criterion-hash";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const VOICE_CHECKERS = join(TOOLS_ROOT, "content", "pipeline", "qa-checkers-voice.ts");

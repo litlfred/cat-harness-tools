@@ -16,8 +16,8 @@ import { join, resolve } from "path";
 import {
   SECTIONS,
   isForeignRoot,
-} from "../../content/pipeline/readme-sections.ts";
-import { loadReadmeConfig } from "../../content/pipeline/readme-toc.ts";
+} from "../../pipeline/readme-sections.ts";
+import { loadReadmeConfig } from "../../pipeline/readme-toc.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */

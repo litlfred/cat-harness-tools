@@ -10,7 +10,7 @@ import {
   checkDetanglerArchimedeanWall,
   checkProofNoAxiomGrowth,
   checkProofBuildGreen,
-} from "../../content/pipeline/qa-checkers-extended";
+} from "../../pipeline/qa-checkers-extended";
 
 describe("QA stub checkers distinguishable sentinels (folio-assistant-89wq)", () => {
   const EXPECTED_SENTINEL: CheckerResult = {

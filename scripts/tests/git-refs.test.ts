@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { DEFAULT_PUBLISH_REF, ownerRepo, publishTargets, publishedPaths } from "../../src/core/git-refs.js";
-import { loadReadmeConfig } from "../../content/pipeline/readme-toc.js";
+import { loadReadmeConfig } from "../../pipeline/readme-toc.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";

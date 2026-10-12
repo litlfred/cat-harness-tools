@@ -267,7 +267,7 @@ const root = resolve(instanceArg(process.argv.slice(2)) ?? AUDITOR_ROOT);
  * lines instead of one.
  */
 // `ownDirectoryById` moved to `schemas/cat-harness.ts` (2026-09-30) when
-// `content/pipeline/translation-index.ts` became its second caller. The
+// `pipeline/translation-index.ts` became its second caller. The
 // reasoning for the BY-ID lookup travelled with it.
 
 // declared-path-literal: the convention fallback, at the call site — an

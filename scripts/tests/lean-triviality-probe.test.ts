@@ -25,7 +25,7 @@ import {
   TACTIC_LADDER,
   SKIP_EXPLANATION,
   leanPathFor,
-} from "../../content/pipeline/lean-triviality-probe.ts";
+} from "../../pipeline/lean-triviality-probe.ts";
 
 /** `lean` on PATH, else any elan toolchain. `undefined` when there is none. */
 function findLean(): string | undefined {

@@ -19,7 +19,7 @@
  * ## The generated REGION, not the generated file
  *
  * This writes only between `<!-- folio:memory:begin -->` and
- * `<!-- folio:memory:end -->`, exactly as `content/pipeline/readme-sections.ts`
+ * `<!-- folio:memory:end -->`, exactly as `pipeline/readme-sections.ts`
  * writes only inside its markers. Nothing outside a marked region is ever
  * touched.
  *

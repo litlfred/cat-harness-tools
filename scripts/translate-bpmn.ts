@@ -2,7 +2,7 @@
 /**
  * BPMN diagram translation — extract strings, and inject them back per locale.
  *
- * Bean `8xx6`. `content/pipeline/bpmn-translate.ts` is the round-trip; this is
+ * Bean `8xx6`. `pipeline/bpmn-translate.ts` is the round-trip; this is
  * the orchestration around it.
  *
  * ## What exists, and what this does not pretend to
@@ -80,9 +80,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { instanceRootsIn, localeDirIn, translationsHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { extractBpmn, injectBpmn } from "../content/pipeline/bpmn-translate.js";
-import { formatPot, potWithoutTimestamp } from "../content/pipeline/pot-extract.js";
-import { parsePo } from "../content/pipeline/po-inject.js";
+import { extractBpmn, injectBpmn } from "../pipeline/bpmn-translate.js";
+import { formatPot, potWithoutTimestamp } from "../pipeline/pot-extract.js";
+import { parsePo } from "../pipeline/po-inject.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**

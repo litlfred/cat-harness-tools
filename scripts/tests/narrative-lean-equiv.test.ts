@@ -4,7 +4,7 @@ import {
   extractMdDeclaredKind,
   extractMdStatement,
   checkEquivalence,
-} from "../../content/pipeline/proof-narrative-lean-equiv-sweep";
+} from "../../pipeline/proof-narrative-lean-equiv-sweep";
 
 /**
  * `checkEquivalence` took `mdText` as its first parameter and never read it,

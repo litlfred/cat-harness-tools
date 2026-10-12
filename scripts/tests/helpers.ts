@@ -8,7 +8,7 @@
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join, relative, resolve } from "path";
 import { execSync } from "child_process";
-import { findContentRepoRoot, findPapers } from "../../content/pipeline/repo-root";
+import { findContentRepoRoot, findPapers } from "../../pipeline/repo-root";
 import { LEAN_PACKAGES } from "@litlfred/cat-harness/schemas/lean-packages.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { complete, enabled, type InstanceState } from "../../src/workflow/instance";
