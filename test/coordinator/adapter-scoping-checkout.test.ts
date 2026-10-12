@@ -12,7 +12,7 @@
 import { describe, test, expect } from "bun:test";
 import { resolve, join } from "path";
 import {
-  PAPER_BLOCK_KINDS,
+  BLOCK_KINDS,
   CONTENT_ADAPTERS,
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
@@ -48,9 +48,9 @@ describe("adapter partition", () => {
   test("a contributed kind never overlaps a built-in one", () => {
     // `register` refuses the collision; this pins that the checkout's real
     // contributors honour it.
-    const paper = new Set<string>(PAPER_BLOCK_KINDS);
+    const builtIn = new Set<string>(BLOCK_KINDS);
     expect(contributed.length).toBeGreaterThan(0);
-    for (const { kind } of contributed) expect(paper.has(kind)).toBe(false);
+    for (const { kind } of contributed) expect(builtIn.has(kind)).toBe(false);
   });
 });
 
