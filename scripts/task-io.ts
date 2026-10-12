@@ -162,6 +162,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "check:declaration-claims": TREE_READER,
   "check:declaration-filename": TREE_READER,
   "check:declared-assets": TREE_READER,
+  "check:declaration-resolution": TREE_READER,
   "check:declared-dirs": TREE_READER,
   "check:declared-paths": TREE_READER,
   "check:docs-populated": TREE_READER,
