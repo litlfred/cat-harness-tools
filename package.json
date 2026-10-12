@@ -197,6 +197,7 @@
     "check:schema-nodes": "bun run cat-harness-tools/scripts/check-schema-nodes.ts",
     "check:secret-leaks": "bun run cat-harness-tools/scripts/check-secret-leaks.ts",
     "check:session-staleness": "bun run cat-harness-tools/scripts/check-session-staleness.ts",
+    "sweep:mark": "bun run cat-harness-tools/scripts/sweep-mark.ts",
     "check:source-licence": "bun run cat-harness-tools/scripts/check-source-licence.ts",
     "check:source-licence:check": "bun run cat-harness-tools/scripts/check-source-licence.ts --check",
     "check:stale-field-advice": "bun run cat-harness-tools/scripts/check-stale-field-advice.ts",

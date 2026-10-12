@@ -30,6 +30,8 @@
 import { readFileSync } from "node:fs";
 
 import { readRows, render, stale, type Report } from "../src/sessions/staleness.js";
+import { REPO_ROOT } from "./lib/roots.ts";
+import { sessionId, writeSweepMark } from "./sweep-mark.ts";
 
 const argv = process.argv.slice(2);
 const warn = argv.includes("--warn");
@@ -62,6 +64,26 @@ const report: Report = ((): Report => {
 })();
 
 console.log(argv.includes("--json") ? JSON.stringify(report, null, 2) : render(report));
+
+// Bean `rq8s`, owner ruling 2026-10-10 ("timestamp"): a run that READ a
+// listing leaves a last-checked mark on the state branch, so the next sweep
+// can tell "checked" from "skipped". Only such a run: an unread or empty
+// listing checked nothing, and a mark for it would make "could not determine"
+// look like "checked". A filtered run (`--repo`) checked one repository, not
+// the owner's sessions, so it does not mark either.
+if (report.state === "checked" && report.read > 0 && !onlyRepo && !argv.includes("--no-mark")) {
+  const w = writeSweepMark(REPO_ROOT ?? process.cwd(), {
+    check: "session-staleness",
+    read: report.read,
+    findings: report.findings.length,
+    by: sessionId(),
+  });
+  console.error(
+    w.state === "written"
+      ? `mark: ${w.path} — commit it to the state branch so the next sweep reads it`
+      : `mark NOT written: ${w.reason}`,
+  );
+}
 
 // `unknown` exits non-zero too: it is not a pass, and a caller that treats a
 // zero exit as "nothing waiting" must never get one from a listing this could
