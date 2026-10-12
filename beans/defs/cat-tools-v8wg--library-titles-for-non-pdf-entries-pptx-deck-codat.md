@@ -1,13 +1,13 @@
 ---
 # cat-tools-v8wg
 title: Library titles for non-PDF entries (pptx deck, CODATA table)
-status: in-progress
+status: completed
 type: task
 priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-11T06:19:15Z
-updated_at: 2026-10-12T08:49:12Z
+updated_at: 2026-10-12T09:02:54Z
 ---
 
 **Rehomed 2026-10-11 from `litlfred/folio-assistant-core` bean `folio-assistant-6eiw`** by the owner's ruling of 2026-10-10 (option 1 + 2: move to the code's repo, keep a pointer in core). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -38,8 +38,8 @@ The owner decided on 2026-10-02 (option 1 on #1849): leave both as they are in
 
 ## Done when
 
-- [ ] Both entries show a title that is verified or editorially corrected, and the source is recorded beside it.
-- [ ] A non-PDF entry with no title source is reported as such rather than shown under its file name.
+- [x] Both entries show a title that is verified or editorially corrected, and the source is recorded beside it.
+- [x] A non-PDF entry with no title source is reported as such rather than shown under its file name.
 
 
 ## Owner decision (answered 2026-10-10: option 1 + 2, which is this rehome)
@@ -80,3 +80,11 @@ regeneration. The cat-harness-store copy should be reopened.
 - [x] **The defect:** an editorial title lived only in the generated manifest, so a regeneration erased it. Fixed in cat-harness-tools#142: an authored `title-correction.json` beside the entry is the editorial source, and a regeneration keeps it.
 - [x] **The data:** folio-assistant-sci#14 restores CODATA's correction with its original basis, and the regenerated manifest.
 - [x] **Done-when 2:** check-library-qa's title-missing already flags a slug title.
+
+
+
+## Summary of Changes
+- **cat-harness-tools#142** (merged `7770be7`): `gen-library-jsonld.ts` reads an authored `title-correction.json` beside a library entry, holding `{title, basis, corrected_on, bean?}`. Its title becomes the editorial title, with the basis recorded as `title_correction`, so a regeneration keeps it. A file with no basis is unreadable rather than silently used. A structure's own `title_correction` still wins. Three tests cover this, including a falsification test showing the title survives a regeneration.
+- **folio-assistant-sci#14** (merged `cdaa25e`): CODATA's correction, restored with its original basis (NIST allascii.txt "CODATA 2022" via SciPy's txt2022), and the regenerated manifest.
+- **The pptx deck**: its title comes from the authored `structure.json` `metadata.title_correction`, so it already survives regeneration (cat-harness `library/kg-folio-asst-2026-09-30/manifest.jsonld:32-36`).
+- **Done-when 2:** check-library-qa's title-missing flags a slug title.
