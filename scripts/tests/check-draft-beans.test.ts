@@ -10,7 +10,7 @@
  *
  * @module scripts/tests/check-draft-beans
  */
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -108,6 +108,17 @@ describe("resolveDefaultRef", () => {
 });
 
 describe("checkDraftBeans detection logic with mocked beans & git", () => {
+  // A fresh empty directory as the repository root, never `/tmp` itself: the
+  // check resolves the bean store by scanning its root for instance
+  // declarations, so a root of `/tmp` read every other test's leftovers. A
+  // stray `<dir>/<dir>.json` there (folio-dir-deferred.test.ts writes one on
+  // purpose) made it "cannot resolve the bean store" and turned seven tests
+  // red depending on what had run before.
+  let emptyRoot = "";
+  beforeEach(() => {
+    emptyRoot = createTempDir("draft-beans-root-");
+  });
+
   const dummyBean = (overrides: Partial<BeanNode>): BeanNode => ({
     id: "folio-assistant-test",
     file: "beans/defs/folio-assistant-test.md",
@@ -129,12 +140,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
       dummyBean({ id: "b2", status: "in-progress" }),
       dummyBean({ id: "b3", status: "completed" }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -158,12 +169,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
         body: "## Work\nDrafting task description for ordinary task implementation.\n",
       }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -187,12 +198,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
         body: "## 6. Recommendation\nDo step 1 now.\n\nSafe default: do nothing.\n",
       }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -225,12 +236,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
         body: "## Recommendation\nOption A\n\nSafe default: B\n",
       }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -261,12 +272,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
         body: "## Recommendation\nOption A\nSafe default: B\n",
       }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -295,12 +306,12 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
         body: "## Recommendation\nOption A\nSafe default: B\n",
       }),
     ];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       defaultRef: "main",
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args[args.length - 1] === "main") {
           return { status: 0, stdout: "deadbeef\n", stderr: "" };
@@ -325,11 +336,11 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
 
   test("handles missing default branch as undetermined", () => {
     const beans = [dummyBean({ id: "b1", status: "draft" })];
-    const report = checkDraftBeans("/tmp", {
+    const report = checkDraftBeans(emptyRoot, {
       beans,
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
-          return { status: 0, stdout: "/tmp\n", stderr: "" };
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
         }
         // All default branch checks fail
         return { status: 1, stdout: "", stderr: "not found" };
