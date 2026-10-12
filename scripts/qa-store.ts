@@ -60,6 +60,8 @@
  * Usage:
  *   bun run cat qa:fetch [--ref main|<sha>|main/<sha>|pr/<n>|pr/<n>/<sha>] [--into DIR] [--prefix P]
  *   bun run cat qa:publish --ref main/<sha>|pr/<n>/<sha> [--root DIR ...] [--gates-result R]
+ *   bun run cat qa:publish --add --ref main/<sha>|pr/<n>/<sha> --root DIR ...   # into the EXISTING entry;
+ *                                                       # only creates paths, or replaces earlier adds (bean 1dre)
  *   bun run cat qa:publish --github --completeness FILE [--gates-result R]   # CI: derive the key, skip forks,
  *                                                       # refuse an incomplete qa:refresh report (bean 3hk4)
  *   bun run cat qa:prune [--apply] [--pr-states FILE]       # dry run unless --apply
@@ -160,6 +162,12 @@ export interface QaManifest {
    * on an entry published without a report, which `--github` refuses.
    */
   completeness?: { mode: string; files: number; families: Record<string, number> };
+  /**
+   * Files a later `qa:publish --add` put into this entry, by path (bean
+   * `1dre`). The entry's first write stands for every path NOT listed here: an
+   * add may only create a path, or replace one an earlier add created.
+   */
+  added?: Record<string, { written_at: string; bytes: number; run?: string }>;
 }
 
 export interface QaIndex {
@@ -1177,6 +1185,145 @@ export function publishQa(
   return { state: "failed", key: kp, reason: r.reason, attempts: r.attempts, entry: built.entry };
 }
 
+export type QaAddState = "added" | "present" | "no-entry" | "conflict" | "empty" | "failed";
+
+export interface QaAddResult {
+  state: QaAddState;
+  /** The entry written to — the ref's own, or the prior entry a skipped ref resolves to. */
+  key: string;
+  reason: string;
+  commit?: string;
+  attempts: number;
+}
+
+type Entry = ReturnType<Store["lsTree"]>[number];
+
+/**
+ * Add `roots` to the entry ALREADY at `ref` (bean `1dre`, owner 2026-10-11:
+ * "add-only publish").
+ *
+ * {@link publishQa} writes an entry once and never again, which is right for a
+ * commit's QA record and wrong for an observation a later job makes about the
+ * same commit — the pages-serving check runs daily on `main`'s HEAD, whose
+ * entry the gates job wrote long before. So this writes INTO that entry, under
+ * one rule: a path the entry's first write created is never changed. A path
+ * may be created, or replaced if an earlier add created it (it is listed in
+ * the manifest's `added`), so a daily observation of an unchanged HEAD
+ * refreshes instead of freezing.
+ *
+ * - No entry at `ref` and no skip that resolves it: `no-entry`, nothing
+ *   written. Creating one here would make it the commit's first write, and the
+ *   gates' publish of that commit would then be the one refused.
+ * - A ref skipped as unchanged resolves to the entry it was skipped onto, the
+ *   same entry a reader of that ref is given.
+ * - The entry must verify; a corrupt one is `failed`, never extended.
+ */
+export function addQa(
+  args: { ref: string; roots: string[]; writtenAt?: string; run?: string },
+  opts: QaStoreOptions = {},
+): QaAddResult {
+  const key = parseQaKey(args.ref);
+  const kp = keyPath(key);
+  const { store, repoRoot } = openStore(opts);
+  const roots = args.roots.map((r) => toRepoPath(r, repoRoot));
+  if (roots.some((r) => r === "")) throw new QaUsageError("refusing to add the whole checkout; name the directories to add");
+  const present = roots.filter((r) => existsSync(join(repoRoot, r)));
+  // input-site: store #0a597796 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
+  const writtenAt = args.writtenAt ?? new Date().toISOString();
+
+  // The added files' tree, built through a private index exactly as an entry is.
+  // input-site: store #dabbd4a3 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
+  const tmp = mkdtempSync(join(tmpdir(), "qa-store-add-"));
+  let addTree: string | undefined;
+  const sizes = new Map<string, number>();
+  try {
+    if (present.length) {
+      const env = { GIT_INDEX_FILE: join(tmp, "index") };
+      store.must([`--work-tree=${repoRoot}`, "add", "-f", "--", ...present], { env, cwd: repoRoot });
+      addTree = store.must(["write-tree"], { env }).trim();
+      for (const l of store.must(["ls-tree", "-r", "-l", "-z", addTree]).split("\0").filter(Boolean)) {
+        const tab = l.indexOf("\t");
+        sizes.set(l.slice(tab + 1), Number(l.slice(0, tab).trim().split(/\s+/)[3]) || 0);
+      }
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+  if (!addTree || sizes.size === 0) return { state: "empty", key: kp, reason: "no files under any root; nothing to add", attempts: 0 };
+  if (store.lsTree(addTree).some((e) => e.name === MANIFEST_FILE)) {
+    throw new QaUsageError(`a root adds a top-level ${MANIFEST_FILE}, which would shadow the entry's own`);
+  }
+
+  let target = kp;
+  let outcome: Exclude<QaAddState, "added" | "failed" | "empty"> | undefined;
+  const r = writeLoop(store, opts, `qa-reports: add ${sizes.size} file(s) to ${kp}`, (_tip, base) => {
+    target = kp;
+    let existing = base ? store.lookup(base, kp) : undefined;
+    if (!existing && base) {
+      const parent = kp.slice(0, kp.lastIndexOf("/"));
+      const resolved = findSkippedTarget(store, base, parent, key.sha);
+      if (resolved) {
+        target = resolved;
+        existing = store.lookup(base, resolved);
+      }
+    }
+    if (!existing || existing.type !== "tree") {
+      outcome = "no-entry";
+      return { done: `${kp} has no entry to add to (nothing published for it, and no skip resolves it); nothing written` };
+    }
+    const v = verifyEntry(store, existing.sha, target);
+    if (v.state !== "ok") throw new Error(`${target} cannot be extended: ${v.state}: ${v.reason}`);
+    const manifest = v.manifest;
+    const added = { ...(manifest.added ?? {}) };
+
+    const conflicts: string[] = [];
+    let changed = 0;
+    let files = manifest.files;
+    let bytes = manifest.bytes;
+    // Merge the added tree into the entry's payload, one level at a time; no blob is read.
+    const merge = (baseTree: string | undefined, addT: string, prefix: string): string => {
+      const into = new Map<string, Entry>((baseTree ? store.lsTree(baseTree) : []).map((e) => [e.name, e]));
+      for (const e of store.lsTree(addT)) {
+        const path = prefix + e.name;
+        const cur = into.get(e.name);
+        if (e.type === "tree") {
+          if (cur && cur.type !== "tree") { conflicts.push(path); continue; }
+          into.set(e.name, { ...e, sha: merge(cur?.sha, e.sha, `${path}/`) });
+          continue;
+        }
+        if (cur && cur.type === "tree") { conflicts.push(path); continue; }
+        if (cur && cur.sha === e.sha) continue;
+        if (cur && !added[path]) { conflicts.push(path); continue; }
+        const size = sizes.get(path) ?? 0;
+        if (cur) bytes -= added[path]!.bytes;
+        else files++;
+        bytes += size;
+        added[path] = { written_at: writtenAt, bytes: size, ...(args.run ? { run: args.run } : {}) };
+        into.set(e.name, e);
+        changed++;
+      }
+      return store.mktree([...into.values()]);
+    };
+    const payload = merge(manifest.payloadTree, addTree!, "");
+    if (conflicts.length) {
+      outcome = "conflict";
+      return { done: `${target}: ${conflicts.length} path(s) belong to the entry's first write and are never changed: ${conflicts.slice(0, 5).join(", ")}; nothing written` };
+    }
+    if (changed === 0) {
+      outcome = "present";
+      return { done: `${target} already holds these files, identical` };
+    }
+    const next: QaManifest = { ...manifest, payloadTree: payload, files, bytes, added };
+    const mblob = store.hashBlob(JSON.stringify(next, null, 2) + "\n");
+    const entry = store.mktree([...store.lsTree(payload), { mode: "100644", type: "blob", sha: mblob, name: MANIFEST_FILE }]);
+    return { tree: store.setPath(base, target.split("/"), { mode: "040000", type: "tree", sha: entry, name: "" })! };
+  });
+  clearSnapshotsFor(store);
+  if (r.state === "pushed") return { state: "added", key: target, reason: r.reason, commit: r.commit, attempts: r.attempts };
+  if (r.state === "done") return { state: outcome ?? "present", key: target, reason: r.reason, attempts: r.attempts };
+  return { state: "failed", key: target, reason: r.reason, attempts: r.attempts };
+}
+
 function clearSnapshotsFor(store: Store): void {
   for (const k of snapshots.keys()) if (k.startsWith(`${store.dir}|`)) snapshots.delete(k);
 }
@@ -1503,6 +1650,17 @@ export function main(argv: string[]): number {
         checkout = d.checkout;
       }
       if (!ref) throw new QaUsageError("publish needs --ref main/<sha> | pr/<n>/<sha>, or --github in CI");
+      if (f.has("add")) {
+        // Bean `1dre`: an observation made after the commit's own publish,
+        // added into that entry (see addQa). Roots are required: an add of
+        // "whatever qa directories exist" would be the whole record again.
+        if (!f.many("root").length) throw new QaUsageError("publish --add needs at least one --root");
+        // input-site: store #f79bad10 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
+        const run = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : undefined;
+        const a = addQa({ ref, roots: f.many("root"), ...(run ? { run } : {}) }, { ...opts, repoRoot });
+        say(a, `qa:publish --add ${a.state.toUpperCase()} ${a.key}: ${a.reason}${a.commit ? ` (${a.commit})` : ""}`);
+        return a.state === "added" || a.state === "present" ? 0 : a.state === "no-entry" || a.state === "empty" ? QA_EXIT.miss : QA_EXIT.unknown;
+      }
       // Bean `3hk4`: a CI publish states what produced its tree. Without a
       // complete `qa:refresh` report, a fresh checkout after `5hox` would be
       // stored as a one-file entry that reads as the record of the commit.

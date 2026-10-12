@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
+  addQa,
   clearQaCache,
   fetchQa,
   githubPublishDecision,
@@ -654,3 +655,92 @@ describe("skipping unchanged QA results (folio-assistant-he8h)", () => {
   }, T);
 });
 
+
+describe("add-only publish (bean 1dre): an observation added to the commit's existing entry", () => {
+  const OBS = "health/pages-serving.json";
+
+  test("adds into the entry the gates wrote, and the entry still verifies; the first write's files are unchanged", () => {
+    const f = fixture();
+    expect(publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates")).state).toBe("published");
+    f.write(OBS, '{"day":1}\n');
+    const a = addQa({ ref: `main/${SHA_A}`, roots: ["health"], writtenAt: "2026-10-12T06:41:00Z" }, f.container("health"));
+    expect(a).toMatchObject({ state: "added", key: `main/${SHA_A}` });
+
+    const o = f.container("reader");
+    const obs = readQa(`main/${SHA_A}`, OBS, o);
+    expect(obs.state === "hit" && obs.text).toBe('{"day":1}\n');
+    expect(readQa(`main/${SHA_A}`, `${RESULTS}/audit-coverage.qa-results.json`, o).state).toBe("hit");
+    const m = readQaManifest(`main/${SHA_A}`, o);
+    expect(m.state).toBe("hit");
+    if (m.state === "hit") {
+      expect(m.manifest.files).toBe(4);
+      expect(m.manifest.roots).toEqual([RESULTS]);
+      expect(m.manifest.added?.[OBS]).toEqual({ written_at: "2026-10-12T06:41:00Z", bytes: 10 });
+    }
+  }, T);
+
+  test("a later add REPLACES what an earlier add wrote — a quiet HEAD's daily observation refreshes", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(OBS, '{"day":1}\n');
+    addQa({ ref: `main/${SHA_A}`, roots: ["health"] }, f.container("health1"));
+    f.write(OBS, '{"day":22}\n');
+    expect(addQa({ ref: `main/${SHA_A}`, roots: ["health"] }, f.container("health2")).state).toBe("added");
+    const o = f.container("reader");
+    const obs = readQa(`main/${SHA_A}`, OBS, o);
+    expect(obs.state === "hit" && obs.text).toBe('{"day":22}\n');
+    const m = readQaManifest(`main/${SHA_A}`, o);
+    expect(m.state === "hit" && [m.manifest.files, m.manifest.added?.[OBS]?.bytes]).toEqual([4, 11]);
+    // The same bytes again is `present`, and writes nothing.
+    expect(addQa({ ref: `main/${SHA_A}`, roots: ["health"] }, f.container("health3")).state).toBe("present");
+  }, T);
+
+  test("a path the first write created is NEVER changed: conflict, nothing written", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(`${RESULTS}/audit-coverage.qa-results.json`, '{"rows":999}\n');
+    const a = addQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("health"));
+    expect(a.state).toBe("conflict");
+    expect(a.reason).toContain(`${RESULTS}/audit-coverage.qa-results.json`);
+    const r = readQa(`main/${SHA_A}`, `${RESULTS}/audit-coverage.qa-results.json`, f.container("reader"));
+    expect(r.state === "hit" && r.text).toBe('{"rows":3}\n');
+  }, T);
+
+  test("NO ENTRY: nothing is created — the commit's first write stays the gates'", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(OBS, '{"day":1}\n');
+    expect(addQa({ ref: `main/${SHA_B}`, roots: ["health"] }, f.container("health")).state).toBe("no-entry");
+    expect(readQa(`main/${SHA_B}`, OBS, f.container("reader")).state).toBe("miss");
+    // …and the gates' later publish of that commit is still a first write.
+    expect(publishQa({ ref: `main/${SHA_B}`, roots: [RESULTS], force: true }, f.container("gates2")).state).toBe("published");
+  }, T);
+
+  test("a SKIPPED commit adds into the entry it was skipped onto — the one its readers are given", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));
+    expect(publishQa({ ref: `main/${SHA_B}`, roots: [RESULTS] }, f.container("gates2")).state).toBe("skipped");
+    f.write(OBS, '{"day":1}\n');
+    const a = addQa({ ref: `main/${SHA_B}`, roots: ["health"] }, f.container("health"));
+    expect(a).toMatchObject({ state: "added", key: `main/${SHA_A}` });
+    const t = readQaTree(`main/${SHA_B}`, "health", f.container("reader"));
+    expect(t.state === "hit" && [...t.files.keys()]).toEqual([OBS]);
+  }, T);
+
+  test("CLI: --add needs a --root; added is exit 0, no entry is exit 1 (miss)", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(OBS, '{"day":1}\n');
+    const env = { QA_STORE_REMOTE: f.url };
+    const base = ["publish", "--add", "--branch", "cat/cat-harness/qa-reports", "--store", join(f.base, "cli.store.git")];
+    const run = (args: string[]) => {
+      const r = spawnSync("bun", [SCRIPT, ...args], { cwd: f.work, encoding: "utf-8", env: { ...process.env, ...env } });
+      return { code: r.status ?? -1, out: r.stdout + r.stderr };
+    };
+    expect(run([...base, "--ref", `main/${SHA_A}`]).code).toBe(QA_EXIT.usage);
+    const ok = run([...base, "--ref", `main/${SHA_A}`, "--root", "health"]);
+    expect(ok.out).toContain("ADDED");
+    expect(ok.code).toBe(0);
+    expect(run([...base, "--ref", `main/${SHA_C}`, "--root", "health"]).code).toBe(QA_EXIT.miss);
+  }, T);
+});
