@@ -607,4 +607,18 @@ describe("the instance an entry belongs to", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("the instance is the declared name, not the folder it was cloned into (bean j3ls)", () => {
+    const root = mkdtempSync(join(tmpdir(), "clone-"));
+    mkdirSync(join(root, "wim", "library", "d"), { recursive: true });
+    writeDeclaration(join(root, "wim"), {
+      name: "who-iris",
+      directories: [{ id: "library", path: "library/", graphTypologies: ["library"] }],
+    });
+    try {
+      expect(libraryInstanceOf(join(root, "wim", "library", "d"))).toBe("who-iris");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

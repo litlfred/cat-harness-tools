@@ -329,16 +329,20 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
 }
 
 /**
- * The instance whose library holds `entryDir` — the folder holding the
- * library, when that folder declares an instance — else `undefined`. The same
- * answer `library-graph.ts` `instanceOf` gives, so the IRI minted here and
- * the page the viewer draws name one instance.
+ * The instance whose library holds `entryDir` — the DECLARED name of the
+ * folder holding the library, when that folder declares an instance — else
+ * `undefined`. The same answer `library-graph.ts` `instanceOf` gives, so the
+ * IRI minted here and the page the viewer draws name one instance.
+ *
+ * The declared name, never the folder's (bean `j3ls`, as `t5dm` for
+ * `instanceOf`): a separated instance's repository is wherever it was cloned,
+ * and who-iris cloned into `wim/` rewrote every manifest IRI to
+ * `.../jsonld/wim/<id>/`, so all 813 nodes read as stale.
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
-  // Resolved first: from `library/<id>` the folder above is ".", whose
-  // basename would mint an IRI under ".../jsonld/./<id>/".
+  // Resolved first: from `library/<id>` the folder above is ".".
   const instanceRoot = dirname(dirname(resolve(entryDir)));
-  return readDeclaration(instanceRoot) !== undefined ? basename(instanceRoot) : undefined;
+  return readDeclaration(instanceRoot)?.name;
 }
 
 /**
