@@ -325,6 +325,8 @@
     "check:draft-beans": "bun run cat-harness-tools/scripts/check-draft-beans.ts",
     "ci:watch": "bun run cat-harness-tools/scripts/watch-ci.ts",
     "check:declared-dirs": "bun run cat-harness-tools/scripts/check-declared-dirs.ts",
+    "check:declaration-resolution": "bun run cat-harness-tools/scripts/check-declaration-resolution.ts",
+    "separation:cutover:check": "bun run cat-harness-tools/scripts/separation-cutover-check.ts",
     "check:mount-collisions": "bun run cat-harness-tools/scripts/check-mount-collisions.ts",
     "check:visualiser-routes": "bun run cat-harness-tools/scripts/check-visualiser-routes.ts",
     "check:environment": "bun run cat-harness-tools/scripts/check-environment.ts",
