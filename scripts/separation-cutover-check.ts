@@ -112,6 +112,10 @@ export const DEFAULT_MONOREPO: Monorepo = { repository: "litlfred/folio-assistan
  * archive or a proposal naming the monorepo is history, and rewriting it would
  * falsify the record (`rewrite-moved-paths` keeps the same list for the same reason).
  */
+// declared-path-literal: a FALLBACK record list, not discovery. This gate judges a
+// checkout whose declarations may be the very thing that is broken, so which
+// directories are records must not depend on reading them; the conventional
+// record locations are named here once.
 export const RECORD_PREFIXES: readonly string[] = [
   "beans/", "todos/", "fsh-guts/", "memory/", "library/", "uploads/", "docs/proposals/", "test/fixtures/", "test/results/", "translations/",
 ];
