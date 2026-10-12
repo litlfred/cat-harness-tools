@@ -24,6 +24,7 @@ import { z } from "zod";
 import { decide, unscopedGrants, type RequestScope } from "@litlfred/cat-harness/schemas/odrl.js";
 import { accessContext, type AccessContext, type Principal } from "../core/access.js";
 import { GITHUB_ROLE_ACTOR, githubPrincipalFor, principalFromGithub, type GithubIdentity } from "../core/github-auth.js";
+import { qualified, resolveIdentities, type Identity } from "../core/identity.js";
 import { authorizeTask, describeVerdict } from "../workflow/authorize.js";
 
 export interface WhoamiInput {
@@ -50,7 +51,7 @@ export function grainNote(id: GithubIdentity): string {
 }
 
 /** The answer, as markdown. Pure: the GitHub identity and the policies are inputs. */
-export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInput): string {
+export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInput, others: readonly Identity[] = []): string {
   const lines: string[] = ["# Who is asking", ""];
   const gh = principalFromGithub(id);
 
@@ -72,6 +73,18 @@ export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInpu
     }
   } else {
     lines.push(`- **GitHub:** ${id.status}${id.reason ? `: ${id.reason}` : ""}.`);
+  }
+
+  // Bean f1e1 (owner 2026-10-10, provider-neutral): every other identity the
+  // session can see, listed so "who is asking" has one answer. None of them
+  // reaches the permission answer below — only what GitHub vouched for does.
+  const rest = others.filter((o) => !(o.provider === "github" && o.handle === id.login));
+  if (rest.length) {
+    lines.push(
+      `- **Also seen** (for preferences only, never for permissions): ` +
+        rest.map((o) => `\`${qualified(o)}\` (${o.vouched ? `vouched, ${o.via}` : `self-asserted, ${o.via}`})`).join("; ") +
+        ".",
+    );
   }
 
   const claimed = input.actor ? ctx.actors.get(input.actor) : undefined;
@@ -142,7 +155,8 @@ export function registerAuthTools(server: McpServer, repoRoot: string): void {
     },
     async (input) => {
       const { identity: id } = await githubPrincipalFor(repoRoot, process.env);
-      return { content: [{ type: "text" as const, text: whoami(accessContext(repoRoot), id, input) }] };
+      const all = await resolveIdentities({ env: process.env, repo: id.repo, cwd: repoRoot });
+      return { content: [{ type: "text" as const, text: whoami(accessContext(repoRoot), id, input, all.identities) }] };
     },
   );
 }
