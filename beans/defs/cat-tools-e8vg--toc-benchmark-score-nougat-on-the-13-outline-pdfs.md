@@ -1,12 +1,13 @@
 ---
 # cat-tools-e8vg
 title: 'TOC benchmark: score Nougat on the 13 outline PDFs (needs huggingface.co) (#2302)'
-status: todo
+status: in-progress
 type: task
+priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-10T16:33:42Z
+updated_at: 2026-10-12T08:51:28Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-u9lb`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
