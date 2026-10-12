@@ -1,15 +1,13 @@
 ---
 # cat-tools-rt0l
 title: todos/index.html serves ZERO notes without JavaScript — the one page most about notes is the only one with no linear floor
-status: todo
+status: completed
 type: task
 priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-11T06:19:15Z
-updated_at: 2026-10-12T09:01:07Z
-blocked_by:
-    - cat-tools-lwjc
+updated_at: 2026-10-12T16:36:18Z
 ---
 
 **Rehomed 2026-10-11 from `litlfred/folio-assistant-core` bean `folio-assistant-dm4j`** by the owner's ruling of 2026-10-10 (option 1 + 2: move to the code's repo, keep a pointer in core). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -63,12 +61,12 @@ notes dashboard is the LAST page that should lack one.
 
 ## Done when
 
-- [ ] `todos/index.html` serves the notes listing in its own bytes, readable
+- [x] `todos/index.html` serves the notes listing in its own bytes, readable
       with JavaScript disabled
-- [ ] It keeps first-painting dark from CSS alone — `first-paint-scheme.e2e.ts`
+- [x] It keeps first-painting dark from CSS alone — `first-paint-scheme.e2e.ts`
       asserts this for all eight shells with JS off in a light-preferring
       browser, so the fix must not disturb the first-paint style
-- [ ] A test asserts it, with JS off, the way `linear-floor.e2e.ts` does for an
+- [x] A test asserts it, with JS off, the way `linear-floor.e2e.ts` does for an
       ordinary page
 
 ## Note on sequencing
@@ -151,15 +149,15 @@ all. Not in this bean's scope; recorded so it is not re-discovered.
 
 ### Revised done-when
 
-- [ ] `renderTodoListing` is called per page with the todos whose `targetLabel`
+- [x] `renderTodoListing` is called per page with the todos whose `targetLabel`
       resolves to that page, and with the full set only on `todos/`
-- [ ] a page with no attached todo emits NO listing markup (not an empty
+- [x] a page with no attached todo emits NO listing markup (not an empty
       section — `could not determine` and `nothing here` stay distinct)
-- [ ] `todos/index.html` serves its listing with JavaScript disabled
-- [ ] `first-paint-scheme.e2e.ts` still passes for all eight shells
-- [ ] `linear-floor.e2e.ts` asserts the per-page case AND the `todos/` case;
+- [x] `todos/index.html` serves its listing with JavaScript disabled
+- [x] `first-paint-scheme.e2e.ts` still passes for all eight shells
+- [x] `linear-floor.e2e.ts` asserts the per-page case AND the `todos/` case;
       no test deleted
-- [ ] the count on a page is that page's own cardinality, never the global
+- [x] the count on a page is that page's own cardinality, never the global
       total (R6: a count that is not the panel's own cardinality is a number
       somebody will act on)
 - [ ] coordinated with #1886, since `footer_custom.html` is its phase C
@@ -209,3 +207,12 @@ pointer.
 - **Done-when 2 (first paint):** this comes from the default layout's head_custom, the same as every Jekyll page. It can't be run here until g9m3, because e2e collects 0.
 
 - **2026-10-12 09:05 UTC:** #139 merged. The bean goes back to todo, blocked by lwjc, because it closes when lwjc does. First paint (Done-when 2) needs e2e to collect, and that waits on kpci.
+
+
+## 2026-10-12 (lane C): closed with lwjc
+
+lwjc shipped as tools#160 and cat-harness#175. The todos board keeps the whole listing (`fa_todo_listing: all`), and every other page lists only its own notes.
+
+Run locally against cat-harness main (`c60560a`): `first-paint-scheme.e2e.ts` and `linear-floor.e2e.ts` pass 19/19. That covers the per-page case, the no-note case, and the `todos/` case with JavaScript off. I used a minimal Playwright config, because CI's e2e job is still g9m3/kpci.
+
+**Not done:** coordination with #1886. It's the same open item as on lwjc.
