@@ -1137,6 +1137,10 @@ export function railStandalonePages(
         ...(harnesses ? { harnesses } : {}),
         navbarRow: foreign ? rebaseNavbarRow(navbarRowData(built), foreign.platformBase, foreign.instance) : navbarRowData(built),
         emitRailData: railDataWriter(siteAbs),
+        // A folio's site: the icon row is the same on every page, so it is
+        // written once beside the rail's data rather than into each page
+        // (2026-10-10 — 849 KB of 1.76 MB of railed HTML on one folio).
+        ...(foreign ? { shareNavbarRow: true } : {}),
       });
       if (after === undefined) {
         skipped.push(rel);

@@ -291,13 +291,23 @@ describe("at rest it is a strip, and opens three ways", () => {
 
   it("the header carries the declared avatar when there is one", () => {
     const html = navbarHtml({ ...model, mark: { avatar: { src: "../a.svg" }, tone: 268 } });
-    expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="">');
+    expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="" loading="lazy" decoding="async">');
     expect(region(html, "fa-nav-top")).toContain("hsl(268 45% 28%)");
+  });
+
+  it("every avatar image is lazy, so a folded Harnesses row fetches nothing until opened (2026-10-10)", () => {
+    // Three harness marks are crops of full landing-card pictures (100-355 KB
+    // each) and two sat in a folded disclosure on every folio page.
+    const crop = { src: "../card.webp", region: { x: 0, y: 0, w: 0.5, h: 0.5 } };
+    const html = navbarHtml({ ...model, mark: { avatar: crop, tone: 268 } });
+    const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+    expect(imgs.length).toBeGreaterThan(0);
+    for (const i of imgs) expect(i).toContain('loading="lazy"');
   });
 
   it("an avatar that declares its ground `none` sits on the rail itself — no tone square (issue #46, gap 5)", () => {
     const html = navbarHtml({ ...model, mark: { avatar: { src: "../a.svg", ground: "none" }, tone: 268 } });
-    expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="">');
+    expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="" loading="lazy" decoding="async">');
     expect(region(html, "fa-nav-top")).not.toContain("hsl(268 45% 28%)");
   });
 

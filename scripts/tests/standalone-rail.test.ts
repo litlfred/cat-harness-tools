@@ -12,11 +12,12 @@
  * is not that it computes wrongly — it is that the caller forgets a family.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { mountRoutes, railStandalonePages } from "../mount-instance-docs.js";
+import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 
 const page = (body: string): string =>
   `<!doctype html>\n<html><head><title>t</title></head><body>${body}</body></html>\n`;
@@ -267,14 +268,52 @@ describe("a FOLIO's site (folio-staging.yml): platform links point at the platfo
     const html = readFileSync(join(root, "index.html"), "utf-8");
     expect(html).toContain(`<script src="${BASE}/assets/js/docs-ui.js" defer`);
     expect(html).toContain(`href="${BASE}/assets/css/docs-ui.css"`);
-    const row = /<script type="application\/json" id="fa-navbar-row"[^>]*>(.*?)<\/script>/s.exec(html);
-    expect(row).not.toBeNull();
-    const data = JSON.parse(row![1]!) as { hrefs?: Record<string, string> };
+    // On a folio's site the row is written ONCE beside the rail's data and the
+    // page's island names it (2026-10-10); read it as a browser would.
+    expect(html).toMatch(/<script type="application\/json" id="fa-navbar-row"[^>]* data-fa-row-src="row-[a-z0-9]+"><\/script>/);
+    const row = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
+    expect(row).toBeDefined();
+    const data = JSON.parse(row!) as { hrefs?: Record<string, string> };
     const targets = Object.values(data.hrefs ?? {});
     expect(targets.length).toBeGreaterThan(0);
     for (const t of targets) expect(t.startsWith(`${BASE}/`)).toBe(true);
     // A second pass adds nothing: the loader is marked.
     railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
     expect(readFileSync(join(root, "index.html"), "utf-8").split("docs-ui.js").length).toBe(2);
+  });
+
+  test("the icon row is written ONCE for the site, and its file runs before every reader (2026-10-10)", () => {
+    // Measured on a folio site: 1,956 B of byte-identical row JSON on each of
+    // 434 pages. Two pages at different depths share one file; the page keeps
+    // an empty island naming it, and the file's deferred script precedes
+    // navbar-row.js and docs-ui.js, which read the island.
+    const root = mkdtempSync(join(tmpdir(), "folio-row-shared-"));
+    mkdirSync(join(root, "a", "b"), { recursive: true });
+    writeFileSync(join(root, "index.html"), page("<h1>Doc</h1>"));
+    writeFileSync(join(root, "a", "b", "index.html"), page("<h1>Deep</h1>"));
+    railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
+    const top = readFileSync(join(root, "index.html"), "utf-8");
+    const deep = readFileSync(join(root, "a", "b", "index.html"), "utf-8");
+    const name = (h: string) => /data-fa-row-src="(row-[a-z0-9]+)"/.exec(h)?.[1];
+    expect(name(top)).toBeDefined();
+    expect(name(deep)).toBe(name(top));
+    expect(deep).toContain(`<script src="../../assets/navbar/${name(top)}.js" defer></script>`);
+    for (const h of [top, deep]) {
+      const file = h.indexOf(`${name(top)}.js`);
+      expect(file).toBeLessThan(h.indexOf("navbar-row.js"));
+      expect(file).toBeLessThan(h.indexOf("docs-ui.js"));
+    }
+    // The file fills the island the way a browser would run it.
+    const body = readFileSync(join(root, "assets", "navbar", `${name(top)}.js`), "utf-8");
+    const island = { text: "", attrs: new Map([["data-fa-row-src", name(top)!]]) };
+    const node = {
+      get textContent() { return island.text; },
+      set textContent(v: string) { island.text = v; },
+      getAttribute: (k: string) => island.attrs.get(k) ?? null,
+      removeAttribute: (k: string) => void island.attrs.delete(k),
+    };
+    new Function("document", body)({ getElementById: (id: string) => (id === "fa-navbar-row" ? node : null) });
+    expect(island.attrs.has("data-fa-row-src")).toBe(false);
+    expect((JSON.parse(island.text) as { icons?: unknown }).icons).toBeDefined();
   });
 });
