@@ -67,7 +67,7 @@ describe("criterionProfiles — the default runs the other way from adapters", (
     // profiles nest and every existing criterion was written against the
     // document vocabulary with the math kinds as an addition.
     expect(criterionProfiles({})).toEqual(CONTENT_PROFILES);
-    expect(criterionAdapters({})).toEqual(["paper"]);
+    expect(criterionAdapters({})).toEqual([...CONTENT_ADAPTERS]);
   });
 
   test("an explicit scope is honoured", () => {
@@ -112,14 +112,15 @@ describe("criterionProfiles — the default runs the other way from adapters", (
     // the PAPER adapter's vocabulary and say nothing about WHO L2/L3 kinds,
     // so the pair would read as a constraint that cannot be satisfied.
     for (const def of QA_CRITERIA_REGISTRY) {
-      if (criterionAdapters(def).includes("paper")) continue;
+      if (CONTENT_ADAPTERS.some((a) => criterionAdapters(def).includes(a))) continue;
       expect({ id: def.id, p: def.profiles }).toEqual({ id: def.id, p: undefined });
     }
     // And neither axis leaked into the other's value space.
-    for (const p of CONTENT_PROFILES) {
-      if (p === "paper") continue;
-      expect(CONTENT_ADAPTERS as readonly string[]).not.toContain(p);
-    }
+    // One name sits on both axes on purpose: `paper` while it named the one
+    // vocabulary, `document` since the split (bean bzwk) — never both, never another.
+    const both = CONTENT_PROFILES.filter((p) => (CONTENT_ADAPTERS as readonly string[]).includes(p));
+    expect(both.length).toBeLessThanOrEqual(1);
+    for (const p of both) expect(["paper", "document"]).toContain(p);
   });
 });
 
