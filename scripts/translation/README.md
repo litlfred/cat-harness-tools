@@ -7,7 +7,7 @@ Scripts for the folio-assistant translation pipeline.
 The Python scripts in this directory are copied from
 [`WorldHealthOrganization/smart-base/input/scripts/`](https://github.com/WorldHealthOrganization/smart-base/tree/main/input/scripts).
 They are the upstream authority for FHIR IG translation workflows.
-The TypeScript ports in `content/pipeline/` are the folio-assistant equivalents.
+The TypeScript ports in `pipeline/` are the folio-assistant equivalents.
 
 ## Smart-base Python scripts
 
@@ -29,8 +29,8 @@ The TypeScript ports in `content/pipeline/` are the folio-assistant equivalents.
 
 | Module | Smart-base source | Functions ported |
 |---|---|---|
-| `content/pipeline/pot-extract.ts` | `extract_translations.py` L633–856 | `extractMarkdown`, `cleanMarkdownText`, `formatPot` |
-| `content/pipeline/po-inject.ts` | `inject_translations.py` L56–818 | `injectMarkdown`, `parsePo`, `gettextToLiquid` |
+| `pipeline/pot-extract.ts` | `extract_translations.py` L633–856 | `extractMarkdown`, `cleanMarkdownText`, `formatPot` |
+| `pipeline/po-inject.ts` | `inject_translations.py` L56–818 | `injectMarkdown`, `parsePo`, `gettextToLiquid` |
 
 ## Simulation
 
@@ -50,7 +50,7 @@ Output goes to `translations/fr/`.
 ## Tests
 
 ```sh
-bun test content/pipeline/translation.test.ts
+bun test pipeline/translation.test.ts
 ```
 
 40 tests covering text cleaning, extraction, formatting, PO parsing,

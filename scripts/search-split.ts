@@ -65,7 +65,7 @@ import { basename, join, resolve } from "node:path";
 import lunr from "lunr";
 
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { targetLocales } from "../content/pipeline/translation-index.ts";
+import { targetLocales } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** Where the theme writes the whole index, relative to the site root. */

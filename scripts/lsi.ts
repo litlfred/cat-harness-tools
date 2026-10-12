@@ -6,7 +6,7 @@
  *
  * @covers library, skills, beans, folio, docs, methodology, memory, policies, glossary
  *
- * Method: `methodologies/lsi.md`. Engine: `content/pipeline/lsi.ts`. Skill:
+ * Method: `methodologies/lsi.md`. Engine: `pipeline/lsi.ts`. Skill:
  * `skills/kg/graph-management/lsi-indexing.md`.
  *
  * ## Subcommands
@@ -72,7 +72,7 @@ import {
   type LsiIndex,
   type LsiOptions,
   type LsiUnit,
-} from "../content/pipeline/lsi";
+} from "../pipeline/lsi";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import type { LsiSidecar } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/

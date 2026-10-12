@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { blockPlacement, pointsForward } from "../../content/pipeline/qa-checkers-extended";
+import { blockPlacement, pointsForward } from "../../pipeline/qa-checkers-extended";
 import { hasFolio } from "./helpers";
 
 /**

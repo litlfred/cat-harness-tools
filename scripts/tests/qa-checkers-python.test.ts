@@ -28,7 +28,7 @@ import {
   checkDeprecated,
   checkUsesLibraryFrameworkAppropriately,
   checkAssertionsAreFalsifiable,
-} from "../../content/pipeline/qa-checkers-python";
+} from "../../pipeline/qa-checkers-python";
 
 /** Write `source` to a temp `.py` and run `fn` against its path. */
 function withPy<T>(source: string, fn: (p: string) => T): T {

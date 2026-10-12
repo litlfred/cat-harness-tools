@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { agentCriteriaFor, publishBlockQa, summariseBlock } from "../publish-block-qa.js";
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.js";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.js";
 
 // `voice-status-leak` and `voice-ai-slop` are registered criteria that depend on `md`.
 const entry = (result: "pass" | "fail" | "warn" | "n/a", md: string, severity?: "critical" | "major" | "minor") => ({

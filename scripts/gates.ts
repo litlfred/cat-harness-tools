@@ -646,7 +646,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     kind: "no-folio",
     reason:
       "runs after `cd content`, so it names a FOLIO's build. `cat-harness/" +
-      "content/pipeline/build.ts` does exist — a different file sharing the " +
+      "pipeline/build.ts` does exist — a different file sharing the " +
       "basename — so resolving to it would be a wrong fix that looks right " +
       "(bean `52dz`, 2026-09-20)",
   },

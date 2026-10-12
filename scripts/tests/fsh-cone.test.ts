@@ -30,7 +30,7 @@ import {
   report,
   toCsv,
   type FshGraph,
-} from "../../content/pipeline/fsh-cone";
+} from "../../pipeline/fsh-cone";
 
 const ROOT = mkdtempSync(join(tmpdir(), "fsh-cone-"));
 let g: FshGraph;

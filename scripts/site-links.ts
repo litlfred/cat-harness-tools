@@ -211,7 +211,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   // Detected here, at the edge, so the library half stays pure and testable.
-  const { detectRepoUrl } = await import("../content/pipeline/readme-toc.js");
+  const { detectRepoUrl } = await import("../pipeline/readme-toc.js");
   const links = siteLinks(decl, detectRepoUrl(root));
   const siteDir = at("--site");
 

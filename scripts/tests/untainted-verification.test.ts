@@ -16,7 +16,7 @@ import { join, relative } from "node:path";
 import { attestationPath, blockAttestationKey, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 
 import { COMPANION_ROLES, untaintedPartitionDefects } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { ROUNDTRIP_DISPATCH, TRANSLATION_ARTEFACTS } from "../../content/pipeline/translation-block-qa.ts";
+import { ROUNDTRIP_DISPATCH, TRANSLATION_ARTEFACTS } from "../../pipeline/translation-block-qa.ts";
 import type { UntaintedDispatch } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import {
   couldNotDispatchEntry,
@@ -25,7 +25,7 @@ import {
   mergeUntainted,
   recordUntainted,
   untaintedEntries,
-} from "../../content/pipeline/untainted-verification.ts";
+} from "../../pipeline/untainted-verification.ts";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 const SOUND: UntaintedDispatch = {

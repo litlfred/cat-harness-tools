@@ -32,7 +32,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { buildTermMatrix, keywordsOf, tokenize, type Keyword } from "../content/pipeline/lsi.ts";
+import { buildTermMatrix, keywordsOf, tokenize, type Keyword } from "../pipeline/lsi.ts";
 import { readStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

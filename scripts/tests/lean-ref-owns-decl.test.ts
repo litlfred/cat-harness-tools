@@ -5,8 +5,8 @@ import { join } from "path";
 import {
   checkLeanRefOwnsDecl,
   resetUsesGraphCache,
-} from "../../content/pipeline/qa-checkers-uses";
-import { buildContentGraph } from "../../content/pipeline/content-graph";
+} from "../../pipeline/qa-checkers-uses";
+import { buildContentGraph } from "../../pipeline/content-graph";
 
 interface Blk {
   slug: string;

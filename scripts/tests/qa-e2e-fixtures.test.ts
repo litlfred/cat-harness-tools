@@ -18,14 +18,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { QA_FAMILIES } from "../../content/pipeline/qa-witness.ts";
+import { QA_FAMILIES } from "../../pipeline/qa-witness.ts";
 import { QaIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 
 const DIR = join(import.meta.dir, "..", "..", "test", "support", "fixtures", "qa-e2e");
 const read = (name: string): Record<string, unknown> => JSON.parse(readFileSync(join(DIR, name), "utf8"));
 
 // The keys `QaWitnessDoc`, `QaCriterionView` and `QaWitness` declare in
-// `content/pipeline/qa-witness.ts`. A key outside these is a shape the
+// `pipeline/qa-witness.ts`. A key outside these is a shape the
 // generator does not write.
 const DOC_KEYS = ["$schema", "family", "subject", "sidecars", "state", "counts", "criteria"];
 const CRITERION_KEYS = ["id", "result", "severity", "locale", "block", "evidence", "metrics", "score", "witnesses"];

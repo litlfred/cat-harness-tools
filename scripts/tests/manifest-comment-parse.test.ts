@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseManifestStringArrays } from "../../content/pipeline/qa-checkers-extended";
+import { parseManifestStringArrays } from "../../pipeline/qa-checkers-extended";
 
 /**
  * The position map `loadChapterGraph` builds is what every detangler criterion

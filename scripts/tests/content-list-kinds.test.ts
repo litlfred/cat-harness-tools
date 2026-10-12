@@ -20,7 +20,7 @@ import { tmpdir } from "os";
 import {
   readBlockManifest,
   readUnlabelledBlockManifest,
-} from "../../content/pipeline/qa-utils";
+} from "../../pipeline/qa-utils";
 import { initFolio } from "../init-folio";
 
 const dirs: string[] = [];

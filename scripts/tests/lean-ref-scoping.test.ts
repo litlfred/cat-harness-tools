@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { parseNestedStringField } from "../../content/pipeline/uses-field";
-import { parseLeanRef } from "../../content/pipeline/content-graph";
+import { parseNestedStringField } from "../../pipeline/uses-field";
+import { parseLeanRef } from "../../pipeline/content-graph";
 
 /**
  * A block manifest carries several `ref:` keys — `lean.ref`, `simulator.ref`,

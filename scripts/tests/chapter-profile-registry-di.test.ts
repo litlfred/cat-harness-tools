@@ -26,9 +26,9 @@ import {
   CHAPTER_EXPECTED_REGIMES,
   CATEGORICAL_CHAPTERS,
   ARCHIMEDEAN_CHAPTERS,
-} from "../../content/pipeline/chapter-profile-registry-di.ts";
+} from "../../pipeline/chapter-profile-registry-di.ts";
 import { registerDefaultChapterProfiles }
-  from "../../content/pipeline/_folio-chapter-profiles.qou.ts";
+  from "../../pipeline/_folio-chapter-profiles.qou.ts";
 
 // Restore the shipped default rather than leaving the registry empty.
 // `registerDefaultChapterProfiles()` runs as a module-load side effect of
@@ -126,7 +126,7 @@ describe("the shipped qou default", () => {
     // and the side effect will not fire again.
     resetChapterProfiles();
     registerDefaultChapterProfiles();
-    const mod = await import("../../content/pipeline/qa-checkers-q-usage.ts");
+    const mod = await import("../../pipeline/qa-checkers-q-usage.ts");
     expect(chapterProfilesConfigured()).toBe(true);
     expect(Object.keys(mod.CHAPTER_EXPECTED_REGIMES).length).toBeGreaterThan(20);
     expect(mod.CATEGORICAL_CHAPTERS.has("quantum-universes")).toBe(true);

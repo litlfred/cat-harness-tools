@@ -262,7 +262,7 @@ export const FOLIO_PATHS: FolioPath[] = [
     reason: "invoked with `--cwd content`, the retired root",
   },
   {
-    match: "content/pipeline/latex-overfull-report.ts",
+    match: "pipeline/latex-overfull-report.ts",
     reason:
       "reads a FOLIO's `main.log`, inside `publish.yml` — the ONE workflow " +
       "exposing `workflow_call`, which `litlfred/qou` invokes at `@main` " +

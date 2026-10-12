@@ -28,7 +28,7 @@ import {
   overlaySeverityOf,
   shippedVoices,
   voiceOverlayCriteria,
-} from "../../content/pipeline/voice-criteria.ts";
+} from "../../pipeline/voice-criteria.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);

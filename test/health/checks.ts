@@ -1975,7 +1975,7 @@ export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
  *
  * **Adding a check is one entry here plus one fixture test.** The runner, the
  * report writer and the markdown renderer all read this array, so nothing else
- * needs touching — the same property `content/pipeline/readme-sections.ts` has
+ * needs touching — the same property `pipeline/readme-sections.ts` has
  * and for the same reason.
  *
  * Order is the order a reader should meet them: the owner's explicit ask

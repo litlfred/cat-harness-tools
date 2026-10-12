@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { PotEntry } from "../../content/pipeline/pot-extract.js";
-import { parsePo, parsePoEntries } from "../../content/pipeline/po-inject.js";
+import type { PotEntry } from "../../pipeline/pot-extract.js";
+import { parsePo, parsePoEntries } from "../../pipeline/po-inject.js";
 import {
   defaultPoHeader,
   syncPoContent,

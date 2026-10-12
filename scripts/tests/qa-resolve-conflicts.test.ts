@@ -38,7 +38,7 @@ const QA = "cat-harness/test/results/";
 function sidecar(result: string, withAgent: boolean): string {
   const criteria: Record<string, unknown[]> = {
     "translation-coverage": [
-      { result, reviewer: { kind: "script", id: "content/pipeline/translation-block-qa.ts" } },
+      { result, reviewer: { kind: "script", id: "pipeline/translation-block-qa.ts" } },
     ],
   };
   if (withAgent) {
@@ -234,7 +234,7 @@ describe("the scanner", () => {
     // One script + one agent per side, two sides.
     expect(scan.kinds.length).toBe(4);
     expect(scan.nonScript.length).toBe(2);
-    expect(scan.reviewerIds).toContain("content/pipeline/translation-block-qa.ts");
+    expect(scan.reviewerIds).toContain("pipeline/translation-block-qa.ts");
   });
 
   test("a family with NO reviewer anywhere scans clean — and that is a different fact", () => {
@@ -276,19 +276,19 @@ describe("the generator is looked up, never guessed", () => {
   test("the WRITING script is chosen and the :check one excluded", () => {
     // A `:check` verifies and writes nothing, so running it to resolve a
     // conflict would leave the conflict resolved to one arbitrary side.
-    expect(generatorFor(scripts, "content/pipeline/translation-block-qa.ts")).toBe("translation:block-qa");
+    expect(generatorFor(scripts, "pipeline/translation-block-qa.ts")).toBe("translation:block-qa");
     expect(generatorFor(scripts, "cat-harness/scripts/kg-audit.ts")).toBe("kg:audit");
   });
 
   test("an unrecognised reviewer yields undefined rather than a plausible guess", () => {
-    expect(generatorFor(scripts, "content/pipeline/not-a-thing.ts")).toBeUndefined();
+    expect(generatorFor(scripts, "pipeline/not-a-thing.ts")).toBeUndefined();
   });
 
   test("this repository's real package.json still answers for its own reviewers", () => {
     // The fixtures above prove the matcher; this proves it against the file
     // that is actually read at runtime, which is what drifts.
     const real = scriptsOf(join(dirname(HARNESS_ROOT)));
-    expect(generatorFor(real, "content/pipeline/translation-block-qa.ts")).toBe("translation:block-qa");
+    expect(generatorFor(real, "pipeline/translation-block-qa.ts")).toBe("translation:block-qa");
   });
 });
 

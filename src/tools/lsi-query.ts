@@ -14,7 +14,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { buildLsi, query, tokenize } from "../../content/pipeline/lsi.js";
+import { buildLsi, query, tokenize } from "../../pipeline/lsi.js";
 import { proseGraphs, unitsOf } from "../../scripts/lsi.js";
 
 export function lsiQueryText(text: string, opts: { instance?: string; graph?: string; top?: number } = {}): string {

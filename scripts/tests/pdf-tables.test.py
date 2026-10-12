@@ -6,7 +6,7 @@ The extraction itself belongs to pdfplumber or camelot and is not retested
 here. What *is* this repo's is everything decided after a backend hands back
 cells: whether two page-split fragments are one table, which line is a
 caption, how a cell matrix becomes a GFM table that
-`content/pipeline/render-latex.ts` can turn into a `tabular`. Those are the
+`pipeline/render-latex.ts` can turn into a `tabular`. Those are the
 decisions that can be silently wrong, and a wrong one is expensive in a
 specific way — **a bad stitch welds two unrelated tables into a single
 plausible-looking one**, and nothing downstream can detect that the rows

@@ -21,7 +21,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import type { TranslationIndex } from "../../content/pipeline/translation-index.ts";
+import type { TranslationIndex } from "../../pipeline/translation-index.ts";
 
 import {
   availableLocaleClaims,

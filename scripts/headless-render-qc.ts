@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
 
 // `VIEWER_DIR` below is `<root>/folio-assistant/ui` — a FOLIO-relative path,
 // since inside a folio the platform IS the `folio-assistant/` directory. So
@@ -26,7 +26,7 @@ const OUT_DIR = join(REPO_ROOT, "build", "render-qc");
 const SAVE_SCREENSHOTS = process.argv.includes("--screenshot");
 
 if (!existsSync(PAPER_JSON)) {
-  console.error("No paper.json found. Run: bun run content/pipeline/export-json.ts");
+  console.error("No paper.json found. Run: bun run pipeline/export-json.ts");
   process.exit(2);
 }
 

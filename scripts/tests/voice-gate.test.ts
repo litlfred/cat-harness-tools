@@ -25,7 +25,7 @@ import {
   voiceExcludesCriterion,
 } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/voices.ts";
-import { criterionDefHash } from "../../content/pipeline/qa-utils";
+import { criterionDefHash } from "../../pipeline/qa-utils";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 describe("criterionVoices", () => {

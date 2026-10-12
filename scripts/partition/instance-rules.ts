@@ -531,7 +531,7 @@ export const RULES: Rule[] = [
       //
       //    These two move FREE: MEASURED, reassigning them adds ZERO
       //    wrong-direction edges. The other two the ruling reaches
-      //    (`schemas/lean-packages.ts`, `content/pipeline/lean-signature.ts`)
+      //    (`schemas/lean-packages.ts`, `pipeline/lean-signature.ts`)
       //    cost SIX core -> sci edges and are held pending the owner's call on
       //    how core is to carry a formal reference it does not own. qou bean
       //    `qou-7ko6`.
@@ -553,7 +553,7 @@ export const RULES: Rule[] = [
       // tool's scope. Nothing under `cat-harness/` imports them.
       // CORE, not harness beside gen-uml-overview: it needs a folio to have
       // anything to do, and its input is the core content model
-      // (`content/pipeline/content-graph.ts`). The shared PlantUML machinery it
+      // (`pipeline/content-graph.ts`). The shared PlantUML machinery it
       // imports (`scripts/plantuml-render.ts`) stays harness, so the edge runs
       // core → harness, the allowed direction.
       // Re-triaged 2026-09-19, bean `zlmp`. Listed as harness until then, on
@@ -673,10 +673,10 @@ export const RULES: Rule[] = [
       // the composition mechanism of the harness, not a thing a folio
       // contains, so `harness-config.ts` importing it was never the wrong
       // direction; the target was on the wrong side. Its other importer,
-      // `content/pipeline/render-discovery.ts`, is core, and core may import
+      // `pipeline/render-discovery.ts`, is core, and core may import
       // harness.
       //
-      // `content/pipeline/repo-root.ts` resolves WHERE the content repo is by
+      // `pipeline/repo-root.ts` resolves WHERE the content repo is by
       // walking up for `computations/` and `content/`. Those directory names
       // are markers it matches on, not a model it defines — and the cut is
       // processes versus tooling. Measured: twelve importers, every one under
@@ -904,7 +904,7 @@ export const RULES: Rule[] = [
       // LSI over the declared prose graphs, and the epic-filing proposal it
       // drives (bean `ansc`). Harness for the same reason as the audit: its
       // subjects are the declarations and the work plan, and the engine it
-      // imports (`content/pipeline/lsi.ts`) is linear algebra over any text.
+      // imports (`pipeline/lsi.ts`) is linear algebra over any text.
       // The PROV-O QA/QC report (#1180 step 5): workflow history → PROV-O,
       // re-checked with `authorizeTask`. Harness on the same terms as the
       // audit: it reads the harness's own work-plan store, role graph and
@@ -956,7 +956,7 @@ export const RULES: Rule[] = [
       // beside the verifier rather than below it.
       // The downstream-tool criterion family (bean `fq5u`): kg:audit's reader
       // of Tool run records, harness for the same reason as the audit itself.
-      // ── Tooling that the `schemas/` and `content/pipeline/` PREFIXES had
+      // ── Tooling that the `schemas/` and `pipeline/` PREFIXES had
       //    claimed for core, on the content-versus-platform reading this list
       //    predates. The owner's cut, 2026-09-19, is different and sharper:
       //    "f-a-core has high level processes only, no tooling. f-a has all
@@ -1142,21 +1142,21 @@ export const RULES: Rule[] = [
   //    The test was applied FIVE times in this block ("Same test again",
   //    "Same test a third time"), so the ruling reached four entries, not one.
   //    Two moved to the sci block above and cost NOTHING. The other two --
-  //    `schemas/lean-packages.ts` and `content/pipeline/lean-signature.ts` --
+  //    `schemas/lean-packages.ts` and `pipeline/lean-signature.ts` --
   //    cost SIX core -> sci edges, measured twice (at `.folio-assistant-pin`
   //    and on current `main`, so not a pin artifact):
   //      schemas/constraints.ts          -> lean-packages
   //      adapters/mcp-server/server.ts   -> lean-packages
   //      adapters/document/resolver.ts   -> lean-packages
   //      adapters/manifest-entries.ts    -> lean-packages
-  //      content/pipeline/qa-utils.ts    -> lean-packages
-  //      content/pipeline/qa-utils.ts    -> lean-signature
+  //      pipeline/qa-utils.ts    -> lean-packages
+  //      pipeline/qa-utils.ts    -> lean-signature
   //
   //    🟩 PAID. All six are gone and both modules are now `sci` (they fall
   //    there on the `lean` keyword rule below, so they need no entry at all).
   //    `schemas/formal-ref.ts` is the injection point core reaches instead --
   //    the third instance of the `references-registry-di` / `value-registry-di`
-  //    pattern -- and `content/pipeline/lean-formal-ref.ts` is the sci-side
+  //    pattern -- and `pipeline/lean-formal-ref.ts` is the sci-side
   //    implementation, which is where the resolution bodies moved verbatim from
   //    `qa-utils.ts`. `BlockBase` is UNCHANGED: core still carries a field
   //    named `lean`, it simply no longer knows the grammar of its `ref`. The
@@ -1270,7 +1270,7 @@ export const RULES: Rule[] = [
       // `check-artifact-index.ts` was core on exactly that reasoning — it has since
       // MOVED to `folio-assistant-core/scripts/` under bean `yj6r`, so no rule in
       // this file adjudicates it any more; see the note where its entry stood. The
-      // difference is the import: this one reads `content/pipeline/fsh-cone.ts`
+      // difference is the import: this one reads `pipeline/fsh-cone.ts`
       // to compare against what that tool extracts, and `fsh-cone` is base by
       // the keyword rule underneath. Calling this core would buy the one thing
       // the partition exists to prevent — a `folio-assist-core -> smart-base`
@@ -1285,13 +1285,13 @@ export const RULES: Rule[] = [
 
   // ── folio-assist-core: the generic document model and its pipeline
   //
-  // The `content/pipeline/` prefix below classifies that whole directory as
+  // The `pipeline/` prefix below classifies that whole directory as
   // core, which is why `check:partition` has always read 0 for it. Bean `yj6r`
   // acted on that classification for the GLOSSARY cluster: `build-glossary.ts`,
   // `codemod-refterm.ts` and their three tests now live in
   // `folio-assistant-core/scripts/`. Nothing was removed from the prefix — a
   // prefix stops matching a path that is no longer under it — but the fact is
-  // recorded here because the next reader will count `content/pipeline/` and
+  // recorded here because the next reader will count `pipeline/` and
   // find two files missing from a directory this rule claims in full.
   //
   // What the move BOUGHT is not a change of classification: it was already
@@ -1305,7 +1305,7 @@ export const RULES: Rule[] = [
     repo: "core",
     // declared-path-literal: the TARGET layout of the five-repo split, which no
     // declaration in THIS repo describes — that is the whole point of the plan.
-    prefixes: ["adapters/mcp-server/", "adapters/document/", "src/blocks/", "scripts/translation/", "skills/folio-core/", "skills/authoring-document/", "skills/authoring/content-lifecycle/", "content/pipeline/", "schemas/", "ui/", "viewer/", "translations/"],
+    prefixes: ["adapters/mcp-server/", "adapters/document/", "src/blocks/", "scripts/translation/", "skills/folio-core/", "skills/authoring-document/", "skills/authoring/content-lifecycle/", "pipeline/", "schemas/", "ui/", "viewer/", "translations/"],
     // `blueprint/` STOOD in the prefixes above until 2026-09-30 (bean `vov0`):
     // it held a hand-written QOU blueprint, folio content in the platform, and
     // is removed now that `blueprint-layout.ts` generates a paper's
@@ -1316,7 +1316,7 @@ export const RULES: Rule[] = [
       // beside the `schemas/changeset.ts` its test reads, so the classification
       // is carried by location. Reasoning kept: it renders a DOCUMENT folio to
       // a site through the document pipeline's own `buildDocumentMarkdown`
-      // (content/pipeline, core), and its subject is a folio's content, not the
+      // (pipeline, core), and its subject is a folio's content, not the
       // harness (bean `fyu2`). The `gen-review-page.ts` entry above still names
       // it as a core caller reaching DOWN into the harness, which is now true
       // by location as well as by rule.

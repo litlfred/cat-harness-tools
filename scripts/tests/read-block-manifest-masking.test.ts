@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { readBlockManifest } from "../../content/pipeline/qa-utils";
+import { readBlockManifest } from "../../pipeline/qa-utils";
 
 /**
  * `readBlockManifest` decides what counts as a content block. Getting it wrong
@@ -10,7 +10,7 @@ import { readBlockManifest } from "../../content/pipeline/qa-utils";
  * file becomes a "block", every per-block checker runs on it, and the results
  * are filed under a label that does not exist.
  *
- * That happened. `content/pipeline/witness-substitution-audit.ts` carries a
+ * That happened. `pipeline/witness-substitution-audit.ts` carries a
  * self-test containing the literal text of a manifest, and the raw scan yielded
  * that audit script as a block labelled `prop:x`.
  */

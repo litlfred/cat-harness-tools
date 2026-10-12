@@ -39,12 +39,12 @@ import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { stripLeanComments } from "../../content/pipeline/lean-lexer.js";
+import { stripLeanComments } from "../../pipeline/lean-lexer.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
 const ROOT = repoRootFor(INSTANCE);
-const CANONICAL = "cat-harness-tools/content/pipeline/lean-lexer.ts";
+const CANONICAL = "cat-harness-tools/pipeline/lean-lexer.ts";
 
 /**
  * Modules allowed a `stripLeanComments` definition that strips NOTHING.
@@ -56,7 +56,7 @@ const CANONICAL = "cat-harness-tools/content/pipeline/lean-lexer.ts";
  * by pattern, and asserted below to be a pure forward, so a real second
  * stripper cannot hide behind it.
  */
-const DELEGATES = new Set(["cat-harness-tools/content/pipeline/pipeline-plugins.ts"]);
+const DELEGATES = new Set(["cat-harness-tools/pipeline/pipeline-plugins.ts"]);
 
 /** A definition of a stripper — `function f(` or `const f = `. */
 const DEFINES = /(?:function\s+stripLeanComments\s*\(|(?:const|let|var)\s+stripLeanComments\s*[:=])/;

@@ -55,7 +55,7 @@
  */
 import { describe, test, expect } from "bun:test";
 
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
 
 const automated = QA_CRITERIA_REGISTRY.filter((d) => d.automated);
 
@@ -74,7 +74,7 @@ describe("a contributed checker cannot fall through to the default", () => {
     // verdict that can never go stale — the state this file's header was
     // written about.
     const { getCriterionSourceFile } = await import(
-      "../../content/pipeline/qa-criteria-registry.ts"
+      "../../pipeline/qa-criteria-registry.ts"
     );
     const contributed = QA_CRITERIA_REGISTRY.filter((d) => d.checker_contributed);
     expect(contributed.length).toBeGreaterThan(0);

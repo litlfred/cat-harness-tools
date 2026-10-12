@@ -907,7 +907,7 @@ describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (ow
     expect(verdict(SKILL, "bun run cat-harness-tools/scripts/qa-refresh.ts --check")).toBe("exempt");
     expect(verdict(SKILL, "see `cat-harness-tools/scripts/partition/engine.ts` and `cat-harness-tools/scripts/gates.ts`")).toBe("exempt");
     expect(verdict(SKILL, "bun run <platform>/cat-harness-tools/archimate/scripts/check-archimate.ts --instance .")).toBe("exempt");
-    expect(verdict(SKILL, "bun run cat-harness-tools/content/pipeline/graph-search.ts \"<q>\"")).toBe("exempt");
+    expect(verdict(SKILL, "bun run cat-harness-tools/pipeline/graph-search.ts \"<q>\"")).toBe("exempt");
     // Other harness Markdown, not only skills: the coordinator's scope.
     expect(verdict("cat-harness/AGENTS.md", "bun run cat-harness-tools/scripts/mount-from-lock.ts")).toBe("exempt");
   });

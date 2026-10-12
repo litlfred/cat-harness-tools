@@ -107,7 +107,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { parsePo } from "../content/pipeline/po-inject.js";
+import { parsePo } from "../pipeline/po-inject.js";
 import { readHarnessConfig } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { localeDirIn, repoRootFor, translationsHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { buildExport, exportIdentity, publishedDocument, undeclaredRootTerms } from "./kg-export.js";

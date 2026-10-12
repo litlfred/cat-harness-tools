@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sameScriptVerdict } from "../../content/pipeline/qa-utils";
+import { sameScriptVerdict } from "../../pipeline/qa-utils";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 function entry(over: Partial<QaCriterionEntry> = {}): QaCriterionEntry {
@@ -8,7 +8,7 @@ function entry(over: Partial<QaCriterionEntry> = {}): QaCriterionEntry {
     result: "pass",
     reviewer: {
       kind: "script",
-      id: "content/pipeline/qa-checkers-voice.ts",
+      id: "pipeline/qa-checkers-voice.ts",
       version: "v1",
       script_hash: "111111111111",
       script_commit_sha: "cafebabecafebabecafebabecafebabecafebabe",

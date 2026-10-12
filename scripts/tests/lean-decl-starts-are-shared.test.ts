@@ -51,12 +51,12 @@ import {
   declarationStarts,
   splitDeclarations,
   stripLeanComments,
-} from "../../content/pipeline/lean-lexer.js";
+} from "../../pipeline/lean-lexer.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
 const ROOT = repoRootFor(INSTANCE);
-const CANONICAL = "cat-harness-tools/content/pipeline/lean-lexer.ts";
+const CANONICAL = "cat-harness-tools/pipeline/lean-lexer.ts";
 
 /** One declaration of each shape the two patterns disagreed about. */
 const DIVERGENT = `theorem alpha : True := by trivial
@@ -147,7 +147,7 @@ describe("there is exactly one declaration pattern", () => {
     // The scoped claim, and the only one this change earns. `DECL_RE` lives in
     // the canonical module; `qa-checkers-q-usage` reads it through
     // `declarationStarts` and defines nothing.
-    expect(patternFiles()).not.toContain("cat-harness-tools/content/pipeline/qa-checkers-q-usage.ts");
+    expect(patternFiles()).not.toContain("cat-harness-tools/pipeline/qa-checkers-q-usage.ts");
   });
 
   test("FIVE other modules still carry their own, and the list may only shrink", () => {
@@ -183,11 +183,11 @@ describe("there is exactly one declaration pattern", () => {
     // pattern does not fail this. The list may only shrink: a sixth file fails
     // here, and converging one lets somebody delete a row.
     expect(patternFiles()).toEqual([
-      "cat-harness-tools/content/pipeline/conjectural-propagation-audit.ts",
-      "cat-harness-tools/content/pipeline/generate-lean-stubs.ts",
-      "cat-harness-tools/content/pipeline/lean-formal-ref.ts",
-      "cat-harness-tools/content/pipeline/lean-lexer.ts",
-      "cat-harness-tools/content/pipeline/proof-narrative-lean-equiv-sweep.ts",
+      "cat-harness-tools/pipeline/conjectural-propagation-audit.ts",
+      "cat-harness-tools/pipeline/generate-lean-stubs.ts",
+      "cat-harness-tools/pipeline/lean-formal-ref.ts",
+      "cat-harness-tools/pipeline/lean-lexer.ts",
+      "cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts",
       "cat-harness-tools/scripts/lean-coverage.ts",
     ]);
   });

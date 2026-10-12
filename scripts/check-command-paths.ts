@@ -160,7 +160,7 @@ export interface CommandPathReport {
  * case: `scripts/install-beans.sh` names a directory this repository does not
  * have, and it is a defect precisely because the document is about this tree.
  *
- * **A skill may be about a FOLIO.** `bun run content/pipeline/content-graph.ts`
+ * **A skill may be about a FOLIO.** `bun run pipeline/content-graph.ts`
  * is correct in a folio and unresolvable in the platform, which carries no
  * folio — `AGENTS.md` says so in its first banner. Failing on those would make
  * the check unrunnable, and exempting the whole corpus would give up the `z9eb`
@@ -350,7 +350,7 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): Co
  * > `<instance>/<path>` does.** That is not "a path that might be wrong" — it
  * > is a path that is wrong *and whose fix is known*, so the finding names it.
  *
- * A path that resolves nowhere is a folio's (`content/pipeline/qa-sweep.ts` is
+ * A path that resolves nowhere is a folio's (`pipeline/qa-sweep.ts` is
  * correct in a folio and this repository carries none) and is COUNTED, never
  * failed. Instance roots are discovered as the directories carrying their own
  * `harness.json`, not listed here — a list would rot on the next split, which
@@ -445,7 +445,7 @@ export function checkPrintedCommands(repo: string, report: CommandPathReport): v
  * `content/`.** The two groups were not the same defect. A command naming
  * `scripts/x.ts` can only mean this repository's tooling — a folio has no
  * `scripts/` at all — so from the repository root it is simply broken. A
- * command naming `content/pipeline/x.ts` is written for somebody standing in a
+ * command naming `pipeline/x.ts` is written for somebody standing in a
  * FOLIO, where it is correct; the onboarding guide already carries three such
  * blocks marked *"run IN A FOLIO"*.
  *

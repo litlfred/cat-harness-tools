@@ -34,7 +34,7 @@
  * A malformed voice must not present as an instance with fewer voices: the
  * second is a legitimate state and the first is a defect, and collapsing them
  * is the false-clean this repository keeps paying for. Same rule as
- * `shippedVoices` in `content/pipeline/voice-criteria.ts`, which is the other
+ * `shippedVoices` in `pipeline/voice-criteria.ts`, which is the other
  * cross-instance reader over this graph.
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -110,7 +110,7 @@ export interface VoiceView {
    * The severity of the derived overlay criterion.
    *
    * Declared rather than computed from the rules, and the criterion id below
-   * is what a QA sidecar carries. See `content/pipeline/voice-criteria.ts` for
+   * is what a QA sidecar carries. See `pipeline/voice-criteria.ts` for
    * why the obvious derivation was rejected.
    */
   overlaySeverity: string;

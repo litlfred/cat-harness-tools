@@ -11,8 +11,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { blockQaPath } from "../../content/pipeline/qa-paths";
-import { orphanVerdicts, sweepOrphanVerdicts } from "../../content/pipeline/orphan-verdict-sweep";
+import { blockQaPath } from "../../pipeline/qa-paths";
+import { orphanVerdicts, sweepOrphanVerdicts } from "../../pipeline/orphan-verdict-sweep";
 
 function inTmp(run: (root: string) => void): void {
   const root = mkdtempSync(join(tmpdir(), "orphan-sweep-"));

@@ -46,7 +46,7 @@ import { basename, join, resolve } from "node:path";
 // through both writers therefore carried a second, unreferenced, byte-identical
 // copy of every prose block: 91 of them across four documents when measured
 // (2026-09-23). Two naming rules for one block is one rule too many.
-import { blockId, libraryInstanceOf, licenceProperties, sectionKey } from "../content/pipeline/gen-library-jsonld.ts";
+import { blockId, libraryInstanceOf, licenceProperties, sectionKey } from "../pipeline/gen-library-jsonld.ts";
 import { manifestLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
 import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";

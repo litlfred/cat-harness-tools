@@ -28,7 +28,7 @@ import {
   getReferenceRegistry,
   references,
   referenceMap,
-} from "../../content/pipeline/references-registry-di";
+} from "../../pipeline/references-registry-di";
 import type { Data as CSLData } from "csl-json";
 
 const ENTRIES: CSLData[] = [

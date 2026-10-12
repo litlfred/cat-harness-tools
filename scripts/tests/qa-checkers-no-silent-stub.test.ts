@@ -22,7 +22,7 @@ import { describe, expect, test } from "bun:test";
  * a property of the body: no call can tell "declined" from "never looked".
  */
 describe("no checker is a silent n/a stub (folio-assistant-89wq, as a class)", () => {
-  const DIR = join(import.meta.dir, "../../content/pipeline");
+  const DIR = join(import.meta.dir, "../../pipeline");
   const MODULES = readdirSync(DIR).filter((f) => /^qa-checkers.*\.ts$/.test(f) && !f.endsWith(".test.ts"));
 
   /** Each exported checker's name and body, cut at the first `}` in column 0. */

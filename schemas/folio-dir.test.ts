@@ -106,7 +106,7 @@ describe("end to end — a consumer finds a folio that declares content/", () =>
     // `findPapers` is a real platform consumer, not a probe. With the folio
     // root hardcoded it looked in `folio/` and reported nothing, so a folio
     // keeping `content/` was invisible however correctly it declared itself.
-    const { findPapers } = await import("../content/pipeline/repo-root.js");
+    const { findPapers } = await import("../pipeline/repo-root.js");
     const root = repo(declaring("content/"));
     mkdirSync(join(root, "content", "demo-paper"), { recursive: true });
     writeFileSync(

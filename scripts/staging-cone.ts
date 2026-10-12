@@ -82,7 +82,7 @@ function resolveSpecifier(fromAbs: string, spec: string): string | undefined {
 export const DECLARED_COMPUTED_IMPORTS: Record<string, (repoRoot: string) => string[]> = {
   // `loadBlockModule`: a folio's block manifests, which live in the directories
   // declared with graph typology `folio`.
-  "cat-harness-tools/content/pipeline/block-module.ts": (repoRoot) =>
+  "cat-harness-tools/pipeline/block-module.ts": (repoRoot) =>
     instanceRootsIn(repoRoot).flatMap((root) =>
       (readDeclaration(root)?.directories ?? [])
         .filter((d) => d.graphTypologies.includes("folio"))

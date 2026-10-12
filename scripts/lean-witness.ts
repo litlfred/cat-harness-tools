@@ -24,7 +24,7 @@ import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { resolve, basename } from "path";
 import { globSync } from "glob";
 import { execSync } from "child_process";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is
 // folio content (`content/**`, `computations/**`), and this is used as the cwd
@@ -33,7 +33,7 @@ import { findContentRepoRoot } from "../content/pipeline/repo-root";
 const REPO_ROOT = findContentRepoRoot();
 // ── Addressing ──────────────────────────────────────────────────
 //
-// Moved to `content/pipeline/witness-address.ts`: naming a witness and asking
+// Moved to `pipeline/witness-address.ts`: naming a witness and asking
 // whether one exists is grammar that travels with `BlockBase.lean`, which is
 // core's; producing and invalidating one is this file's, which is the science
 // layer's. Re-exported so every existing caller is unaffected.
@@ -42,8 +42,8 @@ export {
   witnessPath,
   isWitnessed,
   WITNESS_HASH_LENGTH,
-} from "../content/pipeline/witness-address.js";
-import { leanFileHash, witnessPath, isWitnessed } from "../content/pipeline/witness-address.js";
+} from "../pipeline/witness-address.js";
+import { leanFileHash, witnessPath, isWitnessed } from "../pipeline/witness-address.js";
 
 /** Get the current git HEAD commit SHA. */
 function getCurrentCommitSha(): string {

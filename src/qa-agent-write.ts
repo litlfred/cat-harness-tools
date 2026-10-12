@@ -11,7 +11,7 @@
  * This is the write path used by the parallel agent-drain campaign:
  * a sub-agent evaluates one criterion on one block, then calls
  *
- *   bun run content/pipeline/qa-agent-write.ts \
+ *   bun run pipeline/qa-agent-write.ts \
  *     --block <base-path-without-extension> \
  *     --criterion <criterion-id> \
  *     --result pass|fail|warn|n/a \
@@ -28,7 +28,7 @@
  * is judged at read time by `entryIsFresh` over the full md/ts/lean
  * `field_hash` — this writer does not second-guess it.
  *
- * @module content/pipeline/qa-agent-write
+ * @module pipeline/qa-agent-write
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
@@ -39,8 +39,8 @@ import {
   saveQaReport,
   readBlockManifest,
   resolveCanonicalLean,
-} from "../content/pipeline/qa-utils";
-import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "../content/pipeline/qa-paths";
+} from "../pipeline/qa-utils";
+import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "../pipeline/qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import type {
   BlockQaReport,

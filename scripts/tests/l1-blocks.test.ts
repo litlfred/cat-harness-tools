@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { buildL1 } from "../l1-blocks.ts";
-import { blockId, buildDocumentNodes, orphanedBlocks, sectionKey } from "../../content/pipeline/gen-library-jsonld.ts";
+import { blockId, buildDocumentNodes, orphanedBlocks, sectionKey } from "../../pipeline/gen-library-jsonld.ts";
 
 const SECTIONS = [
   { id: "sec-001-introduction", number: null, title: "Introduction", level: 1, page_start: 1, page_end: 2, n_chars: 13, n_words: 1 },

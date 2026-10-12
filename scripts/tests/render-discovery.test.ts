@@ -11,7 +11,7 @@
  */
 import { describe, test, expect } from "bun:test";
 
-import { resolveRenderTarget } from "../../content/pipeline/render-discovery.ts";
+import { resolveRenderTarget } from "../../pipeline/render-discovery.ts";
 import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.ts";
 import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
 

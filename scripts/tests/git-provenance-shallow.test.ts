@@ -25,7 +25,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gitFileCommitSha, GIT_SHA_UNKNOWN } from "../../content/pipeline/qa-utils.ts";
+import { gitFileCommitSha, GIT_SHA_UNKNOWN } from "../../pipeline/qa-utils.ts";
 
 let full = "";
 let shallow = "";

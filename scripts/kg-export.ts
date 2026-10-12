@@ -3687,7 +3687,7 @@ if (import.meta.main) {
   //
   // The flag is explicit rather than an environment variable, and a directory
   // rather than a boolean, because that is the pattern this repository already
-  // has: `content/pipeline/profile-conformance-axis.test.ts` builds its root
+  // has: `pipeline/profile-conformance-axis.test.ts` builds its root
   // with `mkdtempSync` and passes it in. A second mechanism for "compute
   // somewhere else" would be a second answer to one question.
   //

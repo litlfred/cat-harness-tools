@@ -16,8 +16,8 @@ import {
   type GraphIndex,
   loadGraphIndex,
   defaultRoots,
-} from "../../content/pipeline/graph-index";
-import { graphSearch, formatPath } from "../../content/pipeline/graph-search";
+} from "../../pipeline/graph-index";
+import { graphSearch, formatPath } from "../../pipeline/graph-search";
 
 let ROOT: string;
 let index: GraphIndex;

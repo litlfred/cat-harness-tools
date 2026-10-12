@@ -24,7 +24,7 @@ describe("repo-partition classification", () => {
   });
 
   test("domain keywords assign with keyword provenance, not rule", () => {
-    const a = classify("content/pipeline/render-latex.ts");
+    const a = classify("pipeline/render-latex.ts");
     expect(a.repo).toBe("sci");
     expect(a.provenance).toBe("keyword");
   });

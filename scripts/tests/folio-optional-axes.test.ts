@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
-const REGISTRY = resolve(import.meta.dir, "../../content/pipeline/qa-criteria-registry.ts");
+const REGISTRY = resolve(import.meta.dir, "../../pipeline/qa-criteria-registry.ts");
 
 const PROBE = `
 import { QA_CRITERIA_REGISTRY, DETANGLER_WATCHER_CRITERIA, folioOptionalAxes }

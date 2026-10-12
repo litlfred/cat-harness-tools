@@ -17,7 +17,7 @@ import {
   slotFor,
   verdictStorePath,
   verdictsInLegacySidecar,
-} from "../../content/pipeline/section-title-attestations.ts";
+} from "../../pipeline/section-title-attestations.ts";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "section-title-att-"));
@@ -108,7 +108,7 @@ describe("a slot counts a verdict only against the hash it reviewed", () => {
 
 describe("the audit, end to end on a folio", () => {
   const audit = (cwd: string, ...args: string[]) =>
-    spawnSync("bun", ["run", join(TOOLS_ROOT, "content/pipeline/qa-section-title-audit.ts"), ...args], { cwd, encoding: "utf-8", timeout: 90_000 });
+    spawnSync("bun", ["run", join(TOOLS_ROOT, "pipeline/qa-section-title-audit.ts"), ...args], { cwd, encoding: "utf-8", timeout: 90_000 });
 
   test("--write-sidecar writes the derived copy under test/results/, and commits nothing on main", () => {
     const root = folio();

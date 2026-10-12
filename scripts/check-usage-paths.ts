@@ -19,7 +19,7 @@
  * the basename rule `--fix` would have rewritten that reference to point at
  * `cat-harness/tools/index.ts` — a wrong fix that LOOKS right, which is the
  * exact failure `check-workflow-paths.ts`'s exemption table warns about for the
- * `build.ts` under `content/pipeline/`.
+ * `build.ts` under `pipeline/`.
  *
  * (Both of those wrong spellings are named here WITHOUT their bare prefix on
  * purpose. This module is a printed-command source, so `check:command-paths`

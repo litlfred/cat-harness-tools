@@ -9,10 +9,10 @@ import {
   checkIdUnique,
   resetIdsBaseCache,
   resetIdsIndexCache,
-} from "../../content/pipeline/qa-checkers-ids";
-import { QA_CRITERIA_BY_ID } from "../../content/pipeline/qa-criteria-registry";
-import { checkerFunctionName } from "../../content/pipeline/qa-checker-discovery";
-import * as idsModule from "../../content/pipeline/qa-checkers-ids";
+} from "../../pipeline/qa-checkers-ids";
+import { QA_CRITERIA_BY_ID } from "../../pipeline/qa-criteria-registry";
+import { checkerFunctionName } from "../../pipeline/qa-checker-discovery";
+import * as idsModule from "../../pipeline/qa-checkers-ids";
 
 interface Blk {
   slug: string;
@@ -173,7 +173,7 @@ describe("registration", () => {
     for (const id of ["id-unique", "id-stable"]) {
       const def = QA_CRITERIA_BY_ID[id];
       expect(def?.automated).toBe(true);
-      expect(def?.source_file).toBe("content/pipeline/qa-checkers-ids.ts");
+      expect(def?.source_file).toBe("pipeline/qa-checkers-ids.ts");
       expect(typeof (idsModule as Record<string, unknown>)[checkerFunctionName(id)]).toBe("function");
     }
     expect(QA_CRITERIA_BY_ID["id-unique"].default_severity).toBe("critical");

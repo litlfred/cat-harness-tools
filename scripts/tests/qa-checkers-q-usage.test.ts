@@ -22,7 +22,7 @@ import { describe, test, expect, afterAll } from "bun:test";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { detectRegimes } from "../../content/pipeline/qa-checkers-q-usage.ts";
+import { detectRegimes } from "../../pipeline/qa-checkers-q-usage.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "qa-q-usage-"));
 afterAll(() => {

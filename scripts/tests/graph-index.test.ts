@@ -29,7 +29,7 @@ import {
   parseNode,
   defaultRoots,
   type GraphIndex,
-} from "../../content/pipeline/graph-index";
+} from "../../pipeline/graph-index";
 import { assertEdgeTermsAreIdTyped, GRAPH_EDGE_TERMS } from "@litlfred/cat-harness/schemas/jsonld.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "graph-index-"));

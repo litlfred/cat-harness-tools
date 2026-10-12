@@ -66,7 +66,7 @@ import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/tabular-records
 import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
 import { refreshLibraryIndex } from "./lsi.ts";
 import { IntakeSchema } from "@litlfred/cat-harness/schemas/intake.ts";
-import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../content/pipeline/gen-library-jsonld.ts";
+import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -345,7 +345,7 @@ export function withDerivedArms(
   if (plan.rung === "referenced") {
     return {
       ...plan,
-      steps: [...plan.steps, ["bun", "run", tsHelper("../content/pipeline/gen-library-jsonld.ts"), "--entry", staging]],
+      steps: [...plan.steps, ["bun", "run", tsHelper("../pipeline/gen-library-jsonld.ts"), "--entry", staging]],
     };
   }
   if (plan.rung === "slides") {

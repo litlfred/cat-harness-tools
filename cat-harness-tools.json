@@ -25,7 +25,7 @@
     {
       "id": "cat-harness-tools-schemas",
       "path": "schemas/",
-      "description": "Tests of cat-harness's schemas that exercise tools code: the sixteen `cat-harness/schemas/*.test.ts` files that imported `scripts/`, `src/`, `content/pipeline/` or `test/support/`, moved first (bean `70lx`, batch B0) so that no later batch of the code move leaves a harness file importing into this layer. The Zod sources they test stay in cat-harness and follow in stage 1b (bean `8lcl`). `code`, not `schemas`: nothing here is a schema definition.",
+      "description": "Tests of cat-harness's schemas that exercise tools code: the sixteen `cat-harness/schemas/*.test.ts` files that imported `scripts/`, `src/`, `pipeline/` or `test/support/`, moved first (bean `70lx`, batch B0) so that no later batch of the code move leaves a harness file importing into this layer. The Zod sources they test stay in cat-harness and follow in stage 1b (bean `8lcl`). `code`, not `schemas`: nothing here is a schema definition.",
       "graphTypologies": [
         "code"
       ]
@@ -85,8 +85,8 @@
       ]
     },
     {
-      "id": "cat-harness-tools-content",
-      "path": "content/",
+      "id": "cat-harness-tools-pipeline",
+      "path": "pipeline/",
       "description": "The content pipeline — build, render, QA checkers and generators over a folio's content graph — moved here from `cat-harness/content/pipeline/` by bean `70lx` (stage 1a). Its QA script sidecars stayed in the harness, under `test/results/script-sidecars/`, because they are the harness's QA state.",
       "graphTypologies": [
         "code"

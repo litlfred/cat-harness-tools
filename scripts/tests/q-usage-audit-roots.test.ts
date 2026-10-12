@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { findPapers, soleFolioPaper } from "../../content/pipeline/repo-root";
+import { findPapers, soleFolioPaper } from "../../pipeline/repo-root";
 
 /**
  * The pipeline lives in folio-assistant but audits a downstream CONTENT
@@ -83,7 +83,7 @@ describe("soleFolioPaper", () => {
 });
 
 describe("q-usage-audit CLI: a sweep that finds nothing must not report success", () => {
-  const script = resolve(import.meta.dir, "../../content/pipeline/q-usage-audit.ts");
+  const script = resolve(import.meta.dir, "../../pipeline/q-usage-audit.ts");
 
   test("exits non-zero and names the searched root when no blocks match", async () => {
     const proc = Bun.spawn(

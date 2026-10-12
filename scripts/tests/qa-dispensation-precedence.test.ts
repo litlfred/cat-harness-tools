@@ -28,7 +28,7 @@ import { describe, test, expect, afterAll } from "bun:test";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { hasHumanDispensation } from "../../content/pipeline/q-usage-audit.ts";
+import { hasHumanDispensation } from "../../pipeline/q-usage-audit.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "qa-dispensation-"));
 afterAll(() => {

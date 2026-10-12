@@ -17,7 +17,7 @@
 # just at image-build time.
 #
 # See: cat-harness/scenarios/capabilities/lean-atlas.json
-#      content/pipeline/lean-atlas-ingest.ts
+#      pipeline/lean-atlas-ingest.ts
 set -euo pipefail
 
 # Atlas requires Lean >= 4.17.0 (v4.28.0 tested upstream).
@@ -63,7 +63,7 @@ if [ "$MAJOR" -lt "$MIN_LEAN_MAJOR" ] ||
   fail "Lean $VER is below Atlas's floor of ${MIN_LEAN_MAJOR}.${MIN_LEAN_MINOR}.0.
 Raise the content repo's lean-toolchain (and re-verify its Mathlib pin).
 Until then, use the approximate fallback:
-  bun run content/pipeline/lean-atlas-ingest.ts --scan"
+  bun run pipeline/lean-atlas-ingest.ts --scan"
 fi
 echo "Lean $VER satisfies Atlas's floor (>= ${MIN_LEAN_MAJOR}.${MIN_LEAN_MINOR}.0) ✓"
 
@@ -94,7 +94,7 @@ if [ "$ALREADY" -eq 0 ]; then
   cat >> "$LAKEFILE" <<EOF
 
 # Formal dependency-graph extraction — consumed by
-# content/pipeline/lean-atlas-ingest.ts --ingest. MIT.
+# pipeline/lean-atlas-ingest.ts --ingest. MIT.
 # Pin \`rev\` to a commit for reproducible graphs.
 [[require]]
 name  = "lean-atlas"
@@ -120,8 +120,8 @@ Next — export the graph and ingest it:
 
   lake exe atlas graph-data --output /tmp/atlas-graph.json --pretty
   # adapt to folio's JSONL shape, then:
-  bun run content/pipeline/lean-atlas-ingest.ts --ingest /tmp/atlas-deps.jsonl
-  bun run content/pipeline/lean-atlas-ingest.ts --stale
+  bun run pipeline/lean-atlas-ingest.ts --ingest /tmp/atlas-deps.jsonl
+  bun run pipeline/lean-atlas-ingest.ts --stale
 
 NOTE: the graph-data JSON schema has not been verified against a live run in
 folio-assistant, so the adapter to folio's JSONL still has to be written

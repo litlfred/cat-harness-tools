@@ -84,7 +84,7 @@ fi
 # ── 3. Content pipeline ────────────────────────────────────────
 PIPELINE_OK=false
 PIPELINE_FIX=""
-if [ "$BUN_OK" = true ] && [ -f "$REPO_ROOT/content/pipeline/validate.ts" ]; then
+if [ "$BUN_OK" = true ] && [ -f "$REPO_ROOT/pipeline/validate.ts" ]; then
     PIPELINE_OK=true
 else
     PIPELINE_FIX="Install bun: curl -fsSL https://bun.sh/install | bash"

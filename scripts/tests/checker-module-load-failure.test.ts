@@ -22,7 +22,7 @@ import {
   loadCheckerModule,
   readModule,
   type LoadedModule,
-} from "../../content/pipeline/qa-checker-discovery.ts";
+} from "../../pipeline/qa-checker-discovery.ts";
 
 /** Poisoned by the first describe below; never reaches `loadCheckerModule` first. */
 const FIXTURE = join(import.meta.dir, "fixtures/throws-at-top-level.ts");
@@ -88,7 +88,7 @@ describe("loadCheckerModule", () => {
 
   test("a module that loads is cached as its namespace", async () => {
     const cache = new Map<string, LoadedModule>();
-    const self = join(import.meta.dir, "../../content/pipeline/qa-checker-discovery.ts");
+    const self = join(import.meta.dir, "../../pipeline/qa-checker-discovery.ts");
     const mod = await loadCheckerModule(self, cache);
     expect("loadError" in mod).toBe(false);
     expect(await loadCheckerModule(self, cache)).toBe(mod);

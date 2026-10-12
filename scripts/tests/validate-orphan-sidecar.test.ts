@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "fs";
 import { tmpdir } from "os";
 import { join, basename } from "path";
-import { validateObjects } from "../../content/pipeline/validate";
+import { validateObjects } from "../../pipeline/validate";
 
 /**
  * A chapter directory containing `blocks` as `.ts` + `.md` pairs, plus any

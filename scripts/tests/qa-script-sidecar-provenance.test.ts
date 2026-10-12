@@ -6,7 +6,7 @@ import {
   saveQaScriptSidecar,
   loadQaScriptSidecar,
   scriptSidecarPath,
-} from "../../content/pipeline/qa-utils";
+} from "../../pipeline/qa-utils";
 import type { QaScriptSidecar } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 /**
@@ -27,7 +27,7 @@ let root: string;
 const base = (): QaScriptSidecar => ({
   $schema: "qa-script/v1",
   criterion_id: "test-criterion",
-  source_file: "content/pipeline/qa-checkers-test.ts",
+  source_file: "pipeline/qa-checkers-test.ts",
   script_hash: "aaaaaaaaaaaa",
   script_commit_sha: "1111111111111111111111111111111111111111",
   deps_hash: "bbbbbbbbbbbb",

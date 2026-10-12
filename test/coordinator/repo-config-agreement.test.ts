@@ -31,9 +31,9 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { findContentRepoRoot } from "../../content/pipeline/repo-root.ts";
-import { readDeclaredFolioProfile } from "../../content/pipeline/profile-check.ts";
-import { folioOptionalAxes } from "../../content/pipeline/qa-criteria-registry.ts";
+import { findContentRepoRoot } from "../../pipeline/repo-root.ts";
+import { readDeclaredFolioProfile } from "../../pipeline/profile-check.ts";
+import { folioOptionalAxes } from "../../pipeline/qa-criteria-registry.ts";
 import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /**

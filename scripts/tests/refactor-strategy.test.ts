@@ -4,7 +4,7 @@ import {
   isApplicableAt,
   type RefactorStrategy,
 } from "@litlfred/cat-harness/schemas/refactor-strategy.ts";
-import { loadStrategies } from "../../content/pipeline/refactor-strategy";
+import { loadStrategies } from "../../pipeline/refactor-strategy";
 
 const strat = (over: Partial<RefactorStrategy> = {}): RefactorStrategy => ({
   id: "t",

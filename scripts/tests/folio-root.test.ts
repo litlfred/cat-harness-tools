@@ -6,7 +6,7 @@
  */
 import { describe, test, expect } from "bun:test";
 import { INSTANCE_ROOT, FOLIO_ROOT, hasFolio, LEAN_DIR, QOU_LEAN_DIR } from "./helpers";
-import { findContentRepoRoot, findPapers } from "../../content/pipeline/repo-root";
+import { findContentRepoRoot, findPapers } from "../../pipeline/repo-root";
 
 /**
  * folio-assistant is the PLATFORM; papers, the Lake workspace,
@@ -34,7 +34,7 @@ describe("FOLIO_ROOT detection", () => {
   });
 
   test("the platform alone is NOT a folio", () => {
-    // folio-assistant has a `content/` directory (content/pipeline), which is
+    // folio-assistant has a `content/` directory (pipeline), which is
     // why a bare "does folio/ exist" check is not enough to detect a folio —
     // it would make the platform look like one and let content assertions run
     // against it, which is the failure this whole guard exists to prevent.

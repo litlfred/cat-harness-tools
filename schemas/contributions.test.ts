@@ -252,7 +252,7 @@ describe("contributed QA checkers", () => {
   const from = (name: string, criterion: string, result: "pass" | "fail" = "pass") => ({
     name,
     root: `/deps/${name}`,
-    qaCheckers: [{ criterion, check: checker(result), sourceFile: "content/pipeline/checkers.ts" }],
+    qaCheckers: [{ criterion, check: checker(result), sourceFile: "pipeline/checkers.ts" }],
   });
 
   it("a dependency's checker is reachable by the criterion it answers", () => {
@@ -263,7 +263,7 @@ describe("contributed QA checkers", () => {
       {
         criterion: "dak-bpmn-has-process",
         contributor: "smart-base",
-        label: "smart-base/content/pipeline/checkers.ts",
+        label: "smart-base/pipeline/checkers.ts",
       },
     ]);
   });
@@ -281,9 +281,9 @@ describe("contributed QA checkers", () => {
     r.register(from("smart-base", "dak-bpmn-has-process"));
     expect(r.qaCheckerEntry("dak-bpmn-has-process")).toEqual({
       check: expect.any(Function),
-      sourceFile: "content/pipeline/checkers.ts",
+      sourceFile: "pipeline/checkers.ts",
       root: "/deps/smart-base",
-      label: "smart-base/content/pipeline/checkers.ts",
+      label: "smart-base/pipeline/checkers.ts",
     });
   });
 

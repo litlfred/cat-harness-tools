@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   parseMdBlockRefs,
   deriveForeshadows,
-} from "../../content/pipeline/qa-checkers-extended";
+} from "../../pipeline/qa-checkers-extended";
 
 describe("parseMdBlockRefs", () => {
   test("reads markdown links", () => {
