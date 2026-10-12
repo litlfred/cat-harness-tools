@@ -362,7 +362,7 @@ describe("annotations hold to the data that chooses their targets", () => {
   });
 
   test("every qa-checker and pipeline-plugin ref lies under harness-config's `imports` globs", () => {
-    const globs = ["*/pipeline/plugin-slots.ts", "*/pipeline/qa-checkers-*.ts"];
+    const globs = ["*/content/pipeline/plugin-slots.ts", "*/content/pipeline/qa-checkers-*.ts"];
     const all = roots();
     // A ref is relative to the instance that owns the node: the deepest root holding it.
     const ownerOf = (dir: string) => all.filter((r) => dir.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0]!;
