@@ -15,6 +15,9 @@
  *   bun run cat mount:remote              # plan, fetch, mount, write the lock, re-render the agent surface if it changed
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
+ *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
+ *   bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> --evidence "<where they said yes>" [--whole]
+ *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
  *
  * `state:mount` runs the mount after the branch mounts, so the session-start
  * hook needs no second entry point.
@@ -55,6 +58,23 @@
  * when a new/updated subgraph is mounted... it may have new agentic skills to
  * re-render and add. same for memory."*
  *
+ * ## A mount is runnable, and an install does not make it modified
+ *
+ * After the bytes are locked, each mounted instance that carries a
+ * `package.json` gets `bun install --no-save --production` (`--install-all`
+ * keeps devDependencies, `--no-install` skips it). `node_modules/` is outside
+ * every mount digest and the lockfile is put back byte-for-byte, so `--check`
+ * still passes over an installed mount and a re-mount does not refuse it.
+ * Why that route and not a root-level workspace: `installDependencies` in
+ * `mount-from-lock.ts` (task #10, gap b).
+ *
+ * ## Seeding writes consent
+ *
+ * `--seed <name>=<owner/repo>@<sha> --consent-by <who> --evidence "<…>"`
+ * creates or re-pins a remote instance in `index.config.json` and writes its
+ * `trust.consent` bound to that pin in the same write (task #10, gap c), so a
+ * pin and its consent cannot be committed apart.
+ *
  * ## It never discards work
  *
  * A mounted directory whose bytes no longer hash to the lock is left exactly
@@ -69,9 +89,9 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { mountTrust, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
+import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
 import { checkoutRootFor, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
   MountDefaultsSchema,
@@ -87,7 +107,7 @@ import {
 } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { contentIsOffCheckout, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { stateMountedDirs, withoutStateMounts } from "./mount-from-lock.ts";
+import { installDependencies, isInstallArtefact, stateMountedDirs, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 
 /**
@@ -209,6 +229,14 @@ export interface RemoteMountOptions {
    * real mount and must pass {@link mountTrust}. Default `mount`.
    */
   purpose?: "staging" | "mount";
+  /**
+   * After the bytes are down and locked, `bun install` in each mounted
+   * instance that carries a `package.json`, so its tools run (task #10, gap b).
+   * `production` (default) skips devDependencies; `false` lays bytes only.
+   * The install writes only `node_modules/`, which no digest covers, so it
+   * never makes a mount read modified.
+   */
+  install?: InstallMode | false;
 }
 
 const strip = (p: string): string => p.replace(/\/+$/, "");
@@ -550,7 +578,9 @@ function sha256Text(s: string | Buffer): string {
 }
 
 function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
-  const files = withoutStateMounts(abs, treeEntries(abs).files, skip);
+  // Install artefacts (`node_modules/`) are never pinned bytes: see
+  // `installDependencies` in mount-from-lock.ts for why they are outside fixity.
+  const files = withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip));
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
 
@@ -698,6 +728,22 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           ...p.directories.map((d) => (d.upstreamPath === "." ? "*" : `${d.upstreamPath}/`)),
           ...(p.assets ?? []).map((a) => joinRel(p.upstreamRoot, a)),
         ]);
+        // The digest leaves `node_modules/` out so an install cannot make a
+        // mount read modified. That is only sound while no upstream PINS a
+        // file there, so a tree that does is refused rather than half-verified.
+        const pinsArtefacts = p.directories.find((d) => {
+          const src = join(work, d.upstreamPath);
+          return existsSync(src) && treeEntries(src).files.some((f) => !f.startsWith(".git/") && isInstallArtefact(f));
+        });
+        if (pinsArtefacts) {
+          plan.outcomes.push({
+            instance: p.instance,
+            state: "could-not-determine",
+            path: p.path,
+            detail: `\`${pinsArtefacts.upstreamPath}\` at ${p.sha.slice(0, 12)} tracks files under node_modules/, which the mount digest excludes as install artefacts — refused rather than locked with bytes no check would see`,
+          });
+          continue;
+        }
 
         // A STATE mount inside the instance (its `health`, say) is not this
         // mount's to replace: its files come from a state branch, may hold
@@ -786,6 +832,27 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
       }
     }
 
+    // Install each mounted instance's dependencies AFTER every instance is
+    // down, so a manifest's `workspaces` that names a sibling mount
+    // (`../cat-harnes[s]`) finds it. A failed install is reported against the
+    // instance and fails the run, but is not written into the lock: the lock
+    // records which pinned bytes are on disk, and they are.
+    const installFailed = new Set<string>();
+    if (opts.install !== false) {
+      for (const l of locked) {
+        if (untouched.has(l.instance)) continue;
+        const r = installDependencies(join(plan.instanceRoot, l.path), opts.install ?? "production");
+        if (r.state === "none") continue;
+        const o = plan.outcomes.find((x) => x.instance === l.instance && (x.state === "mounted" || x.state === "unverified-approver" || x.state === "missing"));
+        if (!o) continue;
+        if (r.state === "installed") o.detail += `; ${r.detail}`;
+        else {
+          installFailed.add(l.instance);
+          Object.assign(o, { state: "missing", detail: `${o.detail}; the pinned bytes are on disk but its dependencies are NOT installed, so its tools will not run: ${r.detail}` });
+        }
+      }
+    }
+
     const lock: MountLock = {
       $schema: MOUNT_LOCK_SCHEMA,
       mounts: plan.mounts.map((m) => ({ harness: m.harness, repository: m.repository, ref: m.ref })),
@@ -793,7 +860,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
       // Every non-mounted answer EXCEPT an untouched prior mount, which stays
       // in `instances` and is re-judged from disk by the check.
       unmounted: plan.outcomes
-        .filter((o): o is Exclude<InstanceOutcome, { state: "mounted" | "unverified-approver" }> => o.state !== "mounted" && o.state !== "unverified-approver" && !untouched.has(o.instance))
+        .filter((o): o is Exclude<InstanceOutcome, { state: "mounted" | "unverified-approver" }> => o.state !== "mounted" && o.state !== "unverified-approver" && !untouched.has(o.instance) && !installFailed.has(o.instance))
         .map((o) => {
           const left = leftOnDisk.get(o.instance);
           return { instance: o.instance, state: o.state, detail: o.detail, ...(left ? { leftOnDisk: left } : {}) };
@@ -806,6 +873,55 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
   } finally {
     for (const t of trees.values()) t.close();
   }
+}
+
+// ── Seeding: create or re-pin a remote instance, WITH its consent ────────────
+
+/** One `--seed <name>=<owner/repo>@<sha>`: what to write into the index. */
+export interface SeedSpec {
+  harness: string;
+  repository: string;
+  ref: string;
+  /** Mount every tracked file (`overrides.<harness>.whole: true`). */
+  whole?: boolean;
+}
+
+/** Parse `<name>=<owner/repo>@<40-char sha>`; throws with the expected shape. */
+export function parseSeed(arg: string): SeedSpec {
+  const m = /^([^=\s]+)=([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/.exec(arg);
+  if (!m) throw new Error(`--seed \`${arg}\`: expected <name>=<owner/repo>@<40-character sha>`);
+  return { harness: m[1]!, repository: m[2]!, ref: m[3]! };
+}
+
+/**
+ * Create or re-pin remote instances in `index.config.json`, and write each
+ * one's `trust.consent {by, on, ref, evidence}` from `grant` as part of the
+ * same write (task #10, gap c). Until 2026-10-12 nothing seeded an index with
+ * remote instances, so every entry was hand-written and its consent typed in
+ * after — and a re-pin that forgot to move `consent.ref` was refused at the
+ * next mount (H8: a moved pin asks again). Here the consent is bound to the
+ * pin being written, by `withConsent`, so the two cannot disagree.
+ *
+ * An existing entry keeps its overrides and note; only its repository and pin
+ * move, and a consent already recorded for the SAME pin is kept. Other
+ * entries are not touched. The write goes through `writeDeclaredMounts`, so
+ * the committed `.gitignore` block moves with it. Nothing is fetched: run
+ * `mount:remote` afterwards.
+ */
+export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant): { file: string; mounts: RemoteMount[] } {
+  if (specs.length === 0) throw new Error("nothing to seed");
+  const current = readDeclaredMounts(instanceRoot).mounts;
+  const next: RemoteMount[] = [...current];
+  for (const spec of specs) {
+    const at = next.findIndex((m) => m.harness === spec.harness);
+    let m: RemoteMount = at >= 0 ? { ...next[at]!, repository: spec.repository, ref: spec.ref } : { harness: spec.harness, repository: spec.repository, ref: spec.ref };
+    if (spec.whole) m = { ...m, overrides: { ...m.overrides, [spec.harness]: { ...m.overrides?.[spec.harness], whole: true } } };
+    m = withConsent(m, grant);
+    if (at >= 0) next[at] = m;
+    else next.push(m);
+  }
+  const { file } = writeDeclaredMounts(instanceRoot, next);
+  return { file, mounts: next.filter((m) => specs.some((s) => s.harness === m.harness)) };
 }
 
 // ── Checking (no network) ────────────────────────────────────────────────────
@@ -982,7 +1098,7 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
  * declaration cannot be read is could-not-determine for the whole fan-out:
  * it may be the one that declares mounts.
  */
-export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount" } = {}): { state: CheckResult["state"]; text: string } {
+export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount"; install?: InstallMode | false } = {}): { state: CheckResult["state"]; text: string } {
   const { roots, unreadable } = declaringInstances(checkout);
   const parts: string[] = [];
   const states: CheckResult["state"][] = [];
@@ -996,7 +1112,7 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?:
       states.push(r.state);
       parts.push(reportOutcomes(`Remote mounts — ${root}`, r.state, r.reason, r.outcomes));
     } else {
-      const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose });
+      const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install });
       const sum = summarise(r.plan.outcomes);
       states.push(sum.state);
       parts.push(reportOutcomes(`Remote mounts — ${root}`, sum.state, sum.reason, r.plan.outcomes));
@@ -1053,14 +1169,42 @@ function afterMount(root: string, before: string | undefined, argv: string[], co
   return r.ok ? code : Math.max(code, 1);
 }
 
+/** `--no-install` lays bytes only; `--install-all` adds devDependencies; default `production`. */
+function installOf(argv: string[]): InstallMode | false {
+  return argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production";
+}
+
 if (import.meta.main) {
   const argv = process.argv.slice(2);
   const at = argv.indexOf("--instance");
+  if (argv.includes("--seed")) {
+    const valueOf = (flag: string): string | undefined => {
+      const i = argv.indexOf(flag);
+      return i >= 0 ? argv[i + 1] : undefined;
+    };
+    const by = valueOf("--consent-by");
+    const evidence = valueOf("--evidence");
+    if (!by || !evidence) {
+      console.error("--seed writes consent, so it needs --consent-by <who> and --evidence \"<where they consented, readable>\" (H8: a remote instance without consent is refused at mount)");
+      process.exit(2);
+    }
+    try {
+      const specs = argv.flatMap((a, i) => (a === "--seed" ? [parseSeed(argv[i + 1] ?? "")] : [])).map((s) => ({ ...s, whole: argv.includes("--whole") }));
+      const root = at === -1 ? checkoutRootFor(process.cwd()) : resolve(argv[at + 1]!);
+      const r = seedRemote(root, specs, { by, evidence, on: valueOf("--consent-on") });
+      for (const m of r.mounts) console.log(`✓ ${m.harness} = ${m.repository}@${m.ref.slice(0, 12)}; consent by ${m.trust?.consent?.by} on ${m.trust?.consent?.on}`);
+      console.log(`wrote ${r.file} — run \`bun run cat mount:remote\` to lay the bytes down`);
+      process.exit(0);
+    } catch (e) {
+      console.error(`✗ ${(e as Error).message}`);
+      process.exit(2);
+    }
+  }
   if (at === -1) {
     const root = checkoutRootFor(process.cwd());
     const mounting = !argv.includes("--check") && !argv.includes("--staging");
     const before = lockBytes(root);
-    const r = remoteFanOut(root, { check: argv.includes("--check"), purpose: argv.includes("--staging") ? "staging" : "mount" });
+    const r = remoteFanOut(root, { check: argv.includes("--check"), purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv) });
     console.log(r.text);
     process.exit(mounting ? afterMount(root, before, argv, exitCode(r.state)) : exitCode(r.state));
   }
@@ -1076,7 +1220,7 @@ if (import.meta.main) {
     process.exit(exitCode(p.mounts.length ? summarise(p.outcomes).state : "not-enabled"));
   }
   const before = lockBytes(instanceRoot);
-  const r = mountRemote({ instanceRoot, purpose: argv.includes("--staging") ? "staging" : "mount" });
+  const r = mountRemote({ instanceRoot, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv) });
   const state = r.plan.mounts.length ? summarise(r.plan.outcomes).state : "not-enabled";
   console.log(reportOutcomes("Remote mounts", state, state === "not-enabled" ? "no `remoteMounts` declared" : summarise(r.plan.outcomes).reason, r.plan.outcomes));
   if (r.excluded.length) console.log(`\nAdded to this worktree's info/exclude (not committed): ${r.excluded.map((p) => `\`${p}/\``).join(", ")}.`);

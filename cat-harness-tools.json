@@ -93,6 +93,14 @@
       ]
     },
     {
+      "id": "cat-harness-tools-content-pipeline-link",
+      "path": "content/",
+      "description": "TRANSITIONAL, and holds no file of its own: one symlink, `content/pipeline -> ../pipeline`, left by bean `rnfl` PR 1 (#146, 2026-10-12) when the content pipeline moved up to `pipeline/`, so that the other repositories' commands that still name `cat-harness-tools/content/pipeline/...` (smart-ra's AGENTS.md `qa-sweep`, and the scaffold `folio_init` writes until a folio repins) keep resolving. Declared because a remote mount lays down DECLARED directories only: undeclared, a downstream that mounts this layer by its defaults got `pipeline/` but no `content/`, and every one of those commands failed there while passing in this checkout (task #10, gap a). It exists, so this is not the `dh4f` shape. The symlink is not hashed by the mount digest (a link is not content), so the directory locks as zero files; that is correct. Remove this entry in the same change that removes the symlink, once no repository names the old path.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
       "id": "folio-templates",
       "path": "templates/",
       "description": "Files `folio_init` WRITES INTO a new folio, kept as real files rather than strings inside `scripts/init-folio.ts`. Moved here from `cat-harness/templates/` by bean `70lx`; the id is kept, because `init-folio.ts` looks the directory up by it (`TEMPLATES_ID`).",
