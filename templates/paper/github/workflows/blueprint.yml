@@ -145,9 +145,14 @@ jobs:
             git clone --depth 1 "{{platform_git}}" "{{assistant}}"
           fi
 
-      - name: Install the platform's dependencies
+      # The platform is an INDEX: its layers (cat-harness-tools, core, …) are not
+      # in the checkout but mounted from its index.lock.json, by the mounter the
+      # index itself ships. Without this every `{{assistant}}/cat-harness-tools/…`
+      # path below is "Module not found" (folio-test qa-sweep, 2026-10-12).
+      - name: Mount the platform's layers and install their dependencies
         run: |
           cd "{{assistant}}"
+          bash .github/mount-from-lock.sh --root .
           bun install --frozen-lockfile
 
       # Chapters only: the blueprint is generated from them below, and a
