@@ -368,6 +368,18 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "tip-only rewrite are covered by qa-store.test.ts in `bun test`",
   },
   {
+    // Bean `1dre`. `health-check.yml` adds the daily pages-serving observation
+    // to this commit's `qa-reports` entry. Like `qa:prune` it WRITES a branch
+    // rather than judging a tree, needs `contents: write` and the published
+    // site over the network, and a contributor has no verdict to get from it.
+    // Its add-only rule is pinned by qa-store.test.ts in `bun test`.
+    match: "qa:publish --add",
+    kind: "ci-only",
+    reason:
+      "a daily WRITE of a network observation into the qa-reports branch, not a check; its add-only " +
+      "rule (never changes the entry's first write) is covered by qa-store.test.ts in `bun test`",
+  },
+  {
     // Bean `tfqf`. The site builds' QA evidence: `fetch` reads the
     // `qa-reports` entry for THIS run's ref (`main/<sha>`, `pr/<n>/<sha>`)
     // over the network and may materialise it into the checkout; `verify`
