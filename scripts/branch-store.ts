@@ -907,6 +907,32 @@ export class BranchStore extends TreeStore {
     return { state: "hit", branch: v.branch, tip: v.tip, path: segs.join("/"), blob: e.sha, text: this.catBlobs([e.sha]).get(e.sha)!.toString("utf-8") };
   }
 
+  /**
+   * A file at the tip WITHOUT verifying the branch is a state branch. Bean
+   * `esz4`: a branch README describes every special branch, including the
+   * commit-keyed `qa-reports`, which carries no `manifest.json` and so is
+   * `corrupt` to {@link readFile}. Only the README generator calls this, and it
+   * reads only the two root files that describe a branch.
+   */
+  readUnverified(path: string): FileRead {
+    const segs = segments(path);
+    const v = this.unverifiedTip();
+    if (v.state !== "hit") return v;
+    const e = this.lookup(v.tree, segs);
+    if (!e) return { state: "miss", reason: `${path} is not on ${v.branch} at ${v.tip.slice(0, 12)}` };
+    if (e.type !== "blob") return { state: "corrupt", reason: `${path} on ${v.branch} is a ${e.type}, not a file` };
+    if (!this.ensureBlobs(v.tree, [e.sha])) return { state: "unknown", reason: `could not fetch ${path} from ${v.branch}` };
+    return { state: "hit", branch: v.branch, tip: v.tip, path: segs.join("/"), blob: e.sha, text: this.catBlobs([e.sha]).get(e.sha)!.toString("utf-8") };
+  }
+
+  /** The tip and its tree, with no manifest check — {@link readUnverified} and a describing write only. */
+  private unverifiedTip(): (Hit & { tree: string }) | NotHit {
+    const t = this.fetchTip();
+    if (t.state === "unknown") return { state: "unknown", reason: t.reason };
+    if (t.state === "absent") return { state: "miss", reason: `${t.branch} does not exist` };
+    return { state: "hit", branch: t.branch, tip: t.tip, tree: this.must(["rev-parse", `${t.tip}^{tree}`]).trim() };
+  }
+
   /** {@link readFile}, parsed. Unparseable JSON is `corrupt`, never `miss`. */
   readJson<T = unknown>(path: string): JsonRead<T> {
     const r = this.readFile(path);
@@ -994,7 +1020,7 @@ export class BranchStore extends TreeStore {
    * caller thinks the page has two writers, i.e. the premise of route-keying
    * failing, which is worth a loud stop rather than a silent one.
    */
-  write(changes: Change[], message: string): WriteResult {
+  write(changes: Change[], message: string, opts: { describe?: boolean } = {}): WriteResult {
     if (changes.length === 0) throw new BranchStoreUsageError("no changes to write");
     // BOTH route keyings refuse `expect`, and a family must not be forgotten
     // here: a member is a rendering exactly as a route is, so the premise that
@@ -1013,7 +1039,12 @@ export class BranchStore extends TreeStore {
     const parsed = changes.map((c) => {
       const segs = segments(c.path);
       if (segs.length === 0) throw new BranchStoreUsageError("cannot write the branch root");
-      if (segs.length === 1 && RESERVED.has(segs[0]!)) throw new BranchStoreUsageError(`${segs[0]} describes the branch; a write may not touch it`);
+      // `describe` (bean `esz4`) lets the README generator replace README.md,
+      // and nothing else: the manifest stays a steward's act, and a describing
+      // write that touched content would be a content write under another name.
+      const describesBranch = opts.describe === true && segs.length === 1 && segs[0] === "README.md";
+      if (opts.describe === true && !describesBranch) throw new BranchStoreUsageError(`a describing write may touch README.md only, not ${segs.join("/")}`);
+      if (segs.length === 1 && RESERVED.has(segs[0]!) && !describesBranch) throw new BranchStoreUsageError(`${segs[0]} describes the branch; a write may not touch it`);
       return { ...c, segs };
     });
     const seen = new Set<string>();
@@ -1027,7 +1058,9 @@ export class BranchStore extends TreeStore {
 
     let lastReason = "";
     for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
-      const v = this.verifiedTip();
+      // A describing write reads the tip unverified: the commit-keyed QA
+      // branch carries no manifest, and it is owed a README too (bean `esz4`).
+      const v = opts.describe === true ? this.unverifiedTip() : this.verifiedTip();
       if (v.state === "miss") return { state: "absent", reason: v.reason, branch: this.branch, attempts: attempt };
       if (v.state === "corrupt") return { state: "failed", reason: v.reason, branch: this.branch, attempts: attempt };
       if (v.state !== "hit") {
