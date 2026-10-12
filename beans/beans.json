@@ -24,6 +24,14 @@
         "workflow-state"
       ],
       "description": "Running BPMN instances"
+    },
+    {
+      "id": "marks",
+      "path": "marks",
+      "graphTypologies": [
+        "sweep-marks"
+      ],
+      "description": "When a session-start sweep step last ran — one `folio-sweep-mark/v1` JSON per check, replaced by each run that read its input. Bean `rq8s`, owner ruling 2026-10-10: a skipped `check:session-staleness` is visible after the terminal scrolls."
     }
   ]
 }
