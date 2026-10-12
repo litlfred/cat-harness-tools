@@ -219,3 +219,72 @@ describe("corpus_search", () => {
     expect(r.hits).toHaveLength(0);
   });
 });
+
+/**
+ * The handlers above were reachable only through the viewer server's embedded
+ * chat agent, so an MCP client calling `corpus_search` got "Tool not found"
+ * (qou bean `qou-q261`). `src/tools/graph.ts` registers them on the MCP
+ * surface; these tests drive it through a real MCP client over an in-memory
+ * transport, the way an agent session's client reaches it.
+ */
+describe("served over MCP (src/tools/graph.ts)", () => {
+  async function connected() {
+    const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
+    const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+    const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+    const { registerGraphTools } = await import("../src/tools/graph");
+    const server = new McpServer({ name: "graph-test", version: "0" });
+    registerGraphTools(server, ROOT);
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "graph-test-client", version: "0" });
+    await Promise.all([server.connect(a), client.connect(b)]);
+    return client;
+  }
+
+  test("tools/list carries all four graph tools", async () => {
+    const client = await connected();
+    const { tools } = await client.listTools();
+    const names = tools.map((t) => t.name);
+    for (const n of GRAPH_TOOL_NAMES) expect(names).toContain(n);
+    await client.close();
+  });
+
+  test("tools/call corpus_search answers over the folio and library roots", async () => {
+    invalidateGraphIndex();
+    const client = await connected();
+    const r = (await client.callTool({ name: "corpus_search", arguments: { query: "widget", hops: 0 } })) as {
+      isError?: boolean;
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(r.isError ?? false).toBe(false);
+    const body = JSON.parse(r.content[0].text);
+    expect(body.summary.seedsByProvenance.authored).toBe(2);
+    expect(body.summary.seedsByProvenance.ingested).toBe(1);
+    await client.close();
+  });
+
+  test("the roots are the declared folio and library, falling back to the convention", async () => {
+    const { graphRootsFor } = await import("../src/tools/graph");
+    expect(graphRootsFor(ROOT)).toEqual(ROOTS);
+  });
+
+  test("an unreadable declaration falls back to the convention and SAYS so", async () => {
+    const { graphRootsResolved } = await import("../src/tools/graph");
+    const bad = mkdtempSync(join(tmpdir(), "mcp-graph-bad-"));
+    try {
+      mkdirSync(join(bad, "odd"));
+      writeFileSync(
+        join(bad, "bad.json"),
+        JSON.stringify({ name: "bad", directories: [{ id: "odd", path: "odd/", graphTypologies: ["no-such-typology"] }] }),
+      );
+      const r = graphRootsResolved(bad);
+      expect(r.roots).toEqual([
+        { name: "folio", dir: join(bad, "folio") },
+        { name: "library", dir: join(bad, "library") },
+      ]);
+      expect(r.note).toContain("searched the conventional folio/ and library/");
+    } finally {
+      rmSync(bad, { recursive: true, force: true });
+    }
+  });
+});
