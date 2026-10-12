@@ -69,7 +69,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 import { viewerPlacement } from "./gen-schema-viz.ts";
-import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio/render/file-list.ts";
+import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import {
   directoriesForGraph,
   readDeclaration,
@@ -105,7 +105,7 @@ export interface FolioGraph {
   /** Every declared folio directory, ABSENT ONES INCLUDED. */
   /**
    * `files` is the folio as a list of files: the harness's minimal
-   * rendering (`folio/render/file-list.ts`, bean `ohx6`), read through the
+   * rendering (`folio-render/file-list.ts`, bean `ohx6`), read through the
    * same function, so the viewer's 'list' view and the harness's page cannot
    * disagree about what the folio holds.
    */
