@@ -2,7 +2,7 @@
   "$schema": "state-manifest/v1",
   "status": "active",
   "authoritative": true,
-  "subgraph": "marks",
+  "subgraph": "beans/marks",
   "note": "Authoritative branch store for cat-harness-tools/beans/marks/ (typology sweep-marks, bean rq8s) from 2026-10-12T16:39:26Z. tools#150 declared marks/ on main; check:state-on-main refused it as a NEW state directory on main, so main drops beans/marks/ in the same change that declares this branch as the directory's source. Holds no mark yet: the first session-start sweep writes one.",
   "source": {
     "ref": "main",
@@ -12,7 +12,7 @@
   "keyedBy": "tip",
   "graphs": [
     {
-      "path": "marks",
+      "path": "beans/marks",
       "tree": "d564d0bc3dd917926892c55e3706cc116d5b165e",
       "files": 1
     }
