@@ -42,7 +42,7 @@
  *   bun run cat mount:lock -- --check      # no network: is every locked mount on disk and intact?
  *   bun run cat mount:lock -- --root <dir> # the downstream instance root (default: cwd)
  *   bun run cat mount:lock -- --no-install # lay the bytes down, do not `bun install` in each mount
- *   bun run cat mount:lock -- --install-all # install devDependencies too (default: --production)
+ *   bun run cat mount:lock -- --install-all # install devDependencies too (default: --omit dev)
  *
  * `CAT_MOUNT_URL_PREFIX` replaces `https://github.com` in fetch URLs (tests
  * serve local bare repositories this way); a repository that is already a URL
@@ -214,7 +214,7 @@ export interface InstallOutcome {
 
 /**
  * `bun install` in `dir` when it holds a `package.json`; nothing otherwise.
- * `production` (the default) skips devDependencies — the mount is there to RUN
+ * `production` (the default) skips devDependencies (`--omit dev`) — the mount is there to RUN
  * tools, and a typechecker or a browser is a per-session choice (`all`).
  * Leaves every lockfile as it found it; see the section comment above.
  */
@@ -222,7 +222,14 @@ export function installDependencies(dir: string, mode: InstallMode = "production
   if (!existsSync(join(dir, "package.json"))) return { state: "none", detail: "no package.json" };
   const before = new Map(LOCKFILES.map((f) => [f, existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : undefined]));
   const bun = /bun(\.exe)?$/i.test(process.execPath) ? process.execPath : "bun";
-  const args = ["install", "--no-save", ...(mode === "production" ? ["--production"] : [])];
+  // `--omit dev`, not `--production`: bun's `--production` implies
+  // `--frozen-lockfile`, so a mount whose lockfile is behind its package.json
+  // ("lockfile had changes, but lockfile is frozen", cat-harness@73ff183) or
+  // that bun reads as frozen-incompatible ("Unknown lockfile version",
+  // cat-harness-tools@57721f6) failed to install, and every repository pinning
+  // this mounter lost its tools (smart-ra#48). The lockfile is put back
+  // byte-for-byte below either way, so not freezing it costs nothing.
+  const args = ["install", "--no-save", ...(mode === "production" ? ["--omit", "dev"] : [])];
   const r = spawnSync(bun, args, { cwd: dir, encoding: "utf-8", maxBuffer: 1 << 26 });
   for (const [f, bytes] of before) {
     const abs = join(dir, f);

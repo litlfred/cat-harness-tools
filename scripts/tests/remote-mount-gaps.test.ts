@@ -187,6 +187,16 @@ describe("(b) a mounted layer is runnable, and the install does not make it modi
     }
   });
 
+  test("installDependencies: a lockfile behind its package.json still installs, and is put back", () => {
+    // bun's `--production` implies `--frozen-lockfile`, which refused exactly
+    // this and left a mount's tools without dependencies (smart-ra#48).
+    const dir = mkdtempSync(join(base, "stale-"));
+    const stale = '{\n  "lockfileVersion": 1,\n  "workspaces": {\n    "": {\n      "name": "@t/old",\n    },\n  },\n  "packages": {},\n}\n';
+    write(dir, { "package.json": { name: "@t/x", version: "0.1.0" }, "bun.lock": stale });
+    expect(installDependencies(dir).state).toBe("installed");
+    expect(readFileSync(join(dir, "bun.lock"), "utf-8")).toBe(stale);
+  });
+
   test("installDependencies: no manifest is nothing; a lockfile the install touched is put back byte-for-byte", () => {
     const dir = mkdtempSync(join(base, "inst-"));
     expect(installDependencies(dir).state).toBe("none");

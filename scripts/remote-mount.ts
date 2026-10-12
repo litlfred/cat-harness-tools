@@ -61,7 +61,7 @@
  * ## A mount is runnable, and an install does not make it modified
  *
  * After the bytes are locked, each mounted instance that carries a
- * `package.json` gets `bun install --no-save --production` (`--install-all`
+ * `package.json` gets `bun install --no-save --omit dev` (`--install-all`
  * keeps devDependencies, `--no-install` skips it). `node_modules/` is outside
  * every mount digest and the lockfile is put back byte-for-byte, so `--check`
  * still passes over an installed mount and a re-mount does not refuse it.
