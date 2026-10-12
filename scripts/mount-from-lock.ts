@@ -41,6 +41,8 @@
  *   bun run cat mount:lock                 # lay down / refresh every locked mount
  *   bun run cat mount:lock -- --check      # no network: is every locked mount on disk and intact?
  *   bun run cat mount:lock -- --root <dir> # the downstream instance root (default: cwd)
+ *   bun run cat mount:lock -- --no-install # lay the bytes down, do not `bun install` in each mount
+ *   bun run cat mount:lock -- --install-all # install devDependencies too (default: --production)
  *
  * `CAT_MOUNT_URL_PREFIX` replaces `https://github.com` in fetch URLs (tests
  * serve local bare repositories this way); a repository that is already a URL
@@ -51,7 +53,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -149,9 +151,90 @@ export function withoutStateMounts(dir: string, files: readonly string[], skip: 
 }
 
 export function digestOf(dir: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
-  const files = withoutStateMounts(dir, treeFiles(dir), skip);
+  const files = withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip));
   const listing = files.map((f) => `${sha256(readFileSync(join(dir, f)))}  ${f}\n`).join("");
   return { treeDigest: sha256(listing), files: files.length };
+}
+
+// ── Installing a mount's dependencies (task #10, gap b) ──────────────────────
+//
+// A mounted layer is CODE (`cat-harness`, `cat-harness-tools`, …), and code
+// with no `node_modules` does not run: `Cannot find module
+// '@litlfred/cat-harness/schemas/mount-trust.js'`. Until 2026-10-12 the
+// workaround was a hand `bun install` inside the mount, and that made the mount
+// read MODIFIED: `--check` said "the pinned bytes are not on disk:
+// cat-harness/ modified" and the next re-mount refused it.
+//
+// Two routes were on the table. (1) Resolve the workspace packages WITHOUT
+// writing into the mount — a generated workspace manifest at the downstream
+// root. Rejected: it edits the downstream's tracked `package.json`, and bun's
+// default (isolated) linker writes a `node_modules/` into every workspace
+// member anyway, i.e. into the mounts, so it does not even keep them pristine.
+// (2) Install INTO the mount and define what fixity covers. Taken, because the
+// question fixity answers is "are the PINNED bytes on disk", and an install
+// writes none of them:
+//
+// - `node_modules/`, at any depth, is excluded from every mount digest — the
+//   lock's writer (`remote-mount.ts`), its replayer (this file) and both
+//   `--check`s, through this one function. At any depth because bun's isolated
+//   linker also writes into the SIBLING mounts a manifest's `workspaces` names
+//   (`../cat-harnes[s]`). Nothing upstream tracks a `node_modules/` (measured
+//   2026-10-12 over cat-harness, cat-harness-tools, bootstrap, bootstrap-tools,
+//   folio-assistant-core, smart-base: 0 paths), and `remote-mount.ts` refuses
+//   to lay down a tree that does, so the exclusion can never hide a pinned byte.
+// - The lockfile is NOT excluded: it is a pinned byte. The install runs with
+//   `--no-save`, so bun writes no lockfile and edits no manifest, and the
+//   lockfile's bytes are compared before and after and put back if anything
+//   moved them — a mount stays verifiable by the same digest it was locked at.
+//
+// Old locks keep verifying: a digest over a tree with no `node_modules/` is
+// the same with or without the exclusion.
+
+/** Directory names an install writes and a mount never pins. */
+export const INSTALL_ARTEFACT_DIRS: readonly string[] = ["node_modules"];
+
+/** Is this tree-relative path inside an install artefact? */
+export function isInstallArtefact(rel: string): boolean {
+  return rel.split("/").some((seg) => INSTALL_ARTEFACT_DIRS.includes(seg));
+}
+
+/** `files` without anything an install wrote — what every mount digest hashes. */
+export function withoutInstallArtefacts(files: readonly string[]): string[] {
+  return files.filter((f) => !isInstallArtefact(f));
+}
+
+/** Lockfiles the install must leave byte-identical: they are pinned bytes. */
+const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
+
+export type InstallMode = "production" | "all";
+export interface InstallOutcome {
+  state: "installed" | "none" | "failed";
+  detail: string;
+}
+
+/**
+ * `bun install` in `dir` when it holds a `package.json`; nothing otherwise.
+ * `production` (the default) skips devDependencies — the mount is there to RUN
+ * tools, and a typechecker or a browser is a per-session choice (`all`).
+ * Leaves every lockfile as it found it; see the section comment above.
+ */
+export function installDependencies(dir: string, mode: InstallMode = "production"): InstallOutcome {
+  if (!existsSync(join(dir, "package.json"))) return { state: "none", detail: "no package.json" };
+  const before = new Map(LOCKFILES.map((f) => [f, existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : undefined]));
+  const bun = /bun(\.exe)?$/i.test(process.execPath) ? process.execPath : "bun";
+  const args = ["install", "--no-save", ...(mode === "production" ? ["--production"] : [])];
+  const r = spawnSync(bun, args, { cwd: dir, encoding: "utf-8", maxBuffer: 1 << 26 });
+  for (const [f, bytes] of before) {
+    const abs = join(dir, f);
+    const now = existsSync(abs) ? readFileSync(abs) : undefined;
+    if (bytes === undefined && now !== undefined) rmSync(abs, { force: true });
+    else if (bytes !== undefined && (now === undefined || !bytes.equals(now))) writeFileSync(abs, bytes);
+  }
+  if (r.status !== 0) {
+    const why = (r.error?.message ?? (r.stderr || r.stdout || "")).trim().split("\n").slice(-3).join(" | ");
+    return { state: "failed", detail: `\`bun ${args.join(" ")}\` exited ${r.status ?? r.signal}: ${why}` };
+  }
+  return { state: "installed", detail: `dependencies installed (\`bun ${args.join(" ")}\`; node_modules/ is outside the fixity digest)` };
 }
 
 // ── Reading the lock ─────────────────────────────────────────────────────────
@@ -391,15 +474,34 @@ export function exitCode(outcomes: Outcome[]): 0 | 1 | 2 {
   return 0;
 }
 
-export function run(root: string, check: boolean): { outcomes: Outcome[]; locks: number } {
+export function run(root: string, check: boolean, opts: { install?: InstallMode | false } = {}): { outcomes: Outcome[]; locks: number } {
   const outcomes: Outcome[] = [];
   const locks = readLocks(root);
+  const laid: Array<{ inst: LockInstance; outcome: Outcome }> = [];
   for (const l of locks) {
     if (l.error) {
       outcomes.push({ instance: relative(root, l.file), state: "could-not-determine", detail: l.error });
       continue;
     }
-    for (const inst of l.instances!) outcomes.push(check ? checkInstance(root, inst) : mountInstance(root, inst));
+    for (const inst of l.instances!) {
+      const outcome = check ? checkInstance(root, inst) : mountInstance(root, inst);
+      outcomes.push(outcome);
+      if (outcome.state === "mounted" || outcome.state === "current") laid.push({ inst, outcome });
+    }
+  }
+  // AFTER every instance is down, so a manifest's `workspaces` reaching a
+  // sibling mount finds it. A failed install is reported against the instance
+  // (its tools will not run) but never touches what `--check` verifies.
+  const mode = opts.install ?? "production";
+  if (!check && mode !== false) {
+    for (const { inst, outcome } of laid) {
+      const r = installDependencies(join(root, inst.path), mode);
+      if (r.state === "installed") outcome.detail += `; ${r.detail}`;
+      if (r.state === "failed") {
+        outcome.state = "missing";
+        outcome.detail += `; the bytes are pinned but its dependencies are NOT installed, so its tools will not run: ${r.detail}`;
+      }
+    }
   }
   return { outcomes, locks: locks.length };
 }
@@ -409,7 +511,7 @@ if (import.meta.main) {
   const check = argv.includes("--check");
   const at = argv.indexOf("--root");
   const root = resolve(at >= 0 && argv[at + 1] ? argv[at + 1]! : process.cwd());
-  const { outcomes, locks } = run(root, check);
+  const { outcomes, locks } = run(root, check, { install: argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production" });
   if (locks === 0) {
     console.log(`mount:lock: not-enabled — no ${INDEX_LOCK} (or legacy *${LEGACY_LOCK_SUFFIX}) in ${root}`);
     process.exit(0);
