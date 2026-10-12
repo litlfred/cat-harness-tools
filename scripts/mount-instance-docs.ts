@@ -105,7 +105,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
-import { instanceDirectories, declarationPathIn, readDeclaration, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
 import { foreignScopeFor, scopeNavbarRow } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
@@ -318,9 +318,19 @@ export function publishedDocsPrefix(repo: string, built: string): string | undef
   } catch {
     return undefined;
   }
-  const entry = (d.directories ?? []).find(
+  const entries = (d.directories ?? []).filter(
     (x) => x.path && x.scope !== "repository" && (x.graphTypologies ?? []).includes("docs"),
   );
+  // More than one `docs` layer since slice 1 of the semantic subgraphs: the
+  // site CHROME (`site-chrome/`) is declared first as the base. The pages are
+  // published from the instance's SITE directory, `siteDirFor`'s answer.
+  let site: string | undefined;
+  try {
+    site = siteDirFor(join(repo, built));
+  } catch {
+    site = undefined;
+  }
+  const entry = entries.find((x) => x.path!.replace(/\/+$/, "") === site) ?? entries[0];
   return entry === undefined ? undefined : join(built, entry.path!);
 }
 

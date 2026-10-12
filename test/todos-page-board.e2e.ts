@@ -33,7 +33,7 @@ import { join, resolve } from "node:path";
 import { Liquid } from "liquidjs";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
 
@@ -41,8 +41,8 @@ const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 /** The page under test, at the route the harness declares for `todos`. */
 const TODOS_PAGE = declaredPagePath(ROOT, "todos");
-const CSS = readFileSync(join(SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 const TODOS = readFileSync(join(SITE, "assets/todos/index.json"), "utf8");
 const ITEM_COUNT = (JSON.parse(TODOS) as { items: unknown[] }).items.length;
 
@@ -85,7 +85,7 @@ ${body}
  * opacity), which says nothing about this page.
  */
 async function footer(): Promise<string> {
-  const src = readFileSync(join(SITE, "_includes/footer_custom.html"), "utf8");
+  const src = readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/footer_custom.html")), "utf8");
   const line = /\{%-?\s*include generated\/todo-listing\.html\s*-?%\}/.exec(src);
   if (!line) throw new Error("footer_custom.html no longer includes the todo floor");
   return engine.parseAndRender(line[0], { site: { data } });

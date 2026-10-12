@@ -36,14 +36,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { navbarCss } from "../lib/navbar.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
 const ROOT = join(dirname(HARNESS_ROOT));
 const INSTANCE = join(ROOT, "cat-harness");
-const SITE_CSS = join(INSTANCE, siteDirFor(INSTANCE), "assets", "css", "docs-ui.css");
+const SITE_CSS = join(INSTANCE, siteFileFor(INSTANCE, "assets/css/docs-ui.css"));
 
 /**
  * Selector → normalised declaration body.

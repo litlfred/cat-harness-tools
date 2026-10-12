@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, siteDir, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 export interface UmlPalette {
   /** `schema` | `scenario` | `process` | `state` | `test` → hex. */
@@ -29,7 +29,7 @@ export interface UmlPalette {
 export function readUmlPalette(harnessRoot: string): UmlPalette {
   const decl = readDeclaration(harnessRoot);
   if (!decl) throw new Error(`${harnessRoot} declares no instance`);
-  const css = readFileSync(join(harnessRoot, siteDir(decl), "assets", "css", "uml.css"), "utf8");
+  const css = readFileSync(join(harnessRoot, siteFileFor(harnessRoot, "assets/css/uml.css")), "utf8");
 
   const family: Record<string, string> = {};
   for (const m of css.matchAll(/--fa-uml-([a-z]+):\s*(#[0-9a-fA-F]{3,8})/g)) family[m[1]!] = m[2]!;

@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { BLOCK_URLS_JS, editLinkHtml, editLinksAsset, editUrl, feedbackUrl, sourceUrl } from "../edit-links.js";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 
 describe("edit-links: one recipe for every page's edit and feedback links (bean v433)", () => {
   test("the published runtime is the generated one (run --write-asset after changing the recipe)", () => {
     const harness = join(HARNESS_ROOT);
-    const asset = readFileSync(join(harness, siteDir(readDeclaration(harness)!), "assets", "js", "edit-links.js"), "utf-8");
+    const asset = readFileSync(join(harness, siteFileFor(harness, "assets/js/edit-links.js")), "utf-8");
     expect(asset).toBe(editLinksAsset());
   });
 

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -28,8 +28,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 /** The page-level opt-in, as a page writer stamps it. */
 const FIGURE_IMAGES_STAMP = '<span hidden data-fa-figure-images="ig"></span>';

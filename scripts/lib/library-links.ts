@@ -24,7 +24,7 @@ import { basename, join, relative, sep } from "node:path";
 
 import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { detectRepoUrl } from "../../src/core/git-refs.js";
-import { docsLayers } from "../compose-docs.js";
+import { baseDocsDir } from "../compose-docs.js";
 import { itemFacts } from "../library-readmes.ts";
 import { existingPageDir } from "../viewer-declarations.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -51,7 +51,12 @@ export interface LibraryResolver {
 const SOURCE_BRANCH = "main";
 
 export function libraryResolver(repo: string, instanceRoot: string): LibraryResolver {
-  const base = docsLayers(repo).layers.find((l) => !l.repositoryScoped)?.dir;
+  let base: string | undefined;
+  try {
+    base = baseDocsDir(repo);
+  } catch {
+    base = undefined;
+  }
   const handler = readDeclaration(instanceRoot)?.name;
   const libs = corpusDirectoriesForGraph(instanceRoot, "library");
   const seg = libs.length > 0 ? basename(libs[0]!) : undefined;

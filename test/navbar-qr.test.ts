@@ -15,11 +15,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createContext, runInContext } from "node:vm";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const ROOT = join(HARNESS_ROOT);
-const NAVBAR_ROW_JS = readFileSync(join(ROOT, "docs/assets/js/navbar-row.js"), "utf8");
-const QRCODE_JS = readFileSync(join(ROOT, "docs/assets/js/vendor/qrcode.js"), "utf8");
-const QRCODE_UTF8_JS = readFileSync(join(ROOT, "docs/assets/js/vendor/qrcode_UTF8.js"), "utf8");
+const NAVBAR_ROW_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8");
+const QRCODE_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const QRCODE_UTF8_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode_UTF8.js")), "utf8");
 
 // A hand-rolled DOM mock that the vendored navbar and QR scripts run against:
 // its events and elements are whatever those scripts hand it, so they stay `any`.

@@ -36,14 +36,16 @@
  * @module scripts/tests/inline-colour.test
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteLayersFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const CLIENT_DIR = join(ROOT, siteDirFor(ROOT), "assets/js");
+// Every site layer's scripts: since slice 1 of the semantic subgraphs the
+// chrome's (`site-chrome/`) and the harness pages' own (`docs/`) are two layers.
+const CLIENT_DIRS = siteLayersFor(ROOT).map((l) => join(ROOT, l, "assets/js")).filter((d) => existsSync(d));
 
 /**
  * EVERY client script this site ships, not `docs-ui.js` by name.
@@ -58,9 +60,11 @@ const CLIENT_DIR = join(ROOT, siteDirFor(ROOT), "assets/js");
  * a rule about where OUR colours may be written says nothing about it.
  */
 function clientScripts(): string[] {
-  return readdirSync(CLIENT_DIR, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith(".js"))
-    .map((e) => join(CLIENT_DIR, e.name))
+  return CLIENT_DIRS.flatMap((dir) =>
+    readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith(".js"))
+      .map((e) => join(dir, e.name)),
+  )
     .sort();
 }
 

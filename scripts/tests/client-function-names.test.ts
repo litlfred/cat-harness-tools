@@ -35,11 +35,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const CLIENT = join(ROOT, siteDirFor(ROOT), "assets/js/docs-ui.js");
+const CLIENT = join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"));
 
 /**
  * Every declaration in the IIFE's OWN scope, with its line.

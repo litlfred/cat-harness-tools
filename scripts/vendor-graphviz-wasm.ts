@@ -28,7 +28,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
@@ -37,7 +37,7 @@ function packageDir(): string {
   const own = join(INSTANCE_ROOT, "node_modules", "@hpcc-js", "wasm-graphviz");
   return existsSync(own) ? own : join(repoRootFor(INSTANCE_ROOT), "node_modules", "@hpcc-js", "wasm-graphviz");
 }
-export const VENDOR_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "js", "vendor", "wasm-graphviz");
+export const VENDOR_DIR = join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/js/vendor/wasm-graphviz"));
 export const VENDORED = ["index.js"] as const;
 
 /**

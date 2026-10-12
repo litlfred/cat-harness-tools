@@ -14,9 +14,9 @@
  * @module test/support/site-pages
  */
 import { readFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 import {
   declaredVisualisers,
@@ -100,9 +100,12 @@ export function declaredPageUrl(harnessRoot: string, id: string, rest: Pick<Visu
  * rather than serving a page with no scheme.
  */
 export function firstPaintBlock(siteDir: string): string {
-  const head = readFileSync(join(siteDir, "_includes", "head_custom.html"), "utf8");
+  // The include is the site CHROME's (semantic subgraphs, slice 1): resolve it
+  // across the declared site layers of the instance this site directory is in.
+  const file = join(dirname(siteDir), siteFileFor(dirname(siteDir), "_includes/head_custom.html"));
+  const head = readFileSync(file, "utf8");
   const m = /<!-- fa-first-paint:begin -->([\s\S]*?)<!-- fa-first-paint:end -->/.exec(head);
-  if (!m) throw new Error(`no fa-first-paint block in ${join(siteDir, "_includes", "head_custom.html")}`);
+  if (!m) throw new Error(`no fa-first-paint block in ${file}`);
   return m[1]!;
 }
 

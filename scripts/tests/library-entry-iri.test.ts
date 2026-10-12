@@ -30,7 +30,7 @@ import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { checkEntry } from "../check-l1-complete.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -172,7 +172,7 @@ describe("the shell template", () => {
     expect(shell.trimEnd().endsWith("{% endraw %}")).toBe(true);
   });
   test("the layout writes the alternate it declares", () => {
-    const include = readFileSync(join(SITE, "_includes", "head_custom.html"), "utf-8");
+    const include = readFileSync(join(HARNESS, siteFileFor(HARNESS, "_includes/head_custom.html")), "utf-8");
     expect(include).toContain(
       '{% if page.alternate_jsonld %}<link rel="alternate" type="application/ld+json" href="{{ page.alternate_jsonld }}">{% endif %}',
     );

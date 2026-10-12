@@ -35,7 +35,7 @@ describe("translationMetaBlock", () => {
   });
 
   it("carries only fields the include writes", () => {
-    const include = readFileSync(join(REPO, "cat-harness/docs/_includes/head_custom.html"), "utf-8");
+    const include = readFileSync(join(REPO, "cat-harness/site-chrome/_includes/head_custom.html"), "utf-8");
     const start = include.indexOf(`id="${TRANSLATION_META_ID}"`);
     expect(start).toBeGreaterThan(0);
     const body = include.slice(start, include.indexOf("</script>", start));

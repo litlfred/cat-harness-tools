@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -35,13 +35,13 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 // what Playwright runs the spec with.
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 // The QR encoder must load FIRST: `mountQr` returns early without it, and
 // mountQr is what mounts the theme toggle, reading preferences and language
 // switcher too. Omitting it mounts nothing and every assertion below fails
 // for the wrong reason.
-const QR = readFileSync(join(ROOT, SITE, "assets/js/vendor/qrcode.js"), "utf8");
+const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
 
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
   body { margin: 0; }

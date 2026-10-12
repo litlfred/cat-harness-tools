@@ -27,13 +27,13 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const TILES = ["library", "processes", "tools", "skills", "beans"].map((id) => ({
   id, directory: id, title: id, ref: "x", href: `/${id}/`, surfaces: ["navbar", "board", "glass"], hidden: false,
@@ -48,7 +48,7 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 
 /** just-the-docs' shape: a sidebar with a header, so the ▦ launcher mounts and
  *  Glass settings draws its "Page settings →" cross-link as its first row. */
-const QR = readFileSync(join(ROOT, SITE, "assets/js/vendor/qrcode.js"), "utf8");
+const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
 const WITH_SIDEBAR = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Panel</title>
 <meta name="fa-tiles" content="${attr(TILES)}">
 <meta name="fa-glass-strip" content="${attr(PINS)}">

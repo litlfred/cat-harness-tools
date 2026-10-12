@@ -71,6 +71,7 @@ export { schemeKey, withSavedScheme } from "./lib/scheme-css.js";
 import { VISUALISER_NAV_ATTR, visualiserNavDeclaration, type VisualiserNavEntry } from "./lib/navbar.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { declaredGraphs, instanceMark, instantiatedHarnesses, navbarRowData, publishedGraphs, railNames } from "./mount-instance-docs.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The opt-out a visualisation writes into its own page.
@@ -329,8 +330,8 @@ function navbarRowAssets(): { js: string; css: string } {
   // declared-path-literal: platform assets beside this module, not a folio
   // directory. The docs site publishes them at the same relative paths.
   rowAssets ??= {
-    js: readFileSync(pathToFileURL(join(HARNESS_ROOT, "docs", "assets", "js", "navbar-row.js")), "utf-8"),
-    css: readFileSync(pathToFileURL(join(HARNESS_ROOT, "docs", "assets", "css", "navbar-row.css")), "utf-8"),
+    js: readFileSync(pathToFileURL(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/navbar-row.js"))), "utf-8"),
+    css: readFileSync(pathToFileURL(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/navbar-row.css"))), "utf-8"),
   };
   return rowAssets;
 }
@@ -339,7 +340,7 @@ let narrowCss: string | undefined;
 function narrowViewportCss(): string {
   // declared-path-literal: a platform asset beside this module, not a folio
   // directory. The docs site publishes it at the same relative path.
-  narrowCss ??= readFileSync(pathToFileURL(join(HARNESS_ROOT, "docs", "assets", "css", "narrow-viewport.css")), "utf-8");
+  narrowCss ??= readFileSync(pathToFileURL(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/narrow-viewport.css"))), "utf-8");
   return narrowCss;
 }
 

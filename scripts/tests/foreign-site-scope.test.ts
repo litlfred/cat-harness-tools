@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { compose } from "../compose-docs.ts";
 import {
   HOST_DATA_PROJECTIONS,
@@ -336,7 +336,14 @@ describe("the footer line: a folio's site does not print the platform's (#1901 f
     const out = mkdtempSync(join(tmpdir(), "own-footer-"));
     try {
       compose(out, REPO, {});
-      expect(readFileSync(join(out, "_config.yml"), "utf-8")).toBe(readFileSync(join(CAT_HARNESS, siteDirFor(CAT_HARNESS), "_config.yml"), "utf-8"));
+      // Since slice 1 of the semantic subgraphs the platform's config is two
+      // layers, the site chrome's and docs/'s, MERGED — so the composed file is
+      // parse-equal rather than byte-equal (owner ruling D1, 2026-10-09). The
+      // footer is the site's own, and it arrives unchanged.
+      const own = parseYaml(readFileSync(join(CAT_HARNESS, siteDirFor(CAT_HARNESS), "_config.yml"), "utf-8")) as Record<string, unknown>;
+      const composed = parseYaml(readFileSync(join(out, "_config.yml"), "utf-8")) as Record<string, unknown>;
+      expect(composed.footer_content).toBe(own.footer_content);
+      for (const [k, v] of Object.entries(own)) expect(composed[k]).toEqual(v);
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
@@ -383,7 +390,7 @@ describe("the chrome reads foreignSite.absent (head_custom.html, rendered)", () 
     liquid.registerFilter("relative_url", (p: string) => `/ig-folio${p}`);
     liquid.registerFilter("absolute_url", (p: string) => `https://example.org/ig-folio${p}`);
     liquid.registerFilter("jsonify", (v: unknown) => JSON.stringify(v ?? null));
-    const src = readFileSync(join(CAT_HARNESS, siteDirFor(CAT_HARNESS), "_includes", "head_custom.html"), "utf-8");
+    const src = readFileSync(join(CAT_HARNESS, siteFileFor(CAT_HARNESS, "_includes/head_custom.html")), "utf-8");
     const html = await liquid.parseAndRender(src, { site: { baseurl: "/ig-folio", data }, page: { path: "p.md" } });
     const meta = /id="fa-translation-meta">([\s\S]*?)<\/script>/.exec(html);
     expect(meta).not.toBeNull();

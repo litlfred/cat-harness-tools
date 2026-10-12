@@ -62,7 +62,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -334,13 +334,15 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
   for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
 
-  // The Gemfile is the mounted harness's, in the site directory its declaration names.
+  // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
   const harness = join(root, "cat-harness");
-  const harnessSite = join(harness, siteDirFor(harness));
   // Bundler writes Gemfile.lock beside the Gemfile: copy it out, so the mount stays as pinned.
   const gemDir = join(out, "gems");
   mkdirSync(gemDir, { recursive: true });
-  for (const f of ["Gemfile", "Gemfile.lock"]) if (existsSync(join(harnessSite, f))) copyFileSync(join(harnessSite, f), join(gemDir, f));
+  for (const f of ["Gemfile", "Gemfile.lock"]) {
+    const src = join(harness, siteFileFor(harness, f));
+    if (existsSync(src)) copyFileSync(src, join(gemDir, f));
+  }
   writeFileSync(join(out, "build-config.yml"), buildConfig(readFileSync(join(docs, "_config.yml"), "utf-8")));
   writeFileSync(
     join(out, "override.yml"),

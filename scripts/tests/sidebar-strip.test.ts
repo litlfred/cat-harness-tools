@@ -40,11 +40,12 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const read = (p: string) => readFileSync(join(REPO, p), "utf-8");
 
-const css = read("cat-harness/docs/assets/css/docs-ui.css");
+const css = read("cat-harness/site-chrome/assets/css/docs-ui.css");
 /**
  * Inside `.side-bar` — where all three controls now live.
  *
@@ -55,7 +56,7 @@ const css = read("cat-harness/docs/assets/css/docs-ui.css");
  */
 const inside = read("cat-harness/docs/_includes/generated/navbar-footer.html");
 /** Inside `.main` — which should carry none of them any more. */
-const outside = read("cat-harness/docs/_includes/footer_custom.html");
+const outside = read("cat-harness/site-chrome/_includes/footer_custom.html");
 
 /**
  * The slice that owns this behaviour, WITH COMMENTS STRIPPED.
@@ -183,7 +184,7 @@ describe("three ways in, one way back", () => {
     // did on the rail. Every rule that styled them sat inside the 50rem
     // block, so below 800px a copy rendered unstyled. No rule may name them,
     // in the block or anywhere else in the file.
-    const bare = read("cat-harness/docs/assets/css/docs-ui.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const bare = read("cat-harness/site-chrome/assets/css/docs-ui.css").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(bare).not.toContain(".fa-nav-close");
     expect(bare).not.toContain(".fa-nav-toggle");
     expect(bare).not.toContain(".fa-nav-head");
@@ -228,7 +229,7 @@ describe("the controls live inside the sidebar now", () => {
   it("the control that remains has an accessible name — this is navigation", () => {
     // With the ☰ and [x] gone (#1757), the one control is the theme's avatar
     // link, and `docs-ui.js` names it by what a click does.
-    const js = readFileSync(join(HARNESS_ROOT, "docs", "assets", "js", "docs-ui.js"), "utf8");
+    const js = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
     expect(js).toContain('avatar.title = box.checked ? "Close navigation" : "Open navigation"');
     expect(js).toContain('avatar.setAttribute("aria-expanded"');
   });
@@ -323,7 +324,7 @@ describe("figures keep a white plate, with and without JavaScript", () => {
  * rise above the page, which is what `auto` and any smaller value do.
  */
 describe("no rule may stop the sidebar rising above `.main` (bean `vfr8`)", () => {
-  const css = read("cat-harness/docs/assets/css/docs-ui.css");
+  const css = read("cat-harness/site-chrome/assets/css/docs-ui.css");
 
   /** Declarations whose SUBJECT is `.side-bar`, not a descendant of it. */
   const sidebarZRules = (): { selector: string; value: string }[] => {

@@ -18,6 +18,8 @@ import {
 } from "../docs-rendered-impact.ts";
 
 const mounts: Mount[] = [
+  // The site chrome is its own layer since slice 1 of the semantic subgraphs.
+  { from: "cat-harness/site-chrome/", to: "" },
   { from: "cat-harness/docs/", to: "" },
   { from: "docs/", to: "" },
   { from: "smart-trust/docs/", to: "smart-trust/" },
@@ -69,12 +71,12 @@ describe("mapping a source file into the composed tree", () => {
 
 describe("docsRenderedImpact", () => {
   test("a page, an asset and the search index every page change moves", () => {
-    const i = docsRenderedImpact(opts(["cat-harness/docs/guides/onboarding.md", "cat-harness/docs/assets/css/docs-ui.css"]));
+    const i = docsRenderedImpact(opts(["cat-harness/docs/guides/onboarding.md", "cat-harness/site-chrome/assets/css/docs-ui.css"]));
     expect(paths(i)).toEqual(["data:assets/css/docs-ui.css", `index:${SEARCH_INDEX}`, "content:guides/onboarding.html"]);
   });
 
   test("an asset alone does not move the search index", () => {
-    expect(paths(docsRenderedImpact(opts(["cat-harness/docs/assets/css/docs-ui.css"])))).toEqual(["data:assets/css/docs-ui.css"]);
+    expect(paths(docsRenderedImpact(opts(["cat-harness/site-chrome/assets/css/docs-ui.css"])))).toEqual(["data:assets/css/docs-ui.css"]);
   });
 
   test("an include reaches the pages that include it, through other includes", () => {

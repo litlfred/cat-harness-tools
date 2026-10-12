@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceView, render, type Harness } from "../gen-navbar-include.js";
 import { harnessTiles } from "../harness-tiles.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
@@ -32,7 +32,7 @@ const ROOT = join(dirname(HARNESS_ROOT));
 const INSTANCE = join(ROOT, "cat-harness");
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
 const INCLUDE = join(SITE, "_includes", "generated", "navbar-footer.html");
-const TEMPLATE = join(SITE, "_includes", "nav_footer_custom.html");
+const TEMPLATE = join(INSTANCE, siteFileFor(INSTANCE, "_includes/nav_footer_custom.html"));
 
 const file = (): string => readFileSync(INCLUDE, "utf-8");
 
@@ -94,7 +94,7 @@ describe("what Jekyll is handed", () => {
     // the labels would read as leaving the sidebar with no way in.
     const { canonical, staging } = variants(file());
     for (const v of [canonical, staging]) expect(v).not.toContain('for="fa-nav-open"');
-    const js = readFileSync(join(HARNESS_ROOT, "docs", "assets", "js", "docs-ui.js"), "utf8");
+    const js = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
     expect(js).toContain('bar.querySelector(".site-title")');
     expect(js).toMatch(/box\.checked = !box\.checked/);
   });

@@ -33,12 +33,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { allAvatars, GENERIC, TRASH_OVERLAY, type Avatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** Where the stylesheet goes. Derived from `siteDirFor`, never written down. */
 export function avatarsCssPath(root: string): string {
-  return join(siteDirFor(root), "assets", "css", "avatars.css");
+  // The site CHROME holds it (semantic subgraphs, slice 1).
+  return siteFileFor(root, "assets/css/avatars.css");
 }
 
 /**

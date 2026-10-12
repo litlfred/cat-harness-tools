@@ -68,7 +68,7 @@ import { checkTools, unresolvedPaths } from "./check-tools.js";
 import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
 import { tools, toolsOf } from "../tools/discover.js";
 import { kgDirectories, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { docsLayers } from "./compose-docs.js";
+import { baseDocsDir, docsLayers } from "./compose-docs.js";
 import { PAIR_CRITERION, discoverPairs, evaluatePairsFrom, readAttestations, type PairAttestation } from "./prose-code-pairs.js";
 import { VOICE_REVIEW_CRITERION, evaluateVoiceReviewsFrom, readVoiceReviews, skillVoices, type VoiceReview } from "./skill-voice-review.js";
 import {
@@ -529,7 +529,15 @@ function docsSurface(): DocsSurface | undefined {
   } catch {
     return undefined;
   }
-  const base = layers.find((l) => !l.repositoryScoped);
+  // The PAGES layer, not merely the first: since slice 1 of the semantic
+  // subgraphs the site chrome is declared first (`baseDocsDir`).
+  let baseDir: string | undefined;
+  try {
+    baseDir = baseDocsDir(resolve(root, ".."));
+  } catch {
+    baseDir = undefined;
+  }
+  const base = layers.find((l) => resolve(l.dir) === (baseDir === undefined ? undefined : resolve(baseDir)));
   if (!base) return undefined;
   const texts: string[] = [];
 

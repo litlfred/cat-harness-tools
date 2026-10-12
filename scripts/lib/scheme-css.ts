@@ -24,6 +24,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { HARNESS_ROOT } from "./roots.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const NOT_LIGHT = `:root:not([data-fa-scheme="light"])`;
 const DARK = `:root[data-fa-scheme="dark"]`;
@@ -98,7 +99,7 @@ export function schemeKey(): string {
   if (schemeKeyCache) return schemeKeyCache;
   // declared-path-literal: a platform asset beside this module, not a folio
   // directory. It is the one place the key is defined.
-  const js = readFileSync(pathToFileURL(join(HARNESS_ROOT, "docs", "assets", "js", "docs-ui.js")), "utf-8");
+  const js = readFileSync(pathToFileURL(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js"))), "utf-8");
   const m = /var SCHEME_KEY = "([^"]+)";/.exec(js);
   if (!m) throw new Error("viewer-page: docs-ui.js no longer declares SCHEME_KEY — the dashboards cannot follow the reader's scheme");
   schemeKeyCache = m[1]!;

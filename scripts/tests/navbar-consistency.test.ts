@@ -33,7 +33,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync,
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { judgeThemeKinds, type ThemeWiring } from "../check-navbar-consistency.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
@@ -42,7 +42,7 @@ const SCRIPT = join("cat-harness-tools", "scripts", "check-navbar-consistency.ts
 // root in any source file, and a test is a source file. `siteDirFor` answers
 // relative to the instance, so the instance root is joined in front of it.
 const CLIENT_INSTANCE = join(REPO, "cat-harness");
-const CLIENT = join(CLIENT_INSTANCE, siteDirFor(CLIENT_INSTANCE), "assets", "js", "docs-ui.js");
+const CLIENT = join(CLIENT_INSTANCE, siteFileFor(CLIENT_INSTANCE, "assets/js/docs-ui.js"));
 // The row's registry, `ROW_GLYPHS`, lives beside it (beans `lhvt`, `9rq1`).
 const ROW_CLIENT = join(dirname(CLIENT), "navbar-row.js");
 const DECL = join(REPO, "cat-harness", "cat-harness.json");

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { navbarHtml } from "../scripts/lib/navbar.ts";
 import { NAV_COLLAPSED_PX, NAV_OPEN_PX, NAV_OPEN_WIDE_PX } from "../scripts/lib/navbar-geometry.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -50,10 +50,10 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/navbar-row.css"), "utf8") + "\n" + readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, SITE, "assets/js/navbar-row.js"), "utf8") + "\n" + readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
-const QR = readFileSync(join(ROOT, SITE, "assets/js/vendor/qrcode.js"), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
 const BASEURL = "/folio-assistant";
 
 type Folder = { kind: string; label?: string; path?: string; note?: string; stagingOnly?: true };
@@ -145,7 +145,7 @@ function page(scoped = false): string {
 
 const fixturePage = (): string => page();
 
-const RAIL_CSS = readFileSync(join(ROOT, SITE, "assets/css/navbar.css"), "utf8");
+const RAIL_CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar.css")), "utf8");
 
 function railedPage(): string {
   const navHtml = navbarHtml({

@@ -32,7 +32,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { docsLayers } from "../compose-docs.js";
+import { baseDocsDir } from "../compose-docs.js";
 import { page, pageRelPath, skillIds, toolRows } from "../gen-tools-viz.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { PAGE_LOCALE } from "../viewer-declarations.js";
@@ -52,7 +52,7 @@ const REPO = resolve(dirname(HARNESS_ROOT));
  * targeted run of `check:*` scripts skipped it entirely. `bun test` is itself
  * a gate, and a subset of the gate set is not the gate set.
  */
-const DOCS = docsLayers(REPO).layers.find((l) => !l.repositoryScoped)!.dir;
+const DOCS = baseDocsDir(REPO);
 
 const { tools } = (await import("@litlfred/cat-harness/tools/index.js")) as { tools: () => unknown[] };
 const rows = toolRows(tools());

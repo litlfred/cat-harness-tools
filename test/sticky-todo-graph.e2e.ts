@@ -19,14 +19,14 @@ import { join } from "node:path";
 import { Liquid } from "liquidjs";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
-const CSS = readFileSync(join(SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 const TODOS = readFileSync(join(SITE, "assets/todos/index.json"), "utf8");
 const GRAPH_TEXT = readFileSync(join(SITE, "todos.jsonld"), "utf8");
 

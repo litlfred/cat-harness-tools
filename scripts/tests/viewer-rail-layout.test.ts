@@ -7,7 +7,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutFlags, stripFlags, untippedControls } from "../check-viewer-nav.ts";
 import { injectRail } from "../lib/harness-rail.ts";
 import { withHeadingIds } from "../viewer-page.ts";
@@ -138,16 +138,18 @@ describe("ob3m finding 1 — tooltips on icon-only controls, ▦ Harnesses at re
 describe("stripFlags — the same two questions of the docs site's strip", () => {
   const INSTANCE = HARNESS_ROOT;
   const DOCS = join(INSTANCE, siteDirFor(INSTANCE));
-  const JS = readFileSync(join(DOCS, "assets", "js", "docs-ui.js"), "utf-8");
-  const CSS = readFileSync(join(DOCS, "assets", "css", "docs-ui.css"), "utf-8");
-  const ROW = readFileSync(join(DOCS, "assets", "js", "navbar-row.js"), "utf-8");
+  const JS = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/js/docs-ui.js")), "utf-8");
+  const CSS = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/css/docs-ui.css")), "utf-8");
+  const ROW = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/js/navbar-row.js")), "utf-8");
 
   it("passes the shipped docs-ui.js, navbar-row.js and docs-ui.css", () => {
     expect(stripFlags(JS, CSS, ROW)).toEqual([]);
   });
 
   it("flags a row control built without data-fa-tip", () => {
-    const row = ROW.replace(/, "data-fa-tip": LABELS\.launcher/, "");
+    // The launcher proxy writes its tip from a local since cat-harness#171
+    // (`"data-fa-tip": tip`); the mutation strips that attribute.
+    const row = ROW.replace(/, "data-fa-tip": tip \}/, " }");
     expect(row).not.toBe(ROW);
     expect(stripFlags(JS, CSS, row)).toEqual(["rail-tips"]);
   });

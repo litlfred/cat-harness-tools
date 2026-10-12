@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { TRANSLATION_META_ID, translationMetaBlock, withTranslationMeta } from "../scripts/lib/translation-meta.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -38,8 +38,8 @@ const ROOT = join(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 const SITE = siteDirFor(ROOT);
 
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 const PAGE_FILE = join(REPO, "who-iris", "site", "index.html");
 const PAGE = existsSync(PAGE_FILE) ? readFileSync(PAGE_FILE, "utf8") : "";
 
