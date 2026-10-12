@@ -4,6 +4,7 @@
  *
  * @module scripts/state-push
  * @graphNode none — the write half of the state mount
+ * @covers none — it writes a state graph's edits to its branch and judges nothing
  *
  * Bean `2h76`, the `bun run cat state:push` line. The proposal: *"`bun run
  * state:push` commits and pushes the worktree through the library."*
