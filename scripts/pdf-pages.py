@@ -65,6 +65,7 @@ from _pdf_doc_id import (  # noqa: E402
     slugify as _slugify,
 )
 from _pdf_title import apply as resolve_title, evidence_from_pdf  # noqa: E402
+import _run_context  # noqa: E402
 
 
 def slug(text: str) -> str:
@@ -339,6 +340,15 @@ def main() -> int:
         # `text_source` (`text-layer | ocr`) is removed, not kept beside it.
         existing["source"]["text_source"] = source
         existing.pop("text_source", None)
+        # Which software made OCR'd text (bean `turh`): the reference to the
+        # `folio-run-context/v1` `pdf-ocr.py` wrote beside the pages. Set or
+        # removed, never kept from an earlier run: it describes THIS text.
+        ctx = (_run_context.read_ref(ocr_cache_dir(str(a.outdir), str(pdf)))
+               if source == "ocr" else None)
+        if ctx:
+            existing["source"]["runContext"] = ctx
+        else:
+            existing["source"].pop("runContext", None)
         # The PDF's own Info dictionary, which this rung once dropped (#1794).
         merge_docinfo(existing, pdf_docinfo(pdf))
         existing.update({

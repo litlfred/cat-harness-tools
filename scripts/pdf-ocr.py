@@ -68,6 +68,7 @@ import tempfile
 # `pdf-structure.py --ocr` looked somewhere this never wrote.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _pdf_doc_id import OCR_DIRNAME, derive_doc_id, ocr_cache_dir  # noqa: E402
+import _run_context  # noqa: E402
 
 # A page below this many characters is treated as having no usable text.
 MIN_CHARS_PER_PAGE = 120
@@ -95,6 +96,84 @@ def langs_present() -> set[str]:
     except Exception:
         return set()
     return {l.strip() for l in out.splitlines()[1:] if l.strip()}
+
+
+def _first_line_version(cmd: list[str], pattern: str) -> str:
+    """The version a tool prints about itself, or `unknown`."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except Exception:
+        return "unknown"
+    m = re.search(pattern, (r.stdout or "") + "\n" + (r.stderr or ""))
+    return m.group(1) if m else "unknown"
+
+
+def tessdata_dir() -> str | None:
+    """Where Tesseract reads its language models from, as it reports it."""
+    try:
+        out = subprocess.run(["tesseract", "--list-langs"], capture_output=True,
+                             text=True, timeout=30).stdout
+    except Exception:
+        return None
+    m = re.search(r'"([^"]+)"', out.splitlines()[0] if out else "")
+    return m.group(1) if m else os.environ.get("TESSDATA_PREFIX")
+
+
+def _package_version(file: str) -> str | None:
+    """The distribution package that owns `file`, where dpkg can say."""
+    try:
+        r = subprocess.run(["dpkg-query", "-S", file], capture_output=True, text=True, timeout=20)
+        pkg = r.stdout.split(":", 1)[0].strip() if r.returncode == 0 else ""
+        if not pkg:
+            return None
+        v = subprocess.run(["dpkg-query", "-W", "-f=${Version}", pkg],
+                           capture_output=True, text=True, timeout=20).stdout.strip()
+        return v or None
+    except Exception:
+        return None
+
+
+def ocr_releases(langs: list[str]) -> list[dict]:
+    """`releases[]` of a `folio-run-context/v1` for one OCR run (bean `turh`).
+
+    The engine, the rasteriser, and each language model the run used — each
+    with the sha256 of the bytes that ran. The model matters as much as the
+    engine: Ubuntu's `tesseract-ocr-eng` and tessdata_best's `eng` are both
+    "eng" and read the same page differently.
+    """
+    tools = tools_present()
+    out = [
+        _run_context.provisioned(
+            "tesseract", _first_line_version(["tesseract", "--version"], r"tesseract\s+v?(\S+)"), tools["tesseract"]),
+        _run_context.provisioned(
+            "pdftoppm", _first_line_version(["pdftoppm", "-v"], r"pdftoppm version\s+(\S+)"), tools["pdftoppm"]),
+    ]
+    td = tessdata_dir()
+    for lang in langs:
+        f = os.path.join(td, f"{lang}.traineddata") if td else None
+        if not f or not os.path.exists(f):
+            out.append(_run_context.could_not_provision(
+                f"tessdata-{lang}", "unknown", f"no {lang}.traineddata under {td or 'an unknown tessdata directory'}"))
+            continue
+        digest = _run_context.sha256_file(f) or ""
+        version = _package_version(os.path.realpath(f)) or f"sha256-{digest[:12]}"
+        out.append(_run_context.provisioned(f"tessdata-{lang}", version, f))
+    return out
+
+
+def write_ocr_run_context(pdf: str, root: str, cache: str, langs: list[str]) -> dict | None:
+    """Record which software produced `cache`, beside it. None when no checkout can be named."""
+    ctx = _run_context.build(
+        invoker_script=os.path.abspath(__file__),
+        releases=ocr_releases(langs),
+        inputs=[pdf],
+        where=[root, os.getcwd()],
+    )
+    if ctx is None:
+        print(f"  warning: no git checkout found for {root}; ocr/{_run_context.RUN_CONTEXT_FILENAME} not written",
+              file=sys.stderr)
+        return None
+    return _run_context.write(ctx, cache)
 
 
 def is_mojibake(text: str) -> bool:
@@ -155,6 +234,11 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
     if done and not force:
         return len(done), "cached"
 
+    # A context left by an earlier run would describe software that did not
+    # make the pages about to be written; remove it before they are.
+    stale = os.path.join(cache, _run_context.RUN_CONTEXT_FILENAME)
+    if os.path.exists(stale):
+        os.remove(stale)
     with tempfile.TemporaryDirectory() as tmp:
         stem = os.path.join(tmp, "pg")
         r = subprocess.run(["pdftoppm", "-r", str(dpi), "-png", pdf, stem],
@@ -172,6 +256,12 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
                                  capture_output=True, text=True).stdout
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
                  encoding="utf-8").write(txt)
+        # Which software made these pages (bean `turh`). Written only for a
+        # run that OCR'd: a cache hit was made by whatever ran then, and that
+        # run's record is the one already beside it. Detection read the page
+        # with `osd`, so it is a model this run used as well.
+        models = use.split("+") + ([] if lang else ["osd"])
+        write_ocr_run_context(pdf, root, cache, models)
         return len(pngs), use
 
 

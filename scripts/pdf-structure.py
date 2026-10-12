@@ -104,6 +104,9 @@ from _pdf_doc_id import (  # noqa: E402
 # `pdf-pages.py` and `ingest-document.ts --refresh-title`, so the three agree
 # about what a title is.
 from _pdf_title import BROWSER_RE, apply as resolve_title, evidence_from_pdf  # noqa: E402
+# Which software made OCR'd text: the `folio-run-context/v1` `pdf-ocr.py` wrote
+# beside it, cited by digest (bean `turh`).
+import _run_context  # noqa: E402
 
 # The layout-based fallback (issue #2302): headings read from font metrics,
 # or from a printed contents page. Measured against held-out outlines by
@@ -1264,6 +1267,15 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
 # block near the top for why they are not defined here.
 
 
+def ocr_run_context_ref(path: str, outdir: str | None, ocr_used: bool) -> dict[str, Any]:
+    """`{"runContext": {sha256}}` for OCR'd text whose run recorded one, else `{}`."""
+    if not ocr_used:
+        return {}
+    d, _legacy = find_ocr_cache(outdir or os.path.dirname(os.path.abspath(path)), path)
+    r = _run_context.read_ref(d) if d else None
+    return {"runContext": r} if r else {}
+
+
 def ocr_pages(path: str, outdir: str | None) -> list[str]:
     """Cached OCR text for this PDF, if `pdf-ocr.py` has been run on it.
 
@@ -1534,12 +1546,13 @@ def library_noise_to_stderr():
 
 
 def process(path: str, outdir: str | None = None, use_ocr: bool = False,
-            backend: str = "auto", latex_source: str | None = None) -> tuple[dict[str, Any], list[Section]]:
+            backend: str = "auto", latex_source: str | None = None,
+            title: str | None = None) -> tuple[dict[str, Any], list[Section]]:
     # Everything that touches a PDF backend runs under the redirect. `process`
     # writes nothing to stdout itself — it RETURNS the artefact and its caller
     # prints it — so nothing legitimate is caught by this.
     with library_noise_to_stderr():
-        return _process(path, outdir, use_ocr, backend, latex_source)
+        return _process(path, outdir, use_ocr, backend, latex_source, title)
 
 
 def latex_source_for(path: str, given: str | None) -> str | None:
@@ -1553,7 +1566,8 @@ def latex_source_for(path: str, given: str | None) -> str | None:
 
 
 def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
-             backend: str = "auto", latex_source: str | None = None) -> tuple[dict[str, Any], list[Section]]:
+             backend: str = "auto", latex_source: str | None = None,
+             title: str | None = None) -> tuple[dict[str, Any], list[Section]]:
     reader = open_backend(path, backend)
     pages = reader.page_texts()
     ocr_used = False
@@ -1624,6 +1638,13 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             "page_text": "\n".join(pages[:2]),
             "browser": bool(BROWSER_RE.search(f"{docinfo.get('Creator', '')} {docinfo.get('Producer', '')}")),
         }
+    # A KNOWN title, passed through (`--title`, which `cat ingest` fills from
+    # the catalogue's Dublin Core `dc.title`; bean `turh`): it takes the slot of
+    # the page-1 guess as the raw title, exactly as `pdf-pages.py --title` does,
+    # so the resolver still records whether the PDF corroborates it and the
+    # section files' `doc_title` carry it instead of a scan's misreading.
+    if title:
+        meta = {**meta, "title": title}
     meta = resolve_title(meta | {"docinfo": docinfo}, evidence, doc_id)
 
     artefact: dict[str, Any] = {
@@ -1654,6 +1675,10 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             # with the filename could not tell you that.
             **{k: v for k, v in _tech_meta(path).items()
                if k in ("mtime", "mimetype_sniffed", "mimetype_source")},
+            # Which software made OCR'd text (bean `turh`): the reference to
+            # the run context `pdf-ocr.py` wrote beside the pages. Absent for
+            # an embedded text layer, and for an OCR cache older than it.
+            **ocr_run_context_ref(path, outdir, ocr_used),
         },
         "metadata": meta,
         "toc": [asdict(e) for e in toc],
@@ -1769,6 +1794,9 @@ def main() -> int:
                     help="LaTeX source (directory or e-print) whose \\section commands give the "
                          "headings when the PDF has no outline. Default: the entry's own source/ "
                          "beside the PDF, if there is one. Pass '' to read none.")
+    ap.add_argument("--title", default=None,
+                    help="a title already known for the document (a catalogue record's dc.title): "
+                         "used as the raw title instead of the page-1 parse, and in the sections' doc_title")
     ap.add_argument("--backend", choices=("auto", "pymupdf", "pypdf"), default="auto",
                     help="PDF reader backend. auto (default) prefers PyMuPDF when "
                          "installed (cleaner text + real embedded outlines) and falls "
@@ -1787,7 +1815,7 @@ def main() -> int:
     ok = failed = 0
     for path in targets:
         try:
-            artefact, sections = process(path, args.outdir, args.ocr, args.backend, args.latex_source)
+            artefact, sections = process(path, args.outdir, args.ocr, args.backend, args.latex_source, args.title)
         except Exception as exc:
             failed += 1
             print(f"FAIL  {os.path.basename(path)}: {type(exc).__name__}: {exc}",
