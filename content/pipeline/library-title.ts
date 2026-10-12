@@ -294,6 +294,44 @@ export interface EntryTitleRead {
   from: Partial<Record<LibraryTitleSource, string>>;
   /** Files that exist and would not parse. Non-empty means the title could not be determined. */
   unreadable: { file: string; why: string }[];
+  /**
+   * The editor's record, when it came from {@link TITLE_CORRECTION_FILE} —
+   * carried so the manifest can state its basis, as a PDF's does.
+   */
+  correction?: TitleCorrection;
+}
+
+/** An editor's title, with the basis that makes it a checked title rather than a guess (bean `w6fu`). */
+export interface TitleCorrection {
+  title: string;
+  basis: string;
+  corrected_on: string;
+  bean?: string;
+}
+
+/**
+ * Where an entry WITHOUT a `structure.json` keeps its editorial title — a
+ * tabular dataset, a slide deck. Bean `cat-tools-v8wg`: CODATA's corrected
+ * title was written into the generated manifest, and the next regeneration
+ * overwrote it with the slug (sci `99d054e`), because nothing the generator
+ * reads held it. This file is AUTHORED, beside the entry, and never written
+ * by the generator, so a regeneration reads it rather than erasing it.
+ */
+export const TITLE_CORRECTION_FILE = "title-correction.json";
+
+/** `undefined` when absent; a reason when present and not a correction. */
+export function readTitleCorrection(dir: string): { ok: true; correction?: TitleCorrection } | { ok: false; why: string } {
+  const raw = readJsonFile(join(dir, TITLE_CORRECTION_FILE));
+  if (raw === undefined) return { ok: true };
+  if (raw === null) return { ok: false, why: "not a JSON object" };
+  const title = str(raw.title);
+  const basis = str(raw.basis);
+  const corrected_on = str(raw.corrected_on);
+  if (!title || !basis || !corrected_on) {
+    return { ok: false, why: "a title correction needs `title`, `basis` and `corrected_on` — an editorial title without its basis is a guess" };
+  }
+  const bean = str(raw.bean);
+  return { ok: true, correction: { title, basis, corrected_on, ...(bean ? { bean } : {}) } };
 }
 
 /**
@@ -321,6 +359,18 @@ export function readTitleCandidates(
     if (candidates["dc-record"]) from["dc-record"] = `${cat.file} dc.title`;
   }
 
+  // An editor's correction for an entry with no `structure.json` (bean
+  // `v8wg`). A structure's own `title_correction` below still wins when both
+  // exist, because it is the record the PDF path has always read.
+  let correction: TitleCorrection | undefined;
+  const tc = readTitleCorrection(dir);
+  if (!tc.ok) unreadable.push({ file: TITLE_CORRECTION_FILE, why: tc.why });
+  else if (tc.correction) {
+    correction = tc.correction;
+    candidates.editorial = tc.correction.title;
+    from.editorial = `${TITLE_CORRECTION_FILE} title`;
+  }
+
   const referenced = pre.referenced ?? readJsonFile(join(dir, "referenced.json")) ?? undefined;
   const refTitle = str(obj(referenced?.identity).title);
   if (refTitle) {
@@ -338,5 +388,5 @@ export function readTitleCandidates(
     }
     candidates.sourceFiles = [...(candidates.sourceFiles ?? []), ...(st.candidates.sourceFiles ?? [])];
   }
-  return { candidates, from, unreadable };
+  return { candidates, from, unreadable, ...(correction && from.editorial === `${TITLE_CORRECTION_FILE} title` ? { correction } : {}) };
 }

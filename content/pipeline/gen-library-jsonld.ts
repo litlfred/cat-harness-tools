@@ -104,6 +104,8 @@ export interface ManifestTitle {
   source: LibraryTitleSource;
   /** `<file> <field>` it was read from; absent for `slug`. */
   from?: string;
+  /** The editor's record when it came from `title-correction.json` (bean `v8wg`). */
+  correction?: { title: string; basis: string; corrected_on: string; bean?: string };
 }
 
 /**
@@ -119,7 +121,13 @@ function titleMeta(t: ManifestTitle, md?: Structure["metadata"]): Record<string,
     // correction never passes for an extraction.
     title_verified: t.source === "editorial" || t.source === "corroborated" ? true : undefined,
     title_correction:
-      t.source === "editorial" && md?.title_correction ? { ...md.title_correction, extracted: md.title ?? null } : undefined,
+      t.source !== "editorial"
+        ? undefined
+        : md?.title_correction
+          ? { ...md.title_correction, extracted: md.title ?? null }
+          : t.correction
+            ? { ...t.correction, extracted: null }
+            : undefined,
   };
 }
 
@@ -763,7 +771,11 @@ function entryTitle(
   const read = readTitleCandidates(dir, docId, pre, locatedAt);
   if (read.unreadable.length) return undefined;
   const r = resolveLibraryTitle(read.candidates);
-  return { ...r, from: r.source === "slug" ? undefined : read.from[r.source] };
+  return {
+    ...r,
+    from: r.source === "slug" ? undefined : read.from[r.source],
+    ...(r.source === "editorial" && read.correction ? { correction: read.correction } : {}),
+  };
 }
 
 /**
