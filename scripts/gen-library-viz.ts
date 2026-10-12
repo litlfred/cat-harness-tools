@@ -59,6 +59,7 @@ import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME } from "../src/core/edit-links.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { entryGraphFiles, entryGraphSitePath } from "./lib/library-entry-graphs.ts";
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
@@ -890,6 +891,8 @@ export interface ShellEntry {
   id: string;
   /** Href of the entry's published JSON-LD, relative to the page — the `alternate`. */
   jsonld?: string;
+  /** The JSON-LD graphs of the entry's declared sub-graphs (e.g. its L1 extraction), relative to the page — bean 8pzh. */
+  graphs?: { label: string; href: string }[];
 }
 
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
@@ -1027,7 +1030,13 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     config: { data: dataHref, scope, libRoot, entry: entry.id },
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>${
       entry.jsonld ? ` and this entry from <a href="${escHtml(entry.jsonld)}">its JSON-LD</a>` : ""
-    }; it needs JavaScript to draw them.</p>`,
+    }; it needs JavaScript to draw them.</p>${
+      entry.graphs?.length
+        ? `<p class="note">Graphs read out of this entry: ${entry.graphs
+            .map((g) => `<a href="${escHtml(g.href)}">${escHtml(g.label)}</a>`)
+            .join(", ")}.</p>`
+        : ""
+    }`,
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     searchExclude: true,
   });
@@ -1503,9 +1512,29 @@ if (import.meta.main) {
         emitBytes(dest, readFileSync(src));
         jsonld = relative(shellDir, dest).split(sep).join("/");
       }
+      // ── THE ENTRY'S DECLARED SUB-GRAPHS, BESIDE ITS MANIFEST (bean 8pzh) ──
+      //
+      // Owner, 2026-10-12: *"if its a part of the KG it should be
+      // published."* A directory DECLARED inside the entry with a typology
+      // that is `within: "library"` (an `l1-extraction`, say) is part of
+      // the entry's KG, so every file of it is published at its path relative
+      // to the entry, under the manifest's own directory — copied as-is, like
+      // the manifest. A withheld entry publishes none. Its JSON-LD documents
+      // are linked from the page (here, and through the projection's `links`).
+      const graphs: { label: string; href: string }[] = [];
+      for (const f of e.withheld ? [] : entryGraphFiles(join(repoRoot, e.dir))) {
+        const dest = join(site, entryGraphSitePath(subject, e.id, f.rel));
+        wantedJsonld.add(dest);
+        emitBytes(dest, readFileSync(f.abs));
+        if (f.jsonld) graphs.push({ label: f.rel, href: relative(shellDir, dest).split(sep).join("/") });
+      }
       emit(
         join(shellDir, "index.html"),
-        entryPageHtml(`../${sub.dataHref}`, subject, "../../", { id: e.id, ...(jsonld ? { jsonld } : {}) }),
+        entryPageHtml(`../${sub.dataHref}`, subject, "../../", {
+          id: e.id,
+          ...(jsonld ? { jsonld } : {}),
+          ...(graphs.length ? { graphs } : {}),
+        }),
       );
     }
 

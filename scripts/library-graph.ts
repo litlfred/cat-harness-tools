@@ -98,6 +98,7 @@ import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
+import { entryGraphFiles, entryGraphSitePath } from "./lib/library-entry-graphs.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -239,6 +240,10 @@ export interface LibraryEntry {
    * `href` is an absolute URL, or SITE-ROOT-relative with a leading `/` and no
    * base — the avatar's convention, composed by the viewer against wherever
    * the site is served. Absent when the entry records none.
+   *
+   * Also each JSON-LD graph of a sub-graph DECLARED inside the entry
+   * (`within: "library"`, e.g. an `l1-extraction`), at the site path
+   * it is published at beside the entry's manifest — bean 8pzh item 1.
    */
   links?: { label: string; href: string }[];
 }
@@ -889,8 +894,17 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
           ? { readme: sourceLinks(REPO_URL(repoRoot), `${relative(repoRoot, dir).split("\\").join("/")}/README.md`, "main")?.viewHref }
           : {}),
         ...(() => {
-          const links = has("referenced.json") ? referencedLinksOf(dir) : undefined;
-          return links ? { links } : {};
+          // The entry's declared sub-graphs (bean 8pzh item 1): each JSON-LD
+          // document in one is published beside the manifest by
+          // `gen-library-viz`, and linked from the entry here. A withheld
+          // entry publishes none, so it links none.
+          const graphs = withheldEntryFor(dir)
+            ? []
+            : entryGraphFiles(dir)
+                .filter((f) => f.jsonld)
+                .map((f) => ({ label: f.rel, href: `/${entryGraphSitePath(instance, slug, f.rel)}` }));
+          const links = [...((has("referenced.json") ? referencedLinksOf(dir) : undefined) ?? []), ...graphs];
+          return links.length ? { links } : {};
         })(),
         ...(() => {
           const w = withheldEntryFor(dir);
