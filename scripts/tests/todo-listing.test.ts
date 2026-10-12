@@ -16,6 +16,8 @@ import { describe, expect, test } from "bun:test";
 import { escapeHtml, renderTodoListing } from "../todo-listing.js";
 import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { localSiteDir } from "../lib/local-site-dir.ts";
+import { todoBoardPage } from "../state-visualizer.ts";
 
 /** The minimum a note needs to be a valid `TodoIndexItem`. */
 function item(over: Record<string, unknown> = {}) {
@@ -171,10 +173,15 @@ describe("linear floor on todos/index.html (folio-assistant-dm4j)", () => {
     // layout: default. The linear floor (generated/todo-listing.html) is
     // included in the footer of every default layout page (footer_custom.html),
     // ensuring todos/index.html serves the notes listing in its own bytes.
-    const footer = readFileSync(join(HARNESS_ROOT, "docs", "_includes", "footer_custom.html"), "utf8");
+    //
+    // The page is GENERATED (`todoBoardPage`, written at build by the state
+    // visualiser) and not committed, so this asks the generator — reading a
+    // committed copy failed with ENOENT once the page left main, and said
+    // nothing about the page the site actually serves.
+    const footer = readFileSync(join(localSiteDir(HARNESS_ROOT)!, "_includes", "footer_custom.html"), "utf8");
     expect(footer).toContain("include generated/todo-listing.html");
 
-    const todosPage = readFileSync(join(HARNESS_ROOT, "docs", "todos", "index.html"), "utf8");
+    const todosPage = todoBoardPage({ description: "A person's outstanding items." });
     expect(todosPage).toContain("layout: default");
     expect(todosPage).toContain('<h1 id="todos">Todos</h1>');
   });

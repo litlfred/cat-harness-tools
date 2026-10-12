@@ -32,7 +32,6 @@ import { describe, test, expect } from "bun:test";
 import { resolve } from "path";
 import {
   BLOCK_KINDS,
-  PAPER_BLOCK_KINDS,
   ALL_BLOCK_KINDS,
   ADAPTER_BLOCK_KINDS,
   CONTENT_ADAPTERS,
@@ -59,15 +58,8 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
 const contributed = registry.contributedKinds();
 
 describe("adapter partition", () => {
-  test("paper kinds are BLOCK_KINDS, both read off the same nodes", () => {
-    // A second hand-maintained list is the drift this module exists to stop.
-    // Since bean riit, both are DISCOVERED (the paper adapter's nodes), so
-    // they are equal by construction rather than by being one array.
-    expect([...PAPER_BLOCK_KINDS]).toEqual([...BLOCK_KINDS]);
-  });
-
   test("ALL_BLOCK_KINDS is the built-in kinds, with no duplicates", () => {
-    expect([...ALL_BLOCK_KINDS]).toEqual([...PAPER_BLOCK_KINDS]);
+    expect([...ALL_BLOCK_KINDS]).toEqual([...BLOCK_KINDS]);
     expect(new Set(ALL_BLOCK_KINDS).size).toBe(ALL_BLOCK_KINDS.length);
   });
 
@@ -87,13 +79,16 @@ describe("adapter partition", () => {
 });
 
 describe("criterion adapter scope", () => {
-  test("absent defaults to paper, not to all", () => {
-    expect(criterionAdapters({})).toEqual(["paper"]);
+  test("absent defaults to every built-in vocabulary, not to all", () => {
+    // It was `["paper"]` while one vocabulary held every built-in kind; since
+    // the split by layer (bean bzwk: core `document`, sci `mathpaper`) the
+    // same meaning is every typed vocabulary, whichever layout is mounted.
+    expect(criterionAdapters({})).toEqual([...CONTENT_ADAPTERS]);
   });
 
   test("an explicit scope is honoured", () => {
     expect(criterionAdapters({ adapters: ["dak"] })).toEqual(["dak"]);
-    expect(criterionAdapters({ adapters: ["paper", "dak"] })).toEqual(["paper", "dak"]);
+    expect(criterionAdapters({ adapters: [...CONTENT_ADAPTERS, "dak"] })).toEqual([...CONTENT_ADAPTERS, "dak"]);
   });
 
   test("every criterion resolves to a non-empty scope", () => {
@@ -107,7 +102,7 @@ describe("criterion adapter scope", () => {
     expect(incompatibleCompanions({ adapters: ["dak"], depends_on: ["ts"] })).toEqual(["ts"]);
   });
 
-  test("paper axes never admit a DAK block, and DAK axes never admit a paper one", () => {
+  test("built-in axes never admit a DAK block, and DAK axes never admit a built-in one", () => {
     for (const def of QA_CRITERIA_REGISTRY) {
       const scope = criterionAdapters(def);
       for (const { kind } of contributed.filter((c) => c.adapter === "dak")) {
@@ -115,7 +110,7 @@ describe("criterion adapter scope", () => {
         expect(scope.includes(owner)).toBe(scope.includes("dak"));
       }
       for (const k of BLOCK_KINDS) {
-        expect(scope.includes(adapterForKind(k)!)).toBe(scope.includes("paper"));
+        if (scope.includes("dak")) expect(scope.includes(adapterForKind(k)!)).toBe(false);
       }
     }
   });
@@ -136,17 +131,19 @@ describe("criterion adapter scope", () => {
 });
 
 describe("no-op for the existing paper corpus", () => {
-  test("every kind the corpus can contain resolves to paper", () => {
+  test("every kind the corpus can contain resolves to a built-in vocabulary", () => {
     // walkBlocks recognises a block only via BLOCK_BUILDER_RE, built from
     // BLOCK_KINDS — so these are exactly the kinds a sweep can encounter
     // today. All must pass the adapter gate, or the next sweep rewrites
     // sidecars across the whole corpus.
-    for (const k of BLOCK_KINDS) expect(adapterForKind(k)).toBe("paper");
+    for (const k of BLOCK_KINDS) expect(CONTENT_ADAPTERS as readonly string[]).toContain(adapterForKind(k)!);
   });
 
-  test("every paper-scoped criterion admits every paper kind", () => {
+  test("every built-in-scoped criterion admits every built-in kind", () => {
+    // No criterion scopes to ONE of the built-in vocabularies yet, so a
+    // criterion that names any of them is written for all built-in kinds.
     for (const def of QA_CRITERIA_REGISTRY) {
-      if (!criterionAdapters(def).includes("paper")) continue;
+      if (!CONTENT_ADAPTERS.some((a) => criterionAdapters(def).includes(a))) continue;
       for (const k of BLOCK_KINDS) {
         expect(criterionAdapters(def).includes(adapterForKind(k)!)).toBe(true);
       }

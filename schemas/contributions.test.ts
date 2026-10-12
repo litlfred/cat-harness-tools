@@ -17,7 +17,7 @@ import {
   type FolioContribution,
 } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { CONTENT_ADAPTERS, adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
@@ -120,7 +120,7 @@ describe("ContributionRegistry", () => {
 
   it("refuses an adapter name the platform already owns", () => {
     const r = new ContributionRegistry();
-    expect(() => r.register({ name: "rogue", adapter: { name: "paper", module: "./x.ts" } }))
+    expect(() => r.register({ name: "rogue", adapter: { name: CONTENT_ADAPTERS[0]!, module: "./x.ts" } }))
       .toThrow(ContributionCollisionError);
   });
 
@@ -195,7 +195,8 @@ describe("composedKindOwner", () => {
   it("consults the platform first, the registry second", () => {
     const r = new ContributionRegistry();
     r.register({ name: "sci", blockKinds: [{ kind: "knot-diagram", adapter: "sci" }] });
-    expect(composedKindOwner("theorem", r, adapterForKind)).toBe("paper");
+    expect(composedKindOwner("theorem", r, adapterForKind)).toBe(adapterForKind("theorem")!);
+    expect(CONTENT_ADAPTERS as readonly string[]).toContain(adapterForKind("theorem")!);
     expect(composedKindOwner("knot-diagram", r, adapterForKind)).toBe("sci");
   });
 

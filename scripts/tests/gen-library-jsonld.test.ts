@@ -352,6 +352,44 @@ describe("a whole library entry, through the real branch — bean `p67i`", () =>
     rmSync(root, { recursive: true, force: true });
   });
 
+  // Bean `cat-tools-v8wg`: CODATA's corrected title was written into the
+  // GENERATED manifest, and the next regeneration put the slug back. An
+  // authored `title-correction.json` beside the entry is what the generator
+  // reads, so a regeneration keeps it.
+  const correction = { title: "CODATA 2022 recommended values of the fundamental physical constants", basis: "the NIST CODATA page the file is published from", corrected_on: "2026-10-12", bean: "cat-tools-v8wg" };
+
+  test("an editorial title-correction.json titles a tabular entry, with its basis in the manifest", () => {
+    const dir = entry({ "tabular.jsonld": record("txt", [{ name: "d", headers: ["quantity", "value"] }]), "title-correction.json": correction });
+    const out = buildEntryNodes("d", dir);
+    expect(out.state).toBe("built");
+    if (out.state !== "built") return;
+    const manifest = JSON.parse(out.files.find((f) => f.path === "manifest.jsonld")!.content);
+    expect(manifest.title).toBe(correction.title);
+    expect(manifest.meta.title_source).toBe("editorial");
+    expect(manifest.meta.title_from).toBe("title-correction.json title");
+    expect(manifest.meta.title_verified).toBe(true);
+    expect(manifest.meta.title_correction).toMatchObject({ basis: correction.basis, corrected_on: "2026-10-12", bean: "cat-tools-v8wg" });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("FALSIFICATION: regenerating does not erase it — the defect the bean measured", () => {
+    const dir = entry({ "tabular.jsonld": record("txt", [{ name: "d", headers: ["quantity"] }]), "title-correction.json": correction });
+    const first = buildEntryNodes("d", dir);
+    if (first.state !== "built") throw new Error("not built");
+    // Write the generated manifest back, as a regeneration's previous run would have.
+    writeFileSync(join(dir, "manifest.jsonld"), first.files.find((f) => f.path === "manifest.jsonld")!.content);
+    const second = buildEntryNodes("d", dir);
+    if (second.state !== "built") throw new Error("not built");
+    expect(JSON.parse(second.files.find((f) => f.path === "manifest.jsonld")!.content).title).toBe(correction.title);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a correction without its basis is unreadable — an editorial title with no basis is a guess", () => {
+    const dir = entry({ "tabular.jsonld": record("txt", [{ name: "d", headers: ["q"] }]), "title-correction.json": { title: "Something" } });
+    expect(buildEntryNodes("d", dir).state).toBe("unreadable");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("a record that is THERE and unreadable is `unreadable`, never `no-input`", () => {
     // The failure this separation exists to prevent: reported as "not
     // ingested", it names the wrong cause and sends a reader to the wrong fix.

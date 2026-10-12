@@ -328,6 +328,7 @@
     "check:visualiser-routes": "bun run cat-harness-tools/scripts/check-visualiser-routes.ts",
     "check:environment": "bun run cat-harness-tools/scripts/check-environment.ts",
     "check:declared-paths": "bun run cat-harness-tools/scripts/check-declared-paths.ts",
+    "workflow:instances": "bun run cat-harness-tools/scripts/workflow-instances.ts",
     "check:duplicate-ids": "bun run cat-harness-tools/scripts/check-duplicate-ids.ts",
     "check:fallback-roles": "bun run cat-harness-tools/scripts/check-fallback-roles.ts",
     "check:term-mapping": "bun run cat-harness-tools/scripts/check-term-mapping.ts --check",
