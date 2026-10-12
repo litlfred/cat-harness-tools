@@ -120,3 +120,27 @@ describe("personal-account levels are the mapping (owner, 2026-09-24)", () => {
     }
   });
 });
+
+describe("whoami lists the other identities, and never authorizes on them (bean f1e1)", () => {
+  const id = { status: "authenticated" as const, login: "octo", repo: "o/r", role: "read" as const, via: "token" as const };
+  test("the GitHub login is not repeated; the others are labelled vouched or self-asserted", () => {
+    const md = whoami(CTX, id, {}, [
+      { provider: "github", handle: "octo", via: "token", vouched: true },
+      { provider: "claude", handle: "a@b.c", via: "CLAUDE_CODE_USER_EMAIL", vouched: true },
+      { provider: "git", handle: "a@b.c", via: "git config user.email", vouched: false },
+    ]);
+    expect(md).toContain("**Also seen** (for preferences only, never for permissions)");
+    expect(md).toContain("`claude:a@b.c` (vouched, CLAUDE_CODE_USER_EMAIL)");
+    expect(md).toContain("`git:a@b.c` (self-asserted, git config user.email)");
+    expect(md).not.toContain("`github:octo`");
+  });
+  test("an unauthenticated caller with a self-asserted identity is still nobody for permissions", () => {
+    const md = whoami(CTX, { status: "unauthenticated" }, {}, [{ provider: "git", handle: "owner@x", via: "git config user.email", vouched: false }]);
+    expect(md).toContain("**Nobody:**");
+    expect(md).toContain("`git:owner@x`");
+  });
+  test("no others, no line — the old answer is unchanged", () => {
+    expect(whoami(CTX, id, {})).not.toContain("Also seen");
+  });
+});
+
