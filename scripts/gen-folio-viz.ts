@@ -69,6 +69,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 import { viewerPlacement } from "./gen-schema-viz.ts";
+import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio/render/file-list.ts";
 import {
   directoriesForGraph,
   readDeclaration,
@@ -102,7 +103,13 @@ export interface FolioNodeRow {
 
 export interface FolioGraph {
   /** Every declared folio directory, ABSENT ONES INCLUDED. */
-  directories: Array<{ dir: string; present: boolean; nodes: number }>;
+  /**
+   * `files` is the folio as a list of files: the harness's minimal
+   * rendering (`folio/render/file-list.ts`, bean `ohx6`), read through the
+   * same function, so the viewer's 'list' view and the harness's page cannot
+   * disagree about what the folio holds.
+   */
+  directories: Array<{ dir: string; present: boolean; nodes: number; files: FolioFile[] }>;
   nodes: FolioNodeRow[];
 }
 
@@ -190,7 +197,7 @@ export function readFolioGraph(roots: string[], repo?: string): FolioGraph | nul
         n++;
       }
     }
-    g.directories.push({ dir: rel(dir), present, nodes: n });
+    g.directories.push({ dir: rel(dir), present, nodes: n, files: present ? folioFileList(dir) : [] });
   }
   return g;
 }
@@ -199,7 +206,9 @@ export function projection(g: FolioGraph): unknown {
   return {
     $schema: "folio-graph-projection/v1",
     tile: { folio: { count: g.nodes.length, unit: "stickies" } },
-    directories: g.directories,
+    // Sizes formatted by the harness's own `formatBytes`, so the list view and
+    // `folio/index.md` show the same number, not two roundings of it.
+    directories: g.directories.map((d) => ({ ...d, files: d.files.map((f) => ({ ...f, size: formatBytes(f.bytes) })) })),
     nodes: g.nodes,
   };
 }
@@ -249,6 +258,7 @@ export function viewerHtml(dataHref: string): string {
      the landing board; this is a view of the graph behind it.</p>
   <div id="badges"></div>
   <div id="dirs"></div>
+  <div id="files"></div>
   <div id="nodes"><p class="empty">loading…</p></div>
 </div>
 <script>
@@ -286,6 +296,21 @@ fetch(DATA_HREF).then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.
         (d.present ? "present" : '<span class="pill warn">declared, absent</span>') +
         "</td><td>" + d.nodes + "</td></tr>";
     }).join("") + "</tbody></table>";
+
+  /* THE 'LIST' VIEW (bean ohx6): the folio as the files it holds, the same
+     list the harness's own page (folio/index.md) renders. Drawn before the
+     node table so it shows even when the folio has no stickies. */
+  $("files").innerHTML = '<h2 id="fo-files-head">List view: files</h2>' +
+    G.directories.map(function(d){
+      var files = d.files || [];
+      if (!d.present) return '<p class="empty"><code>' + esc(d.dir) + "</code> is declared but absent, so it holds no files.</p>";
+      if (files.length === 0) return '<p class="empty"><code>' + esc(d.dir) + "</code> holds no files.</p>";
+      return '<table aria-label="Files in ' + esc(d.dir) + '" aria-labelledby="fo-files-head">' +
+        "<caption>Files in <code>" + esc(d.dir) + "</code></caption>" +
+        "<thead><tr><th>file</th><th>size</th></tr></thead><tbody>" +
+        files.map(function(f){ return "<tr><td><code>" + esc(f.path) + "</code></td><td class=\"muted\">" + esc(f.size) + "</td></tr>"; }).join("") +
+        "</tbody></table>";
+    }).join("");
 
   if (G.nodes.length === 0) {
     $("nodes").innerHTML = '<h2 id="fo-nodes-head">Folio nodes</h2>' +

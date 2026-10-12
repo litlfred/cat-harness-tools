@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
+import { folioFileList } from "@litlfred/cat-harness/folio/render/file-list.ts";
 import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
@@ -199,5 +200,30 @@ describe("node links resolve on the page (qgjh)", () => {
   test("a protocol-relative or unknown href stays text", () => {
     expect(linkHref("//evil.example/x")).toBe("");
     expect(linkHref("javascript:alert(1)")).toBe("");
+  });
+});
+
+describe("the 'list' view is the harness's own file list (bean ohx6)", () => {
+  const g = readFolioGraph([ROOT, REPO]);
+
+  test("each present directory's files are EXACTLY folioFileList's answer, not a second listing", () => {
+    for (const d of g!.directories.filter((x) => x.present)) {
+      expect(d.files).toEqual(folioFileList(join(REPO, d.dir)));
+    }
+  });
+
+  test("the projection carries a formatted size for every file, and an absent directory lists none", () => {
+    const p = projection(g!) as { directories: Array<{ present: boolean; files: Array<{ path: string; bytes: number; size: string }> }> };
+    for (const d of p.directories) {
+      if (!d.present) expect(d.files).toEqual([]);
+      for (const f of d.files) expect(f.size).toMatch(/^\d+(\.\d)? (B|KB|MB|GB)$/);
+    }
+  });
+
+  test("the page has a place for the list view, drawn before the node table", () => {
+    const html = viewerHtml("../assets/folio/index.json");
+    expect(html).toContain('<div id="files"></div>');
+    expect(html.indexOf('id="files"')).toBeLessThan(html.indexOf('id="nodes"'));
+    expect(html).toContain("List view: files");
   });
 });
