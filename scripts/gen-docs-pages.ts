@@ -38,7 +38,7 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, dirname, relative, resolve, posix } from "node:path";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
 import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
-import { renderTodoListing } from "./todo-listing.js";
+import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
 import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/semantic-zoom.js";
 import {
   buildTranslationIndex,
@@ -346,6 +346,18 @@ const TODO_ASSET = join(OUT_DIR, "assets", "todos", "index.json");
  * standing rule is that a generated directory is never hand-edited.
  */
 const TODO_LISTING_INCLUDE = join(OUT_DIR, "_includes", "generated", "todo-listing.html");
+
+/**
+ * EACH PAGE'S OWN LISTING — bean `lwjc`. One fragment per page that has a note
+ * attached, under `todo-listing/`, and a `_data` index of which pages have one:
+ * Jekyll cannot include a file that is not there, so `footer_custom.html` asks
+ * the index first. A page with no note gets no file and no index entry, so
+ * "nothing here" is an absence, never an empty section. The single listing
+ * above stays: it is the todos board's, and the footer of a site built by an
+ * older cat-harness still includes it.
+ */
+const TODO_LISTING_PAGES_DIR = join(OUT_DIR, "_includes", "generated", "todo-listing");
+const TODO_LISTING_INDEX = join(OUT_DIR, "_data", "todo_listing.json");
 
 /**
  * The folio's semantic-zoom declaration, as the board reads it.
@@ -1518,6 +1530,49 @@ function processHierarchy(): Record<string, string[]> {
       }),
     "data",
   );
+
+  // EACH PAGE'S OWN LISTING (bean `lwjc`), from the same `items`, through the
+  // same renderer, with the same hrefs: only the set of notes and the scope
+  // differ. Its count is the page's own cardinality, never the folio's.
+  {
+    const listingOpts = {
+      pageHref: (page: string, node: string) => `{{ '/${publishedPagePath(OUT_DIR, page)}' | relative_url }}#${node}`,
+      todoPageHref: (id: string) => `{{ '/${todoPageSitePath(id)}' | relative_url }}`,
+    };
+    const { pages, unplaced } = groupTodosByPage(items);
+    const written = new Set<string>();
+    // `unplaced` is a COUNT of notes whose label no page carries. They are on
+    // the todos board's whole listing, and on no page's: "could not determine"
+    // is recorded here rather than shown as a page with nothing on it.
+    const index: { pages: Record<string, string>; unplaced: number } = { pages: {}, unplaced: unplaced.length };
+    mkdirSync(TODO_LISTING_PAGES_DIR, { recursive: true });
+    for (const [page, pageItems] of [...pages].sort(([a], [b]) => a.localeCompare(b))) {
+      const file = todoListingFileFor(page);
+      written.add(file);
+      index.pages[page] = `generated/todo-listing/${file}`;
+      emit(
+        join(TODO_LISTING_PAGES_DIR, file),
+        GENERATED_INCLUDE_BANNER + renderTodoListing(pageItems, { ...listingOpts, scope: "page" }),
+        "data",
+      );
+    }
+    // A page that lost its last note loses its fragment too: a leftover file
+    // would still be listed nowhere, but it would be a stale artefact in a
+    // directory this generator owns.
+    for (const f of readdirSync(TODO_LISTING_PAGES_DIR)) {
+      if (!f.endsWith(".html") || written.has(f)) continue;
+      if (check) {
+        console.error(`  ✗ _includes/generated/todo-listing/${f} is stale: no note is attached to that page any more`);
+        stale++;
+      } else unlinkSync(join(TODO_LISTING_PAGES_DIR, f));
+    }
+    mkdirSync(dirname(TODO_LISTING_INDEX), { recursive: true });
+    emit(TODO_LISTING_INDEX, JSON.stringify(index, null, 2) + "\n", "data");
+    console.log(
+      `  ${check ? "·" : "✓"} _includes/generated/todo-listing/ ` +
+        `(${pages.size} page(s) with notes, ${unplaced.length} unplaced)`,
+    );
+  }
 
   // THE GRAPH AND A PAGE PER TODO — issue #1908. From the SAME `items`, so the
   // JSON index the board reads, the no-JS floor and the JSON-LD cannot

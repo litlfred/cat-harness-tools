@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
-import { escapeHtml, renderTodoListing } from "../todo-listing.js";
+import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } from "../todo-listing.js";
 import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { localSiteDir } from "../lib/local-site-dir.ts";
@@ -184,5 +184,55 @@ describe("linear floor on todos/index.html (folio-assistant-dm4j)", () => {
     const todosPage = todoBoardPage({ description: "A person's outstanding items." });
     expect(todosPage).toContain("layout: default");
     expect(todosPage).toContain('<h1 id="todos">Todos</h1>');
+  });
+});
+
+describe("each page lists only its own notes (bean lwjc)", () => {
+  const at = (page: string, node = "n") => ({ target: { page, node, label: `sec:${page}-${node}` }, targetLabel: `sec:${page}-${node}` });
+  const notes = [
+    item({ id: "p1", ...at("guides/beans-and-todos") }),
+    item({ id: "u1", targetLabel: "sec:gone-x" }),
+    item({ id: "q1", ...at("concepts/agentic-harness") }),
+    item({ id: "p2", ...at("guides/beans-and-todos", "m") }),
+  ];
+
+  test("groups by the page each note is attached to, keeping input order", () => {
+    const { pages, unplaced } = groupTodosByPage(notes);
+    expect([...pages.keys()]).toEqual(["guides/beans-and-todos", "concepts/agentic-harness"]);
+    expect(pages.get("guides/beans-and-todos")!.map((i) => i.id)).toEqual(["p1", "p2"]);
+    expect(pages.get("concepts/agentic-harness")!.map((i) => i.id)).toEqual(["q1"]);
+    // A label no page carries is UNPLACED, never folded into a page.
+    expect(unplaced.map((i) => i.id)).toEqual(["u1"]);
+  });
+
+  test("a page with no note gets no entry -- an absence, not an empty list", () => {
+    const { pages } = groupTodosByPage(notes);
+    expect(pages.has("guides/writing-a-document")).toBe(false);
+    expect(groupTodosByPage([]).pages.size).toBe(0);
+  });
+
+  test("a page's count is its own cardinality, never the folio's", () => {
+    const { pages } = groupTodosByPage(notes);
+    const html = renderTodoListing(pages.get("guides/beans-and-todos")!, { scope: "page" });
+    expect(html).toContain(`data-fa-todo-count="2"`);
+    expect(html).toContain(`data-fa-todo-scope="page"`);
+    expect(html).toContain("Notes on this page (2)");
+    expect(html).not.toContain("Every note in this folio, in document order");
+  });
+
+  test("the folio listing is unchanged by default", () => {
+    const html = renderTodoListing(notes);
+    expect(html).toContain(`data-fa-todo-scope="folio"`);
+    expect(html).toContain("Open notes (4)");
+  });
+
+  test("one fragment file per page, flat", () => {
+    expect(todoListingFileFor("guides/beans-and-todos")).toBe("guides__beans-and-todos.html");
+    expect(todoListingFileFor("index")).toBe("index.html");
+  });
+
+  test("the todos board keeps the whole listing: its page says so in front matter", () => {
+    const board = todoBoardPage({ description: "A person's outstanding items." });
+    expect(board).toMatch(/^fa_todo_listing: all$/m);
   });
 });

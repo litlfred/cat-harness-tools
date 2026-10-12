@@ -842,6 +842,7 @@ export function todoBoardPage(g: Pick<StateGraph, "description">): string {
 layout: default
 title: Todos
 nav_exclude: true
+fa_todo_listing: all
 ---
 <!--
   ${GENERATED_BY}: the next run
