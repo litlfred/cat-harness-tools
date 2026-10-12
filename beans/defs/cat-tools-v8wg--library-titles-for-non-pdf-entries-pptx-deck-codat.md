@@ -1,12 +1,13 @@
 ---
 # cat-tools-v8wg
 title: Library titles for non-PDF entries (pptx deck, CODATA table)
-status: todo
+status: in-progress
 type: task
+priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-11T06:19:15Z
-updated_at: 2026-10-11T06:19:15Z
+updated_at: 2026-10-12T08:49:12Z
 ---
 
 **Rehomed 2026-10-11 from `litlfred/folio-assistant-core` bean `folio-assistant-6eiw`** by the owner's ruling of 2026-10-10 (option 1 + 2: move to the code's repo, keep a pointer in core). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -72,3 +73,10 @@ that an editorial title is not preserved across regeneration (the resolver,
 cat-harness-tools `gen-library-jsonld.ts`). **This copy stays open as the
 owning one**, since sci has no store, until a title correction survives
 regeneration. The cat-harness-store copy should be reopened.
+
+
+
+## 2026-10-12 (lane B)
+- [x] **The defect:** an editorial title lived only in the generated manifest, so a regeneration erased it. Fixed in cat-harness-tools#142: an authored `title-correction.json` beside the entry is the editorial source, and a regeneration keeps it.
+- [x] **The data:** folio-assistant-sci#14 restores CODATA's correction with its original basis, and the regenerated manifest.
+- [x] **Done-when 2:** check-library-qa's title-missing already flags a slug title.

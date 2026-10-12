@@ -1,12 +1,13 @@
 ---
 # cat-tools-rt0l
 title: todos/index.html serves ZERO notes without JavaScript — the one page most about notes is the only one with no linear floor
-status: todo
+status: in-progress
 type: task
+priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-11T06:19:15Z
-updated_at: 2026-10-11T06:19:15Z
+updated_at: 2026-10-12T08:49:12Z
 ---
 
 **Rehomed 2026-10-11 from `litlfred/folio-assistant-core` bean `folio-assistant-dm4j`** by the owner's ruling of 2026-10-10 (option 1 + 2: move to the code's repo, keep a pointer in core). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -197,3 +198,10 @@ pointer.
 
 **Pointer:** the residue is `litlfred/cat-harness-tools` bean **`cat-tools-lwjc`**
 (cat-harness-tools PR #68). This copy closes when that one does.
+
+
+
+## 2026-10-12 (lane B)
+- **Already in place:** todoBoardPage makes the page a default-layout Jekyll page, so it carries the footer listing (Done-when 1). linear-floor.e2e.ts asserts it with JavaScript disabled (Done-when 3).
+- **Fixed in cat-harness-tools#139:** the unit test read a generated page that main does not hold. It now asks the generator.
+- **Done-when 2 (first paint):** this comes from the default layout's head_custom, the same as every Jekyll page. It can't be run here until g9m3, because e2e collects 0.
