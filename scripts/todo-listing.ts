@@ -73,6 +73,54 @@ export interface TodoListingOptions {
    * it because Jekyll owns `baseurl`, and an absent href renders no link.
    */
   todoPageHref?: (id: string) => string | undefined;
+  /**
+   * Which listing this is (bean `lwjc`). `"folio"`, the default, is every note
+   * — the todos board's listing. `"page"` is the notes attached to ONE page,
+   * which is what a page's footer shows: its count is that page's own, never
+   * the folio's.
+   */
+  scope?: "folio" | "page";
+}
+
+/** What {@link groupTodosByPage} returns: each page's own notes, and the rest. */
+export interface TodosByPage {
+  /** Page key (a `target.page`) → that page's notes, in input order. */
+  pages: Map<string, TodoIndexItem[]>;
+  /** Notes with no resolved `target`: the third state, never folded into a page. */
+  unplaced: TodoIndexItem[];
+}
+
+/**
+ * Split the notes by the page they are attached to (bean `lwjc`).
+ *
+ * Input order is kept within each page, for the same reason
+ * {@link renderTodoListing} never sorts. A page with no note gets NO entry, so
+ * "nothing here" stays an absence rather than an empty section.
+ */
+export function groupTodosByPage(items: readonly TodoIndexItem[]): TodosByPage {
+  const pages = new Map<string, TodoIndexItem[]>();
+  const unplaced: TodoIndexItem[] = [];
+  for (const item of items) {
+    const page = item.target?.page;
+    if (page === undefined) {
+      unplaced.push(item);
+      continue;
+    }
+    const list = pages.get(page);
+    if (list) list.push(item);
+    else pages.set(page, [item]);
+  }
+  return { pages, unplaced };
+}
+
+/**
+ * The include file a page's listing is written to, under
+ * `_includes/generated/todo-listing/`. A page key is a site path
+ * (`guides/beans-and-todos`); `/` becomes `__` so every fragment is one file in
+ * one directory.
+ */
+export function todoListingFileFor(page: string): string {
+  return `${page.replace(/\//g, "__")}.html`;
 }
 
 /**
@@ -217,16 +265,20 @@ export function renderTodoListing(
   // English, not inheriting `dir="rtl"` from <html>.
   out.push(
     `<section class="fa-todo-listing" id="fa-todo-listing" lang="en" dir="ltr" ` +
-      `aria-labelledby="fa-todo-listing-heading" data-fa-todo-count="${items.length}">`,
+      `aria-labelledby="fa-todo-listing-heading" data-fa-todo-scope="${opts.scope ?? "folio"}" ` +
+      `data-fa-todo-count="${items.length}">`,
   );
+  const scope = opts.scope ?? "folio";
+  const heading = scope === "page" ? "Notes on this page" : "Open notes";
+  const lead =
+    scope === "page"
+      ? "The notes attached to this page, in document order. Every note in this folio is on the todos board."
+      : "Every note in this folio, in document order. This listing is the artefact; the board is an overlay over it.";
   out.push(
     `  <h2 class="fa-todo-listing-heading" id="fa-todo-listing-heading">` +
-      `Open notes (${items.length})</h2>`,
+      `${heading} (${items.length})</h2>`,
   );
-  out.push(
-    `  <p class="fa-todo-listing-lead">Every note in this folio, in document order. ` +
-      `This listing is the artefact; the board is an overlay over it.</p>`,
-  );
+  out.push(`  <p class="fa-todo-listing-lead">${lead}</p>`);
   if (items.length === 0) {
     // Zero notes is a DETERMINED empty and says so. The failure this guards
     // against is the other one — a board that opens empty is

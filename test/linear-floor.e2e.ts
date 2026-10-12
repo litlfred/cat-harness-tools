@@ -33,7 +33,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { renderTodoListing } from "../scripts/todo-listing.ts";
+import { groupTodosByPage, renderTodoListing } from "../scripts/todo-listing.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -93,6 +93,26 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 </div></div>
 <script>${JS}</script></body></html>`;
 
+/**
+ * A PAGE'S OWN LISTING — bean `lwjc`. What `footer_custom.html` includes on
+ * `beans-and-todos`: the fragment `gen-docs-pages.ts` writes for that page,
+ * from the same grouping and the same renderer. A page with no note attached
+ * includes nothing at all, which `BARE_PAGE` stands for.
+ */
+const OWN_LISTING = renderTodoListing(groupTodosByPage(ITEMS).pages.get("beans-and-todos") ?? [], {
+  pageHref: (page, node) => `/${page}.html#${node}`,
+  scope: "page",
+});
+const pageWith = (body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<style>${CSS}</style></head><body>
+<div class="main-content-wrap"><div class="main-content" id="main-content">
+  <h1>A page</h1>
+  <p>Body text.</p>
+  ${body}
+</div></div></body></html>`;
+const URL_OWN = "http://floor.test/beans-and-todos.html";
+const URL_BARE = "http://floor.test/bare.html";
+
 const URL_PAGE = "http://floor.test/page.html";
 const URL_TODOS = "http://floor.test/todos/index.html";
 
@@ -127,6 +147,12 @@ test.beforeEach(async ({ page }) => {
     }
     if (url.endsWith("/todos/index.html") || url.endsWith("/todos/")) {
       return route.fulfill({ contentType: "text/html", body: TODOS_PAGE });
+    }
+    if (url.endsWith("/beans-and-todos.html")) {
+      return route.fulfill({ contentType: "text/html", body: pageWith(OWN_LISTING) });
+    }
+    if (url.endsWith("/bare.html")) {
+      return route.fulfill({ contentType: "text/html", body: pageWith("") });
     }
     if (url.endsWith("/assets/todos/index.json")) {
       return route.fulfill({
@@ -181,6 +207,25 @@ test.describe("with JavaScript disabled", () => {
     const declared = await page.locator("#fa-todo-listing").getAttribute("data-fa-todo-count");
     const actual = await page.locator("#fa-todo-listing .fa-todo-listing-item").count();
     expect(Number(declared)).toBe(actual);
+  });
+
+  test("a page lists ONLY its own notes, and its count is its own (bean lwjc)", async ({ page }) => {
+    await page.goto(URL_OWN);
+    const listing = page.locator("#fa-todo-listing");
+    await expect(listing).toHaveAttribute("data-fa-todo-scope", "page");
+    const ids = await page
+      .locator("#fa-todo-listing .fa-todo-listing-item")
+      .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.faTodo));
+    // `alpha-note` is attached here; `zeta-note` is attached to no page.
+    expect(ids).toEqual(["alpha-note"]);
+    expect(await listing.getAttribute("data-fa-todo-count")).toBe("1");
+    await expect(page.getByText("Zeta comes first in the file")).toHaveCount(0);
+  });
+
+  test("a page with no note attached carries NO listing — not an empty one (bean lwjc)", async ({ page }) => {
+    await page.goto(URL_BARE);
+    await expect(page.locator("#fa-todo-listing")).toHaveCount(0);
+    await expect(page.locator(".fa-todo-listing-none")).toHaveCount(0);
   });
 
   test("todos/index.html serves the notes listing in its own bytes without JavaScript (folio-assistant-dm4j)", async ({ page }) => {
