@@ -67,11 +67,15 @@ if [ -f "$INTERACTION" ]; then
     # The GitHub login first, resolved by the authentication Tool's own
     # resolver (`bun run cat auth:login`, auth_whoami's githubIdentity): the
     # handle is the key, and asking GitHub is the auth process's job.
-    GH_LOGIN=""
+    # Provider-neutral since bean f1e1 (owner 2026-10-10): `auth:login --all`
+    # prints every identity the session can see — GitHub, GitLab CI, the agent
+    # host's account, the user-level config, the git author — each bare and
+    # as `provider:handle`, so an entry may alias `gitlab:<handle>` too.
+    ID_KEYS=""
     if command -v bun >/dev/null 2>&1; then
-      GH_LOGIN=$(cd "$CHECKOUT_ROOT" && timeout 8 bun run --silent cat auth:login 2>/dev/null || true)
+      ID_KEYS=$(cd "$CHECKOUT_ROOT" && timeout 8 bun run --silent cat auth:login --all 2>/dev/null || true)
     fi
-    WHO_IDS=$(printf '%s\n' "$GH_LOGIN" "${CLAUDE_CODE_USER_EMAIL:-}" "${GITHUB_ACTOR:-}" "$(git config user.email 2>/dev/null)" "$(git config user.name 2>/dev/null)" | grep -v '^$' | jq -R . | jq -s .)
+    WHO_IDS=$(printf '%s\n' "$ID_KEYS" "${CLAUDE_CODE_USER_EMAIL:-}" "${GITHUB_ACTOR:-}" "$(git config user.email 2>/dev/null)" "$(git config user.name 2>/dev/null)" | grep -v '^$' | jq -R . | jq -s .)
     jq -r --argjson ids "$WHO_IDS" '
       def line($k; $v): "- **\($k)** — profiles: \($v.profiles | join(", ") | if . == "" then "(none)" else . end)  \n  \($v.note // "")  \n  _source: \($v.source // "unrecorded")_";
       (.users // {}) as $u
@@ -91,6 +95,20 @@ if [ -f "$INTERACTION" ]; then
     echo "- jq not installed; read \`cat-harness/memory/interaction.json\` by hand."
   fi
   echo
+fi
+# The user-level store (bean f1e1, owner 2026-10-10): preferences that are not
+# repository content live per machine, never committed. Same path rule as
+# `userConfigPath` in src/core/identity.ts.
+USER_ID_CONFIG="${CAT_HARNESS_USER_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/cat-harness/identity.json}"
+if [ -f "$USER_ID_CONFIG" ] && command -v jq >/dev/null 2>&1; then
+  USER_PREFS=$(jq -r 'select(.interaction) | .interaction | to_entries[] | "- **\(.key)**: \(.value | if type == "string" then . else tojson end)"' "$USER_ID_CONFIG" 2>/dev/null) \
+    || USER_PREFS="- (could not parse $USER_ID_CONFIG — read it by hand)"
+  if [ -n "$USER_PREFS" ]; then
+    echo "## Interaction preferences — this machine's user config (not committed)"
+    echo
+    echo "$USER_PREFS"
+    echo
+  fi
 fi
 
 # ── 0b. WHICH LANGUAGE to talk to them in ───────────────────────────────────

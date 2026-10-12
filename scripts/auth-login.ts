@@ -10,6 +10,9 @@
  * interaction preferences are keyed by, and resolving it belongs to the
  * authentication process and its GitHub-specific tools, not to the sweep.
  *
+ * `--all` (bean f1e1) prints every identity the session can see instead,
+ * provider-neutral: see `src/core/identity.ts`.
+ *
  * Exits 0 with the login on stdout when GitHub named one; exits 2 (could not
  * determine) with the reason on stderr otherwise — never 0 with an empty line,
  * so a caller cannot read "nobody" as "somebody we know nothing about".
@@ -18,6 +21,23 @@
  * @covers none — a resolver, not a gate
  */
 import { githubIdentity } from "../src/core/github-auth.js";
+import { matchKeys, resolveIdentities } from "../src/core/identity.js";
+
+if (import.meta.main && process.argv.includes("--all")) {
+  // Bean f1e1, owner ruling 2026-10-10 (provider-neutral): every identity the
+  // session can see, one match key per line — each handle bare and as
+  // `provider:handle` — for the sweep to match interaction entries against.
+  // `--json` prints the resolution instead. Exit 2 when nothing was found, for
+  // the same reason as below.
+  const r = await resolveIdentities({ env: process.env, cwd: process.cwd() });
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify({ identities: r.identities, userConfig: r.userConfig.state, notes: r.notes }, null, 2));
+  } else {
+    for (const k of matchKeys(r.identities)) console.log(k);
+  }
+  for (const n of r.notes) console.error(`note: ${n}`);
+  process.exit(r.identities.length ? 0 : 2);
+}
 
 if (import.meta.main) {
   const id = await githubIdentity({ env: process.env });
