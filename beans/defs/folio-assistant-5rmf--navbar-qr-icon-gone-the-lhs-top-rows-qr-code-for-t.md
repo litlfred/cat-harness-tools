@@ -5,10 +5,8 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-06T06:51:27Z
-updated_at: 2026-10-10T16:36:18Z
+updated_at: 2026-10-12T16:11:34Z
 parent: folio-assistant-9rq1
-blocked_by:
-    - cat-tools-g9m3
 ---
 
 Owner, 2026-10-06 (https://claude.ai/code/session_012qoycyCSGidZqW245vXhze), verbatim:
@@ -39,3 +37,14 @@ Queued for later, or for an idle agent. Not separation work.
 ### Finding 2026-10-10: the icon is not declared, so it is not drawn
 
 With e2e running (PR #69 for g9m3), `navbar-row.e2e.ts` fails exactly the 5rmf checks. The rendered row is `Todos, Beans, fsh-guts…, More actions`, with no `QR code for this page`. `navbar-row.js` can draw `qr`, and `NAVBAR_ICONS` in `cat-harness/schemas/cat-harness.ts` allows it, but `cat-harness/cat-harness.json`'s `navbarIcons` does not list it, so `docs/_data/harness.json` resolves `[close, todos, beans, fsh-guts, launcher]`. **The fix is in litlfred/cat-harness:** add `"qr"` between `"fsh-guts"` and `"launcher"` in `navbarIcons` and regenerate `docs/_data/harness.json` (`bun run cat docs:harness`). After that, the two e2e checks here should pass unchanged.
+
+
+## Lane C, 2026-10-12: the icon is drawn, and its panel now works
+
+- [x] **Declared and drawn.** `qr` is in `cat-harness.json` `navbarIcons` on cat-harness main. The e2e check `navbar-row.e2e.ts` "QR icon button toggles…" passes locally with a minimal Playwright config, which skips the global setup that g9m3 blocks.
+- [x] **The rendered check found two defects**, both fixed in cat-harness `fix/qr-opens-rail`:
+  - Desktop: the code opened as a 56px sliver inside the collapsed strip. The pointer on the icon column holds the strip shut (`.fa-nav-tip-hold`). Opening the code now pins the bar, and closing it unpins only a pin it made.
+  - Phone (390px): the card's top rows sat under the fixed top bar. It now starts at 3rem.
+- [x] **The e2e check now fails if the code opens in a closed bar**, or if closing it leaves the bar pinned or held open. It fails on cat-harness main and passes with the fix. `navbar-row`, `sidebar-rail`, `rail-tips`, `rail-icon-row` and `site-title-rtl` pass 100/100.
+- [x] **Screenshots** (desktop 1280px, phone 390px) are in `test/results/5rmf/`, taken from the e2e fixture with the fix applied.
+- [ ] **Still open:** the commit that dropped the icon is still not named. The pre-split history is in the folio-assistant monorepo, and this session's clone is shallow. This is archaeology only; nothing that ships depends on it.

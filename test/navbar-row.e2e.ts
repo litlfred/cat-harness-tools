@@ -305,11 +305,22 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     await expect(caption).toHaveCount(1);
     expect(await caption.textContent()).toBe(page.url());
 
+    // THE BAR OPENS WITH IT (measured 2026-10-12): the code lives in the bar,
+    // and the pointer on the icon column holds the strip shut, so the code
+    // opened as a 56px sliver. Opening it pins the bar.
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
+    expect((await qrPanel.boundingBox())!.width).toBeGreaterThan(150);
+
     // Second click closes it (l4zi: reachable inverse)
     await qrBtn.click();
     await expect(qrBtn).toHaveAttribute("aria-expanded", "false");
     await expect(qrPanel).toHaveAttribute("data-open", "false");
     await expect(qrPanel).toBeHidden();
+    // ...and gives back only the pin it made: not pinned, and not held open by
+    // the icon's focus once the pointer leaves.
+    expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
 
     // Open again, clicking panel closes it
     await qrBtn.click();
