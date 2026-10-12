@@ -68,6 +68,7 @@ import {
   VectorFiguresSidecarSchema,
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
+import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
@@ -221,6 +222,9 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // package's document loader, so it is linked data, not JSON shaped like it.
   "smart-kg-l1-library.jsonld",
   "smart-kg-l1-dak-references.json",
+  // Authored, not produced by an arm: an editor's title, read by
+  // gen-library-jsonld over the extracted one (bean `v8wg`).
+  TITLE_CORRECTION_FILE,
 ];
 
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
