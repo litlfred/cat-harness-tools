@@ -124,8 +124,16 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
   test("on the real tree, every file and every byte matches the base", () => {
     // The one that licenses rewiring `docs-site.yml`. Checked on the real tree
     // rather than a fixture, because that is what the publish path builds.
+    //
+    // SINCE SLICE 1 OF THE SEMANTIC SUBGRAPHS (owner, 2026-10-09) the real tree
+    // has TWO instance layers: the just-the-docs chrome, `site-chrome/`, and
+    // the harness's pages, `docs/`, over it. So "the base" is their later-wins
+    // union, and the owner's ruling D1 ("parse-equal") states what `_config.yml`
+    // may do: the two layers' configs are MERGED, so the composed file must
+    // PARSE to the merge, while every other file stays byte-identical.
     const { layers } = docsLayers(REPO);
-    const base = layers.find((l) => !l.repositoryScoped)!;
+    const instanceLayers = layers.filter((l) => !l.repositoryScoped);
+    expect(instanceLayers.map((l) => l.id)).toEqual(["site-chrome", "docs"]);
 
     const dest = join(mkdtempSync(join(tmpdir(), "composereal-")), "site");
     const report = compose(dest, REPO);
@@ -133,10 +141,22 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // ...and it actually composed something. A byte-identity assertion over
     // two empty trees is satisfied by a composer that does nothing.
     expect(Object.keys(report.suppliedBy).length).toBeGreaterThan(100);
-    expect(report.overrides).toEqual([]);
+    // The only shadows are the chrome's empty stand-ins for the includes the
+    // harness's pages generate: anything else would be a page silently lost.
+    for (const o of report.overrides) {
+      expect(o.baseLayer).toBe("site-chrome");
+      expect(o.path.startsWith("_includes/generated/")).toBe(true);
+    }
+    // D1: the config is the merge of the two, setting for setting.
+    const chromeCfg = parseYaml(readFileSync(join(instanceLayers[0]!.dir, "_config.yml"), "utf-8"));
+    const docsCfg = parseYaml(readFileSync(join(instanceLayers[1]!.dir, "_config.yml"), "utf-8"));
+    expect(parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8"))).toEqual(mergeConfig(chromeCfg, docsCfg).merged);
 
-    const before = treeDigest(base.dir);
+    const before = new Map<string, string>();
+    for (const l of instanceLayers) for (const [p, h] of treeDigest(l.dir)) before.set(p, h);
+    before.delete("_config.yml");
     const after = treeDigest(dest);
+    after.delete("_config.yml");
 
     // THE PROPERTY IS "COMPOSITION NEVER CHANGES A BASE FILE", not "the tree
     // has the same number of files in it". Those were the same assertion until

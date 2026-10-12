@@ -33,12 +33,14 @@
  */
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { join, relative, resolve } from "node:path";
+import { siteLayersFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-const INCLUDES = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "_includes");
+// Every site layer's includes: since slice 1 of the semantic subgraphs the
+// chrome (`site-chrome/`) and the harness pages (`docs/`) are two layers.
+const INCLUDE_DIRS = siteLayersFor(INSTANCE_ROOT).map((l) => join(INSTANCE_ROOT, l, "_includes")).filter((d) => existsSync(d));
 
 /** Tags that take no expression. Anything else must carry one. */
 const NO_EXPRESSION = new Set(["else", "endif", "endfor", "endunless", "endcase", "endraw", "raw", "endcomment", "comment", "endtablerow", "break", "continue"]);
@@ -77,9 +79,9 @@ export function liquidTags(src: string): Tag[] {
   return out;
 }
 
-const files = existsSync(INCLUDES)
-  ? readdirSync(INCLUDES).filter((f) => /\.(html|js|md)$/i.test(f)).sort()
-  : [];
+const files = INCLUDE_DIRS.flatMap((d) =>
+  readdirSync(d).filter((f) => /\.(html|js|md)$/i.test(f)).map((f) => join(d, f)),
+).sort();
 
 describe("Liquid in docs/_includes", () => {
   it("there are includes to check", () => {
@@ -89,8 +91,8 @@ describe("Liquid in docs/_includes", () => {
   });
 
   for (const f of files) {
-    it(`${f}: every tag is real or escaped`, () => {
-      const src = readFileSync(join(INCLUDES, f), "utf-8");
+    it(`${relative(INSTANCE_ROOT, f)}: every tag is real or escaped`, () => {
+      const src = readFileSync(f, "utf-8");
       const bad: string[] = [];
       for (const t of liquidTags(src)) {
         if (t.raw) continue;

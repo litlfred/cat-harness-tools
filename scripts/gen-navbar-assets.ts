@@ -28,7 +28,7 @@
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { PIN_FILE, readPinFile } from "./check-bun-pin.ts";
 import { NAVBAR_JS, RAIL_DATA_DIR, railPageOf } from "./lib/harness-rail.ts";
 import { NAVBAR_CSS, navbarCss } from "./lib/navbar.ts";
@@ -79,8 +79,8 @@ export function runtimeNote(running: string = Bun.version, repoRoot: string = jo
 
 /** Where each is written in this checkout. */
 export function navbarAssetPaths(): { css: string; js: string } {
-  const site = join(ROOT, siteDirFor(ROOT));
-  return { css: join(site, NAVBAR_CSS), js: join(site, NAVBAR_JS) };
+  // The site CHROME holds both (semantic subgraphs, slice 1).
+  return { css: join(ROOT, siteFileFor(ROOT, NAVBAR_CSS)), js: join(ROOT, siteFileFor(ROOT, NAVBAR_JS)) };
 }
 
 if (import.meta.main) {
@@ -102,7 +102,9 @@ if (import.meta.main) {
   }
   // Rail data no committed page names any more: this generator family's own
   // stale output (a changed rail moves its pages to a new content-named file).
-  const site = paths.js.slice(0, paths.js.length - NAVBAR_JS.length);
+  // The PAGES' site directory: rail data serves the harness pages, which stay in
+  // `siteDirFor`'s layer while navbar.js is the chrome's (semantic subgraphs, slice 1).
+  const site = join(ROOT, siteDirFor(ROOT));
   const dataDir = join(site, RAIL_DATA_DIR);
   if (existsSync(dataDir)) {
     const named = new Set<string>();

@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceStickyThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 
@@ -23,7 +23,7 @@ const ROOT = join(ORIGIN_DIR, "..", "..");
 const REPO = resolve(ROOT, "..");
 
 describe("the committed stylesheet carries every instance sticky theme here", () => {
-  const committed = readFileSync(join(ROOT, siteDirFor(ROOT), "assets", "css", "themes.css"), "utf8");
+  const committed = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/themes.css")), "utf8");
   const { themes, conflicts } = instanceStickyThemes(REPO, "cat-harness", new Set(THEMES.map((t) => t.id)));
 
   test("there is at least one to check, and no collision", () => {

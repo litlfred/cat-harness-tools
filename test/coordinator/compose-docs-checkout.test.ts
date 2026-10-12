@@ -22,13 +22,16 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 
 describe("compose-docs reads its layers from the declaration", () => {
 
-  test("the REAL repository declares exactly the one base layer this is built on", () => {
+  test("the REAL repository declares the site chrome as the base and docs over it", () => {
     // Vacuity guard: every fixture test below would pass against a repository
     // that had no layers at all. The root's empty `root-docs` overlay was
     // excised (bean `yywu`, owner 2026-10-06); the overlay mechanism stays,
     // exercised by the fixtures, for a folio that declares one.
     const { layers, missing } = docsLayers(REPO);
     expect(missing).toEqual([]);
-    expect(layers.map((l) => l.id)).toEqual(["docs"]);
+    // Semantic subgraphs, slice 1 (owner, 2026-10-09): the just-the-docs
+    // CHROME is its own `docs` layer, declared first, and the harness's pages
+    // overlay it.
+    expect(layers.map((l) => l.id)).toEqual(["site-chrome", "docs"]);
   });
 });

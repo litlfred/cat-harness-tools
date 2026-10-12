@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const JS = readFileSync(join(ROOT, siteDirFor(ROOT), "assets/js/docs-ui.js"), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 /**
  * Bean `ob3m` finding 12 — two unrelated panels both called "Settings".

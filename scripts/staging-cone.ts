@@ -217,7 +217,8 @@ export function coneForCheckout(changed: readonly string[] | undefined, repoRoot
  * just-the-docs a per-IG site is built with, and the workflow is the build.
  */
 export const SITE_ENVIRONMENT: readonly RegExp[] = [
-  /^cat-harness\/docs\/Gemfile(\.lock)?$/,
+  // The Gemfile is the site CHROME's since slice 1 of the semantic subgraphs.
+  /^cat-harness\/site-chrome\/Gemfile(\.lock)?$/,
   /^\.github\/workflows\/feature-staging\.yml$/,
 ];
 

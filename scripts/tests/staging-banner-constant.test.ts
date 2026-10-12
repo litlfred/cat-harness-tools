@@ -25,7 +25,7 @@ import { describe, test, expect } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   run,
   injectInto,
@@ -238,7 +238,7 @@ describe("the banner goes in the BODY, not in a comment that mentions one", () =
     // the checkout and resolve to a `docs/` that is not there.
     const instance = resolve(HARNESS_ROOT);
     const include = readFileSync(
-      join(instance, siteDirFor(instance), "_includes", "head_custom.html"),
+      join(instance, siteFileFor(instance, "_includes/head_custom.html")),
       "utf-8",
     );
     // The premise of the test, asserted: if the include stops containing a

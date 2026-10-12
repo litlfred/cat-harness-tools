@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { UN_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
 import { qaResultHref } from "../scripts/qa-result-link.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -38,8 +38,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const PAGE_URL = "http://tr.test/page.html";
 const QA_INDEX_URL = "/assets/qa/harness/qa-index.json";
@@ -851,7 +851,7 @@ test.describe("on a folio's site the sweep badge is the folio's or says why — 
  */
 test.describe("on an Arabic page the rest of the chrome is English, laid out as English", () => {
   const SITE_ABS = join(ROOT, SITE);
-  const ROW_JS = readFileSync(join(SITE_ABS, "assets/js/navbar-row.js"), "utf8");
+  const ROW_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8");
   const NAVBAR = (JSON.parse(readFileSync(join(SITE_ABS, "_data/harness.json"), "utf8")) as { navbar: unknown }).navbar;
   const FOOTER = (() => {
     const src = readFileSync(join(SITE_ABS, "_includes/generated/navbar-footer.html"), "utf8");

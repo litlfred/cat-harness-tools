@@ -18,6 +18,7 @@ import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { localSiteDir } from "../lib/local-site-dir.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** The minimum a note needs to be a valid `TodoIndexItem`. */
 function item(over: Record<string, unknown> = {}) {
@@ -178,7 +179,7 @@ describe("linear floor on todos/index.html (folio-assistant-dm4j)", () => {
     // visualiser) and not committed, so this asks the generator — reading a
     // committed copy failed with ENOENT once the page left main, and said
     // nothing about the page the site actually serves.
-    const footer = readFileSync(join(localSiteDir(HARNESS_ROOT)!, "_includes", "footer_custom.html"), "utf8");
+    const footer = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "_includes/footer_custom.html")), "utf8");
     expect(footer).toContain("include generated/todo-listing.html");
 
     const todosPage = todoBoardPage({ description: "A person's outstanding items." });

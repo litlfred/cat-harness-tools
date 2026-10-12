@@ -34,7 +34,7 @@ import {
   tokenCount,
   type SearchManifest,
 } from "../search-split.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCES = new Set(["smart-trust", "who-iris"]);
@@ -268,7 +268,7 @@ describe("prebuilt indexes for scopes over the token budget — bean lrzn", () =
     // Render the site's theme override as Jekyll would, and run its builder.
     const { Liquid } = await import("liquidjs");
     const root = resolve(HARNESS_ROOT);
-    const src = readFileSync(join(root, siteDirFor(root), "assets/js/just-the-docs.js"), "utf8").replace(/^---[\s\S]*?---\n/, "");
+    const src = readFileSync(join(root, siteFileFor(root, "assets/js/just-the-docs.js")), "utf8").replace(/^---[\s\S]*?---\n/, "");
     const liquid = new Liquid({ dynamicPartials: false, templates: { "lunr/custom-index.js": "", "js/custom.js": "" } });
     liquid.registerFilter("relative_url", (p: string) => p);
     // As Jekyll renders the theme's default (liquidjs drops its backslashes).

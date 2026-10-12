@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { resolveChromium } from "../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -37,9 +37,9 @@ test.use({
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const THEMES = readFileSync(join(ROOT, SITE, "assets/css/themes.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const THEMES = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/themes.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const ART_PATH = "/assets/img/harness/landing-library-card.webp";
 const ART = readFileSync(join(ROOT, SITE, ART_PATH.slice(1)));

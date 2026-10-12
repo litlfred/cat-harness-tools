@@ -108,7 +108,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
@@ -170,7 +170,17 @@ interface DeclEntry {
  * path is the `dh4f` defect — a consumer that scans nothing and reports clean.
  */
 export function baseDocsDir(repo = REPO): string {
-  const base = docsLayers(repo).layers.find((l) => !l.repositoryScoped);
+  // The layer a generator writes PAGES into is the instance's own site
+  // directory (`siteDirFor`), not merely the first instance-scoped layer: since
+  // slice 1 of the semantic subgraphs (owner, 2026-10-09) cat-harness declares
+  // its just-the-docs CHROME, `site-chrome/`, as a `docs` layer BEFORE `docs/`,
+  // so "the first" is the chrome, and a page written there would be a page in
+  // the theme. Falls back to the first instance-scoped layer for an instance
+  // whose site directory is not one of its declared layers.
+  const harness = join(repo, "cat-harness");
+  const instanceLayers = docsLayers(repo).layers.filter((l) => !l.repositoryScoped);
+  const site = existsSync(harness) ? resolve(harness, siteDirFor(harness)) : undefined;
+  const base = instanceLayers.find((l) => resolve(l.dir) === site) ?? instanceLayers[0];
   if (base === undefined) throw new Error("no instance-scoped docs layer is declared");
   return base.dir;
 }

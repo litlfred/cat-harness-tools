@@ -34,7 +34,7 @@ import {
   TRANSLATION_QA_PAGES_FILE,
 } from "../gen-docs-pages.ts";
 import { QaIndexSchema, QaTranslationPagesSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -135,7 +135,7 @@ describe("the authored-page translation list", () => {
   });
 
   test("`head_custom.html` no longer reads it from `_data`", () => {
-    const head = readFileSync(join(SITE, "_includes", "head_custom.html"), "utf-8");
+    const head = readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html")), "utf-8");
     expect(head).not.toContain("site.data.translation-qa-pages");
     expect(head).toContain(`/assets/qa/${TRANSLATION_QA_PAGES_FILE}`);
   });

@@ -35,7 +35,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { NAV_GEOMETRY, rem } from "./lib/navbar-geometry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -48,7 +48,8 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * the moment an instance is laid out differently.
  */
 export function navbarGeometryCssPath(root: string): string {
-  return join(siteDirFor(root), "assets", "css", "docs-ui.css");
+  // The site CHROME holds it (semantic subgraphs, slice 1).
+  return siteFileFor(root, "assets/css/docs-ui.css");
 }
 
 /** The generated region's fences. Everything between them is this script's. */

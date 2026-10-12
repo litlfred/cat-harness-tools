@@ -34,7 +34,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { docsLayers } from "../compose-docs.js";
+import { baseDocsDir } from "../compose-docs.js";
 import { page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -44,7 +44,7 @@ import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 /** The base docs layer — asked, never spelled; `site-dir-single-answer` refuses a literal. */
-const DOCS = docsLayers(REPO).layers.find((l) => !l.repositoryScoped)!.dir;
+const DOCS = baseDocsDir(REPO);
 
 const rows = await processRows(REPO);
 

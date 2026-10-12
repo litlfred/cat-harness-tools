@@ -25,7 +25,7 @@ import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { join } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** The slice of the vendored encoder's API this file uses. It attaches to the
@@ -41,10 +41,10 @@ type QrFactory = (typeNumber: number, errorCorrectionLevel: string) => QrModel;
 
 const ctx: { qrcode?: QrFactory } = {};
 createContext(ctx);
-runInContext(readFileSync(join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets/js/vendor/qrcode.js"), "utf8"), ctx);
+runInContext(readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/vendor/qrcode.js")), "utf8"), ctx);
 // The UTF-8 shim must load after the encoder; without it `stringToBytes` is
 // single-byte and any non-ASCII character in a URL encodes to mojibake.
-runInContext(readFileSync(join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets/js/vendor/qrcode_UTF8.js"), "utf8"), ctx);
+runInContext(readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/vendor/qrcode_UTF8.js")), "utf8"), ctx);
 const loaded = ctx.qrcode;
 // Not a formality: if the vendored file ever stops attaching to the global,
 // every test below would fail with a confusing TypeError instead of saying so.

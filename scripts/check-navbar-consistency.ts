@@ -92,6 +92,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   siteDirFor,
+  siteFileFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { THEME_KINDS, type ThemeKind } from "@litlfred/cat-harness/schemas/theme.js";
 import { instanceThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
@@ -353,7 +354,7 @@ function main(): number {
     // measured, after composing it as absolute first and getting the ROOT
     // instance's `docs/` instead of `cat-harness/docs/`.
     const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
-    client = join(instanceRoot, siteDirFor(instanceRoot), CLIENT_TAIL);
+    client = join(instanceRoot, siteFileFor(instanceRoot, CLIENT_TAIL));
   } catch (e) {
     // The declaration would not load, so WHERE the client lives is unknown.
     // Refuse rather than fall back to a guessed path: a guess that happened to
@@ -554,7 +555,7 @@ function main(): number {
   // kind is held to what its surface actually selects.
   const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
   const siteRoot = join(instanceRoot, siteDirFor(instanceRoot));
-  const headFile = join(siteRoot, "_includes", "head_custom.html");
+  const headFile = join(instanceRoot, siteFileFor(instanceRoot, "_includes/head_custom.html"));
   const wiring: ThemeWiring = {
     webpageData: readWebpageData(join(instanceRoot, instanceThemesDataPath(instanceRoot))),
     headConsumesData: existsSync(headFile) && readFileSync(headFile, "utf8").includes("site.data.instance-themes"),

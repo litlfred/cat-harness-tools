@@ -7,6 +7,8 @@ import { navbarAssetPaths, navbarCssFile, navbarJsFile, runtimeNote } from "../g
 import { PIN_FILE } from "../check-bun-pin.ts";
 import { NAVBAR_JS, RAIL_DATA_DIR, expandRail, injectRail, railPageOf } from "../lib/harness-rail.ts";
 import { NAVBAR_CSS } from "../lib/navbar.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
  * The rail from shared data — bean `lnoy`. Owner, 2026-10-05: *"4. Option 3
@@ -117,8 +119,9 @@ describe("the committed rail data and the pages that name it agree (bean lnoy)",
   // a new name and the old file is left behind. Neither direction may drift:
   // a page naming a missing file draws only its Home link; a file no page
   // names is stale output. `bun run cat navbar:assets` removes the latter.
-  const { js } = navbarAssetPaths();
-  const site = js.slice(0, js.length - NAVBAR_JS.length);
+  // The pages' site directory, not the chrome's that holds navbar.js (semantic
+  // subgraphs, slice 1): rail data serves the harness pages.
+  const site = join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT)) + "/";
   const dataDir = site + RAIL_DATA_DIR;
   const files = new Set(
     existsSync(dataDir) ? [...new Bun.Glob("rail-*.js").scanSync({ cwd: dataDir })].map((f) => f.replace(/\.js$/, "")) : [],

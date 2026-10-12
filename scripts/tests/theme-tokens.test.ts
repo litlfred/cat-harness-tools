@@ -17,14 +17,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { renderThemesCss } from "../gen-themes-css.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 // The site root is `siteDirFor`'s answer, not a literal — see
 // `site-dir-single-answer.test.ts`, which failed on this line first.
-const UI = readFileSync(join(ROOT, siteDirFor(ROOT), "assets", "css", "docs-ui.css"), "utf8");
+const UI = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 
 /** Role names the generated stylesheet defines. */
 function emittedTokens(): string[] {

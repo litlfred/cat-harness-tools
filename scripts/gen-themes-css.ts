@@ -41,7 +41,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { pageThemeCssVars, themeCssVars, type ResolvedTheme } from "@litlfred/cat-harness/schemas/theme.js";
 import {
   explainStickyThemeConflict,
@@ -63,7 +63,9 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * this file on its first run.
  */
 export function themesCssPath(root: string): string {
-  return join(siteDirFor(root), "assets", "css", "themes.css");
+  // The site CHROME holds it since slice 1 of semantic subgraphs; `siteFileFor`
+  // answers which declared site layer that is.
+  return siteFileFor(root, "assets/css/themes.css");
 }
 
 /**

@@ -23,14 +23,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const CLIENT = join(ROOT, siteDirFor(ROOT), "assets/js/docs-ui.js");
+const CLIENT = join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"));
 /** The harness icon row's drawing, loaded on pages without `docs-ui.js` (beans `lhvt`, `9rq1`). */
-const ROW_CLIENT = join(ROOT, siteDirFor(ROOT), "assets/js/navbar-row.js");
+const ROW_CLIENT = join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"));
 const LISTING = join(TOOLS_ROOT, "scripts", "todo-listing.ts");
 
 /** `href: <expr>` / `href="<expr>"` sites, with their line numbers. */

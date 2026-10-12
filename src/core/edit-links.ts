@@ -251,7 +251,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     document.addEventListener(ev, (e) => { const h = e.target.closest && e.target.closest("[data-src], a[data-fa-link]"); if (h) ready(h); }, { passive: true });
 })();`;
 
-/** The published asset, `cat-harness/docs/assets/js/edit-links.js`: the runtime, as a file. A test holds them equal. */
+/** The published asset, `cat-harness/site-chrome/assets/js/edit-links.js`: the runtime, as a file. A test holds them equal. */
 export function editLinksAsset(): string {
   return `/*
  * edit-links.js: the "edit on GitHub" and "feedback" links of every page,
@@ -339,11 +339,11 @@ export function injectBlockActions(
 /** `bun run cat-harness-tools/src/core/edit-links.ts --write-asset` regenerates the published runtime. */
 if (import.meta.main && process.argv.includes("--write-asset")) {
   const { writeFileSync } = await import("node:fs");
-  const { readDeclaration, siteDir } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+  const { readDeclaration, siteFileFor } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
   const harness = join(HARNESS_ROOT);
   const own = readDeclaration(harness);
   if (!own) throw new Error(`${harness} declares no instance: nowhere to publish the runtime`);
-  const out = join(harness, siteDir(own), "assets", "js", "edit-links.js");
+  const out = join(harness, siteFileFor(harness, "assets/js/edit-links.js"));
   writeFileSync(out, editLinksAsset());
   console.error(`✓ wrote ${out}`);
 }

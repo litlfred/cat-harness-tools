@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { exitCodeFor, siteLinks, verifySiteLinks } from "../site-links.js";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const DECL = { name: "folio-assistant", stub: "folio-assistant" };
@@ -169,7 +169,7 @@ describe("the template and the data agree", () => {
     // by rendering it through the real Liquid engine (see the PR); what is
     // guarded here is the regression that put the defect there in the first
     // place — somebody writing a path into the template by hand.
-    const html = readFileSync(join(ROOT, siteDirFor(ROOT), "_includes/head_custom.html"), "utf8");
+    const html = readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html")), "utf8");
     const block = html.match(
       /<script type="application\/json" id="fa-site-links">[\s\S]*?<\/script>/,
     );

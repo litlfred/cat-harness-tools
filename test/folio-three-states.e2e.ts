@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutStandIn, parseThemed } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
@@ -72,8 +72,8 @@ function libraryViewerAsset(pathname: string): { contentType: string; body: stri
   }
   return undefined;
 }
-const CSS = readFileSync(join(ROOT, SITE, "assets/css/docs-ui.css"), "utf8");
-const JS = readFileSync(join(ROOT, SITE, "assets/js/docs-ui.js"), "utf8");
+const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 /**
  * A library page: two rows that declare themselves, and nothing else.
@@ -476,7 +476,7 @@ const PROJECTION = join(SITE_ABS, "assets", "library", "index.json");
     const page = readFileSync(VIEW, "utf8");
     expect(page.startsWith("---\nlayout: default\n")).toBe(true);
     expect(page).not.toContain("data-fa-folio-mount");
-    expect(readFileSync(join(SITE_ABS, "_includes", "head_custom.html"), "utf8")).toMatch(
+    expect(readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html")), "utf8")).toMatch(
       /<script src="\{\{ '\/assets\/js\/docs-ui\.js' \| relative_url \}\}[^"]*" defer><\/script>/,
     );
   });

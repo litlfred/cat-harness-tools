@@ -99,7 +99,7 @@ describe("a BUILT site (IG Jekyll, AST): siteInCone", () => {
   };
   const carry = (changed: string[] | undefined, over: Partial<typeof base> = {}) => siteInCone({ ...base, ...over, changed }).carry;
   it("no file list carries", () => expect(carry(undefined)).toBe(true));
-  it("the build environment carries every site", () => expect(carry(["cat-harness/docs/Gemfile.lock"])).toBe(true));
+  it("the build environment carries every site", () => expect(carry(["cat-harness/site-chrome/Gemfile.lock"])).toBe(true));
   it("a change under the instance carries it", () => expect(carry(["a/fhir-artifact-index/menu.json"])).toBe(true));
   it("the cone reaching one of its directories carries it", () => {
     expect(carry(["themes/x.json"], { cone: [{ ...base.cone[0]!, carry: true }] })).toBe(true);

@@ -70,7 +70,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   VIEWER_NAV_QA_SCHEMA,
   ViewerNavQaSchema,
@@ -522,9 +522,9 @@ if (import.meta.main) {
   // that grades: it is clean on the day this lands, so a flag here is always
   // the author of the diff, which is the gate's own test for a regression.
   const strip = stripFlags(
-    readFileSync(join(DOCS, "assets", "js", "docs-ui.js"), "utf-8"),
-    readFileSync(join(DOCS, "assets", "css", "docs-ui.css"), "utf-8"),
-    readFileSync(join(DOCS, "assets", "js", "navbar-row.js"), "utf-8"),
+    readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf-8"),
+    readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf-8"),
+    readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf-8"),
   );
   for (const f of strip) {
     console.error(`  ✗ the docs site's sidebar strip fails ${f} (docs-ui.js / navbar-row.js / docs-ui.css)`);

@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { audit, regressions } from "../check-viewer-nav.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import {
   NAVBAR_OPT_OUT,
   declinesNavbar,
@@ -204,7 +205,7 @@ describe("the gate refuses a REGRESSION, not an absence", () => {
 });
 
 describe("the narrow-viewport rules ride on the fixture — bean `2r2n`", () => {
-  const css = readFileSync(join(HARNESS_ROOT, "docs/assets/css/narrow-viewport.css"), "utf-8");
+  const css = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/narrow-viewport.css")), "utf-8");
 
   test("inlined into the head, from the one file the themed pages link", () => {
     const out = withNarrowViewport(PAGE("<table><tr><td>x</td></tr></table>"));
@@ -228,7 +229,7 @@ describe("the narrow-viewport rules ride on the fixture — bean `2r2n`", () => 
 
 describe("the reader's saved scheme reaches a standalone viewer — bean `dc64`", () => {
   test("the key is the one docs-ui.js stores the scheme under", () => {
-    const js = readFileSync(join(HARNESS_ROOT, "docs/assets/js/docs-ui.js"), "utf-8");
+    const js = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf-8");
     expect(js).toContain(`var SCHEME_KEY = "${schemeKey()}";`);
   });
 

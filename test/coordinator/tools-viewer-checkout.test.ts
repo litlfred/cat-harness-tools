@@ -14,7 +14,7 @@ import { join, relative, resolve } from "node:path";
 
 import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { docsLayers } from "../../scripts/compose-docs.js";
+import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows } from "../../scripts/gen-tools-viz.js";
 
@@ -35,7 +35,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
  * targeted run of `check:*` scripts skipped it entirely. `bun test` is itself
  * a gate, and a subset of the gate set is not the gate set.
  */
-const DOCS = docsLayers(REPO).layers.find((l) => !l.repositoryScoped)!.dir;
+const DOCS = baseDocsDir(REPO);
 
 const decl = JSON.parse(readFileSync(declarationPathIn(join(REPO, "cat-harness"))!, "utf-8")) as {
   directories?: { id?: string; graphTypologies?: string[]; coverage?: { docs?: string; visualiser?: unknown } }[];

@@ -274,7 +274,7 @@ describe("classify", () => {
     expect(classify("who-iris/uploads/x.pdf").pattern?.id).toBe("uploads");
     // Authored neighbours of the new globs stay refused.
     expect(classify("cat-harness/docs/beans/notes.md").strategy).toBe("refuse");
-    expect(classify("cat-harness/docs/_includes/head_custom.html").strategy).toBe("refuse");
+    expect(classify("cat-harness/site-chrome/_includes/head_custom.html").strategy).toBe("refuse");
   });
 
   test("the standalone baseline is taken from the base; its sibling baseline and its writer are not", () => {
