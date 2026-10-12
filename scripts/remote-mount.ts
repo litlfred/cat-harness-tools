@@ -16,7 +16,7 @@
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
- *   bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> --evidence "<where they said yes>" [--whole]
+ *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
  *
  * `state:mount` runs the mount after the branch mounts, so the session-start
@@ -1183,9 +1183,13 @@ if (import.meta.main) {
       return i >= 0 ? argv[i + 1] : undefined;
     };
     const by = valueOf("--consent-by");
-    const evidence = valueOf("--evidence");
+    // The evidence is free prose — it quotes what was said — so its home is
+    // stdin, where it is data rather than a command-line word (the Tool's
+    // `evidence` input, and check:tools' injection rule). `--evidence` is still
+    // read for a caller already passing it.
+    const evidence = valueOf("--evidence") ?? (process.stdin.isTTY ? undefined : readFileSync(0, "utf-8").trim() || undefined);
     if (!by || !evidence) {
-      console.error("--seed writes consent, so it needs --consent-by <who> and --evidence \"<where they consented, readable>\" (H8: a remote instance without consent is refused at mount)");
+      console.error("--seed writes consent, so it needs --consent-by <who> and the evidence (where they consented, readable) on stdin (H8: a remote instance without consent is refused at mount)");
       process.exit(2);
     }
     try {
