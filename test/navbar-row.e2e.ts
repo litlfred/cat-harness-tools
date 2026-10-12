@@ -962,11 +962,14 @@ test.describe("every glyph in the navbar paints with the text colour", () => {
  * owner chose the three-state one: `[x]` whenever the bar is open, and
  * pressing it remembers a stay-closed preference across pages.
  */
-test.describe("the navbar can be closed, and it stays closed", () => {
+test.describe("the navbar can be closed, and the hover peek comes back", () => {
   // ONE CONTROL since ob3m finding 8 (owner, 2026-10-01): the avatar. The [x]
-  // and the hamburger that used to set and lift this preference are gone from
-  // theme pages, as #1762 removed them from the rail. Pinning by the avatar
-  // lifts stay-closed; unpinning by it sets stay-closed.
+  // and the hamburger are gone from theme pages, as #1762 removed them from
+  // the rail. Owner, 2026-10-12: *"when LHS navbar is slid open, the navbar
+  // remains collapsed. you then have to click the avatar to open it"* -- with
+  // the avatar the only close, a REMEMBERED stay-closed withheld the peek on
+  // every page after any close. A close now holds only until the pointer
+  // leaves the bar, and is not stored.
   const avatar = (p: import("@playwright/test").Page) => p.locator(".side-bar .site-title");
 
   test("no [x] and no hamburger are drawn -- the avatar is the control", async ({ page }) => {
@@ -976,14 +979,31 @@ test.describe("the navbar can be closed, and it stays closed", () => {
     await expect(avatar(page)).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("closing by the avatar is REMEMBERED for the next page", async ({ page }) => {
+  test("closing by the avatar is NOT remembered -- the peek returns once the pointer leaves", async ({ page }) => {
     await load(page, CUSTOM);
     await avatar(page).click();
     await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
     await avatar(page).click();
     expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBe("closed");
-    expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBe("closed");
+    // The close collapses the bar out from under the avatar's centre, so the
+    // pointer has usually left already; either way nothing is stored.
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
+    expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
+    await page.mouse.move(900, 400);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
+    await page.hover(".side-bar .site-nav");
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
+  });
+
+  test("a stay-closed an earlier visit STORED is cleared, not obeyed", async ({ page }) => {
+    await page.addInitScript(() => {
+      try { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("fa-nav", "closed"); sessionStorage.setItem("seeded", "1"); } } catch {}
+    });
+    await load(page, CUSTOM);
+    expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
+    await page.hover(".side-bar .site-nav");
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
   });
 
   test("closed means the POINTER stops opening it -- and only the pointer", async ({ page }) => {
@@ -1016,7 +1036,7 @@ test.describe("the navbar can be closed, and it stays closed", () => {
     await load(page, CUSTOM);
     await avatar(page).click();
     await avatar(page).click();
-    expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBe("closed");
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBe("closed");
     await avatar(page).click();
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
     expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
@@ -1033,8 +1053,8 @@ test.describe("the navbar can be closed, and it stays closed", () => {
   });
 
   test("a browser that refuses localStorage still gets the close", async ({ page }) => {
-    // The preference is a convenience, so a throwing localStorage degrades to
-    // "closed for this page" rather than to a broken navbar.
+    // Nothing is stored any more, but the load still READS storage to clear an
+    // old stay-closed, so a throwing localStorage must not break the bar.
     await page.addInitScript(() => {
       Object.defineProperty(window, "localStorage", {
         get() { throw new Error("denied"); },
@@ -1044,7 +1064,8 @@ test.describe("the navbar can be closed, and it stays closed", () => {
     expect(errors).toEqual([]);
     await avatar(page).click();
     await avatar(page).click();
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBe("closed");
+    expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
   });
 });
 
@@ -1196,7 +1217,7 @@ test.describe("the avatar opens and closes the bar — owner, 2026-09-27", () =>
     await avatar.click();
     expect(page.url()).toBe("http://navbar.fixture/nav");
     expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
-    expect(await page.evaluate(() => localStorage.getItem("fa-nav"))).toBe("closed");
+    expect(await page.evaluate(() => localStorage.getItem("fa-nav"))).toBeNull();
     // Closed means closed: not held open by the avatar's focus.
     await page.mouse.move(900, 400);
     await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
