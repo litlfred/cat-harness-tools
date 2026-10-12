@@ -37,8 +37,11 @@ const contributed = registry.contributedKinds();
 
 describe("adapter partition", () => {
 
-  test("paper is the one built-in adapter — dak is contributed (bean 1335)", () => {
-    expect([...CONTENT_ADAPTERS]).toEqual(["paper"]);
+  test("the built-in vocabularies are the platform's own — dak is contributed (bean 1335)", () => {
+    // One `paper` vocabulary until bean bzwk splits it by layer into core's
+    // `document` and sci's `mathpaper`; either layout may be mounted here.
+    expect([["paper"], ["document", "mathpaper"]]).toContainEqual([...CONTENT_ADAPTERS].sort());
+    expect(CONTENT_ADAPTERS as readonly string[]).not.toContain("dak");
     expect(registry.contributedAdapters()).toContain("dak");
   });
 

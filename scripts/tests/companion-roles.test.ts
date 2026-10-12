@@ -34,6 +34,7 @@ import {
   entryIsFresh,
 } from "../../content/pipeline/qa-utils";
 import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry";
+import { CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { criterionAdapters } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
@@ -139,13 +140,13 @@ describe("no churn on the existing paper corpus", () => {
     expect(missingCompanionNote("lean")).toBe("block has no .lean sibling");
   });
 
-  test("every paper-scoped criterion still declares only paper companions", () => {
+  test("every built-in-scoped criterion still declares only built-in companions", () => {
     // DAK criteria now exist and legitimately depend on .dmn/.fsh, so this
     // narrows to the paper axes — which are the ones whose sidecars already
     // exist in the folio and must not start invalidating differently.
     const paper = new Set(["md", "ts", "lean"]);
     for (const def of QA_CRITERIA_REGISTRY) {
-      if (!criterionAdapters(def).includes("paper")) continue;
+      if (!CONTENT_ADAPTERS.some((a) => criterionAdapters(def).includes(a))) continue;
       for (const r of def.depends_on) {
         expect(paper.has(r)).toBe(true);
       }
