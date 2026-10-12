@@ -147,7 +147,9 @@ describe("stripFlags — the same two questions of the docs site's strip", () =>
   });
 
   it("flags a row control built without data-fa-tip", () => {
-    const row = ROW.replace(/, "data-fa-tip": LABELS\.launcher/, "");
+    // The launcher proxy writes its tip from a local since cat-harness#171
+    // (`"data-fa-tip": tip`); the mutation strips that attribute.
+    const row = ROW.replace(/, "data-fa-tip": tip \}/, " }");
     expect(row).not.toBe(ROW);
     expect(stripFlags(JS, CSS, row)).toEqual(["rail-tips"]);
   });
