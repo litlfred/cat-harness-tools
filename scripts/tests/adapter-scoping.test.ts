@@ -32,7 +32,6 @@ import { describe, test, expect } from "bun:test";
 import { resolve } from "path";
 import {
   BLOCK_KINDS,
-  PAPER_BLOCK_KINDS,
   ALL_BLOCK_KINDS,
   ADAPTER_BLOCK_KINDS,
   CONTENT_ADAPTERS,
@@ -59,15 +58,8 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
 const contributed = registry.contributedKinds();
 
 describe("adapter partition", () => {
-  test("paper kinds are BLOCK_KINDS, both read off the same nodes", () => {
-    // A second hand-maintained list is the drift this module exists to stop.
-    // Since bean riit, both are DISCOVERED (the paper adapter's nodes), so
-    // they are equal by construction rather than by being one array.
-    expect([...PAPER_BLOCK_KINDS]).toEqual([...BLOCK_KINDS]);
-  });
-
   test("ALL_BLOCK_KINDS is the built-in kinds, with no duplicates", () => {
-    expect([...ALL_BLOCK_KINDS]).toEqual([...PAPER_BLOCK_KINDS]);
+    expect([...ALL_BLOCK_KINDS]).toEqual([...BLOCK_KINDS]);
     expect(new Set(ALL_BLOCK_KINDS).size).toBe(ALL_BLOCK_KINDS.length);
   });
 

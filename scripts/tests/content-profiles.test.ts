@@ -13,7 +13,6 @@
 import { describe, test, expect } from "bun:test";
 import {
   BLOCK_KINDS,
-  PAPER_BLOCK_KINDS,
   DOCUMENT_BLOCK_KINDS,
   MATH_BLOCK_KINDS,
   CONTENT_ADAPTERS,
@@ -29,12 +28,12 @@ import { join } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 describe("the profile partition", () => {
-  test("document and math are disjoint and cover the paper vocabulary", () => {
+  test("document and math are disjoint and cover the built-in kinds", () => {
     const doc = new Set<string>(DOCUMENT_BLOCK_KINDS);
     const math = new Set<string>(MATH_BLOCK_KINDS);
     for (const k of math) expect(doc.has(k)).toBe(false);
-    expect(doc.size + math.size).toBe(PAPER_BLOCK_KINDS.length);
-    expect(new Set([...doc, ...math])).toEqual(new Set<string>(PAPER_BLOCK_KINDS));
+    expect(doc.size + math.size).toBe(BLOCK_KINDS.length);
+    expect(new Set([...doc, ...math])).toEqual(new Set<string>(BLOCK_KINDS));
   });
 
   test("a kind added to BLOCK_KINDS cannot go unclassified", () => {
