@@ -46,6 +46,12 @@
  *   bun run cat ingest uploads/FILE.pdf --refresh-meta   # technical facts only
  *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title (w6fu)
  *   bun run cat ingest uploads/FILE.pdf --library who-iris
+ *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
+ *
+ * `--title` passes a KNOWN title through to the PDF rungs (bean `turh`). Absent
+ * it, the catalogue's Dublin Core `dc.title` is passed when the instance has a
+ * catalogue node for this entry — the first authority of the 2026-10-01 title
+ * ruling, so a scan no longer carries its OCR's misreading as `doc_title`.
  *
  * `--library` is required only when the repository declares more than one, and
  * then it is REQUIRED rather than defaulted: since bean `frs5` there are two,
@@ -62,6 +68,7 @@ import { fileURLToPath } from "node:url";
 
 import { ARCHIVE_MIMETYPES } from "@litlfred/cat-harness/schemas/archive-contents.ts";
 import { checkEntry, type Requirement } from "./check-l1-complete.ts";
+import { catalogueRecordFor, dcValue } from "../pipeline/library-title.ts";
 import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/tabular-records.ts";
 import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
 import { refreshLibraryIndex } from "./lsi.ts";
@@ -849,6 +856,46 @@ function planForPdf(pdf: string, p: Probe, lib: string): Plan {
 }
 
 /**
+ * A title already known for the document, and where it came from (bean `turh`).
+ *
+ * `--title` first: the caller has looked. Then the catalogue's Dublin Core
+ * `dc.title`, through the same `catalogueRecordFor` the manifest's title
+ * resolver reads (`pipeline/library-title.ts`), so ingest and the manifest ask
+ * one source the same way. `undefined` when neither has one — the rungs then
+ * resolve a title from the PDF as before, and nothing is guessed here.
+ *
+ * It existed only by hand before: `who-pub-tps-931` had to be rebuilt with
+ * `pdf-pages.py --from-ocr --title "WHO Editorial Style Manual"`, because the
+ * ingest path could not carry the catalogue's title to the rung.
+ */
+export function knownTitle(
+  argv: readonly string[],
+  instanceRoot: string,
+  slug: string,
+): { title: string; from: string } | undefined {
+  const i = argv.indexOf("--title");
+  const given = i >= 0 ? (argv[i + 1] ?? "").trim() : "";
+  if (given) return { title: given, from: "--title" };
+  const cat = catalogueRecordFor(instanceRoot, slug);
+  const t = cat ? dcValue(cat.rec, "title") : "";
+  return cat && t ? { title: t, from: `${cat.file} dc.title` } : undefined;
+}
+
+/** The rungs that take `--title`: both write `structure.json` and the sections' `doc_title`. */
+const TITLE_RUNGS = new Set(["pdf-structure.py", "pdf-pages.py"]);
+
+/** `plan` with `--title` handed to each rung that takes one. Pure. */
+export function withKnownTitle(plan: Plan, title: string | undefined): Plan {
+  if (!title) return plan;
+  return {
+    ...plan,
+    steps: plan.steps.map((s) =>
+      TITLE_RUNGS.has(basename(s[1] ?? "")) && !s.includes("--title") ? [...s, "--title", title] : s,
+    ),
+  };
+}
+
+/**
  * Recompute `source` on an entry that already exists, from the upload.
  *
  * Bean `nso8` says the technical facts must be "produced by the ingest path
@@ -980,7 +1027,7 @@ if (import.meta.main) {
   // was boolean; `--library who-iris` breaks it, because `who-iris` does not
   // start with `--` and would be ingested as a filename — producing "who-iris:
   // not there" while the real argument sat untouched two places along.
-  const takesValue = new Set(["--library", "--reference"]);
+  const takesValue = new Set(["--library", "--reference", "--title"]);
   let pdf: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -1056,6 +1103,7 @@ if (import.meta.main) {
   // (bean `scfh`). Chosen by the caller, never inferred: whether a licence
   // permits posting a copy is a reading of the licence, not of the bytes.
   const reference = argv.includes("--reference") ? argv[argv.indexOf("--reference") + 1] : undefined;
+  const known = knownTitle(argv, resolve(INSTANCE_ROOT), slug);
   const plan = withDerivedArms(
     reference
       ? {
@@ -1063,7 +1111,7 @@ if (import.meta.main) {
           why: "--reference given — recorded with its outline and sha256, text withheld",
           steps: [["python3", pyHelper("referenced-source.py"), "-o", stagingRoot, pdf, "--identity", reference]],
         }
-      : planFor(pdf, undefined, stagingRoot),
+      : withKnownTitle(planFor(pdf, undefined, stagingRoot), known?.title),
     pdf,
     stagingRoot,
     staging,
@@ -1076,6 +1124,7 @@ if (import.meta.main) {
   console.log(`${basename(pdf)} -> ${destination}/${slug}/`);
   console.log(`  rung: ${plan.rung}`);
   console.log(`  why:  ${plan.why}`);
+  if (known) console.log(`  title: ${known.title} (from ${known.from})`);
   // Before any arm runs — the licence step is EARLY by ruling (bean 7bg9).
   const lic = earlyLicence(pdf);
   console.log(`  licence: ${lic.verdict} — ${lic.detail}`);
