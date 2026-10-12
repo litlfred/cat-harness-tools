@@ -1,0 +1,124 @@
+/**
+ * The KG sub-graphs DECLARED INSIDE one library entry, and where they are
+ * published — bean 8pzh item 1.
+ *
+ * Owner, 2026-10-12, on where L1 extraction output lives: *"a and b"* — keep it
+ * committed beside the library entry (`<entry>/l1-extraction/`) AND publish it
+ * with the source — and: *"why does b not happen already? if its a part of the
+ * KG it should be published."*
+ *
+ * It did not happen because the output was not part of the declared KG. An
+ * entry's own nodes are its manifest, sections and blocks (the `library`
+ * typology); a directory of other files inside it was in the repository and
+ * named by no typology, so nothing published it. The fix is a declaration, not
+ * a list of filenames here: an instance declares the directory inside the
+ * entry, with a typology that is `within: "library"` (a content layer's
+ * `l1-extraction`, say), and this module finds every such declaration. So the rule
+ * the publisher follows is the owner's own — declared KG content is published —
+ * and this layer never names a kind a higher layer owns.
+ *
+ * ## Where a file lands
+ *
+ * Beside the entry's manifest, at its path relative to the entry:
+ * `<entry>/l1-extraction/recommendations.l1.json` is published at
+ * `assets/library/jsonld/<instance>/<entry>/l1-extraction/recommendations.l1.json`.
+ * That is the layout `schemas/library-iri.ts` reserved for exactly this — *"the
+ * entry's other nodes have an obvious place to be published under the same
+ * directory later"* — and it keeps the source layout, so a relative reference
+ * between two files of the sub-graph still resolves on the site.
+ *
+ * The bytes are copied as they are. A graph document carries its own `@id`
+ * (an L1 IRI, not a site path), so nothing here rewrites it; and the
+ * committed file stays the single source, validated where it is written by
+ * the layer that owns its vocabulary.
+ *
+ * @module scripts/lib/library-entry-graphs
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
+import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+
+/** One file of a sub-graph declared inside a library entry. */
+export interface EntryGraphFile {
+  /** The typology of the declaring directory (e.g. `l1-extraction`). */
+  kind: string;
+  /** The source on disk. */
+  abs: string;
+  /** Its path relative to the entry directory, `/`-separated — also its path under the entry's published directory. */
+  rel: string;
+  /** A JSON-LD document — parses as JSON and carries `@context` — and so a graph a reader is linked to. */
+  jsonld: boolean;
+}
+
+/** The nearest directory at or above `dir` that holds an instance declaration, or `undefined`. */
+function declaringInstanceRoot(dir: string): string | undefined {
+  for (let d = resolve(dir); ; d = dirname(d)) {
+    if (findDeclarationFile(d) !== undefined) return d;
+    if (dirname(d) === d) return undefined;
+  }
+}
+
+function filesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir).sort()) {
+    if (name.startsWith(".")) continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...filesUnder(p));
+    else out.push(p);
+  }
+  return out;
+}
+
+function isJsonLd(abs: string): boolean {
+  if (!/\.(json|jsonld)$/.test(abs)) return false;
+  try {
+    const v = JSON.parse(readFileSync(abs, "utf-8")) as unknown;
+    return typeof v === "object" && v !== null && !Array.isArray(v) && "@context" in v;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every file of every directory DECLARED inside `entryDir` whose typology is a
+ * sub-graph of `library` (`within: "library"`) and is published. Sorted by
+ * `rel`. Empty when the entry holds none, or its instance cannot be read —
+ * an unreadable declaration is `check:harness-dirs`'s finding, not this one's.
+ */
+export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
+  const entry = resolve(entryDir);
+  const instRoot = declaringInstanceRoot(dirname(entry));
+  if (instRoot === undefined) return [];
+  let dirs: ReturnType<typeof instanceDirectories>;
+  try {
+    dirs = instanceDirectories(instRoot, readDeclaration(instRoot, registry), registry);
+  } catch {
+    return [];
+  }
+  const byRel = new Map<string, EntryGraphFile>();
+  for (const d of dirs) {
+    if (d.scope === "repository") continue;
+    const abs = resolve(instRoot, d.path);
+    if (!abs.startsWith(entry + sep) || !existsSync(abs) || !statSync(abs).isDirectory()) continue;
+    const kind = (d.graphTypologies ?? []).find((k) => {
+      const def = registry.get(k);
+      return def?.within === "library" && def.published !== false;
+    });
+    if (kind === undefined) continue;
+    for (const f of filesUnder(abs)) {
+      const rel = relative(entry, f).split(sep).join("/");
+      if (!byRel.has(rel)) byRel.set(rel, { kind, abs: f, rel, jsonld: isJsonLd(f) });
+    }
+  }
+  return [...byRel.values()].sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+}
+
+/** Where `rel` (from {@link entryGraphFiles}) is published, SITE-relative: beside the entry's manifest. */
+export function entryGraphSitePath(instance: string, docId: string, rel: string): string {
+  const base = dirname(libraryAssetSitePath(instance, docId));
+  return `${base}/${rel.split("/").map(encodeURIComponent).join("/")}`;
+}
