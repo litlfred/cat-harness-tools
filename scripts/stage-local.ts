@@ -18,7 +18,10 @@
  * agent-run: their publish workflows are dispatch-only and are documentation
  * of what this path must match, never something an agent dispatches. So:
  *
- * - **which publisher** is read from the repository's own workflow files
+ * - **a declared site first**: a repository whose `<instance>.config.json`
+ *   carries `site.build` is built by `build-instance-site.ts` from its own
+ *   package scripts ({@link declaredRecipe}, {@link stageDeclared});
+ * - otherwise **which publisher** is read from the repository's own workflow files
  *   ({@link detectPublisher}): a caller of `folio-staging.yml` is a folio, a
  *   caller of smart-base's `fhirbuild.yml`/`ghbuild.yml` an IG
  *   (`stage-local-ig.ts`);
@@ -120,6 +123,8 @@ import {
   runIgBuild,
 } from "./stage-local-ig.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -797,11 +802,93 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   return done(r);
 }
 
+/**
+ * The instance a checkout declares at its root, and the `site.build` recipe its
+ * `<name>.config.json` carries, or undefined when it declares none. A
+ * repository that declares a recipe builds its site from its own package
+ * scripts, through `build-instance-site.ts`, rather than from a workflow file.
+ * smart-ra has no publishing workflow at all (bean n3h9), so reading its
+ * workflows found only `fhirbuild.yml` and took the folio for an IG.
+ */
+export function declaredRecipe(repo: string): { instance: string; recipe: SiteRecipe } | undefined {
+  const root = resolve(repo);
+  const file = findDeclarationFile(root);
+  if (file === undefined) return undefined;
+  const instance = siteFields(readFileSync(join(root, file), "utf-8"), join(root, file)).name;
+  const recipe = recipeFromConfig(root, instance);
+  return recipe === undefined ? undefined : { instance, recipe };
+}
+
+/** What `stageDeclared` did: the declared-recipe path's answer to {@link StageResult}. */
+export interface DeclaredResult {
+  kind: "folio";
+  via: "site.build";
+  instance: string;
+  target: Target;
+  url: string;
+  pushed: boolean;
+  site?: string;
+}
+
+/**
+ * The declared-recipe path: hand the checkout to `build-instance-site.ts` with
+ * its own `site.build`. The target follows the branch exactly as
+ * {@link chooseTarget} decides it for a workflow-described folio. The root is
+ * published only from the pushed default branch, a preview at
+ * `STAGING/<branch>/`, and `--plan` and `--dry-run` publish nothing.
+ */
+export async function stageDeclared(
+  o: StageOptions,
+  d: { instance: string; recipe: SiteRecipe },
+): Promise<DeclaredResult> {
+  const log = o.log ?? ((s: string) => console.error(s));
+  if (o.artifact) throw new Error("--artifact is not available for a site.build recipe: build-instance-site publishes to the Pages branch only");
+  const repo = resolve(o.repo);
+  const branch = o.branch ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const sha = git(repo, ["rev-parse", "HEAD"]);
+  const remote = git(repo, ["config", "--get", "remote.origin.url"]);
+  const ownerRepo = ownerRepoOf(remote);
+  if (!ownerRepo) throw new Error("origin is not a GitHub remote");
+  const [owner, name] = ownerRepo.split("/") as [string, string];
+  const defaultBranch = readDefaultBranch(repo);
+  const target = chooseTarget({ branch, defaultBranch, ...(o.main ? { main: true } : {}) });
+  if (target === "main" && !o.plan) {
+    git(repo, ["fetch", "-q", "origin", defaultBranch ?? branch]);
+    const tip = git(repo, ["rev-parse", "FETCH_HEAD"]);
+    if (tip !== sha) throw new Error(`HEAD ${sha.slice(0, 7)} is not origin/${defaultBranch ?? branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
+  }
+  const url = `https://${owner}.github.io/${name}/${target === "preview" ? `STAGING/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
+  const publish = !o.plan && !o.dryRun;
+  log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `STAGING/ preview of ${branch}`}`);
+  log(`via         build-instance-site.ts --instance ${d.instance}${target === "preview" ? ` --staging ${branch}` : ""}${publish ? " --publish" : ""}`);
+  log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
+  log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
+  log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
+  if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
+  const r = await buildInstanceSite({
+    root: repo,
+    instance: d.instance,
+    linkRoot: "https://litlfred.github.io/folio-assistant",
+    out: join(repo, "..", `${d.instance}-site`),
+    ...(d.recipe.home !== undefined ? { home: d.recipe.home } : {}),
+    pre: d.recipe.pre,
+    sourceSteps: d.recipe.sourceSteps,
+    siteSteps: d.recipe.siteSteps,
+    ...(target === "preview" ? { staging: branch } : {}),
+    mount: true,
+    fresh: false,
+    publish,
+    ...(publish ? { remote } : {}),
+  });
+  return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
+}
+
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher folio|ig]
 
-  One command for every agent-run publish: a folio (its workflow calls ${FOLIO_WORKFLOW}) or an
-  IG (it calls smart-base's ${IG_WORKFLOWS.join(" or ")}), preview or main site. The default
-  branch publishes the main site; any other branch a preview.
+  One command for every agent-run publish: a folio that declares its site in
+  <instance>.config.json site.build (built by build-instance-site.ts), a folio whose workflow calls
+  ${FOLIO_WORKFLOW}, or an IG (it calls smart-base's ${IG_WORKFLOWS.join(" or ")}); preview or
+  main site. The default branch publishes the main site; any other branch a preview.
 
   --plan             print what would be built and where, and stop
   --dry-run          build, and compose the commit in a temporary publish-branch worktree; push nothing
@@ -827,6 +914,23 @@ if (import.meta.main) {
     return i >= 0 ? argv[i + 1] : undefined;
   };
   try {
+    const repoArg = opt("repo") ?? process.cwd();
+    const declared = opt("publisher") === "ig" ? undefined : declaredRecipe(repoArg);
+    if (declared !== undefined) {
+      const d = await stageDeclared(
+        {
+          repo: repoArg,
+          ...(opt("branch") ? { branch: opt("branch")! } : {}),
+          dryRun: argv.includes("--dry-run"),
+          plan: argv.includes("--plan"),
+          main: argv.includes("--main"),
+          ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
+        },
+        declared,
+      );
+      console.log(JSON.stringify(d));
+      process.exit(0);
+    }
     const r = await stageLocal({
       repo: opt("repo") ?? process.cwd(),
       ...(opt("branch") ? { branch: opt("branch")! } : {}),
