@@ -1,0 +1,216 @@
+#!/usr/bin/env bun
+/**
+ * Install the harness's skills into an agent host, each under its harness's
+ * prefix (bean `folio-assistant-x4mt`, issue litlfred/folio-assistant#247).
+ *
+ * @module cat-harness-tools/scripts/install-skills
+ *
+ * ```sh
+ * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity] [--into <dir>] [--check]
+ * ```
+ *
+ * ## The owner's ruling, 2026-10-10
+ *
+ * "A, but harnesses have own prefix (e.g. cat, fa)". So:
+ * - **At install, not at rest.** Nothing in any repository is renamed: skill
+ *   files, manifests, BPMN `folio:skill` refs and cross-references keep the
+ *   bare name. Only the installed copy carries the prefix.
+ * - **Per harness.** Each instance may declare `skillPrefix` (cat-harness
+ *   declares `cat`). A skill takes the prefix of the instance that OWNS it; an
+ *   instance that declares none takes the prefix of the instance at `--root`,
+ *   the harness it is installed from. With no prefix anywhere, the install is
+ *   refused rather than writing bare names into a host's namespace.
+ *
+ * ## What is installed
+ *
+ * The union across the dependency tree: every skill directory
+ * `resolveSkillDirs(root)` returns (dependencies first, the root last, so the
+ * root wins a name collision; the loser is reported, not dropped silently).
+ * Within them, every `.md` that `isSkillMd` accepts and that has a
+ * `description` in its front matter: a host decides when to load a skill from
+ * its description, so a skill without one cannot be triggered, and inventing
+ * one would put words in the author's mouth. Those are listed as skipped.
+ *
+ * Each skill becomes `<host dir>/<prefix>-<name>/SKILL.md`: the source front
+ * matter with `name` replaced by the prefixed name, a provenance line, and the
+ * body unchanged. The two hosts written today share that layout, verified
+ * against their documentation:
+ *
+ * | host | directory |
+ * |---|---|
+ * | Claude Code | `.claude/skills/` |
+ * | Antigravity | `.agents/skills/` |
+ *
+ * Gemini CLI, Cursor and Copilot are not written yet: their formats differ
+ * (rules files, instructions files) and were not verified here. Writing a guess
+ * would produce files a host silently ignores.
+ *
+ * ## Owned output only
+ *
+ * Every installed `SKILL.md` carries {@link INSTALLED_MARKER}. A re-run
+ * removes installed directories whose skill is gone, and touches nothing
+ * without the marker: a host's own skills, and skills a person put there,
+ * are not this script's to delete. `--check` writes nothing and exits 1 when
+ * the host directory differs from what an install would write.
+ */
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
+
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { isSkillMd } from "./known-skills.ts";
+
+/** Where each host loads project skills from, relative to the project root. */
+export const HOSTS = {
+  claude: ".claude/skills",
+  antigravity: ".agents/skills",
+} as const;
+export type Host = keyof typeof HOSTS;
+
+/** The line that marks a `SKILL.md` as this script's output, and so its to replace or remove. */
+export const INSTALLED_MARKER = "<!-- installed by cat-harness-tools/scripts/install-skills.ts; edit the source, not this copy -->";
+
+export interface SourceSkill {
+  /** The bare name: front-matter `name`, or the file's basename. */
+  name: string;
+  /** Absolute path of the source `.md`. */
+  file: string;
+  /** The instance that owns it. */
+  instance: string;
+  /** That instance's declared prefix, if any. */
+  prefix?: string;
+  /** Why it cannot be installed, when it cannot. */
+  skip?: string;
+}
+
+const FRONT_MATTER = /^---\n([\s\S]*?)\n---\n?/;
+
+/**
+ * An instance's declared `skillPrefix`. Read through a narrow view rather
+ * than the declaration type, so this compiles against a cat-harness that
+ * predates the field (cat-harness#160) and simply finds none there.
+ */
+export function declaredPrefix(instanceRoot: string): string | undefined {
+  return (readDeclaration(instanceRoot) as { skillPrefix?: string } | undefined)?.skillPrefix;
+}
+
+function walkMd(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) walkMd(p, out);
+    else if (e.isFile() && e.name.endsWith(".md")) out.push(p);
+  }
+  return out;
+}
+
+/** One `.md` read as a skill: its name, its owner, and whether a host could use it. */
+export function readSourceSkill(file: string): SourceSkill | undefined {
+  if (!isSkillMd(file)) return undefined;
+  const instance = findInstanceRoot(file) ?? "";
+  const text = readFileSync(file, "utf-8");
+  const fm = FRONT_MATTER.exec(text)?.[1] ?? "";
+  const name = /^name:\s*["']?([^"'\n]+?)["']?\s*$/m.exec(fm)?.[1] ?? basename(file, ".md");
+  const prefix = instance ? declaredPrefix(instance) : undefined;
+  const skip = fm === "" ? "no front matter" : /^description:/m.test(fm) ? undefined : "no description: a host could never trigger it";
+  return { name, file, instance, ...(prefix ? { prefix } : {}), ...(skip ? { skip } : {}) };
+}
+
+/** Every skill the harness at `root` would install, in overlay order (root last). */
+export function collectSkills(root: string): SourceSkill[] {
+  return resolveSkillDirs(root).flatMap((d) => walkMd(d).sort().map(readSourceSkill).filter((s): s is SourceSkill => s !== undefined));
+}
+
+/** The installed copy: the prefixed name in the front matter, a provenance line, the body unchanged. */
+export function renderInstalled(text: string, installedName: string, provenance: string): string {
+  const m = FRONT_MATTER.exec(text);
+  if (!m) throw new Error("a skill without front matter cannot be installed");
+  const fm = /^name:.*$/m.test(m[1]!) ? m[1]!.replace(/^name:.*$/m, `name: ${installedName}`) : `name: ${installedName}\n${m[1]}`;
+  return `---\n${fm}\n---\n${INSTALLED_MARKER}\n<!-- source: ${provenance} -->\n${text.slice(m[0].length)}`;
+}
+
+export interface InstallPlan {
+  /** Installed directory name → the `SKILL.md` it holds. */
+  files: Map<string, string>;
+  skipped: { file: string; reason: string }[];
+  /** Installed names claimed twice; the later (closer to the root) source won. */
+  collisions: { name: string; lost: string; won: string }[];
+}
+
+/** What an install from `root` writes: pure apart from reading the sources. */
+export function planInstall(root: string, skills: readonly SourceSkill[] = collectSkills(root)): InstallPlan {
+  const rootPrefix = declaredPrefix(root);
+  const files = new Map<string, string>();
+  const from = new Map<string, string>();
+  const skipped: InstallPlan["skipped"] = [];
+  const collisions: InstallPlan["collisions"] = [];
+  for (const s of skills) {
+    const rel = relative(root, s.file);
+    if (s.skip) {
+      skipped.push({ file: rel, reason: s.skip });
+      continue;
+    }
+    const prefix = s.prefix ?? rootPrefix;
+    if (!prefix) {
+      skipped.push({ file: rel, reason: "neither its instance nor the installing harness declares skillPrefix" });
+      continue;
+    }
+    const installed = `${prefix}-${s.name}`;
+    if (from.has(installed)) collisions.push({ name: installed, lost: from.get(installed)!, won: rel });
+    from.set(installed, rel);
+    files.set(installed, renderInstalled(readFileSync(s.file, "utf-8"), installed, rel));
+  }
+  return { files, skipped, collisions };
+}
+
+/** Installed directories under `hostDir` that carry the marker: the only ones this script may remove. */
+export function ownedInstalls(hostDir: string): string[] {
+  if (!existsSync(hostDir)) return [];
+  return readdirSync(hostDir).filter((d) => {
+    const f = join(hostDir, d, "SKILL.md");
+    return existsSync(f) && statSync(f).isFile() && readFileSync(f, "utf-8").includes(INSTALLED_MARKER);
+  });
+}
+
+function main(argv: string[]): number {
+  const flag = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
+  const root = resolve(flag("--root") ?? process.cwd());
+  const host = (flag("--host") ?? "claude") as Host;
+  if (!(host in HOSTS)) {
+    console.error(`install-skills: unknown host "${host}" (known: ${Object.keys(HOSTS).join(", ")})`);
+    return 2;
+  }
+  const hostDir = join(resolve(flag("--into") ?? root), HOSTS[host]);
+  const check = argv.includes("--check");
+
+  if (!declaredPrefix(root) && collectSkills(root).every((s) => !s.prefix)) {
+    console.error(`install-skills: no instance under ${root} declares skillPrefix, so there is no namespace to install into`);
+    return 2;
+  }
+  const plan = planInstall(root);
+  const stale = ownedInstalls(hostDir).filter((d) => !plan.files.has(d));
+  const changed = [...plan.files].filter(([d, text]) => {
+    const f = join(hostDir, d, "SKILL.md");
+    return !existsSync(f) || readFileSync(f, "utf-8") !== text;
+  });
+
+  for (const c of plan.collisions) console.warn(`  ! ${c.name}: ${c.won} replaces ${c.lost}`);
+  if (check) {
+    for (const [d] of changed) console.error(`  ✗ ${relative(root, join(hostDir, d))} is stale or missing`);
+    for (const d of stale) console.error(`  ✗ ${relative(root, join(hostDir, d))} is no longer a skill`);
+    console.log(`install-skills --check: ${plan.files.size} skill(s), ${changed.length + stale.length} out of date, ${plan.skipped.length} skipped`);
+    return changed.length + stale.length > 0 ? 1 : 0;
+  }
+  for (const [d, text] of changed) {
+    mkdirSync(join(hostDir, d), { recursive: true });
+    writeFileSync(join(hostDir, d, "SKILL.md"), text);
+  }
+  for (const d of stale) rmSync(join(hostDir, d), { recursive: true });
+  for (const s of plan.skipped) console.log(`  · skipped ${s.file}: ${s.reason}`);
+  console.log(
+    `install-skills: ${plan.files.size} skill(s) in ${relative(process.cwd(), hostDir) || "."} ` +
+      `(${changed.length} written, ${stale.length} removed, ${plan.skipped.length} skipped, ${plan.collisions.length} collision(s))`,
+  );
+  return 0;
+}
+
+if (import.meta.main) process.exit(main(process.argv.slice(2)));

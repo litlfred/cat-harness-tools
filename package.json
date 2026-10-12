@@ -510,6 +510,7 @@
     "kind:table": "bun run cat-harness-tools/scripts/kind-table.ts",
     "kind:table:check": "bun run cat-harness-tools/scripts/kind-table.ts --check",
     "skills:docs": "bun run cat-harness-tools/scripts/gen-skill-docs.ts",
+    "skills:install": "bun run cat-harness-tools/scripts/install-skills.ts",
     "skills:docs:check": "bun run cat-harness-tools/scripts/gen-skill-docs.ts --check",
     "stakeholder-map": "bun run cat-harness-tools/scripts/stakeholder-map.ts",
     "state:mount": "bun run cat-harness-tools/scripts/state-mount.ts",
