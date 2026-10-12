@@ -47,4 +47,52 @@ describe("matching outline headings to page lines", () => {
     );
     expect(got).toEqual([["1 Intro", 1], ["A Properties of analytic functions", 2], ["B.1 Polarization", 2]]);
   });
+
+  // ant-v14-n7-s p. 302: the heading runs into its paragraph, the math is
+  // spaced ("p = 3" for the outline's "p=3"), and with a longer paragraph the
+  // line passes the 120-character guard of the ordinary rule.
+  const RUN_IN = "3C1. Lie type in cross-characteristic for p = 3. In this section, we prove Theorem 3.7 for groups of Lie type defined in characteristic different from 3, which is the harder case.";
+
+  test("a run-in heading longer than 120 characters still opens its section", () => {
+    const got = py(
+      `pages = ['3C. The case p = 3\\nintro', 'text\\n${RUN_IN}\\nmore', '3C2. Lie type in defining characteristic for p = 3\\nfin']\n` +
+      "toc = [ps.TocEntry(3, t, p, 'outline', None) for t, p in [('3C. The case p=3',1),('3C1. Lie type in cross-characteristic for p=3',2),('3C2. Lie type in defining characteristic for p=3',3)]]\n" +
+      "print(json.dumps([len(pages[1].splitlines()[1]), [[s.title, s.page_start] for s in ps.split_sections(pages, toc)]]))",
+    );
+    expect(got).toEqual([RUN_IN.length, [
+      ["3C. The case p=3", 1],
+      ["3C1. Lie type in cross-characteristic for p=3", 2],
+      ["3C2. Lie type in defining characteristic for p=3", 3],
+    ]]);
+    expect(RUN_IN.length).toBeGreaterThan(120);
+  });
+
+  test("a long line that only MENTIONS a title mid-sentence is not a heading", () => {
+    const mention = "As explained in the discussion preceding 3C1. Lie type in cross-characteristic for p = 3, we may assume that the group is simple and of Lie type throughout.";
+    const got = py(
+      `pages = ['${mention}\\nbody text']\n` +
+      "e = ps.TocEntry(4, '3C1. Lie type in cross-characteristic for p=3', 1, 'outline', None)\n" +
+      "print(json.dumps(ps.locate_heading(pages, e)))",
+    );
+    expect(mention.length).toBeGreaterThan(120);
+    expect(got).toBeNull();
+  });
+
+  test("a run-in prefix must end at a boundary, not inside a longer token", () => {
+    const got = py(
+      "pages = ['3C1. Lie type in cross-characteristic for p = 31 and every larger prime the argument of Section 2 applies verbatim to the groups considered here.']\n" +
+      "e = ps.TocEntry(4, '3C1. Lie type in cross-characteristic for p=3', 1, 'outline', None)\n" +
+      "print(json.dumps(ps.locate_heading(pages, e)))",
+    );
+    expect(got).toBeNull();
+  });
+
+  test("an unlabelled title gets no run-in match", () => {
+    const got = py(
+      "pages = ['Introduction of the auxiliary operator below is what makes the estimate work, and we use it throughout the remainder of this paper without further comment.']\n" +
+      "e = ps.TocEntry(1, 'Introduction', 1, 'outline', None)\n" +
+      "print(json.dumps(ps.locate_heading(pages, e)))",
+    );
+    expect(got).toBeNull();
+  });
 });

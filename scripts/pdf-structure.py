@@ -1172,34 +1172,95 @@ def _match_key(text: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
+def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
+    """`(page_idx, line_idx)` of the line that prints outline entry `e`, or None.
+
+    Searched within two pages either side of the entry's own page. Factored out
+    of `split_sections` so `heading-match-dryrun.py` asks the same question the
+    splitter does, rather than a second spelling of it.
+    """
+    needle = _match_key(e.title)[:44]
+    if not needle:
+        return None
+    run_in = _run_in_keys(e)
+    lo = max(0, (e.page or 1) - 2)
+    hi = min(len(pages), (e.page or 1) + 2)
+    for pi in range(lo, hi):
+        lines = pages[pi].splitlines()
+        for li, line in enumerate(lines):
+            cand = _match_key(line)
+            # A label alone on its line ("A", "B.1", "3C1.") is the
+            # heading's number; PyMuPDF puts it above the title, so the
+            # outline's "A Properties of ..." matches only the two joined.
+            if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
+                cand = _match_key(line + " " + lines[li + 1])
+            if needle in cand and len(cand) < 120:
+                return (pi, li)
+            if run_in and _starts_run_in(cand, run_in):
+                return (pi, li)
+    return None
+
+
+# A heading label that can open a run-in heading: it carries a digit ("3C1.",
+# "2.1", "B.2") or ends in a full stop ("A."). A bare capital is refused
+# because it is indistinguishable from the article in "A note on ...".
+_RUN_IN_LABEL = re.compile(r"(?=[A-Z0-9.]*\d|[A-Z0-9.]*\.$)[A-Z0-9]{1,4}(?:\.[A-Z0-9]{1,3})*\.?")
+
+
+def _run_in_keys(e: TocEntry) -> list[str]:
+    """Whitespace-free match keys for `e` printed as label + title, or [] when
+    the entry has no label (then only the ordinary needle rule applies).
+
+    Measured on `ant-v14-n7-s` (2026-10-12): the outline's "3C1. Lie type in
+    cross-characteristic for p=3" is printed "3C1. Lie type in cross-
+    characteristic for p = 3. In this section, ..." — the heading runs into its
+    paragraph, and the math is spaced. The needle rule misses it twice over:
+    "p=" is not in "p = 3", and a run-in line is routinely past the 120-char
+    guard. Comparing with whitespace removed, anchored at line start and closed
+    by a boundary, catches it without letting a mid-sentence mention through.
+    """
+    title = _match_key(e.title)
+    if e.number:
+        n = _match_key(e.number).rstrip(".")
+        return [re.sub(r"\s+", "", f"{n} {title}"), re.sub(r"\s+", "", f"{n}. {title}")]
+    first = e.title.strip().split(maxsplit=1)
+    if len(first) == 2 and _RUN_IN_LABEL.fullmatch(first[0]):
+        return [re.sub(r"\s+", "", title)]
+    return []
+
+
+def _starts_run_in(cand: str, keys: list[str]) -> bool:
+    """True when `cand` (a `_match_key`ed line) BEGINS with one of `keys`,
+    whitespace ignored, and the heading ends at a boundary: end of line,
+    whitespace, or `.:;,` / a dash followed by whitespace or end of line.
+    Length is not limited — a run-in heading carries its paragraph with it."""
+    for key in keys:
+        i = k = 0
+        while i < len(cand) and k < len(key):
+            if cand[i].isspace():
+                i += 1
+                continue
+            if cand[i] != key[k]:
+                break
+            i += 1
+            k += 1
+        if k < len(key) or len(key) < 4:
+            continue
+        rest = cand[i:]
+        if not rest or rest[0].isspace() or re.match(r"[.:;,\u2013\u2014-](\s|$)", rest):
+            return True
+    return False
+
+
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
     """Slice the document text at heading boundaries."""
     marks: list[tuple[int, int, TocEntry]] = []  # (page_idx, line_idx, entry)
-    used: set[int] = set()
+    used: set[tuple[int, int]] = set()
 
     for e in toc:
-        needle = _match_key(e.title)[:44]
-        if not needle:
-            continue
-        lo = max(0, (e.page or 1) - 2)
-        hi = min(len(pages), (e.page or 1) + 2)
-        found = None
-        for pi in range(lo, hi):
-            lines = pages[pi].splitlines()
-            for li, line in enumerate(lines):
-                cand = _match_key(line)
-                # A label alone on its line ("A", "B.1", "3C1.") is the
-                # heading's number; PyMuPDF puts it above the title, so the
-                # outline's "A Properties of ..." matches only the two joined.
-                if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
-                    cand = _match_key(line + " " + lines[li + 1])
-                if needle in cand and len(cand) < 120:
-                    found = (pi, li)
-                    break
-            if found:
-                break
+        found = locate_heading(pages, e)
         if found and found not in used:
-            used.add(found)  # type: ignore[arg-type]
+            used.add(found)
             marks.append((found[0], found[1], e))
 
     marks.sort(key=lambda t: (t[0], t[1]))
