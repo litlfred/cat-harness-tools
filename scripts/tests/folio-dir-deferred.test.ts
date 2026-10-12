@@ -11,16 +11,26 @@
  *
  * @module scripts/tests/folio-dir-deferred.test
  */
-import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
+// Every root is removed after its test. A leaked `<dir>/<dir>.json` holding
+// "{ not json" is a broken DECLARATION to anything that scans the temp
+// directory for instances: it turned seven `check-draft-beans` tests red
+// whenever the two files shared a run.
+const roots: string[] = [];
+afterEach(() => {
+  for (const d of roots.splice(0)) rmSync(d, { recursive: true, force: true });
+});
+
 /** A root whose declaration will not parse, so `folioDir` throws on it. */
 function unreadableRoot(): string {
   const d = mkdtempSync(join(tmpdir(), "folio-dir-deferred-"));
+  roots.push(d);
   // Named after the DIRECTORY, and `<name>.json` rather than
   // `<name>.config.json`. Declarations became `<name>.json` on 2026-09-21, and
   // an unparseable file has no `name` to agree with — so it counts as this
@@ -74,6 +84,7 @@ describe("folioDirDeferred", () => {
     // would break that; memoising on first use would make it depend on which
     // caller ran first.
     const root = mkdtempSync(join(tmpdir(), "folio-dir-ok-"));
+    roots.push(root);
     const get = folioDirDeferred(root, import.meta.url);
     expect(get()).toBe(folioDir(root));
     expect(get()).toBe(get());
