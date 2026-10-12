@@ -54,7 +54,7 @@ import { resolve, dirname, relative } from "path";
 import { globSync } from "glob";
 import { execSync } from "child_process";
 import type { ComputationWitness } from "@litlfred/cat-harness/schemas/types.ts";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
 
 /**
  * A `.witness.json` as it appears on disk.

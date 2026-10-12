@@ -42,7 +42,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { basename, relative } from "path";
 import { globSync } from "glob";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is
 // folio content (`content/**`, `computations/**`), and this is used as the cwd

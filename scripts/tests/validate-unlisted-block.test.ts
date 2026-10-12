@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { validateObjects } from "../../content/pipeline/validate";
+import { validateObjects } from "../../pipeline/validate";
 import type { ValidationIssue } from "@litlfred/cat-harness/schemas/types.ts";
 
 type Sec = { title: string; blocks: string[] } | { name: string };

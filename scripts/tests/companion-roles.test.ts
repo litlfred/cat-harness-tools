@@ -32,8 +32,8 @@ import {
   hashBlockFiles,
   freshnessKeys,
   entryIsFresh,
-} from "../../content/pipeline/qa-utils";
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry";
+} from "../../pipeline/qa-utils";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
 import { criterionAdapters } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 

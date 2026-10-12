@@ -15,7 +15,7 @@ import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
 import { INSTANCE_ROOT, FOLIO_ROOT, hasFolio, REPO_ROOT } from "./helpers";
-import { maskComments } from "../../content/pipeline/uses-field";
+import { maskComments } from "../../pipeline/uses-field";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 

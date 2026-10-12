@@ -28,7 +28,7 @@ describe("a new folio is QA'd from its first commit", () => {
     const root = join(repo, "doc");
     initFolio({ targetDir: root, contentType: "document", slug: "qa-doc", title: "QA Doc", authors: ["A"], link: "sibling", assistantPath: "folio-assistant", skipVcs: true });
     const agents = readFileSync(join(root, "AGENTS.md"), "utf-8");
-    expect(agents).toContain("bun run folio-assistant/cat-harness-tools/content/pipeline/qa-sweep.ts folio");
+    expect(agents).toContain("bun run folio-assistant/cat-harness-tools/pipeline/qa-sweep.ts folio");
     expect(agents).toContain("test/results/block-qa/");
     // The old sibling layout is no longer taught.
     expect(agents).not.toContain("<chapter>/<root>.qa.json");
@@ -59,13 +59,13 @@ describe("a new folio is QA'd from its first commit", () => {
     const sidecars = join(repo, "sidecar-root");
     // `env` explicitly: Bun does not pass runtime-set variables to a child, and
     // standalone the preload sets FOLIO_FIXTURE_CHECKOUT (the vocabulary).
-    const sweep = spawnSync("bun", ["run", join(REPO_ROOT, "cat-harness-tools/content/pipeline/qa-sweep.ts"), "handbook/folio", "--script-sidecar-root", sidecars], { cwd: repo, encoding: "utf-8", env: { ...process.env } });
+    const sweep = spawnSync("bun", ["run", join(REPO_ROOT, "cat-harness-tools/pipeline/qa-sweep.ts"), "handbook/folio", "--script-sidecar-root", sidecars], { cwd: repo, encoding: "utf-8", env: { ...process.env } });
     expect(sweep.status).toBe(0);
     // ANTI-VACUITY. Without this, "the platform checkout was not written to"
     // would also be satisfied by a flag that silently disabled the write, or
     // by a sweep that found no automated criteria at all — and this test would
     // pass over exactly the emptiness it is supposed to rule out.
-    const wrote = readdirSync(join(sidecars, "content/pipeline/script-sidecars"));
+    const wrote = readdirSync(join(sidecars, "pipeline/script-sidecars"));
     expect(wrote.length).toBeGreaterThan(0);
     expect(wrote.every((f) => f.endsWith(".script.json"))).toBe(true);
     expect(existsSync(join(folio, "test/results/block-qa/folio/qa-sub/introduction/overview.qa.json"))).toBe(true);

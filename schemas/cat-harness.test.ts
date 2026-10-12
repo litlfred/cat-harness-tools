@@ -1208,7 +1208,7 @@ describe("ownDirectoryById — two entries, one path, different scopes", () => {
    * declares `docs` (instance-scoped) and `root-docs` (`scope: "repository"`),
    * both with `path: "docs/"`. They resolve against different roots, so a
    * caller asking for the instance's own `docs` must not be handed the
-   * repository's. `content/pipeline/translation-index.ts` is that caller —
+   * repository's. `pipeline/translation-index.ts` is that caller —
    * everything it computes is instance-relative.
    */
   // The declared directory under test, named once. It is an id and a path in

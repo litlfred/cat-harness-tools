@@ -46,7 +46,7 @@ import {
   pageKey,
   sourceLocale,
   type TranslationIndex,
-} from "../content/pipeline/translation-index.ts";
+} from "../pipeline/translation-index.ts";
 import {
   QA_FAMILY_LABEL,
   qaCorpusAvailability,
@@ -55,7 +55,7 @@ import {
   sidecarPaths,
   type QaFamily,
   type QaWitnessDoc,
-} from "../content/pipeline/qa-witness.ts";
+} from "../pipeline/qa-witness.ts";
 import { todoDefaultTheme } from "./todos.js";
 import { publishedTodoFiles } from "./todo-source.js";
 import { declaredSubgraphNode } from "./kg-export.ts";
@@ -77,7 +77,7 @@ import {
   sourceLinks,
   repoRootFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { isQaGraphUnknown, projectQaGraph } from "../content/pipeline/qa-graph-index.ts";
+import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
@@ -99,7 +99,7 @@ const SOURCE_LOCALE = sourceLocale(INSTANCE_ROOT);
 // because `qa-section-title-audit.ts` walked every `content/<dir>/` looking for
 // chapter manifests and treated webpage manifests as folio chapters ("7 titles
 // across 7 chapters"). The fix was in the wrong place: the audit now skips
-// `docs/source/` explicitly (alongside `content/pipeline/` and
+// `docs/source/` explicitly (alongside `pipeline/` and
 // `content/schema/`), so documentation can live where content belongs — under
 // `content/` — without tripping the folio-emptiness gate.
 const SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);

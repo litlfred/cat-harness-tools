@@ -138,7 +138,7 @@ def pdf_docinfo(pdf: Path) -> dict[str, str]:
     `/Title` ("RFC 2119: Key words for use in RFCs ...", "Link Groups").
 
     Recorded verbatim, junk included ("Microsoft Word - gurel_emet.doc"). The
-    junk filter belongs to the reader (`content/pipeline/library-title.ts`),
+    junk filter belongs to the reader (`pipeline/library-title.ts`),
     because a filter applied here would hide the evidence it judged.
     """
     keys = (("title", "Title"), ("author", "Author"), ("producer", "Producer"),
@@ -347,7 +347,7 @@ def main() -> int:
             "toc_source": outline_state(pdf),
             "granularity": "page",
             # EXACTLY the section shape `pdf-structure.py` writes, field for
-            # field. `content/pipeline/gen-library-jsonld.ts` reads `sec.id`,
+            # field. `pipeline/gen-library-jsonld.ts` reads `sec.id`,
             # `page_start` and `page_end`, and an invented `section_id` crashed
             # it with `undefined is not an object (evaluating 'sectionId.match')`
             # — the same "two spellings of one concept" defect this file's own

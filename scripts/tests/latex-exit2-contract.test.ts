@@ -20,7 +20,7 @@ const ROOT = resolve(dirname(HARNESS_ROOT));
 
 describe("LaTeX family exit-2 contract (Finding 1 on jh2j)", () => {
   test("validate-tex exits 2 on could-not-determine (no snippets in platform)", () => {
-    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/content/pipeline/validate-tex.ts"], {
+    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/pipeline/validate-tex.ts"], {
       cwd: ROOT,
       stdout: "pipe",
       stderr: "pipe",
@@ -29,7 +29,7 @@ describe("LaTeX family exit-2 contract (Finding 1 on jh2j)", () => {
   });
 
   test("audit-tex-source exits 2 on could-not-determine (no content files in platform)", () => {
-    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/content/pipeline/audit-tex-source.ts"], {
+    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/pipeline/audit-tex-source.ts"], {
       cwd: ROOT,
       stdout: "pipe",
       stderr: "pipe",
@@ -63,7 +63,7 @@ describe("LaTeX family exit-2 contract (Finding 1 on jh2j)", () => {
   });
 
   test("generate-main-tex exits 2 on could-not-determine (no paper manifest in platform)", () => {
-    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/content/pipeline/generate-main-tex.ts"], {
+    const res = Bun.spawnSync(["bun", "run", "cat-harness-tools/pipeline/generate-main-tex.ts"], {
       cwd: ROOT,
       stdout: "pipe",
       stderr: "pipe",

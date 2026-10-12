@@ -128,7 +128,7 @@ describe("slug validation", () => {
   });
 
   test("a reserved slug is refused rather than silently undiscovered", () => {
-    // content/schema/ and content/pipeline/ have platform meanings; a document
+    // content/schema/ and pipeline/ have platform meanings; a document
     // there would never be found by discovery, with no error to explain why.
     const d = tmp();
     expect(() => initFolio(opts(d, { slug: "schema" }))).toThrow(/reserved/);
@@ -361,7 +361,7 @@ describe("workflow templates (52dz)", () => {
       // ...and the substitution happened: the platform path the caller chose
       // is the one the QA sweep runs from.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain(
-        "vendor/fa/cat-harness-tools/content/pipeline/qa-sweep.ts",
+        "vendor/fa/cat-harness-tools/pipeline/qa-sweep.ts",
       );
       // GitHub's own `${{ … }}` expressions survive substitution untouched.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep-nightly.yml"), "utf-8")).toContain(
@@ -470,7 +470,7 @@ describe("the scaffolded folio actually builds", () => {
     // then resolves exactly as it would in a real folio.
     symlinkSync(REPO_ROOT, join(d, "folio-assistant"));
 
-    const { buildDocumentMarkdown } = await import("../../content/pipeline/render-markdown");
+    const { buildDocumentMarkdown } = await import("../../pipeline/render-markdown");
     const result = await buildDocumentMarkdown(
       join(d, "folio/cold-chain-guidance/cold-chain-guidance.ts"),
     );
@@ -493,7 +493,7 @@ describe("the scaffolded folio actually builds", () => {
     initFolio(opts(d));
     symlinkSync(REPO_ROOT, join(d, "folio-assistant"));
 
-    const { checkFolioProfile } = await import("../../content/pipeline/profile-check");
+    const { checkFolioProfile } = await import("../../pipeline/profile-check");
     const r = checkFolioProfile(d);
     expect(r.profile).toBe("document");
     // Through the scaffold's OWN index entry: an instance an

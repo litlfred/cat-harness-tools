@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { Block } from "@litlfred/cat-harness/schemas/types.ts";
 
-import { ENV_NAMES, renderBlock } from "../../content/pipeline/render-latex";
+import { ENV_NAMES, renderBlock } from "../../pipeline/render-latex";
 
 const rec = (extra: Record<string, unknown> = {}) =>
   ({ kind: "recommendation", label: "who-anc:rec-12", title: "Iron and folic acid", ...extra }) as unknown as Block;

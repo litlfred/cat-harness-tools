@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   checkDetanglerNoDependencyCycle,
   checkDetanglerNoForwardRef,
-} from "../../content/pipeline/qa-checkers-extended";
-import { buildContentGraph } from "../../content/pipeline/content-graph";
-import { walkBlocks } from "../../content/pipeline/qa-utils";
+} from "../../pipeline/qa-checkers-extended";
+import { buildContentGraph } from "../../pipeline/content-graph";
+import { walkBlocks } from "../../pipeline/qa-utils";
 import { FOLIO_ROOT, hasFolio } from "./helpers";
 import { join } from "path";
 

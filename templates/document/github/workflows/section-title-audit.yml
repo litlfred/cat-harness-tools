@@ -63,7 +63,7 @@ jobs:
       # warnings (compound / too-long) do not. Run from the folio root: the
       # audit reads the content root relative to the working directory.
       - name: Machine review — titles + structure (hard gate)
-        run: bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-section-title-audit.ts"
+        run: bun run "{{assistant}}/cat-harness-tools/pipeline/qa-section-title-audit.ts"
 
       # COMPUTE AND JUDGE: compute the derived copy from the live manifests and
       # the stored verdicts. Exit 2 means the verdict store could not be read —
@@ -71,4 +71,4 @@ jobs:
       # {{folio}}/<document>/section-title-audit.qa.json is read once and its
       # verdicts moved into the store; removing it from main is a person's call.
       - name: Compute the derived copy and judge the verdict store
-        run: bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-section-title-audit.ts" --report-only --write-sidecar --thorough
+        run: bun run "{{assistant}}/cat-harness-tools/pipeline/qa-section-title-audit.ts" --report-only --write-sidecar --thorough

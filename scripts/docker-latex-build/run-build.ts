@@ -1,4 +1,4 @@
-// Node.js-compatible wrapper for content/pipeline/build.ts
+// Node.js-compatible wrapper for pipeline/build.ts
 // Works around Bun-specific import.meta.dir/main used in the pipeline.
 // Usage: npx tsx cat-harness-tools/scripts/docker-latex-build/run-build.ts [same args as pipeline/build.ts]
 

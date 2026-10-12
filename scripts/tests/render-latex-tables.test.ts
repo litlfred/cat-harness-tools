@@ -19,7 +19,7 @@ import {
   chooseColumnSpec,
   splitLongMath,
   findMathTextSeams,
-} from "../../content/pipeline/render-latex";
+} from "../../pipeline/render-latex";
 
 const GFM_TABLE = `
 | Name | Value | Notes |

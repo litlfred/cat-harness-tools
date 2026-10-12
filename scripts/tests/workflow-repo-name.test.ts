@@ -12,7 +12,7 @@
  * the same URL from `github.event.repository.name` or `GITHUB_REPOSITORY` and
  * get it right. This is the genericity family `AGENTS.md` records — the `QOU.`
  * module prefix, `generate-readme.sh`, the `folio-assistant/simulators`
- * literal — each of which was found in `scripts/` or `content/pipeline/`.
+ * literal — each of which was found in `scripts/` or `pipeline/`.
  * **The workflows had never been swept.**
  *
  * ## What is deliberately NOT a finding

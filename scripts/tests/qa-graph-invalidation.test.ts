@@ -2,13 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { entryIsFresh, freshnessKeys } from "../../content/pipeline/qa-utils";
-import { usesGraphHash } from "../../content/pipeline/uses-graph-hash";
+import { entryIsFresh, freshnessKeys } from "../../pipeline/qa-utils";
+import { usesGraphHash } from "../../pipeline/uses-graph-hash";
 import {
   DETANGLER_ARCHIMEDEAN_WALL,
   QA_CRITERIA_BY_ID,
   QA_CRITERIA_REGISTRY,
-} from "../../content/pipeline/qa-criteria-registry";
+} from "../../pipeline/qa-criteria-registry";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 /**

@@ -30,7 +30,7 @@ import {
   licenceProperties,
   LICENCE_FILENAME,
   libraryInstanceOf,
-} from "../../content/pipeline/gen-library-jsonld";
+} from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";

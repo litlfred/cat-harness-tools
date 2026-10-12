@@ -162,7 +162,7 @@ def normalize_rows(rows: Iterable[Iterable[Any]]) -> list[list[str]]:
 def to_gfm(rows: list[list[str]]) -> str:
     """Render a cell matrix as a GFM pipe table.
 
-    GFM specifically, and not CSV, because `content/pipeline/render-latex.ts`
+    GFM specifically, and not CSV, because `pipeline/render-latex.ts`
     already converts a GFM table node to `\\begin{tabular}` with booktabs. So a
     table extracted here can be pasted into a content block and rendered by
     machinery that exists, with no new converter in between.

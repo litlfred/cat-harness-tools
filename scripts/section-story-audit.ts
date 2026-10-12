@@ -66,8 +66,8 @@
 import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { findContentRepoRoot } from "../content/pipeline/repo-root";
-import { requirePaper } from "../content/pipeline/repo-root";
+import { findContentRepoRoot } from "../pipeline/repo-root";
+import { requirePaper } from "../pipeline/repo-root";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is
 // folio content (`content/**`, `computations/**`), and this is used as the cwd

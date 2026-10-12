@@ -301,7 +301,7 @@ test.describe("the page-level translation badge joins the badge row", () => {
           witnesses: [
             {
               kind: "script",
-              id: "content/pipeline/translation-block-qa.ts",
+              id: "pipeline/translation-block-qa.ts",
               freshness: "fresh",
             },
           ],

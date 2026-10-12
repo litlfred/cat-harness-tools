@@ -29,7 +29,7 @@ import { describe, test, expect } from "bun:test";
 import {
   preserveNonScriptEntries,
   insertAdjudication,
-} from "../../content/pipeline/qa-utils.ts";
+} from "../../pipeline/qa-utils.ts";
 import type {
   QaCriterionEntry,
   QaReviewerKind,
@@ -48,7 +48,7 @@ function entry(
       kind,
       id:
         kind === "script"
-          ? "content/pipeline/qa-checkers-voice.ts"
+          ? "pipeline/qa-checkers-voice.ts"
           : kind === "agent"
             ? "claude:one-voice-integration-watcher"
             : "litlfred",
@@ -264,7 +264,7 @@ describe("insertAdjudication — a reviewer supersedes their own earlier entry",
     expect(out.map((e) => e.reviewer.id)).toEqual([
       "one-voice-integration-watcher",
       "voice-editorial-review",
-      "content/pipeline/qa-checkers-voice.ts",
+      "pipeline/qa-checkers-voice.ts",
     ]);
   });
 

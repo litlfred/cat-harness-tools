@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { readUnlabelledBlockManifest, walkBlocks } from "../../content/pipeline/qa-utils";
+import { readUnlabelledBlockManifest, walkBlocks } from "../../pipeline/qa-utils";
 
 /**
  * `walkBlocks` answers two different questions with one enumeration: "what is

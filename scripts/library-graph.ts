@@ -94,7 +94,7 @@ const REPO_URL = (root: string): string | undefined => {
 import { proseBody, type SummaryStatus } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { withheldEntryFor } from "./lib/withheld.ts";
 import { entryItems, type SummaryTally } from "./summaries.ts";
-import { ingestRungOf, type IngestRung } from "../content/pipeline/gen-library-jsonld.ts";
+import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";

@@ -34,7 +34,7 @@ import {
   getDeclaredGraphDirectories,
 } from "../benchmark-guard";
 
-const PIPELINE = join(import.meta.dir, "../../content/pipeline");
+const PIPELINE = join(import.meta.dir, "../../pipeline");
 const SCRIPTS = join(import.meta.dir, "..");
 
 /** Scripts that write a machine-generated worklist or report. */

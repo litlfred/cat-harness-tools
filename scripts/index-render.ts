@@ -24,7 +24,7 @@
  * - bootstrap's `AGENTS.md`, quoted as the cold start for a checkout that
  *   is not yet set up — the provenance the deleted declaration's `source`
  *   carried, now carried by the render itself;
- * - the README section generators (`content/pipeline/readme-sections.ts`):
+ * - the README section generators (`pipeline/readme-sections.ts`):
  *   `cat-harness:cold-start`, `cat-harness:instances` and `readme:toc`.
  *
  * The hand-written prose the two files carried before went where its
@@ -64,8 +64,8 @@ import { join, posix, relative, resolve, sep } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, INSTANCE_README_ROLE, declaredAssets, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { INDEX_CONFIG_FILENAME, readIndexConfig, remoteMountPathOf, type IndexConfig, type IndexInstance } from "@litlfred/cat-harness/schemas/index-config.js";
-import { README_TOC_MARKER, syncSections } from "../content/pipeline/readme-sections.js";
-import { loadReadmeConfig } from "../content/pipeline/readme-toc.js";
+import { README_TOC_MARKER, syncSections } from "../pipeline/readme-sections.js";
+import { loadReadmeConfig } from "../pipeline/readme-toc.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This instance's root — whatever directory it is mounted at. */

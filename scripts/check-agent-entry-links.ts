@@ -27,7 +27,7 @@
  * confirm rather than assume — confirmed: it ran clean over `AGENTS.md`
  * unmodified.
  *
- * That auditor was inside `content/pipeline/readme-links.ts` when this check
+ * That auditor was inside `pipeline/readme-links.ts` when this check
  * was written, which made this file import core from harness and forced it to
  * be CLASSIFIED core — honest about shipping, dishonest about subject, since
  * `AGENTS.md` is harness through and through. Bean `cp3l` lifted the generic

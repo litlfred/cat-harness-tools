@@ -37,7 +37,7 @@ describe("namesSelf — the suffix rule, not a basename rule", () => {
   test("a pre-split root is a suffix and so names the file", () => {
     expect(namesSelf("cat-harness/content/pipeline/build.ts", "pipeline/build.ts")).toBe(true);
     expect(
-      namesSelf("cat-harness/content/pipeline/qa-sweep.ts", "content/pipeline/qa-sweep.ts"),
+      namesSelf("cat-harness/content/pipeline/qa-sweep.ts", "pipeline/qa-sweep.ts"),
     ).toBe(true);
     expect(namesSelf("cat-harness/scripts/render-log.ts", "render-log.ts")).toBe(true);
   });

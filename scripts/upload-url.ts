@@ -48,7 +48,7 @@ import {
   rootForScope,
   type ContentDirectory,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { detectRepoUrl } from "../content/pipeline/readme-toc.js";
+import { detectRepoUrl } from "../pipeline/readme-toc.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The graph typology an acquisition queue declares. */

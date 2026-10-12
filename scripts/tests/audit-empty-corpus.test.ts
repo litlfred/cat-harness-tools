@@ -80,7 +80,7 @@ function makeFolio(name: string): string {
 }
 
 describe("qa-section-title-audit", () => {
-  const SCRIPT = "content/pipeline/qa-section-title-audit.ts";
+  const SCRIPT = "pipeline/qa-section-title-audit.ts";
 
   test("refuses to report success over an empty corpus", () => {
     const r = run(SCRIPT, INSTANCE_ROOT);
@@ -110,7 +110,7 @@ describe("qa-section-title-audit", () => {
 });
 
 describe("trivial-skeleton-audit", () => {
-  const SCRIPT = "content/pipeline/trivial-skeleton-audit.ts";
+  const SCRIPT = "pipeline/trivial-skeleton-audit.ts";
 
   test("refuses to report success over an empty corpus", () => {
     const r = run(SCRIPT, INSTANCE_ROOT);

@@ -80,7 +80,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { PIN_FILE, readPinFile } from "./check-bun-pin.ts";
-import { SCRIPT_SIDECAR_DIR } from "../content/pipeline/qa-utils.ts";
+import { SCRIPT_SIDECAR_DIR } from "../pipeline/qa-utils.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

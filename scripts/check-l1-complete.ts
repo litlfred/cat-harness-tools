@@ -67,7 +67,7 @@ import {
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
-import { LICENCE_FILENAME } from "../content/pipeline/gen-library-jsonld.ts";
+import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";

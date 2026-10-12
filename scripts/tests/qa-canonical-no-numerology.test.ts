@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { checkCanonicalNoNumerology } from "../../content/pipeline/qa-checkers-extended";
+import { checkCanonicalNoNumerology } from "../../pipeline/qa-checkers-extended";
 
 function md(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "numerology-"));

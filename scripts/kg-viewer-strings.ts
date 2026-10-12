@@ -51,8 +51,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { parsePo } from "../content/pipeline/po-inject.js";
-import type { PotEntry } from "../content/pipeline/pot-extract.js";
+import { parsePo } from "../pipeline/po-inject.js";
+import type { PotEntry } from "../pipeline/pot-extract.js";
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
  * `.po` live. Falls back to the convention because extraction CREATES the

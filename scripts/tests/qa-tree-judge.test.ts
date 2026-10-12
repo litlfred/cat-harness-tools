@@ -29,7 +29,7 @@ import { dirname, join, resolve } from "node:path";
 import { judgeSidecarTree, type FreshSidecar } from "../qa-results.ts";
 import { clearQaCache, publishQa, type QaStoreOptions } from "../qa-store.ts";
 import { KG_CRITERIA, KG_QA_SCHEMA, gradedKgFindings, type KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import { gradedTranslationFindings } from "../../content/pipeline/translation-block-qa.ts";
+import { gradedTranslationFindings } from "../../pipeline/translation-block-qa.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -265,7 +265,7 @@ function gitStatus(): string {
 
 describe("the gate CLIs in judge mode", () => {
   test("an unknown flag is a usage error (2) before anything is computed", () => {
-    for (const script of ["cat-harness-tools/scripts/kg-audit.ts", "cat-harness-tools/scripts/kg-audit-all.ts", "cat-harness-tools/content/pipeline/translation-block-qa.ts"]) {
+    for (const script of ["cat-harness-tools/scripts/kg-audit.ts", "cat-harness-tools/scripts/kg-audit-all.ts", "cat-harness-tools/pipeline/translation-block-qa.ts"]) {
       const r = spawnSync("bun", ["run", script, "--check", "--chek"], { cwd: REPO, encoding: "utf-8" });
       expect(r.status, script).toBe(2);
       expect(r.stderr + r.stdout, script).toContain("unknown flag");
@@ -310,7 +310,7 @@ describe("the gate CLIs in judge mode", () => {
       const before = gitStatus();
       const r = spawnSync(
         "bun",
-        ["run", "cat-harness-tools/content/pipeline/translation-block-qa.ts", "--check", "--root", "docs/source/process-crdm-methodology", "--against", "main"],
+        ["run", "cat-harness-tools/pipeline/translation-block-qa.ts", "--check", "--root", "docs/source/process-crdm-methodology", "--against", "main"],
         { cwd: REPO, encoding: "utf-8", env: { ...process.env, QA_STORE_REMOTE: `file://${bare}`, QA_STORE_DIR: join(base, "store.git") } },
       );
       const out = r.stdout + r.stderr;

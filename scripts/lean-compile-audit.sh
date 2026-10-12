@@ -137,7 +137,7 @@ lake build || echo "Build had errors — continuing to collect diagnostics"
 
 # ── Collect diagnostics ─────────────────────────────────────────
 echo "Collecting diagnostics from .lean files..."
-TARGETS=$(bun run content/pipeline/lean-compile-audit.ts --list 2>/dev/null \
+TARGETS=$(bun run pipeline/lean-compile-audit.ts --list 2>/dev/null \
   | grep '\.lean$')
 TOTAL=$(echo "$TARGETS" | wc -l)
 JSONL=$(mktemp /tmp/lean-diag.XXXXXX.jsonl)
@@ -161,10 +161,10 @@ echo ""
 
 # ── Ingest + sweep ──────────────────────────────────────────────
 echo "Ingesting diagnostics..."
-bun run content/pipeline/lean-compile-audit.ts --ingest "$JSONL"
+bun run pipeline/lean-compile-audit.ts --ingest "$JSONL"
 
 echo "Running QA sweep..."
-bun run content/pipeline/qa-sweep.ts content/ --only proof-lean-compiles
+bun run pipeline/qa-sweep.ts content/ --only proof-lean-compiles
 
 rm -f "$JSONL"
 

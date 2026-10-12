@@ -25,7 +25,7 @@ import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced
 import { checkEntry, entryKind } from "../check-l1-complete.ts";
 
 const SCRIPT = resolve(import.meta.dir, "../referenced-source.py");
-const GEN = resolve(import.meta.dir, "../../content/pipeline/gen-library-jsonld.ts");
+const GEN = resolve(import.meta.dir, "../../pipeline/gen-library-jsonld.ts");
 const made: string[] = [];
 afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });

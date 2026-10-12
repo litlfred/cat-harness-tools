@@ -9,7 +9,7 @@
 #   Phase B — agent walks .lean files and calls
 #             `mcp__lean-lsp__lean_diagnostic_messages` per file, emitting
 #             JSONL to /tmp/lean-diagnostics-<DATE>.jsonl  [AGENT-DRIVEN]
-#   Phase C — `bun run content/pipeline/lean-compile-audit.ts --ingest <jsonl>`
+#   Phase C — `bun run pipeline/lean-compile-audit.ts --ingest <jsonl>`
 #             then qa-sweep proof-lean-compiles to refresh 629 stale sidecars
 #
 # Resume-safe: each phase is independent. If the container restarts mid-build,
@@ -98,7 +98,7 @@ case "$cmd" in
     if [ -z "$jsonl" ] || [ ! -f "$jsonl" ]; then
       echo "Usage: $0 ingest <path-to-diagnostics.jsonl>"
       echo "  JSONL must have one {\"file\":..., \"diagnostics\":[...]} per line"
-      echo "  per content/pipeline/lean-compile-audit.ts --ingest format."
+      echo "  per pipeline/lean-compile-audit.ts --ingest format."
       exit 1
     fi
     # Phase C must fail loudly if either step fails — orchestrator's
@@ -107,10 +107,10 @@ case "$cmd" in
     set -e
     echo "Phase C.1: ingest $jsonl into lean-compile-diagnostics.json"
     cd "$REPO_ROOT"
-    bun run content/pipeline/lean-compile-audit.ts --ingest "$jsonl"
+    bun run pipeline/lean-compile-audit.ts --ingest "$jsonl"
     echo ""
     echo "Phase C.2: qa-sweep proof-lean-compiles to refresh sidecars"
-    bun run content/pipeline/qa-sweep.ts content/quantum-observable-universe \
+    bun run pipeline/qa-sweep.ts content/quantum-observable-universe \
       --only proof-lean-compiles
     echo ""
     echo "Done. Stale sidecar count should drop from 629."
@@ -123,7 +123,7 @@ Lean-closure orchestrator — drives the 3-gate pipeline.
 Phases:
   A. lake build QOU                      (~1-3 hrs; sources Mathlib from local clone)
   B. per-file mcp__lean-lsp__lean_diagnostic_messages [AGENT-DRIVEN]
-     Emit JSONL per content/pipeline/lean-compile-audit.ts --ingest format:
+     Emit JSONL per pipeline/lean-compile-audit.ts --ingest format:
        {"file": "<repo-rel-path>", "diagnostics": [<LSP-style>]}
      One line per .lean file under content/quantum-observable-universe/.
   C. ingest JSONL + qa-sweep to clear 629 stale sidecars

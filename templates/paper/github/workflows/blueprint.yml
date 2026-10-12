@@ -155,7 +155,7 @@ jobs:
       - name: Build content objects to LaTeX chapters
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness-tools/content/pipeline/build.ts" \
+          bun run "{{assistant}}/cat-harness-tools/pipeline/build.ts" \
             "{{folio}}/$PAPER/$PAPER.ts" \
             --out-dir "$FOLIO_BUILD_DIR/chapters"
           echo "Generated chapters:"
@@ -167,7 +167,7 @@ jobs:
       # continue-on-error: without it there is no blueprint to build.
       - name: Generate the blueprint layout
         run: |
-          bun run "{{assistant}}/folio-assistant-sci/content/pipeline/blueprint-layout.ts" \
+          bun run "{{assistant}}/folio-assistant-sci/pipeline/blueprint-layout.ts" \
             --paper "{{folio}}/$PAPER/$PAPER.ts" \
             --out "{{folio}}/$PAPER/lean/blueprint/src"
 

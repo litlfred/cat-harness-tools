@@ -83,7 +83,7 @@ jobs:
       - name: QA sweep (warn-only on baseline criticals)
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-sweep.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-sweep.log
+          bun run "{{assistant}}/cat-harness-tools/pipeline/qa-sweep.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-sweep.log
           echo ""
           echo "Sweep exit code: ${PIPESTATUS[0]}"
 
@@ -96,7 +96,7 @@ jobs:
           for axis in one-voice proof canonical compute detangler bibliography; do
             echo ""
             echo "── axis: $axis ─────────────────────────────────"
-            bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-sweep.ts" "{{folio}}" \
+            bun run "{{assistant}}/cat-harness-tools/pipeline/qa-sweep.ts" "{{folio}}" \
               --axis "$axis" --json 2>/dev/null \
               | python3 "{{assistant}}/cat-harness-tools/scripts/ci/qa-axis-summary.py" \
                 2>&1 | tee "/tmp/qa-axis-$axis.log"
@@ -105,7 +105,7 @@ jobs:
       - name: QA staleness map
         continue-on-error: true
         run: |
-          bun run "{{assistant}}/cat-harness-tools/content/pipeline/qa-staleness.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-staleness.log
+          bun run "{{assistant}}/cat-harness-tools/pipeline/qa-staleness.ts" "{{folio}}" --ci 2>&1 | tee /tmp/qa-staleness.log
 
       # Schema sanity — every .qa.json sidecar must declare the v1 schema
       # marker. Derived verdicts are transient working-copy outputs under

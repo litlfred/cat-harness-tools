@@ -22,7 +22,7 @@ import {
   loadReadmeConfig,
   renderToc,
   type ReadmeTocConfig,
-} from "../../content/pipeline/readme-toc";
+} from "../../pipeline/readme-toc";
 
 const dirs: string[] = [];
 

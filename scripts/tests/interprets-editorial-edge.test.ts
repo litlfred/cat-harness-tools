@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseStringField } from "../../content/pipeline/uses-field";
+import { parseStringField } from "../../pipeline/uses-field";
 
 /**
  * `interprets` became an editorial edge on 2026-08-15 (owner decision, bean

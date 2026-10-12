@@ -39,8 +39,8 @@ import {
   profileExcludesCriterion,
 } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { CONTENT_PROFILES, CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry";
-import { readDeclaredFolioProfile, readFolioProfile } from "../../content/pipeline/profile-check";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
+import { readDeclaredFolioProfile, readFolioProfile } from "../../pipeline/profile-check";
 import { initFolio } from "../init-folio";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";

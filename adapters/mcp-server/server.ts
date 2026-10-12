@@ -36,8 +36,8 @@ import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../..
 // and the TeX renderer belongs to the science layer, so it is resolved from
 // the folio's declared profile through `resolveRenderTarget`. See
 // `schemas/render-targets.ts`.
-import { resolveRenderTarget } from "../../content/pipeline/render-discovery.js";
-import { readDeclaredFolioProfile } from "../../content/pipeline/profile-check.js";
+import { resolveRenderTarget } from "../../pipeline/render-discovery.js";
+import { readDeclaredFolioProfile } from "../../pipeline/profile-check.js";
 import { registerServedToolGroups } from "../../src/tool-groups.js";
 import { createContentAdapter } from "../../src/content-adapter.js";
 import { GitHelper } from "../../src/core/git.js";
@@ -72,7 +72,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { join, relative, resolve, extname, basename } from "path";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
-import { contributionsRoot } from "../../content/pipeline/repo-root.ts";
+import { contributionsRoot } from "../../pipeline/repo-root.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "../../src/core/handover-screen.js";
 
@@ -1787,7 +1787,7 @@ async function handleViewerRequest(url: URL): Promise<Response | null> {
       }
 
       // Step 1: Build content objects → .tex chapters
-      const buildResult = spawnSync("bun", ["run", join(REPO_ROOT, "content/pipeline/build.ts")], {
+      const buildResult = spawnSync("bun", ["run", join(REPO_ROOT, "pipeline/build.ts")], {
         cwd: REPO_ROOT,
         stdio: "pipe",
         timeout: 60_000,
@@ -1980,7 +1980,7 @@ async function handleViewerRequest(url: URL): Promise<Response | null> {
       if (!existsSync(lightningDir)) mkdirSync(lightningDir, { recursive: true });
 
       // Build content objects → .tex first (for preamble/macros)
-      const buildResult = spawnSync("bun", ["run", join(REPO_ROOT, "content/pipeline/build.ts")], {
+      const buildResult = spawnSync("bun", ["run", join(REPO_ROOT, "pipeline/build.ts")], {
         cwd: REPO_ROOT,
         stdio: "pipe",
         timeout: 60_000,

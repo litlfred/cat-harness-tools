@@ -39,7 +39,7 @@ import { join } from "node:path";
 
 import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-import { parsePoEntries } from "../../content/pipeline/po-inject.ts";
+import { parsePoEntries } from "../../pipeline/po-inject.ts";
 import {
   UI_STRINGS,
   loadCatalogues,

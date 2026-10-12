@@ -17,7 +17,7 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const SRC = join(import.meta.dir, "../../content/pipeline/export-json.ts");
+const SRC = join(import.meta.dir, "../../pipeline/export-json.ts");
 
 describe("export-json guards every registry touch", () => {
   const src = readFileSync(SRC, "utf-8");

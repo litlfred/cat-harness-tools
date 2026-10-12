@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { graphLayer, isContentGraph, isContextGraph, isDerivedGraph, isStateGraph, processMayWrite, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-import { walkBlocks } from "../../content/pipeline/qa-utils.js";
+import { walkBlocks } from "../../pipeline/qa-utils.js";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

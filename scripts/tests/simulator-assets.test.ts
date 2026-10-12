@@ -35,7 +35,7 @@ import {
   isDeferred,
   validateSimulatorAssets,
   DEFERRED_TAG,
-} from "../../content/pipeline/validate-simulator.js";
+} from "../../pipeline/validate-simulator.js";
 
 function repoWith(files: string[]): string {
   const root = mkdtempSync(join(tmpdir(), "sim-assets-"));

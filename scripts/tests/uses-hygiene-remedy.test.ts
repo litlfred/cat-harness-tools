@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { checkUsesEditorialHygiene } from "../../content/pipeline/qa-checkers-uses";
-import { buildContentGraph, parseUses } from "../../content/pipeline/content-graph";
-import { walkBlocks } from "../../content/pipeline/qa-utils";
+import { checkUsesEditorialHygiene } from "../../pipeline/qa-checkers-uses";
+import { buildContentGraph, parseUses } from "../../pipeline/content-graph";
+import { walkBlocks } from "../../pipeline/qa-utils";
 import { FOLIO_ROOT, hasFolio } from "./helpers";
 import { readFileSync } from "fs";
 import { join } from "path";

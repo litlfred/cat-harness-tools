@@ -23,7 +23,7 @@ import { join } from "path";
 import {
   checkCanonicalScriptNotDeprecated,
   checkComputeLpDualPresent,
-} from "../../content/pipeline/qa-checkers-extended";
+} from "../../pipeline/qa-checkers-extended";
 
 let root: string;
 

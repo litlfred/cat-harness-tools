@@ -2,8 +2,8 @@ import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
-import { walkBlocks, readBlockManifest } from "../../content/pipeline/qa-utils";
-import { loadBlockModuleSync } from "../../content/pipeline/block-module";
+import { walkBlocks, readBlockManifest } from "../../pipeline/qa-utils";
+import { loadBlockModuleSync } from "../../pipeline/block-module";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /**

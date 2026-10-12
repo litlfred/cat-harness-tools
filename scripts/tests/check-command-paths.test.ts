@@ -80,7 +80,7 @@ describe("the skill corpus judges only what claims to be about this tree", () =>
   });
 
   test("a folio's path is not — the platform carries no folio", () => {
-    expect(aboutThisTree(root, "content/pipeline/qa-sweep.ts")).toBe(false);
+    expect(aboutThisTree(root, "pipeline/qa-sweep.ts")).toBe(false);
     expect(aboutThisTree(root, "./scripts/tests/run-tests.sh")).toBe(false);
   });
 
@@ -107,7 +107,7 @@ describe("a FOLIO-OWNED head is declined even when that directory exists HERE", 
   const root = fixture({ "keep.md": "" }, ["cat-harness", "docs", "content", "uploads"]);
 
   test("`docs/`, `content/` and `uploads/` are declined although present", () => {
-    for (const tok of ["docs/audits/x.json", "content/pipeline/qa-sweep.ts", "uploads/a.pdf"]) {
+    for (const tok of ["docs/audits/x.json", "pipeline/qa-sweep.ts", "uploads/a.pdf"]) {
       expect({ tok, judged: aboutThisTree(root, tok) }).toEqual({ tok, judged: false });
     }
   });
@@ -253,7 +253,7 @@ describe("the printed-command reader — bean `b963`'s third class", () => {
 
   test("a path that resolves nowhere is a folio's — counted, never held", () => {
     const root = fixture(
-      { "cat-harness/cat-harness.json": '{"name":"cat-harness"}', "cat-harness/scripts/a.ts": "// bun run content/pipeline/x.ts\n" },
+      { "cat-harness/cat-harness.json": '{"name":"cat-harness"}', "cat-harness/scripts/a.ts": "// bun run pipeline/x.ts\n" },
       ["cat-harness/scripts"],
     );
     const r = checkCommandPaths(root);
@@ -288,7 +288,7 @@ describe("the owner's verdict on the 237 — fail on scripts/, count content/", 
   });
 
   test("a command addressed to a FOLIO is counted, never failed", () => {
-    const r = checkCommandPaths(fixtureWith("// bun run content/pipeline/qa-sweep.ts\n", "content/pipeline/qa-sweep.ts"));
+    const r = checkCommandPaths(fixtureWith("// bun run pipeline/qa-sweep.ts\n", "pipeline/qa-sweep.ts"));
     expect(r.dead).toEqual([]);
     expect(r.held).toHaveLength(1);
   });

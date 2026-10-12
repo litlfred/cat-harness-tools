@@ -24,7 +24,7 @@ import {
   replaceUsesArray,
   removeUsesField,
   stripArrayField,
-} from "../../content/pipeline/uses-field";
+} from "../../pipeline/uses-field";
 
 const BLOCK = (fields: string) => `export default theorem({ label: "thm:a", ${fields} });\n`;
 

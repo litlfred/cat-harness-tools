@@ -3,7 +3,7 @@
  *
  * @module src/core/markdown-links
  *
- * Bean `cp3l`. This is the half of `content/pipeline/readme-links.ts` that
+ * Bean `cp3l`. This is the half of `pipeline/readme-links.ts` that
  * was never about a README: given some markdown and somewhere to resolve
  * against, it says which links are dead, which resolved, and which it could
  * not check. It works on `AGENTS.md`, a skill, a workflow page or a README,
@@ -11,7 +11,7 @@
  *
  * It lived in core because its first caller did, and that cost a wrong
  * direction one layer out — a harness check auditing a harness file had to
- * reach into core to do it. `content/pipeline/readme-links.ts` keeps what is
+ * reach into core to do it. `pipeline/readme-links.ts` keeps what is
  * genuinely README-shaped: the declared-asset lookup, the `README.md`
  * default, the config, and the CLI.
  *

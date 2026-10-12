@@ -23,9 +23,9 @@ import {
   discoverBlockCheckers,
   discoverScriptCheckers,
   readModule,
-} from "../../content/pipeline/qa-checker-discovery.ts";
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
-import { resolveCriterionSource } from "../../content/pipeline/criterion-source.ts";
+} from "../../pipeline/qa-checker-discovery.ts";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
+import { resolveCriterionSource } from "../../pipeline/criterion-source.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { pathToFileURL } from "node:url";

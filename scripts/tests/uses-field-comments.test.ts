@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { maskComments, findUsesField, parseUsesField } from "../../content/pipeline/uses-field";
-import { extractUses, parseUses } from "../../content/pipeline/content-graph";
+import { maskComments, findUsesField, parseUsesField } from "../../pipeline/uses-field";
+import { extractUses, parseUses } from "../../pipeline/content-graph";
 
 /**
  * The editorial graph is built from `uses[]`, and a block whose array cannot be

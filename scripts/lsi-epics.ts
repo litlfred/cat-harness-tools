@@ -38,9 +38,9 @@
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { buildLsi, centroid, cosineVectors, foldIn, unitVector, type LsiIndex } from "../content/pipeline/lsi";
+import { buildLsi, centroid, cosineVectors, foldIn, unitVector, type LsiIndex } from "../pipeline/lsi";
 import { declaredGraphs } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { buildCa } from "../content/pipeline/ca";
+import { buildCa } from "../pipeline/ca";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";

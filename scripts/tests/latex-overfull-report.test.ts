@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { parseOverfull } from "../../content/pipeline/latex-overfull-report";
+import { parseOverfull } from "../../pipeline/latex-overfull-report";
 
 describe("latex-overfull-report", () => {
   test("parses boxes and tracks the source file across (file …) nesting", () => {

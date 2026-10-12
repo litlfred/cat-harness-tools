@@ -17,12 +17,12 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { resolve, join } from "path";
 
-import { QA_CRITERIA_REGISTRY } from "../../content/pipeline/qa-criteria-registry.ts";
-import { checkerFunctionName } from "../../content/pipeline/qa-checker-discovery.ts";
+import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
+import { checkerFunctionName } from "../../pipeline/qa-checker-discovery.ts";
 import {
   isCriterionSourceMiss,
   resolveCriterionSource,
-} from "../../content/pipeline/criterion-source.ts";
+} from "../../pipeline/criterion-source.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import {
@@ -38,7 +38,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = resolve(ORIGIN_DIR, "../..");
 const REPO = resolve(ROOT, "..");
-const CHECKER_DIR = "content/pipeline";
+const CHECKER_DIR = "pipeline";
 
 /**
  * The dependency tree, so a CONTRIBUTED checker is found where it lives.

@@ -40,7 +40,7 @@ fi
 
 # ── Step 2: Re-export JSON for viewer ────────────────────────────────────────
 if command -v bun &>/dev/null; then
-  bun run "$REPO_ROOT/content/pipeline/export-json.ts" 2>&1 | sed 's/^/  /' || true
+  bun run "$REPO_ROOT/pipeline/export-json.ts" 2>&1 | sed 's/^/  /' || true
 fi
 
 # ── Step 3 + 4: Per-block standalone PDF render + optional Drive push ─────────

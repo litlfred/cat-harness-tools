@@ -42,7 +42,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { buildContentGraph, isElaborated, type ContentGraph } from "../content/pipeline/content-graph.js";
+import { buildContentGraph, isElaborated, type ContentGraph } from "../pipeline/content-graph.js";
 import type { FormalizationStatus, ProofObjectsManifest } from "@litlfred/cat-harness/schemas/formalization-types.js";
 import { bothViews, renderSvgs, safeId, sha256, svgStamp, type RenderJob } from "./plantuml-render.js";
 import { readUmlPalette } from "./uml-palette.js";
