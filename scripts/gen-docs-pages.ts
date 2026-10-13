@@ -62,6 +62,7 @@ import { declaredSubgraphNode } from "./kg-export.ts";
 import { TODO_GRAPH_SITE_PATH, serialiseJsonld, todoDocument, todoGraphDocument, todoPageSitePath, todoSitePath } from "./todo-graph.ts";
 import { isTodoPage, todoPageHtml } from "./todo-page.ts";
 import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, readBeans } from "./beans.js";
+import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.js";
 import { milestoneRollup } from "./milestone-rollup.js";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
@@ -1214,7 +1215,7 @@ function todoRelations(tags: {
   for (const r of tags.references) {
     if (r.kind === "bean") {
       const file = beanFile(r.id);
-      out.push(file ? { axis: "bean", label: r.id, href: `${REPO_WEB}/blob/main/${file}` }
+      out.push(file ? { axis: "bean", label: r.id, href: branchKeptHref(branchKeptLocation(repoRootFor(INSTANCE_ROOT), file, REPO_WEB)) }
                     : { axis: "bean", label: r.id });
       continue;
     }
@@ -1408,7 +1409,13 @@ function processHierarchy(): Record<string, string[]> {
     //
     // Spread, so an absent link is an ABSENT KEY rather than `null` — a
     // consumer testing truthiness and one testing presence should agree.
-    ...(sourceLinks(REPO_URL, repoRelative(path), SOURCE_BRANCH) ?? {}),
+    // The BRANCH the todo is on, not `main`: todos are kept on
+    // `cat/cat-harness/todos` since the state cutover, and a `main` link 404s.
+    ...((() => {
+      if (REPO_URL === undefined) return {};
+      const at = branchKeptLocation(repoRootFor(INSTANCE_ROOT), repoRelative(path), REPO_URL);
+      return sourceLinks(at.web, at.path, at.ref) ?? {};
+    })()),
   }));
   mkdirSync(dirname(TODO_ASSET), { recursive: true });
   const processes = processHierarchy();
@@ -1675,7 +1682,21 @@ function processHierarchy(): Record<string, string[]> {
 // would otherwise need the repository's web address, and a literal in
 // `docs-ui.js` is one folio's own address inside shared client code.
 {
-  const beans = readBeans(repoRootFor(INSTANCE_ROOT));
+  const beansRead = readBeans(repoRootFor(INSTANCE_ROOT));
+  // WHERE THE FILES ARE ON THE FORGE. Since the state cutover the bean store
+  // is kept on its own branch (`cat/cat-harness/beans`) and untracked on
+  // `main`, so `<repo>/blob/main/<file>` answers 404 for every bean. Each
+  // `file` is rewritten to its path ON THE BRANCH that keeps it, and the
+  // branch travels once as `fileRef` (with `fileWeb`, the repository that
+  // holds it) — never re-derived in the client. See `branch-kept-href.ts`.
+  const beanForge = beansRead?.[0] ? branchKeptLocation(repoRootFor(INSTANCE_ROOT), beansRead[0].file, REPO_WEB) : undefined;
+  const beans = beansRead === null ? null : beansRead.map((b) => {
+    const at = branchKeptLocation(repoRootFor(INSTANCE_ROOT), b.file, REPO_WEB);
+    if (beanForge && (at.ref !== beanForge.ref || at.web !== beanForge.web)) {
+      throw new Error(`bean ${b.id} is kept at ${at.web}@${at.ref}, the store at ${beanForge.web}@${beanForge.ref}: one store, one branch`);
+    }
+    return { ...b, file: at.path };
+  });
   // `null` is "no bean store", which is NOT the same as a store with nothing
   // in it, and rendering them alike is how a consumer reports a clean run over
   // a repository it never looked at. A folio with no work plan simply gets no
@@ -1733,6 +1754,9 @@ function processHierarchy(): Record<string, string[]> {
         // than carrying one instance's address in shared client code. Same
         // reason `editHref` is composed here, one level further on.
         repoWeb: REPO_WEB,
+        // The repository and branch every `file` below is a path on.
+        fileWeb: beanForge?.web ?? REPO_WEB,
+        fileRef: beanForge?.ref ?? SOURCE_BRANCH,
         items,
         // The edges themselves, `blocker → blocked`, with the key(s) that
         // declared each. A dangling edge stays here AND is a
