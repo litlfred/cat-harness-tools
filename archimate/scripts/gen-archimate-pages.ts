@@ -67,6 +67,7 @@ import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archim
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 
@@ -314,7 +315,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
   }));
   files.push(
     { path: LOADER, content: readFileSync(join(TEMPLATES, "archimate.js"), "utf8") },
-    { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") },
+    // `color-scheme: light dark` alone follows the OS, not the navbar switch
+    // (`data-fa-scheme`, issue #2208): pin the scheme the reader picked.
+    { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + darkRules(":root { color-scheme: dark; }") + "\n" },
   );
   return { graphPath, pageRoot, files };
 }
