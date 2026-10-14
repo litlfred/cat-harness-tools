@@ -12,6 +12,10 @@ import { join } from "node:path";
 
 import { chooseTarget, composeIg, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage, stageLocal } from "../stage-local.ts";
 import {
+  IG_KEEP,
+  IG_SITE_STEPS,
+  igFolioSite,
+  igIdentity,
   applyIgDeploy,
   branchDirOf,
   callerInputs,
@@ -416,4 +420,35 @@ ${IG_WORKFLOW.slice(IG_WORKFLOW.indexOf("      - name: Deploy candidate\n"), IG_
     // Never a force push: the seed is still in the branch's history.
     expect(sh(bare, "log", "--format=%s", "gh-pages")).toContain("seed");
   }, 60_000);
+});
+
+describe("an IG repository's folio site (owner, 2026-10-14)", () => {
+  const scripts = new Set<string>(Object.values(IG_SITE_STEPS));
+  const landing = { kind: "instance", name: "base-harness" };
+  const identity = { title: "Example IG" };
+
+  test("the site's title and description are the IG's own, from sushi-config.yaml", () => {
+    expect(igIdentity("id: x\ntitle: Example IG\ndescription: An example.\n", "repo")).toEqual({ title: "Example IG", description: "An example." });
+    expect(igIdentity("id: x\nname: ExampleIG\n", "repo")).toEqual({ title: "ExampleIG" });
+    expect(igIdentity(undefined, "repo")).toEqual({ title: "repo" });
+    expect(igIdentity(": not yaml : [", "repo")).toEqual({ title: "repo" });
+  });
+
+  test("harnessed, with the steps mounted: the folio route, scoped to the landing instance", () => {
+    const r = igFolioSite({ hasIndexConfig: true, scripts, landing, identity });
+    expect(r.site).toEqual({ scope: "base-harness", title: "Example IG", sourceSteps: [IG_SITE_STEPS.source], siteSteps: [IG_SITE_STEPS.site], keep: [...IG_KEEP] });
+  });
+
+  test("not harnessed, or nothing mounted to compose it: the bare IG route, and why", () => {
+    expect(igFolioSite({ hasIndexConfig: false, scripts, landing, identity }).why).toMatch(/no index\.config\.json/);
+    expect(igFolioSite({ hasIndexConfig: true, scripts: new Set([IG_SITE_STEPS.source]), landing, identity }).why).toMatch(new RegExp(IG_SITE_STEPS.site));
+  });
+
+  test("harnessed but no landing named: refused, never guessed among the mounts", () => {
+    expect(() => igFolioSite({ hasIndexConfig: true, scripts, landing: { kind: "ambiguous", reason: "none-flagged" }, identity })).toThrow(/site.*landing/);
+  });
+
+  test("the IG workflow's per-branch previews are kept at the root", () => {
+    expect(IG_KEEP).toContain("branches");
+  });
 });
