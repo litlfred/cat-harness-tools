@@ -25,6 +25,15 @@
  *   ({@link detectPublisher}): a caller of `folio-staging.yml` is a folio, a
  *   caller of smart-base's `fhirbuild.yml`/`ghbuild.yml` an IG
  *   (`stage-local-ig.ts`);
+ * - **an IG repository that is harnessed** — it has `index.config.json`, and a
+ *   layer it mounts provides the `ig-site:*` checkout scripts — publishes the
+ *   folio's just-the-docs site with the IG composed at its root, not the IG
+ *   Publisher's bare output (owner, 2026-10-14: an IG repository "doesn't
+ *   need its own harness. It can just define index.config.json"). The IG is
+ *   built by its workflow's steps as before; the site around it by
+ *   `build-instance-site.ts`, scoped to the instance `index.config.json`
+ *   names as `site.landing` and titled from `sushi-config.yaml`
+ *   ({@link stageIgFolio}; `--bare-ig` keeps the old route);
  * - **main site or preview** follows the branch ({@link chooseTarget}): the
  *   default branch publishes the main site at the root as `publish-main`
  *   does ({@link composeMain}: `publish-main-site.ts`, the `main-site`
@@ -110,6 +119,10 @@ import {
   type ExprContext,
   fetchWorkflow,
   FOLIO_WORKFLOW,
+  igFolioSite,
+  type IgFolioSite,
+  igIdentity,
+  IG_SITE_STAMP,
   IG_WORKFLOWS,
   type IgTarget,
   type Publisher,
@@ -124,7 +137,9 @@ import {
 } from "./stage-local-ig.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
+import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { buildInstanceSite, recipeFromConfig, siteFields, stagingDir, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -493,6 +508,8 @@ export interface StageOptions {
   workflowSource?: string;
   /** Which publisher, when the repository's workflows call both (the folio by default). */
   publisher?: Publisher;
+  /** IG: publish the IG Publisher's output as it is, even where the folio site route applies. */
+  bareIg?: boolean;
   log?: (s: string) => void;
 }
 
@@ -760,6 +777,9 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   const planCtx: ExprContext = { github, inputs: { ...wf.inputs, ...callerWith }, env: { IS_DEFAULT_BRANCH: String(isDefault), BRANCH_DIR: branchDirOf(branch), BRANCH_NAME: branch }, steps: {} };
   const steps = planIgSteps(wf, planCtx);
   const missing = missingPrerequisites(steps, commandWorks);
+  const folio = o.bareIg ? undefined : folioSiteFor(repo, ownerRepo);
+  if (folio?.site) return stageIgFolio(a, { wf, path, note, steps, missing, github, inputs: planCtx.inputs, isDefault }, folio.site);
+  if (folio?.why) log(`· ${folio.why}`);
   const url = `${pagesRoot}/${t0.dest ? `${t0.dest}/` : ""}`;
   const plan: StagePlan = {
     kind: "ig", caller: a.caller, workflow: `${u.owner}/${u.repo}/${path}@${u.ref}`, ...(note ? { note } : {}),
@@ -800,6 +820,105 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, undefined, { slug: branchDirOf(branch), branch, sha }, log) });
   const r = await pushLoop({ repo, publishBranch: t.deploy.branch, ...(o.dryRun ? { dryRun: true } : {}), gate: false, attempts: 3, compose: (pages) => composeIg(pages, site, t), url, log });
   return done(r);
+}
+
+/** The IG folio-site route for this checkout, read off what it holds ({@link igFolioSite}). */
+function folioSiteFor(repo: string, ownerRepo: string): ReturnType<typeof igFolioSite> {
+  const sushi = join(repo, "sushi-config.yaml");
+  return igFolioSite({
+    hasIndexConfig: existsSync(join(repo, "index.config.json")),
+    scripts: new Set(scriptTable(repo).keys()),
+    landing: resolveLandingInstance(repo),
+    identity: igIdentity(existsSync(sushi) ? readFileSync(sushi, "utf-8") : undefined, ownerRepo.split("/")[1]!),
+  });
+}
+
+interface IgBuilt {
+  wf: ReturnType<typeof readWorkflow>;
+  path: string;
+  note: string | undefined;
+  steps: ReturnType<typeof planIgSteps>;
+  missing: string[];
+  github: Record<string, string>;
+  inputs: Record<string, unknown>;
+  isDefault: boolean;
+}
+
+/**
+ * An IG repository's folio site: the IG built by its own workflow's steps
+ * (the IG Publisher, into the checkout), then the folio site built around it
+ * by `build-instance-site.ts`: the chrome of the landing instance the
+ * repository mounts, the IG composed at its root, the Publisher's own pages
+ * filled in, Jekyll, the link check. The root keeps `STAGING/`,
+ * `_render-log/` and the IG workflow's `branches/`; a preview goes to
+ * `STAGING/<branch>/`, as every folio's does. The workflow's own deploy steps
+ * are not mirrored: the folio site replaces them.
+ */
+async function stageIgFolio(a: IgRun, b: IgBuilt, site: IgFolioSite): Promise<StageResult> {
+  const { o, log, repo, branch, sha, ownerRepo, pagesRoot, target } = a;
+  const u = a.detected.uses;
+  const name = ownerRepo.split("/")[1]!;
+  const staging = target === "preview" ? stagingDir(branch) : undefined;
+  const url = `${pagesRoot}/${staging ? `${staging}/` : ""}`;
+  const out = join(repo, "..", `${name}-site`);
+  const message = `Publish ${name} ${sha.slice(0, 7)}${staging ? ` preview of ${branch}` : ""} (folio site, built locally)`;
+  const plan: StagePlan = {
+    kind: "ig", caller: a.caller, workflow: `${u.owner}/${u.repo}/${b.path}@${u.ref}`, ...(b.note ? { note: b.note } : {}),
+    target, branch, ...(a.defaultBranch ? { defaultBranch: a.defaultBranch } : {}), sha,
+    publishBranch: "gh-pages", dest: staging ? `${staging}/` : "/", url,
+    replaces: staging ? `${staging}/, wholesale` : "the root, as a folio's root publish replaces it",
+    preserved: staging ? [`everything outside ${staging}/`] : ["STAGING", "_render-log", ...site.keep],
+    build: [
+      `the IG: the runnable steps of ${b.path} below, in its order, in the checkout as on a runner (the IG Publisher writes output/)`,
+      `the folio site "${site.title}": build-instance-site.ts with the chrome of ${site.scope} (index.config.json site.landing)`,
+      `  source ${site.sourceSteps.join(", ")} — the IG's pages at the site root`,
+      `  site   ${site.siteSteps.join(", ")} — the Publisher's own pages the site lacks, and ${IG_SITE_STAMP} at the root (required: a folio root marker)`,
+      `  out    ${out}`,
+    ],
+    gate: "build-instance-site's link check: every link the chrome writes must resolve; the IG's own dead links are reported, not gated",
+    commit: [message],
+    steps: b.steps.map((s) => ({ name: s.name, action: s.action, ...(s.reason ? { reason: s.reason } : {}) })),
+    notRun: [
+      "the workflow's deploy steps: the folio site is published in their place (pass --bare-ig for the Publisher's output as it is)",
+      ...(u.file !== PAGES_SIBLING ? [`${u.file}'s own job (the build.fhir.org trigger): an external build, not this repository's Pages`] : []),
+    ],
+    ...(b.missing.length ? { missing: b.missing } : {}),
+  };
+  log(formatPlan(plan));
+  const done = (r: Partial<StageResult>): StageResult => ({ kind: "ig", target, slug: staging ?? branch, url, pushed: false, site: join(out, "_site"), plan, ...r });
+  if (o.plan) return done({});
+  if (o.artifact) throw new Error("--artifact is not available for an IG's folio site: build-instance-site publishes to the Pages branch only");
+  if (b.missing.length) {
+    if (o.dryRun) {
+      log(`✓ --dry-run: plan only — this machine lacks ${b.missing.length} prerequisite(s) to build, listed above; nothing built, nothing pushed`);
+      return done({});
+    }
+    throw new Error(`cannot build this IG here: missing ${b.missing.join("; ")}`);
+  }
+  log(`· building ${ownerRepo}@${branch} (${sha.slice(0, 7)}) with ${b.path}`);
+  const ctx = runIgBuild(repo, b.wf, { github: b.github, inputs: b.inputs, env: {}, steps: {} }, log);
+  const ranDefault = ctx.env.IS_DEFAULT_BRANCH;
+  if (ranDefault !== undefined && ranDefault !== String(b.isDefault)) throw new Error(`the workflow's own step decided IS_DEFAULT_BRANCH=${ranDefault}, and this run planned ${b.isDefault}; refusing to publish to the wrong place`);
+  const publish = !o.dryRun;
+  const r = await buildInstanceSite({
+    root: repo,
+    instance: site.scope,
+    identity: { title: site.title, ...(site.description ? { description: site.description } : {}) },
+    linkRoot: "https://litlfred.github.io/folio-assistant",
+    out,
+    pre: [],
+    sourceSteps: site.sourceSteps,
+    siteSteps: site.siteSteps,
+    ...(target === "preview" ? { staging: branch } : {}),
+    mount: true,
+    fresh: false,
+    publish,
+    ...(publish ? { remote: git(repo, ["config", "--get", "remote.origin.url"]) } : {}),
+    keep: site.keep,
+    require: [IG_SITE_STAMP],
+    message,
+  });
+  return done({ pushed: publish, site: r.site });
 }
 
 /**
@@ -883,7 +1002,7 @@ export async function stageDeclared(
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
 }
 
-const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher folio|ig]
+const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher folio|ig] [--bare-ig]
 
   One command for every agent-run publish: a folio that declares its site in
   <instance>.config.json site.build (built by build-instance-site.ts), a folio whose workflow calls
@@ -896,7 +1015,9 @@ const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run
   --artifact DIR     write a claude.ai Artifact bundle instead of pushing
   --workflow-source  IG: read the reusable workflow from this checkout instead of fetching it
   --publisher        folio or ig, when the repository's workflows call both (folio by default:
-                     it owns the publish root, and an IG root deploy is a clean one)`;
+                     it owns the publish root, and an IG root deploy is a clean one)
+  --bare-ig          IG: publish the IG Publisher's output as its workflow lays it, even where the
+                     repository is harnessed (index.config.json) and would publish its folio site`;
 
 function publisherOf(s: string): Publisher {
   if (s !== "folio" && s !== "ig") throw new Error(`--publisher is folio or ig, not '${s}'`);
@@ -942,6 +1063,7 @@ if (import.meta.main) {
       ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
       ...(opt("workflow-source") ? { workflowSource: opt("workflow-source")! } : {}),
       ...(opt("publisher") ? { publisher: publisherOf(opt("publisher")!) } : {}),
+      ...(argv.includes("--bare-ig") ? { bareIg: true } : {}),
     });
     const { plan: _plan, ...rest } = r;
     console.log(JSON.stringify(rest));
