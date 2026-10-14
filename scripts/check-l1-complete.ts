@@ -74,6 +74,7 @@ import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
+import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -1455,9 +1456,17 @@ export function sidecarStates(
   reports: EntryReport[],
   against?: string,
 ): { slug: string; state: QaResultState }[] {
+  // Resolved once for every entry, not once per entry (see qa-results' storedOn).
+  // Unresolvable here means what it means there: no directory is stored.
+  let location: QaLocation | undefined;
+  try {
+    location = resolveQaLocation();
+  } catch {
+    location = undefined;
+  }
   return reports.map((r) => ({
     slug: r.slug,
-    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug), join("library-qa", r.slug)), sidecarDocument(r), { against }),
+    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug), join("library-qa", r.slug)), sidecarDocument(r), { against, location }),
   }));
 }
 
