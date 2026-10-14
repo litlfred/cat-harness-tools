@@ -1044,12 +1044,27 @@ test.describe("the navbar can be closed, and the hover peek comes back", () => {
 
   test("the avatar LIFTS it -- an action whose inverse is unreachable is not a toggle", async ({ page }) => {
     // `l4zi`. Without this the bar could be closed once and never peek again.
+    //
+    // The hold lasts only while the pointer is on the bar (cat-harness#169),
+    // so the close is made where the bar still IS once it has collapsed: 20px
+    // in, on the strip. A click at the avatar's centre (x=132 of the open
+    // 264px bar) collapses the bar out from under the pointer, the pointerleave
+    // that follows releases the hold within milliseconds -- measured: closed
+    // at 698ms, leave at 700ms, released at 701ms -- and there is nothing left
+    // for the avatar to lift. That case is the "NOT remembered" test above.
     await load(page, CUSTOM);
-    await avatar(page).click();
-    await avatar(page).click();
+    const onStrip = async () => {
+      const b = (await avatar(page).boundingBox())!;
+      await avatar(page).click({ position: { x: 20 - b.x, y: b.height / 2 } });
+    };
+    await onStrip();
+    await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
+    await onStrip();
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBe("closed");
-    await avatar(page).click();
+    await onStrip();
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
+    await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
     expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
   });
 
