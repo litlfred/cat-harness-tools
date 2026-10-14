@@ -62,6 +62,43 @@ function declaringInstanceRoot(dir: string): string | undefined {
   }
 }
 
+type DeclaredDirectories = ReturnType<typeof instanceDirectories>;
+
+/**
+ * One instance's declared directories, read once per declaration text.
+ *
+ * `check:l1-complete` asks {@link entrySubgraphDirs} once per library entry,
+ * and every entry of a library has the same declaring instance. Re-reading and
+ * re-resolving that declaration for each one made `checkAll` over the corpus
+ * slow enough to time a test out (`ingest-and-l1`, 5.8 s against bun's 5 s).
+ * The key is the declaration's TEXT as well as its root, and the registry's
+ * size (kinds are registered at runtime), the same key `readDeclaration` uses:
+ * an edited declaration, such as a test fixture rewritten in place, is read
+ * again rather than answered from a stale copy. `undefined` is an unreadable declaration, cached
+ * the same way: it is `check:harness-dirs`'s finding, not this one's.
+ */
+const declaredDirectoriesCache = new Map<string, { text: string; registry: GraphTypologyRegistry; kinds: number; dirs: DeclaredDirectories | undefined }>();
+
+function declaredDirectoriesOf(instRoot: string, registry: GraphTypologyRegistry): DeclaredDirectories | undefined {
+  let text = "";
+  try {
+    const file = findDeclarationFile(instRoot);
+    text = file === undefined ? "" : readFileSync(join(instRoot, file), "utf-8");
+  } catch {
+    text = "";
+  }
+  const hit = declaredDirectoriesCache.get(instRoot);
+  if (hit !== undefined && hit.text === text && hit.registry === registry && hit.kinds === registry.names().length) return hit.dirs;
+  let dirs: DeclaredDirectories | undefined;
+  try {
+    dirs = instanceDirectories(instRoot, readDeclaration(instRoot, registry), registry);
+  } catch {
+    dirs = undefined;
+  }
+  declaredDirectoriesCache.set(instRoot, { text, registry, kinds: registry.names().length, dirs });
+  return dirs;
+}
+
 function filesUnder(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort()) {
@@ -105,12 +142,8 @@ export function entrySubgraphDirs(entryDir: string, registry: GraphTypologyRegis
   const entry = resolve(entryDir);
   const instRoot = declaringInstanceRoot(dirname(entry));
   if (instRoot === undefined) return [];
-  let dirs: ReturnType<typeof instanceDirectories>;
-  try {
-    dirs = instanceDirectories(instRoot, readDeclaration(instRoot, registry), registry);
-  } catch {
-    return [];
-  }
+  const dirs = declaredDirectoriesOf(instRoot, registry);
+  if (dirs === undefined) return [];
   const out: EntrySubgraphDir[] = [];
   for (const d of dirs) {
     if (d.scope === "repository") continue;
