@@ -28,11 +28,18 @@
  *
  * ## Fast vs full is DERIVED too
  *
- * From job membership, not from a judgement encoded here. The `typescript`
- * job needs no browser; the `e2e` job installs Chromium, which is why
+ * From job membership, not from a judgement encoded here: a job that installs
+ * a browser ({@link installsBrowser}) is in `--all` only, and every other job
+ * is in the fast set. The `e2e` job installs Chromium, which is why
  * `render:bpmn:check` lives there — bpmn-js renders through a browser, and
  * it passed "locally" once only because a browser had been staged earlier in
  * that session. Default is the fast set; `--all` adds the rest.
+ *
+ * The rule is the predicate, never a job's name, and it moves jobs when the
+ * workflow does. B1 (owner, 2026-10-14) gave `typescript-test` a Chromium
+ * install, because `derive:publish` draws the publish-time BPMN pages its
+ * tests read; so `bun test` is in `--all` from then on, beside the other
+ * browser job, and the fast set is the jobs that still need no browser.
  *
  * ## The vacuity guard
  *
@@ -44,7 +51,7 @@
  * README with no markers). A filter over nothing passes.
  *
  * Usage:
- *   bun run cat gates              # the fast set — what the `typescript` job runs
+ *   bun run cat gates              # the fast set — every job that installs no browser
  *   bun run cat gates --all        # plus the jobs that need a browser
  *   bun run cat gates --list       # print them and exit, running nothing
  *   bun run cat gates --jobs 3     # pool size for read-only gates (default: CPUs - 1)
@@ -992,6 +999,38 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "reads this run's own per-PR verdict artifacts and decides whether any of them is new; nothing " +
       "to run outside a run, and its branches are pinned by merge-main-workflow.test.ts in `bun test`",
   },
+  {
+    // folio-assistant#2526 (owner, 2026-10-10: "regenerate at build"):
+    // `docs/_data/harness.json` carries each navbar tile's count, and the
+    // beans count is LIVE (open beans on the work-plan tip), so the site
+    // builds (docs-site.yml, feature-staging.yml) rewrite it from the
+    // projections they have just written. That is a WRITER. Its verdict is
+    // `docs:harness:check` in the gate set, which is `publish:check
+    // docs:harness` since B1: it runs this same writer and then holds it to a
+    // fixed point and to every committed file it must not move. Matched with
+    // the command prefix, which both workflows' lines share, and which no
+    // `:check` twin outside the gates workflow carries.
+    match: "bun run cat docs:harness",
+    kind: "covered-by",
+    reason:
+      "a BUILD step: the site builds rewrite docs/_data/harness.json with this build's live tile counts; " +
+      "its verdict is `docs:harness:check` (publish:check docs:harness) in the gate set, which runs the same writer",
+  },
+  {
+    // The daily health sweep keeps its report on a state branch
+    // (`cat/cat-harness/health`; owner, 2026-10-11: "move health to state
+    // branch now"), so health-check.yml writes it there through the mount.
+    // A PUBLISH from a job holding `contents: write`: it pushes, and there is
+    // no tree to judge — the report is a fact about the deployed site and the
+    // repository's open work on that day. `state:push`'s splice (only what
+    // changed, onto the tip, never a force-push) is pinned by state-push.test.ts
+    // in `bun test`.
+    match: "bun run cat state:push -- --id health",
+    kind: "ci-only",
+    reason:
+      "a WRITE of the daily health report to its state branch from a `contents: write` job, not a check; " +
+      "the splice it performs is pinned by state-push.test.ts in `bun test`",
+  },
 ];
 
 /**
@@ -1035,7 +1074,7 @@ export function exemptionFor(command: string): StepExemption | undefined {
  * `playwright install` is the discriminator rather than a job's name: it is
  * what actually costs the 36 seconds and actually requires Chromium.
  */
-function installsBrowser(def: { steps?: { run?: string }[] }): boolean {
+export function installsBrowser(def: { steps?: { run?: string }[] }): boolean {
   return (def.steps ?? []).some((s) => /playwright\s+install/.test(s.run ?? ""));
 }
 
@@ -1607,7 +1646,61 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "health:check",
     kind: "covered-by",
     reason:
-      "`health-check.yml` runs `test/health/run.ts` directly rather than through this script name — daily, and it commits its results",
+      "`health-check.yml` runs `test/health/run.ts` directly rather than through this script name — daily, and it writes its results to their state branch through `state:push`",
+  },
+  {
+    script: "publish:check",
+    kind: "covered-by",
+    reason:
+      "A RUNNER WITH NO SUBJECT OF ITS OWN (B1, owner 2026-10-14): it takes the writer to judge as its argument, and run bare it exits 2 with `name a package script that writes`. CI runs it through every `<writer>:check` alias that names one — `docs:harness:check`, `auto:docs:check`, `navbar:include:check`, `subgraph:jsonld:check` and the rest are each `publish-check.ts <writer>` — so every writer it can judge is judged, under its own name",
+  },
+  {
+    script: "beans:retag:check",
+    kind: "covered-by",
+    reason:
+      "IT JUDGES THE WORK PLAN, which lives on its state branch rather than in the commit under review (bean `xeer`'s reason for `check:bean-issues`), and the write it checks for is made on every path a bean takes to that branch: `state:push` retags the store before it splices (`retagBeansBeforePush`), and the session-start sweep retags the mount. So no bean reaches the branch untagged through the harness's own tools; this `--check` is for a store somebody wrote around them. Bean `ujiv`",
+  },
+  {
+    script: "check:draft-beans",
+    kind: "report",
+    reason:
+      "IT JUDGES THE WORK PLAN AGAINST OTHER BRANCHES, not a commit (bean `folio-assistant-3432`): it reports draft decision beans that exist on no ancestor of the default branch, so it needs the bean store mounted from its state branch and the default branch's history, which a pull-request checkout (one commit, no `origin/main`) does not carry: there it exits 2, `could not determine default branch ref`, measured in a single-branch clone. Its finding is about a SIBLING's unmerged branch, so as a gate it would redden this PR for somebody else's draft. Run it from a goal-review sweep",
+  },
+  {
+    script: "branch:readme:check",
+    kind: "report",
+    reason:
+      "ITS SUBJECT IS OTHER BRANCHES (bean `esz4`): it reads every declared special branch's README over the network and compares it with the rendering from its declaration and manifest. A state branch moves independently of `main` — the work plan, the health reports and the QA store are written by their own jobs — so as a PR gate it would redden on a branch the PR never touched, and an unreachable branch is exit 2 rather than a verdict on the diff. The fix it names is `branch:readme --push <branch>`, a write to that branch, never a change to the PR",
+  },
+  {
+    script: "check:tool-parity",
+    kind: "report",
+    reason:
+      "A MEASUREMENT, with no failing state (bean `folio-assistant-2ngl`): it counts the Tool nodes with an MCP arm, a CLI arm or both, and lists the skills a CLI-only developer mode cannot exercise. It exits 0 on every outcome, so as a CI step it would be a gate that can never fire; the numbers are input to the developer-mode decision, not a defect in a diff",
+  },
+  {
+    script: "secrets:check",
+    kind: "report",
+    reason:
+      "IT JUDGES THE REPOSITORIES' SECRET SETTINGS, not the commit (bean `folio-assistant-jzba`): it compares declared credential needs with the `${{ secrets.NAME }}` the workflows use and with the secret NAMES GitHub lists, which needs a token allowed to list them. Every run exits 2 by its own design until `credentials/needs.json` exists (bean `9hxd`), so as a CI step its normal state is unable to fire; its naming findings are advisories about secrets an owner configures outside any PR",
+  },
+  {
+    script: "separation:cutover:check",
+    kind: "report",
+    reason:
+      "A ONE-EVENT QUESTION, asked of a repository that has just left the monorepo: is its cutover complete (kg-separation stage 13)? Five of its six conditions are gates CI already runs (`remote-mount --check`, `check:declaration-resolution`'s parts, `check:import-direction`, `check:reference-direction`), and the sixth, `site`, is a full site build it runs only with `--site`; without it the run is `not-run` and exits 2 by design. So as a step it would either repeat gates or build the site twice. Run it, with `--site`, in the separated repository at its cutover",
+  },
+  {
+    script: "post-merge:regen:check",
+    kind: "covered-by",
+    reason:
+      "IT RUNS THE GATES' CHECK HALVES ITSELF (bean `folio-assistant-ey1c`): `checkPostMergeRegen` reads the gate set (`loadGates`) and runs the `:check` of every repairable writer/check pair in it, so wiring it into the workflow the gate set is read from would run the gates inside the gates — the reason `check:merged` is exempt. Its subject is `main` AFTER a merge, which no pull-request run has; its repair logic is pinned by post-merge-regen.test.ts in `bun test`",
+  },
+  {
+    script: "check:cat-harness-tools-standalone",
+    kind: "covered-by",
+    reason:
+      "RUN IN THIS LAYER'S OWN CI: cat-harness-tools' `pr-tests.yml` measures the layer standing alone on the pull request's base and head (`check-standalone.ts --layer cat-harness-tools --measured-out …`) and its `standalone` job fails on a test that newly fails. In folio-assistant the layer is a mount at a pin that has already passed that, the way `check:cat-harness-standalone` is the index's job for cat-harness",
   },
 ];
 

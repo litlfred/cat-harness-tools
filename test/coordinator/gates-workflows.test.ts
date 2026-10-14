@@ -31,7 +31,9 @@ import {
   otherWorkflowSteps,
   unclassifiedSteps,
   unrunScripts,
+  installsBrowser,
 } from "../../scripts/gates.ts";
+import { parse } from "yaml";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /**
@@ -127,7 +129,8 @@ describe("the gates come from the workflow, not from a list", () => {
     // So the property is asserted instead of the membership: the jobs that
     // carry the bulk are present, the one that installs Chromium is not, and
     // the total is nowhere near the 6 the regression produced. Growth passes,
-    // shrinkage fails.
+    // shrinkage fails. `typescript-test` is not named here since B1 gave it a
+    // browser: the test below holds every job, it included, to the rule.
     const gates = loadGates(ROOT);
     const jobs = new Set(gates.map((g) => g.job));
     // Bean `dlqu` split `typescript` into `typescript-static` (lint, types)
@@ -137,7 +140,6 @@ describe("the gates come from the workflow, not from a list", () => {
     // aggregates would assert membership of jobs that contribute nothing, and
     // `e2e` would pass the browser exclusion for the wrong reason.
     expect(jobs.has("typescript-static")).toBe(true);
-    expect(jobs.has("typescript-test")).toBe(true);
     // `gates` is a roll-up since bean `doxj` and carries no command; its
     // three parts do.
     expect(jobs.has("gates-kg")).toBe(true);
@@ -146,6 +148,36 @@ describe("the gates come from the workflow, not from a list", () => {
     expect(jobs.has("gates-unrun")).toBe(true);
     expect(jobs.has("e2e-shard")).toBe(false);
     expect(gates.length).toBeGreaterThan(100);
+  });
+
+  test("a job is in the fast set exactly when it installs no browser — asked of the job, never of its name", () => {
+    // The membership above names the jobs that carry the bulk; this is the
+    // RULE they follow, over every job the workflow has, so a job that gains
+    // or loses a browser moves between the sets without an edit here.
+    //
+    // It moved one on 2026-10-14. B1 (owner: "B: the unit-test job generates
+    // the pages first") gave `typescript-test` a Chromium install, because
+    // `derive:publish` draws the publish-time BPMN pages its tests read. So
+    // `bun test` left the fast set for `--all`, beside `e2e-shard`: the fast
+    // set is the inner loop that needs no browser, and a `bun test` that
+    // reads pages drawn through Chromium is not that. Asserting
+    // `typescript-test` in the fast set by name would have kept the claim
+    // after the property behind it had gone.
+    const doc = parse(readFileSync(join(ROOT, GATES_WORKFLOW), "utf-8")) as {
+      jobs: Record<string, { steps?: { run?: string }[] }>;
+    };
+    const browser = new Set(Object.entries(doc.jobs).filter(([, d]) => installsBrowser(d)).map(([j]) => j));
+    // Not vacuous: the e2e job is a browser job, so the rule has something
+    // on each side of it.
+    expect(browser.has("e2e-shard")).toBe(true);
+    const fast = new Set(loadGates(ROOT).map((g) => g.job));
+    const all = new Set(loadGates(ROOT, { all: true }).map((g) => g.job));
+    // `typescript-test` contributes, in one set or the other — never neither.
+    expect(all.has("typescript-test")).toBe(true);
+    for (const job of all) {
+      if (!(job in doc.jobs)) continue; // another workflow's step, `<file>/<job>`
+      expect({ job, fast: fast.has(job) }).toEqual({ job, fast: !browser.has(job) });
+    }
   });
 });
 
