@@ -12,7 +12,7 @@
  * alone, cat-harness has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -640,6 +640,33 @@ describe("a DECLARED visualiser is a viewer — the other half of `flh4`", () =>
     );
     const folio = tilesOf(f).find((t) => t.name === "folio")!;
     expect(folio.visualisations.find((v) => v.kind === "schemas")?.path).toBe("/schemas/");
+  });
+
+  test("a folio whose whole site is GENERATED links a writer-built viewer at its ref (smart-ra, 2026-10-14)", () => {
+    // The checkout root, no site directory on disk: its pages are written into
+    // the site source at publish, so a declared ref IS the site path. Every
+    // Folders row on litlfred/smart-ra read "viewer not published" until this.
+    const f = fixture({ host: host(), "": { name: "folio", directories: [] } });
+    expect(existsSync(join(f.repo, siteDirFor(f.repo)))).toBe(false);
+    mkdirSync(join(f.repo, "tools"), { recursive: true });
+    writeFileSync(join(f.repo, "tools", "gen.ts"), "");
+    const viewer = { ref: "en/folio/models/index.html", writer: ["tools/gen.ts"] };
+    writeDeclaration(
+      f.repo,
+      JSON.stringify(decorate({ name: "folio", directories: [{ id: "m", path: "models/", graphTypologies: ["schemas"], coverage: { visualiser: [viewer] } }] }), null, 2),
+    );
+    const folio = tilesOf(f).find((t) => t.name === "folio")!;
+    expect(folio.visualisations.find((v) => v.kind === "schemas")?.path).toBe("/en/folio/models/");
+  });
+
+  test("...but not when the folio HAS a site directory on disk", () => {
+    const f = fixture({ host: host(), "": { name: "folio", directories: [] } });
+    mkdirSync(join(f.repo, siteDirFor(f.repo)), { recursive: true });
+    mkdirSync(join(f.repo, "tools"), { recursive: true });
+    writeFileSync(join(f.repo, "tools", "gen.ts"), "");
+    const dir = (ref: string) => ({ id: "m", path: "models/", graphTypologies: ["schemas"], coverage: { visualiser: [{ ref, writer: ["tools/gen.ts"] }] } });
+    writeDeclaration(f.repo, JSON.stringify(decorate({ name: "folio", directories: [dir("en/folio/models/index.html")] }), null, 2));
+    expect(tilesOf(f).find((t) => t.name === "folio")!.visualisations.find((v) => v.kind === "schemas")?.path).toBeUndefined();
   });
 
   test("a page that resolves OUTSIDE the site directory is NOT linked — and is named as built", () => {

@@ -710,16 +710,43 @@ function tileFor(
     return under === undefined ? undefined : publishedUrlOf(`${decl.name}/${ref.slice(under.length)}`);
   };
 
+  // A FOLIO WHOSE WHOLE SITE IS GENERATED (litlfred/smart-ra): it is the
+  // checkout's root, has no site directory on disk, and its viewers are pages
+  // its declared `writer`s build into the site source at publish. Such a ref
+  // IS the page's site path — the rule core's `landingLinks` already links the
+  // landing by. Without it every Folders row on that site read "viewer not
+  // published" over pages the site serves (owner, 2026-10-14).
+  const generatedSite = isRepoRoot && !existsSync(join(instanceDir, siteDirFor(instanceDir)));
+  const generatedRefOf = (v: { ref: string; writer?: readonly string[] }): string | undefined =>
+    generatedSite && v.writer !== undefined && !existsSync(join(repoRoot, v.ref)) && !v.ref.startsWith("/") && !v.ref.split("/").includes("..")
+      ? publishedUrlOf(v.ref)
+      : undefined;
+
   const declared = new Map<string, string>();
   for (const d of dirs) {
     for (const v of visualisationsOf(d.coverage, d.id)) {
       // Built at publish (bean 0b8c) counts as present: its page is never
       // committed, and the answer must not depend on a local copy.
       if (!visualisationResolves(v, (p) => existsSync(join(repoRoot, p)))) continue;
-      const page = publishedRefOf(v.ref);
+      const page = publishedRefOf(v.ref) ?? generatedRefOf(v);
       if (page === undefined) continue;
       for (const kind of d.graphTypologies ?? []) {
         if (!declared.has(kind)) declared.set(kind, page);
+      }
+    }
+  }
+
+  // ...and on such a site the DIRECTORY'S OWN declaration counts as well:
+  // `withViewers` puts a harness's viewer in its place (cat-harness's
+  // archimate viewer over smart-ra's `archimate/`), which that site never
+  // builds, while the folio's own declared page is the one it serves.
+  if (generatedSite) {
+    for (const d of instanceDirectories(instanceDir)) {
+      for (const v of visualisationsOf(d.coverage, d.id)) {
+        if (v.publish === "staging-only" || !visualisationResolves(v, (p) => existsSync(join(repoRoot, p)))) continue;
+        const page = generatedRefOf(v);
+        if (page === undefined) continue;
+        for (const kind of d.graphTypologies ?? []) if (!declared.has(kind)) declared.set(kind, page);
       }
     }
   }
