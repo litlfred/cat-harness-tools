@@ -1,0 +1,99 @@
+/**
+ * The ✍ suggest editor, installed into a built site: Milkdown Crepe and KaTeX
+ * bundled into ONE module and ONE stylesheet at `assets/vendor/crepe/`, where
+ * the edit-links runtime looks for them (bean folio-assistant-4dx7).
+ *
+ *   bun run cat-harness-tools/scripts/suggest-editor.ts --site _site
+ *
+ * ## Why bundled here and not loaded from a CDN
+ *
+ * Owner, 2026-10-14, on the live dth-hrh site: the editor failed with
+ * *"Adding different instances of a keyed plugin (plugin$)"*. jsDelivr's
+ * `+esm` serves each package as its own module and resolves each one's
+ * dependencies on its own, so two copies of `prosemirror-state` met in one
+ * editor. Its theme CSS also `@import`s bare package paths a CDN cannot
+ * resolve. One bundle, built from this package's pinned dependencies, has one
+ * copy of each and its CSS inlined, and it is the bytes the tests run.
+ *
+ * ## Why installed at BUILD time and never committed
+ *
+ * As `pdf-viewer.ts` says of pdf.js: it costs the site and nothing else, and
+ * the pin is this package's own `@milkdown/crepe` and `katex` versions.
+ *
+ * @covers none — a build step that installs third-party bytes, not an audit of a declared graph
+ */
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
+
+/** Where the editor lands, relative to the SITE ROOT. The runtime derives the same path. */
+export const SUGGEST_EDITOR_DIR = "assets/vendor/crepe";
+
+// From the module URL, not `import.meta.dir`: the e2e spec imports this file under Node.
+const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "suggest-editor");
+
+/** A package's directory, as module resolution from `from` (default: the bundle entry) finds it. */
+export function packageDir(name: string, from: string = ENTRY): string {
+  const main = Bun.resolveSync(name, from);
+  const at = main.lastIndexOf(`/${name}/`);
+  if (at < 0) throw new Error(`cannot place ${name} from ${main}`);
+  return main.slice(0, at + name.length + 1);
+}
+
+/** The KaTeX Crepe depends on, found from Crepe's own directory. */
+export function katexDir(): string {
+  return packageDir("katex", packageDir("@milkdown/crepe"));
+}
+
+/** Bundle `crepe.js` (exports `Crepe`, and KaTeX as the default) and `crepe.css` (with KaTeX's fonts) into `<siteDir>/assets/vendor/crepe/`. */
+export async function installSuggestEditor(siteDir: string): Promise<{ dir: string; files: string[] }> {
+  const dir = join(resolve(siteDir), ...SUGGEST_EDITOR_DIR.split("/"));
+  const work = mkdtempSync(join(tmpdir(), "suggest-editor-"));
+  try {
+    // KaTeX is Crepe's own dependency, resolved from Crepe's directory, so the
+    // node views render with the KaTeX the editor ships and this package
+    // declares no second copy beside the root's.
+    const katex = katexDir();
+    const jsEntry = join(work, "entry.ts");
+    writeFileSync(jsEntry, `export * from ${JSON.stringify(join(ENTRY, "entry.ts"))};\nexport { default } from ${JSON.stringify(Bun.resolveSync("katex", katex))};\n`);
+    const js = await Bun.build({ entrypoints: [jsEntry], target: "browser", format: "esm", minify: true });
+    if (!js.success || js.outputs.length !== 1) throw new Error(`the editor did not bundle: ${js.logs.map(String).join("; ")}`);
+    // The stylesheet entry names each package's CSS by the path module
+    // resolution finds, not by a relative node_modules path: standing alone, a
+    // layer's own node_modules is not there and the root's is (seed-ready.ts).
+    const cssEntry = join(work, "entry.css");
+    writeFileSync(cssEntry, [
+      `${packageDir("@milkdown/crepe")}/lib/theme/common/style.css`,
+      `${packageDir("@milkdown/crepe")}/lib/theme/frame/style.css`,
+      `${katexDir()}/dist/katex.min.css`,
+    ].map((f) => `@import ${JSON.stringify(f)};`).join("\n") + "\n");
+    const out = join(work, "out");
+    const css = await Bun.build({ entrypoints: [cssEntry], outdir: out, minify: true, naming: { entry: "crepe.css", asset: "fonts/[name]-[hash].[ext]" } });
+    if (!css.success) throw new Error(`the editor's stylesheet did not bundle: ${css.logs.map(String).join("; ")}`);
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "crepe.js"), await js.outputs[0]!.text());
+    cpSync(out, dir, { recursive: true });
+    if (!existsSync(join(dir, "crepe.css"))) throw new Error("the editor's stylesheet was not written");
+    const files = readdirSync(dir, { recursive: true }).map(String).sort();
+    return { dir, files };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+if (import.meta.main) {
+  const argv = process.argv.slice(2);
+  const site = argv[argv.indexOf("--site") + 1];
+  if (!argv.includes("--site") || !site) {
+    console.error("usage: suggest-editor.ts --site <built site dir>");
+    process.exit(2);
+  }
+  installSuggestEditor(site)
+    .then((r) => console.log(`suggest-editor: Crepe + KaTeX → ${r.dir} (${r.files.length} files)`))
+    .catch((e) => {
+      console.error(`✗ suggest-editor: ${(e as Error).message}`);
+      process.exit(1);
+    });
+}

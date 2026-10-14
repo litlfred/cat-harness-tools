@@ -646,6 +646,9 @@ function filesUnder(dir: string, prefix = ""): string[] {
   return out;
 }
 
+/** What a shell writes for the platform's per-page todo listing: no page lists a note. */
+export const EMPTY_TODO_LISTING: { pages: Record<string, string> } = { pages: {} };
+
 export interface ComposeReport {
   /**
    * A shell's scoping to the folio whose site it is (#2263): which instance,
@@ -979,6 +982,13 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       writeFileSync(data, `${JSON.stringify(next, null, 2)}\n`);
       scoped = { instance: scope.instance, platformBase: scope.platformBase, hostProjections: [...new Set(hostProjections)].sort() };
     }
+    // THE PLATFORM'S PER-PAGE TODO LISTING (bean `lwjc`) is a projection of
+    // ITS notes on ITS pages. The footer falls back to the whole listing when
+    // the index is ABSENT, so leaving it out would put every platform note on
+    // the folio's site. Written EMPTY instead (owner, 2026-10-14): no page of
+    // the folio's site lists a platform note, and the footer includes nothing.
+    const todoListing = join(out, "_data", "todo_listing.json");
+    if (existsSync(todoListing)) writeFileSync(todoListing, `${JSON.stringify(EMPTY_TODO_LISTING, null, 2)}\n`);
     // The landing stickies' platform links, re-based the same way (who-iris's
     // own site, 2026-10-09: they resolved under the folio's baseurl and 404'd).
     const stickiesData = join(out, "_data", "stickies.json");

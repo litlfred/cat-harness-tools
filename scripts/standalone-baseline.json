@@ -6,7 +6,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 445,
+      "failed": 444,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -263,6 +263,7 @@
         "test/coordinator/gates-workflows.test.ts > every workflow step is accounted for > no step CI runs is unclassified",
         "test/coordinator/gates-workflows.test.ts > every workflow step is accounted for > the foreign-step reader finds steps — an empty read is not a clean one",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > `--all` is a superset of the fast set, and strictly larger",
+        "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > a job is in the fast set exactly when it installs no browser — asked of the job, never of its name",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > each gate carries the step name the Actions UI shows",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > every browser-free job contributes, so a split cannot silently shrink the set",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > every extracted command is a bun invocation, in workflow order",
@@ -432,7 +433,6 @@
         "test/coordinator/tools-checkout.test.ts > tools > every satisfies names a skill that exists",
         "test/coordinator/tools-checkout.test.ts > tools > skill discovery is not a hardcoded list",
         "test/coordinator/tools-discover-checkout.test.ts > tools() over this checkout > includes every instance that declares a tools graph — smart-base's no longer invisible",
-        "test/coordinator/tools-discover-checkout.test.ts > tools() over this checkout > toolsOf(cat-harness) is the harness's own graph only — what its document publishes",
         "test/coordinator/tools-viewer-checkout.test.ts > every satisfies names a skill that exists > no tool advertises a capability the graph cannot locate",
         "test/coordinator/tools-viewer-checkout.test.ts > the generator writes where the declaration says > and the committed page is current",
         "test/coordinator/tools-viewer-checkout.test.ts > the page reports the join in both directions > states that all resolve, rather than only warning when they do not",
