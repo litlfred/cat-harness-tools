@@ -50,7 +50,9 @@ import {
   parseReference,
 } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { loadBlocksUnder, reportLoadFailures, type LoadedBlock } from "./block-module";
-import { findContentRepoRoot, findPapers } from "./repo-root";
+import { contributionsRoot, findContentRepoRoot, findPapers } from "./repo-root";
+import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { paperArg } from "./cli-args";
 
 /** A reference that could not be resolved to an IRI, with where it came from. */
@@ -100,16 +102,19 @@ export function blockToJsonLd(
   paper: string,
   dangling: DanglingRef[],
   unconventional: UnconventionalRef[] = [],
+  /** Registry of contributed kinds, so a persona or requirement is typed. */
+  contributions?: ContributionRegistry,
 ): Record<string, unknown> {
   const b = loaded.block;
+  const types = typesForKind(loaded.kind, contributions);
 
   const doc: Record<string, unknown> = {
-    "@context": documentContext(typesForKind(loaded.kind)),
+    "@context": documentContext(types),
     // `mintNodeId`, not `resolveLabel`: a block's own label always yields an
     // id. The placeholder this replaces gave every prefix-less label the same
     // `@id`, which collided 12 blocks into one on the real corpus.
     "@id": mintNodeId(loaded.label, paper),
-    "@type": typesForKind(loaded.kind),
+    "@type": types,
     label: loaded.label,
     kind: loaded.kind,
   };
@@ -222,6 +227,15 @@ async function run(): Promise<number> {
   const unconventional: UnconventionalRef[] = [];
   let anyLoadFailure = false;
 
+  // A dependency's block kinds (the contributed `dak` kinds) are blocks too.
+  // Loaded as qa-sweep loads them; registering them is also what lets
+  // `typesForKind` type them.
+  const contributions = await loadContributions<FolioContribution, ContributionRegistry>(
+    contributionsRoot(),
+    new ContributionRegistry(),
+  );
+  const contributedKinds = new Set(contributions.contributedBuilders().values());
+
   for (const paper of papers) {
     const paperDir = join(folioDir(root),  paper);
     if (!existsSync(paperDir)) {
@@ -229,12 +243,12 @@ async function run(): Promise<number> {
       return 2;
     }
 
-    const { blocks, failures } = await loadBlocksUnder(paperDir);
+    const { blocks, failures } = await loadBlocksUnder(paperDir, contributedKinds);
     if (reportLoadFailures(failures)) anyLoadFailure = true;
 
     for (const loaded of [...blocks.values()].sort((a, b) => a.file.localeCompare(b.file))) {
       const out = loaded.file.replace(/\.ts$/, ".jsonld");
-      const next = serialise(blockToJsonLd(loaded, paper, dangling, unconventional));
+      const next = serialise(blockToJsonLd(loaded, paper, dangling, unconventional, contributions));
       const prev = existsSync(out) ? readFileSync(out, "utf-8") : undefined;
 
       if (prev === next) {

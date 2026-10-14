@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, checkLinks, readUpstreamPages, stepCommand } from "../build-instance-site.ts";
+import { tmpdir } from "node:os";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand } from "../build-instance-site.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -62,11 +61,6 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
 });
 
 describe("keepPinned — a build leaves a mounted layer as the lock pins it (litlfred/dth-hrh, 2026-10-14)", () => {
-  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
-  const { tmpdir } = require("node:os") as typeof import("node:os");
-  const { keepPinned } = require("../build-instance-site.ts") as typeof import("../build-instance-site.ts");
-
   const setup = () => {
     const root = mkdtempSync(join(tmpdir(), "keep-pinned-"));
     mkdirSync(join(root, "cat-harness/docs/_data"), { recursive: true });
@@ -117,6 +111,14 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     expect(readUpstreamPages(join(d, "absent.txt")).size).toBe(0);
     writeFileSync(join(d, "u.txt"), "# composed\na.html\n\nsub/b.html\n");
     expect([...readUpstreamPages(join(d, "u.txt"))]).toEqual(["a.html", "sub/b.html"]);
+  });
+
+  test("a required root file a step did not write is named, so the site is not published", () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-req-"));
+    writeFileSync(join(site, "index.html"), "x");
+    expect(missingRequired(site, ["folio-build.json", "index.html"])).toEqual(["folio-build.json"]);
+    writeFileSync(join(site, "folio-build.json"), "{}");
+    expect(missingRequired(site, ["folio-build.json"])).toEqual([]);
   });
 
   test("a dead link on a content page is reported apart; one on any other page still refuses", async () => {

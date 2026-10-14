@@ -107,7 +107,7 @@ import {
 } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { contentIsOffCheckout, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { installDependencies, isInstallArtefact, stateMountedDirs, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
+import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 
 /**
@@ -580,7 +580,14 @@ function sha256Text(s: string | Buffer): string {
 function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
   // Install artefacts (`node_modules/`) are never pinned bytes: see
   // `installDependencies` in mount-from-lock.ts for why they are outside fixity.
-  const files = withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip));
+  // Neither are the paths the instance declares `builtAtPublish`: the publish
+  // writes them into the mount, so the lock's digest (mount-from-lock.ts
+  // `digestOf`) leaves them out and this one must too, or a mount whose site
+  // was built reads as modified.
+  const files = withoutBuiltAtPublish(
+    withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip)),
+    builtAtPublishOf(abs),
+  );
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
 

@@ -122,6 +122,7 @@ import {
   igFolioSite,
   type IgFolioSite,
   igIdentity,
+  IG_SITE_STAMP,
   IG_WORKFLOWS,
   type IgTarget,
   type Publisher,
@@ -871,7 +872,7 @@ async function stageIgFolio(a: IgRun, b: IgBuilt, site: IgFolioSite): Promise<St
       `the IG: the runnable steps of ${b.path} below, in its order, in the checkout as on a runner (the IG Publisher writes output/)`,
       `the folio site "${site.title}": build-instance-site.ts with the chrome of ${site.scope} (index.config.json site.landing)`,
       `  source ${site.sourceSteps.join(", ")} — the IG's pages at the site root`,
-      `  site   ${site.siteSteps.join(", ")} — the Publisher's own pages the site lacks`,
+      `  site   ${site.siteSteps.join(", ")} — the Publisher's own pages the site lacks, and ${IG_SITE_STAMP} at the root (required: a folio root marker)`,
       `  out    ${out}`,
     ],
     gate: "build-instance-site's link check: every link the chrome writes must resolve; the IG's own dead links are reported, not gated",
@@ -914,6 +915,7 @@ async function stageIgFolio(a: IgRun, b: IgBuilt, site: IgFolioSite): Promise<St
     publish,
     ...(publish ? { remote: git(repo, ["config", "--get", "remote.origin.url"]) } : {}),
     keep: site.keep,
+    require: [IG_SITE_STAMP],
     message,
   });
   return done({ pushed: publish, site: r.site });

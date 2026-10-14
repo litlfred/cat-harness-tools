@@ -54,8 +54,14 @@ export const FOLIO_WORKFLOW = "folio-staging.yml";
 export const IG_WORKFLOWS = ["fhirbuild.yml", "ghbuild.yml"] as const;
 /** Where an IG workflow with no deploy step finds its Pages build: the sibling beside it. */
 export const PAGES_SIBLING = "ghbuild.yml";
-/** What marks a publish root as a folio's: `publish-main`'s manifest, the previews, the render log. */
-export const FOLIO_ROOT_MARKERS = ["_main-site.json", "STAGING", "_render-log"] as const;
+/**
+ * What marks a publish root as a folio's: `publish-main`'s manifest, the
+ * previews, the render log, and `folio-build.json`, the stamp every folio site
+ * build writes (`site-build-stamp.ts`). The stamp is the one a root deployed by
+ * an IG repository's `folio-site.yml` carries (smart-trust, smart-immunizations);
+ * without it a root IG deploy would replace that site with bare Publisher output.
+ */
+export const FOLIO_ROOT_MARKERS = ["_main-site.json", "STAGING", "_render-log", "folio-build.json"] as const;
 /**
  * Paths `JamesIves/github-pages-deploy-action@v4` never deletes under
  * `clean`, whatever `clean-exclude` says: the action's own built-in excludes.
@@ -588,6 +594,14 @@ export const IG_SITE_STEPS = { source: "ig-site:compose", site: "ig-site:publish
  * is a separate question for the owner, never a side effect of a publish.
  */
 export const IG_KEEP = ["branches"] as const;
+
+/**
+ * The root file an IG repository's folio site must carry before it is
+ * published: `folio-build.json`, which `ig-site:publisher-pages` writes, and
+ * by which {@link FOLIO_ROOT_MARKERS} recognises the root as a folio's, so a
+ * later `--bare-ig` deploy refuses to clean it away.
+ */
+export const IG_SITE_STAMP = "folio-build.json" as const;
 
 /** The site's title and description, from the IG's `sushi-config.yaml`; the repository's name when it says none. */
 export function igIdentity(sushiText: string | undefined, repoName: string): { title: string; description?: string } {

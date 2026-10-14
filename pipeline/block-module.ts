@@ -188,6 +188,12 @@ function asLoadedBlock(
  */
 export async function loadBlocksUnder(
   root: string,
+  /**
+   * Kinds a dependency contributes (smart-base's DAK kinds, since bean
+   * `1335`). Without them a contributed block — a persona, a user scenario,
+   * a requirement — is silently not a block (litlfred/dth-hrh: 52 of 322).
+   */
+  contributedKinds?: ReadonlySet<string>,
 ): Promise<{ blocks: Map<string, LoadedBlock>; failures: BlockLoadFailure[] }> {
   const blocks = new Map<string, LoadedBlock>();
   const failures: BlockLoadFailure[] = [];
@@ -200,7 +206,7 @@ export async function loadBlocksUnder(
       if (!f.endsWith(".ts")) continue;
       const path = join(dirPath, f);
       try {
-        const b = await loadBlockModule(path);
+        const b = await loadBlockModule(path, contributedKinds);
         if (b) blocks.set(b.label, b);
       } catch (e) {
         failures.push({ file: path, error: String(e).replace(/\s+/g, " ").slice(0, 300) });

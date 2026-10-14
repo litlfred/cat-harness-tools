@@ -93,6 +93,13 @@ export interface BuildOptions {
   identity?: { title: string; description?: string };
   /** More root entries a root publish keeps, beside `STAGING/` and `_render-log/`. */
   keep?: string[];
+  /** Root files the built site must hold before it is published (a step's promise, checked). */
+  require?: string[];
+}
+
+/** The `require`d root files a built site does not hold. */
+export function missingRequired(site: string, required: readonly string[]): string[] {
+  return required.filter((f) => !existsSync(join(site, f)));
 }
 
 /**
@@ -446,6 +453,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   }
   writeFileSync(join(site, ".nojekyll"), "");
 
+  const lacking = missingRequired(site, o.require ?? []);
+  if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
   const upstream = readUpstreamPages(upstreamFile);
   const links = await checkLinks(site, `${baseurl}/`, upstream);
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);

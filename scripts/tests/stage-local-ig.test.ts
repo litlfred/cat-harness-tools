@@ -12,7 +12,9 @@ import { join } from "node:path";
 
 import { chooseTarget, composeIg, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage, stageLocal } from "../stage-local.ts";
 import {
+  FOLIO_ROOT_MARKERS,
   IG_KEEP,
+  IG_SITE_STAMP,
   IG_SITE_STEPS,
   igFolioSite,
   igIdentity,
@@ -303,6 +305,16 @@ describe("stage-local: an IG lands where its workflow's deploy step puts it", ()
     expect(() => applyIgDeploy(pages, out, igTarget(deploys, { isDefault: true, branchDir: "main", sha: "a", runUrl: "u" }), () => {})).toThrow(/folio's site/);
     expect(existsSync(join(pages, "STAGING/x/index.html"))).toBe(true);
   });
+
+  test("so is one over the folio site an IG repository's folio-site.yml deployed, known by its build stamp", () => {
+    const pages = tmp("stage-local-ig-pages-");
+    put(pages, "index.html", "<title>WHO SMART Trust | folio-assistant</title>");
+    put(pages, "folio-build.json", "{}");
+    const out = tmp("stage-local-ig-out-");
+    put(out, "index.html");
+    expect(() => applyIgDeploy(pages, out, igTarget(deploys, { isDefault: true, branchDir: "main", sha: "a", runUrl: "u" }), () => {})).toThrow(/folio-build\.json/);
+    expect(existsSync(join(pages, "folio-build.json"))).toBe(true);
+  });
 });
 
 describe("stage-local: the IG build is the workflow's own steps, planned", () => {
@@ -450,5 +462,14 @@ describe("an IG repository's folio site (owner, 2026-10-14)", () => {
 
   test("the IG workflow's per-branch previews are kept at the root", () => {
     expect(IG_KEEP).toContain("branches");
+  });
+
+  test("the stamp the folio route requires is a folio root marker, so a bare IG deploy refuses that root", () => {
+    expect(FOLIO_ROOT_MARKERS as readonly string[]).toContain(IG_SITE_STAMP);
+    const pages = mkdtempSync(join(tmpdir(), "ig-folio-root-"));
+    writeFileSync(join(pages, IG_SITE_STAMP), "{}");
+    writeFileSync(join(pages, "index.html"), "folio");
+    const t = { deploy: { branch: "gh-pages", folder: "output", targetFolder: "", message: "", clean: true, cleanExclude: [], singleCommit: false }, dest: "", keep: [".git"], commit: ["m"] };
+    expect(() => applyIgDeploy(pages, "output", t, () => {})).toThrow(/folio's site/);
   });
 });
