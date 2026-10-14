@@ -20,7 +20,7 @@ import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { railStandalonePages } from "../mount-instance-docs.js";
 import { formatPlan, stageLocal } from "../stage-local.ts";
 import { applyIgDeploy, chromeCoverage, chromeShortfall, igTarget, readIgDeploys, readWorkflow } from "../stage-local-ig.ts";
-import { FAKE_RAIL, FAKE_RAIL_NOTHING, FAKE_SYNC } from "./ig-chrome-fixture.ts";
+import { FAKE_RAIL, FAKE_RAIL_NOTHING, FAKE_SYNC, FAKE_SYNC_FAILS } from "./ig-chrome-fixture.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
 const put = (root: string, rel: string, text = "x") => {
@@ -82,7 +82,7 @@ jobs:
  * when `rail` is given — the platform's chrome scripts where a mount puts
  * them) and a gh-pages root that a `folio-site.yml` run chromed.
  */
-function fixture(rail?: string): { bare: string; repo: string; src: string } {
+function fixture(rail?: string, sync = FAKE_SYNC): { bare: string; repo: string; src: string } {
   const bare = tmp("ig-chrome-origin-");
   sh(bare, "init", "-q", "--bare", "-b", "main");
   const repo = tmp("ig-chrome-repo-");
@@ -94,7 +94,7 @@ function fixture(rail?: string): { bare: string; repo: string; src: string } {
   put(repo, ".github/workflows/fhirbuild.yml", CALLER);
   put(repo, "r.json", JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "r", title: "R Guide", directories: [] }));
   if (rail !== undefined) {
-    put(repo, "cat-harness-tools/scripts/sync-docs-harness.ts", FAKE_SYNC);
+    put(repo, "cat-harness-tools/scripts/sync-docs-harness.ts", sync);
     put(repo, "cat-harness-tools/scripts/rail-standalone-pages.ts", rail);
   }
   sh(repo, "add", "-A");
@@ -205,5 +205,14 @@ describe("a root publish never replaces a chromed root with bare pages", () => {
     expect(sh(bare, "show", "gh-pages:index.html")).toContain('id="fa-navbar-row"');
     expect(sh(bare, "show", "gh-pages:StructureDefinition-CWT.html")).toContain("<h1>CWT</h1>");
     expect(sh(bare, "ls-tree", "--name-only", "gh-pages").split("\n").sort()).toEqual(["StructureDefinition-CWT.html", "branches", "index.html"]);
+  }, 60_000);
+
+  test("a harness-data sync that refuses is said, not fatal: the chrome is judged on the pages", async () => {
+    const { bare, repo, src } = fixture(FAKE_RAIL, FAKE_SYNC_FAILS);
+    const said: string[] = [];
+    const r = await stageLocal({ repo, workflowSource: src, log: (s) => said.push(s) });
+    expect(r).toMatchObject({ target: "main", pushed: true });
+    expect(said.join("\n")).toMatch(/sync-docs-harness exited 1: the rail reads the harness data the cat-harness mount pins/);
+    expect(sh(bare, "show", "gh-pages:index.html")).toContain('id="fa-navbar-row"');
   }, 60_000);
 });

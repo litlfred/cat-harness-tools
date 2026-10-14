@@ -452,6 +452,15 @@ export function composeIg(pages: string, folder: string, t: IgTarget, chromed = 
  * into the cat-harness MOUNT, so the pinned bytes are put back afterwards
  * (`keepPinned`), as `build-instance-site` does.
  *
+ * A sync that fails is said and not fatal: the harness commits its own
+ * `_data/harness.json`, and the rail's foreign-site scope exists to rebase
+ * exactly that platform data onto another instance's site (#2263). Measured
+ * 2026-10-14 on smart-trust: the sync refuses there ("cannot decide the
+ * site's landing page", its `index.config.json` names no `landing`), and the
+ * rail over the pinned data still chromed every page. Whether the chrome
+ * landed is judged on the pages afterwards ({@link chromeShortfall}), never
+ * on the exit codes.
+ *
  * What it does NOT give, and the plan says so: `folio-site.yml` composes the IG
  * INTO a Jekyll shell (`stage-ig-sites --compose-at-root`), so its pages wear
  * the theme's side bar and search box; railed pages wear the harness rail and
@@ -502,7 +511,8 @@ export function applyIgChrome(repo: string, site: string, c: IgChrome, log: (s: 
   try {
     const harness = join(repo, "cat-harness");
     if (existsSync(harness)) restore = keepPinned(join(harness, siteFileFor(harness, "_data/harness.json")), lockedMountPaths(repo), repo);
-    run(repo, "bun", ["run", c.sync]);
+    const sync = spawnSync("bun", ["run", c.sync], { cwd: repo, stdio: "inherit" });
+    if (sync.status !== 0) log(`· sync-docs-harness exited ${sync.status}: the rail reads the harness data the cat-harness mount pins`);
     run(repo, "bun", ["run", c.rail, "--site", site, "--built", "cat-harness", "--foreign-site", "--home-label", c.homeLabel, ...(c.instance ? ["--instance", c.instance] : [])]);
   } finally {
     restore();

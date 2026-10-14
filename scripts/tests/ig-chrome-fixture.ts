@@ -22,3 +22,5 @@ walk(site);
 
 /** A rail that runs and rails nothing: the chrome step's failure, as the publish sees it. */
 export const FAKE_RAIL_NOTHING = "// rails nothing\n";
+/** A sync that refuses, as sync-docs-harness does in a checkout whose index names no landing instance (smart-trust, 2026-10-14). */
+export const FAKE_SYNC_FAILS = "process.exit(1);\n";
