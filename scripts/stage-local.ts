@@ -847,7 +847,7 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   const chrome = igChromeFor(repo, ownerRepo.split("/")[1]!);
   // A root publish without the chrome would replace a chromed root with bare pages: a missing prerequisite there.
   if (isDefault && "unavailable" in chrome) missing.push(`the harness chrome — ${chrome.unavailable}; a root publish is refused without it`);
-  const planned = steps.map((s) => ({ name: s.name, action: s.action, ...(s.reason ? { reason: s.reason } : {}) }));
+  const planned: { name: string; action: string; reason?: string }[] = steps.map((s) => ({ name: s.name, action: s.action, ...(s.reason ? { reason: s.reason } : {}) }));
   const firstDeploy = planned.findIndex((s) => s.action === "deploy");
   planned.splice(firstDeploy < 0 ? planned.length : firstDeploy, 0, igChromeStep(chrome, t0.deploy.folder));
   const url = `${pagesRoot}/${t0.dest ? `${t0.dest}/` : ""}`;
