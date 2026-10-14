@@ -76,7 +76,13 @@
  * - `2` — usage, or the tip could not be read. Never read as "open".
  */
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+
+import {
+  RenderedImpactSchema,
+  reviewList,
+  type RenderedImpact,
+} from "@litlfred/cat-harness/schemas/rendered-impact.ts";
 
 /** After a staging commit: longer than a Pages build (≤ 3m40s measured 2026-10-03). */
 export const STAGING_WINDOW_MS = 5 * 60_000;
@@ -182,6 +188,76 @@ export interface CommentInput {
   tip?: Tip;
   /** pushed: when the push landed. */
   pushedMs?: number;
+  /**
+   * The rendered-impact list(s) for this build (`rendered-impact.json`). Absent
+   * means NO list was computed — a third state, never read as "nothing changed".
+   */
+  impact?: readonly RenderedImpact[];
+}
+
+/** How many page rows a comment lists before pointing at the rest. */
+export const MAX_REVIEW_ROWS = 20;
+
+/**
+ * The "Pages to review" section: one deep link per changed page (and per
+ * anchor on it) into the preview, each beside the SAME page on the main site,
+ * so a reviewer opens the change and its before, not two site roots (bean
+ * `g4dv`, owner 2026-10-14: review requests carry deep links to what is being
+ * edited). The row shape is `folio-staging.yml`'s. Pure.
+ *
+ * Three states, kept apart: no list computed (said plainly — not "no
+ * change"); a list that names pages; a list that names none. Inputs the
+ * renderer could not map (`undetermined`) are listed as NOT KNOWN, because a
+ * short list next to them would otherwise read as complete.
+ */
+export function reviewSection(staging: string, main: string, impact: readonly RenderedImpact[] | undefined): string {
+  if (impact === undefined) {
+    return `**Pages to review:** No page list was computed for this build, so nothing here says which pages changed — compare the [preview](${staging}) with the [main site](${main}) page by page.`;
+  }
+  const rows: string[] = [];
+  let index = 0;
+  const unknown: string[] = [];
+  // Pages before data (CSS, JSON, images), so the 20 rows shown are the ones
+  // a reviewer reads; each group stays in path order.
+  const files = impact
+    .flatMap((imp) => reviewList(imp))
+    .sort((x, y) => Number(x.role !== "content") - Number(y.role !== "content") || x.path.localeCompare(y.path));
+  for (const imp of impact) index += imp.files.filter((f) => f.role === "index").length;
+  for (const f of files) {
+    for (const a of f.anchors?.length ? f.anchors : [undefined]) {
+      const frag = a === undefined ? "" : `#${encodeURIComponent(a)}`;
+      const label = `\`${f.path}${a === undefined ? "" : ` › ${a}`}\``;
+      if (f.change === "removed") rows.push(`- removed: ${label} · [before](${main}${f.path}${frag})`);
+      else if (f.change === "added") rows.push(`- [${label}](${staging}${f.path}${frag}) · (new page)`);
+      else rows.push(`- [${label}](${staging}${f.path}${frag}) · [before](${main}${f.path}${frag})`);
+    }
+  }
+  for (const u of impact.flatMap((imp) => imp.undetermined)) {
+    unknown.push(`- \`${u.input}\` — ${u.scope === "all" ? "can change any page" : "changes pages not mapped one by one"}: ${u.reason}`);
+  }
+  const json = `[rendered-impact.json](${staging}rendered-impact.json)`;
+  const indexNote = index ? ` (and ${index} index file(s), not listed)` : "";
+  const shown = rows.slice(0, MAX_REVIEW_ROWS);
+  const more = rows.length > shown.length ? `\n- … and ${rows.length - shown.length} more in ${json}` : "";
+  const head = rows.length
+    ? `**Pages to review:** ${rows.length}${indexNote} — each links the preview, then the same page on the main site — ${json}\n${shown.join("\n")}${more}`
+    : `**Pages to review:** the page list computed for this build names no rendered page${indexNote} — ${json}`;
+  const shownUnknown = unknown.slice(0, MAX_REVIEW_ROWS);
+  const unknownMore = unknown.length > shownUnknown.length ? `\n- … and ${unknown.length - shownUnknown.length} more in ${json}` : "";
+  const notKnown = unknown.length
+    ? `\n\n**Not known** — inputs the list could not map to pages (never read as "no change"):\n${shownUnknown.join("\n")}${unknownMore}`
+    : "";
+  return `${head}${notKnown}`;
+}
+
+/** Read a `rendered-impact.json` (one impact or an array). `undefined` when it cannot be read or is not one. */
+export function readImpact(path: string): RenderedImpact[] | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf-8"));
+    return (Array.isArray(raw) ? raw : [raw]).map((x) => RenderedImpactSchema.parse(x));
+  } catch {
+    return undefined;
+  }
 }
 
 /** The marker the PR-comment step finds its own comment by. */
@@ -225,9 +301,11 @@ ${status}
 
 ${rate}
 
+${reviewSection(url, main, c.impact)}
+
 Every page carries a sage banner linking back to the branch, this PR, the issue it is for, the main site, and the build log.
 
-> Compare with [main site](${main}) to review changes.`;
+**Main site:** ${main}`;
 }
 
 function flag(argv: string[], name: string): string | undefined {
@@ -239,7 +317,7 @@ function flag(argv: string[], name: string): string | undefined {
 
 const USAGE =
   "usage: staging-push-gate.ts gate --dir PAGES_CHECKOUT [--queued-at ISO]\n" +
-  "       staging-push-gate.ts comment --state queued|pushed --out FILE [--dir PAGES_CHECKOUT] [--pushed-at ISO]\n" +
+  "       staging-push-gate.ts comment --state queued|pushed --out FILE [--dir PAGES_CHECKOUT] [--pushed-at ISO] [--impact RENDERED_IMPACT_JSON]\n" +
   "       (comment reads SLUG, BRANCH, SHA and GITHUB_REPOSITORY from the environment)";
 
 if (import.meta.main) {
@@ -289,6 +367,10 @@ if (import.meta.main) {
     }
     const dir = flag(argv, "dir");
     const p = flag(argv, "pushed-at");
+    const i = flag(argv, "impact");
+    const impact = i === undefined ? undefined : readImpact(i);
+    // Unreadable is reported, then commented as "no page list" — the honest state.
+    if (i !== undefined && impact === undefined) console.error(`::warning::staging-push-gate: ${i} is not a readable rendered-impact list`);
     const body = stagingComment({
       state,
       owner,
@@ -299,6 +381,7 @@ if (import.meta.main) {
       nowMs,
       tip: dir === undefined ? undefined : readTip(dir),
       pushedMs: p === undefined || Number.isNaN(Date.parse(p)) ? undefined : Date.parse(p),
+      impact,
     });
     writeFileSync(out, `${body}\n`);
     process.exit(0);
