@@ -264,6 +264,8 @@
     "mcp:capture": "bun run cat-harness-tools/scripts/capture-mcp-tools.ts",
     "check:cat-harness-standalone": "bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness",
     "standalone:baseline": "bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness --update",
+    "check:cat-harness-tools-standalone": "bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools",
+    "standalone:baseline:tools": "bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --update",
     "qa:attestations:migrate": "bun run cat-harness-tools/scripts/migrate-qa-attestations.ts",
     "qa:attestations:migrate:check": "bun run cat-harness-tools/scripts/migrate-qa-attestations.ts --check",
     "bib:attestations:migrate": "bun run cat-harness-tools/scripts/migrate-bib-attestations.ts",
