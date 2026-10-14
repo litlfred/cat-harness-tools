@@ -267,7 +267,7 @@ export const FOLIO_PATHS: FolioPath[] = [
       "reads a FOLIO's `main.log`, inside `publish.yml` — the ONE workflow " +
       "exposing `workflow_call`, which `litlfred/qou` invokes at `@main` " +
       "(`qou/.github/workflows/build.yml:10`). Its four sibling invocations " +
-      "are folio-relative (`cd content && bun run pipeline/...`) and its " +
+      "are folio-relative (each does `cd content`, then runs a `pipeline/` script) and its " +
       "`actions/checkout` steps carry no `repository:`, so they check out the " +
       "CALLING repo: a `cat-harness/` prefix resolves to nothing there. " +
       "I prefixed this line under `52dz` because THIS check demanded it, " +
