@@ -27,6 +27,15 @@
  * the current root has and the candidate lacks. Directories the publish keeps
  * (previews under `branches/`, `STAGING/`) are not the candidate's to carry
  * and are left out of both sides.
+ *
+ * ## Directories dropped by a ruling
+ *
+ * A directory the current root serves that the owner ruled is NOT to be
+ * published any more is not a shortfall, but only when the caller names it in
+ * a {@link DroppedByRuling} with the ruling's own words. Each entry matches
+ * top-level DIRECTORY names only (a `*` glob), so it cannot excuse a missing
+ * feature, a missing `index.html`, the stamp, or any directory it does not
+ * name. What it excuses is said, never silent ({@link droppedByRuling}).
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -96,8 +105,33 @@ export function siteFeatures(site: string, exclude: readonly string[] = []): Sit
   return f;
 }
 
+/** A top-level directory the root no longer serves by the owner's ruling, and the ruling that says so. */
+export interface DroppedByRuling {
+  /** A top-level directory name; `*` matches any run of characters other than `/`. */
+  dir: string;
+  /** The ruling, quoted with its date: what a reader of the refusal is shown. */
+  ruling: string;
+}
+
+/** Whether a top-level directory name matches a dropped entry's glob. Pure. */
+export function matchesDropped(name: string, d: DroppedByRuling): boolean {
+  if (d.dir === "" || d.dir.includes("/")) return false;
+  const re = new RegExp(`^${d.dir.split("*").map((x) => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*")}$`);
+  return re.test(name);
+}
+
+/** The directories `current` serves that `candidate` lacks and a ruling drops, each with its ruling. Pure. */
+export function droppedByRuling(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[]): { dir: string; ruling: string }[] {
+  return current.dirs
+    .filter((d) => !candidate.dirs.includes(d))
+    .flatMap((d) => {
+      const hit = dropped.find((x) => matchesDropped(d, x));
+      return hit ? [{ dir: d, ruling: hit.ruling }] : [];
+    });
+}
+
 /** Everything `current` has that `candidate` lacks, in words; empty when the candidate loses nothing. Pure. */
-export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures): string[] {
+export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[] = []): string[] {
   const out: string[] = [];
   for (const k of Object.keys(PAGE_FEATURES) as PageFeature[]) {
     if (current.counts[k] > 0 && candidate.counts[k] === 0) {
@@ -107,7 +141,7 @@ export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures):
     }
   }
   if (current.index !== undefined && candidate.index === undefined) out.push("index.html: the current root has one, the candidate has none");
-  const missing = current.dirs.filter((d) => !candidate.dirs.includes(d));
+  const missing = current.dirs.filter((d) => !candidate.dirs.includes(d) && !dropped.some((x) => matchesDropped(d, x)));
   if (missing.length) out.push(`directories the current root serves and the candidate does not: ${missing.map((d) => `${d}/`).join(", ")}`);
   if (current.stamp && !candidate.stamp) out.push("the build stamp folio-build.json: the current root has it, the candidate does not");
   return out;

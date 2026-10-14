@@ -13,7 +13,9 @@ import { join } from "node:path";
 import { chooseTarget, composeIg, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage, stageLocal } from "../stage-local.ts";
 import {
   FOLIO_ROOT_MARKERS,
+  IG_DROPPED,
   IG_KEEP,
+  IG_SITE_OPTIONAL,
   IG_SITE_STAMP,
   IG_SITE_STEPS,
   igFolioSite,
@@ -439,7 +441,8 @@ ${IG_WORKFLOW.slice(IG_WORKFLOW.indexOf("      - name: Deploy candidate\n"), IG_
 });
 
 describe("an IG repository's folio site (owner, 2026-10-14)", () => {
-  const scripts = new Set<string>(Object.values(IG_SITE_STEPS));
+  const table = (names: string[], manifest = "base-layer/package.json") => new Map(names.map((n) => [n, { manifest }]));
+  const scripts = table(Object.values(IG_SITE_STEPS));
   const landing = { kind: "instance", name: "base-harness" };
   const identity = { title: "Example IG" };
 
@@ -450,14 +453,47 @@ describe("an IG repository's folio site (owner, 2026-10-14)", () => {
     expect(igIdentity(": not yaml : [", "repo")).toEqual({ title: "repo" });
   });
 
-  test("harnessed, with the steps mounted: the folio route, scoped to the landing instance", () => {
+  test("harnessed, with the steps mounted: the folio route from the AST, scoped to the landing instance", () => {
     const r = igFolioSite({ hasIndexConfig: true, scripts, landing, identity });
-    expect(r.site).toEqual({ scope: "base-harness", title: "Example IG", sourceSteps: [IG_SITE_STEPS.source], siteSteps: [IG_SITE_STEPS.site], keep: [...IG_KEEP] });
+    expect(r.site).toMatchObject({
+      scope: "base-harness",
+      title: "Example IG",
+      pre: [IG_SITE_STEPS.ast],
+      sourceSteps: [IG_SITE_STEPS.source],
+      siteSteps: [IG_SITE_STEPS.site],
+      keep: [...IG_KEEP],
+      dropped: [...IG_DROPPED],
+    });
   });
 
-  test("not harnessed, or nothing mounted to compose it: the bare IG route, and why", () => {
+  test("not harnessed, or nothing mounted to build it: the bare IG route, and why", () => {
     expect(igFolioSite({ hasIndexConfig: false, scripts, landing, identity }).why).toMatch(/no index\.config\.json/);
-    expect(igFolioSite({ hasIndexConfig: true, scripts: new Set([IG_SITE_STEPS.source]), landing, identity }).why).toMatch(new RegExp(IG_SITE_STEPS.site));
+    expect(igFolioSite({ hasIndexConfig: true, scripts: table([]), landing, identity }).why).toMatch(new RegExp(IG_SITE_STEPS.site));
+  });
+
+  test("some of the required steps but not all: refused, naming the missing ones (mounts pinned apart)", () => {
+    expect(() => igFolioSite({ hasIndexConfig: true, scripts: table([IG_SITE_STEPS.source, IG_SITE_STEPS.site]), landing, identity })).toThrow(new RegExp(`not ${IG_SITE_STEPS.ast}`));
+  });
+
+  test("the IG API sidecars run when the LANDING layer provides them, after the AST; another provider is said, not run", () => {
+    const withSide = new Map([...scripts, [IG_SITE_OPTIONAL.sidecars, { manifest: "base-harness-mount/package.json" }]]);
+    const run = igFolioSite({ hasIndexConfig: true, scripts: withSide, landing, landingPath: "base-harness-mount", identity }).site!;
+    expect(run.pre).toEqual([IG_SITE_STEPS.ast, IG_SITE_OPTIONAL.sidecars]);
+    const other = igFolioSite({ hasIndexConfig: true, scripts: withSide, landing, landingPath: "elsewhere", identity }).site!;
+    expect(other.pre).toEqual([IG_SITE_STEPS.ast]);
+    expect(other.notes.join("\n")).toMatch(/NOT run — provided by base-harness-mount\/package\.json/);
+  });
+
+  test("the OpenAPI pages run when the checkout holds an OpenAPI graph, before the AST's data is served", () => {
+    const withOa = new Map([...scripts, [IG_SITE_OPTIONAL.openapi, { manifest: "tools/package.json" }]]);
+    expect(igFolioSite({ hasIndexConfig: true, scripts: withOa, landing, hasOpenapi: true, identity }).site!.siteSteps).toEqual([IG_SITE_OPTIONAL.openapi, IG_SITE_STEPS.site]);
+    expect(igFolioSite({ hasIndexConfig: true, scripts: withOa, landing, hasOpenapi: false, identity }).site!.siteSteps).toEqual([IG_SITE_STEPS.site]);
+    expect(igFolioSite({ hasIndexConfig: true, scripts, landing, hasOpenapi: true, identity }).site!.notes.join("\n")).toMatch(/NOT built/);
+  });
+
+  test("the Publisher's version comparisons are the one drop the root's parity guard excuses, by the owner's ruling", () => {
+    expect(IG_DROPPED.map((d) => d.dir)).toEqual(["comparison-v*"]);
+    expect(IG_DROPPED[0]!.ruling).toContain("2a");
   });
 
   test("harnessed but no landing named: refused, never guessed among the mounts", () => {
