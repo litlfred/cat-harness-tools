@@ -134,11 +134,26 @@ interface GraphMountBase {
  */
 export type GraphMount =
   | (GraphMountBase & { state: "mounted"; tip: string; files?: number })
-  | (GraphMountBase & { state: "stale" | "refused" | "miss" | "corrupt" | "unknown" });
+  | (GraphMountBase & { state: "stale" | "refused" | "miss" | "corrupt" | "unknown" })
+  /**
+   * A checkout-level (`scope: "repository"`) graph that a mounted instance
+   * declares, that the root does not declare, and whose branch the root's
+   * `origin` does not carry ({@link TipLocation.unownedBy}). The graph does not
+   * exist in this checkout, and nothing at the root said it should. Owner,
+   * 2026-10-14 (smart-ra#59, `issue-marks`): "Report as absent", not as a
+   * miss. Only a determined `miss` becomes this: a graph that could not be
+   * asked about (`unknown`) or is `corrupt` stays a failure.
+   */
+  | (GraphMountBase & { state: "absent"; declaredBy: string });
 
 /** A graph whose files are on disk and readable, whether or not it just moved. */
 export function isPresent(g: GraphMount): boolean {
   return g.state === "mounted" || g.state === "stale";
+}
+
+/** A graph the mount accounts for: present, or determined absent where the root never asked for it. Everything else is a failure. */
+export function isSettled(g: GraphMount): boolean {
+  return isPresent(g) || g.state === "absent";
 }
 
 export type MountResult =
@@ -279,6 +294,13 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
       const r = mountTip(loc, { repoRoot: root, store });
       if (r.state === "mounted") {
         graphs.push({ ...base, state: "mounted", reason: `${r.files} file(s) at ${r.tip.slice(0, 12)}`, tip: r.tip, files: r.files });
+      } else if (r.state === "miss" && loc.unownedBy !== undefined) {
+        graphs.push({
+          ...base,
+          state: "absent",
+          declaredBy: loc.unownedBy,
+          reason: `declared for every checkout by ${loc.unownedBy}, not by this root, and ${loc.branch} is not on this checkout's remote; declare it at the root to keep it here`,
+        });
       } else {
         graphs.push({ ...base, state: r.state, reason: r.reason });
       }
@@ -289,10 +311,12 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
   }
 
   const present = graphs.filter(isPresent);
-  const failed = graphs.filter((g) => !isPresent(g));
+  const failed = graphs.filter((g) => !isSettled(g));
+  const absent = graphs.length - present.length - failed.length;
   const n = graphs.length;
   if (failed.length === 0) {
-    return { state: "mounted", reason: `${n} declared graph(s), all present`, locations, graphs };
+    const reason = absent ? `${n} declared graph(s): ${present.length} present, ${absent} absent and not this root's` : `${n} declared graph(s), all present`;
+    return { state: "mounted", reason, locations, graphs };
   }
   if (present.length === 0) {
     return { state: "failed", reason: `none of the ${n} declared graph(s) could be mounted`, locations, graphs };
@@ -314,7 +338,7 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
 function graphTable(graphs: GraphMount[]): string[] {
   const L = ["| graph | branch | path | state | detail |", "|---|---|---|---|---|"];
   for (const g of graphs) {
-    const mark = g.state === "mounted" ? "mounted" : g.state === "stale" ? "⚠️ stale" : `🛑 ${g.state}`;
+    const mark = g.state === "mounted" ? "mounted" : g.state === "stale" ? "⚠️ stale" : g.state === "absent" ? "absent" : `🛑 ${g.state}`;
     L.push(`| \`${g.id}\` | \`${g.branch}\` | \`${g.path}\` | ${mark} | ${g.reason} |`);
   }
   return L;
@@ -327,11 +351,19 @@ export function report(r: MountResult): string {
     return L.join("\n");
   }
   const present = r.graphs.filter(isPresent);
-  const failed = r.graphs.filter((g) => !isPresent(g));
+  const failed = r.graphs.filter((g) => !isSettled(g));
   const stale = r.graphs.filter((g) => g.state === "stale");
+  const absent = r.graphs.filter((g) => g.state === "absent");
   if (r.graphs.length > 0 && failed.length === 0) {
     L.push(`Mounted ${present.length} declared graph(s), each from its own branch at its own declared path.`, "");
     L.push(...graphTable(r.graphs), "");
+    if (absent.length) {
+      L.push(
+        `${absent.map((g) => `\`${g.id}\``).join(", ")}: absent. Declared for every checkout by a mounted instance, not by this root, ` +
+          `and not on this checkout's remote. Not a failure; declare it at the root to keep it here.`,
+        "",
+      );
+    }
     if (stale.length) {
       L.push(`⚠️ ${stale.map((g) => `\`${g.id}\``).join(", ")} hold unpushed edits and were left untouched. Nothing was discarded.`, "");
     }

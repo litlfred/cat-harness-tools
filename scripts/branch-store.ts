@@ -252,6 +252,17 @@ export interface TipLocation {
   repository?: string;
   /** The directory's path ON THE BRANCH, when it differs from {@link path} (instance-relative in its own repository). */
   branchPath?: string;
+  /**
+   * Set when the location is a `scope: "repository"` graph that a mounted
+   * instance declares and the checkout's root does not: the instance that
+   * declared it. Such a graph is the checkout's own (its work plan, its issue
+   * marks), so it is read from the checkout's `origin`, but no declaration at
+   * the root asked for it. If that origin does not carry its branch, the
+   * graph is ABSENT from this checkout, which is not a failed mount (owner,
+   * 2026-10-14, smart-ra#59: "Report as absent"). A root that wants the graph
+   * declares it at the same path, and then this is not set.
+   */
+  unownedBy?: string;
 }
 
 /** The marker key of a location: its {@link TipLocation.key}, else its id. */
@@ -354,6 +365,10 @@ function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = 
       const path = repoRelative(repoRoot, d.absPath);
       if (found.some((o) => o.path === path)) continue;
       const loc: TipLocation & { instRoot: string } = { id: d.id, path, branch: at!.branch, keyedBy: k, instRoot: inst };
+      // A checkout-level graph some mounted instance declares for whatever
+      // checkout it sits in, with no declaration of the root's own claiming
+      // the path (that one would have been found first and won above).
+      if (k === "tip" && d.scope === "repository" && resolve(inst) !== resolve(repoRoot)) loc.unownedBy = d.declaredBy ?? relative(repoRoot, inst);
       // A TIP graph declared inside a remote-mounted instance is read from that
       // instance's repository. Route stores are published by the checkout's own
       // generators and stay on its origin.
