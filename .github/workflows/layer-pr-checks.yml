@@ -312,7 +312,12 @@ jobs:
             import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
             const r = mountState({});
             console.log(report(r));
-            process.exit(r.state === "failed" || r.state === "partial" ? 1 : 0);
+            // Not fatal: both sides mount the same branches, so a graph that
+            // will not mount reads the same on base and head, and the compare
+            // job judges what the PR changed. Dying here judged nothing
+            // (smart-ra#59: issue-marks has no branch on that remote).
+            if (r.state === "failed" || r.state === "partial")
+              console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
           '
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
