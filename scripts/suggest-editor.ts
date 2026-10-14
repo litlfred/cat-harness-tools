@@ -24,12 +24,14 @@
  */
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
 
 /** Where the editor lands, relative to the SITE ROOT. The runtime derives the same path. */
 export const SUGGEST_EDITOR_DIR = "assets/vendor/crepe";
 
-const ENTRY = join(import.meta.dir, "suggest-editor");
+// From the module URL, not `import.meta.dir`: the e2e spec imports this file under Node.
+const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "suggest-editor");
 
 /** A package's directory, as module resolution from `from` (default: the bundle entry) finds it. */
 export function packageDir(name: string, from: string = ENTRY): string {
