@@ -104,6 +104,13 @@ export interface DocumentView {
   $schema: "folio-library-document/v1";
   id: string;
   title: string | null;
+  /**
+   * Which structure variant the entry is. Only a PDF has pages and an
+   * outline: a text or notebook source is divided by its own headings, so
+   * the view lists those as its contents and shows no page count, rather
+   * than "0 pages" and "the PDF carries no outline" (litlfred/dth-hrh).
+   */
+  variant: "pdf" | "notebook" | "text";
   pages: number;
   tocSource: string | null;
   tocMethod: string | null;
@@ -256,6 +263,7 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
     $schema: "folio-library-document/v1",
     id,
     title: s.metadata?.title ?? null,
+    variant: read.variant,
     pages: s.source?.pages ?? 0,
     tocSource: s.toc_source ?? null,
     tocMethod: d.toc_inferred_method ?? null,
@@ -321,6 +329,15 @@ function notRecorded(what){
   return '<p class="empty">' + esc(what) + ' not recorded for this entry — it was ingested before this field existed. Re-ingest to add it.</p>';
 }
 function docContents(d){
+  if (!d.toc.length && d.variant && d.variant !== "pdf") {
+    /* A text or notebook source has no separate outline: its headings ARE its
+       sections, so they are its contents. */
+    if (!d.sections.length) return '<p class="empty">No sections: the source has no headings.</p>';
+    return '<p class="note">Contents: the source\u2019s own headings.</p><ul class="toc">' + d.sections.map(function(s){
+      return '<li style="margin-left:' + (Math.max(0, (s.level || 1) - 1)) + 'em"><a href="#sec-' + esc(s.id) + '" data-sec="' + esc(s.id) + '">' +
+        (s.number ? esc(s.number) + ' ' : '') + esc(s.title) + '</a></li>';
+    }).join("") + '</ul>';
+  }
   if (!d.toc.length) return '<p class="empty">No table of contents: the PDF carries no outline and none could be inferred.</p>';
   var how = d.tocSource === "outline" ? "the PDF\u2019s own outline"
     : "inferred (" + esc(d.tocMethod || "unknown") + "); each entry\u2019s confidence and the evidence behind it are shown";
@@ -459,7 +476,8 @@ function renderDocument(id, d, err){
   var tab = DOC_TABS.filter(function(t){ return t[0] === DOC_TAB; })[0] || DOC_TABS[0];
   var whole = d.links ? ' <span class="doc-actions" data-src="' + esc(d.links.dir) + '" data-block="' + esc(id) + '"><a data-fa-link="source">source</a> ' +
     '<a data-fa-link="feedback" title="Give feedback on this document (opens a GitHub issue)">📣 feedback</a></span>' : '';
-  el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + d.pages + ' pages)</span>' + whole + '</h2>' +
+  var size = d.variant && d.variant !== "pdf" ? d.sections.length + ' sections' : d.pages + ' pages';
+  el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + size + ')</span>' + whole + '</h2>' +
     '<div class="seg" role="tablist" aria-label="Document view">' + DOC_TABS.map(function(t){
       return '<button type="button" role="tab" aria-selected="' + (t[0] === tab[0]) + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>';
     }).join("") + '</div>' + (d.keywords && d.keywords.length ? '<div class="dockw"><span class="note">Keywords (LSI):</span> ' + chips(d.keywords) + '</div>' : '') +
