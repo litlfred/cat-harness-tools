@@ -1,0 +1,385 @@
+# The pull-request checks every harnessed layer runs, as ONE reusable workflow.
+#
+# Owner, 2026-10-14 ("1"): a layer is judged on its own pull requests by one
+# workflow the harness owns, called from each layer, rather than a copy per
+# layer. Until then only cat-harness-tools, folio-assistant-core, who-iris and
+# bootstrap-tools had pull-request CI. The rest (smart-base, smart-trust,
+# smart-immunizations, fhir-harness, folio-assistant-sci, bootstrap,
+# cat-harness) were judged by nothing until folio-assistant re-pinned them:
+# the 2026-10-06 "defined, not run on events" ruling for the WHO forks
+# switched their harness gates off with their IG builds, and the
+# initialization process never installed any pull-request checks.
+#
+# Generalised from folio-assistant-core's `pr-checks.yml` (14ed7ad), whose
+# layout is this repository's `pr-tests.yml`: check out the folio-assistant
+# index, mount every instance from its `index.lock.json`, take the lower
+# layers at main, and put THE CALLER (at the ref under test) in place of its
+# locked mount. Three judgements:
+#   - Typecheck, on the PR, when the instance carries a tsconfig.json.
+#   - Tests (no new failures): the instance's tests on main and on the PR;
+#     fails only on a test the PR newly breaks.
+#   - Gates (no new failures): the harness's graph checks over the own
+#     instance, and every `check:*` / `*:check` script of the own instance
+#     AND its whole dependency harness, its transitive `needs` (owner,
+#     2026-10-14: "A harnessed repo should run not just core but all of the
+#     checks in the dependency harness"), on main and on the PR; fails only
+#     on a gate the PR newly breaks (`run-gates.py`).
+#
+# Two modes, because a harnessed repository is one of two shapes:
+#   - `layer`: a layer the folio-assistant index mounts (cat-harness,
+#     smart-base, ...). The index is checked out and the caller swapped in.
+#   - `index`: a repository that is its own index (an IG repository over
+#     smart-base, smart-ra, a folio): the caller IS the root, mounted from its
+#     own `index.lock.json`, and its own instance is the one it declares at
+#     its root, or, when it declares none, every instance it mounts.
+# A gate or test already red on main is listed in the step summary, never
+# hidden and never counted against the PR.
+#
+# A caller is about fifteen lines:
+#
+#   on: { pull_request: {}, workflow_dispatch: {} }
+#   permissions: { contents: read }
+#   jobs:
+#     checks:
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
+#       with:
+#         instance: smart-base      # its directory in the index
+#         path-in-repo: smart-base  # where it sits in the caller ('.' for the root)
+#
+# and for a repository that is its own index, `with: { mode: index }`.
+
+name: Layer PR checks
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: "'layer' (mounted by the folio-assistant index) or 'index' (the caller is its own index)."
+        required: false
+        type: string
+        default: "layer"
+      instance:
+        description: "layer mode: the instance's directory in the folio-assistant index (its mount path). index mode: optional."
+        required: false
+        type: string
+        default: ""
+      test-path:
+        description: "What `bun test` runs, from the root; empty means the instance's directory (layer) or no tests (index)."
+        required: false
+        type: string
+        default: ""
+      gate-jobs:
+        description: "Gates run at once (the dependency harness is ~300 gates)."
+        required: false
+        type: number
+        default: 1
+      path-in-repo:
+        description: "Where the instance sits in the calling repository; '.' for the repository root."
+        required: false
+        type: string
+        default: "."
+      layers-at-main:
+        description: "Lower layers taken at main instead of the lock (the caller is never replaced). 'auto': the instance's @litlfred/* dependencies, which it imports by package name and whose main it tracks."
+        required: false
+        type: string
+        default: "auto"
+      state-graphs:
+        description: "Branch-kept graphs to mount before tests and gates; each must come back mounted."
+        required: false
+        type: string
+        default: "beans todos fsh-guts"
+      index-ref:
+        description: "layer mode: the folio-assistant ref to check out (main, or a re-pin branch while main's pins are behind)."
+        required: false
+        type: string
+        default: "main"
+      tools-ref:
+        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
+        required: false
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - &checkout-index
+        name: Check out the root (the folio-assistant index, or the caller in index mode)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
+          # Index mode: the PR's merge commit on both sides; the base side then
+          # steps to its first parent (below). Never `pull_request.base.sha`:
+          # it is the base as of the PR's last push, older than the main the
+          # merge commit holds whenever main moved since, so head-vs-base would
+          # charge main's own changes to the PR (seen on smart-base#57, where
+          # smart-base#53 landed between).
+          ref: ${{ inputs.mode == 'index' && '' || inputs.index-ref }}
+          fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
+          path: fa
+      - &setup-bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - &mount
+        # A root that carries its own replayer (folio-assistant's
+        # `.github/mount-from-lock.sh`) is mounted with it: it knows which
+        # layer held the replayer at the commit its lock pins. Otherwise the
+        # replayer is `mount-from-lock.ts` at the commit the root's lock pins
+        # (cat-harness-tools, or cat-harness before the code moved, bean
+        # 70lx); it imports only node:*, so that one file is enough, as
+        # who-iris's checks.yml does.
+        name: Mount every instance from the root's lock
+        run: |
+          set -euo pipefail
+          if [ -f fa/.github/mount-from-lock.sh ]; then
+            bash fa/.github/mount-from-lock.sh --root fa
+            exit 0
+          fi
+          work="$(mktemp -d)"
+          git -C "$work" init -q
+          for layer in cat-harness-tools cat-harness; do
+            read -r repo sha < <(bun -e '
+              const l = JSON.parse(require("node:fs").readFileSync("fa/index.lock.json", "utf-8"));
+              const i = (l.instances ?? []).find((x) => x.instance === process.argv[1]);
+              console.log(i ? `${i.repository} ${i.sha}` : "- -");
+            ' "$layer")
+            [ "$repo" = "-" ] && continue
+            git -C "$work" fetch -q --depth 1 --filter=blob:none "https://github.com/${repo}.git" "$sha"
+            if git -C "$work" checkout -q FETCH_HEAD -- scripts/mount-from-lock.ts 2>/dev/null; then
+              bun "$work/scripts/mount-from-lock.ts" --root fa
+              exit 0
+            fi
+          done
+          echo "::error::no mount-from-lock replayer at the cat-harness-tools or cat-harness commit fa/index.lock.json pins"
+          exit 2
+      - name: Check out the PR
+        if: inputs.mode == 'layer'
+        uses: actions/checkout@v4
+        with:
+          path: src
+      - &lower-layers-main
+        name: Take the lower layers at main
+        env:
+          LAYERS: ${{ inputs.layers-at-main }}
+          INSTANCE: ${{ inputs.instance }}
+          MODE: ${{ inputs.mode }}
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -euo pipefail
+          if [ "$LAYERS" = "auto" ]; then
+            # The PR's own package.json in layer mode: its imports are what
+            # it is judged against, and the locked copy may predate them.
+            pkg="fa/package.json"
+            [ "$MODE" = "layer" ] && pkg="src/${SUBDIR:-.}/package.json"
+            LAYERS="$(python3 - "$pkg" <<'PY'
+          import json, sys
+          try:
+              p = json.load(open(sys.argv[1]))
+          except FileNotFoundError:
+              p = {}
+          deps = {**p.get("dependencies", {}), **p.get("devDependencies", {}), **p.get("peerDependencies", {})}
+          print(" ".join(sorted(d.split("/", 1)[1] for d in deps if d.startswith("@litlfred/"))))
+          PY
+          )"
+            echo "lower layers at main (from @litlfred/* dependencies): ${LAYERS:-none}"
+          fi
+          for r in $LAYERS; do
+            [ "$r" = "$INSTANCE" ] && continue
+            rm -rf "fa/$r"
+            git clone -q --depth 1 "https://github.com/litlfred/$r" "fa/$r"
+            rm -rf "fa/$r/.git"
+          done
+      - &swap
+        # A directory holding its own `.git` inside the index checkout is a
+        # FOREIGN checkout to `instanceRootsIn`, so it would not be discovered
+        # as an instance. Lock mounts carry no `.git`; the swapped-in copy is
+        # made to look the same.
+        name: Put the caller in place of its locked mount
+        if: inputs.mode == 'layer'
+        env:
+          INSTANCE: ${{ inputs.instance }}
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -euo pipefail
+          rm -rf "fa/$INSTANCE"
+          if [ "$SUBDIR" = "." ]; then mv src "fa/$INSTANCE"; else mv "src/$SUBDIR" "fa/$INSTANCE"; fi
+          rm -rf "fa/$INSTANCE/.git"
+          test -f "fa/$INSTANCE/$INSTANCE.json" || { echo "::error::fa/$INSTANCE/$INSTANCE.json is missing: is path-in-repo right?"; exit 2; }
+      - &install
+        name: Install
+        working-directory: fa
+        run: bun install
+      - name: tsc --noEmit
+        working-directory: fa/${{ inputs.mode == 'layer' && inputs.instance || '.' }}
+        run: |
+          if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+
+  run:
+    name: ${{ matrix.side }} — tests and gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
+    steps:
+      - *checkout-index
+      - name: Base side of the root (index mode)
+        if: inputs.mode == 'index' && matrix.side == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: fa
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
+      - *setup-bun
+      - *mount
+      - name: Check out the caller
+        if: inputs.mode == 'layer'
+        uses: actions/checkout@v4
+        with:
+          path: src
+          fetch-depth: 2
+      - name: Base side of the caller
+        if: inputs.mode == 'layer' && matrix.side == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: src
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
+      - *lower-layers-main
+      - name: The judging scripts, the same on both sides
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ inputs.tools-ref }}
+          path: ci
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - *swap
+      - *install
+      - name: Install Chromium, for the checks that draw through a browser
+        # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
+        # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
+        # the same reason). The index's OWN Playwright installs it, so the
+        # browser build is the one that Playwright expects: a bare `npx
+        # playwright` may fetch another (smart-base#57: "Executable doesn't
+        # exist at .../chromium_headless_shell-1243").
+        working-directory: fa
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the index: no browser installed"
+          fi
+      - name: Mount every graph kept on a branch, and build the IG pages
+        # Every branch-kept graph the declarations name (beans, todos,
+        # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
+        # mounts them with `state:mount`, but through `mountState` directly:
+        # `state:mount` also re-lays the remote mounts against the lock, which
+        # would refuse the swapped-in caller. Then the IG instances' pages,
+        # which are built rather than committed (bean hupw); several gates
+        # read them (owner's session 01Pc8v, 2026-10-14: declaration-resolution
+        # was red only because neither was done).
+        working-directory: fa
+        run: |
+          set -euo pipefail
+          bun -e '
+            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+            const r = mountState({});
+            console.log(report(r));
+            // Not fatal: both sides mount the same branches, so a graph that
+            // will not mount reads the same on base and head, and the compare
+            // job judges what the PR changed. Dying here judged nothing
+            // (smart-ra#59: issue-marks has no branch on that remote).
+            if (r.state === "failed" || r.state === "partial")
+              console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
+          '
+          if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
+            bun run cat smart:pages
+          fi
+      - name: bun test
+        working-directory: fa
+        # Judged by the compare job, not by this exit code.
+        env:
+          TEST_PATH: ${{ inputs.test-path != '' && inputs.test-path || (inputs.mode == 'layer' && format('./{0}', inputs.instance) || '') }}
+        run: |
+          if [ -z "$TEST_PATH" ]; then
+            echo "no test-path in index mode: no tests run"
+            echo '<?xml version="1.0"?><testsuites tests="0" failures="0"></testsuites>' > "$RUNNER_TEMP/junit.xml"
+          else
+            # shellcheck disable=SC2086 -- TEST_PATH may name several paths
+            bun test $TEST_PATH --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
+            # A layer with no test files (bootstrap: prose and schemas) makes
+            # bun exit before writing a report. That is zero tests, not a
+            # failure, and the compare job reads it as such on both sides.
+            if [ ! -s "$RUNNER_TEMP/junit.xml" ]; then
+              echo "no test files under $TEST_PATH: no tests run"
+              echo '<?xml version="1.0"?><testsuites tests="0" failures="0"></testsuites>' > "$RUNNER_TEMP/junit.xml"
+            fi
+          fi
+          test -s "$RUNNER_TEMP/junit.xml"
+      - name: Gates
+        # Judged by the compare job, not by this exit code.
+        env:
+          GATE_JOBS: ${{ inputs.gate-jobs }}
+          OWN: ${{ inputs.instance != '' && format('--instance {0}', inputs.instance) || '' }}
+        # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
+        run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.side }}
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/gates.json
+
+  compare:
+    name: No new failures (tests and gates)
+    needs: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ inputs.tools-ref }}
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        run: python3 .github/scripts/layer-pr-checks/compare-test-failures.py results/results-base/junit.xml results/results-head/junit.xml
+      - name: Gates
+        id: gates
+        continue-on-error: true
+        run: python3 .github/scripts/layer-pr-checks/compare-gates.py results/results-base/gates.json results/results-head/gates.json
+      - name: Verdict
+        if: steps.tests.outcome != 'success' || steps.gates.outcome != 'success'
+        run: |
+          echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }} — see the step summary"
+          exit 1

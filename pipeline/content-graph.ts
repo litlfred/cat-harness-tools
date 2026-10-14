@@ -613,7 +613,7 @@ if (import.meta.main) {
     if (!g.hasFormal) {
       console.log(
         `\n  No ${ATLAS_CACHE_REL}. Union degrades to the editorial graph.\n` +
-          `  Populate it with: bun run pipeline/lean-atlas-ingest.ts --ingest <jsonl>`,
+          `  Populate it with: bun run cat-harness-tools/pipeline/lean-atlas-ingest.ts --ingest <jsonl>`,
       );
     }
   }

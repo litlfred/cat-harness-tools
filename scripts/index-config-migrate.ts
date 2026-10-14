@@ -11,6 +11,11 @@
  *                                                    # write the .gitignore block, rename the lock to index.lock.json
  *   bun run cat index-config:migrate --check         # exit 1 when --write would change anything
  *   bun run cat index-config:migrate --root <dir>    # any checkout — a separated harness's standalone clone too
+ *   bun run cat index-config:migrate --inline --write
+ *                                                    # ALSO retire each imported `<name>.config.json`: its
+ *                                                    # content moves inline into its index entry, the file goes
+ *   bun run cat index-config:migrate --inline --check
+ *                                                    # exit 1 while any imported `<name>.config.json` remains
  *   bun run cat index-config:migrate --write --prefer-declaration
  *                                                    # a remoteMounts entry that DIFFERS from the index's wins
  *                                                    # (a re-pin merged from main); without it, a difference throws
@@ -34,13 +39,38 @@
  * run: the index is still correct without them, and the decision about the
  * stray file is a person's.
  *
+ * ## `--inline`: retiring `<name>.config.json` (bean `ymvt`)
+ *
+ * Owner, 2026-10-14: *"i thought ONLY index.config.json"*. The index is the
+ * one config; each instance's config is inline in its entry; a
+ * `<name>.config.json` is imported only as a migration step and then retired.
+ * `--inline` is that step: the entry becomes the imported file overlaid by the
+ * entry's own fields — EXACTLY the effective config every index-first reader
+ * already computed — its `import` is dropped and the file is deleted. So the
+ * effective config of every instance is unchanged by construction
+ * ({@link inlineEntries}). A root config the index does not list is not
+ * touched (that is `check:landing-instance`'s `unlisted` finding, a person's call).
+ *
  * Exit codes: 0 written / up to date / planned · 1 stale under `--check` · 2 could not convert.
  */
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { INDEX_LOCK_FILENAME, findDeclarationFile, lockFilesIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { INDEX_CONFIG_FILENAME, buildIndexConfig, formatIndexConfig, lockedMountPaths, withIgnoreBlock, type IndexMigration } from "@litlfred/cat-harness/schemas/index-config.js";
+import {
+  INDEX_CONFIG_FILENAME,
+  buildIndexConfig,
+  formatIndexConfig,
+  importedConfigFilename,
+  inlineOverrides,
+  lockedMountPaths,
+  withIgnoreBlock,
+  type IndexConfig,
+  type IndexInstance,
+  type IndexMigration,
+} from "@litlfred/cat-harness/schemas/index-config.js";
+
+import { overlayConfig } from "./instance-config.ts";
 
 export interface MigrateResult {
   migration: IndexMigration;
@@ -52,13 +82,52 @@ export interface MigrateResult {
   gitignore?: { file: string; text: string };
   /** The legacy `<name>.mount-lock.json` to rename to `index.lock.json`, when there is one. */
   lockRename?: { from: string; to: string };
+  /** Under `--inline`: the `<name>.config.json` files whose content moved into their entries, to delete. */
+  retire?: string[];
   /** Whether writing would change a file. */
   changes: boolean;
 }
 
+/** The raw text of a legacy config as JSON, keeping its `_comment` (it moves with the content). */
+function readLegacy(file: string): Record<string, unknown> {
+  const raw = JSON.parse(readFileSync(file, "utf-8")) as unknown;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`${file} is not a JSON object`);
+  return raw as Record<string, unknown>;
+}
+
+/**
+ * Every index entry with its imported `<name>.config.json` folded in: the
+ * file's content overlaid by the entry's inline fields — the same overlay
+ * `effectiveInstanceConfig` reads — with `import` dropped. The file's
+ * `_comment` is kept as the entry's when the entry has none. Returns the new
+ * config and the files whose content moved. Pure apart from reading.
+ */
+export function inlineEntries(root: string, config: IndexConfig): { config: IndexConfig; retire: string[] } {
+  const retire: string[] = [];
+  const instances = config.instances.map((entry): IndexInstance => {
+    const file = importedConfigFilename(entry);
+    const path = join(root, file);
+    if (!existsSync(path)) return entry;
+    const { _comment: legacyComment, ...legacy } = readLegacy(path);
+    const merged = overlayConfig(legacy, inlineOverrides(entry));
+    const { import: _i, ...head } = entry;
+    retire.push(file);
+    const comment = entry._comment ?? (typeof legacyComment === "string" ? legacyComment : undefined);
+    return { ...head, ...(comment !== undefined ? { _comment: comment } : {}), ...merged } as IndexInstance;
+  });
+  // Two entries importing ONE file each get its content; it is deleted once.
+  return { config: { ...config, instances }, retire: [...new Set(retire)] };
+}
+
 /** Plan the conversion of `root`; writes nothing. */
-export function planMigration(root: string, opts: { preferDeclaration?: boolean } = {}): MigrateResult {
+export function planMigration(root: string, opts: { preferDeclaration?: boolean; inline?: boolean } = {}): MigrateResult {
   const migration = buildIndexConfig(root, opts);
+  let retire: string[] | undefined;
+  if (opts.inline) {
+    const inlined = inlineEntries(root, migration.config);
+    migration.config = inlined.config;
+    if (inlined.retire.length > 0) retire = inlined.retire;
+  }
   const indexText = formatIndexConfig(migration.config);
   const indexFile = join(root, INDEX_CONFIG_FILENAME);
   let changes = !existsSync(indexFile) || readFileSync(indexFile, "utf-8") !== indexText;
@@ -93,7 +162,16 @@ export function planMigration(root: string, opts: { preferDeclaration?: boolean 
     lockRename = { from: join(root, legacy[0]!), to: join(root, INDEX_LOCK_FILENAME) };
     changes = true;
   }
-  return { migration, indexText, ...(declaration ? { declaration } : {}), ...(gitignore ? { gitignore } : {}), ...(lockRename ? { lockRename } : {}), changes };
+  if (retire !== undefined) changes = true;
+  return {
+    migration,
+    indexText,
+    ...(declaration ? { declaration } : {}),
+    ...(gitignore ? { gitignore } : {}),
+    ...(lockRename ? { lockRename } : {}),
+    ...(retire ? { retire } : {}),
+    changes,
+  };
 }
 
 /** Write what {@link planMigration} planned. The index first, so a failure leaves the mounts declared somewhere. */
@@ -103,6 +181,8 @@ export function applyMigration(root: string, plan: MigrateResult): void {
   if (plan.declaration) writeFileSync(plan.declaration.file, plan.declaration.text);
   // A rename, so the lock's history follows it (`git` sees the move at commit).
   if (plan.lockRename) renameSync(plan.lockRename.from, plan.lockRename.to);
+  // Last: the index that now carries their content is already written.
+  for (const f of plan.retire ?? []) rmSync(join(root, f));
 }
 
 function arg(name: string): string | undefined {
@@ -116,7 +196,7 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   let plan: MigrateResult;
   try {
-    plan = planMigration(root, { preferDeclaration: process.argv.includes("--prefer-declaration") });
+    plan = planMigration(root, { preferDeclaration: process.argv.includes("--prefer-declaration"), inline: process.argv.includes("--inline") });
   } catch (e) {
     console.error(`index-config:migrate: could not convert ${root}: ${(e as Error).message}`);
     process.exit(2);
@@ -128,11 +208,16 @@ if (import.meta.main) {
   if (migration.moved.length) console.log(`  moved from ${migration.movedFrom}: remoteMounts ${migration.moved.join(", ")}`);
   if (plan.lockRename) console.log(`  lock:      ${plan.lockRename.from} → ${plan.lockRename.to}`);
   if (plan.gitignore) console.log(`  .gitignore: the generated index-mounts block is written`);
+  if (plan.retire) console.log(`  inline:    ${plan.retire.join(", ")} → moved into their index entries, and the files retired`);
   for (const f of migration.findings) console.log(`  ⚠ ${f.kind}: ${"file" in f ? `${f.file} — ` : ""}${f.detail}`);
 
   if (check) {
     if (plan.changes) {
-      console.error(`✗ ${INDEX_CONFIG_FILENAME}, its .gitignore block or the lock's name is stale, or the declaration still carries remoteMounts — run \`bun run cat index-config:migrate --write\``);
+      console.error(
+        `✗ ${INDEX_CONFIG_FILENAME}, its .gitignore block or the lock's name is stale, or the declaration still carries remoteMounts` +
+          (plan.retire ? `, or a legacy config is still imported (${plan.retire.join(", ")})` : "") +
+          ` — run \`bun run cat index-config:migrate${plan.retire ? " --inline" : ""} --write\``,
+      );
       process.exit(1);
     }
     console.log(`✓ ${INDEX_CONFIG_FILENAME} is current`);
@@ -144,5 +229,9 @@ if (import.meta.main) {
     process.exit(0);
   }
   if (plan.changes) applyMigration(root, plan);
-  console.log(plan.changes ? `✓ wrote ${join(root, INDEX_CONFIG_FILENAME)}${plan.declaration ? ` and removed remoteMounts from ${plan.declaration.file}` : ""}` : "✓ up to date");
+  console.log(
+    plan.changes
+      ? `✓ wrote ${join(root, INDEX_CONFIG_FILENAME)}${plan.declaration ? ` and removed remoteMounts from ${plan.declaration.file}` : ""}${plan.retire ? `; retired ${plan.retire.join(", ")}` : ""}`
+      : "✓ up to date",
+  );
 }

@@ -56,6 +56,18 @@ import { dirname } from "node:path";
 const SLUG = "cold-chain-guidance";
 const SCAFFOLD_CONFIG = instanceConfigFilename(SLUG);
 const scaffoldConfigIn = (dir: string): string => join(dir, SCAFFOLD_CONFIG);
+/**
+ * The scaffold's config as written: INLINE in its `index.config.json` entry
+ * (bean `ymvt` — the index is the one config, and no `<slug>.config.json` is
+ * written), minus the index's own keys.
+ */
+function scaffoldConfig(dir: string): Record<string, unknown> {
+  const idx = JSON.parse(readFileSync(join(dir, "index.config.json"), "utf-8")) as { instances: Array<Record<string, unknown>> };
+  const entry = idx.instances.find((e) => e.name === SLUG);
+  if (entry === undefined) throw new Error(`index.config.json lists no ${SLUG}`);
+  const { name: _n, source: _s, import: _i, _comment: _c, ...config } = entry;
+  return config;
+}
 
 /**
  * The platform as a folio links it: the REPOSITORY root, which contains
@@ -217,8 +229,10 @@ describe("what gets written", () => {
   test("every file the layout needs, and no subject matter", () => {
     const d = tmp();
     const r = initFolio(opts(d));
+    // The config is inline in the index (bean `ymvt`), never a legacy file.
+    expect(existsSync(scaffoldConfigIn(d))).toBe(false);
     for (const f of [
-      SCAFFOLD_CONFIG,
+      "index.config.json",
       ".mcp.json",
       ".beans.yml",
       "folio/schema/builders.ts",
@@ -525,7 +539,7 @@ describe("a contentless instance (mer2)", () => {
   // the scaffolder, so the test fails if initiation stops writing any of them.
   const INSTANCE_LEVEL = [
     instanceDeclarationFilename(SLUG),
-    SCAFFOLD_CONFIG,
+    "index.config.json",
     ".mcp.json",
     ".claude/settings.json",
     ".gitignore",
@@ -553,7 +567,7 @@ describe("a contentless instance (mer2)", () => {
   test("the config names no adapter and the declaration no folio directory", () => {
     const d = tmp();
     initInstance(instanceOpts(d));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d) as Record<string, any>;
     expect(config.contentType).toBeUndefined();
     expect(config.adapter).toBeUndefined();
     expect(config.adapterModule).toBeUndefined();
@@ -600,7 +614,7 @@ describe("a contentless instance (mer2)", () => {
   test("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper" }));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d) as Record<string, any>;
     expect(config.contentType).toBe("paper");
     expect(config.adapter).toBe("paper");
   });
@@ -645,7 +659,7 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   test("a contentless instance stands on cat-harness, and reaches its skills through the stack", () => {
     const d = tmp();
     initInstance({ targetDir: d, slug: SLUG, title: "Cold Chain Guidance", link: "submodule", skipVcs: true });
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d) as Record<string, any>;
     expect(config.dependencies).toEqual({ folioAssistant: [{ name: "cat-harness", path: "folio-assistant/cat-harness" }] });
     symlinkSync(REPO_ROOT, join(d, "folio-assistant"));
     const chain = chainNames(d);

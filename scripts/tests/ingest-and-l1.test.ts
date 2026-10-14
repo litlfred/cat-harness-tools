@@ -431,7 +431,10 @@ describe("the verdict as a committed sidecar", () => {
       return;
     }
     expect(staleSidecars(root, all ?? [])).toEqual([]);
-  });
+    // A real-corpus walk: ~5.2 s on the CI runner, over bun's 5 s default, so
+    // it timed out there as a "new failure" on unrelated PRs. A timeout, not a
+    // skip — the same budget the other real-corpus tests carry.
+  }, 30_000);
 });
 
 
