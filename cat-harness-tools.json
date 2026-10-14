@@ -195,5 +195,14 @@
   },
   "_canonicalUrl_comment": "A placeholder base under this repository's own publication root, not a FHIR canonical. It exists because a Tool node's I/O type IRIs are minted against it at load and Zod refuses a relative one.",
   "canonicalUrl": "https://litlfred.github.io/folio-assistant/cat-harness-tools",
-  "_name_comment": "THE NAME IS NOT AN INSTANTIATION CLAIM. Instantiation is a `<name>.config.json` at the repository root (`harness-tiles`, bean `6n23`), and there is none for this layer. Staged as a sibling directory like bootstrap-tools; after the split it becomes its own repository and only `livesAt` changes."
+  "_name_comment": "THE NAME IS NOT AN INSTANTIATION CLAIM. Instantiation is a `<name>.config.json` at the repository root (`harness-tiles`, bean `6n23`), and there is none for this layer. Staged as a sibling directory like bootstrap-tools; after the split it becomes its own repository and only `livesAt` changes.",
+  "gateExemptions": {
+    "steps": [
+      {
+        "match": "cat-harness-tools/scripts/staging-changes.ts",
+        "kind": "covered-by",
+        "reason": "a BUILD step of feature-staging, not a check: it writes the preview's changes/ page (sources, the predicted cone, and the diff against the gh-pages root) and is continue-on-error; its logic is covered by scripts/tests/staging-changes.test.ts in `bun test`"
+      }
+    ]
+  }
 }
