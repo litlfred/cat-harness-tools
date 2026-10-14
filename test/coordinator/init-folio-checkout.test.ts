@@ -35,7 +35,7 @@ const SLUG = "cold-chain-guidance";
  * The scaffold's config: INLINE in its `index.config.json` entry (bean `ymvt`
  * — `folio_init` writes no `<slug>.config.json`), minus the index's own keys.
  */
-function scaffoldConfig(dir: string): Record<string, any> {
+function scaffoldConfig(dir: string): Record<string, unknown> {
   const idx = JSON.parse(readFileSync(join(dir, "index.config.json"), "utf-8")) as { instances: Array<Record<string, unknown>> };
   const entry = idx.instances.find((e) => e.name === SLUG);
   if (entry === undefined) throw new Error(`index.config.json lists no ${SLUG}`);

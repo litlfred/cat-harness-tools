@@ -31,7 +31,7 @@
 import { join, relative } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { conventionalFolioDir, directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import { executeGraphTool } from "../../adapters/mcp-server/tools/graph.js";
 
@@ -62,9 +62,9 @@ export function graphRootsResolved(repoRoot: string): {
     folio = folioDir(repoRoot);
     libraries = directoriesForGraph(repoRoot, "library");
   } catch (e) {
-    // declared-path-literal: the convention, used only because the declaration
-    // could not be read, and reported in `note`.
-    folio = join(repoRoot, "folio");
+    // The convention, used only because the declaration could not be read,
+    // and reported in `note`.
+    folio = conventionalFolioDir(repoRoot);
     note =
       `the instance declaration could not be read (${e instanceof Error ? e.message.split(". ")[0] : String(e)}); ` +
       `searched the conventional folio/ and library/ instead`;

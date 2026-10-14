@@ -72,7 +72,7 @@ const docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
  * (`@id` in the content context), and `check:context-emission` refuses a file
  * path there: a reader resolving a relative path against the node's own IRI
  * lands somewhere that is not the file. The asset's `source` is relative to
- * this instance, and may now leave it (`../smart-base/processes/…`, since a
+ * this instance, and may now leave it (`../<instance>/processes/…`, since a
  * content-type process lives with its skill), so it is resolved against the
  * REPOSITORY and published as the forge's view URL — one rule for every asset,
  * moved or not.

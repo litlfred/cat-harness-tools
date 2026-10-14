@@ -35,7 +35,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
 import { INDEX_CONFIG_FILENAME, INDEX_CONFIG_SCHEMA, formatIndexConfig, withIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
@@ -623,8 +623,10 @@ export default prose({
  */
 function starterBlockNode(root: string, slug: string): string {
   const block = { kind: "prose", label: "prose:overview", title: "Overview", uses: [] as string[] };
-  // declared-path-literal: the starter block's own manifest path, written above in initFolio: a scaffold reads no declaration.
-  const file = join(root, "folio", slug, "introduction", "overview.ts");
+  // The starter block's own manifest path, written above in initFolio at the
+  // convention, which is also the `folio/` its declaration names: a scaffold
+  // reads no declaration, because it is the one writing it.
+  const file = join(conventionalFolioDir(root), slug, "introduction", "overview.ts");
   return serialiseBlockNode(blockToJsonLd({ kind: block.kind, label: block.label, uses: [], file, block }, slug, []));
 }
 

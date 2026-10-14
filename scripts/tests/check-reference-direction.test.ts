@@ -31,6 +31,7 @@ import {
   CENSUS_FAMILY,
   CHECK_FAIL_ON_NEW,
   declaresTranslationMirror,
+  DATED_PROPOSAL_RECORD,
   DEFINITION_NAMES_IMPLEMENTATION,
   movedTo,
   rekeyMovedPairs,
@@ -941,6 +942,52 @@ describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (ow
         [DEFINITION_NAMES_IMPLEMENTATION],
       ).verdict,
     ).toBe("wrong-direction");
+  });
+});
+
+// ── Q1 (2026-10-14): a dated decision record is not reworded ─────
+
+describe("X5 — a dated proposal record may name the layers it was written about (owner, 2026-10-14, Q1)", () => {
+  const LAYERS = new Map<string, readonly string[]>([
+    ["cat-harness", []],
+    ["cat-harness-tools", ["cat-harness"]],
+    ["smart-base", ["cat-harness-tools"]],
+  ]);
+  const LAYER_RULE: LayerRule = {
+    allowed: allowedFromNeeds(
+      LAYERS,
+      ancestorsOf(flattenDependencies([...LAYERS].map(([id, needs]) => ({ id, needs: [...needs], fatal: false }))).order),
+    ),
+  };
+  const verdict = (file: string, to = "smart-base", text = `the ${to} layer, as measured that day`) =>
+    classifyReference(occ("cat-harness", to, text, file), LAYER_RULE, never, [DATED_PROPOSAL_RECORD]).verdict;
+
+  test("a dated record under docs/proposals/ is exempt, whichever layer it names and whatever the line says", () => {
+    expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.md")).toBe("exempt");
+    expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.md", "cat-harness-tools")).toBe("exempt");
+    // The measurement a record carries, beside it.
+    expect(verdict("cat-harness/docs/proposals/placement-audit-2026-10-01.json")).toBe("exempt");
+    // Any instance's proposals, not only the harness's.
+    expect(verdict("cat-harness-tools/docs/proposals/tools-split-2026-10-01.md")).toBe("exempt");
+  });
+
+  test("FAILS for the undated pages beside the records — the index and living proposals are edited, so they are read", () => {
+    expect(verdict("cat-harness/docs/proposals/index.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/README.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/instance-versioning.md")).toBe("wrong-direction");
+  });
+
+  test("FAILS for a date that is not at the end of the name, or is not a date", () => {
+    expect(verdict("cat-harness/docs/proposals/2026-10-12-checkout-layout.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12-draft.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-13-40.md")).toBe("wrong-direction");
+  });
+
+  test("FAILS outside docs/proposals/, in a sub-directory of it, and for a file type a record is not written in", () => {
+    expect(verdict("cat-harness/docs/requirements/checkout-layout-2026-10-12.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/old/checkout-layout-2026-10-12.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/proposals/checkout-layout-2026-10-12.md")).toBe("wrong-direction");
+    expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.ts")).toBe("wrong-direction");
   });
 });
 

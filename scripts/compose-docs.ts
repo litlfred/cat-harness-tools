@@ -707,6 +707,8 @@ export interface ComposeReport {
    * the site carries still stands there (a site not yet regenerated).
    */
   readonly forwards: { written: string[]; superseded: string[] };
+  /** The repository-scoped layers a platform-only shell left out (`platformOnly`), never silently. */
+  readonly leftOut?: DocsLayer[];
 }
 
 /**
@@ -807,6 +809,22 @@ export interface ComposeOptions {
    * tile re-based — never the platform's numbers on someone else's page.
    */
   readonly foreign?: { instance?: string; platformBase?: string; title?: string };
+  /**
+   * A shell of the PLATFORM's chrome only: the repository-scoped layers — the
+   * docs directories the checkout root's own declaration names — are left out
+   * and reported in `leftOut`. Only with `shell`.
+   *
+   * An IG repository's own site (`ig-repo-site`) asks for this. Its shell was
+   * always composed in a folio-assistant checkout (fhir-harness's
+   * `templates/ig-repo-site/folio-site.yml`), whose root declares no docs
+   * layer, so it carried the platform's chrome and nothing of the IG's. Run
+   * from the IG's own checkout, the root's `docs` entry (smart-trust's
+   * `docs/`, the IG's artefact pages and their `assets/`) became an overlay,
+   * and its assets arrived twice: once here, once from `stage-ig-sites`, which
+   * builds that directory into the IG site (`igSite`) and refuses a path the
+   * host already has. That step owns the directory; the shell does not.
+   */
+  readonly platformOnly?: boolean;
 }
 
 /** Is `rel` part of the site's chrome — Jekyll machinery or a static asset — rather than a page? */
@@ -816,7 +834,11 @@ export const isChrome = (rel: string): boolean => {
 };
 
 export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): ComposeReport {
-  const { layers, missing } = docsLayers(repo);
+  if (opts.platformOnly && !opts.shell) throw new Error("compose-docs: platformOnly is a shell's option (--platform-only needs --shell)");
+  const declared = docsLayers(repo);
+  const missing = declared.missing;
+  const leftOut = opts.platformOnly ? declared.layers.filter((l) => l.repositoryScoped) : [];
+  const layers = opts.platformOnly ? declared.layers.filter((l) => !l.repositoryScoped) : declared.layers;
   const withheld = opts.staging === true ? [] : withheldFromCanonical(repo);
   const withheldFiles: string[] = [];
 
@@ -1003,6 +1025,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     aliases,
     forwards,
     ...(scoped ? { scoped } : {}),
+    ...(opts.platformOnly ? { leftOut } : {}),
   };
 }
 
@@ -1022,7 +1045,7 @@ if (import.meta.main) {
   const out = i >= 0 ? argv[i + 1] : undefined;
   if (!out) {
     console.error(
-      "usage: compose-docs.ts --out <dir> [--check] [--staging] [--changed-files <file>] [--shell [--instance <name>] [--title <label>] [--link-root <platform site>]]",
+      "usage: compose-docs.ts --out <dir> [--check] [--staging] [--changed-files <file>] [--shell [--platform-only] [--instance <name>] [--title <label>] [--link-root <platform site>]]",
     );
     process.exit(2);
   }
@@ -1056,6 +1079,11 @@ if (import.meta.main) {
   // not symmetric.
   const staging = argv.includes("--staging");
   const shell = argv.includes("--shell");
+  const platformOnly = argv.includes("--platform-only");
+  if (platformOnly && !shell) {
+    console.error("compose-docs: --platform-only needs --shell");
+    process.exit(2);
+  }
   // `--instance <name> [--title <label>] [--link-root <platform site>]`: whose
   // site the shell is for (#2263). Only meaningful with --shell.
   const opt = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
@@ -1066,8 +1094,11 @@ if (import.meta.main) {
         ...(opt("--link-root") ? { platformBase: opt("--link-root")! } : {}),
       }
     : undefined;
-  const r = compose(resolve(out), REPO, { staging, changedFiles, shell, ...(foreign ? { foreign } : {}) });
+  const r = compose(resolve(out), REPO, { staging, changedFiles, shell, platformOnly, ...(foreign ? { foreign } : {}) });
   if (shell) console.log("  --shell: the chrome only — Jekyll machinery and assets, no page, no composed instance");
+  for (const l of r.leftOut ?? []) {
+    console.log(`  --platform-only: left out ${l.id} (repository) — ${relative(REPO, l.dir)}; the site's own steps compose it`);
+  }
   if (r.scoped) {
     console.log(
       `  --shell: harness data scoped to ${r.scoped.instance ?? "an UNNAMED folio (pass --instance: nothing is then its own)"}; ` +
