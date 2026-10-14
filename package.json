@@ -462,7 +462,7 @@
     "navbar:geometry": "bun run cat-harness-tools/scripts/gen-navbar-geometry-css.ts",
     "navbar:geometry:check": "bun run cat-harness-tools/scripts/gen-navbar-geometry-css.ts --check",
     "navbar:include": "bun run cat-harness-tools/scripts/gen-navbar-include.ts",
-    "navbar:include:check": "bun run cat-harness-tools/scripts/gen-navbar-include.ts --check",
+    "navbar:include:check": "bun run cat-harness-tools/scripts/publish-check.ts navbar:include",
     "ns:check": "bun run cat-harness-tools/scripts/ns-export.ts --check",
     "ns:export": "bun run cat-harness-tools/scripts/ns-export.ts",
     "pages:bootstrap": "bun run cat-harness-tools/scripts/pages-bootstrap.ts",
