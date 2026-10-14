@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -16,18 +16,26 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * The page is the COMMITTED overview page's figure markup (its Liquid
  * `relative_url` resolved, as Jekyll would on a root site), with the
  * committed `uml.css`, `kg-graph.js`, vendored Graphviz and DOT served from
- * the docs tree. So the test agrees with what ships, not with a stand-in
- * (`kg-viewer` §"Verifying it"). Nothing is fetched from a third party: any
- * request off the fixture origin fails the test.
+ * the COMPOSED site: every path is resolved through the instance's site
+ * layers (`siteFileFor`, top-most layer wins), as `compose-docs` lays them
+ * down. Since cat-harness's semantic-subgraphs slice 1 (19e5d6b) the
+ * stylesheet, the script and the vendored Graphviz are the site CHROME's
+ * (`site-chrome/`), while the page and its DOT stay in `docs/`. Serving the
+ * `siteDirFor` directory alone answered 404 for the chrome, so no view was
+ * ever hidden and the interactive view never started. So the test agrees
+ * with what ships, not with a stand-in (`kg-viewer` §"Verifying it").
+ * Nothing is fetched from a third party: any request off the fixture origin
+ * fails the test.
  */
 const ROOT = join(HARNESS_ROOT);
-const SITE = join(ROOT, siteDirFor(ROOT));
+/** A site path (no leading slash) → the file the composed site serves for it. */
+const siteFile = (rel: string) => join(ROOT, siteFileFor(ROOT, rel));
 const ORIGIN = "https://site.example.test";
 const PAGE = "uml/overview/bootstrap";
 
 /** The overview page's figure block, Liquid resolved, in a bare page that loads uml.css. */
 function pageHtml(): string {
-  const md = readFileSync(join(SITE, `${PAGE}.md`), "utf8");
+  const md = readFileSync(siteFile(`${PAGE}.md`), "utf8");
   const start = md.indexOf('<div class="fa-uml-views">');
   const end = md.indexOf("</script>", start) + "</script>".length;
   if (start < 0 || end < start) throw new Error(`${PAGE}.md has no interactive figure block`);
@@ -49,7 +57,7 @@ async function open(page: Page, errors: string[], requests: string[]): Promise<v
       return route.abort();
     }
     if (url.pathname === `/${PAGE}.html`) return route.fulfill({ contentType: "text/html", body: pageHtml() });
-    const file = join(SITE, decodeURIComponent(url.pathname));
+    const file = siteFile(decodeURIComponent(url.pathname).replace(/^\/+/, ""));
     if (!existsSync(file)) return route.fulfill({ status: 404, body: "" });
     const ext = url.pathname.slice(url.pathname.lastIndexOf("."));
     return route.fulfill({ contentType: TYPES[ext] ?? "application/octet-stream", body: readFileSync(file) });
@@ -57,7 +65,7 @@ async function open(page: Page, errors: string[], requests: string[]): Promise<v
   await page.goto(`${ORIGIN}/${PAGE}.html`);
 }
 
-const dotText = () => readFileSync(join(SITE, "assets/img/uml/overview/bootstrap.dot"), "utf8");
+const dotText = () => readFileSync(siteFile("assets/img/uml/overview/bootstrap.dot"), "utf8");
 
 test.describe("UML overview, Interactive view", () => {
   test("is lazy: Graphviz is fetched only when the view is picked, then lays the DOT out", async ({ page }) => {
