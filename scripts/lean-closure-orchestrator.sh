@@ -9,7 +9,7 @@
 #   Phase B — agent walks .lean files and calls
 #             `mcp__lean-lsp__lean_diagnostic_messages` per file, emitting
 #             JSONL to /tmp/lean-diagnostics-<DATE>.jsonl  [AGENT-DRIVEN]
-#   Phase C — `bun run pipeline/lean-compile-audit.ts --ingest <jsonl>`
+#   Phase C — `bun run cat-harness-tools/pipeline/lean-compile-audit.ts --ingest <jsonl>`
 #             then qa-sweep proof-lean-compiles to refresh 629 stale sidecars
 #
 # Resume-safe: each phase is independent. If the container restarts mid-build,
@@ -107,10 +107,10 @@ case "$cmd" in
     set -e
     echo "Phase C.1: ingest $jsonl into lean-compile-diagnostics.json"
     cd "$REPO_ROOT"
-    bun run pipeline/lean-compile-audit.ts --ingest "$jsonl"
+    bun run "$REPO_ROOT/pipeline/lean-compile-audit.ts" --ingest "$jsonl"
     echo ""
     echo "Phase C.2: qa-sweep proof-lean-compiles to refresh sidecars"
-    bun run pipeline/qa-sweep.ts content/quantum-observable-universe \
+    bun run "$REPO_ROOT/pipeline/qa-sweep.ts" content/quantum-observable-universe \
       --only proof-lean-compiles
     echo ""
     echo "Done. Stale sidecar count should drop from 629."
