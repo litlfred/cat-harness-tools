@@ -1,0 +1,217 @@
+# The pull-request checks every harnessed layer runs, as ONE reusable workflow.
+#
+# Owner, 2026-10-14 ("1"): a layer is judged on its own pull requests by one
+# workflow the harness owns, called from each layer, rather than a copy per
+# layer. Until then only cat-harness-tools, folio-assistant-core, who-iris and
+# bootstrap-tools had pull-request CI. The rest (smart-base, smart-trust,
+# smart-immunizations, fhir-harness, folio-assistant-sci, bootstrap,
+# cat-harness) were judged by nothing until folio-assistant re-pinned them:
+# the 2026-10-06 "defined, not run on events" ruling for the WHO forks
+# switched their harness gates off with their IG builds, and the
+# initialization process never installed any pull-request checks.
+#
+# Generalised from folio-assistant-core's `pr-checks.yml` (14ed7ad), whose
+# layout is this repository's `pr-tests.yml`: check out the folio-assistant
+# index, mount every instance from its `index.lock.json`, take the lower
+# layers at main, and put THE CALLER (at the ref under test) in place of its
+# locked mount. Three judgements:
+#   - Typecheck, on the PR, when the instance carries a tsconfig.json.
+#   - Tests (no new failures): the instance's tests on main and on the PR;
+#     fails only on a test the PR newly breaks.
+#   - Gates (no new failures): the harness's graph checks over the instance
+#     and its own `check:*` / `*:check` scripts, on main and on the PR; fails
+#     only on a gate the PR newly breaks (`run-gates.py`).
+# A gate or test already red on main is listed in the step summary, never
+# hidden and never counted against the PR.
+#
+# A caller is about fifteen lines:
+#
+#   on: { pull_request: {}, workflow_dispatch: {} }
+#   permissions: { contents: read }
+#   jobs:
+#     checks:
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
+#       with:
+#         instance: smart-base      # its directory in the index
+#         path-in-repo: smart-base  # where it sits in the caller ('.' for the root)
+
+name: Layer PR checks
+
+on:
+  workflow_call:
+    inputs:
+      instance:
+        description: "The instance's directory in the folio-assistant index (its mount path)."
+        required: true
+        type: string
+      path-in-repo:
+        description: "Where the instance sits in the calling repository; '.' for the repository root."
+        required: false
+        type: string
+        default: "."
+      layers-at-main:
+        description: "Lower layers taken at main instead of the lock (the caller is never replaced)."
+        required: false
+        type: string
+        default: "cat-harness cat-harness-tools"
+      state-graphs:
+        description: "Branch-kept graphs to mount before tests and gates; each must come back mounted."
+        required: false
+        type: string
+        default: "beans todos fsh-guts"
+      tools-ref:
+        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
+        required: false
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - &checkout-index
+        name: Check out the folio-assistant index
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/folio-assistant
+          path: fa
+      - &setup-bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - &mount
+        name: Mount every instance from the index lock
+        run: bash fa/.github/mount-from-lock.sh --root fa
+      - &lower-layers-main
+        name: Take the lower layers at main
+        env:
+          LAYERS: ${{ inputs.layers-at-main }}
+          INSTANCE: ${{ inputs.instance }}
+        run: |
+          for r in $LAYERS; do
+            [ "$r" = "$INSTANCE" ] && continue
+            rm -rf "fa/$r"
+            git clone -q --depth 1 "https://github.com/litlfred/$r" "fa/$r"
+            rm -rf "fa/$r/.git"
+          done
+      - name: Check out the PR
+        uses: actions/checkout@v4
+        with:
+          path: src
+      - &swap
+        # A directory holding its own `.git` inside the index checkout is a
+        # FOREIGN checkout to `instanceRootsIn`, so it would not be discovered
+        # as an instance. Lock mounts carry no `.git`; the swapped-in copy is
+        # made to look the same.
+        name: Put the caller in place of its locked mount
+        env:
+          INSTANCE: ${{ inputs.instance }}
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -euo pipefail
+          rm -rf "fa/$INSTANCE"
+          if [ "$SUBDIR" = "." ]; then mv src "fa/$INSTANCE"; else mv "src/$SUBDIR" "fa/$INSTANCE"; fi
+          rm -rf "fa/$INSTANCE/.git"
+          test -f "fa/$INSTANCE/$INSTANCE.json" || { echo "::error::fa/$INSTANCE/$INSTANCE.json is missing: is path-in-repo right?"; exit 2; }
+      - &install
+        name: Install
+        working-directory: fa
+        run: bun install
+      - name: tsc --noEmit
+        working-directory: fa/${{ inputs.instance }}
+        run: |
+          if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+
+  run:
+    name: ${{ matrix.side }} — tests and gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
+    steps:
+      - *checkout-index
+      - *setup-bun
+      - *mount
+      - *lower-layers-main
+      - name: Check out the caller (base or head)
+        uses: actions/checkout@v4
+        with:
+          path: src
+          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || github.event.repository.default_branch) || '' }}
+      - name: The judging scripts, the same on both sides
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ inputs.tools-ref }}
+          path: ci
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - *swap
+      - *install
+      - name: Mount the graphs kept on branches
+        # Tests and gates read them and refuse an unmounted copy; each must
+        # come back `mounted`.
+        working-directory: fa
+        env:
+          GRAPHS: ${{ inputs.state-graphs }}
+        run: |
+          for id in $GRAPHS; do
+            bun cat-harness-tools/scripts/state-mount.ts --id "$id" --json > "$RUNNER_TEMP/mount-$id.json"
+            python3 - "$RUNNER_TEMP/mount-$id.json" "$id" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          bad = [g for g in d.get("graphs", []) if g.get("state") != "mounted"]
+          if d.get("state") != "mounted" or bad or not d.get("graphs"):
+              print(f"::error::{sys.argv[2]} did not mount: {json.dumps(d)}")
+              sys.exit(1)
+          print(f"{sys.argv[2]}: mounted")
+          PY
+          done
+      - name: bun test
+        working-directory: fa
+        # Judged by the compare job, not by this exit code.
+        run: |
+          bun test "./${{ inputs.instance }}" --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
+          test -s "$RUNNER_TEMP/junit.xml"
+      - name: Gates
+        # Judged by the compare job, not by this exit code.
+        run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "${{ inputs.instance }}" "$RUNNER_TEMP/gates.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.side }}
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/gates.json
+
+  compare:
+    name: No new failures (tests and gates)
+    needs: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ inputs.tools-ref }}
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        run: python3 .github/scripts/layer-pr-checks/compare-test-failures.py results/results-base/junit.xml results/results-head/junit.xml
+      - name: Gates
+        id: gates
+        continue-on-error: true
+        run: python3 .github/scripts/layer-pr-checks/compare-gates.py results/results-base/gates.json results/results-head/gates.json
+      - name: Verdict
+        if: steps.tests.outcome != 'success' || steps.gates.outcome != 'success'
+        run: |
+          echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }} — see the step summary"
+          exit 1
