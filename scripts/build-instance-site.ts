@@ -287,6 +287,29 @@ function jekyllExe(): string {
   return "jekyll";
 }
 
+/**
+ * Keep a MOUNTED file as pinned across a build that rewrites it.
+ *
+ * `sync-docs-harness` writes the tiles into `cat-harness/docs/_data/harness.json`,
+ * which every later step (landing data, chrome, rail) reads. In a folio that
+ * mounts cat-harness, that file is part of a pinned layer: rewriting it left the
+ * mount no longer matching index.lock.json, so the NEXT build's mount step
+ * refused (`cat-harness/ modified`) until the mount was laid down again by hand
+ * (litlfred/dth-hrh, 2026-10-14). Returns the function that puts the pinned
+ * bytes back, or removes the file if there was none; a no-op when `path` is not
+ * inside a mount (cat-harness building its own site commits the file).
+ */
+export function keepPinned(path: string, mountDirs: readonly string[], root: string): () => void {
+  const rel = relative(resolve(root), resolve(path));
+  const inMount = mountDirs.some((m) => rel === m || rel.startsWith(`${m}/`));
+  if (!inMount) return () => {};
+  const pinned = existsSync(path) ? readFileSync(path) : undefined;
+  return () => {
+    if (pinned === undefined) rmSync(path, { force: true });
+    else writeFileSync(path, pinned);
+  };
+}
+
 export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string; base: string }> {
   const root = resolve(o.root);
   const declFile = findDeclarationFile(root);
@@ -326,42 +349,50 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
-  run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
-  const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
-  run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
-  run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
-  if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-  for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
-
-  // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
-  const harness = join(root, "cat-harness");
-  // Bundler writes Gemfile.lock beside the Gemfile: copy it out, so the mount stays as pinned.
-  const gemDir = join(out, "gems");
-  mkdirSync(gemDir, { recursive: true });
-  for (const f of ["Gemfile", "Gemfile.lock"]) {
-    const src = join(harness, siteFileFor(harness, f));
-    if (existsSync(src)) copyFileSync(src, join(gemDir, f));
-  }
-  writeFileSync(join(out, "build-config.yml"), buildConfig(readFileSync(join(docs, "_config.yml"), "utf-8")));
-  writeFileSync(
-    join(out, "override.yml"),
-    overrideConfig({ title, description: decl.description, baseurl, url: `https://${gh.owner}.github.io` }),
-  );
-  run("bundle install", "bundle install >/dev/null", gemDir);
-  run(
-    "jekyll",
-    `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe()} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
-    gemDir,
-  );
-
+  // The harness data the build rewrites lives in the cat-harness mount: put the pinned
+  // bytes back afterwards, failed build or not, so the mount stays as the lock pins it.
+  const harnessDir = join(root, "cat-harness");
+  const restoreHarnessData = keepPinned(join(harnessDir, siteFileFor(harnessDir, "_data/harness.json")), mounted, root);
   const s = JSON.stringify(site);
-  for (const st of o.siteSteps ?? []) run(`site: ${st}`, `bun run ${st} ${s}`, root);
-  run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
-  run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
-  run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
-  run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
-  run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}`, root);
+  try {
+    run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
+    run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
+    const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
+    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
+    run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
+    if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
+    for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
+
+    // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
+    const harness = join(root, "cat-harness");
+    // Bundler writes Gemfile.lock beside the Gemfile: copy it out, so the mount stays as pinned.
+    const gemDir = join(out, "gems");
+    mkdirSync(gemDir, { recursive: true });
+    for (const f of ["Gemfile", "Gemfile.lock"]) {
+      const src = join(harness, siteFileFor(harness, f));
+      if (existsSync(src)) copyFileSync(src, join(gemDir, f));
+    }
+    writeFileSync(join(out, "build-config.yml"), buildConfig(readFileSync(join(docs, "_config.yml"), "utf-8")));
+    writeFileSync(
+      join(out, "override.yml"),
+      overrideConfig({ title, description: decl.description, baseurl, url: `https://${gh.owner}.github.io` }),
+    );
+    run("bundle install", "bundle install >/dev/null", gemDir);
+    run(
+      "jekyll",
+      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe()} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
+      gemDir,
+    );
+
+    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `bun run ${st} ${s}`, root);
+    run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
+    run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
+    run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
+    run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
+    run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}`, root);
+  } finally {
+    restoreHarnessData();
+  }
   writeFileSync(join(site, ".nojekyll"), "");
 
   const links = await checkLinks(site, `${baseurl}/`);

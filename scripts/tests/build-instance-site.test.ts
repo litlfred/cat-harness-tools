@@ -56,3 +56,45 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
     expect(() => siteFields("{}", "x.json")).toThrow(/declares no name/);
   });
 });
+
+describe("keepPinned — a build leaves a mounted layer as the lock pins it (litlfred/dth-hrh, 2026-10-14)", () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const { tmpdir } = require("node:os") as typeof import("node:os");
+  const { keepPinned } = require("../build-instance-site.ts") as typeof import("../build-instance-site.ts");
+
+  const setup = () => {
+    const root = mkdtempSync(join(tmpdir(), "keep-pinned-"));
+    mkdirSync(join(root, "cat-harness/docs/_data"), { recursive: true });
+    return root;
+  };
+
+  test("puts a mounted file's pinned bytes back after it is rewritten", () => {
+    const root = setup();
+    const f = join(root, "cat-harness/docs/_data/harness.json");
+    writeFileSync(f, "pinned");
+    const restore = keepPinned(f, ["cat-harness"], root);
+    writeFileSync(f, "rewritten by sync-docs-harness");
+    restore();
+    expect(readFileSync(f, "utf-8")).toBe("pinned");
+  });
+
+  test("removes a mounted file the build created", () => {
+    const root = setup();
+    const f = join(root, "cat-harness/docs/_data/harness.json");
+    const restore = keepPinned(f, ["cat-harness"], root);
+    writeFileSync(f, "created");
+    restore();
+    expect(existsSync(f)).toBe(false);
+  });
+
+  test("leaves a file outside every mount alone (cat-harness building its own site commits it)", () => {
+    const root = setup();
+    const f = join(root, "cat-harness/docs/_data/harness.json");
+    writeFileSync(f, "old");
+    const restore = keepPinned(f, ["smart-base"], root);
+    writeFileSync(f, "new");
+    restore();
+    expect(readFileSync(f, "utf-8")).toBe("new");
+  });
+});
