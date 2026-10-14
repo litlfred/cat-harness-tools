@@ -132,3 +132,18 @@ describe("a text source is shown by its own headings, not as a PDF (litlfred/dth
     expect(v?.variant).toBe("pdf");
   });
 });
+
+describe("plainHeading — a text heading as a reader sees it (litlfred/dth-hrh)", () => {
+  const { plainHeading } = require("../lib/library-document.ts") as typeof import("../lib/library-document.ts");
+  test("strips emphasis and escapes, keeps the words", () => {
+    expect(plainHeading("**Chapter 1\\. Why Digital Health Workforce Registries Matter**")).toBe("Chapter 1. Why Digital Health Workforce Registries Matter");
+    expect(plainHeading("**1.1 Global challenges**")).toBe("1.1 Global challenges");
+    expect(plainHeading("__Part 0\\. Introduction__")).toBe("Part 0. Introduction");
+    expect(plainHeading("The *FHIR* `Practitioner` resource")).toBe("The FHIR Practitioner resource");
+  });
+  test("an escaped star stays a star; words with underscores are untouched", () => {
+    expect(plainHeading("Rating \\*\\*\\* stars")).toBe("Rating *** stars");
+    expect(plainHeading("HWF_Registry_DTH_Outline.md")).toBe("HWF_Registry_DTH_Outline.md");
+    expect(plainHeading("Plain heading")).toBe("Plain heading");
+  });
+});

@@ -186,6 +186,27 @@ export function extractOf(text: string | null, max = EXTRACT_CHARS): { extract: 
  * The document view of one entry directory, or null when it carries no
  * `structure.json`. `withheld` suppresses every verbatim extract.
  */
+/**
+ * A text or notebook heading as a reader should SEE it: inline Markdown
+ * emphasis (`**…**`, `__…__`, `*…*`, `_…_`, `` `…` ``) and backslash escapes
+ * (`1\.`) removed. Display only: the text rung keeps the source verbatim in
+ * structure.json and sections/*.md, and so does this view's data for a PDF.
+ * The words are unchanged, so matching a heading to a folio section (which
+ * compares letters and digits only) is unaffected (litlfred/dth-hrh).
+ */
+export function plainHeading(t: string): string {
+  // Escapes are held aside first, so an escaped "\*" is never read as emphasis.
+  const held: string[] = [];
+  const hold = (c: string) => `\u0000${held.push(c) - 1}\u0000`;
+  return t
+    .replace(/\\([\\`*_{}\[\]()#+\-.!|>~])/g, (_m, c: string) => hold(c))
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?![\w*])/g, "$1$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\u0000(\d+)\u0000/g, (_m, i: string) => held[Number(i)]!)
+    .trim();
+}
+
 export function readEntryDocument(dir: string, id: string, opts: { withheld?: boolean; links?: EntryLinks } = {}): DocumentView | null {
   // Through the shared accessor (bean rkqp): it knows every structure
   // variant. A pdf structure carries the TOC, pages and figures this view
@@ -198,7 +219,7 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
         metadata: { title: read.title ?? undefined },
         toc_source: (read.raw as { toc_source?: string }).toc_source,
         sections: read.sections.map((x) => ({
-          id: x.id, number: x.number, title: x.title, level: x.level, n_words: x.n_words,
+          id: x.id, number: x.number, title: plainHeading(x.title), level: x.level, n_words: x.n_words,
           page_start: x.locator.kind === "pages" ? x.locator.start : null,
           page_end: x.locator.kind === "pages" ? x.locator.end : null,
         })),
