@@ -208,6 +208,16 @@ describe("the pages to review (deep links, bean g4dv)", () => {
     expect(body).toContain(`[before](${MAIN}a.html)`);
   });
 
+  test("pages come before data files, so the capped rows are the ones a reviewer reads", () => {
+    const s = reviewSection(STAGING, MAIN, [
+      impact([
+        { path: "assets/a.css", change: "changed", role: "data" },
+        { path: "z/page.html", change: "changed", role: "content" },
+      ]),
+    ]);
+    expect(s.indexOf("z/page.html")).toBeLessThan(s.indexOf("assets/a.css"));
+  });
+
   test("readImpact: one impact or an array; anything else is undefined", () => {
     const dir = mkdtempSync(join(tmpdir(), "gate-i-"));
     const one = join(dir, "one.json");

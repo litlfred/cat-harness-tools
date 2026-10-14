@@ -217,20 +217,23 @@ export function reviewSection(staging: string, main: string, impact: readonly Re
   const rows: string[] = [];
   let index = 0;
   const unknown: string[] = [];
-  for (const imp of impact) {
-    index += imp.files.filter((f) => f.role === "index").length;
-    for (const f of reviewList(imp)) {
-      for (const a of f.anchors?.length ? f.anchors : [undefined]) {
-        const frag = a === undefined ? "" : `#${encodeURIComponent(a)}`;
-        const label = `\`${f.path}${a === undefined ? "" : ` › ${a}`}\``;
-        if (f.change === "removed") rows.push(`- removed: ${label} · [before](${main}${f.path}${frag})`);
-        else if (f.change === "added") rows.push(`- [${label}](${staging}${f.path}${frag}) · (new page)`);
-        else rows.push(`- [${label}](${staging}${f.path}${frag}) · [before](${main}${f.path}${frag})`);
-      }
+  // Pages before data (CSS, JSON, images), so the 20 rows shown are the ones
+  // a reviewer reads; each group stays in path order.
+  const files = impact
+    .flatMap((imp) => reviewList(imp))
+    .sort((x, y) => Number(x.role !== "content") - Number(y.role !== "content") || x.path.localeCompare(y.path));
+  for (const imp of impact) index += imp.files.filter((f) => f.role === "index").length;
+  for (const f of files) {
+    for (const a of f.anchors?.length ? f.anchors : [undefined]) {
+      const frag = a === undefined ? "" : `#${encodeURIComponent(a)}`;
+      const label = `\`${f.path}${a === undefined ? "" : ` › ${a}`}\``;
+      if (f.change === "removed") rows.push(`- removed: ${label} · [before](${main}${f.path}${frag})`);
+      else if (f.change === "added") rows.push(`- [${label}](${staging}${f.path}${frag}) · (new page)`);
+      else rows.push(`- [${label}](${staging}${f.path}${frag}) · [before](${main}${f.path}${frag})`);
     }
-    for (const u of imp.undetermined) {
-      unknown.push(`- \`${u.input}\` — ${u.scope === "all" ? "can change any page" : "changes pages not mapped one by one"}: ${u.reason}`);
-    }
+  }
+  for (const u of impact.flatMap((imp) => imp.undetermined)) {
+    unknown.push(`- \`${u.input}\` — ${u.scope === "all" ? "can change any page" : "changes pages not mapped one by one"}: ${u.reason}`);
   }
   const json = `[rendered-impact.json](${staging}rendered-impact.json)`;
   const indexNote = index ? ` (and ${index} index file(s), not listed)` : "";
