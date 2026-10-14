@@ -710,16 +710,41 @@ function tileFor(
     return under === undefined ? undefined : publishedUrlOf(`${decl.name}/${ref.slice(under.length)}`);
   };
 
+  // A FOLIO WHOSE WHOLE SITE IS GENERATED (litlfred/smart-ra): it is the
+  // checkout's root, has no site directory on disk, and its viewers are pages
+  // its declared `writer`s build into the site source at publish. Such a ref
+  // IS the page's site path — the rule core's `landingLinks` already links the
+  // landing by. Without it every Folders row on that site read "viewer not
+  // published" over pages the site serves (owner, 2026-10-14).
+  const generatedSite = isRepoRoot && isGeneratedSite(instanceDir);
+  const generatedRefOf = (v: { ref: string; writer?: readonly string[] }): string | undefined =>
+    generatedSite ? generatedPageOf(repoRoot, v) : undefined;
+
   const declared = new Map<string, string>();
   for (const d of dirs) {
     for (const v of visualisationsOf(d.coverage, d.id)) {
       // Built at publish (bean 0b8c) counts as present: its page is never
       // committed, and the answer must not depend on a local copy.
       if (!visualisationResolves(v, (p) => existsSync(join(repoRoot, p)))) continue;
-      const page = publishedRefOf(v.ref);
+      const page = publishedRefOf(v.ref) ?? generatedRefOf(v);
       if (page === undefined) continue;
       for (const kind of d.graphTypologies ?? []) {
         if (!declared.has(kind)) declared.set(kind, page);
+      }
+    }
+  }
+
+  // ...and on such a site the DIRECTORY'S OWN declaration counts as well:
+  // `withViewers` puts a harness's viewer in its place (cat-harness's
+  // archimate viewer over smart-ra's `archimate/`), which that site never
+  // builds, while the folio's own declared page is the one it serves.
+  if (generatedSite) {
+    for (const d of instanceDirectories(instanceDir)) {
+      for (const v of visualisationsOf(d.coverage, d.id)) {
+        if (v.publish === "staging-only" || !visualisationResolves(v, (p) => existsSync(join(repoRoot, p)))) continue;
+        const page = generatedRefOf(v);
+        if (page === undefined) continue;
+        for (const kind of d.graphTypologies ?? []) if (!declared.has(kind)) declared.set(kind, page);
       }
     }
   }
@@ -1530,6 +1555,34 @@ export function solveCrop(r: { x: number; y: number; w: number; h: number }): {
     left: +((-100 * r.x) / r.w).toFixed(4),
     top: +((-100 * r.y) / r.h).toFixed(4),
   };
+}
+
+/**
+ * Is this checkout-root instance's site GENERATED — no authored site on disk,
+ * every page written into the site source at publish (litlfred/smart-ra)?
+ *
+ * "Authored" is a Jekyll config or a home page, not the directory existing:
+ * the build's own `gen-landing-data` step writes `docs/_data/stickies.json`
+ * into such a checkout before `compose-docs` runs, and a test on the
+ * directory alone flipped the answer mid-build — the Folders rows then
+ * linked to the platform (found on smart-ra's preview, 2026-10-14).
+ */
+export function isGeneratedSite(instanceDir: string): boolean {
+  const site = join(instanceDir, siteDirFor(instanceDir));
+  return !["_config.yml", "index.md", "index.html"].some((f) => existsSync(join(site, f)));
+}
+
+/**
+ * On a generated site, the published path of a viewer its `writer` builds:
+ * the ref IS the site path (core's `landingLinks` rule). Undefined for a ref
+ * on disk, one with no writer, or one that is absolute or climbs out. The
+ * one rule `harnessTiles` and `foreign-site-scope`'s `rootOwnPages` share, so
+ * the Folders row and the scope that keeps it on this site cannot disagree.
+ */
+export function generatedPageOf(repoRoot: string, v: { ref: string; writer?: readonly string[] }): string | undefined {
+  if (v.writer === undefined || v.ref.startsWith("/") || v.ref.split("/").includes("..")) return undefined;
+  if (existsSync(join(repoRoot, v.ref))) return undefined;
+  return publishedUrlOf(v.ref);
 }
 
 export function publishedUrlOf(relPathUnderSite: string): string {
