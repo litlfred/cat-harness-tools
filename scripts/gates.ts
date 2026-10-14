@@ -36,10 +36,12 @@
  * that session. Default is the fast set; `--all` adds the rest.
  *
  * The rule is the predicate, never a job's name, and it moves jobs when the
- * workflow does. B1 (owner, 2026-10-14) gave `typescript-test` a Chromium
- * install, because `derive:publish` draws the publish-time BPMN pages its
- * tests read; so `bun test` is in `--all` from then on, beside the other
- * browser job, and the fast set is the jobs that still need no browser.
+ * workflow does. B1 (owner, 2026-10-14) needs Chromium to draw the
+ * publish-time BPMN pages `bun test` reads. Installed in `typescript-test`, it
+ * moved `bun test` out of the fast set; so the owner moved the page build out
+ * instead ("Move the page build out"): the `publish-pages` job installs
+ * Chromium and runs `derive:publish`, the test shards restore its artifact
+ * and install no browser, and `bun test` stays in the inner loop.
  *
  * ## The vacuity guard
  *
