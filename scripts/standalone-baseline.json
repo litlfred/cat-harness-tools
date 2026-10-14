@@ -271,6 +271,7 @@
         "test/coordinator/gates-workflows.test.ts > every workflow step is accounted for > no step CI runs is unclassified",
         "test/coordinator/gates-workflows.test.ts > every workflow step is accounted for > the foreign-step reader finds steps — an empty read is not a clean one",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > `--all` is a superset of the fast set, and strictly larger",
+        "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > a job is in the fast set exactly when it installs no browser — asked of the job, never of its name",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > each gate carries the step name the Actions UI shows",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > every browser-free job contributes, so a split cannot silently shrink the set",
         "test/coordinator/gates-workflows.test.ts > the gates come from the workflow, not from a list > every extracted command is a bun invocation, in workflow order",

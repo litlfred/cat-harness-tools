@@ -72,6 +72,7 @@ import { join, resolve } from "node:path";
 
 import { checkoutRootFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { parse } from "yaml";
 
 import { distortions } from "./check-environment.ts";
@@ -230,6 +231,19 @@ function declaredExemptions(root: string = checkoutRootFor(resolve(HARNESS_ROOT)
   const scripts: ScriptExemption[] = [];
   for (const instance of instanceRootsIn(root)) {
     const g = readDeclaration(instance)?.gateExemptions;
+    steps.push(...(g?.steps ?? []));
+    scripts.push(...(g?.scripts ?? []));
+  }
+  // And the INDEX's, for the steps of its own workflows: the index owns
+  // `.github/workflows/`, so it declares their exemptions in the same change
+  // as the step (cat-harness `GateExemptionsSchema`, `index.config.json`).
+  // Declared from a layer instead, an exemption landed ahead of its step and
+  // matched nothing CI ran on the next re-pin (`qa:publish --add`). An index
+  // that does not parse is a fault, never "no exemptions".
+  const index = readIndexConfig(root);
+  if (index.state === "unreadable") throw new Error(`gates: ${index.file} is unreadable (${index.why}), so its gate exemptions cannot be read`);
+  if (index.state === "ok") {
+    const g = (index.config as { gateExemptions?: { steps?: StepExemption[]; scripts?: ScriptExemption[] } }).gateExemptions;
     steps.push(...(g?.steps ?? []));
     scripts.push(...(g?.scripts ?? []));
   }
@@ -1017,21 +1031,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason:
       "a BUILD step: the site builds rewrite docs/_data/harness.json with this build's live tile counts; " +
       "its verdict is `docs:harness:check` (publish:check docs:harness) in the gate set, which runs the same writer",
-  },
-  {
-    // The daily health sweep keeps its report on a state branch
-    // (`cat/cat-harness/health`; owner, 2026-10-11: "move health to state
-    // branch now"), so health-check.yml writes it there through the mount.
-    // A PUBLISH from a job holding `contents: write`: it pushes, and there is
-    // no tree to judge — the report is a fact about the deployed site and the
-    // repository's open work on that day. `state:push`'s splice (only what
-    // changed, onto the tip, never a force-push) is pinned by state-push.test.ts
-    // in `bun test`.
-    match: "bun run cat state:push -- --id health",
-    kind: "ci-only",
-    reason:
-      "a WRITE of the daily health report to its state branch from a `contents: write` job, not a check; " +
-      "the splice it performs is pinned by state-push.test.ts in `bun test`",
   },
 ];
 
