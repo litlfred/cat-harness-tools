@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { clearCheckoutCache } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { tools } from "@litlfred/cat-harness/tools/index.js";
+import { tools as layerTools } from "../tools/index.js";
 import { registerDeclaredToolGroups, toolGroupsFromNodes } from "./tool-groups.js";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -50,6 +51,42 @@ describe("tool groups derived from Tool nodes (zmdo)", () => {
     const [o] = await registerDeclaredToolGroups({}, [{ id: "none", module: "src/no-content-adapter.ts", layer: "harness" }], ROOT);
     expect(o.state).toBe("failed");
     expect(o.state === "failed" && o.detail).toContain("exports no register");
+  });
+});
+
+/**
+ * The Tool nodes THIS layer declares (`tools/index.ts`): a node whose
+ * in-process module is code here is declared here, so its module path is
+ * relative to this layer and names no other instance (owner, 2026-10-14). A
+ * declared MCP name ending in `*` is a family (`workflow_*`): every name the
+ * registrar serves must fall in it, and it must serve at least one.
+ */
+describe("this layer's own Tool nodes are served from this layer", () => {
+  const nodes = layerTools();
+
+  test("it declares bpmn-engine, and no in-process module climbs out of the layer", () => {
+    expect(nodes.map((n) => n.id)).toContain("bpmn-engine");
+    for (const n of nodes) {
+      const m = n.invoke?.inProcess?.module;
+      if (m !== undefined) expect({ id: n.id, module: m, climbs: m.startsWith("../") || m.startsWith("/") }).toEqual({ id: n.id, module: m, climbs: false });
+    }
+  });
+
+  test("each group registers exactly the names its nodes declare, a family by prefix", async () => {
+    const groups = toolGroupsFromNodes(nodes, "cat-harness-tools");
+    expect(groups.length).toBeGreaterThan(0);
+    for (const g of groups) {
+      const { names, server } = recordingServer();
+      const [o] = await registerDeclaredToolGroups(server, [g], ROOT, [ROOT]);
+      expect(o).toEqual({ id: g.id, state: "registered" });
+      const declared = nodes.filter((n) => n.invoke?.inProcess?.module === g.module && n.invoke?.mcp).map((n) => n.invoke!.mcp!.tool);
+      const families = declared.filter((d) => d.endsWith("*")).map((d) => d.slice(0, -1));
+      const exact = declared.filter((d) => !d.endsWith("*"));
+      const covered = (n: string) => exact.includes(n) || families.some((f) => n.startsWith(f));
+      expect({ module: g.module, undeclared: names.filter((n) => !covered(n)).sort() }).toEqual({ module: g.module, undeclared: [] });
+      expect({ module: g.module, unserved: exact.filter((d) => !names.includes(d)) }).toEqual({ module: g.module, unserved: [] });
+      expect({ module: g.module, emptyFamilies: families.filter((f) => !names.some((n) => n.startsWith(f))) }).toEqual({ module: g.module, emptyFamilies: [] });
+    }
   });
 });
 
