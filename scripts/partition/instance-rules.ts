@@ -391,6 +391,7 @@ export const RULES: Rule[] = [
       "schemas/tool.ts",                     // what a Tool IS — `tools` is a harness graph typology
       "schemas/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
       "schemas/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
+      "schemas/built-at-publish.ts",         // what an instance serves and never commits — read by the declaration schema itself (B1)
       "schemas/tool-types.ts",               // the Tool I/O type vocabulary
       "schemas/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
