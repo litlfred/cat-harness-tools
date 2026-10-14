@@ -55,6 +55,10 @@ export default table({ label: "tbl:tb1", title: "Tb", caption: "c", data: { head
   block("ch1", "ch1", `import { chapter } from "__BUILDERS__";
 export default chapter({ title: "Ch", sections: [{ title: "S", blocks: ["t1"] }] });
 `);
+  // A dependency's kind (smart-base's `persona`): a block only when the
+  // caller passes the contributed kinds.
+  block("ch1", "pers1", `export default { kind: "persona", label: "pers:p1", title: "P" };
+`);
   // A block that throws on import. Must be REPORTED, not skipped.
   block("ch1", "broken", `import { theorem } from "__BUILDERS__";
 export default theorem({ label: "NOT-A-VALID-PREFIX", title: "B", statement: "s" });
@@ -93,6 +97,14 @@ describe("loadBlocksUnder sees every block kind", () => {
     expect(failures.length).toBe(1);
     expect(failures[0].file).toContain("broken.ts");
     expect(failures[0].error.length).toBeGreaterThan(0);
+  });
+});
+
+describe("loadBlocksUnder and contributed kinds", () => {
+  test("a contributed kind is a block only when the caller names it", async () => {
+    expect((await loadBlocksUnder(root)).blocks.has("pers:p1")).toBe(false);
+    const { blocks } = await loadBlocksUnder(root, new Set(["persona"]));
+    expect(blocks.get("pers:p1")?.kind).toBe("persona");
   });
 });
 
