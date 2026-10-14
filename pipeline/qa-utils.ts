@@ -1126,7 +1126,7 @@ function makeFailureReporter(opts: WalkBlocksOptions): FailureReporter {
           `      source-text identity, so nothing is skipped — but none of them was\n` +
           `      verified. If this is the whole corpus, the cause is usually a folio\n` +
           `      checked out without its platform symlink (<folio>/folio-assistant).\n` +
-          `      Run: bun run pipeline/verify-block-walk.ts <content-root>`,
+          `      Run: bun run cat-harness-tools/pipeline/verify-block-walk.ts <content-root>`,
       );
     }
   };

@@ -13,6 +13,7 @@
     "src/**/*.ts",
     "adapters/**/*.ts",
     "scripts/**/*.ts",
+    "scripts/**/*.d.mts",
     "types/**/*.d.ts",
     "test/**/*.ts",
     "pipeline/**/*.ts",

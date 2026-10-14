@@ -664,8 +664,8 @@ if (import.meta.main) {
   if (!existsSync(mainTex)) {
     console.error(
       `[latex-preflight] main.tex not found at ${mainTex}.\n` +
-        `  Generate it first: bun run pipeline/build.ts ` +
-        `<paper>.ts --generate-main --main-out ../main.tex`,
+        `  Generate it first: bun run cat-harness-tools/pipeline/build.ts ` +
+        `<paper>.ts --generate-main --main-out main.tex`,
     );
     process.exit(2);
   }

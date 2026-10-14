@@ -49,7 +49,7 @@ function main(): number {
   const site = at("--site");
   const built = at("--built");
   if (!site || !built) {
-    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--foreign-site [--home-label <name>] [--instance <name>]]");
+    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--foreign-site [--home-label <name>] [--instance <name> [--landing]]]");
     return 2;
   }
   // `--foreign-site`: the site is a FOLIO's, not the platform's (folio-staging.yml).
@@ -57,7 +57,13 @@ function main(): number {
   // of the platform's mount routes exist here to be left alone.
   const homeLabel = at("--home-label");
   const foreign: ForeignSiteRail | undefined = argv.includes("--foreign-site")
-    ? { platformBase: DOCS_SITE_BASE.replace(/\/$/, ""), ...(homeLabel ? { homeLabel } : {}), ...(at("--instance") ? { instance: at("--instance")! } : {}) }
+    ? {
+        platformBase: DOCS_SITE_BASE.replace(/\/$/, ""),
+        ...(homeLabel ? { homeLabel } : {}),
+        ...(at("--instance") ? { instance: at("--instance")! } : {}),
+        // `--landing`: the checkout declares no instance; `--instance` is only the harness it lands on.
+        ...(argv.includes("--landing") ? { landing: true } : {}),
+      }
     : undefined;
   const siteAbs = resolve(site);
   if (!existsSync(siteAbs)) {
