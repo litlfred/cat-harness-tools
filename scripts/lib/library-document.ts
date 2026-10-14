@@ -181,8 +181,10 @@ function sectionText(path: string, markdown = false): string | null {
  * A Markdown section body as one line of plain text, for an extract: the
  * section's own opening heading dropped (the view already shows it as the
  * title), heading, quote and bullet markers and fence lines removed, links
- * and images reduced to their text, and each line's emphasis and escapes
- * removed by `plainHeading`. Display only; sections/*.md stays verbatim.
+ * and images reduced to their text, a table's delimiter row dropped and each
+ * row read as its non-empty cells joined by "; " (the twg-outline's "Handbook
+ * at a glance" showed its pipes), and each line's emphasis and escapes removed
+ * by `plainHeading`. Display only; sections/*.md stays verbatim.
  */
 export function plainMarkdown(md: string): string {
   const lines = md.replace(/\r\n?/g, "\n").split("\n");
@@ -191,7 +193,8 @@ export function plainMarkdown(md: string): string {
   if (/^ {0,3}#{1,6}(\s|$)/.test(lines[i] ?? "")) i++;
   return lines
     .slice(i)
-    .filter((l) => !/^\s*(```|~~~)/.test(l) && !/^\s*([-*_]\s*){3,}$/.test(l))
+    .filter((l) => !/^\s*(```|~~~)/.test(l) && !/^\s*([-*_]\s*){3,}$/.test(l) && !TABLE_DELIMITER.test(l))
+    .map((l) => (/^\s*\|/.test(l) ? tableRow(l) : l))
     .map((l) =>
       plainHeading(
         l.replace(/^ {0,3}#{1,6}\s+/, "")
@@ -202,6 +205,15 @@ export function plainMarkdown(md: string): string {
           .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"),
       ))
     .join(" ");
+}
+
+/** A GFM table's delimiter row: `| :--- | ---: |`, with or without the outer pipes. */
+const TABLE_DELIMITER = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+/** A table row as its non-empty cells, joined by "; ". `\|` inside a cell is a literal pipe. */
+function tableRow(l: string): string {
+  return l.trim().replace(/^\|/, "").replace(/(?<!\\)\|\s*$/, "")
+    .split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim()).filter(Boolean).join("; ");
 }
 
 /** Cut at a word boundary, and say whether anything was cut. */

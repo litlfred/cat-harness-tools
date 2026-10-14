@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractOf, plainHeading, readEntryDocument } from "../lib/library-document.ts";
+import { extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../lib/library-document.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));
@@ -168,5 +168,13 @@ describe("a Markdown section's extract (litlfred/dth-hrh, twg-outline)", () => {
     const dir = entry(text("file"));
     writeFileSync(join(dir, "sections", "s001-part-4.md"), md);
     expect(readEntryDocument(dir, "t")!.sections[0]!.extract).toStartWith("# **Part 4\\. Examples**");
+  });
+});
+
+describe("a Markdown table in an extract (litlfred/dth-hrh, 'Handbook at a glance')", () => {
+  test("drops the delimiter row and reads each row as its cells", () => {
+    const md = "## At a glance\n\n| Part | Chapter | Sections |\n| :---- | :---- | :---- |\n| Part 0 | 1. Why **registries** | A; B |\n| | 2. Scope | `a\\|b` |\n";
+    // As sectionText reads it: whitespace collapsed and trimmed.
+    expect(plainMarkdown(md).replace(/\s+/g, " ").trim()).toBe("Part; Chapter; Sections Part 0; 1. Why registries; A; B 2. Scope; a|b");
   });
 });
