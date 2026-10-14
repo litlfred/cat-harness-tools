@@ -75,6 +75,14 @@ export interface BlockActionsConfig {
    * "plain issues + coding for content slug").
    */
   content?: string;
+  /**
+   * The site's variable values as KG nodes (`values.jsonld`, written by
+   * `gen-values-jsonld.ts`), relative to the page or absolute: the ✍ suggest
+   * editor shows each variable's current value from it.
+   */
+  values?: string;
+  /** Where the ✍ suggest editor loads Milkdown Crepe from, when not the pinned CDN copy (tests, an offline mirror). */
+  suggest?: { lib?: string; module?: string };
 }
 
 export const DEFAULT_TEMPLATE = "block-feedback.yml";
@@ -191,7 +199,7 @@ export const BLOCK_URLS_JS = `function faBlockUrls(c, b) {
     if (url) facts.push("**On the site:** " + url);
     q.set("body", facts.concat(["", "**Type:** general | technical | editorial", "", "**Comment:**", "", "", "**Proposed change:**", ""]).join("\\n"));
   }
-  return { edit: "https://github.com/" + repo + "/edit/" + branch + "/" + path, source: src, feedback: "https://github.com/" + c.repo + "/issues/new?" + q };
+  return { edit: "https://github.com/" + repo + "/edit/" + branch + "/" + path, suggest: "https://github.com/" + repo + "/edit/" + branch + "/" + path, source: src, feedback: "https://github.com/" + c.repo + "/issues/new?" + q };
 }`;
 
 /**
@@ -243,9 +251,168 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // Only this host's own links: a nested host (a Lean link inside a block's row) fills itself.
     for (const a of links) if ((a === host || a.closest("[data-src]") === host) && u[a.dataset.faLink]) a.href = u[a.dataset.faLink];
   };
-  const fill = (root) => { for (const h of (root || document).querySelectorAll("[data-src], a[data-fa-link]")) ready(h); };
+  const fill = (root) => { addSuggest(root); for (const h of (root || document).querySelectorAll("[data-src], a[data-fa-link]")) ready(h); };
   // A page that learns its repository later (the folio site reads it from its outline) says so here.
   const configure = (c) => { cfg = c; };
+  // ── ✍ suggest: a block's Markdown in a WYSIWYG editor, the change as a prefilled issue ──
+  //
+  // Beside every ✎ edit link whose source is Markdown, on any page of any
+  // harness. The editor (Milkdown Crepe, MIT) is imported only on first use.
+  // The text is read through the block's KG node (<block>.jsonld, its text)
+  // from the repository itself, and the change leaves as a GitHub issue the
+  // reader submits: no OAuth, no token, no server. Variables, directives and
+  // LaTeX references are the reader's to change, add or delete; what is
+  // checked is that each is well-formed, and the panel under the editor shows
+  // each variable's current value from the site's values.jsonld. Nothing read
+  // is written as HTML.
+  const SUGGEST_LIB = "https://cdn.jsdelivr.net/npm/@milkdown/crepe@7.22.2";
+  const SUGGEST_KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.18.10/dist/katex.min.css";
+  const TOKENISH = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?|\\\\[A-Za-z]+\\{[^}\\n]*\\}/g;
+  // Variables, directives and LaTeX references stay the reader's to change,
+  // add or delete. They are wrapped in \\u27e6 \\u27e7 only so the editor's
+  // Markdown escaping cannot corrupt them, and unwrapped on submit; what is
+  // checked is that each one is still well-formed, nothing more (owner,
+  // 2026-10-14: "I only want that the syntax is valid").
+  const wrap = (md) => md.replace(TOKENISH, (m) => "\\u27e6" + m + "\\u27e7");
+  const unwrap = (md) => md.replace(/\\u27e6([^\\u27e6\\u27e7]*)\\u27e7/g, (m, inner) => inner.replace(/\\\\([!-\\/:-@\\[-\\u0060{-~])/g, "$1"));
+  const LIQUID = /^\\{\\{\\s*[A-Za-z_][\\w-]*(?:\\.[\\w-]+|\\[\\d+\\])*\\s*(?:\\|\\s*[A-Za-z_]\\w*(?:\\s*:\\s*[^|{}]+?)?\\s*)*\\}\\}$/;
+  const TAG = /^\\{%\\s*[A-Za-z_]\\w*[^%]*%\\}$/;
+  const DIRECTIVE = /^:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^{}\\n]*\\})?$/;
+  const LATEXREF = /^\\\\[A-Za-z]+\\{[^{}\\n]+\\}$/;
+  const syntaxErrors = (md) => {
+    const bad = [];
+    for (const m of md.matchAll(/\\{\\{[\\s\\S]*?(?:\\}\\}|$)|\\{%[\\s\\S]*?(?:%\\}|$)/g)) if (!LIQUID.test(m[0]) && !TAG.test(m[0])) bad.push(m[0]);
+    for (const m of md.matchAll(/:{1,2}[A-Za-z][\\w-]*\\[[^\\n]*?(?:\\](?:\\{[^\\n]*?\\})?|$)/gm)) if (!DIRECTIVE.test(m[0])) bad.push(m[0]);
+    for (const m of md.matchAll(/\\\\(?:cite|ref|eqref|autoref|cref)\\b[^\\s]*/g)) if (!LATEXREF.test(m[0].replace(/[.,;:)]+$/, ""))) bad.push(m[0]);
+    return bad;
+  };
+  // Variable names and, when the site published them, their current values.
+  const variablesIn = (md) => Array.from(md.matchAll(/\\{\\{\\s*([A-Za-z_][\\w.\\-\\[\\]]*)/g), (m) => m[1]);
+  const lineDiff = (a, b) => {
+    const x = a.split("\\n"), y = b.split("\\n"), n = x.length, m = y.length;
+    const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const out = [];
+    let i = 0, j = 0;
+    while (i < n || j < m) {
+      if (i < n && j < m && x[i] === y[j]) { out.push(" " + x[i]); i++; j++; }
+      else if (j < m && (i === n || L[i][j + 1] > L[i + 1][j])) out.push("+" + y[j++]);
+      else out.push("-" + x[i++]);
+    }
+    // Two lines of context around each change.
+    const keep = out.map((l, k) => out.slice(Math.max(0, k - 2), k + 3).some((c) => c[0] !== " "));
+    const hunks = [];
+    out.forEach((l, k) => { if (keep[k]) hunks.push(l); else if (hunks.length && hunks[hunks.length - 1] !== "@@") hunks.push("@@"); });
+    if (hunks[hunks.length - 1] === "@@") hunks.pop();
+    return hunks.join("\\n");
+  };
+  const raw = (repo, branch, path) => "https://raw.githubusercontent.com/" + repo + "/" + branch + "/" + path.split("/").map(encodeURIComponent).join("/");
+  const sourceOf = (a) => {
+    const h = a.closest("[data-src]");
+    if (h && h.dataset.src) return { src: h.dataset.src, label: h.dataset.block || h.dataset.src, repo: h.dataset.repo, branch: h.dataset.branch };
+    if (a.dataset.src || adopt(a)) return { src: a.dataset.src, label: a.dataset.block || a.dataset.src, repo: a.dataset.repo, branch: a.dataset.branch };
+    return null;
+  };
+  const el = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); for (const k of kids || []) e.append(k); return e; };
+  const suggest = async (a) => {
+    const s = sourceOf(a), c = config();
+    if (!s || !/\\.md$/.test(s.src)) return;
+    const repo = s.repo || c.repo, branch = s.branch || c.branch || "main";
+    const status = el("p", { className: "fa-suggest-status", textContent: "Loading " + s.src + " …" });
+    const host = el("div", { className: "fa-suggest-editor" });
+    const send = el("button", { type: "button", textContent: "Submit as an issue", disabled: true });
+    const close = el("button", { type: "button", textContent: "Cancel" });
+    const vars = el("ul", { className: "fa-suggest-vars" });
+    const dlg = el("dialog", { className: "fa-suggest" }, [el("h2", { textContent: "Suggest a change: " + s.label }), status, host, vars, el("p", {}, [send, " ", close])]);
+    close.onclick = () => { dlg.close(); dlg.remove(); };
+    if (!document.getElementById("fa-suggest-css"))
+      document.head.append(el("style", { id: "fa-suggest-css", textContent: "dialog.fa-suggest{width:min(60rem,95vw);max-height:90vh;overflow:auto;padding:1rem 1.25rem}dialog.fa-suggest h2{font-size:1.1rem;margin:0 0 .5rem}.fa-suggest-status{color:#5b6770;font-size:.9rem}.fa-suggest-editor{border:1px solid #d6dde2;min-height:12rem;margin:.5rem 0}.fa-suggest-vars{font-size:.85rem;color:#5b6770;margin:.25rem 0;padding-left:1.2rem}.fa-suggest-vars .bad{color:#b3261e}" }));
+    document.body.append(dlg);
+    dlg.showModal();
+    let path = s.src, original;
+    try {
+      // The KG node names the block's text; a page without one falls back to the source.
+      const node = await fetch(raw(repo, branch, s.src.replace(/\\.md$/, ".jsonld"))).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (node && typeof node.text === "string") path = s.src.replace(/[^/]*$/, "") + node.text;
+      const r = await fetch(raw(repo, branch, path));
+      if (!r.ok) throw new Error(r.status + " reading " + path);
+      original = await r.text();
+    } catch (e) { status.textContent = "Could not load the block: " + e.message; return; }
+    const wrapped = wrap(original);
+    // The site's variable values, as KG nodes (values.jsonld), when it publishes them.
+    const values = c.values ? await fetch(c.values).then((r) => (r.ok ? r.json() : null)).catch(() => null) : null;
+    const valueOf = (key) => {
+      const nodes = values && (values["@graph"] || values);
+      const n = Array.isArray(nodes) ? nodes.find((x) => x.key === key) : null;
+      return n ? String(n.formatted !== undefined ? n.formatted : n.value) : undefined;
+    };
+    let get, base;
+    try {
+      const lib = (c.suggest && c.suggest.lib) || SUGGEST_LIB;
+      // The theme's own @import of KaTeX names a package, which a CDN cannot resolve: named here.
+      for (const href of [lib + "/lib/theme/common/style.css", lib + "/lib/theme/frame/style.css", SUGGEST_KATEX_CSS])
+        if (!document.querySelector('link[href="' + href + '"]')) document.head.append(el("link", { rel: "stylesheet", href: href }));
+      const { Crepe } = await import((c.suggest && c.suggest.module) || lib + "/+esm");
+      const crepe = new Crepe({ root: host, defaultValue: wrapped });
+      await crepe.create();
+      get = () => crepe.getMarkdown();
+      status.textContent = wrapped === original ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.";
+    } catch (e) {
+      // No editor (offline, blocked CDN): the same flow over plain Markdown.
+      const ta = el("textarea", { value: wrapped, rows: 16, style: "width:100%" });
+      host.append(ta);
+      get = () => ta.value;
+      status.textContent = "The visual editor did not load (" + e.message + "); editing the Markdown directly.";
+    }
+    base = get();
+    // Live: each variable and its current value, and any item whose syntax is broken.
+    const refresh = () => {
+      if (!dlg.isConnected) return clearInterval(timer);
+      const text = unwrap(get());
+      const items = variablesIn(text).map((k) => { const v = valueOf(k); return el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) }); });
+      for (const b of syntaxErrors(text)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
+      vars.replaceChildren(...items);
+    };
+    const timer = setInterval(refresh, 800);
+    refresh();
+    send.disabled = false;
+    send.onclick = async () => {
+      const now = get();
+      if (now === base) { status.textContent = "Nothing has changed yet."; return; }
+      const errs = syntaxErrors(unwrap(now));
+      if (errs.length) { status.textContent = "Fix the syntax first: " + errs.map((e) => e.slice(0, 60)).join(" \\u00b7 "); return; }
+      const facts = ["**Block:** \\u0060" + s.label + "\\u0060", "**Source:** https://github.com/" + repo + "/blob/" + branch + "/" + path, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(s.label)];
+      const body = facts.concat(["", "**Suggested change**, made in the visual editor (the diff is against the editor's rendering of the source):", "", "\\u0060\\u0060\\u0060diff", lineDiff(unwrap(base), unwrap(now)), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
+      const q = new URLSearchParams({ title: "Suggested edit: " + s.label, body: body });
+      let url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + q;
+      // GitHub refuses very long URLs: carry the body on the clipboard instead.
+      if (url.length > 7000) {
+        try { await navigator.clipboard.writeText(body); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
+        url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + new URLSearchParams({ title: "Suggested edit: " + s.label, body: "The suggested change is on the clipboard: paste it here." });
+      }
+      window.open(url, "_blank", "noopener");
+      close.onclick();
+    };
+  };
+  const SUGGEST_TITLE = "Suggest a change in a visual editor (opens a GitHub issue)";
+  const addSuggest = (root) => {
+    for (const a of (root || document).querySelectorAll('a[data-fa-link="edit"], a.ba-edit')) {
+      if (a.nextElementSibling && a.nextElementSibling.dataset.faLink === "suggest") continue;
+      const s = sourceOf(a);
+      if (!s || !/\\.md$/.test(s.src)) continue;
+      const b = el("a", { className: "ba-suggest", href: a.getAttribute("href") || "#", title: SUGGEST_TITLE, textContent: "✍ suggest", tabIndex: 0 });
+      b.dataset.faLink = "suggest";
+      a.after(b);
+    }
+  };
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest('a[data-fa-link="suggest"]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    suggest(a);
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => addSuggest());
+  else addSuggest();
   window.faEditLinks = { urls: faBlockUrls, fill: fill, configure: configure };
   // Both the link reached and the host it sits in: a pointer that lands
   // straight on a compact host's link (no gap crossed) or keyboard focus on it
