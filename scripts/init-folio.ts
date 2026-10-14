@@ -49,6 +49,8 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { git, remoteState } from "./lib/empty-remote.ts";
+import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
 /** The upstream this folio pins its platform to. */
@@ -1461,7 +1463,18 @@ function finishScaffold(s: Scaffold): void {
   const platformPresent = existsSync(join(root, assistant));
   if (!o.skipVcs && !o.dryRun) {
     linkPlatform(root, assistant, o, result);
-  } else if (o.link === "submodule" && !platformPresent) {
+  } else if (!o.dryRun && !enclosingRepoRoot(root)) {
+    // `--skip-vcs` skips linking the platform, and with it `seedMainIfEmpty`,
+    // which lives in that step. dth-hrh was scaffolded so, into a cloud
+    // checkout of an EMPTY repository on a feature branch; nothing put `main`
+    // on the remote, the branch was pushed first, and GitHub made it the
+    // default (owner, 2026-10-14). The remote still gets `main` here, without
+    // a branch switch: the caller chose the branch it is on.
+    const seed = seedRemoteMainIfEmpty(root);
+    const note = formatRemoteSeed(seed).split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2)).join(" ");
+    if (note) result.notes.push(note);
+  }
+  if ((o.skipVcs || o.dryRun) && o.link === "submodule" && !platformPresent) {
     // Only when it is actually absent. Emitting this unconditionally told a
     // caller who had already added the submodule (and passed --skip-vcs
     // precisely because of that) to add it again.
@@ -1713,11 +1726,6 @@ export type SeedOutcome =
   | { kind: "no-main"; current: string }
   | { kind: "stopped"; reason: string };
 
-function git(root: string, args: string[], timeout = 60_000) {
-  const r = spawnSync("git", args, { cwd: root, stdio: "pipe", timeout });
-  return { ok: r.status === 0, out: r.stdout?.toString().trim() ?? "", err: r.stderr?.toString().trim() ?? "" };
-}
-
 /**
  * On an EMPTY repository, make `main` real before bootstrapping onto it.
  *
@@ -1747,12 +1755,10 @@ export function seedMainIfEmpty(root: string, slug: string): SeedOutcome {
     return { kind: "no-main", current };
   }
 
-  const hasOrigin = git(root, ["remote"]).out.split(/\s+/).includes("origin");
-  if (hasOrigin) {
-    const heads = git(root, ["ls-remote", "--heads", "origin"]);
-    if (!heads.ok) return { kind: "stopped", reason: `could not ask the remote whether it is empty (${heads.err.slice(0, 200) || "no output"}) — not seeding over history nobody checked` };
-    if (heads.out !== "") return { kind: "stopped", reason: "the remote already has branches — this checkout is empty only because nothing was fetched; fetch and check out its default branch instead of seeding" };
-  }
+  const remote = remoteState(root);
+  const hasOrigin = remote.kind !== "no-origin";
+  if (remote.kind === "unknown") return { kind: "stopped", reason: `could not ask the remote whether it is empty (${remote.reason}) — not seeding over history nobody checked` };
+  if (remote.kind === "has-branches") return { kind: "stopped", reason: "the remote already has branches — this checkout is empty only because nothing was fetched; fetch and check out its default branch instead of seeding" };
 
   if (!git(root, ["symbolic-ref", "HEAD", "refs/heads/main"]).ok) return { kind: "stopped", reason: "could not point HEAD at main" };
   const seed = git(root, ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "--quiet", "-m", "Seed main"]);
