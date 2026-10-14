@@ -99,3 +99,36 @@ describe("keywords in the document view", () => {
     expect(readEntryDocument(entry(base), "r")!.keywords).toBeUndefined();
   });
 });
+
+describe("a text source is shown by its own headings, not as a PDF (litlfred/dth-hrh)", () => {
+  // A minimal text-structure/v1 entry, in the shape text-structure.ts writes.
+  const sec = (id: string, level: number, line: number) => ({
+    id, number: null, title: id, level, file: "outline.md", line_start: line, line_end: line + 1, unit: "heading", n_chars: 10, n_words: 2,
+  });
+  const text = {
+    _schema: "text-structure/v1",
+    doc_id: "outline",
+    source: {
+      file: "outline.md", sha256: "0".repeat(64), digest: "file", bytes: 20, mtime: null,
+      mimetype_sniffed: "text/plain", mimetype_source: "content",
+      files: [{ path: "outline.md", sha256: "0".repeat(64), bytes: 20, lines: 4, format: "markdown" }],
+      upstream: null,
+    },
+    metadata: { title: "An outline" },
+    toc_source: "headings",
+    sections: [sec("s001-a", 1, 1), sec("s002-b", 2, 3)],
+    structure_note: "test",
+  };
+
+  test("the view says it is a text source and keeps its sections", () => {
+    const v = readEntryDocument(entry(text), "outline");
+    expect(v).not.toBeNull();
+    expect(v!.variant).toBe("text");
+    expect(v!.sections.map((s) => s.id)).toEqual(["s001-a", "s002-b"]);
+  });
+
+  test("a PDF entry still says pdf", () => {
+    const v = readEntryDocument(entry(base), "r");
+    expect(v?.variant).toBe("pdf");
+  });
+});
