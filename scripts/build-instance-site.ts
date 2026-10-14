@@ -117,7 +117,25 @@ export const STEP_ENV = { baseurl: "FOLIO_SITE_BASEURL", upstreamPages: "FOLIO_S
  */
 export function stepCommand(root: string, name: string): string {
   if (!SCRIPT_NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a package script name`);
-  return existsSync(join(root, "package.json")) ? `bun run ${name}` : `bun run ${JSON.stringify(join(import.meta.dir, "run-script.ts"))} ${name}`;
+  return ownsScript(root, name) ? `bun run ${name}` : `bun run ${JSON.stringify(join(import.meta.dir, "run-script.ts"))} ${name}`;
+}
+
+/**
+ * Whether the checkout's own package.json defines the script. An IG repository
+ * may carry a package.json for its own tooling (smart-immunizations' holds
+ * only fsh-sushi) that names none of the site's steps: `bun run <step>` there
+ * fails "Script not found", so the step goes through the mounted layers'
+ * script table instead, as it does where there is no package.json at all.
+ */
+function ownsScript(root: string, name: string): boolean {
+  const file = join(root, "package.json");
+  if (!existsSync(file)) return false;
+  try {
+    const scripts = (JSON.parse(readFileSync(file, "utf-8")) as { scripts?: Record<string, unknown> }).scripts;
+    return typeof scripts?.[name] === "string";
+  } catch {
+    return false;
+  }
 }
 
 /**

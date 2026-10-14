@@ -101,8 +101,12 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
   test("a step runs from the checkout's own package.json, or through run-script.ts where it has none", () => {
     const d = mkdtempSync(join(tmpdir(), "bis-step-"));
     expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
-    writeFileSync(join(d, "package.json"), "{}");
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { "build:site": "echo" } }));
     expect(stepCommand(d, "build:site")).toBe("bun run build:site");
+    // A package.json for the IG's own tooling, naming none of the site's steps
+    // (smart-immunizations: fsh-sushi only): the step still resolves.
+    writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { "fsh-sushi": "^3" } }));
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
     expect(() => stepCommand(d, "x; rm -rf /")).toThrow();
   });
 
