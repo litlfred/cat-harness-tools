@@ -20,7 +20,7 @@
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { z } from "zod";
 import { existsSync, readdirSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import {
@@ -30,7 +30,7 @@ import {
   slugify,
   type InitFolioOptions,
 } from "../../scripts/init-folio.js";
-import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /**
  * Is this directory already a folio?
@@ -42,8 +42,10 @@ import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-
  * a list of seventeen "already present" lines to interpret.
  */
 function existingFolio(root: string): string | undefined {
-  const cfg = resolveHarnessConfigPath(root);
-  if (cfg) return basename(cfg.path);
+  // Index first (bean `ymvt`): an instance configured by its
+  // `index.config.json` entry is a folio as much as one with a legacy file.
+  const cfg = readEffectiveConfig(root);
+  if (cfg.from !== undefined && (cfg.state !== "absent" || cfg.via === "index")) return cfg.from;
   const folioRoot = folioDir(root);
   if (existsSync(folioRoot)) {
     const docs = readdirSync(folioRoot, { withFileTypes: true })
