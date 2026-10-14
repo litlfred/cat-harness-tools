@@ -48,6 +48,8 @@ import { join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
+import { NAVBAR_ROW_ID } from "./lib/harness-rail.ts";
+
 /** The reusable workflow a folio calls. */
 export const FOLIO_WORKFLOW = "folio-staging.yml";
 /** The reusable workflows an IG calls (smart-base's). */
@@ -62,6 +64,67 @@ export const PAGES_SIBLING = "ghbuild.yml";
  * without it a root IG deploy would replace that site with bare Publisher output.
  */
 export const FOLIO_ROOT_MARKERS = ["_main-site.json", "STAGING", "_render-log", "folio-build.json"] as const;
+/**
+ * The one marker a CHROMED IG output may replace: the stamp of the chromed IG
+ * site `folio-site.yml` deployed (owner, 2026-10-14, decision "1": the one
+ * publish path gives an IG the chrome `folio-site.yml` gave it). The other
+ * markers are a folio's own publish (`publish-main`'s manifest, its previews,
+ * its render log), which no IG deploy replaces, chromed or not.
+ */
+export const CHROMED_IG_REPLACES = ["folio-build.json"] as const;
+
+/**
+ * Does this page wear the harness chrome — the icon row `#fa-navbar-row` that
+ * both chromes write: the Jekyll head include on a page `folio-site.yml` laid
+ * out, and `rail-standalone-pages` on a page it railed? The one test both
+ * agree on, so a root is recognised as chromed whichever route chromed it.
+ */
+export function wearsChrome(html: string): boolean {
+  return html.includes(`id="${NAVBAR_ROW_ID}"`);
+}
+
+/** What the chrome step left on a built IG: its pages, those carrying the rail (or a theme nav), and those carrying the icon row. */
+export interface ChromeCoverage {
+  pages: number;
+  railed: number;
+  navbarRow: number;
+  /** The root page, `index.html`, wears the chrome; undefined when the output has none. */
+  index?: boolean;
+}
+
+/** Count the chrome on every `.html` page under `site`. Pure over the files. */
+export function chromeCoverage(site: string): ChromeCoverage {
+  const c: ChromeCoverage = { pages: 0, railed: 0, navbarRow: 0 };
+  const walk = (d: string): void => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name.startsWith(".")) continue;
+      const abs = join(d, e.name);
+      if (e.isDirectory()) { walk(abs); continue; }
+      if (!e.name.endsWith(".html")) continue;
+      const html = readFileSync(abs, "utf-8");
+      c.pages++;
+      if (/<nav class="fa-nav"|id="site-nav"/.test(html)) c.railed++;
+      const row = wearsChrome(html);
+      if (row) c.navbarRow++;
+      if (abs === join(site, "index.html")) c.index = row;
+    }
+  };
+  if (existsSync(site)) walk(site);
+  return c;
+}
+
+/**
+ * Why a chrome step did NOT chrome the site, or undefined when it did: the
+ * root page wears the icon row, and so does at least one page railed. Said in
+ * words, because the caller refuses a root publish on it.
+ */
+export function chromeShortfall(c: ChromeCoverage): string | undefined {
+  if (c.pages === 0) return "the IG output holds no .html page to chrome";
+  if (c.railed === 0) return `none of its ${c.pages} page(s) carries the rail`;
+  if (c.navbarRow === 0) return `none of its ${c.pages} page(s) carries the icon row (#${NAVBAR_ROW_ID}); the harness data it is drawn from was not there`;
+  if (c.index === false) return `its root page, index.html, carries no icon row (#${NAVBAR_ROW_ID})`;
+  return undefined;
+}
 /**
  * Paths `JamesIves/github-pages-deploy-action@v4` never deletes under
  * `clean`, whatever `clean-exclude` says: the action's own built-in excludes.
@@ -449,12 +512,22 @@ export function igTarget(d: { main?: IgDeploy; candidate?: IgDeploy }, o: { isDe
  * Lay the built folder onto a publish-branch checkout as the deploy action
  * would: into the target folder, without deleting when `clean` is off; at the
  * root with `clean`, removing every top-level entry not kept first.
+ *
+ * `chromed` says the folder wears the harness chrome (the step stage-local
+ * runs after the build). A root that wears it is never replaced by a folder
+ * that does not: the root's `index.html` is read, not only the stamp, because
+ * a root chromed by stage-local itself carries no `folio-build.json`.
  */
-export function applyIgDeploy(pages: string, folder: string, t: IgTarget, copy: (from: string, to: string) => void): void {
+export function applyIgDeploy(pages: string, folder: string, t: IgTarget, copy: (from: string, to: string) => void, o: { chromed?: boolean } = {}): void {
   const dest = join(pages, t.dest);
   if (t.keep) {
-    const folio = FOLIO_ROOT_MARKERS.filter((m) => existsSync(join(pages, m)) && !t.keep!.includes(m));
+    const replaceable: readonly string[] = o.chromed ? CHROMED_IG_REPLACES : [];
+    const folio = FOLIO_ROOT_MARKERS.filter((m) => existsSync(join(pages, m)) && !t.keep!.includes(m) && !replaceable.includes(m));
     if (folio.length) throw new Error(`the publish branch carries a folio's site (${folio.join(", ")}); a clean IG deploy at the root would delete it — refusing`);
+    const index = join(pages, "index.html");
+    if (!o.chromed && existsSync(index) && wearsChrome(readFileSync(index, "utf-8"))) {
+      throw new Error("the publish root wears the harness chrome (#" + NAVBAR_ROW_ID + " on index.html) and this IG output does not; a clean deploy would replace it with bare IG Publisher pages — refusing");
+    }
     for (const e of readdirSync(pages)) if (!t.keep.includes(e)) rmSync(join(pages, e), { recursive: true, force: true });
   } else if (t.dest !== "" && t.deploy.clean) {
     rmSync(dest, { recursive: true, force: true });

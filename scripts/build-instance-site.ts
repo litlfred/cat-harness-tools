@@ -310,6 +310,14 @@ export function keepPinned(path: string, mountDirs: readonly string[], root: str
   };
 }
 
+/** The mount paths `index.lock.json` names in `root`; empty when there is no lock. */
+export function lockedMountPaths(root: string): string[] {
+  const lockFile = join(root, "index.lock.json");
+  return existsSync(lockFile)
+    ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
+    : [];
+}
+
 export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string; base: string }> {
   const root = resolve(o.root);
   const declFile = findDeclarationFile(root);
@@ -340,10 +348,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
   }
   if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
-  const lockFile = join(root, "index.lock.json");
-  const mounted: string[] = existsSync(lockFile)
-    ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
-    : [];
+  const mounted = lockedMountPaths(root);
   run("install", ["bun install --no-save >/dev/null", ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
   for (const p of o.pre) run(`pre: ${p}`, `bun run ${p}`, root);
 
