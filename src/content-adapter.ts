@@ -17,13 +17,13 @@
  * type, then — with nothing installed above the harness — the generic tools
  * only, said out loud (bean `zmdo`).
  */
-import { basename, resolve } from "path";
+import { resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 
 import { resolveBuiltinAdapter } from "./builtin-adapters.js";
 import type { GitHelper } from "./core/git.js";
 import { log } from "./core/logging.js";
-import { expectedInstanceConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { NoContentAdapter } from "./no-content-adapter.js";
 import type { ContentAdapter } from "./types.js";
 
@@ -44,24 +44,29 @@ export function readFolioContentConfig(repoRoot: string): FolioContentConfig {
     feedbackDir: resolve(repoRoot, ".folio-feedback"),
   };
 
-  // The instance's own config — `<name>.config.json`, resolved outward from
-  // the instance root (2026-09-20). `undefined` = nothing declares an instance
-  // here, so there is no config to prefer and the defaults above stand.
-  const harnessConfigPath = expectedInstanceConfigPath(repoRoot);
-  if (harnessConfigPath !== undefined && existsSync(harnessConfigPath)) {
-    try {
-      const config = JSON.parse(readFileSync(harnessConfigPath, "utf-8"));
-      out.adapterType = config.contentType || config.adapter || "paper";
-      out.contentDeclared = Boolean(config.contentType || config.adapter);
-      out.adapterModule = config.adapterModule;
-      if (config.feedbackDir) out.feedbackDir = resolve(repoRoot, config.feedbackDir);
-      if (config.viewer?.port) out.viewerPort = config.viewer.port;
-      // NAME THE FILE ACTUALLY READ. A hardcoded `harness.config.json` here
-      // once told an operator to look at a file that does not exist.
-      log("init", `Loaded ${basename(harnessConfigPath)}: adapter=${out.adapterType}`);
-    } catch (e) {
-      log("init", `Failed to read ${harnessConfigPath}: ${e}`);
-    }
+  // The instance's own config, INDEX FIRST (bean `ymvt`): its
+  // `index.config.json` entry, else `<name>.config.json` as a legacy fallback
+  // (reported). `absent` with no `from` = nothing declares an instance here,
+  // so there is no config to prefer and the defaults above stand.
+  const eff = readEffectiveConfig(repoRoot);
+  if (eff.state === "ok") {
+    const config = eff.config as {
+      contentType?: string;
+      adapter?: string;
+      adapterModule?: string;
+      feedbackDir?: string;
+      viewer?: { port?: number };
+    };
+    out.adapterType = config.contentType || config.adapter || "paper";
+    out.contentDeclared = Boolean(config.contentType || config.adapter);
+    out.adapterModule = config.adapterModule;
+    if (config.feedbackDir) out.feedbackDir = resolve(repoRoot, config.feedbackDir);
+    if (config.viewer?.port) out.viewerPort = config.viewer.port;
+    // NAME THE SOURCE ACTUALLY READ. A hardcoded `harness.config.json` here
+    // once told an operator to look at a file that does not exist.
+    log("init", `Loaded ${eff.from}${eff.via === "file" ? " (legacy: move it inline into index.config.json)" : ""}: adapter=${out.adapterType}`);
+  } else if (eff.state === "unreadable") {
+    log("init", `Failed to read ${eff.from}: ${eff.why}`);
   }
 
   // Fallback: lean-mcp.config.json for viewer_port

@@ -18,7 +18,8 @@
  * agent-run: their publish workflows are dispatch-only and are documentation
  * of what this path must match, never something an agent dispatches. So:
  *
- * - **a declared site first**: a repository whose `<instance>.config.json`
+ * - **a declared site first**: a repository whose instance config (its
+ *   `index.config.json` entry; a legacy `<instance>.config.json` is a reported fallback)
  *   carries `site.build` is built by `build-instance-site.ts` from its own
  *   package scripts ({@link declaredRecipe}, {@link stageDeclared});
  * - otherwise **which publisher** is read from the repository's own workflow files
@@ -1036,7 +1037,7 @@ async function stageIgFolio(a: IgRun, b: IgBuilt, site: IgFolioSite): Promise<St
 
 /**
  * The instance a checkout declares at its root, and the `site.build` recipe its
- * `<name>.config.json` carries, or undefined when it declares none. A
+ * config carries (its `index.config.json` entry, index first), or undefined when it declares none. A
  * repository that declares a recipe builds its site from its own package
  * scripts, through `build-instance-site.ts`, rather than from a workflow file.
  * smart-ra has no publishing workflow at all (bean n3h9), so reading its
@@ -1128,7 +1129,7 @@ export async function stageDeclared(
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher folio|ig] [--bare-ig]
 
   One command for every agent-run publish: a folio that declares its site in
-  <instance>.config.json site.build (built by build-instance-site.ts), a folio whose workflow calls
+  its index.config.json entry site.build (built by build-instance-site.ts), a folio whose workflow calls
   ${FOLIO_WORKFLOW}, or an IG (it calls smart-base's ${IG_WORKFLOWS.join(" or ")}); preview or
   main site. The default branch publishes the main site; any other branch a preview.
 

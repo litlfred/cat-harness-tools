@@ -38,8 +38,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pin:
+    # Every job stands on the SAME cat-harness and index commits, read once
+    # here. Cloned per job, `main` moved between the base and head jobs (minutes
+    # apart), and the comparison charged that move to the PR: ingest-and-l1's
+    # verdicts flipped "new failure" / "fixed by this PR" with the corpus's
+    # timing (cat-harness-tools#217, #223).
+    name: Pin cat-harness and the index
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cat-harness: ${{ steps.pin.outputs.cat-harness }}
+      index: ${{ steps.pin.outputs.index }}
+    steps:
+      - id: pin
+        run: |
+          set -euo pipefail
+          echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   typecheck:
     name: Typecheck
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -48,6 +69,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: litlfred/folio-assistant
+          ref: ${{ needs.pin.outputs.index }}
           path: fa
       - &setup-bun
         uses: oven-sh/setup-bun@v2
@@ -57,10 +79,15 @@ jobs:
         name: Mount every instance from the index lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
-        name: Use cat-harness main
+        name: Use cat-harness main, at the pinned commit
+        env:
+          SHA: ${{ needs.pin.outputs.cat-harness }}
         run: |
+          set -euo pipefail
           rm -rf fa/cat-harness
-          git clone -q --depth 1 https://github.com/litlfred/cat-harness fa/cat-harness
+          git init -q fa/cat-harness
+          git -C fa/cat-harness fetch -q --depth 1 https://github.com/litlfred/cat-harness "$SHA"
+          git -C fa/cat-harness checkout -q --detach FETCH_HEAD
           rm -rf fa/cat-harness/.git
       - name: Put the PR in place of the locked cat-harness-tools
         run: rm -rf fa/cat-harness-tools
@@ -85,6 +112,7 @@ jobs:
 
   run-tests:
     name: bun test (${{ matrix.side }})
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -101,7 +129,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: fa/cat-harness-tools
-          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+          fetch-depth: 2
+      - &base-side
+        # Both sides check out the PR's merge commit; the base side steps to its
+        # first parent, the main it merges into. Never `pull_request.base.sha`:
+        # that is main as of the PR's last push, older than the main the merge
+        # commit holds whenever main moved since. workflow_dispatch: main's tip.
+        name: Base side, the merge commit's first parent
+        if: matrix.side == 'base'
+        working-directory: fa/cat-harness-tools
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin main
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
       - *unnest
       - *install
       - name: Mount the graphs kept on branches
@@ -149,6 +194,7 @@ jobs:
     # graphs mounted: a mount is the monorepo's, and the rehearsal copies only
     # the closure anyway.
     name: standalone (${{ matrix.side }})
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -165,7 +211,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: fa/cat-harness-tools
-          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+          fetch-depth: 2
+      - *base-side
       - name: Measure with the PR's checker on both sides
         # So a main that predates --measured-out is still measured. Only the
         # checker file is taken from the PR; the tree it measures is main's.
