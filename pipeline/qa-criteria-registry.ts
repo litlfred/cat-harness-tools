@@ -1161,7 +1161,7 @@ const PROOF: QaCriterionDefinition[] = [
   {
     id: "recommendation-strength-resolves",
     domain: "canonical",
-    // The rule is the harness's; the checker is folio-assistant-core's,
+    // The rule is the harness's; the checker is the content core's,
     // because code lists and the `recommendation` kind are content vocabulary
     // (bean folio-assistant-55ao). See `checker_contributed`.
     checker_contributed: true,
@@ -1181,7 +1181,7 @@ const PROOF: QaCriterionDefinition[] = [
   {
     id: "proof-compile-cost",
     domain: "proof",
-    // The rule is core's; the checker is `folio-assistant-sci`'s, because
+    // The rule is core's; the checker is the science layer's, because
     // elaboration cost is a Lean measurement. See `checker_contributed`.
     checker_contributed: true,
     description:
@@ -1202,7 +1202,7 @@ const PROOF: QaCriterionDefinition[] = [
   {
     id: "proof-no-cost-regression",
     domain: "proof",
-    // The rule is core's; the checker is `folio-assistant-sci`'s, because
+    // The rule is core's; the checker is the science layer's, because
     // elaboration cost is a Lean measurement. See `checker_contributed`.
     checker_contributed: true,
     description:
@@ -2352,7 +2352,7 @@ const RENDER: QaCriterionDefinition[] = [
  * contributes it, its kinds and these five checkers from its own
  * `contributions.ts` (see `dak-kinds-contribution-2026-10-02.md`). The
  * criteria stay declared in core, marked `checker_contributed`, which is the
- * cut `folio-assistant-sci` made for the elaboration-cost checkers — a
+ * cut the science layer made for the elaboration-cost checkers — a
  * criterion is a rule about content, a checker is the tooling that answers it.
  * `adapters: ["dak"]` is a plain string: it names the adapter as data, not as
  * an import, so core holds no edge to the contributor for it. Where the
@@ -2659,12 +2659,12 @@ export const EXTENDED_CHECKER_FILE =
 export const USES_CHECKER_FILE = "pipeline/qa-checkers-uses.ts";
 // The elaboration-cost checkers USED to be hosted here, and this constant
 // named them: `pipeline/qa-checkers-cost.ts`. They moved to
-// `folio-assistant-sci` on 2026-09-21 (bean `rfev`) because elaboration cost
+// the science layer on 2026-09-21 (bean `rfev`) because elaboration cost
 // is a Lean measurement, so the checker is the science layer's tooling while
 // the criterion stays core's rule.
 //
-// The constant is GONE rather than repointed. A core module holding the string
-// `folio-assistant-sci/...` would be core naming a higher layer — invisible to
+// The constant is GONE rather than repointed. A core module holding a path
+// string into the science layer would be core naming a higher layer — invisible to
 // `check:partition`, which counts imports and not strings, and precisely the
 // runtime edge bean `zlmp` measured five of. Both criteria now carry
 // `checker_contributed: true`, and `resolveCriterionSource` asks the

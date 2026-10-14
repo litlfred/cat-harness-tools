@@ -346,7 +346,7 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
  *
  * The declared name, never the folder's (bean `j3ls`, as `t5dm` for
  * `instanceOf`): a separated instance's repository is wherever it was cloned,
- * and who-iris cloned into `wim/` rewrote every manifest IRI to
+ * and a separated instance cloned into `wim/` rewrote every manifest IRI to
  * `.../jsonld/wim/<id>/`, so all 813 nodes read as stale.
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
@@ -426,7 +426,7 @@ export function buildDocumentNodes(
   // Section ranges OVERLAP -- a section's `page_end` is the start page of the
   // next one, inclusive -- so without this a figure is emitted once per
   // containing section, every emission writing the SAME path with a different
-  // `derivedFrom`. Measured 2026-09-22 on `smart-base/library/9789240093362-eng/`
+  // `derivedFrom`. Measured 2026-09-22 on an IG library entry (`9789240093362-eng`)
   // (bean `imen`): page 71 falls inside FOUR sections, page 68 inside three,
   // page 30 inside two. Last write won, and `--check` then reported the losers
   // stale forever, because re-running reproduced the same race.
@@ -591,7 +591,8 @@ let contentPrefixes: Map<string, string> | undefined;
  * instance the CONTENT repository declares as a dependency.
  *
  * `defaultInstancePrefixes` reads only the checkout this module sits in, so
- * run from a content repository it could not bind `folio-assistant-sci:` —
+ * run from a content repository it could not bind a dependency's prefix
+ * (e.g. the science layer's) —
  * the prefix of the `Theorem` and `Definition` types that theorem candidates
  * carry — and every entry with a candidate threw. Measured on qou 2026-10-11:
  * 18 entries had no section nodes for that reason. `instancePrefixes` already

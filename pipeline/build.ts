@@ -23,7 +23,8 @@ import {
 import { generateMainTex } from "./generate-main-tex";
 import { collectReferencedTerms } from "./markdown-ast";
 // The LaTeX preflight and Lean coverage are the science layer's: reached
-// through pipeline slots that folio-assistant-sci fills (bean `squu`).
+// through pipeline slots that a higher layer fills through its `contributes`
+// module (bean `squu`).
 import { leanFileStatus, resolveLeanFile, runPreflight } from "./pipeline-plugins";
 import { findContentRepoRoot, findPapers } from "./repo-root";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
