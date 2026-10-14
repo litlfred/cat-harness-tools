@@ -977,6 +977,12 @@ export async function stageDeclared(
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
+  log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
+  if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
+  if (target === "main") {
+    log(`keeps       STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
+    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
+  }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
   const r = await buildInstanceSite({
     root: repo,
@@ -987,11 +993,15 @@ export async function stageDeclared(
     pre: d.recipe.pre,
     sourceSteps: d.recipe.sourceSteps,
     siteSteps: d.recipe.siteSteps,
+    ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
+    ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
+    ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(target === "preview" ? { staging: branch } : {}),
     mount: true,
     fresh: false,
     publish,
-    ...(publish ? { remote } : {}),
+    // The remote is read even when nothing is published: the root's guard measures what it would replace.
+    remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
 }
