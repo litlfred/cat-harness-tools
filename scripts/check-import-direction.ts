@@ -32,8 +32,13 @@
  * - **Module specifiers**: static `import`/`export … from`, literal `import()`
  *   and `require()`, parsed by bootstrap-tools' `specifiersOf` (comments and
  *   non-specifier strings stripped, so a docblock quoting an import is not one).
- *   Only relative and absolute specifiers can cross an instance boundary in this
- *   checkout; bare ones resolve to `node_modules`.
+ *   Relative and absolute specifiers are resolved as paths. A bare specifier
+ *   is judged when it names an instance's PACKAGE — `@litlfred/cat-harness/…`
+ *   is the instance whose `package.json` `name` is `@litlfred/cat-harness` —
+ *   and skipped otherwise, as a third-party module from `node_modules`. Until
+ *   2026-10-14 every bare specifier was skipped, so an import written by
+ *   package name crossed layers unseen; bean `7pvn` rewrites core's 260
+ *   cross-layer imports that way, and they must stay graded.
  * - **Module-path literals**: a string such as `"../folio-assistant-sci/adapters/paper/index.ts"`
  *   handed to a VARIABLE `import(abs)`. `src/builtin-adapters.ts` was exactly
  *   that until this change, and its own docblock said *"the one edge no
@@ -67,7 +72,7 @@
  * @module scripts/check-import-direction
  * @covers code
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { specifiersOf, stripComments } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
@@ -123,6 +128,30 @@ export function readInstances(repoRoot: string): Instance[] {
     // No `name` → it can own nothing by name; skipped rather than invented.
     return decl.name ? [{ root, name: decl.name, needs: decl.needs }] : [];
   });
+}
+
+/**
+ * Each instance's package name → its root, from the `package.json` beside its
+ * declaration. An instance without one has no name to import it by.
+ */
+export function packageRoots(all: readonly Instance[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const i of all) {
+    const pkg = join(i.root, "package.json");
+    if (!existsSync(pkg)) continue;
+    const name = (JSON.parse(readFileSync(pkg, "utf-8")) as { name?: unknown }).name;
+    if (typeof name === "string" && name.length > 0) out.set(name, i.root);
+  }
+  return out;
+}
+
+/** Where a bare specifier lands when it names an instance's package; `undefined` for any other package. */
+export function packageTarget(spec: string, packages: ReadonlyMap<string, string>): string | undefined {
+  for (const [name, root] of packages) {
+    if (spec === name) return root;
+    if (spec.startsWith(`${name}/`)) return join(root, spec.slice(name.length + 1));
+  }
+  return undefined;
 }
 
 /** The INNERMOST declaring root containing `abs` — the root instance contains every other one. */
@@ -204,6 +233,7 @@ export function analyse(repoRoot = REPO_ROOT): ImportDirectionReport {
     allowed: allowedFromNeeds(new Map(all.map((i) => [i.name, i.needs])), ancestorsOf(flat.order)),
   };
 
+  const packages = packageRoots(all);
   const findings: ImportEdge[] = [];
   const variableSpecifiers: { file: string; count: number }[] = [];
   const filesRead = new Map<string, number>();
@@ -232,13 +262,15 @@ export function analyse(repoRoot = REPO_ROOT): ImportDirectionReport {
 
     const seen = new Set<string>();
     for (const spec of specifiersOf(src)) {
-      if (!spec.startsWith(".") && !spec.startsWith("/")) continue; // bare → node_modules
+      const bare = !spec.startsWith(".") && !spec.startsWith("/");
+      const target = bare ? packageTarget(spec, packages) : resolve(dirname(abs), spec);
+      if (target === undefined) continue; // another package → node_modules
       // One edge per (file, specifier): `import` + `export … from` of the same
       // module is one dependency, and counting it twice inflates the number a
       // reader compares across runs.
       if (seen.has(spec)) continue;
       seen.add(spec);
-      judge(abs, resolve(dirname(abs), spec), from, spec, "specifier");
+      judge(abs, target, from, spec, "specifier");
     }
 
     for (const lit of stringLiterals(src)) {
