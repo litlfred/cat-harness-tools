@@ -31,6 +31,14 @@ export const SUGGEST_EDITOR_DIR = "assets/vendor/crepe";
 
 const ENTRY = join(import.meta.dir, "suggest-editor");
 
+/** A package's directory, as module resolution from the bundle entry finds it. */
+export function packageDir(name: string): string {
+  const main = Bun.resolveSync(name, ENTRY);
+  const at = main.lastIndexOf(`/${name}/`);
+  if (at < 0) throw new Error(`cannot place ${name} from ${main}`);
+  return main.slice(0, at + name.length + 1);
+}
+
 /** Bundle `crepe.js` (exports `Crepe`, and KaTeX as the default) and `crepe.css` (with KaTeX's fonts) into `<siteDir>/assets/vendor/crepe/`. */
 export async function installSuggestEditor(siteDir: string): Promise<{ dir: string; files: string[] }> {
   const dir = join(resolve(siteDir), ...SUGGEST_EDITOR_DIR.split("/"));
@@ -38,12 +46,22 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
   try {
     const js = await Bun.build({ entrypoints: [join(ENTRY, "entry.ts")], target: "browser", format: "esm", minify: true });
     if (!js.success || js.outputs.length !== 1) throw new Error(`the editor did not bundle: ${js.logs.map(String).join("; ")}`);
-    const css = await Bun.build({ entrypoints: [join(ENTRY, "entry.css")], outdir: work, minify: true, naming: { entry: "crepe.css", asset: "fonts/[name]-[hash].[ext]" } });
+    // The stylesheet entry names each package's CSS by the path module
+    // resolution finds, not by a relative node_modules path: standing alone, a
+    // layer's own node_modules is not there and the root's is (seed-ready.ts).
+    const cssEntry = join(work, "entry.css");
+    writeFileSync(cssEntry, [
+      `${packageDir("@milkdown/crepe")}/lib/theme/common/style.css`,
+      `${packageDir("@milkdown/crepe")}/lib/theme/frame/style.css`,
+      `${packageDir("katex")}/dist/katex.min.css`,
+    ].map((f) => `@import ${JSON.stringify(f)};`).join("\n") + "\n");
+    const out = join(work, "out");
+    const css = await Bun.build({ entrypoints: [cssEntry], outdir: out, minify: true, naming: { entry: "crepe.css", asset: "fonts/[name]-[hash].[ext]" } });
     if (!css.success) throw new Error(`the editor's stylesheet did not bundle: ${css.logs.map(String).join("; ")}`);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "crepe.js"), await js.outputs[0]!.text());
-    cpSync(work, dir, { recursive: true });
+    cpSync(out, dir, { recursive: true });
     if (!existsSync(join(dir, "crepe.css"))) throw new Error("the editor's stylesheet was not written");
     const files = readdirSync(dir, { recursive: true }).map(String).sort();
     return { dir, files };
