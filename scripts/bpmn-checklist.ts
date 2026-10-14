@@ -22,18 +22,46 @@
  *   3. start and end events are the entry and exit lines.
  * An agent with no MCP can walk 1–3 by hand; 4 (the calls) makes it auditable.
  *
+ * ## Committed, in the instance that owns the diagram (owner, 2026-10-14)
+ *
+ * The owner chose to COMMIT the checklists, so `bpmn:checklist:check` compares
+ * committed bytes. Committed where, is the question that decides whether the
+ * comparison can stay green, and the answer is the instance that owns the
+ * diagram, BESIDE it: `<dir>/<stem>.bpmn` → `<dir>/<stem>.checklist.md`.
+ *
+ * - Not one directory for every instance's diagrams. That was the default
+ *   (`cat-harness/docs/assets/workflows/checklists`), and nothing had ever
+ *   been written there. Committed, it would hold folio-assistant-core's,
+ *   smart-base's and sci's diagrams inside cat-harness: 33 new wrong-direction
+ *   references in 27 files (measured with `check:reference-direction`), and a
+ *   red check in cat-harness whenever a layer above it edits a diagram. That
+ *   is the B1 defect, a commit that cannot hold an artefact current.
+ * - Beside the diagram, not in the owner's site directory. A diagram's
+ *   directory is mounted wherever the diagram is, by construction. A site
+ *   directory is not always: smart-base's `docs/` is built from the mount and
+ *   never committed.
+ * - **Except below the harness.** bootstrap and bootstrap-tools must not refer
+ *   to a harness, and a checklist names `workflow_complete` and this
+ *   generator. So the harness holds theirs, in its own site's
+ *   `assets/workflows/checklists/`. Naming a layer it `needs` is the right
+ *   direction.
+ *
+ * The source line a checklist cites is `<instance>/<path within it>`, so it is
+ * the same text in an index checkout and in the owner's own repository.
+ *
  * Usage:
- *   bun run cat bpmn:checklist          # write <out>/<stem>.checklist.md for every diagram
- *   bun run cat bpmn:checklist:check    # exit 1 if any is stale or missing
- *   … [--out <dir>]                      # default: the harness site's assets/workflows/checklists
+ *   bun run cat bpmn:checklist          # write every diagram's checklist where it is committed
+ *   bun run cat bpmn:checklist:check    # exit 1 if any is stale, missing or orphaned
+ *   … [--out <dir>]                      # write them all into one directory instead
  *
  * @module scripts/bpmn-checklist
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { loadProcessModel, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
+import { belowOf } from "./declarations-retag.ts";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -158,13 +186,59 @@ export function bpmnSources(root: string = HARNESS_ROOT): string[] {
   return [...all].sort();
 }
 
+/** Where the harness keeps the checklists of the instances below it (bootstrap, bootstrap-tools). */
 export const defaultOutDir = (root: string = HARNESS_ROOT): string => join(root, siteDirFor(root), "assets", "workflows", "checklists");
 
-/** Render every diagram; returns `{ file, text }` per checklist, and the diagrams that could not be loaded. */
-export async function renderAll(sources: readonly string[], repoRoot: string): Promise<{ files: { name: string; text: string }[]; failed: string[] }> {
-  const files: { name: string; text: string }[] = [];
+/** One diagram's checklist: the file it is written to, and the source line it cites. */
+export interface Placement {
+  /** Absolute path of the `<stem>.checklist.md`. */
+  out: string;
+  /** `<instance>/<path within it>` — the same in an index and in the owner's repository. */
+  label: string;
+}
+
+/**
+ * Where each diagram's checklist is committed (see the module header): beside
+ * the diagram in the instance that owns it, or, for an instance below the
+ * harness, in the harness's `defaultOutDir`. `harnessRoot` is the harness
+ * instance; a source outside every instance is labelled from the repository
+ * root and kept beside its diagram.
+ */
+export function placementOf(sources: readonly string[], repoRoot: string, harnessRoot: string = HARNESS_ROOT): Map<string, Placement> {
+  const instances = instanceRootsIn(repoRoot)
+    .map((root) => ({ root: resolve(root), decl: readDeclaration(root) }))
+    .filter((i): i is { root: string; decl: NonNullable<typeof i.decl> } => i.decl?.name !== undefined)
+    // Deepest first, so a nested instance owns its own files.
+    .sort((a, b) => b.root.length - a.root.length);
+  const needs = new Map(instances.map((i) => [i.decl.name!, (i.decl.needs ?? []) as readonly string[]] as const));
+  const harness = readDeclaration(harnessRoot)?.name;
+  const below = harness ? belowOf(harness, needs) : new Set<string>();
+  const out = new Map<string, Placement>();
+  for (const src of sources) {
+    const abs = resolve(src);
+    const owner = instances.find((i) => abs === i.root || abs.startsWith(i.root + sep));
+    const label = (owner ? `${owner.decl.name}/${relative(owner.root, abs)}` : relative(repoRoot, abs)).split("\\").join("/");
+    const name = `${basename(abs, ".bpmn")}.checklist.md`;
+    out.set(src, { out: owner && below.has(owner.decl.name!) ? join(defaultOutDir(harnessRoot), name) : join(dirname(abs), name), label });
+  }
+  return out;
+}
+
+/**
+ * Render every diagram; returns `{ name, out, text }` per checklist, and the
+ * diagrams that could not be loaded. `--out <dir>` puts them all in one
+ * directory (`into`), where two diagrams with one stem would collide, and that
+ * is refused rather than won by the last write.
+ */
+export async function renderAll(
+  sources: readonly string[],
+  repoRoot: string,
+  opts: { into?: string; harnessRoot?: string } = {},
+): Promise<{ files: { name: string; out: string; text: string }[]; failed: string[] }> {
+  const files: { name: string; out: string; text: string }[] = [];
   const failed: string[] = [];
-  const names = new Set<string>();
+  const outs = new Set<string>();
+  const placed = placementOf(sources, repoRoot, opts.harnessRoot);
   for (const src of sources) {
     let model: ProcessModel;
     try {
@@ -173,43 +247,76 @@ export async function renderAll(sources: readonly string[], repoRoot: string): P
       failed.push(`${relative(repoRoot, src)}: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
       continue;
     }
-    const name = `${basename(src, ".bpmn")}.checklist.md`;
-    if (names.has(name)) {
-      failed.push(`${relative(repoRoot, src)}: a second diagram named ${basename(src)} would overwrite ${name}`);
+    const p = placed.get(src)!;
+    const name = basename(p.out);
+    const out = opts.into ? join(opts.into, name) : p.out;
+    if (outs.has(out)) {
+      failed.push(`${relative(repoRoot, src)}: a second diagram named ${basename(src)} would overwrite ${relative(repoRoot, out)}`);
       continue;
     }
-    names.add(name);
-    files.push({ name, text: checklistFor(model, relative(repoRoot, src).split("\\").join("/")) });
+    outs.add(out);
+    files.push({ name, out, text: checklistFor(model, p.label) });
   }
   return { files, failed };
+}
+
+/**
+ * Committed checklists no diagram produces any more: every `*.checklist.md`
+ * in a directory a checklist is written to, or a declared workflow directory
+ * holds, that is not one of `wanted`.
+ */
+export function orphanChecklists(dirs: Iterable<string>, wanted: ReadonlySet<string>): string[] {
+  const out = new Set<string>();
+  const walk = (d: string): void => {
+    if (!existsSync(d)) return;
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".checklist.md") && !wanted.has(p)) out.add(p);
+    }
+  };
+  for (const d of dirs) walk(d);
+  return [...out].sort();
 }
 
 if (import.meta.main) {
   const argv = process.argv.slice(2);
   const check = argv.includes("--check");
   const oi = argv.indexOf("--out");
-  const outDir = oi >= 0 ? resolve(argv[oi + 1]!) : defaultOutDir();
+  const into = oi >= 0 ? resolve(argv[oi + 1]!) : undefined;
   const repoRoot = repoRootFor(HARNESS_ROOT);
   const sources = bpmnSources();
   if (sources.length === 0) {
     console.error("bpmn-checklist: no .bpmn sources found in any declared knowledge-graph directory — refusing to report a clean run over nothing");
     process.exit(2);
   }
-  const { files, failed } = await renderAll(sources, repoRoot);
+  const { files, failed } = await renderAll(sources, repoRoot, { into });
   for (const f of failed) console.error(`? ${f}`);
+  const shown = (p: string): string => relative(repoRoot, p);
   if (check) {
-    const stale = files.filter((f) => !existsSync(join(outDir, f.name)) || readFileSync(join(outDir, f.name), "utf8") !== f.text).map((f) => f.name);
-    const wanted = new Set(files.map((f) => f.name));
-    const orphans = existsSync(outDir) ? readdirSync(outDir).filter((n) => n.endsWith(".checklist.md") && !wanted.has(n)) : [];
-    for (const s of stale) console.error(`✗ ${s} is stale or missing — run \`bun run cat bpmn:checklist\``);
-    for (const o of orphans) console.error(`✗ ${o} has no diagram — remove it`);
+    const stale = files.filter((f) => !existsSync(f.out) || readFileSync(f.out, "utf8") !== f.text).map((f) => f.out);
+    const wanted = new Set(files.map((f) => f.out));
+    // Every directory a checklist is written to, and every directory holding a
+    // diagram: a diagram that was deleted or renamed leaves its checklist in a
+    // directory the first set may no longer name.
+    const dirs = new Set([...files.map((f) => dirname(f.out)), ...sources.map((s) => dirname(s)), ...(into ? [into] : [defaultOutDir()])]);
+    const orphans = orphanChecklists(dirs, wanted);
+    for (const s of stale) console.error(`✗ ${shown(s)} is stale or missing — run \`bun run cat bpmn:checklist\``);
+    for (const o of orphans) console.error(`✗ ${shown(o)} has no diagram — remove it`);
     if (stale.length + orphans.length > 0) process.exit(1);
     if (failed.length > 0) process.exit(2);
-    console.log(`✓ ${files.length} checklist(s) current in ${relative(repoRoot, outDir)}`);
+    console.log(`✓ ${files.length} checklist(s) current, each beside its diagram or, below the harness, in ${shown(defaultOutDir())}`);
   } else {
-    mkdirSync(outDir, { recursive: true });
-    for (const f of files) writeFileSync(join(outDir, f.name), f.text);
-    console.log(`bpmn-checklist: ${files.length} checklist(s) written to ${relative(repoRoot, outDir)}${failed.length ? `; ${failed.length} diagram(s) could not be loaded` : ""}`);
+    for (const f of files) {
+      mkdirSync(dirname(f.out), { recursive: true });
+      writeFileSync(f.out, f.text);
+    }
+    const byInstance = new Map<string, number>();
+    for (const f of files) {
+      const k = shown(f.out).split("/")[0]!;
+      byInstance.set(k, (byInstance.get(k) ?? 0) + 1);
+    }
+    console.log(`bpmn-checklist: ${files.length} checklist(s) written (${[...byInstance].map(([k, n]) => `${k} ${n}`).join(", ")})${failed.length ? `; ${failed.length} diagram(s) could not be loaded` : ""}`);
     if (failed.length > 0) process.exit(2);
   }
 }
