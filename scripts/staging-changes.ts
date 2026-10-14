@@ -16,7 +16,7 @@
  * | list | from |
  * |---|---|
  * | 1. changed SOURCE assets | the branch's file list, with every re-pinned mount in `index.lock.json` EXPANDED into the files that changed between its two pins (`expandRepins`) |
- * | 2. downstream RENDERED assets, predicted | the docs renderer's `rendered-impact.json` (skill `rendered-impact`), computed over list 1 |
+ * | 2. downstream RENDERED assets, predicted | the docs renderer's `rendered-impact.json` (skill `rendered-impact`), computed over list 1, and the pages the published root says were generated from a file of list 1 (`predictByProvenance`) |
  * | 3. the QA check | the built preview against the site published at the `gh-pages` ROOT (`measureSites`), sorted by `comparePrediction` into in-cone and NOT in the cone |
  *
  * ## Why a re-pin has to be expanded
@@ -271,6 +271,78 @@ export function coneInputs(s: Sources): string[] {
   return [...out].sort();
 }
 
+// ─── 2b. Provenance: the pages each source was last generated into ─────────
+//
+// A generated page says what it was generated from: the "Generated from
+// `<path>`" note at the top of its body, and `data-src="<path>"` on its edit
+// link, both repo-relative. That is the generators' own record, so reading it
+// back off the PUBLISHED root maps a changed source to the pages built from it
+// last time, with no guess from a file name. A mounted instance's skill,
+// process or schema reaches the site only through such generators, which is
+// why the docs renderer can name no page for it.
+//
+// It predicts the pages a source ALREADY has. A new source has none yet, and
+// a page that lists sources (an index) names none of them in its own
+// provenance; both stay for the QA diff to measure.
+
+export const PROVENANCE_RENDERER = "published-provenance";
+
+const GENERATED_FROM = /Generated from (?:<a [^>]*>)?<code[^>]*>([^<]+)<\/code>/g;
+const DATA_SRC = /\bdata-src="([^"]+)"/g;
+
+/** The repo-relative sources a page names as what it was generated from. */
+export function pageSources(html: string): string[] {
+  const out = new Set<string>();
+  for (const re of [GENERATED_FROM, DATA_SRC]) for (const m of html.matchAll(re)) out.add(m[1].trim().replace(/^\.\//, ""));
+  return [...out];
+}
+
+/** Source path → the published pages naming it, over every page at the root but other previews. */
+export function provenanceIndex(root: string): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop()!;
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      const rel = relative(root, p).split("\\").join("/");
+      if (PUBLISH_ROOT_OTHERS.test(rel) || PUBLISH_ROOT_OTHERS.test(`${rel}/`)) continue;
+      const st = statSync(p);
+      if (st.isDirectory()) stack.push(p);
+      else if (st.isFile() && /\.html?$/i.test(name)) {
+        for (const src of pageSources(readFileSync(p, "utf-8"))) index.set(src, [...(index.get(src) ?? []), rel]);
+      }
+    }
+  }
+  return index;
+}
+
+/** The pages the published root says each changed source was generated into. */
+export function predictByProvenance(sources: Sources, index: ReadonlyMap<string, readonly string[]>): RenderedImpact {
+  const files = new Map<string, RenderedFile>();
+  for (const c of sources.changes) {
+    if (!c.mounted) continue;
+    for (const input of c.from ? [c.path, c.from] : [c.path]) {
+      for (const page of index.get(input) ?? []) {
+        const prior = files.get(page);
+        if (prior) {
+          if (!prior.via.includes(input)) prior.via.push(input);
+          continue;
+        }
+        // A page generated only from a removed source goes with it.
+        files.set(page, { path: page, change: c.status === "removed" ? "removed" : "changed", role: "content", via: [input] });
+      }
+    }
+  }
+  return RenderedImpactSchema.parse({
+    $schema: RENDERED_IMPACT_TAG,
+    renderer: PROVENANCE_RENDERER,
+    method: "cone",
+    inputs: coneInputs(sources),
+    files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)),
+  });
+}
+
 // ─── 3. The QA check: the preview against the gh-pages root ────────────────
 
 /** Never compared: other previews, the render log, git's own files. */
@@ -374,7 +446,13 @@ export interface QaCheck {
 /** A single prediction from several renderers' files. */
 export function mergeImpacts(impacts: readonly RenderedImpact[]): RenderedImpact {
   const files = new Map<string, RenderedFile>();
-  for (const i of impacts) for (const f of i.files) if (!files.has(f.path)) files.set(f.path, f);
+  for (const i of impacts) {
+    for (const f of i.files) {
+      const prior = files.get(f.path);
+      if (!prior) files.set(f.path, { ...f, via: [...f.via] });
+      else for (const v of f.via) if (!prior.via.includes(v)) prior.via.push(v);
+    }
+  }
   return RenderedImpactSchema.parse({
     $schema: RENDERED_IMPACT_TAG,
     renderer: impacts.map((i) => i.renderer).join("+") || "none",
@@ -502,12 +580,15 @@ ${[...byInstance]
   const sec2 = `<section id="cone"><h2>2. Downstream rendered assets — the dependency cone</h2>
 ${
   predicted
-    ? `<p>Predicted before the build by <code>${esc(predicted.renderer)}</code> from the files above (skill <code>rendered-impact</code>). <em>Reached through</em> is the chain from a changed input to the file.</p>
+    ? `<p>Predicted before the build by <code>${esc(predicted.renderer)}</code> from the files above (skill <code>rendered-impact</code>). <em>Reached through</em> is the chain from a changed input to the file. <code>${PROVENANCE_RENDERER}</code> is the generators' own record: each published page that says it was generated from a changed file.</p>
 ${predicted.files.length ? renderedTable(predicted.files, o, measured) : '<p class="muted">The cone names no rendered file.</p>'}
 ${
   predicted.undetermined.length
-    ? `<h3>Inputs the renderer could not place <span class="muted">(${predicted.undetermined.length})</span></h3><p>Not "no change": the renderer cannot say which files these reach. The QA check below is what measures them.</p><table><thead><tr><th>input</th><th>scope</th><th>why</th></tr></thead><tbody>${predicted.undetermined
-        .map((u) => `<tr data-q="${esc(u.input.toLowerCase())}"><td><code>${esc(u.input)}</code></td><td>${esc(u.scope)}</td><td>${esc(u.reason)}</td></tr>`)
+    ? `<h3>Inputs a renderer could not place <span class="muted">(${predicted.undetermined.length})</span></h3><p>Not "no change": that renderer cannot say which files these reach. Where the published pages name an input as their source, those pages are in the list above (<em>by provenance</em>); anything else is for the QA check below to measure.</p><table><thead><tr><th>input</th><th>scope</th><th>by provenance</th><th>why</th></tr></thead><tbody>${predicted.undetermined
+        .map((u) => {
+          const placed = predicted.files.filter((f) => f.via.includes(u.input)).length;
+          return `<tr data-q="${esc(u.input.toLowerCase())}"><td><code>${esc(u.input)}</code></td><td>${esc(u.scope)}</td><td>${placed ? `${placed} page(s)` : '<span class="muted">none</span>'}</td><td>${esc(u.reason)}</td></tr>`;
+        })
         .join("")}</tbody></table>`
     : ""
 }`
@@ -617,12 +698,15 @@ if (import.meta.main) {
       process.exit(2);
     }
     const raw = readJson<unknown>(arg("--predicted"));
-    const predicted = raw === undefined ? undefined : mergeImpacts((Array.isArray(raw) ? raw : [raw]).map((r) => RenderedImpactSchema.parse(r)));
+    const impacts = raw === undefined ? [] : (Array.isArray(raw) ? raw : [raw]).map((r) => RenderedImpactSchema.parse(r));
     let qa: QaCheck | undefined;
     let qaAbsent: string | undefined;
     const [before, after] = [arg("--before"), arg("--after")];
+    const rootSite = before && existsSync(join(before, "index.html"));
+    if (rootSite) impacts.push(predictByProvenance(sources, provenanceIndex(before)));
+    const predicted = impacts.length ? mergeImpacts(impacts) : undefined;
     if (!before || !after) qaAbsent = "no --before/--after site given";
-    else if (!existsSync(join(before, "index.html"))) qaAbsent = `the publish root (${before}) holds no site`;
+    else if (!rootSite) qaAbsent = `the publish root (${before}) holds no site`;
     else {
       const measured = measureSites({
         before,

@@ -16,10 +16,14 @@ import {
   foldBase,
   type Lock,
   measureSites,
+  mergeImpacts,
   mountedPath,
   pageBody,
   parseChangedList,
+  pageSources,
   parseNameStatus,
+  predictByProvenance,
+  provenanceIndex,
   qaCheck,
   renderPage,
 } from "../staging-changes.js";
@@ -178,5 +182,41 @@ describe("the QA diff against the publish root", () => {
     });
     expect(html).toContain("Not known: this build wrote no prediction");
     expect(html).toContain("Not measured: no root");
+  });
+});
+
+describe("prediction by provenance", () => {
+  const T = mkdtempSync(join(tmpdir(), "staging-prov-"));
+  afterAll(() => rmSync(T, { recursive: true, force: true }));
+  const put = (rel: string, body: string) => {
+    mkdirSync(dirname(join(T, rel)), { recursive: true });
+    writeFileSync(join(T, rel), body);
+  };
+  put("root/processes/a.html", '<main><p>Generated from <code class="x">smart-base/processes/a.bpmn</code> by render</p></main>');
+  put("root/reference/a.html", '<main><p>Generated from <a href="https://x/blob/main/smart-base/skills/a.md"><code>smart-base/skills/a.md</code></a></p><a data-src="smart-base/skills/a.md">edit</a></main>');
+  put("root/reference/b.html", '<main><a data-src="smart-base/skills/b.md">edit</a></main>');
+  put("root/index.html", "<main>no provenance</main>");
+  put("root/STAGING/other/reference/a.html", '<a data-src="smart-base/skills/a.md">x</a>');
+
+  test("reads both provenance forms, and never another preview", () => {
+    expect(pageSources('Generated from <code>x/y.md</code> <a data-src="./z.md">')).toEqual(["x/y.md", "z.md"]);
+    const ix = provenanceIndex(join(T, "root"));
+    expect(ix.get("smart-base/skills/a.md")).toEqual(["reference/a.html"]);
+    expect(ix.get("smart-base/processes/a.bpmn")).toEqual(["processes/a.html"]);
+  });
+
+  test("a changed source predicts its pages; a removed one removes them; an unmounted one predicts nothing", () => {
+    const ix = provenanceIndex(join(T, "root"));
+    const src = (path: string, status: "modified" | "removed", mounted = true) => ({ path, status, repository: "o/sb", upstreamPath: path, mounted });
+    const p = predictByProvenance(
+      { $schema: "staging-changes/v1", repository: "o/fa", repins: [], changes: [src("smart-base/skills/a.md", "modified"), src("smart-base/skills/b.md", "removed"), src("smart-base/processes/a.bpmn", "modified", false)] },
+      ix,
+    );
+    expect(p.files.map((f) => [f.path, f.change, f.via])).toEqual([
+      ["reference/a.html", "changed", ["smart-base/skills/a.md"]],
+      ["reference/b.html", "removed", ["smart-base/skills/b.md"]],
+    ]);
+    const merged = mergeImpacts([p, { ...p, renderer: "docs-site", files: [{ path: "reference/a.html", change: "changed", role: "content", via: ["x.md"] }] }]);
+    expect(merged.files.find((f) => f.path === "reference/a.html")!.via).toEqual(["smart-base/skills/a.md", "x.md"]);
   });
 });
