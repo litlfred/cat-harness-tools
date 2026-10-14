@@ -11,6 +11,7 @@ runs them.
 - [Why a separate layer](#why-a-separate-layer)
 - [Where it sits](#where-it-sits)
 - [Status](#status)
+- [Working on it from a plain clone](#working-on-it-from-a-plain-clone)
 
 <!-- readme:toc:end -->
 
@@ -31,3 +32,28 @@ content layers above; a server part that needs one moves up into it.
 Step 3a: the standalone MCP server (`adapters/mcp-server/`). Step 3b brings the
 HTTP server, the tool and route modules, and the document adapter's server
 wrapper.
+
+## Working on it from a plain clone
+
+`@litlfred/cat-harness` and `@litlfred/bootstrap-tools` are not published to
+any registry, so `bun install` in a lone clone fails with a 404 for both. They
+are resolved as **workspaces** instead: `package.json` lists
+`../cat-harnes[s]` and `../bootstrap-tool[s]`, which match a sibling checkout
+when there is one and nothing when there is not. Clone the two layers this one
+`needs` beside it:
+
+```sh
+mkdir work && cd work
+git clone https://github.com/litlfred/cat-harness
+git clone https://github.com/litlfred/bootstrap-tools
+git clone https://github.com/litlfred/cat-harness-tools
+cd cat-harness-tools
+bun install
+bun test scripts/tests/stage-local-ig.test.ts
+```
+
+`main` of `cat-harness` is the right sibling, since this repository's `main`
+tracks it (see `.github/workflows/pr-tests.yml`). Inside a folio-assistant
+index, or a folio with its layers mounted, the same globs match the mounted
+directories and nothing needs cloning. Tests that read other instances (the
+index's workflows, `bootstrap/`, content folios) still need that full mount.
