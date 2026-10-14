@@ -30,6 +30,8 @@ const put = (root: string, rel: string, text = "x") => {
 const sh = (cwd: string, ...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf-8" }).trim();
 const page = (body: string) => `<!doctype html>\n<html><head><title>t</title></head><body>${body}</body></html>\n`;
 const CHROMED_ROOT = page(`<nav id="site-nav"></nav><script type="application/json" id="fa-navbar-row">{}</script>live`);
+/** A root stage-local itself published over railed IG output: the rail and the icon row, no theme side bar, no stamp. */
+const RAILED_ROOT = page(`<nav class="fa-nav"></nav><script type="application/json" id="fa-navbar-row">{}</script>railed`);
 
 const CALLER = `on:
   workflow_dispatch:
@@ -82,7 +84,7 @@ jobs:
  * when `rail` is given — the platform's chrome scripts where a mount puts
  * them) and a gh-pages root that a `folio-site.yml` run chromed.
  */
-function fixture(rail?: string, sync = FAKE_SYNC): { bare: string; repo: string; src: string } {
+function fixture(rail?: string, sync = FAKE_SYNC, root: "folio-site" | "railed" = "folio-site"): { bare: string; repo: string; src: string } {
   const bare = tmp("ig-chrome-origin-");
   sh(bare, "init", "-q", "--bare", "-b", "main");
   const repo = tmp("ig-chrome-repo-");
@@ -103,8 +105,8 @@ function fixture(rail?: string, sync = FAKE_SYNC): { bare: string; repo: string;
 
   const seed = tmp("ig-chrome-seed-");
   sh(seed, "init", "-q", "-b", "gh-pages");
-  put(seed, "index.html", CHROMED_ROOT);
-  put(seed, "folio-build.json", "{}");
+  put(seed, "index.html", root === "folio-site" ? CHROMED_ROOT : RAILED_ROOT);
+  if (root === "folio-site") put(seed, "folio-build.json", "{}");
   put(seed, "branches/other/index.html", "other");
   sh(seed, "add", "-A");
   sh(seed, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "folio-site");
@@ -164,7 +166,7 @@ describe("a root publish never replaces a chromed root with bare pages", () => {
   const deploys = readIgDeploys(readWorkflow(WORKFLOW));
   const main = igTarget(deploys, { isDefault: true, branchDir: "main", sha: "a", runUrl: "u" });
 
-  test("bare output over a chromed root is refused, stamp or no stamp; chromed output replaces folio-site.yml's stamp but never a folio's publish", () => {
+  test("bare output over a chromed root is refused, stamp or no stamp; railed output does not replace folio-site.yml's side bar and stamp, nor a folio's publish", () => {
     const pages = tmp("ig-chrome-pages-");
     put(pages, "index.html", CHROMED_ROOT);
     const out = tmp("ig-chrome-out-");
@@ -174,8 +176,17 @@ describe("a root publish never replaces a chromed root with bare pages", () => {
 
     put(pages, "folio-build.json", "{}");
     expect(() => applyIgDeploy(pages, out, main, () => {})).toThrow(/folio-build\.json/);
-    applyIgDeploy(pages, out, main, () => {}, { chromed: true });
-    expect(existsSync(join(pages, "folio-build.json"))).toBe(false);
+    // Railed IG Publisher output lacks the theme's side bar and the stamp folio-site.yml's root carries.
+    const railed = tmp("ig-chrome-railed-");
+    put(railed, "index.html", RAILED_ROOT);
+    expect(() => applyIgDeploy(pages, railed, main, () => {}, { chromed: true })).toThrow(/side bar \(#site-nav\).*folio-build\.json/);
+    expect(readFileSync(join(pages, "index.html"), "utf-8")).toBe(CHROMED_ROOT);
+    // A candidate carrying all of it replaces the root, stamp included.
+    const whole = tmp("ig-chrome-whole-");
+    put(whole, "index.html", CHROMED_ROOT.replace("live", "new"));
+    put(whole, "folio-build.json", '{"new":1}');
+    applyIgDeploy(pages, whole, main, (from, to) => execFileSync("cp", ["-a", `${from}/.`, to]), { chromed: true });
+    expect(readFileSync(join(pages, "folio-build.json"), "utf-8")).toBe('{"new":1}');
 
     put(pages, "STAGING/x/index.html");
     expect(() => applyIgDeploy(pages, out, main, () => {}, { chromed: true })).toThrow(/folio's site \(STAGING\)/);
@@ -198,8 +209,14 @@ describe("a root publish never replaces a chromed root with bare pages", () => {
     expect(sh(bare, "show", "gh-pages:index.html")).toBe(CHROMED_ROOT.trim());
   }, 60_000);
 
-  test("with the chrome applied, the root is replaced by the chromed IG", async () => {
+  test("railed IG output over a root folio-site.yml built is refused, naming what it lacks, and the branch is untouched", async () => {
     const { bare, repo, src } = fixture(FAKE_RAIL);
+    await expect(stageLocal({ repo, workflowSource: src, log: quiet })).rejects.toThrow(/lacks what the publish root carries: the theme's side bar \(#site-nav\).*folio-build\.json/);
+    expect(sh(bare, "log", "-1", "--format=%s", "gh-pages")).toBe("folio-site");
+  }, 60_000);
+
+  test("with the chrome applied, a railed root is replaced by the chromed IG", async () => {
+    const { bare, repo, src } = fixture(FAKE_RAIL, FAKE_SYNC, "railed");
     const r = await stageLocal({ repo, workflowSource: src, log: quiet });
     expect(r).toMatchObject({ target: "main", pushed: true });
     expect(sh(bare, "show", "gh-pages:index.html")).toContain('id="fa-navbar-row"');
@@ -208,7 +225,7 @@ describe("a root publish never replaces a chromed root with bare pages", () => {
   }, 60_000);
 
   test("a harness-data sync that refuses is said, not fatal: the chrome is judged on the pages", async () => {
-    const { bare, repo, src } = fixture(FAKE_RAIL, FAKE_SYNC_FAILS);
+    const { bare, repo, src } = fixture(FAKE_RAIL, FAKE_SYNC_FAILS, "railed");
     const said: string[] = [];
     const r = await stageLocal({ repo, workflowSource: src, log: (s) => said.push(s) });
     expect(r).toMatchObject({ target: "main", pushed: true });

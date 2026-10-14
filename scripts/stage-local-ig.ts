@@ -49,6 +49,7 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { NAVBAR_ROW_ID } from "./lib/harness-rail.ts";
+import { parityShortfall, siteFeatures } from "./site-parity.ts";
 
 /** The reusable workflow a folio calls. */
 export const FOLIO_WORKFLOW = "folio-staging.yml";
@@ -517,6 +518,10 @@ export function igTarget(d: { main?: IgDeploy; candidate?: IgDeploy }, o: { isDe
  * runs after the build). A root that wears it is never replaced by a folder
  * that does not: the root's `index.html` is read, not only the stamp, because
  * a root chromed by stage-local itself carries no `folio-build.json`.
+ * Beyond the chrome, a clean root deploy must carry everything the root it
+ * replaces carries — the theme's side bar and search, the served
+ * directories, the build stamp — measured on the pages by `site-parity.ts`;
+ * a railed IG Publisher output over a root `folio-site.yml` built is refused.
  */
 export function applyIgDeploy(pages: string, folder: string, t: IgTarget, copy: (from: string, to: string) => void, o: { chromed?: boolean } = {}): void {
   const dest = join(pages, t.dest);
@@ -528,6 +533,9 @@ export function applyIgDeploy(pages: string, folder: string, t: IgTarget, copy: 
     if (!o.chromed && existsSync(index) && wearsChrome(readFileSync(index, "utf-8"))) {
       throw new Error("the publish root wears the harness chrome (#" + NAVBAR_ROW_ID + " on index.html) and this IG output does not; a clean deploy would replace it with bare IG Publisher pages — refusing");
     }
+    // Owner, 2026-10-14: a root publish loses nothing the root has — measured on the pages (site-parity.ts).
+    const short = parityShortfall(siteFeatures(pages, t.keep), siteFeatures(folder));
+    if (short.length) throw new Error(`the IG output lacks what the publish root carries: ${short.join("; ")} — refusing a clean deploy at the root`);
     for (const e of readdirSync(pages)) if (!t.keep.includes(e)) rmSync(join(pages, e), { recursive: true, force: true });
   } else if (t.dest !== "" && t.deploy.clean) {
     rmSync(dest, { recursive: true, force: true });
