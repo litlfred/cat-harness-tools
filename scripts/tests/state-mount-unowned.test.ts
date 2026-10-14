@@ -15,8 +15,9 @@
  * | test | the rule |
  * |---|---|
  * | tipLocations | only a repository-scoped location of a non-root instance carries `unownedBy` |
- * | origin lacks the branch | `absent`, and the mount as a whole is `mounted` |
- * | origin carries the branch | it mounts as before (the folio-assistant case) |
+ * | origin carries no branch of the namespace | `absent`, and the mount as a whole is `mounted` (the smart-ra case) |
+ * | origin carries the branch | it mounts as before |
+ * | origin carries OTHER branches of the namespace, not this one | `miss`, a failure: the checkout adopted the namespace (the folio-assistant case; "Tighten it", #249) |
  * | the root declares the path | the root's declaration wins, and ITS miss is still a failure |
  *
  * Real repositories, as in `state-mount-shared-id.test.ts`: the outcome turns on
@@ -66,6 +67,8 @@ const BEANS_BRANCH = "cat/root/beans";
 interface Opts {
   /** Seed the lower instance's `issue-marks` branch on the checkout's origin. */
   originCarriesMarks?: boolean;
+  /** Seed ANOTHER branch of the lower instance's namespace (`cat/lower/todos`) on the checkout's origin. */
+  originCarriesSibling?: boolean;
   /** The root declares `issue-marks/` itself, on its own branch (seeded only if `rootMarksSeeded`). */
   rootDeclaresMarks?: boolean;
   rootMarksSeeded?: boolean;
@@ -83,6 +86,7 @@ function index(o: Opts = {}) {
   git(base, "init", "-q", "--bare", "-b", "main", origin);
   seed(base, origin, BEANS_BRANCH, { "manifest.json": MANIFEST, "beans/a.md": "A\n" });
   if (o.originCarriesMarks) seed(base, origin, MARKS_BRANCH, { "manifest.json": MANIFEST, "issue-marks/1.json": "{}\n" });
+  if (o.originCarriesSibling) seed(base, origin, "cat/lower/todos", { "manifest.json": MANIFEST, "todos/t.md": "T\n" });
   if (o.rootMarksSeeded) seed(base, origin, ROOT_MARKS_BRANCH, { "manifest.json": MANIFEST, "issue-marks/2.json": "{}\n" });
 
   const work = join(base, "work");
@@ -116,7 +120,7 @@ describe("a repository-scoped graph a mounted instance declares and the root doe
     expect(locs.find((l) => l.id === "beans")?.unownedBy).toBeUndefined();
   });
 
-  test("its branch missing from the checkout's origin is ABSENT, and the mount still succeeds", () => {
+  test("its branch missing, and no branch of its namespace on the checkout's origin: ABSENT, and the mount still succeeds (smart-ra)", () => {
     const f = index();
     const r = mountState({ repoRoot: f.work });
     expect(r.graphs.map((g) => [g.id, g.state])).toEqual([
@@ -128,6 +132,16 @@ describe("a repository-scoped graph a mounted instance declares and the root doe
     const text = report(r);
     expect(text).not.toContain("FAILED");
     expect(text).toContain("`issue-marks`: absent");
+  });
+
+  test("its branch missing while the origin keeps other branches of its namespace: a MISS, and the mount fails (folio-assistant)", () => {
+    const f = index({ originCarriesSibling: true });
+    const r = mountState({ repoRoot: f.work });
+    const g = r.graphs.find((x) => x.id === "issue-marks");
+    expect(g?.state).toBe("miss");
+    expect(g?.reason).toContain("cat/lower/todos");
+    expect(r.state).toBe("partial");
+    expect(report(r)).toContain("FAILED");
   });
 
   test("its branch on the checkout's origin mounts as before", () => {

@@ -96,7 +96,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { locationKey, mountTip, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
+import { locationKey, mountTip, namespaceCarried, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
@@ -138,10 +138,14 @@ export type GraphMount =
   /**
    * A checkout-level (`scope: "repository"`) graph that a mounted instance
    * declares, that the root does not declare, and whose branch the root's
-   * `origin` does not carry ({@link TipLocation.unownedBy}). The graph does not
-   * exist in this checkout, and nothing at the root said it should. Owner,
-   * 2026-10-14 (smart-ra#59, `issue-marks`): "Report as absent", not as a
-   * miss. Only a determined `miss` becomes this: a graph that could not be
+   * `origin` does not carry, where that origin carries NO branch of the
+   * graph's namespace either ({@link TipLocation.unownedBy},
+   * {@link namespaceCarried}). The graph does not exist in this checkout, and
+   * nothing at the root said it should. Owner, 2026-10-14 (smart-ra#59,
+   * `issue-marks`): "Report as absent", not as a miss; then "Tighten it"
+   * (cat-harness-tools#249): a remote that keeps other branches of that
+   * namespace has adopted it (folio-assistant), so a missing one there stays
+   * a `miss`. Only a determined `miss` becomes this: a graph that could not be
    * asked about (`unknown`) or is `corrupt` stays a failure.
    */
   | (GraphMountBase & { state: "absent"; declaredBy: string });
@@ -295,12 +299,19 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
       if (r.state === "mounted") {
         graphs.push({ ...base, state: "mounted", reason: `${r.files} file(s) at ${r.tip.slice(0, 12)}`, tip: r.tip, files: r.files });
       } else if (r.state === "miss" && loc.unownedBy !== undefined) {
-        graphs.push({
-          ...base,
-          state: "absent",
-          declaredBy: loc.unownedBy,
-          reason: `declared for every checkout by ${loc.unownedBy}, not by this root, and ${loc.branch} is not on this checkout's remote; declare it at the root to keep it here`,
-        });
+        const ns = namespaceCarried(loc, root, store);
+        if (ns.state === "not-carried") {
+          graphs.push({
+            ...base,
+            state: "absent",
+            declaredBy: loc.unownedBy,
+            reason: `declared for every checkout by ${loc.unownedBy}, not by this root, and this checkout's remote carries no ${ns.namespace}* branch; declare it at the root to keep it here`,
+          });
+        } else if (ns.state === "carried") {
+          graphs.push({ ...base, state: "miss", reason: `${r.reason}; this checkout's remote carries ${ns.branches.join(", ")}, so it keeps that namespace and the missing branch is a failure` });
+        } else {
+          graphs.push({ ...base, state: "unknown", reason: `${r.reason}; and whether this checkout's remote keeps that namespace could not be asked: ${ns.reason}` });
+        }
       } else {
         graphs.push({ ...base, state: r.state, reason: r.reason });
       }

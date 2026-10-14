@@ -258,9 +258,11 @@ export interface TipLocation {
    * declared it. Such a graph is the checkout's own (its work plan, its issue
    * marks), so it is read from the checkout's `origin`, but no declaration at
    * the root asked for it. If that origin does not carry its branch, the
-   * graph is ABSENT from this checkout, which is not a failed mount (owner,
-   * 2026-10-14, smart-ra#59: "Report as absent"). A root that wants the graph
-   * declares it at the same path, and then this is not set.
+   * graph MAY be absent from this checkout rather than a failed mount (owner,
+   * 2026-10-14, smart-ra#59: "Report as absent"): it is, when that remote
+   * carries no branch of the graph's namespace at all ({@link namespaceCarried};
+   * "Tighten it", cat-harness-tools#249). A root that wants the graph declares
+   * it at the same path, and then this is not set.
    */
   unownedBy?: string;
 }
@@ -1306,6 +1308,42 @@ export function storeOptionsFor(
     storeDir = join(c.stdout.trim(), "branch-store", `${loc.repository.replace(/[^A-Za-z0-9._-]+/g, "__")}.git`);
   }
   return { ...base, remote, storeDir };
+}
+
+/**
+ * Whether the remote a location is read from carries ANY branch in that
+ * location's branch namespace (`cat/cat-harness/` for
+ * `cat/cat-harness/issue-marks`), the location's own branch included.
+ *
+ * The signal behind an unowned graph's `absent` ({@link TipLocation.unownedBy};
+ * owner, 2026-10-14, cat-harness-tools#249: "Tighten it"). A checkout whose
+ * remote keeps a declaring instance's state branches has adopted that
+ * instance's namespace for its own state (folio-assistant carries
+ * `cat/cat-harness/{beans,todos,issue-marks,fsh-guts,...}`), so one of them
+ * going missing there is a failure. A checkout whose remote has no branch in
+ * the namespace (smart-ra) never carried it, and the graph is absent. Whether
+ * the DECLARING repository has the branch cannot tell those two apart:
+ * litlfred/cat-harness carries it in both cases.
+ *
+ * `unknown` when ls-remote could not answer: never read as "not carried".
+ */
+export function namespaceCarried(
+  loc: Pick<TipLocation, "branch" | "repository">,
+  repoRoot: string,
+  store?: BranchStoreOptions,
+): { state: "carried"; branches: string[] } | { state: "not-carried"; namespace: string } | { state: "unknown"; reason: string } {
+  const slash = loc.branch.lastIndexOf("/");
+  const namespace = slash > 0 ? loc.branch.slice(0, slash + 1) : loc.branch;
+  const s = BranchStore.open(loc.branch, { repoRoot, ...storeOptionsFor(loc, repoRoot, store) });
+  const pattern = slash > 0 ? `refs/heads/${namespace}*` : `refs/heads/${loc.branch}`;
+  const ls = s.git(["ls-remote", "--heads", "origin", pattern]);
+  if (ls.status !== 0) return { state: "unknown", reason: `ls-remote failed: ${ls.stderr.trim()}` };
+  const branches = ls.stdout
+    .toString()
+    .split("\n")
+    .map((l) => l.split("\t")[1]?.trim().replace(/^refs\/heads\//, ""))
+    .filter((b): b is string => Boolean(b));
+  return branches.length ? { state: "carried", branches } : { state: "not-carried", namespace };
 }
 
 /**
