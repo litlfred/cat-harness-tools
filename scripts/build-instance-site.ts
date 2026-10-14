@@ -75,7 +75,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { describeFeatures, parityShortfall, siteFeatures } from "./site-parity.ts";
@@ -445,6 +445,39 @@ export function keepPinned(path: string, mountDirs: readonly string[], root: str
   };
 }
 
+/** The files the build's own steps generate into a site's `_data/`: `sync-docs-harness` and `gen-landing-data`. */
+export const GENERATED_DATA = ["_data/harness.json", "_data/stickies.json"] as const;
+
+/**
+ * {@link keepPinned} for every {@link GENERATED_DATA} file in every mount's site
+ * directory. Not only cat-harness: `gen-landing-data` writes the LANDING's
+ * `stickies.json`, which for an IG landing on smart-base is in the smart-base
+ * mount (litlfred/smart-hiv, 2026-10-14). A mount with no declaration has no site
+ * directory and nothing to keep.
+ */
+export function pinGeneratedData(root: string, mountDirs: readonly string[]): () => void {
+  const restores = mountDirs.flatMap((m) => {
+    const dir = join(root, m);
+    const sites = new Set<string>();
+    for (const f of GENERATED_DATA) {
+      try {
+        sites.add(siteFileFor(dir, f));
+      } catch {
+        // no declaration: no site directory
+      }
+      try {
+        sites.add(join(siteDirFor(dir), f));
+      } catch {
+        // no declaration: no site directory
+      }
+    }
+    return [...sites].map((rel) => keepPinned(join(dir, rel), mountDirs, root));
+  });
+  return () => {
+    for (const r of restores) r();
+  };
+}
+
 /** The mount paths `index.lock.json` names in `root`; empty when there is no lock. */
 export function lockedMountPaths(root: string): string[] {
   const lockFile = join(root, "index.lock.json");
@@ -545,10 +578,11 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     [STEP_ENV.upstreamPages]: upstreamFile,
   };
   for (const p of o.pre) run(`pre: ${p}`, stepCommand(root, p), root, env);
-  // The harness data the build rewrites lives in the cat-harness mount: put the pinned
-  // bytes back afterwards, failed build or not, so the mount stays as the lock pins it.
-  const harnessDir = join(root, "cat-harness");
-  const restoreHarnessData = keepPinned(join(harnessDir, siteFileFor(harnessDir, "_data/harness.json")), mounted, root);
+  // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
+  // whichever mount holds the harness or the landing — cat-harness, or smart-base for an
+  // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
+  // every mount stays as the lock pins it.
+  const restoreHarnessData = pinGeneratedData(root, mounted);
   const s = JSON.stringify(site);
   try {
     const has = PROFILE_STEPS[o.profile ?? "folio"];
