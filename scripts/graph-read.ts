@@ -60,7 +60,8 @@
  * the mount (measured: `beans/` is not an instance root), which is precisely
  * why the two questions stay separate.
  */
-import { relative, sep } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
@@ -141,6 +142,25 @@ function declaredEntry(
 }
 
 /**
+ * The checkout that holds `root`: the nearest directory at or above it with a
+ * `.git`. Mount markers live in THAT checkout's git directory, so a caller
+ * that passes an instance root (`test/health/run.ts` passes cat-harness's)
+ * must be looked up there: in an index the instance is a mount with no `.git`
+ * of its own, and asking it for markers found none, so a mounted `health`
+ * read as "not mounted" and the report could not be written. With no `.git`
+ * anywhere above, `root` itself, as before.
+ */
+export function enclosingCheckout(root: string): string {
+  let dir = resolve(root);
+  for (;;) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return resolve(root);
+    dir = up;
+  }
+}
+
+/**
  * Which directory to read for the declared graph `id`.
  *
  * Never throws for a declaration it merely dislikes: an unknown id is
@@ -163,7 +183,7 @@ export function graphReadPath(id: string, repoRoot: string): GraphRead {
   const { absPath, resolved } = found;
   const declaredPath = relative(repoRoot, absPath).split(sep).join("/");
   if (resolved.kind === "branch" && resolved.keyedBy === "route") {
-    const r = routePresence({ id, branch: resolved.branch, keyedBy: resolved.keyedBy }, absPath, repoRoot);
+    const r = routePresence({ id, branch: resolved.branch, keyedBy: resolved.keyedBy }, absPath, enclosingCheckout(repoRoot));
     // Same answer as `not-cut-over` below, and for the same reason: the files are
     // still tracked here, so HERE is the store.
     if (r.state === "not-cut-over") return { state: "ok", at: absPath, from: "checkout", id, path: declaredPath, notCutOver: true };
@@ -197,7 +217,7 @@ export function graphReadPath(id: string, repoRoot: string): GraphRead {
   if (resolved.kind !== "branch" || resolved.keyedBy !== "tip") {
     return { state: "ok", at: absPath, from: "checkout", id, path: declaredPath };
   }
-  const t = tipPresence({ id, branch: resolved.branch, keyedBy: resolved.keyedBy }, absPath, repoRoot);
+  const t = tipPresence({ id, branch: resolved.branch, keyedBy: resolved.keyedBy }, absPath, enclosingCheckout(repoRoot));
   switch (t.state) {
     case "mounted":
       return { state: "ok", at: t.into, from: "mount", id, path: declaredPath };
