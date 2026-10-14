@@ -35,18 +35,22 @@
 # A gate or test already red on main is listed in the step summary, never
 # hidden and never counted against the PR.
 #
-# A caller is about fifteen lines:
+# A caller is the one `uses:` line and nothing else (owner, 2026-10-14:
+# "there shouldnt be copying of code"):
 #
 #   on: { pull_request: {}, workflow_dispatch: {} }
 #   permissions: { contents: read }
 #   jobs:
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
-#       with:
-#         instance: smart-base      # its directory in the index
-#         path-in-repo: smart-base  # where it sits in the caller ('.' for the root)
 #
-# and for a repository that is its own index, `with: { mode: index }`.
+# Everything every caller would otherwise repeat is decided here: the instance
+# is the calling repository's name, the folio-assistant ref is `index-ref`'s
+# default, the judging scripts are at main, and one run per PR is kept
+# (`concurrency`, below). A caller passes an input only when it genuinely
+# differs from that: smart-base's `path-in-repo: smart-base` (its instance is
+# a sub-directory), a `layers-at-main` the dependencies do not imply, or
+# `with: { mode: index }` for a repository that is its own index.
 
 name: Layer PR checks
 
@@ -59,7 +63,7 @@ on:
         type: string
         default: "layer"
       instance:
-        description: "layer mode: the instance's directory in the folio-assistant index (its mount path). index mode: optional."
+        description: "layer mode: the instance's directory in the folio-assistant index (its mount path); empty means the calling repository's name. index mode: optional."
         required: false
         type: string
         default: ""
@@ -92,7 +96,10 @@ on:
         description: "layer mode: the folio-assistant ref to check out (main, or a re-pin branch while main's pins are behind)."
         required: false
         type: string
-        default: "main"
+        # folio-assistant main pins pre-70lx layers until folio-assistant#2529
+        # merges, so every caller pinned this branch by hand. It is pinned
+        # here once instead; set it back to "main" when #2529 merges.
+        default: "claude/nifty-johnson-w3mspn"
       tools-ref:
         description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
         required: false
@@ -101,6 +108,17 @@ on:
 
 permissions:
   contents: read
+
+# One run per PR (or ref), the newest. The group is this workflow's own, so it
+# never collides with a group a caller may still declare.
+concurrency:
+  group: layer-pr-checks-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The instance, once: the input when given, else (layer mode) the calling
+# repository's name, which is the instance's name for every layer.
+env:
+  INSTANCE: ${{ inputs.instance != '' && inputs.instance || (inputs.mode == 'layer' && github.event.repository.name || '') }}
 
 jobs:
   typecheck:
@@ -172,7 +190,6 @@ jobs:
         name: Take the lower layers at main
         env:
           LAYERS: ${{ inputs.layers-at-main }}
-          INSTANCE: ${{ inputs.instance }}
           MODE: ${{ inputs.mode }}
           SUBDIR: ${{ inputs.path-in-repo }}
         run: |
@@ -208,7 +225,6 @@ jobs:
         name: Put the caller in place of its locked mount
         if: inputs.mode == 'layer'
         env:
-          INSTANCE: ${{ inputs.instance }}
           SUBDIR: ${{ inputs.path-in-repo }}
         run: |
           set -euo pipefail
@@ -221,7 +237,7 @@ jobs:
         working-directory: fa
         run: bun install
       - name: tsc --noEmit
-        working-directory: fa/${{ inputs.mode == 'layer' && inputs.instance || '.' }}
+        working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
         run: |
           if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
 
@@ -331,7 +347,7 @@ jobs:
         working-directory: fa
         # Judged by the compare job, not by this exit code.
         env:
-          TEST_PATH: ${{ inputs.test-path != '' && inputs.test-path || (inputs.mode == 'layer' && format('./{0}', inputs.instance) || '') }}
+          TEST_PATH: ${{ inputs.test-path != '' && inputs.test-path || (inputs.mode == 'layer' && format('./{0}', env.INSTANCE) || '') }}
         run: |
           if [ -z "$TEST_PATH" ]; then
             echo "no test-path in index mode: no tests run"
@@ -352,7 +368,7 @@ jobs:
         # Judged by the compare job, not by this exit code.
         env:
           GATE_JOBS: ${{ inputs.gate-jobs }}
-          OWN: ${{ inputs.instance != '' && format('--instance {0}', inputs.instance) || '' }}
+          OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
         # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
         run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN
       - uses: actions/upload-artifact@v4
