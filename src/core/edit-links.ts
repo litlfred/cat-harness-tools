@@ -346,7 +346,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const n = Array.isArray(nodes) ? nodes.find((x) => x.key === key) : null;
       return n ? String(n.formatted !== undefined ? n.formatted : n.value) : undefined;
     };
-    let get, base;
+    let get;
     try {
       const lib = (c.suggest && c.suggest.lib) || SUGGEST_LIB;
       // The theme's own @import of KaTeX names a package, which a CDN cannot resolve: named here.
@@ -364,7 +364,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       get = () => ta.value;
       status.textContent = "The visual editor did not load (" + e.message + "); editing the Markdown directly.";
     }
-    base = get();
+    const base = get();
     // Live: each variable and its current value, and any item whose syntax is broken.
     const refresh = () => {
       if (!dlg.isConnected) return clearInterval(timer);
@@ -387,7 +387,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       let url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + q;
       // GitHub refuses very long URLs: carry the body on the clipboard instead.
       if (url.length > 7000) {
-        try { await navigator.clipboard.writeText(body); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
+        try { await navigator.clipboard.writeText(body); } catch { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
         url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + new URLSearchParams({ title: "Suggested edit: " + s.label, body: "The suggested change is on the clipboard: paste it here." });
       }
       window.open(url, "_blank", "noopener");
