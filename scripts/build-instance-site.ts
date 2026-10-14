@@ -78,7 +78,7 @@ import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
-import { describeFeatures, parityShortfall, siteFeatures } from "./site-parity.ts";
+import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -115,6 +115,12 @@ export interface BuildOptions {
    */
   parity?: "refuse" | "report" | "off";
   parityAgainst?: string;
+  /**
+   * Top-level directories the current root serves that this build drops by the
+   * owner's ruling ({@link DroppedByRuling}): not a shortfall, and said with the
+   * ruling. Matches directory names only; it excuses nothing else.
+   */
+  parityDropped?: DroppedByRuling[];
   /** The platform steps around the declared ones ({@link PROFILE_STEPS}); `folio` when absent. */
   profile?: SiteProfile;
   /** `report`: unresolved links are said, and do not stop the publish. */
@@ -605,7 +611,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       const cand = siteFeatures(site, keep);
       console.log(`parity: ${describeFeatures("current root", cur)}`);
       console.log(`parity: ${describeFeatures("this build  ", cand)}`);
-      const short = parityShortfall(cur, cand);
+      for (const d of droppedByRuling(cur, cand, o.parityDropped ?? [])) console.log(`parity: ${d.dir}/ is dropped by ruling, not a shortfall — ${d.ruling}`);
+      const short = parityShortfall(cur, cand, o.parityDropped ?? []);
       for (const m of short) console.error(`  ✗ ${m}`);
       if (short.length && o.publish && o.parity !== "report") throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
       if (!short.length) console.log("parity: ✓ this build carries everything the published root does");
