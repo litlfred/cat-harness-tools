@@ -144,7 +144,7 @@ jobs:
     # run against the committed `scripts/standalone-baseline.json`: a failure
     # the baseline does not list is red (exit 1), and so is a run that could
     # not be measured (exit 2). A listed test that now passes is printed, not
-    # red; `bun run cat standalone:baseline:tools` writes the shorter list, so
+    # red; `standalone:baseline:tools` writes the shorter list, so
     # the count only goes down. See scripts/check-standalone.ts.
     #
     # The baseline is measured in THIS layout (the index mounts, cat-harness
@@ -167,7 +167,11 @@ jobs:
       - *install
       - name: cat-harness-tools fails standalone no more than its baseline
         working-directory: fa
-        run: bun run cat check:cat-harness-tools-standalone
+        # Called directly, not through `bun run cat`: folio-assistant's root
+        # `cat` alias points at cat-harness/scripts/run-script.ts, which has
+        # moved to this repository, so it does not resolve against cat-harness
+        # main. Same command as `check:cat-harness-tools-standalone`.
+        run: bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools
 
   tests:
     name: Tests (no new failures)
