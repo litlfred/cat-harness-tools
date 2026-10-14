@@ -430,14 +430,15 @@ export function declaredGraphs(
   /** The harness's display name, from `harness.json`. Absent falls back to the directory name. */
   harnessName?: string,
 ): NavItem[] {
-  const decl = declarationPathIn(join(REPO, instanceDirName));
+  const dir = instanceDirOf(instanceDirName);
+  const decl = declarationPathIn(dir);
   if (decl === undefined || !existsSync(decl)) return [];
   let d: { directories?: { graphTypologies?: string[] }[] };
   try {
     // Own entries AND those declared from within (bean `cmsl`): `voices` is
     // declared in `skills/skills.json` now, and the raw file dropped it from
     // every voices viewer page's rail (measured 2026-09-30, bean `2j2r`).
-    d = { directories: instanceDirectories(join(REPO, instanceDirName)) };
+    d = { directories: instanceDirectories(dir) };
   } catch {
     // Not this script's finding — `kg:schema:check` owns an unparseable
     // declaration. Here it is an empty middle, and the caller still renders
@@ -1067,6 +1068,64 @@ export function ownsCheckout(instance: string | undefined): boolean {
   return instance !== undefined && readDeclaration(REPO)?.name === instance;
 }
 
+/**
+ * Where an instance's declaration lives: `<checkout>/<name>/` for a mounted
+ * instance, and the checkout itself for the folio whose own site this is
+ * ({@link ownsCheckout}). Looking only under `<checkout>/<name>/` found no
+ * declaration for smart-ra's `dpi-h-ra` — declared at the repository root —
+ * so every page of that site carried an EMPTY "Graphs" group (owner,
+ * 2026-10-14: "graphs dont work there is nothing there").
+ */
+export function instanceDirOf(instance: string): string {
+  return ownsCheckout(instance) ? REPO : join(REPO, instance);
+}
+
+/**
+ * The folio's OWN graphs on its own site, for a page of that site.
+ *
+ * `harness.json`'s paths are site-absolute and name the PLATFORM's handler
+ * viewers (`/en/cat-harness/beans/`); composed against the platform they open
+ * the platform's work, not the folio's, and composed against this site most
+ * of them do not exist. So a row links only to a page this finished site
+ * HOLDS — the handler's path when the folio published it, else the
+ * directory's declared `coverage.visualiser` (`en/dpi-h-ra/archimate/`) —
+ * and otherwise stays an unlinked row saying why.
+ */
+export function ownSiteGraphs(
+  siteAbs: string,
+  built: string,
+  instance: string,
+  toRoot: string,
+): Map<string, GraphFallback> {
+  const held = (p: string): string | undefined => {
+    const rel = p.replace(/^\/+/, "");
+    if (rel.endsWith(".html")) return existsSync(join(siteAbs, rel)) ? rel.replace(/(^|\/)index\.html$/, "$1") : undefined;
+    const dirRel = rel === "" || rel.endsWith("/") ? rel : `${rel}/`;
+    return existsSync(join(siteAbs, dirRel, "index.html")) ? dirRel : undefined;
+  };
+  const declared = new Map<string, string>();
+  try {
+    for (const entry of instanceDirectories(REPO) as { id: string; graphTypologies?: string[]; coverage?: Parameters<typeof visualisationsOf>[0] }[]) {
+      for (const v of visualisationsOf(entry.coverage, entry.id)) {
+        const at = held(v.ref);
+        if (at === undefined) continue;
+        for (const kind of entry.graphTypologies ?? []) if (!declared.has(kind)) declared.set(kind, at);
+      }
+    }
+  } catch {
+    // An unparseable declaration is `kg:schema:check`'s finding; the rows still come from `declaredGraphs`.
+  }
+  const out = new Map<string, GraphFallback>();
+  for (const [kind, f] of publishedGraphs(built, instance, "")) {
+    const { href, note: _note, ...named } = f;
+    const at = (href !== undefined ? held(href) : undefined) ?? declared.get(kind);
+    if (at !== undefined) out.set(kind, { href: `${toRoot}/${at}`, ...named });
+    else out.set(kind, { note: f.note ?? "not published on this site", ...named });
+  }
+  for (const [kind, at] of declared) if (!out.has(kind)) out.set(kind, { href: `${toRoot}/${at}` });
+  return out;
+}
+
 export function railStandalonePages(
   siteAbs: string,
   built: string,
@@ -1126,7 +1185,9 @@ export function railStandalonePages(
       const named = railNames(built, owner);
       // The platform's links resolve against the platform's site; only home is this site's.
       const linkRoot = foreign?.platformBase ?? toRoot;
-      const links = declaredGraphs(owner, new Map(), publishedGraphs(built, owner, linkRoot), named.harness);
+      // The folio's OWN graphs are on this site, and link only where it holds them.
+      const site = foreign && ownsCheckout(owner) ? ownSiteGraphs(siteAbs, built, owner, toRoot) : publishedGraphs(built, owner, linkRoot);
+      const links = declaredGraphs(owner, new Map(), site, named.harness);
       // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
       const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
       const harnesses = foreign?.instance
