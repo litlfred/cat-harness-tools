@@ -55,6 +55,9 @@
  *   bun run cat index:render:check      # fail when any is not current
  *   … [--root <dir>]                    # default: this checkout
  *
+ * Both build the declared pages first (`lib/index-pages.ts`): an instance's
+ * `<instance>:pages`, for each docs directory it builds that is not on disk.
+ *
  * Exit codes: 0 written or current, or no `index.config.json` (not an index
  * checkout: its root files are a folio's own) · 1 `--check` found a stale or
  * missing file · 2 the index or an instance it names could not be read.
@@ -67,6 +70,7 @@ import { INDEX_CONFIG_FILENAME, readIndexConfig, remoteMountPathOf, type IndexCo
 import { README_TOC_MARKER, syncSections } from "../pipeline/readme-sections.js";
 import { loadReadmeConfig } from "../pipeline/readme-toc.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { buildPages, pagesBuildsFor } from "./lib/index-pages.ts";
 
 /** This instance's root — whatever directory it is mounted at. */
 const HERE = resolve(HARNESS_ROOT);
@@ -420,6 +424,11 @@ export function renderIndex(root: string): IndexRender {
   if (idx.state === "unreadable") return { state: "undetermined", problems: [`${idx.file} is ${idx.why}`] };
   const { rows, problems } = indexRows(root, idx.config);
   if (problems.length > 0) return { state: "undetermined", problems };
+  // Built pages first (owner, 2026-10-14: "Build pages first"): the instance
+  // table links a declared docs directory by its presence, and an IG's docs
+  // are built, so the render reads a built tree in every setting.
+  const failedBuilds = buildPages(root, pagesBuildsFor(root, rows));
+  if (failedBuilds.length > 0) return { state: "undetermined", problems: failedBuilds.map((f) => `pages not built, so the README's links cannot be computed — ${f}`) };
   const ctx = sectionContext(root);
   try {
     const agents = renderAgents(root, idx.config, rows, ctx);
