@@ -12,23 +12,27 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { RenderedImpact } from "@litlfred/cat-harness/schemas/rendered-impact.ts";
 import {
   COMMENT_MARKER,
   EXIT_WAITED,
   LIVE_AFTER_PUSH_MS,
   MAIN_WINDOW_MS,
+  MAX_REVIEW_ROWS,
   MAX_WAIT_MS,
   STAGING_WINDOW_MS,
   clock,
   decide,
   estimateLive,
   parseTip,
+  readImpact,
   readTip,
+  reviewSection,
   stagingComment,
   tipKind,
 } from "../staging-push-gate.ts";
@@ -127,6 +131,120 @@ describe("the PR comment", () => {
     expect(body).toContain(`pushed to \`gh-pages\` at ${clock(pushed)}`);
     expect(body).toContain(clock(pushed + LIVE_AFTER_PUSH_MS));
     expect(body).not.toMatch(/\bis live\b/);
+  });
+});
+
+describe("the pages to review (deep links, bean g4dv)", () => {
+  const STAGING = "https://o.github.io/r/STAGING/s/";
+  const MAIN = "https://o.github.io/r/";
+  type ImpactFile = RenderedImpact["files"][number];
+  const impact = (
+    files: Array<Omit<ImpactFile, "via"> & { via?: string[] }>,
+    undetermined: RenderedImpact["undetermined"] = [],
+  ): RenderedImpact => ({
+    $schema: "rendered-impact/v1",
+    renderer: "docs-site",
+    method: "cone",
+    inputs: [],
+    files: files.map((f) => ({ via: [], ...f })),
+    undetermined,
+  });
+  const base = { owner: "o", repo: "r", slug: "s", branch: "b", sha: "0123456789abcdef", nowMs: NOW, state: "pushed" as const };
+
+  test("no list computed is its own state — said plainly, never 'nothing changed'", () => {
+    const body = stagingComment(base);
+    expect(body).toContain("No page list was computed for this build");
+    expect(body).not.toMatch(/no rendered page|nothing changed/i);
+    expect(body).toContain("https://o.github.io/r/STAGING/s/");
+  });
+
+  test("a changed page links deep into the preview and the same page on main, per anchor", () => {
+    const s = reviewSection(STAGING, MAIN, [
+      impact([
+        { path: "smart-base/processes/x.html", change: "changed", role: "content", anchors: ["step one"] },
+        { path: "a/b.html", change: "changed", role: "content" },
+      ]),
+    ]);
+    expect(s).toContain(`- [\`a/b.html\`](${STAGING}a/b.html) · [before](${MAIN}a/b.html)`);
+    expect(s).toContain(
+      `- [\`smart-base/processes/x.html › step one\`](${STAGING}smart-base/processes/x.html#step%20one) · [before](${MAIN}smart-base/processes/x.html#step%20one)`,
+    );
+    expect(s).toContain("**Pages to review:** 2");
+  });
+
+  test("a new page has no before; a removed page has no preview link", () => {
+    const s = reviewSection(STAGING, MAIN, [
+      impact([
+        { path: "new.html", change: "added", role: "content" },
+        { path: "gone.html", change: "removed", role: "content" },
+      ]),
+    ]);
+    expect(s).toContain(`- [\`new.html\`](${STAGING}new.html) · (new page)`);
+    expect(s).not.toContain(`${MAIN}new.html`);
+    expect(s).toContain(`- removed: \`gone.html\` · [before](${MAIN}gone.html)`);
+    expect(s).not.toContain(`${STAGING}gone.html`);
+  });
+
+  test(`capped at ${MAX_REVIEW_ROWS} rows, with how many more and where`, () => {
+    const files = Array.from({ length: MAX_REVIEW_ROWS + 5 }, (_, i) => ({ path: `p${String(i).padStart(2, "0")}.html`, change: "changed" as const, role: "content" as const }));
+    const s = reviewSection(STAGING, MAIN, [impact(files)]);
+    expect(s.split("\n").filter((l) => l.startsWith("- [")).length).toBe(MAX_REVIEW_ROWS);
+    expect(s).toContain("… and 5 more");
+    expect(s).toContain(`${STAGING}rendered-impact.json`);
+  });
+
+  test("index files are counted, not listed; undetermined inputs are NOT KNOWN, not absent", () => {
+    const s = reviewSection(STAGING, MAIN, [
+      impact(
+        [{ path: "assets/js/search-data.json", change: "changed", role: "index" }],
+        [{ input: "_layouts/default.html", reason: "a layout", scope: "all" }],
+      ),
+    ]);
+    expect(s).toContain("names no rendered page (and 1 index file(s), not listed)");
+    expect(s).not.toContain("search-data.json`](");
+    expect(s).toContain("**Not known**");
+    expect(s).toContain("`_layouts/default.html` — can change any page");
+  });
+
+  test("with a list, the main-site root is not presented as the comparison", () => {
+    const body = stagingComment({ ...base, impact: [impact([{ path: "a.html", change: "changed", role: "content" }])] });
+    expect(body).not.toContain("to review changes");
+    expect(body).toContain("**Main site:** https://o.github.io/r/");
+    expect(body).toContain(`[before](${MAIN}a.html)`);
+  });
+
+  test("pages come before data files, so the capped rows are the ones a reviewer reads", () => {
+    const s = reviewSection(STAGING, MAIN, [
+      impact([
+        { path: "assets/a.css", change: "changed", role: "data" },
+        { path: "z/page.html", change: "changed", role: "content" },
+      ]),
+    ]);
+    expect(s.indexOf("z/page.html")).toBeLessThan(s.indexOf("assets/a.css"));
+  });
+
+  test("readImpact: one impact or an array; anything else is undefined", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-i-"));
+    const one = join(dir, "one.json");
+    writeFileSync(one, JSON.stringify(impact([{ path: "a.html", change: "changed", role: "content" }])));
+    expect(readImpact(one)?.length).toBe(1);
+    const bad = join(dir, "bad.json");
+    writeFileSync(bad, "{}");
+    expect(readImpact(bad)).toBeUndefined();
+    expect(readImpact(join(dir, "missing.json"))).toBeUndefined();
+  });
+
+  test("CLI --impact puts the deep links in the body", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-ci-"));
+    const file = join(dir, "rendered-impact.json");
+    writeFileSync(file, JSON.stringify(impact([{ path: "a/b.html", change: "changed", role: "content" }])));
+    const out = join(dir, "c.md");
+    const r = spawnSync("bun", ["run", SCRIPT, "comment", "--state", "pushed", "--out", out, "--impact", file], {
+      encoding: "utf-8",
+      env: { ...process.env, GITHUB_REPOSITORY: "o/r", SLUG: "s", BRANCH: "b", SHA: "abcdef1234" },
+    });
+    expect(r.status).toBe(0);
+    expect(readFileSync(out, "utf8")).toContain(`(${STAGING}a/b.html) · [before](${MAIN}a/b.html)`);
   });
 });
 

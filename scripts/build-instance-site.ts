@@ -84,6 +84,49 @@ export interface BuildOptions {
   publish: boolean;
   remote?: string;
   message?: string;
+  /**
+   * The site's title and description when the checkout declares no instance:
+   * a repository that only mounts layers (`index.config.json`), such as an IG
+   * repository on its base harness. `instance` is then the chrome's SCOPE, an
+   * instance the checkout mounts, and the title is the site's own.
+   */
+  identity?: { title: string; description?: string };
+  /** More root entries a root publish keeps, beside `STAGING/` and `_render-log/`. */
+  keep?: string[];
+  /** Root files the built site must hold before it is published (a step's promise, checked). */
+  require?: string[];
+}
+
+/** The `require`d root files a built site does not hold. */
+export function missingRequired(site: string, required: readonly string[]): string[] {
+  return required.filter((f) => !existsSync(join(site, f)));
+}
+
+/**
+ * The environment every step runs with, so a step needs no flag for what the
+ * build already knows: the site's base path, and the file in which a step
+ * lists the pages whose links are the CONTENT's own (see {@link checkLinks}).
+ */
+export const STEP_ENV = { baseurl: "FOLIO_SITE_BASEURL", upstreamPages: "FOLIO_SITE_UPSTREAM_PAGES" } as const;
+
+/**
+ * How a step runs: `bun run <name>` from the checkout's own `package.json`, or,
+ * in a checkout with none (it only mounts layers), through `run-script.ts`,
+ * which finds the name among the mounted layers' checkout scripts. Either way
+ * a step is a script NAME, never a command.
+ */
+export function stepCommand(root: string, name: string): string {
+  if (!SCRIPT_NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a package script name`);
+  return existsSync(join(root, "package.json")) ? `bun run ${name}` : `bun run ${JSON.stringify(join(import.meta.dir, "run-script.ts"))} ${name}`;
+}
+
+/**
+ * The site-relative pages a step listed as carrying the content's own links:
+ * one path per line, `#` comments and blank lines ignored.
+ */
+export function readUpstreamPages(file: string): Set<string> {
+  if (!existsSync(file)) return new Set();
+  return new Set(readFileSync(file, "utf-8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#")));
 }
 
 /** A branch name safe to use as one path segment under STAGING/. */
@@ -245,15 +288,23 @@ function served(site: string, rel: string): boolean {
   return existsSync(`${p}.html`);
 }
 
-export async function checkLinks(site: string, base: string): Promise<{ pages: number; files: number; misses: string[] }> {
+/**
+ * Every unresolved link of the built site. A link on a page in `upstream` is
+ * returned apart, in `upstreamMisses`: that page carries the CONTENT's own
+ * links (an IG's source pages, the IG Publisher's output), whose dead links
+ * are the content's to fix and are reported, while a dead link on any other
+ * page is the build's and refuses the publish.
+ */
+export async function checkLinks(site: string, base: string, upstream: ReadonlySet<string> = new Set()): Promise<{ pages: number; files: number; misses: string[]; upstreamMisses: string[] }> {
   const misses: string[] = [];
+  const upstreamMisses: string[] = [];
   const pages = htmlFiles(site);
   for (const page of pages) {
     const rel = relative(site, page).split(sep).join("/");
     for (const url of await pageUrls(readFileSync(page, "utf-8"))) {
       const t = targetOf(url, rel, base);
       if (t === undefined) continue;
-      if (t === "outside-base" || !served(site, t)) misses.push(`${rel}: ${url}`);
+      if (t === "outside-base" || !served(site, t)) (upstream.has(rel) ? upstreamMisses : misses).push(`${rel}: ${url}`);
     }
   }
   let files = 0;
@@ -265,12 +316,12 @@ export async function checkLinks(site: string, base: string): Promise<{ pages: n
     }
   };
   count(site);
-  return { pages: pages.length, files, misses };
+  return { pages: pages.length, files, misses, upstreamMisses };
 }
 
-function run(label: string, cmd: string, cwd: string): void {
+function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
   console.log(`▶ ${label}`);
-  const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit" });
+  const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit", env: { ...process.env, ...env } });
   if (r.status !== 0) throw new Error(`${label} failed (exit ${r.status}): ${cmd}`);
 }
 
@@ -313,14 +364,17 @@ export function keepPinned(path: string, mountDirs: readonly string[], root: str
 export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string; base: string }> {
   const root = resolve(o.root);
   const declFile = findDeclarationFile(root);
-  const decl = declFile === undefined ? undefined : siteFields(readFileSync(join(root, declFile), "utf-8"), join(root, declFile));
-  if (!decl) throw new Error(`${root} holds no instance declaration`);
-  if (decl.name !== o.instance) throw new Error(`${root} declares ${decl.name}, not ${o.instance}`);
+  const declared = declFile === undefined ? undefined : siteFields(readFileSync(join(root, declFile), "utf-8"), join(root, declFile));
+  if (!declared && !o.identity) throw new Error(`${root} holds no instance declaration`);
+  if (declared && !o.identity && declared.name !== o.instance) throw new Error(`${root} declares ${declared.name}, not ${o.instance}`);
+  // With an identity the site is the checkout's own and `instance` only scopes the chrome.
+  const decl = o.identity ? { name: o.instance, title: o.identity.title, description: o.identity.description } : declared!;
   const remote = capture("git remote get-url origin", root);
   const gh = ownerRepo(remote);
   if (!gh) throw new Error(`origin ${remote} is not a GitHub repository: the base path cannot be read`);
   const title = decl.title ?? decl.name;
   for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+  if (o.keep?.some((k) => k === "" || k.includes("/") || k === "." || k === "..")) throw new Error(`keep names root entries, not paths: ${JSON.stringify(o.keep)}`);
   const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
   const out = resolve(o.out);
@@ -344,11 +398,15 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const mounted: string[] = existsSync(lockFile)
     ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
     : [];
-  run("install", ["bun install --no-save >/dev/null", ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
-  for (const p of o.pre) run(`pre: ${p}`, `bun run ${p}`, root);
+  const ownPackage = existsSync(join(root, "package.json"));
+  run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
+  const upstreamFile = join(out, "upstream-pages.txt");
+  const stepEnv = { [STEP_ENV.baseurl]: baseurl, [STEP_ENV.upstreamPages]: upstreamFile };
+  for (const p of o.pre) run(`pre: ${p}`, stepCommand(root, p), root, stepEnv);
 
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
+  writeFileSync(upstreamFile, "");
   // The harness data the build rewrites lives in the cat-harness mount: put the pinned
   // bytes back afterwards, failed build or not, so the mount stays as the lock pins it.
   const harnessDir = join(root, "cat-harness");
@@ -361,7 +419,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-    for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
+    for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${JSON.stringify(docs)}`, root, stepEnv);
 
     // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
     const harness = join(root, "cat-harness");
@@ -384,7 +442,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       gemDir,
     );
 
-    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `bun run ${st} ${s}`, root);
+    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, stepEnv);
     run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
     run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
     run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
@@ -395,8 +453,15 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   }
   writeFileSync(join(site, ".nojekyll"), "");
 
-  const links = await checkLinks(site, `${baseurl}/`);
+  const lacking = missingRequired(site, o.require ?? []);
+  if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
+  const upstream = readUpstreamPages(upstreamFile);
+  const links = await checkLinks(site, `${baseurl}/`, upstream);
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);
+  if (links.upstreamMisses.length > 0) {
+    console.log(`links: ${links.upstreamMisses.length} unresolved on ${upstream.size} page(s) the content supplies (reported, not gated: the content's own to fix):`);
+    for (const m of links.upstreamMisses.slice(0, 20)) console.log(`  · ${m}`);
+  }
   if (links.misses.length > 0) {
     for (const m of links.misses.slice(0, 50)) console.error(`  ✗ ${m}`);
     throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
@@ -415,7 +480,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     }
     const opts: Parameters<typeof publishSite>[0] & { into?: string; keep?: string[] } = staging
       ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
-      : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" };
+      : { site, remote: o.remote, keep: [...new Set(["STAGING", "_render-log", ...(o.keep ?? [])])], message, name: "Claude", email: "noreply@anthropic.com" };
     const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);
     console.log(r.state === "published" ? `published ${r.commit} (attempt ${r.attempt})` : "branch already current");

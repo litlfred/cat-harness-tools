@@ -62,6 +62,8 @@
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --check
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --doc <doc-id>
+ *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --entry <entry-dir>
+ *   (any other argument is refused, and nothing is written)
  *
  * @module pipeline/gen-library-jsonld
  * @covers library, uploads
@@ -949,8 +951,33 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
   return { state: "no-input" };
 }
 
+/** The flags `run` reads, and those that take a value. */
+const FLAGS = new Set(["--check", "--prune", "--entry", "--doc"]);
+const VALUED = new Set(["--entry", "--doc"]);
+
+/**
+ * An argument `run` would not read, or undefined. A flag it does not know
+ * used to be ignored, so `--help` ran a full WRITE over every library
+ * (2026-10-14, litlfred/dth-hrh): an unknown flag is now refused before
+ * anything is written.
+ */
+export function unknownArgument(argv: readonly string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (!FLAGS.has(a)) return a;
+    if (VALUED.has(a)) i++;
+  }
+  return undefined;
+}
+
 async function run(): Promise<number> {
   const argv = process.argv.slice(2);
+  const unknown = unknownArgument(argv);
+  if (unknown !== undefined) {
+    console.error(`gen-library-jsonld: unknown argument ${JSON.stringify(unknown)}; nothing written.`);
+    console.error("usage: gen-library-jsonld.ts [--check] [--prune] [--doc <doc-id>] | --entry <dir>");
+    return 2;
+  }
   // ONE entry directory, wherever it is — a STAGED entry, before promotion.
   // `ingest-document.ts` runs this as the `referenced` rung's manifest arm
   // (bean `scfh`), so the manifest has one writer whether the entry is staged

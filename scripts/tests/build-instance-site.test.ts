@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand } from "../build-instance-site.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -94,5 +94,40 @@ describe("keepPinned — a build leaves a mounted layer as the lock pins it (lit
     writeFileSync(f, "new");
     restore();
     expect(readFileSync(f, "utf-8")).toBe("new");
+  });
+});
+
+describe("build-instance-site — a checkout that only mounts layers (an IG repository)", () => {
+  test("a step runs from the checkout's own package.json, or through run-script.ts where it has none", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-step-"));
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
+    writeFileSync(join(d, "package.json"), "{}");
+    expect(stepCommand(d, "build:site")).toBe("bun run build:site");
+    expect(() => stepCommand(d, "x; rm -rf /")).toThrow();
+  });
+
+  test("the pages a step lists as the content's own: one per line, comments and blanks ignored", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-up-"));
+    expect(readUpstreamPages(join(d, "absent.txt")).size).toBe(0);
+    writeFileSync(join(d, "u.txt"), "# composed\na.html\n\nsub/b.html\n");
+    expect([...readUpstreamPages(join(d, "u.txt"))]).toEqual(["a.html", "sub/b.html"]);
+  });
+
+  test("a required root file a step did not write is named, so the site is not published", () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-req-"));
+    writeFileSync(join(site, "index.html"), "x");
+    expect(missingRequired(site, ["folio-build.json", "index.html"])).toEqual(["folio-build.json"]);
+    writeFileSync(join(site, "folio-build.json"), "{}");
+    expect(missingRequired(site, ["folio-build.json"])).toEqual([]);
+  });
+
+  test("a dead link on a content page is reported apart; one on any other page still refuses", async () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-links-"));
+    mkdirSync(join(site, "sub"));
+    writeFileSync(join(site, "index.html"), '<a href="sub/b.html">ok</a><a href="gone.html">dead</a>');
+    writeFileSync(join(site, "sub", "b.html"), '<a href="../StructureDefinition-x.html">dead</a>');
+    const r = await checkLinks(site, "/repo/", new Set(["sub/b.html"]));
+    expect(r.misses).toEqual(["index.html: gone.html"]);
+    expect(r.upstreamMisses).toEqual(["sub/b.html: ../StructureDefinition-x.html"]);
   });
 });
