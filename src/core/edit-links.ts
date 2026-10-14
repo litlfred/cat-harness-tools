@@ -247,8 +247,16 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // A page that learns its repository later (the folio site reads it from its outline) says so here.
   const configure = (c) => { cfg = c; };
   window.faEditLinks = { urls: faBlockUrls, fill: fill, configure: configure };
+  // Both the link reached and the host it sits in: a pointer that lands
+  // straight on a compact host's link (no gap crossed) or keyboard focus on it
+  // matches the bare link first, which carries no facts of its own.
   for (const ev of ["pointerover", "focusin", "touchstart"])
-    document.addEventListener(ev, (e) => { const h = e.target.closest && e.target.closest("[data-src], a[data-fa-link]"); if (h) ready(h); }, { passive: true });
+    document.addEventListener(ev, (e) => {
+      if (!e.target.closest) return;
+      const a = e.target.closest("a[data-fa-link]"), h = e.target.closest("[data-src]");
+      if (a) ready(a);
+      if (h && h !== a) ready(h);
+    }, { passive: true });
 })();`;
 
 /** The published asset, `cat-harness/site-chrome/assets/js/edit-links.js`: the runtime, as a file. A test holds them equal. */
@@ -267,8 +275,10 @@ ${EDIT_LINKS_RUNTIME}
 export function compactActionsHtml(b: BlockContext): string {
   return (
     `<span class="block-actions" data-block="${esc(b.label)}" data-src="${esc(b.source)}"${b.section ? ` data-sec="${esc(b.section)}"` : ""}${b.repo ? ` data-repo="${esc(b.repo)}"` : ""}>` +
-    `<a class="ba-edit" data-fa-link="edit" title="Edit this block's source on GitHub">✎ edit</a>` +
-    `<a class="ba-feedback" data-fa-link="feedback" title="Give feedback on this block (opens a GitHub issue)">📣 feedback</a>` +
+    // tabindex: an <a> without href takes no keyboard focus, and focus is
+    // one of the events that fills it.
+    `<a class="ba-edit" data-fa-link="edit" tabindex="0" title="Edit this block's source on GitHub">✎ edit</a>` +
+    `<a class="ba-feedback" data-fa-link="feedback" tabindex="0" title="Give feedback on this block (opens a GitHub issue)">📣 feedback</a>` +
     `</span>`
   );
 }
@@ -288,7 +298,7 @@ export function editLinkHtml(
   return (
     `<a class="${o.className ?? "fa-edit-link"}" data-fa-link="${kind}" data-src="${esc(o.source)}"` +
     `${o.label ? ` data-block="${esc(o.label)}"` : ""}${o.line ? ` data-line="${o.line}"` : ""}${o.repo ? ` data-repo="${esc(o.repo)}"` : ""}` +
-    `${fallback ? ` href="${esc(fallback)}"` : ""}>${esc(text)}</a>`
+    `${fallback ? ` href="${esc(fallback)}"` : ` tabindex="0"`}>${esc(text)}</a>`
   );
 }
 
