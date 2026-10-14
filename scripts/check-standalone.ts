@@ -37,7 +37,7 @@
  * - **could not determine** (2): the probe could not produce a summary, or no
  *   baseline is committed. Never rendered as held.
  *
- * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--update]
+ * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--update | --measured-out <file>]
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -71,11 +71,30 @@ export interface Judgement {
 }
 
 /** Pure: the probe's result against the committed baseline. */
-export function judge(probe: Probe, baseline: Baseline | undefined): Judgement {
+/**
+ * A failure's key with its test file relative to the layer. Bun names a file
+ * by its absolute path when it sits outside the run's working directory, so the
+ * same test keyed `/home/runner/…/<layer>/pipeline/x.test.ts` on CI and
+ * `/home/user/…/<layer>/pipeline/x.test.ts` locally read as two tests: a new
+ * failure on CI for a test the baseline lists. Cut at the layer's directory.
+ */
+export function layerRelativeKey(key: string, layer: string): string {
+  if (!key.startsWith("/")) return key;
+  const at = key.split(" > ")[0]!.lastIndexOf(`/${layer}/`);
+  return at < 0 ? key : key.slice(at + layer.length + 2);
+}
+
+/** The command that rewrites one layer's entry, named so it can be pasted as printed. */
+export const refreshCommand = (layer: string): string =>
+  `bun run cat-harness-tools/scripts/check-standalone.ts --layer ${layer} --update`;
+
+export function judge(probe: Probe, baseline: Baseline | undefined, layer?: string): Judgement {
   if (probe.state !== "measured") {
     return { exit: STANDALONE_EXIT.undetermined, lines: [`could not determine: ${probe.note}`] };
   }
-  const measured: Baseline = { failing: [...probe.findings].sort(), failed: probe.count };
+  const key = (k: string): string => (layer ? layerRelativeKey(k, layer) : k);
+  if (baseline) baseline = { ...baseline, failing: baseline.failing.map(key) };
+  const measured: Baseline = { failing: [...new Set(probe.findings.map(key))].sort(), failed: probe.count };
   if (!baseline) {
     return {
       exit: STANDALONE_EXIT.undetermined,
@@ -93,7 +112,7 @@ export function judge(probe: Probe, baseline: Baseline | undefined): Judgement {
   const lines: string[] = [];
   const shorter: string[] = [];
   if (fixed.length > 0) {
-    shorter.push(`${fixed.length} listed test(s) now pass standalone — not a failure; \`bun run cat standalone:baseline\` lowers the list:`);
+    shorter.push(`${fixed.length} listed test(s) now pass standalone — not a failure; \`${layer ? refreshCommand(layer) : "bun run cat standalone:baseline"}\` lowers the list:`);
     for (const n of fixed) shorter.push(`  - ${n}`);
   }
   if (grew.length > 0) {
@@ -162,7 +181,18 @@ function main(argv: string[]): number {
     return STANDALONE_EXIT.undetermined;
   }
 
-  const verdict = judge(probeStandalone(repoRoot, name, decls), readBaseline(name));
+  const probe = probeStandalone(repoRoot, name, decls);
+  const out = arg("--measured-out", argv);
+  if (out) {
+    // CI measures base and head with this, and judges the pair against the
+    // baseline in .github/scripts/compare-standalone.py: cat-harness main moves
+    // under both, so only what head newly breaks is the PR's.
+    const keyed = probe.state === "measured" ? { ...probe, findings: [...new Set(probe.findings.map((k) => layerRelativeKey(k, name)))].sort() } : probe;
+    writeFileSync(out, JSON.stringify(keyed, null, 2) + "\n");
+    console.log(`wrote ${out}: ${probe.state}${probe.state === "measured" ? `, ${probe.count} failing` : ` (${probe.note})`}`);
+    return probe.state === "measured" ? STANDALONE_EXIT.held : STANDALONE_EXIT.undetermined;
+  }
+  const verdict = judge(probe, readBaseline(name), name);
   if (argv.includes("--update") && verdict.measured) {
     writeBaseline(name, verdict.measured);
     console.log(`wrote ${relative(repoRoot, BASELINE_PATH)} for ${name}: ${verdict.measured.failed} failing standalone.`);

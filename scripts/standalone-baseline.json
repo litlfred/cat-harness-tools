@@ -8,7 +8,6 @@
     "cat-harness-tools": {
       "failed": 455,
       "failing": [
-        "/home/user/ci-layout/fa/cat-harness-tools/pipeline/pot-for-pages.test.ts > the page set is derived, never written down > the derived set is a SUBSET of what the module owns",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > bytes that are not OpenAPI 3 are FAILED and never replace a held copy",
@@ -18,6 +17,7 @@
         "openapi/scripts/openapi.test.ts > the committed gateway API > a config kept INSIDE the declared openapi directory is found, and one at the root wins",
         "openapi/scripts/openapi.test.ts > the committed gateway API > a hand edit to the document is caught",
         "openapi/scripts/openapi.test.ts > the committed gateway API > is held and matches its provenance",
+        "pipeline/pot-for-pages.test.ts > the page set is derived, never written down > the derived set is a SUBSET of what the module owns",
         "schemas/cat-harness.test.ts > a directory declares the theme it renders on (owner, 2026-09-20) > THE METHODOLOGIES TAKE `analyst`, and the theme id is real",
         "schemas/cat-harness.test.ts > instanceRootsIn — discovered, never listed > finds EVERY instance of THIS repository, which is the defect it fixes",
         "schemas/cat-harness.test.ts > materialiseDirectories > this instance declares uploads, and reaches a library",
