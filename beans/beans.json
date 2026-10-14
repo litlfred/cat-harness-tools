@@ -28,6 +28,7 @@
     {
       "id": "marks",
       "path": "marks",
+      "subgraph": true,
       "graphTypologies": [
         "sweep-marks"
       ],
