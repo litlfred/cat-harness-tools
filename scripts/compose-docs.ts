@@ -120,6 +120,7 @@ import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visua
 import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
+import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -1018,6 +1019,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   // ever writes over the other or over a page.
   const forwards = opts.shell ? { written: [], superseded: [] } : writeForwardingPages(out, repo, withheld);
 
+
   // DEDUPED. A path present in two layers is withheld once per layer, and a
   // report listing it twice made `withheld.length` stop meaning "files this
   // tree does not carry" — which is the only thing a reader would use it for.
@@ -1037,6 +1039,28 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     ...(scoped ? { scoped } : {}),
     ...(opts.platformOnly ? { leftOut } : {}),
   };
+}
+
+/**
+ * THE GLOB SCOPES, EXPANDED — the stage the CLI runs straight after
+ * `compose()`, over the finished tree (owner, 2026-10-14: "Explicit scopes").
+ *
+ * Jekyll re-runs a glob scope's `Dir.glob` on every `to_liquid` of every page,
+ * which was most of the docs build's CPU; one exact-path scope per match is
+ * the same set of pages in Jekyll 3.10 and 4 at a fraction of the cost
+ * (`lib/default-scope-globs.ts`). Generated here, never written by hand, so a
+ * page added to a globbed folder is covered by the next compose.
+ *
+ * A stage of its own rather than part of `compose()`: composition is ruled
+ * parse-equal to the merge of the layers' configs (D1), and the tests that
+ * hold it to that stay true of `compose()`. This stage then rewrites ONLY the
+ * `defaults` block, splicing it into the composed file's text, so every other
+ * key keeps its bytes; with no glob scope the file is not touched at all.
+ */
+export function expandComposedScopes(out: string): ExpandedScope[] {
+  const configPath = join(out, "_config.yml");
+  if (!existsSync(configPath)) return [];
+  return expandGlobScopesInFile(configPath, out);
 }
 
 /** Every file beneath a directory with its bytes — for the identity check. */
@@ -1105,6 +1129,10 @@ if (import.meta.main) {
       }
     : undefined;
   const r = compose(resolve(out), REPO, { staging, changedFiles, shell, platformOnly, ...(foreign ? { foreign } : {}) });
+  // The glob front-matter scopes, expanded over the tree just composed.
+  // Not on a shell: its pages are composed into it by later steps, so its
+  // tree is not finished here, and a glob expanded now would miss them.
+  const scopes = shell ? [] : expandComposedScopes(resolve(out));
   if (shell) console.log("  --shell: the chrome only — Jekyll machinery and assets, no page, no composed instance");
   for (const l of r.leftOut ?? []) {
     console.log(`  --platform-only: left out ${l.id} (repository) — ${relative(REPO, l.dir)}; the site's own steps compose it`);
@@ -1154,6 +1182,9 @@ if (import.meta.main) {
     console.log(`  ${d.carry ? "CARRIED " : "STUBBED "} ${d.instance.under} — ${d.why}`);
   }
 
+  // Each glob scope with what it became, so a reader can see a folder's pages
+  // were covered rather than trust a count.
+  for (const x of scopes) console.log(`  SCOPE    ${x.glob} -> ${x.paths.length} exact path(s): ${x.paths.join(", ")}`);
   console.log(`  ${r.aliases.written.length} alias redirect(s) written`);
   console.log(
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +
