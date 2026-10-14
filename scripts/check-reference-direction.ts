@@ -394,6 +394,39 @@ const LAYERING_SPECIFICATIONS = [
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
+ * X5 — a DATED DECISION RECORD (owner, 2026-10-14, Q1 of the #2529
+ * reference-direction review: "Exempt as records").
+ *
+ * A proposal under an instance's `docs/proposals/` whose file name ends in the
+ * date it was written (`<topic>-YYYY-MM-DD.md`, or the `.json` measurement it
+ * carries) is a RECORD: it states the options, the measurements and the
+ * layering as they stood on that day, and the owner answered it as written.
+ * Rewording it afterwards so that it no longer names a higher layer would
+ * falsify what was asked and what was decided — the same reason X3 leaves the
+ * layering specifications naming the layers they define.
+ *
+ * Deliberately narrow, and each half is held by a test:
+ *
+ *  - **dated** — the file name must END in `-YYYY-MM-DD`. The undated pages
+ *    beside them (`index.md`, `README.md`, a proposal still being argued
+ *    without a date) are living documents, edited as the answer changes, and
+ *    stay `wrong-direction`.
+ *  - **a proposal** — directly under `docs/proposals/` of an instance root,
+ *    not in a sub-directory and not in any other `docs/` section.
+ *
+ * A pattern rather than a named list, unlike X3, because the owner ruled on
+ * the CLASS ("dated decision records"), not on three files: every dated record
+ * written later is the same kind of thing for the same reason.
+ */
+// declared-path-literal: the shape of a dated proposal record, repo-root-relative because that is how an occurrence's file is reported
+const DATED_PROPOSAL_RECORD_FILE = /^[a-z0-9][a-z0-9-]*\/docs\/proposals\/[a-z0-9][a-z0-9-]*-\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\.(?:md|json)$/;
+export const DATED_PROPOSAL_RECORD: ReferenceExemption = {
+  file: DATED_PROPOSAL_RECORD_FILE,
+  reason:
+    "X5, a DATED DECISION RECORD (owner, 2026-10-14, Q1: \"Exempt as records\"): a proposal whose file name carries the date it was written records the layering, the options and the measurements as they stood that day, and the owner answered it as written. Rewording it to stop naming a higher layer would falsify the record. Dated files directly under an instance's `docs/proposals/` only; the undated index and living pages beside them are read",
+};
+
+/**
  * X4 — a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z,
  * session_01UC1NuEuSy1MBNpEhnDuiGj: "2 y", ruling (ii) — *"rule that a harness
  * skill may name a cat-harness-tools script"*).
@@ -469,6 +502,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
     reason:
       "X3, a LAYERING SPECIFICATION (owner, Q-B 2026-10-01): the file's subject IS the instance graph — it defines the layers, so it names them. Moved to any one layer it could no longer describe the others. A named list of three, ruled by the owner, never a pattern",
   },  DEFINITION_NAMES_IMPLEMENTATION,
+  DATED_PROPOSAL_RECORD,
 ];
 
 /**

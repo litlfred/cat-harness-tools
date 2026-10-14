@@ -531,8 +531,8 @@ const instancesSection: ReadmeSection = {
       // A declared directory that is NOT ON DISK is not linked, and is
       // counted instead. An index checkout lays an instance down as a remote
       // mount, and a mount may take only some of its directories
-      // (`overrides.<name>.directories`) — smart-base's `docs/` is declared and
-      // not mounted. Linking it rendered a dead link in a generated row, which
+      // (`overrides.<name>.directories`) — an instance's declared `docs/` may
+      // not be mounted. Linking it rendered a dead link in a generated row, which
       // asserts the entry exists; dropping it silently would hide the gap.
       const dirs = (kind: string): Array<{ path: string; scope?: string }> =>
         (decl.directories ?? [])
@@ -998,7 +998,7 @@ export function syncSections(
 /**
  * Load the science layer's coverage computation, if it is installed.
  *
- * Through the `lean-coverage` pipeline slot, which folio-assistant-sci fills
+ * Through the `lean-coverage` pipeline slot, which a higher layer fills
  * (bean `squu`). This used to import `scripts/lean-coverage.ts` by a variable
  * path under THIS instance's root, which named no file to the partition but
  * would have found nothing once that script moves to the science layer, and
