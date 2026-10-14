@@ -96,6 +96,19 @@ describe("scriptsFor — a gate command to the files it runs", () => {
     expect(scriptsFor("bun run check:x:check", scripts)).toEqual(["cat-harness/scripts/check-x.ts"]);
   });
 
+  test("through publish-check to the writer it runs (B1)", () => {
+    // The gate audits what the writer writes, so the writer's `@covers` is the
+    // gate's; publish-check's own `@covers none` must not be all it reads.
+    const routed = {
+      "docs:x": "bun run cat-harness-tools/scripts/gen-x.ts",
+      "docs:x:check": "bun run cat-harness-tools/scripts/publish-check.ts docs:x",
+    };
+    expect(scriptsFor("bun run cat docs:x:check", routed)).toEqual([
+      "cat-harness-tools/scripts/publish-check.ts",
+      "cat-harness-tools/scripts/gen-x.ts",
+    ]);
+  });
+
   test("a command with no script resolves to nothing, rather than guessing", () => {
     expect(scriptsFor("bun run cat lint", scripts)).toEqual([]);
     expect(scriptsFor("bunx tsc --noEmit -p tsconfig.json", scripts)).toEqual([]);
