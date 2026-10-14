@@ -87,15 +87,16 @@ export interface BlockActionsConfig {
    */
   graph?: string;
   /**
-   * The ✍ suggest editor. `lib`/`module`/`katex`: where Milkdown Crepe and
-   * KaTeX load from, when not the pinned CDN copies (tests, an offline
-   * mirror). `profiles`: the editor-checker bundles for this page's blocks
+   * The ✍ suggest editor. `module`/`css`/`katex`: where Milkdown Crepe, its
+   * stylesheet and KaTeX load from, when not the site's own bundle at
+   * `assets/vendor/crepe/` (`scripts/suggest-editor.ts`; tests, a mirror).
+   * `profiles`: the editor-checker bundles for this page's blocks
    * (`bundleEditorProfiles` in `pipeline/editor-profiles.ts`), and
    * `katexMacros` the page's KaTeX macro table they are handed.
    */
   suggest?: {
-    lib?: string;
     module?: string;
+    css?: string;
     katex?: string;
     katexMacros?: Record<string, string>;
     profiles?: Array<{ id: string; module: string; kinds?: string[]; extensions?: string[]; rawLatexFirstFor?: string[] }>;
@@ -282,9 +283,6 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // checked is that each is well-formed, and the panel under the editor shows
   // each variable's current value from the site's values.jsonld. Nothing read
   // is written as HTML.
-  const SUGGEST_LIB = "https://cdn.jsdelivr.net/npm/@milkdown/crepe@7.22.2";
-  const SUGGEST_KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.18.10/dist/katex.min.css";
-  const SUGGEST_KATEX = "https://cdn.jsdelivr.net/npm/katex@0.18.10/+esm";
   const TOKENISH = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?|\\\\[A-Za-z]+\\{[^}\\n]*\\}/g;
   // Variables, directives and LaTeX references stay the reader's to change,
   // add or delete. They are wrapped in \\u27e6 \\u27e7 only so the editor's
@@ -341,6 +339,24 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // A block's YAML front matter is not the reader's to edit: Crepe would turn
   // it into a thematic break and a setext heading. It is kept aside, unchanged.
   const FRONT_MATTER = /^---\\n[\\s\\S]*?\\n---\\n/;
+  // The site root, from any same-origin URL under /assets/ the page already
+  // loads (a page is served at several depths, and the runtime is often
+  // inlined, so it cannot use its own script's URL); the editor bundle is under it.
+  // The page's own site root: the longest root of a same-origin /assets/ URL
+  // the page loads that also contains this page (a page can load another
+  // site's chrome from the same origin, /folio-assistant/assets/…).
+  const vendorBase = () => {
+    let best = null;
+    for (const e of document.querySelectorAll("script[src], link[href]")) {
+      let u;
+      try { u = new URL(e.getAttribute("src") || e.getAttribute("href"), location.href); } catch (x) { continue; }
+      const i = u.pathname.indexOf("/assets/");
+      if (u.origin !== location.origin || i < 0) continue;
+      const root = u.pathname.slice(0, i + 1);
+      if (location.pathname.indexOf(root) === 0 && (!best || root.length > best.length)) best = root;
+    }
+    return best === null ? null : location.origin + best + "assets/vendor/crepe/";
+  };
   // The KG labels and bibliography keys a profile's checker warns against, read once from the page's graph.
   let kgRefs;
   const kgReferences = async (c) => {
@@ -470,12 +486,17 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // and first remark transformer. Its base is Crepe's round-trip of the
     // source, so escapes Crepe adds are not counted as the reader's change.
     const visual = async (text) => {
-      const lib = (c.suggest && c.suggest.lib) || SUGGEST_LIB;
-      // The theme's own @import of KaTeX names a package, which a CDN cannot resolve: named here.
-      for (const href of [lib + "/lib/theme/common/style.css", lib + "/lib/theme/frame/style.css", SUGGEST_KATEX_CSS])
-        if (!document.querySelector('link[href="' + href + '"]')) document.head.append(el("link", { rel: "stylesheet", href: href }));
-      const { Crepe } = await import((c.suggest && c.suggest.module) || lib + "/+esm");
-      if (mod && mod.nodeViews && !katex) katex = (await import((c.suggest && c.suggest.katex) || SUGGEST_KATEX)).default;
+      // The site's own bundle (suggest-editor.ts): Crepe and KaTeX from one
+      // copy of ProseMirror, its stylesheet with every import resolved.
+      const sc = c.suggest || {};
+      const base = vendorBase();
+      const moduleUrl = sc.module || (base && base + "crepe.js");
+      if (!moduleUrl) throw new Error("this site has no editor bundle (assets/vendor/crepe/)");
+      const css = sc.css || (base && !sc.module ? base + "crepe.css" : null);
+      if (css && !document.querySelector('link[href="' + css + '"]')) document.head.append(el("link", { rel: "stylesheet", href: css }));
+      const lib = await import(moduleUrl);
+      const Crepe = lib.Crepe;
+      if (mod && mod.nodeViews && !katex) katex = sc.katex ? (await import(sc.katex)).default : lib.default;
       const box = el("div");
       host.replaceChildren(box);
       const opts = { root: box, defaultValue: text };

@@ -1,0 +1,4 @@
+/* The ✍ suggest editor's one stylesheet: Crepe's theme and KaTeX's, imports resolved. */
+@import "../../node_modules/@milkdown/crepe/lib/theme/common/style.css";
+@import "../../node_modules/@milkdown/crepe/lib/theme/frame/style.css";
+@import "../../node_modules/katex/dist/katex.min.css";

@@ -443,6 +443,18 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "Its shim, embed and install helpers are covered by pdf-viewer.test.ts in `bun test`",
   },
   {
+    // The ✍ suggest editor (bean `folio-assistant-4dx7`). A DEPLOY step like
+    // the pdf.js viewer above: it bundles this package's pinned Crepe and
+    // KaTeX into `./_site/assets/vendor/crepe/`, which only the deploy and
+    // staging jobs produce. The bundle is built and checked by
+    // `suggest-editor.test.ts` in `bun test`.
+    match: "suggest-editor.ts --site",
+    kind: "ci-only",
+    reason:
+      "a DEPLOY step, not a check: it bundles the pinned Crepe and KaTeX into ./_site, which only exists " +
+      "inside the site-build job. The bundle itself is covered by suggest-editor.test.ts in `bun test`",
+  },
+  {
     // Its sibling, and exempt for the same reason. `compose-docs.ts` lays the
     // declared `docs` layers into one tree for Jekyll to build — base
     // (`cat-harness/docs/`) then the repository root's overlay. It COPIES
