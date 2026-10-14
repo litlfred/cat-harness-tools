@@ -399,21 +399,199 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     return true;
   };
   const findingItem = (f) => el("li", { className: f.severity === "error" ? "bad" : "warn", textContent: (f.severity === "error" ? "Error" : "Warning") + (f.line ? " (line " + f.line + ")" : "") + ": " + f.message });
+  // \\u2500\\u2500 The dialog: wireframe candidate A (cat-harness docs/wireframes/suggest-editor,
+  // owner's choice 2026-10-14): one screen, a toolbar always shown, changes
+  // marked as you type (new text green and underlined, removed text red and
+  // struck through), a Why field that becomes the issue's reason, and a size
+  // the reader chooses. Underline is not offered: Markdown has none, and
+  // underlined means added.
+  const SUGGEST_CSS = [
+    "dialog.fa-suggest{width:min(60rem,95vw);height:min(44rem,90vh);max-width:100vw;max-height:100vh;padding:0;border:2px solid #1b1b1b;display:flex;flex-direction:column;overflow:hidden}",
+    "dialog.fa-suggest:not([open]){display:none}",
+    "dialog.fa-suggest.fa-sg-large{width:min(80rem,98vw);height:94vh}",
+    "dialog.fa-suggest.fa-sg-full{width:100vw;height:100vh;margin:0}",
+    ".fa-sg-hd{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid #d6dde2}",
+    ".fa-sg-hd h2{font-size:1.05rem;margin:0;flex:1;overflow-wrap:anywhere}",
+    "dialog.fa-suggest button{min-height:44px;min-width:44px;padding:0 .7rem;border:1px solid #1b1b1b;background:#fff;color:#1b1b1b;font:inherit;cursor:pointer;border-radius:4px}",
+    "dialog.fa-suggest button[aria-pressed=true]{background:#e8e8e8;font-weight:700}",
+    "dialog.fa-suggest button:focus-visible{outline:3px solid #0b57d0;outline-offset:2px}",
+    ".fa-sg-tb{display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;padding:.4rem .75rem;border-bottom:1px solid #d6dde2}",
+    ".fa-sg-tb .fa-sg-sep{width:1px;align-self:stretch;background:#d6dde2;margin:0 .2rem}",
+    ".fa-sg-tb .fa-sg-note{font-size:.8rem;color:#5b6770;margin:0 .4rem}",
+    ".fa-sg-tb .fa-sg-mode{margin-left:auto;display:inline-flex;gap:.25rem}",
+    ".fa-suggest-status{color:#5b6770;font-size:.9rem;margin:.25rem .75rem}",
+    ".fa-suggest-status:empty{display:none}",
+    ".fa-suggest-editor{flex:1;min-height:8rem;overflow:auto;margin:0}",
+    ".fa-suggest-editor textarea{width:100%;height:100%;min-height:12rem;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:.9rem;border:0;padding:.75rem;resize:none}",
+    "dialog.fa-suggest .milkdown .ProseMirror{padding:.75rem 1rem}",
+    "dialog.fa-suggest .ProseMirror a{text-decoration-style:dotted}",
+    "ins.fa-sg-ins,.fa-sg-ins-block{color:#0b6b2a;background:#e6f4ea;text-decoration:underline 3px;text-underline-offset:3px}",
+    "del.fa-sg-del{color:#b3261e;text-decoration:line-through 2px;margin-right:.2em;user-select:none}",
+    "ins.fa-sg-ins::before,del.fa-sg-del::before{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}",
+    "ins.fa-sg-ins::before{content:' [added: '}del.fa-sg-del::before{content:' [removed: '}",
+    ".fa-suggest-vars{font-size:.85rem;color:#5b6770;margin:.25rem .75rem;padding-left:1.2rem;max-height:6rem;overflow:auto}",
+    ".fa-suggest-vars .bad{color:#b3261e}.fa-suggest-vars .warn{color:#8a5a00}",
+    ".fa-sg-why{padding:.25rem .75rem}.fa-sg-why label{font-weight:700;display:block}",
+    ".fa-sg-why textarea{width:100%;box-sizing:border-box;min-height:4rem;font:inherit;padding:.4rem;border:1px solid #1b1b1b;border-radius:4px}",
+    ".fa-sg-ft{display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;border-top:1px solid #d6dde2}",
+    ".fa-sg-ft .fa-sg-help{flex:1;font-size:.85rem;color:#5b6770}",
+    ".fa-sg-ft button.fa-sg-send{font-weight:700}",
+    "@media (max-width:700px){dialog.fa-suggest,dialog.fa-suggest.fa-sg-large{width:100vw;height:100vh;margin:0;border:0}.fa-sg-size{display:none}.fa-sg-tb .fa-sg-note{flex-basis:100%;order:9}.fa-sg-tb .fa-sg-mode{margin-left:0}.fa-sg-ft{flex-wrap:wrap}.fa-sg-ft .fa-sg-help{flex-basis:100%}.fa-sg-ft button{flex:1}}",
+  ].join("");
+  // A block's text as tokens (words, spaces, and a separator between paragraphs),
+  // each with the document position it starts at: what the change marks diff.
+  const tokensOf = (node, at0) => {
+    const start = at0 + 1;
+    const out = [];
+    let word = null;
+    const flush = () => { if (word) { out.push(word); word = null; } };
+    node.descendants((child, pos) => {
+      if (child.isTextblock && out.length + (word ? 1 : 0)) { flush(); out.push({ t: "\\n", pos: start + pos }); }
+      if (child.isText) {
+        const at = start + pos;
+        for (let k = 0; k < child.text.length; k++) {
+          const ch = child.text[k], sp = /\\s/.test(ch);
+          if (word && word.sp === sp) word.t += ch;
+          else { flush(); word = { t: ch, pos: at + k, sp: sp }; }
+        }
+      } else if (child.isLeaf && !child.isText) { flush(); out.push({ t: "\\ufffc" + child.type.name, pos: start + pos, size: child.nodeSize }); }
+      return true;
+    });
+    flush();
+    return out;
+  };
+  // Longest common subsequence of two arrays by key: the pairs that did not change.
+  const lcs = (a, b, key) => {
+    const n = a.length, m = b.length;
+    if (n * m > 4e6) return [];
+    const L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = key(a[i]) === key(b[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const pairs = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (key(a[i]) === key(b[j])) { pairs.push([i, j]); i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) i++;
+      else j++;
+    }
+    return pairs;
+  };
+  // The change marks: what differs between the source as the editor first
+  // showed it and the document now, as ProseMirror decorations. Removed text is
+  // a widget (it is not in the document); added text an inline <ins>.
+  const changeMarks = (lib, baseOf) => {
+    let count = 0;
+    const key = new lib.PluginKey("fa-suggest-changes");
+    const decorate = (doc) => {
+      const base = baseOf();
+      count = 0;
+      if (!base) return lib.DecorationSet.empty;
+      const blocks = [];
+      doc.forEach((node, offset) => blocks.push({ node: node, pos: offset, text: node.type.name + ":" + node.textContent }));
+      const decos = [];
+      const del = (pos, text) => {
+        if (!text.trim()) return;
+        decos.push(lib.Decoration.widget(pos, () => { const d = document.createElement("del"); d.className = "fa-sg-del"; d.textContent = text; return d; }, { side: -1, key: "del" + pos + ":" + text }));
+      };
+      const tokenDiff = (was, now, blockEnd) => {
+        const pairs = lcs(was, now, (x) => x.t);
+        let wi = 0, ni = 0;
+        const step = (toW, toN) => {
+          const gone = was.slice(wi, toW).map((x) => (x.t === "\\n" ? " " : x.t.charAt(0) === "\\ufffc" ? "" : x.t)).join("");
+          const added = now.slice(ni, toN).filter((x) => x.t !== "\\n");
+          const hasAdd = added.length && added.some((x) => !/^\\s+$/.test(x.t));
+          if (hasAdd || gone.trim()) count++;
+          if (hasAdd) {
+            const last = added[added.length - 1];
+            decos.push(lib.Decoration.inline(added[0].pos, last.pos + (last.size || last.t.length), { nodeName: "ins", class: "fa-sg-ins" }));
+          }
+          const at = toN < now.length ? now[toN].pos : blockEnd;
+          if (gone) del(added.length ? added[0].pos : at, gone);
+          wi = toW; ni = toN;
+        };
+        // A shared space between two changed words does not split one replacement into two.
+        for (const [w, n] of pairs) { if (/^\\s+$/.test(was[w].t)) continue; if (w > wi || n > ni) step(w, n); wi = w + 1; ni = n + 1; }
+        if (wi < was.length || ni < now.length) step(was.length, now.length);
+      };
+      const pairs = lcs(base, blocks, (x) => x.text);
+      let bi = 0, di = 0;
+      const gap = (toB, toD) => {
+        const goneB = base.slice(bi, toB), newB = blocks.slice(di, toD);
+        const k = Math.min(goneB.length, newB.length);
+        for (let x = 0; x < k; x++) tokenDiff(goneB[x].tokens, tokensOf(newB[x].node, newB[x].pos), newB[x].pos + newB[x].node.nodeSize - 1);
+        for (let x = k; x < newB.length; x++) { count++; decos.push(lib.Decoration.node(newB[x].pos, newB[x].pos + newB[x].node.nodeSize, { class: "fa-sg-ins-block" })); }
+        const at = toD < blocks.length ? blocks[toD].pos : doc.content.size;
+        for (let x = k; x < goneB.length; x++) { count++; del(at, goneB[x].node.textContent); }
+        bi = toB; di = toD;
+      };
+      for (const [b, d] of pairs) { if (b > bi || d > di) gap(b, d); bi = b + 1; di = d + 1; }
+      if (bi < base.length || di < blocks.length) gap(base.length, blocks.length);
+      return lib.DecorationSet.create(doc, decos);
+    };
+    const plugin = new lib.Plugin({
+      key: key,
+      state: { init: (_, state) => decorate(state.doc), apply: (tr, old, _, state) => (tr.docChanged || tr.getMeta(key) ? decorate(state.doc) : old) },
+      props: { decorations: (state) => key.getState(state) },
+    });
+    return { plugin: plugin, key: key, count: () => count };
+  };
+  // The base blocks, with their tokens, from the document the editor first showed.
+  const baseBlocksOf = (doc) => {
+    const out = [];
+    doc.forEach((node, offset) => out.push({ node: node, pos: offset, text: node.type.name + ":" + node.textContent, tokens: tokensOf(node, offset) }));
+    return out;
+  };
+  // Markdown around the raw pane's selection, typed so the browser's own undo keeps it.
+  const rawWrap = (ta, before, after, linePrefix) => {
+    ta.focus();
+    const a = ta.selectionStart, b = ta.selectionEnd, sel = ta.value.slice(a, b);
+    let text;
+    if (linePrefix) {
+      const ls = ta.value.lastIndexOf("\\n", a - 1) + 1;
+      ta.setSelectionRange(ls, b);
+      text = ta.value.slice(ls, b).split("\\n").map((l) => linePrefix + l).join("\\n");
+    } else text = before + (sel || "text") + after;
+    if (!document.execCommand("insertText", false, text)) ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, "end");
+  };
   const suggest = async (a) => {
     const s = sourceOf(a), c = config();
     if (!s || !suggestable(c, s)) return;
     const repo = s.repo || c.repo, branch = s.branch || c.branch || "main";
+    const btn = (label, title, extra) => { const b = el("button", Object.assign({ type: "button", textContent: label, title: title }, extra || {})); b.setAttribute("aria-label", title); return b; };
+    const titleId = "fa-sg-title-" + Date.now();
     const status = el("p", { className: "fa-suggest-status", textContent: "Loading " + s.src + " …" });
+    status.setAttribute("role", "status");
     const host = el("div", { className: "fa-suggest-editor" });
-    const send = el("button", { type: "button", textContent: "Submit as an issue", disabled: true });
-    const close = el("button", { type: "button", textContent: "Cancel" });
-    const toggle = el("button", { type: "button", hidden: true });
+    const send = btn("Submit as an issue", "Submit as an issue", { className: "fa-sg-send", disabled: true });
+    const close = btn("Cancel", "Cancel");
+    const larger = btn("Larger", "Make the editor larger", { className: "fa-sg-size" });
+    const full = btn("Full screen", "Fill the screen", { className: "fa-sg-size" });
+    const x = btn("\\u2715", "Close");
+    larger.setAttribute("aria-pressed", "false");
+    full.setAttribute("aria-pressed", "false");
+    const toolbar = el("div", { className: "fa-sg-tb" });
+    toolbar.setAttribute("role", "toolbar");
+    toolbar.setAttribute("aria-label", "Formatting");
+    const visualBtn = btn("Visual", "Edit visually"), rawBtn = btn("Raw", "Edit the raw Markdown");
+    const mode = el("span", { className: "fa-sg-mode" }, [visualBtn, rawBtn]);
     const vars = el("ul", { className: "fa-suggest-vars" });
-    const dlg = el("dialog", { className: "fa-suggest" }, [el("h2", { textContent: "Suggest a change: " + s.label }), status, host, vars, el("p", {}, [send, " ", toggle, " ", close])]);
-    let surface = null;
-    close.onclick = () => { if (surface) surface.destroy(); dlg.close(); dlg.remove(); };
-    if (!document.getElementById("fa-suggest-css"))
-      document.head.append(el("style", { id: "fa-suggest-css", textContent: "dialog.fa-suggest{width:min(60rem,95vw);max-height:90vh;overflow:auto;padding:1rem 1.25rem}dialog.fa-suggest h2{font-size:1.1rem;margin:0 0 .5rem}.fa-suggest-status{color:#5b6770;font-size:.9rem}.fa-suggest-editor{border:1px solid #d6dde2;min-height:12rem;margin:.5rem 0}.fa-suggest-editor textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:.9rem;border:0;padding:.5rem}.fa-suggest-vars{font-size:.85rem;color:#5b6770;margin:.25rem 0;padding-left:1.2rem}.fa-suggest-vars .bad{color:#b3261e}.fa-suggest-vars .warn{color:#8a5a00}" }));
+    vars.setAttribute("aria-live", "polite");
+    const why = el("textarea", { id: titleId + "-why", rows: 3, placeholder: "What should change, and why? This becomes the issue's reason." });
+    const whyBox = el("div", { className: "fa-sg-why" }, [el("label", { htmlFor: why.id, textContent: "Why?" }), why]);
+    const h2 = el("h2", { id: titleId, textContent: "Suggest a change: " + s.label });
+    const dlg = el("dialog", { className: "fa-suggest" }, [
+      el("div", { className: "fa-sg-hd" }, [h2, larger, full, x]),
+      status, toolbar, host, vars, whyBox,
+      el("div", { className: "fa-sg-ft" }, [el("span", { className: "fa-sg-help", textContent: "Opens a GitHub issue with your change and your reason." }), send, close]),
+    ]);
+    dlg.setAttribute("aria-labelledby", titleId);
+    let surface = null, timer = null;
+    const cleanup = () => { if (timer) clearInterval(timer); if (surface) surface.destroy(); surface = null; if (dlg.isConnected) dlg.remove(); };
+    close.onclick = x.onclick = () => { if (dlg.open) dlg.close(); cleanup(); };
+    // Esc closes it, as a modal dialog does; focus stays inside while it is open.
+    dlg.addEventListener("close", cleanup);
+    larger.onclick = () => { const on = dlg.classList.toggle("fa-sg-large"); larger.setAttribute("aria-pressed", String(on)); };
+    full.onclick = () => { const on = dlg.classList.toggle("fa-sg-full"); full.setAttribute("aria-pressed", String(on)); };
+    if (!document.getElementById("fa-suggest-css")) document.head.append(el("style", { id: "fa-suggest-css", textContent: SUGGEST_CSS }));
     document.body.append(dlg);
     dlg.showModal();
     let path = s.src, original, kind = String(s.label).split(":")[0];
@@ -444,10 +622,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       catch (e) { notes.push("The " + (prof.id || "profile") + " checks did not load (" + e.message + ")."); }
     }
     const facts = ["**Block:** \\u0060" + s.label + "\\u0060", "**Source:** https://github.com/" + repo + "/blob/" + branch + "/" + path, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(s.label)];
+    const reason = () => (why.value.trim() ? why.value.trim() : "");
     // A mode: its own editor, the same issue flow over the text it hands back.
     // get() may be async (an editor in another window answers by postMessage);
     // it is read on submit, not polled.
     if (mod && typeof mod.open === "function") {
+      toolbar.hidden = true;
       const ctx = { text: original, src: s.src, path: path, label: s.label, kind: kind, repo: repo, branch: branch, config: c, status: (m) => { status.textContent = String(m); } };
       let handle;
       try { handle = await mod.open(host, ctx); }
@@ -470,8 +650,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         let custom = null;
         if (typeof mod.issue === "function") { try { custom = await mod.issue(original, now, ctx); } catch (e) { custom = null; } }
         const title = (custom && custom.title) || "Suggested edit: " + s.label;
-        const body = (custom && custom.body) || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
-        if (await openIssue(c.repo || repo, title, body, custom && custom.template, status)) close.onclick();
+        const issueBody = (custom && custom.body) || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
+        if (await openIssue(c.repo || repo, title, issueBody, custom && custom.template, status)) close.onclick();
       };
       return;
     }
@@ -480,94 +660,152 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const kg = mod && typeof mod.check === "function" ? await kgReferences(c) : null;
     // A profile that keeps LaTeX verbatim itself (remarkFirst) must not have it wrapped in \\u27e6 \\u27e7 as well.
     const latexOwned = !!(mod && mod.remarkFirst);
-    const wrapped = latexOwned ? body.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(body);
-    let katex = null;
+    const shield = (t) => (latexOwned ? t.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(t));
+    const wrapped = shield(body);
+    let katex = null, lib = null, visualBase = null;
     // The visual surface: Crepe, with the profile's latex settings, node views
-    // and first remark transformer. Its base is Crepe's round-trip of the
-    // source, so escapes Crepe adds are not counted as the reader's change.
+    // and first remark transformer, the toolbar's commands and the change
+    // marks. Its base is Crepe's round-trip of the SOURCE, kept across a
+    // switch to raw and back, so escapes Crepe adds are not counted as the
+    // reader's change and the marks always compare with the source.
     const visual = async (text) => {
       // The site's own bundle (suggest-editor.ts): Crepe and KaTeX from one
       // copy of ProseMirror, its stylesheet with every import resolved.
       const sc = c.suggest || {};
-      const base = vendorBase();
-      const moduleUrl = sc.module || (base && base + "crepe.js");
+      const vb = vendorBase();
+      const moduleUrl = sc.module || (vb && vb + "crepe.js");
       if (!moduleUrl) throw new Error("this site has no editor bundle (assets/vendor/crepe/)");
-      const css = sc.css || (base && !sc.module ? base + "crepe.css" : null);
-      if (css && !document.querySelector('link[href="' + css + '"]')) document.head.append(el("link", { rel: "stylesheet", href: css }));
-      const lib = await import(moduleUrl);
+      const cssUrl = sc.css || (vb && !sc.module ? vb + "crepe.css" : null);
+      if (cssUrl && !document.querySelector('link[href="' + cssUrl + '"]')) document.head.append(el("link", { rel: "stylesheet", href: cssUrl }));
+      lib = lib || (await import(moduleUrl));
       const Crepe = lib.Crepe;
       if (mod && mod.nodeViews && !katex) katex = sc.katex ? (await import(sc.katex)).default : lib.default;
       const box = el("div");
       host.replaceChildren(box);
-      const opts = { root: box, defaultValue: text };
+      // The dialog's own toolbar replaces Crepe's selection toolbar, and
+      // Crepe's block handle (the wide left gutter) is not used here.
+      const opts = { root: box, defaultValue: text, features: { [Crepe.Feature.Toolbar]: false, [Crepe.Feature.BlockEdit]: false } };
       if (mod && typeof mod.latexConfig === "function") opts.featureConfigs = { [Crepe.Feature.Latex]: mod.latexConfig(km) };
       const crepe = new Crepe(opts);
-      if (mod && (mod.remarkFirst || mod.nodeViews))
-        // Milkdown's own InitReady timer, found in the schema's wait list so no
-        // second copy of @milkdown/core is imported: after it, before the schema
-        // builds the parser, is when a remark plugin can still go first.
-        crepe.editor.use((ctx) => {
-          const init = (ctx.get("schemaTimer") || []).find((t) => t && t.name === "InitReady");
-          return async () => {
-            if (init) await ctx.wait(init);
-            if (typeof mod.remarkFirst === "function") ctx.update("remarkPlugins", mod.remarkFirst(macros));
-            if (mod.nodeViews && katex) ctx.update("nodeView", (v) => v.concat(Object.keys(mod.nodeViews).map((n) => [n, mod.nodeViews[n](katex, km)])));
-          };
-        });
+      let baseBlocks = null;
+      const marks = lib.Plugin && lib.DecorationSet ? changeMarks(lib, () => baseBlocks) : null;
+      // Milkdown's own InitReady timer, found in the schema's wait list so no
+      // second copy of @milkdown/core is imported: after it, before the schema
+      // builds the parser, is when a remark plugin can still go first, and
+      // before the editor state is made a ProseMirror plugin can still join.
+      crepe.editor.use((ctx) => {
+        const init = (ctx.get("schemaTimer") || []).find((t) => t && t.name === "InitReady");
+        return async () => {
+          if (init) await ctx.wait(init);
+          if (mod && typeof mod.remarkFirst === "function") ctx.update("remarkPlugins", mod.remarkFirst(macros));
+          if (mod && mod.nodeViews && katex) ctx.update("nodeView", (v) => v.concat(Object.keys(mod.nodeViews).map((n) => [n, mod.nodeViews[n](katex, km)])));
+          if (marks) ctx.update("prosePlugins", (p) => p.concat([marks.plugin]));
+        };
+      });
       await crepe.create();
+      const view = crepe.editor.action((ctx) => ctx.get("editorView"));
+      const run = (cmd, payload) => { view.focus(); crepe.editor.action(lib.callCommand(cmd.key, payload)); };
       const get = () => unwrap(crepe.getMarkdown());
-      return { name: "visual", get: get, base: get(), destroy: () => { try { crepe.destroy(); } catch (e) {} } };
+      // The base, and the marks, are the SOURCE as Crepe shows it: this
+      // editor's first document when it opened on the source, else a probe
+      // editor's (it opened on text carried over from the raw pane).
+      if (text === wrapped) {
+        if (visualBase === null) visualBase = get();
+        if (marks) baseBlocks = baseBlocksOf(view.state.doc);
+      } else if (marks || visualBase === null) {
+        const probe = new Crepe({ root: el("div"), defaultValue: wrapped, features: { [Crepe.Feature.Toolbar]: false, [Crepe.Feature.BlockEdit]: false } });
+        probe.editor.use((ctx) => { const init = (ctx.get("schemaTimer") || []).find((t) => t && t.name === "InitReady"); return async () => { if (init) await ctx.wait(init); if (mod && typeof mod.remarkFirst === "function") ctx.update("remarkPlugins", mod.remarkFirst(macros)); }; });
+        await probe.create();
+        if (visualBase === null) visualBase = unwrap(probe.getMarkdown());
+        if (marks) baseBlocks = baseBlocksOf(probe.editor.action((ctx) => ctx.get("editorView")).state.doc);
+        probe.destroy();
+      }
+      if (marks) view.dispatch(view.state.tr.setMeta(marks.key, true));
+      return {
+        name: "visual", get: get, base: visualBase, changes: () => (marks ? marks.count() : null),
+        destroy: () => { try { crepe.destroy(); } catch (e) {} },
+        bold: () => run(lib.toggleStrongCommand), italic: () => run(lib.toggleEmphasisCommand), strike: () => run(lib.toggleStrikethroughCommand),
+        heading: () => run(lib.wrapInHeadingCommand, 3), bullets: () => run(lib.wrapInBulletListCommand), numbers: () => run(lib.wrapInOrderedListCommand),
+        code: () => run(lib.toggleInlineCodeCommand), undo: () => run(lib.undoCommand), redo: () => run(lib.redoCommand),
+        link: () => { const href = window.prompt("Link address"); if (href) run(lib.toggleLinkCommand, { href: href }); },
+      };
     };
-    // The raw surface: the block's Markdown as it is, LaTeX and all.
+    // The raw surface: the block's Markdown as it is, LaTeX and all; the toolbar types Markdown.
     const rawSurface = (text) => {
-      const ta = el("textarea", { value: text, rows: 18 });
+      const ta = el("textarea", { value: text });
+      ta.setAttribute("aria-label", "The block's Markdown");
       host.replaceChildren(ta);
-      return { name: "raw", get: () => ta.value, base: body, destroy: () => {} };
+      const ex = (c2) => () => { ta.focus(); document.execCommand(c2); };
+      return {
+        name: "raw", get: () => ta.value, base: body, changes: () => null, destroy: () => {},
+        bold: () => rawWrap(ta, "**", "**"), italic: () => rawWrap(ta, "_", "_"), strike: () => rawWrap(ta, "~~", "~~"),
+        heading: () => rawWrap(ta, "", "", "### "), bullets: () => rawWrap(ta, "", "", "- "), numbers: () => rawWrap(ta, "", "", "1. "),
+        code: () => rawWrap(ta, "\\u0060", "\\u0060"), undo: ex("undo"), redo: ex("redo"),
+        link: () => { const href = window.prompt("Link address"); if (href) rawWrap(ta, "[", "](" + href + ")"); },
+      };
     };
+    // The toolbar: the same buttons on both surfaces.
+    const tools = [["B", "Bold", "bold"], ["I", "Italic", "italic"], ["S", "Strikethrough", "strike"], null, ["H", "Heading", "heading"], ["\\u2022", "Bulleted list", "bullets"], ["1.", "Numbered list", "numbers"], null, ["\\ud83d\\udd17", "Link", "link"], ["</>", "Code", "code"], null, ["\\u21b6", "Undo", "undo"], ["\\u21b7", "Redo", "redo"]];
+    for (const t of tools) {
+      if (!t) { toolbar.append(el("span", { className: "fa-sg-sep" })); continue; }
+      const b = btn(t[0], t[1]);
+      if (t[2] === "bold") b.style.fontWeight = "700";
+      if (t[2] === "italic") b.style.fontStyle = "italic";
+      if (t[2] === "strike") b.style.textDecoration = "line-through";
+      b.onmousedown = (e) => e.preventDefault();
+      b.onclick = () => { if (surface && surface[t[2]]) surface[t[2]](); };
+      toolbar.append(b);
+    }
+    toolbar.append(el("span", { className: "fa-sg-note", textContent: "No underline: underlined text means added." }), mode);
     const rawFirst = !!(prof && prof.rawLatexFirstFor && prof.rawLatexFirstFor.indexOf(kind) >= 0);
+    const show = () => {
+      visualBtn.setAttribute("aria-pressed", String(surface.name === "visual"));
+      rawBtn.setAttribute("aria-pressed", String(surface.name === "raw"));
+    };
     try {
       surface = rawFirst ? rawSurface(body) : await visual(wrapped);
     } catch (e) {
-      // No editor (offline, blocked CDN): the same flow over plain Markdown.
+      // No editor bundle, or it failed: the same flow over plain Markdown.
       surface = rawSurface(body);
       notes.push("The visual editor did not load (" + e.message + "); editing the Markdown directly.");
     }
-    const describe = () => {
-      if (surface.name === "raw") return "Editing the raw Markdown" + (mod ? " and LaTeX" : "") + ".";
-      return wrapped === body ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.";
-    };
+    show();
+    const describe = () => (surface.name === "raw" ? "Editing the raw Markdown" + (mod ? " and LaTeX" : "") + "." : wrapped === body ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.");
     status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
-    // Both surfaces when a profile serves the block (owner, 2026-10-14: "both").
-    if (prof && mod) {
-      toggle.hidden = false;
-      const label = () => { toggle.textContent = surface.name === "raw" ? "Edit visually" : "Edit as raw text"; };
-      label();
-      toggle.onclick = async () => {
-        const text = surface.get();
-        const next = surface.name === "raw" ? "visual" : "raw";
-        surface.destroy();
-        try { surface = next === "raw" ? rawSurface(text) : await visual(latexOwned ? text.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(text)); }
-        catch (e) { surface = rawSurface(text); notes.push("The visual editor did not load (" + e.message + ")."); }
-        label();
-        status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
-      };
-    }
+    const switchTo = async (next) => {
+      if (surface.name === next) return;
+      const text = surface.get();
+      surface.destroy();
+      try { surface = next === "raw" ? rawSurface(text) : await visual(shield(text)); }
+      catch (e) { surface = rawSurface(text); notes.push("The visual editor did not load (" + e.message + ")."); }
+      show();
+      status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
+    };
+    visualBtn.onclick = () => switchTo("visual");
+    rawBtn.onclick = () => switchTo("raw");
     // What the profile's checker says the edit introduces: errors block, warnings do not.
     const findings = (text) => {
       if (!mod || typeof mod.check !== "function" || text === surface.base) return [];
       try { return mod.check(surface.base, text, { macros: macros, kg: kg || undefined }) || []; }
       catch (e) { return [{ severity: "warning", message: "the checker failed: " + e.message, line: 0 }]; }
     };
-    // Live: each variable and its current value, any item whose syntax is broken, and the profile's findings.
+    // Live: how many changes, each variable and its current value, any item
+    // whose syntax is broken, and the profile's findings.
     const refresh = () => {
-      if (!dlg.isConnected) return clearInterval(timer);
+      if (!dlg.isConnected || !surface) return clearInterval(timer);
       const text = surface.get();
-      const items = variablesIn(text).map((k) => { const v = valueOf(k); return el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) }); });
+      const n = surface.changes();
+      const items = [];
+      if (n !== null) {
+        const li = el("li", {}, [n ? n + (n === 1 ? " change: " : " changes: ") : "No changes yet. ", ...(n ? [Object.assign(document.createElement("ins"), { className: "fa-sg-ins", textContent: "added" }), " ", Object.assign(document.createElement("del"), { className: "fa-sg-del", textContent: "removed" })] : [])]);
+        items.push(li);
+      } else if (text !== surface.base) items.push(el("li", { textContent: "Changed. Switch to Visual to see the changes marked." }));
+      for (const k of variablesIn(text)) { const v = valueOf(k); items.push(el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) })); }
       for (const b of syntaxErrors(text, !mod)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
       for (const f of findings(text)) items.push(findingItem(f));
       vars.replaceChildren(...items);
     };
-    const timer = setInterval(refresh, 800);
+    timer = setInterval(refresh, 800);
     refresh();
     send.disabled = false;
     send.onclick = async () => {
@@ -576,7 +814,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const errs = syntaxErrors(now, !mod).concat(findings(now).filter((f) => f.severity === "error").map((f) => f.message));
       if (errs.length) { status.textContent = "Fix the syntax first: " + errs.map((e) => e.slice(0, 60)).join(" \\u00b7 "); return; }
       const how = surface.name === "raw" ? "in the raw editor" : "in the visual editor (the diff is against the editor's rendering of the source)";
-      const issue = facts.concat(["", "**Suggested change**, made " + how + ":", "", "\\u0060\\u0060\\u0060diff", lineDiff(surface.base, now), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
+      const issue = facts.concat(["", "**Suggested change**, made " + how + ":", "", "\\u0060\\u0060\\u0060diff", lineDiff(surface.base, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
       if (await openIssue(c.repo || repo, "Suggested edit: " + s.label, issue, undefined, status)) close.onclick();
     };
   };
