@@ -119,7 +119,12 @@ jobs:
           # merge commit holds whenever main moved since, so head-vs-base would
           # charge main's own changes to the PR (seen on smart-base#57, where
           # smart-base#53 landed between).
-          ref: ${{ inputs.mode == 'index' && '' || inputs.index-ref }}
+          # `github.ref`, never `''`: an expression's `a && '' || b` is `b`,
+          # because `''` is falsy, so index mode checked out the caller's
+          # `index-ref` default, `main`, and judged main against its own
+          # first parent instead of the PR (smart-immunizations#35, run
+          # 38633852296: `-B main refs/remotes/origin/main`).
+          ref: ${{ inputs.mode == 'index' && github.ref || inputs.index-ref }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
       - &setup-bun
