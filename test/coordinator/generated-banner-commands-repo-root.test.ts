@@ -164,7 +164,12 @@ describe("a command a generated page names is a command that exists", () => {
     // outcome as the banner being true.
     expect(namedCommands().some((c) => c.command === "docs:pages:check")).toBe(true);
     const declared = scripts();
-    expect(declared["docs:pages:check"]).toContain("gen-docs-pages.ts");
-    expect(declared["docs:pages:check"]).toContain("--check");
+    // Since B1 (owner, 2026-10-14) the check goes through `publish:check`,
+    // which runs the writer and then the writer's OWN `--check` against what
+    // it just wrote -- so the chain still ends at `gen-docs-pages.ts --check`,
+    // one step further down. Both links are asserted.
+    expect(declared["docs:pages:check"]).toContain("publish-check.ts docs:pages");
+    expect(declared["docs:pages"]).toContain("gen-docs-pages.ts");
+    expect(readFileSync(join(import.meta.dir, "..", "..", "scripts", "publish-check.ts"), "utf8")).toContain("--check");
   });
 });

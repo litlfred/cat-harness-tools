@@ -150,8 +150,44 @@ export function withoutStateMounts(dir: string, files: readonly string[], skip: 
   return files.filter((f) => !under.some((u) => (resolve(dir, f) + "/").startsWith(u)));
 }
 
+/**
+ * The paths a mounted instance DECLARES it builds at publish (`builtAtPublish`
+ * in its `<name>.json`; owner, 2026-10-14, "B1"), instance-relative. They are
+ * excluded from the digest for the same reason as `node_modules/`: the pinned
+ * commit cannot contain them (the instance ignores them, and its own test holds
+ * that nothing declared is tracked), so a publish build that writes them into
+ * the mount has written none of the PINNED bytes, and must not make the next
+ * re-mount refuse the mount as "somebody's work". An old pin declares nothing,
+ * so its digest is unchanged. Read with `node:fs` alone, as this file must.
+ */
+export function builtAtPublishOf(dir: string): string[] {
+  const out: string[] = [];
+  let names: string[] = [];
+  try {
+    names = readdirSync(dir).filter((n) => n.endsWith(".json"));
+  } catch {
+    return out;
+  }
+  for (const n of names) {
+    try {
+      const d = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; builtAtPublish?: unknown };
+      if (typeof d.$schema !== "string" || !d.$schema.startsWith("cat-harness-declaration") || !Array.isArray(d.builtAtPublish)) continue;
+      for (const e of d.builtAtPublish) if (e && typeof e.path === "string") out.push(e.path);
+    } catch {
+      // Not a declaration, or not JSON: it excludes nothing, so the digest judges every byte.
+    }
+  }
+  return out;
+}
+
+/** `files` minus any declared built at publish (a directory entry ends in `/`). */
+export function withoutBuiltAtPublish(files: readonly string[], declared: readonly string[]): string[] {
+  if (declared.length === 0) return [...files];
+  return files.filter((f) => !declared.some((p) => (p.endsWith("/") ? f.startsWith(p) : f === p)));
+}
+
 export function digestOf(dir: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
-  const files = withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip));
+  const files = withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip)), builtAtPublishOf(dir));
   const listing = files.map((f) => `${sha256(readFileSync(join(dir, f)))}  ${f}\n`).join("");
   return { treeDigest: sha256(listing), files: files.length };
 }
