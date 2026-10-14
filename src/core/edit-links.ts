@@ -396,7 +396,11 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   };
   const SUGGEST_TITLE = "Suggest a change in a visual editor (opens a GitHub issue)";
   const addSuggest = (root) => {
-    for (const a of (root || document).querySelectorAll('a[data-fa-link="edit"], a.ba-edit')) {
+    // Only over a real DOM: the runtime is also evaluated against stubs (a
+    // viewer's own tests), where there is nothing to add a link to.
+    const r = root || document;
+    if (!r || typeof r.querySelectorAll !== "function") return;
+    for (const a of r.querySelectorAll('a[data-fa-link="edit"], a.ba-edit')) {
       if (a.nextElementSibling && a.nextElementSibling.dataset.faLink === "suggest") continue;
       const s = sourceOf(a);
       if (!s || !/\\.md$/.test(s.src)) continue;
