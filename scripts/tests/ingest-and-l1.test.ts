@@ -431,7 +431,12 @@ describe("the verdict as a committed sidecar", () => {
       return;
     }
     expect(staleSidecars(root, all ?? [])).toEqual([]);
-  });
+    // A walk of the REAL corpus (checkAll over every library entry): it ran at
+    // the edge of bun's 5s default on CI runners and timed out (5.2s) when a
+    // PR's other tests added load, as workflow-events.test.ts records of
+    // another real-corpus walk. The assertions are unchanged; the budget is
+    // the corpus's, not the default's.
+  }, 30_000);
 });
 
 
