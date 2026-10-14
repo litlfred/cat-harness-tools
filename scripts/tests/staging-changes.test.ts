@@ -30,7 +30,7 @@ import {
 
 const lock = (sha: string, extra: Lock["instances"] = []): Lock => ({
   instances: [
-    { instance: "smart-base", repository: "o/smart-base", sha, directories: [{ path: "smart-base/processes", upstreamPath: "smart-base/processes" }, { path: "smart-base/library", upstreamPath: "smart-base/library" }] },
+    { instance: "mounted-layer", repository: "o/mounted-layer", sha, directories: [{ path: "mounted-layer/processes", upstreamPath: "mounted-layer/processes" }, { path: "mounted-layer/library", upstreamPath: "mounted-layer/library" }] },
     { instance: "tools", repository: "o/tools", sha: "t1", directories: [{ path: "tools", upstreamPath: "." }] },
     ...extra,
   ],
@@ -47,22 +47,22 @@ describe("mountedPath", () => {
 
 describe("expandRepins", () => {
   const differ: Differ = (repo, from, to) => {
-    expect([repo, from, to]).toEqual(["o/smart-base", "s1", "s2"]);
+    expect([repo, from, to]).toEqual(["o/mounted-layer", "s1", "s2"]);
     return [
-      { status: "modified", path: "smart-base/processes/a.bpmn" },
-      { status: "renamed", from: "smart-base/library/old.md", path: "smart-base/library/new.md" },
+      { status: "modified", path: "mounted-layer/processes/a.bpmn" },
+      { status: "renamed", from: "mounted-layer/library/old.md", path: "mounted-layer/library/new.md" },
       { status: "modified", path: "input/fsh/x.fsh" },
     ];
   };
   test("a moved pin becomes its files at their mount paths; an unmoved one contributes nothing", () => {
     const { repins, changes } = expandRepins(lock("s1"), lock("s2"), differ);
-    expect(repins).toEqual([{ instance: "smart-base", repository: "o/smart-base", from: "s1", to: "s2", files: 3 }]);
+    expect(repins).toEqual([{ instance: "mounted-layer", repository: "o/mounted-layer", from: "s1", to: "s2", files: 3 }]);
     expect(changes.map((c) => [c.path, c.status, c.mounted])).toEqual([
-      ["smart-base/processes/a.bpmn", "modified", true],
-      ["smart-base/library/new.md", "renamed", true],
+      ["mounted-layer/processes/a.bpmn", "modified", true],
+      ["mounted-layer/library/new.md", "renamed", true],
       ["input/fsh/x.fsh", "modified", false],
     ]);
-    expect(changes[1].from).toBe("smart-base/library/old.md");
+    expect(changes[1].from).toBe("mounted-layer/library/old.md");
   });
   test("a pin that cannot be diffed is said, never dropped", () => {
     const { repins, changes } = expandRepins(lock("s1"), lock("s2"), () => {
@@ -80,10 +80,10 @@ describe("expandRepins", () => {
 
 describe("collectSources", () => {
   test("expands only when the lock is in the branch's list, and says so when its base is missing", () => {
-    const differ: Differ = () => [{ status: "added", path: "smart-base/processes/b.bpmn" }];
+    const differ: Differ = () => [{ status: "added", path: "mounted-layer/processes/b.bpmn" }];
     const s = collectSources({ repository: "o/fa", changed: "modified\tindex.lock.json\nadded\tdocs/x.md\n", base: lock("s1"), headLock: lock("s2"), differ });
-    expect(s.changes.map((c) => c.path)).toEqual(["index.lock.json", "docs/x.md", "smart-base/processes/b.bpmn"]);
-    expect(coneInputs(s)).toEqual(["docs/x.md", "index.lock.json", "smart-base/processes/b.bpmn"]);
+    expect(s.changes.map((c) => c.path)).toEqual(["index.lock.json", "docs/x.md", "mounted-layer/processes/b.bpmn"]);
+    expect(coneInputs(s)).toEqual(["docs/x.md", "index.lock.json", "mounted-layer/processes/b.bpmn"]);
     const noBase = collectSources({ repository: "o/fa", changed: "index.lock.json", headLock: lock("s2"), differ });
     expect(noBase.repins[0].doubt).toContain("not expanded");
     const noLock = collectSources({ repository: "o/fa", changed: "docs/x.md", base: lock("s1"), headLock: lock("s2"), differ });
@@ -192,31 +192,31 @@ describe("prediction by provenance", () => {
     mkdirSync(dirname(join(T, rel)), { recursive: true });
     writeFileSync(join(T, rel), body);
   };
-  put("root/processes/a.html", '<main><p>Generated from <code class="x">smart-base/processes/a.bpmn</code> by render</p></main>');
-  put("root/reference/a.html", '<main><p>Generated from <a href="https://x/blob/main/smart-base/skills/a.md"><code>smart-base/skills/a.md</code></a></p><a data-src="smart-base/skills/a.md">edit</a></main>');
-  put("root/reference/b.html", '<main><a data-src="smart-base/skills/b.md">edit</a></main>');
+  put("root/processes/a.html", '<main><p>Generated from <code class="x">mounted-layer/processes/a.bpmn</code> by render</p></main>');
+  put("root/reference/a.html", '<main><p>Generated from <a href="https://x/blob/main/mounted-layer/skills/a.md"><code>mounted-layer/skills/a.md</code></a></p><a data-src="mounted-layer/skills/a.md">edit</a></main>');
+  put("root/reference/b.html", '<main><a data-src="mounted-layer/skills/b.md">edit</a></main>');
   put("root/index.html", "<main>no provenance</main>");
-  put("root/STAGING/other/reference/a.html", '<a data-src="smart-base/skills/a.md">x</a>');
+  put("root/STAGING/other/reference/a.html", '<a data-src="mounted-layer/skills/a.md">x</a>');
 
   test("reads both provenance forms, and never another preview", () => {
     expect(pageSources('Generated from <code>x/y.md</code> <a data-src="./z.md">')).toEqual(["x/y.md", "z.md"]);
     const ix = provenanceIndex(join(T, "root"));
-    expect(ix.get("smart-base/skills/a.md")).toEqual(["reference/a.html"]);
-    expect(ix.get("smart-base/processes/a.bpmn")).toEqual(["processes/a.html"]);
+    expect(ix.get("mounted-layer/skills/a.md")).toEqual(["reference/a.html"]);
+    expect(ix.get("mounted-layer/processes/a.bpmn")).toEqual(["processes/a.html"]);
   });
 
   test("a changed source predicts its pages; a removed one removes them; an unmounted one predicts nothing", () => {
     const ix = provenanceIndex(join(T, "root"));
     const src = (path: string, status: "modified" | "removed", mounted = true) => ({ path, status, repository: "o/sb", upstreamPath: path, mounted });
     const p = predictByProvenance(
-      { $schema: "staging-changes/v1", repository: "o/fa", repins: [], changes: [src("smart-base/skills/a.md", "modified"), src("smart-base/skills/b.md", "removed"), src("smart-base/processes/a.bpmn", "modified", false)] },
+      { $schema: "staging-changes/v1", repository: "o/fa", repins: [], changes: [src("mounted-layer/skills/a.md", "modified"), src("mounted-layer/skills/b.md", "removed"), src("mounted-layer/processes/a.bpmn", "modified", false)] },
       ix,
     );
     expect(p.files.map((f) => [f.path, f.change, f.via])).toEqual([
-      ["reference/a.html", "changed", ["smart-base/skills/a.md"]],
-      ["reference/b.html", "removed", ["smart-base/skills/b.md"]],
+      ["reference/a.html", "changed", ["mounted-layer/skills/a.md"]],
+      ["reference/b.html", "removed", ["mounted-layer/skills/b.md"]],
     ]);
     const merged = mergeImpacts([p, { ...p, renderer: "docs-site", files: [{ path: "reference/a.html", change: "changed", role: "content", via: ["x.md"] }] }]);
-    expect(merged.files.find((f) => f.path === "reference/a.html")!.via).toEqual(["smart-base/skills/a.md", "x.md"]);
+    expect(merged.files.find((f) => f.path === "reference/a.html")!.via).toEqual(["mounted-layer/skills/a.md", "x.md"]);
   });
 });

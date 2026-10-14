@@ -21,7 +21,7 @@
  *
  * ## Why a re-pin has to be expanded
  *
- * A change to a mounted instance (smart-base, say) reaches this site as a
+ * A change to a mounted instance (a content layer, say) reaches this site as a
  * one-line edit to `index.lock.json`. Handed to a renderer as it is, that
  * predicts nothing, and the reviewer is shown one JSON file. So each mount
  * whose commit moved is diffed in its OWN repository between the two pins,
@@ -669,7 +669,7 @@ details{margin:8px 0}summary{cursor:pointer}
 <p>Branch <code>${esc(o.branch)}</code> (preview <code>${esc(o.slug)}</code>) at <a href="https://github.com/${esc(s.repository)}/commit/${esc(s.head ?? "")}"><code>${short(s.head)}</code></a>. Generated ${esc(o.generatedAt)}.</p>
 <div class="tiles">${counts}</div>
 <nav><a href="#sources">1. sources</a><a href="#cone">2. dependency cone</a><a href="#qa">3. QA against the root</a></nav>
-<p><label for="filter">Filter every list by path: </label><br><input id="filter" type="search" placeholder="e.g. smart-base/processes" autocomplete="off"></p>
+<p><label for="filter">Filter every list by path: </label><br><input id="filter" type="search" placeholder="e.g. a directory or file name" autocomplete="off"></p>
 ${sec1}
 ${sec2}
 ${sec3}
