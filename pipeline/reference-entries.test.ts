@@ -41,7 +41,8 @@ const garoufalidis = {
   note: "arXiv:math/0306230.",
 };
 const who = { $schema: "folio-reference/v1", id: "who2014", type: "book", author: [{ literal: "World Health Organization" }], URL: "https://iris.who.int/handle/10665/145714" };
-const MODULE = `export const references = [
+const MODULE = `// Entries are \`ref({…})\` calls; one, \`ref({ id: "ghost" })\`, was removed.
+export const references = [
   ref({
     id: "leitner2026",
     type: "article",
@@ -99,6 +100,12 @@ describe("referenceEntries", () => {
   });
 
   test("a folio with neither reads nothing", () => expect(referenceEntries(folio())).toEqual([]));
+
+  test("a ref({…}) named in a comment is not an entry, and does not swallow the ones after it", () => {
+    const ids = referenceEntries(folio({ module: MODULE })).map((e) => e.id);
+    expect(ids).not.toContain("ghost");
+    expect(ids).toEqual(["leitner2026", "garoufalidis2004"]);
+  });
 });
 
 describe("source-ledger-index reads split references", () => {

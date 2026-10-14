@@ -106,7 +106,10 @@ function unorderedEntries(repoRoot: string): ReferenceEntry[] {
   const mod = referencesModule(repoRoot);
   if (mod) {
     const src = readFileSync(mod, "utf-8");
-    for (const m of src.matchAll(/ref\(\{(.*?)\n\s*\}\)/gs)) {
+    // A call starts a line. Mentioned in a comment (qou's header names
+    // `ref({…})`; a merge note names `ref({ id: "orellana1998" })`), the
+    // unanchored pattern began there and swallowed the entries that followed.
+    for (const m of src.matchAll(/^[ \t]*ref\(\{(.*?)\n\s*\}\)/gms)) {
       const id = m[1]!.match(/\bid:\s*"([^"]+)"/)?.[1];
       if (!id || seen.has(id)) continue;
       seen.add(id);
