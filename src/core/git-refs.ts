@@ -64,7 +64,31 @@ export function detectRepoUrl(root: string): string | undefined {
   if (!remote) return undefined;
   const ssh = remote.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
   if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  return remote.replace(/\.git$/, "");
+  return withoutCredentials(remote).replace(/\.git$/, "");
+}
+
+/**
+ * `url` with any user and password removed — `https://x-access-token:<token>@github.com/o/r`
+ * becomes `https://github.com/o/r`.
+ *
+ * `git remote get-url` APPLIES `insteadOf`, and a CI job that authenticates
+ * git by rewriting `https://github.com/` to a token-bearing URL (smart-ra's
+ * `site-publish.yml`) gets the token back from it. That value was published
+ * on every page of smart-ra's site as the "source" link (2026-10-14). A
+ * repository's address never carries credentials; nothing read from a remote
+ * may reach a page without passing through here.
+ */
+export function withoutCredentials(url: string): string {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return url;
+  }
+  if (!u.username && !u.password) return url;
+  u.username = "";
+  u.password = "";
+  return u.toString().replace(/\/$/, url.endsWith("/") ? "/" : "");
 }
 
 /** `owner/repo` from a repo web URL, for `raw.githubusercontent.com`. */

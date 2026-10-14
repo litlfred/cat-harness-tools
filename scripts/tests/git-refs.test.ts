@@ -14,11 +14,12 @@
  * spreads `publishTargets` and the same file's own block, in that order.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { DEFAULT_PUBLISH_REF, ownerRepo, publishTargets, publishedPaths } from "../../src/core/git-refs.js";
+import { DEFAULT_PUBLISH_REF, detectRepoUrl, ownerRepo, publishTargets, publishedPaths, withoutCredentials } from "../../src/core/git-refs.js";
 import { loadReadmeConfig } from "../../pipeline/readme-toc.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
@@ -96,6 +97,28 @@ describe("the git facts", () => {
       expect(paths!.has("AGENTS.md")).toBe(true);
     } finally {
       fx.cleanup();
+    }
+  });
+});
+
+describe("withoutCredentials — no token reaches a page (smart-ra, 2026-10-14)", () => {
+  test("strips an insteadOf token, and leaves clean URLs byte-identical", () => {
+    expect(withoutCredentials("https://x-access-token:ghs_abc@github.com/litlfred/smart-ra")).toBe("https://github.com/litlfred/smart-ra");
+    expect(withoutCredentials("https://user@github.com/o/r.git")).toBe("https://github.com/o/r.git");
+    expect(withoutCredentials("https://github.com/o/r")).toBe("https://github.com/o/r");
+    expect(withoutCredentials("git@github.com:o/r.git")).toBe("git@github.com:o/r.git");
+  });
+
+  test("detectRepoUrl never returns the token git's insteadOf puts in the remote", () => {
+    const repo = mkdtempSync(join(tmpdir(), "creds-"));
+    try {
+      const run = (...a: string[]) => execFileSync("git", ["-C", repo, ...a], { stdio: "pipe" });
+      run("init", "-q");
+      run("remote", "add", "origin", "https://github.com/o/r.git");
+      run("config", "url.https://x-access-token:SECRET@github.com/.insteadOf", "https://github.com/");
+      expect(detectRepoUrl(repo)).toBe("https://github.com/o/r");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });
