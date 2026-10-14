@@ -1,6 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -52,8 +54,22 @@ const PHRASE = /[A-Za-z]{5,}\s+[A-Za-z]{5,}/;
 
 let site = "";
 let server: ChildProcess | undefined;
-const PORT = 8600 + Math.floor(Math.random() * 300);
-const BASE = `http://127.0.0.1:${PORT}`;
+// Each worker that runs this file serves its OWN copy of the site. The port is
+// the OS's free one (not a random pick from a range: two workers drew the same
+// port, the second's server failed to bind, its readiness probe answered from
+// the FIRST worker's server, and that worker's afterAll then took the server
+// away mid-test -- ERR_CONNECTION_REFUSED on folio-assistant#2529). The probe
+// also reads back a token only this worker wrote, so it cannot be answered by
+// anyone else's server.
+let BASE = "";
+const freePort = () => new Promise<number>((resolve, reject) => {
+  const s = createServer();
+  s.once("error", reject);
+  s.listen(0, "127.0.0.1", () => {
+    const { port } = s.address() as { port: number };
+    s.close(() => resolve(port));
+  });
+});
 
 test.beforeAll(async () => {
   site = mkdtempSync(join(tmpdir(), "q8ar-site-"));
@@ -72,14 +88,21 @@ test.beforeAll(async () => {
     "--payload-out", payloads,
   ], { stdio: "inherit" });
 
-  server = spawn("python3", ["-m", "http.server", String(PORT), "--bind", "127.0.0.1", "--directory", site], { stdio: "ignore" });
+  const token = randomUUID();
+  writeFileSync(join(site, "server-token.txt"), token);
+  const port = await freePort();
+  BASE = `http://127.0.0.1:${port}`;
+  const proc = spawn("python3", ["-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", site], { stdio: "ignore" });
+  server = proc;
   for (let i = 0; i < 100; i++) {
+    if (proc.exitCode !== null) throw new Error(`python3 -m http.server exited (${proc.exitCode}) on port ${port}`);
     try {
-      if ((await fetch(`${BASE}/slices/search.html`)).ok) return;
+      const r = await fetch(`${BASE}/server-token.txt`);
+      if (r.ok && (await r.text()) === token && (await fetch(`${BASE}/slices/search.html`)).ok) return;
     } catch { /* not up yet */ }
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error("python3 -m http.server did not come up");
+  throw new Error(`python3 -m http.server did not come up on port ${port}`);
 });
 
 test.afterAll(() => {
