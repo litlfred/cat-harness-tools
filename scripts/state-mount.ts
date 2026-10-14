@@ -151,7 +151,7 @@ export type MountResult =
 
 export interface MountOptions {
   repoRoot?: string;
-  /** Mount only the graphs with this declared directory id — every one of them — or the one with this key (`who-iris.health`). */
+  /** Mount only the graphs with this declared directory id — every one of them — or the one with this key (`<instance>.health`). */
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;
@@ -453,7 +453,7 @@ if (import.meta.main) {
   // Skipped for `--id`, which names one branch-kept graph.
   //
   // FIRST, because a state graph can be declared INSIDE a remote-mounted
-  // instance (cat-harness's, who-iris' … `health`): the instance is laid down,
+  // instance (cat-harness's, a content instance's … `health`): the instance is laid down,
   // then its graphs are mounted into it. The other order mounted the graphs
   // and then re-laid the instance over them.
   const remote = at === -1 ? remoteFanOut(repoRootOf()) : undefined;

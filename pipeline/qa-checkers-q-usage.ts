@@ -38,7 +38,7 @@
 import { existsSync, readFileSync } from "fs";
 // The Lean lexer and qou's chapter profiles are the science layer's, so they
 // arrive through pipeline slots rather than imports (bean `squu`). Same names,
-// same behaviour; the slot is filled by folio-assistant-sci's contributions.
+// same behaviour; the slot is filled by a higher layer's contributions.
 import { declarationStarts, registerDefaultChapterProfiles, stripLeanComments } from "./pipeline-plugins.js";
 import { sep } from "path";
 
