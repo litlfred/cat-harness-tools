@@ -78,7 +78,7 @@ export interface PushOptions {
   message?: string;
   /** Report what would be sent and send nothing. */
   dryRun?: boolean;
-  /** Push only the graphs with this id — every one of them — or the one with this key (`who-iris.health`). */
+  /** Push only the graphs with this id — every one of them — or the one with this key (`<instance>.health`). */
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;

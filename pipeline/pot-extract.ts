@@ -4,15 +4,15 @@
  * Extracts translatable strings from folio content `.md` files into
  * GNU gettext `.pot` (Portable Object Template) format.
  *
- * ## Origin: smart-base `extract_translations.py`
+ * ## Origin: the upstream `extract_translations.py`
  *
  * This module is a TypeScript port of the markdown extraction logic in
- * `WorldHealthOrganization/smart-base/input/scripts/extract_translations.py`
- * (lines 530–920, function `extract_markdown` and helpers). The Python
+ * <https://github.com/WorldHealthOrganization/smart-base/blob/main/input/scripts/extract_translations.py>
+ * ("upstream" below; lines 530–920, function `extract_markdown` and helpers). The Python
  * original handles FHIR IG narrative pages under `input/pagecontent/`;
  * this handles folio content blocks. The extraction logic is generic
  * markdown processing, not WHO-specific, so it lives in folio-assistant
- * rather than being loaded from smart-base. The smart-base copy remains.
+ * rather than being loaded from upstream. The upstream copy remains.
  *
  * ## What it extracts
  *
@@ -33,7 +33,7 @@
  * - Table separator rows (`|---|---|`)
  * - Strings shorter than 3 characters after cleaning
  *
- * ## Text cleaning (mirrors smart-base `_clean_markdown_text`)
+ * ## Text cleaning (mirrors upstream `_clean_markdown_text`)
  *
  * Before emitting a `msgid`, inline formatting is stripped:
  * - HTML comments removed
@@ -43,13 +43,13 @@
  * - Inline code spans removed
  * - Bold/italic markers stripped (content preserved)
  * - HTML tags removed
- * - Liquid `{% %}` control tags removed (smart-base compat)
- * - Liquid `{{ expr }}` → `{lqd_expr}` gettext brace vars (smart-base compat)
+ * - Liquid `{% %}` control tags removed (upstream compat)
+ * - Liquid `{{ expr }}` → `{lqd_expr}` gettext brace vars (upstream compat)
  *
  * @module pipeline/pot-extract
  */
 
-// ── Text cleaning patterns (mirrors smart-base _clean_markdown_text) ────
+// ── Text cleaning patterns (mirrors upstream _clean_markdown_text) ──────
 
 const MD_HTML_COMMENT_RE = /<!--.*?-->/gs;
 const MD_IMAGE_RE = /!\[([^\]]*)\]\([^)]*\)/g;
@@ -273,9 +273,9 @@ const LQD_PREFIX = "lqd_";
  * Strip markdown formatting from a text fragment to obtain plain text
  * suitable for a `msgid` value.
  *
- * Mirrors smart-base `_clean_markdown_text()` in
+ * Mirrors upstream `_clean_markdown_text()` in
  * `extract_translations.py` lines 633–697. The Liquid expression
- * handling preserves smart-base's `{lqd_expr}` convention for IG
+ * handling preserves the upstream `{lqd_expr}` convention for IG
  * Publisher compatibility.
  */
 export function cleanMarkdownText(text: string): string {
@@ -374,7 +374,7 @@ export type PotEntryKind =
   | "manifest-title"
   | "ui-string"
   // A glossary term's label, alternative label or definition
-  // (`folio-assistant-core/scripts/glossary-pot.ts`). Declared 2026-09-30: that
+  // (the content core's glossary producer). Declared 2026-09-30: that
   // producer predates `kind` and never decided, which compiled only because its
   // directory is outside tsconfig's include list.
   | "glossary-term";
@@ -395,12 +395,12 @@ export interface PotEntry {
   comment?: string;
 }
 
-// ── Markdown extraction (mirrors smart-base extract_markdown) ───
+// ── Markdown extraction (mirrors upstream extract_markdown) ─────
 
 /**
  * Extract translatable strings from a Markdown file.
  *
- * Uses the same state machine as smart-base's `extract_markdown()`:
+ * Uses the same state machine as upstream `extract_markdown()`:
  * YAML front matter → fenced code blocks → HTML skip blocks →
  * blank lines → headings → horizontal rules → list items →
  * blockquotes → table rows → kramdown attributes → paragraph
@@ -735,7 +735,7 @@ export function extractFromManifest(
  * Format POT entries into a GNU gettext POT file string.
  *
  * Deduplicates entries with the same msgid (merging source references),
- * matching smart-base's `write_pot()` behaviour.
+ * matching upstream `write_pot()` behaviour.
  */
 export function formatPot(entries: PotEntry[], metadata?: {
   projectName?: string;
@@ -773,7 +773,7 @@ export function formatPot(entries: PotEntry[], metadata?: {
     ``,
   ].join("\n");
 
-  // Sort entries case-insensitively (matches smart-base)
+  // Sort entries case-insensitively (matches upstream)
   const sortedKeys = [...deduped.keys()].sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
   );

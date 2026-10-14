@@ -16,11 +16,13 @@
 # NO E2E JOB, and why (bean cat-tools-g9m3, Done-when 3). The Playwright suite
 # (`bun run cat test:e2e`, 83 `*.e2e.ts` specs under `test/` on 2026-10-12) cannot be run
 # meaningfully against this mount yet: with the paths fixed (#65), collection
-# still stops at a spec that throws "no instance named who-iris declares a
-# visualiser catalogue", because the who-iris pinned in folio-assistant's
-# `index.lock.json` predates that visualiser. A job here would report 0 specs,
+# still stops at a spec that throws "no instance named <catalogue instance>
+# declares a visualiser catalogue", because the instance that declares the
+# visualiser catalogue the spec needs is pinned, in folio-assistant's
+# `index.lock.json`, at a commit that predates that visualiser. A job here would report 0 specs,
 # which reads as a pass and is the 1xhc shape this repository keeps paying for.
-# The job belongs here once who-iris is re-pinned (lane A, bean kpci): then add
+# The job belongs here once that instance is re-pinned (lane A, bean kpci) --
+# or in the index's CI, which mounts every layer: then add
 # a job that fails when `playwright test --list` collects fewer than the specs
 # on disk, and runs them.
 

@@ -226,7 +226,7 @@ async function run(): Promise<void> {
   // THE COMPOSITION ROOT. This process has a top-level `await run()`, so this
   // is the outermost thing that runs before any checker is looked for — the
   // place a dependency's contributions are loaded. It names no dependency: it
-  // walks the ones the folio DECLARES, so `folio-assistant-sci` supplying the
+  // walks the ones the folio DECLARES, so a higher layer supplying the
   // elaboration-cost checkers costs this file no knowledge that sci exists.
   //
   // Which is the point. `getCriterionSourceFile` used to hold the string
