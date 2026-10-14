@@ -331,8 +331,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // (the ✍ link beside ✎ edit) a data-src adopted from its href, and the
     // block's label is the host's, not the link's.
     const h = a.parentElement && a.parentElement.closest("[data-src]");
-    if (h && h.dataset.src) return { src: h.dataset.src, label: h.dataset.block || h.dataset.src, repo: h.dataset.repo, branch: h.dataset.branch, mode: h.dataset.suggestMode };
-    if (a.dataset.src || adopt(a)) return { src: a.dataset.src, label: a.dataset.block || a.dataset.src, repo: a.dataset.repo, branch: a.dataset.branch, mode: a.dataset.suggestMode };
+    if (h && h.dataset.src) return { src: h.dataset.src, label: h.dataset.block || h.dataset.src, repo: h.dataset.repo, branch: h.dataset.branch, mode: h.dataset.suggestMode, text: h.dataset.suggestText };
+    if (a.dataset.src || adopt(a)) return { src: a.dataset.src, label: a.dataset.block || a.dataset.src, repo: a.dataset.repo, branch: a.dataset.branch, mode: a.dataset.suggestMode, text: a.dataset.suggestText };
     return null;
   };
   const el = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); for (const k of kids || []) e.append(k); return e; };
@@ -382,7 +382,9 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // extension. A host names one with data-suggest-mode.
   const profilesOf = (c) => ((c.suggest && c.suggest.profiles) || []).filter((p) => p && p.module);
   const fileOk = (p, src) => (p.extensions && p.extensions.length ? p.extensions.some((x) => src.endsWith(x)) : /\\.md$/.test(src));
-  const suggestable = (c, s) => (!s.mode && /\\.md$/.test(s.src)) || profilesOf(c).some((p) => fileOk(p, s.src) && (!s.mode || p.id === s.mode));
+  // A host that names its mode is served by that profile whatever its file is
+  // (a Questionnaire written in FSH); otherwise by file type.
+  const suggestable = (c, s) => (s.mode ? profilesOf(c).some((p) => p.id === s.mode) : /\\.md$/.test(s.src) || profilesOf(c).some((p) => fileOk(p, s.src)));
   const profileFor = (c, kind, s) => s.mode
     ? profilesOf(c).find((p) => p.id === s.mode)
     : profilesOf(c).find((p) => fileOk(p, s.src) && (!p.kinds || p.kinds.indexOf(kind) >= 0));
@@ -629,29 +631,77 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // it is read on submit, not polled.
     if (mod && typeof mod.open === "function") {
       toolbar.hidden = true;
-      const ctx = { text: original, src: s.src, path: path, label: s.label, kind: kind, repo: repo, branch: branch, config: c, status: (m) => { status.textContent = String(m); } };
+      // The mode's text: the block's source, or, when the host names one
+      // (data-suggest-text), what the site BUILT from it, e.g. a Questionnaire
+      // compiled from FSH. The source stays the issue's subject either way.
+      let text = original;
+      if (s.text) {
+        try {
+          const r = await fetch(new URL(s.text, location.href).href);
+          if (!r.ok) throw new Error(r.status + " reading " + s.text);
+          text = await r.text();
+        } catch (e) { status.textContent = "Could not load the built text: " + e.message; return; }
+      }
+      // ctx.why is live: the reader's reason as it stands when the mode reads it.
+      const ctx = { text: text, sourceText: original, sourcePath: path, src: s.src, path: path, label: s.label, kind: kind, repo: repo, branch: branch, config: c, status: (m) => { status.textContent = String(m); }, get why() { return reason(); } };
+      const formBox = el("div"), srcBox = el("div", { hidden: true });
+      host.replaceChildren(formBox, srcBox);
       let handle;
-      try { handle = await mod.open(host, ctx); }
+      try { handle = await mod.open(formBox, ctx); }
       catch (e) { status.textContent = "The " + (prof.id || "editor") + " did not open: " + e.message; return; }
-      surface = { name: "mode", get: () => handle.get(), base: original, destroy: () => { try { if (handle && handle.dispose) handle.dispose(); } catch {} } };
+      surface = { name: "mode", get: () => handle.get(), base: text, destroy: () => { try { if (handle && handle.dispose) handle.dispose(); } catch {} } };
+      // Both editors when the mode edits a built text (owner, 2026-10-14: "Both"):
+      // the mode's own, and the source itself, raw. The issue carries whichever
+      // the reader used; the mode stays open, so switching back loses nothing.
+      let onSource = false, srcArea = null;
+      if (s.text) {
+        const ext = (path.match(/\\.([A-Za-z0-9]+)$/) || [])[1];
+        const formBtn = btn("Form", "Edit in the form"), srcBtn = btn(ext ? ext.toUpperCase() : "Source", "Edit the source text");
+        const sw = el("div", { className: "fa-sg-tb" }, [el("span", { className: "fa-sg-mode" }, [formBtn, srcBtn])]);
+        sw.setAttribute("role", "group");
+        sw.setAttribute("aria-label", "Editor");
+        host.before(sw);
+        const show = () => {
+          formBtn.setAttribute("aria-pressed", String(!onSource));
+          srcBtn.setAttribute("aria-pressed", String(onSource));
+          formBox.hidden = onSource;
+          srcBox.hidden = !onSource;
+        };
+        formBtn.onclick = () => { onSource = false; show(); };
+        srcBtn.onclick = () => {
+          if (!srcArea) { srcArea = el("textarea", { value: original }); srcArea.setAttribute("aria-label", "The source: " + path); srcBox.append(srcArea); }
+          onSource = true; show(); srcArea.focus();
+        };
+        show();
+      }
       status.textContent = notes.join(" ");
+      const sourceIssue = async () => {
+        const now = srcArea.value;
+        if (now === original) { status.textContent = "Nothing has changed yet."; return; }
+        const body = facts.concat(["", "**Suggested change**, made in the source (" + path + "):", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
+        if (await openIssue(c.repo || repo, "Suggested edit: " + s.label, body, undefined, status)) close.onclick();
+      };
       send.disabled = false;
       send.onclick = async () => {
+        if (onSource) return sourceIssue();
         let now;
         try { now = await surface.get(); } catch (e) { status.textContent = "Could not read the edit: " + e.message; return; }
-        if (typeof now !== "string" || now === original) { status.textContent = "Nothing has changed yet."; return; }
+        if (typeof now !== "string" || now === text) { status.textContent = "Nothing has changed yet."; return; }
         let found = [];
         if (typeof mod.check === "function") {
-          try { found = (await mod.check(original, now, { kg: (await kgReferences(c)) || undefined })) || []; }
+          try { found = (await mod.check(text, now, { kg: (await kgReferences(c)) || undefined })) || []; }
           catch (e) { found = [{ severity: "warning", message: "the checker failed: " + e.message }]; }
         }
         vars.replaceChildren(...found.map(findingItem));
         const errs = found.filter((f) => f.severity === "error");
         if (errs.length) { status.textContent = "Fix first: " + errs.map((f) => String(f.message).slice(0, 60)).join(" \\u00b7 "); return; }
         let custom = null;
-        if (typeof mod.issue === "function") { try { custom = await mod.issue(original, now, ctx); } catch { custom = null; } }
+        if (typeof mod.issue === "function") { try { custom = await mod.issue(text, now, ctx); } catch { custom = null; } }
         const title = (custom && custom.title) || "Suggested edit: " + s.label;
-        const issueBody = (custom && custom.body) || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
+        // A mode's own body keeps the reader's reason: appended when the body does not already carry it.
+        const why = reason();
+        const own = custom && custom.body ? (why && custom.body.indexOf(why) < 0 ? custom.body + "\\n\\n**Why:**\\n" + why + "\\n" : custom.body) : null;
+        const issueBody = own || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(text, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
         if (await openIssue(c.repo || repo, title, issueBody, custom && custom.template, status)) close.onclick();
       };
       return;

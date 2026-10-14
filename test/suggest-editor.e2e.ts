@@ -175,3 +175,93 @@ test.describe("✍ suggest editor (wireframe candidate A)", () => {
     expect(small).toEqual([]);
   });
 });
+
+// ── Modes: an editor of the profile's own, over the text the site BUILT ──────
+//
+// The shape fhir-harness#68 publishes for a Questionnaire written in FSH: the
+// host names the .fsh source (data-src) and the built JSON (data-suggest-text).
+// Owner, 2026-10-14: "Both" — the form over the built JSON, and the FSH raw.
+
+const FSH = "Instance: intake\nInstanceOf: Questionnaire\n* item[0].linkId = \"1\"\n";
+const BUILT = JSON.stringify({ resourceType: "Questionnaire", id: "intake", item: [{ linkId: "1" }] });
+const MODE = `export function open(host, ctx) {
+  const ta = document.createElement("textarea"); ta.className = "q-form"; ta.value = ctx.text; host.append(ta);
+  window.__ctx = ctx;
+  return { get: async () => ta.value, dispose() { window.__disposed = true; } };
+}
+export function check(before, after) { try { JSON.parse(after); return []; } catch (e) { return [{ severity: "error", message: "not JSON" }]; } }
+export function issue(before, after, ctx) { return { title: "Questionnaire change: " + ctx.label, body: "items: " + JSON.parse(after).item.length }; }`;
+const MODE_CFG = { repo: "o/r", branch: "main", suggest: { profiles: [{ id: "questionnaire", module: "/assets/modes/q.js", extensions: [".json"] }] } };
+const MODE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Q</title>
+<link rel="stylesheet" href="/assets/css/site.css"></head><body>
+<div data-src="input/fsh/intake.fsh" data-block="questionnaire:intake" data-suggest-mode="questionnaire" data-suggest-text="/built/Questionnaire-intake.source.json"><a data-fa-link="edit" href="#">✎ edit</a></div>
+<script type="application/json" id="fa-edit-cfg">${JSON.stringify(MODE_CFG)}</script>
+<script>${EDIT_LINKS_RUNTIME}</script></body></html>`;
+
+async function openMode(page: Page): Promise<{ opened: () => string; errors: string[] }> {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.route(`${ORIGIN}/**`, (r) => {
+    const path = new URL(r.request().url()).pathname;
+    if (path === "/") return r.fulfill({ contentType: "text/html", body: MODE_PAGE });
+    if (path === "/assets/modes/q.js") return r.fulfill({ contentType: "text/javascript", body: MODE });
+    if (path === "/built/Questionnaire-intake.source.json") return r.fulfill({ contentType: "application/json", body: BUILT });
+    return r.fulfill({ status: path.endsWith(".css") ? 200 : 404, contentType: "text/css", body: "" });
+  });
+  await page.route(/raw\.githubusercontent\.com/, (r) =>
+    r.request().url().endsWith("intake.fsh") ? r.fulfill({ contentType: "text/plain", body: FSH }) : r.fulfill({ status: 404, body: "" }),
+  );
+  let url = "";
+  await page.exposeFunction("__opened", (u: string) => { url = u; });
+  await page.goto(`${ORIGIN}/`);
+  await page.evaluate(() => {
+    (window as unknown as { open: (u: string) => null }).open = (u: string) => { (window as unknown as { __opened: (u: string) => void }).__opened(u); return null; };
+  });
+  await page.locator('a[data-fa-link="suggest"]').click();
+  await page.locator(`${D} textarea.q-form`).waitFor({ timeout: 30_000 });
+  return { opened: () => url, errors };
+}
+
+test.describe("✍ suggest modes over a built text (FSH-built Questionnaire)", () => {
+  test("the form edits the built JSON; the mode sees the FSH source and the reader's Why", async ({ page }) => {
+    await openMode(page);
+    await expect(page.locator(`${D} textarea.q-form`)).toHaveValue(BUILT);
+    await expect(page.locator(`${D} button[aria-label="Edit in the form"]`)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(`${D} button[aria-label="Edit the source text"]`)).toHaveText("FSH");
+    await page.locator(`${D} .fa-sg-why textarea`).fill("Two items are needed.");
+    const ctx = await page.evaluate(() => { const c = (window as unknown as { __ctx: { sourcePath: string; sourceText: string; why: string } }).__ctx; return { p: c.sourcePath, t: c.sourceText, w: c.why }; });
+    expect(ctx).toEqual({ p: "input/fsh/intake.fsh", t: FSH, w: "Two items are needed." });
+  });
+
+  test("a mode's own issue body keeps the reader's Why, and its check still blocks", async ({ page }) => {
+    const { opened, errors } = await openMode(page);
+    await page.locator(`${D} textarea.q-form`).fill("{ broken");
+    await page.locator(`${D} button`, { hasText: "Submit as an issue" }).click();
+    await expect(page.locator(`${D} .fa-suggest-status`)).toContainText("not JSON");
+    await page.locator(`${D} textarea.q-form`).fill(JSON.stringify({ resourceType: "Questionnaire", id: "intake", item: [{ linkId: "1" }, { linkId: "2" }] }));
+    await page.locator(`${D} .fa-sg-why textarea`).fill("Two items are needed.");
+    await page.locator(`${D} button`, { hasText: "Submit as an issue" }).click();
+    await expect.poll(opened).not.toBe("");
+    const u = new URL(opened());
+    expect(u.searchParams.get("title")).toBe("Questionnaire change: questionnaire:intake");
+    expect(u.searchParams.get("body")).toBe("items: 2\n\n**Why:**\nTwo items are needed.\n");
+    expect(await page.evaluate(() => (window as unknown as { __disposed?: boolean }).__disposed)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("FSH: the source edited as text, its diff and the Why in the issue", async ({ page }) => {
+    const { opened } = await openMode(page);
+    await page.locator(`${D} button[aria-label="Edit the source text"]`).click();
+    const fsh = page.locator(`${D} textarea[aria-label="The source: input/fsh/intake.fsh"]`);
+    await expect(fsh).toHaveValue(FSH);
+    await expect(page.locator(`${D} textarea.q-form`)).toBeHidden();
+    await fsh.fill(FSH + "* item[1].linkId = \"2\"\n");
+    await page.locator(`${D} .fa-sg-why textarea`).fill("Two items are needed.");
+    await page.locator(`${D} button`, { hasText: "Submit as an issue" }).click();
+    await expect.poll(opened).not.toBe("");
+    const body = new URL(opened()).searchParams.get("body")!;
+    expect(body).toContain("made in the source (input/fsh/intake.fsh)");
+    expect(body).toContain('+* item[1].linkId = "2"');
+    expect(body).toContain("**Why:**\nTwo items are needed.");
+  });
+});

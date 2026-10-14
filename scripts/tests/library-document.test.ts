@@ -146,3 +146,27 @@ describe("plainHeading — a text heading as a reader sees it (litlfred/dth-hrh)
     expect(plainHeading("Plain heading")).toBe("Plain heading");
   });
 });
+
+describe("a Markdown section's extract (litlfred/dth-hrh, twg-outline)", () => {
+  const text = (unit: "heading" | "file") => ({
+    _schema: "text-structure/v1", doc_id: "t", metadata: { title: "T" }, toc_source: "headings", structure_note: "verbatim",
+    source: { file: "t.md", sha256: "0".repeat(64), digest: "file", bytes: 1, mtime: null, mimetype_sniffed: "text/plain", mimetype_source: "content", upstream: null,
+      files: [{ path: "t.md", sha256: "0".repeat(64), bytes: 1, lines: 9, format: "markdown" }] },
+    sections: [{ id: "s001-part-4", number: null, title: "**Part 4\\. Examples**", level: 1, file: "t.md", line_start: 1, line_end: 9, unit, n_chars: 1, n_words: 1 }],
+  });
+  const md = "---\nsection_id: s001-part-4\n---\n# **Part 4\\. Examples**\n\n**Purpose:** worked [use cases](u.md).\n\n* Maturity *levels*  \n* Step 2\\. done\n";
+
+  test("drops its own heading and reads as plain text", () => {
+    const dir = entry(text("heading"));
+    writeFileSync(join(dir, "sections", "s001-part-4.md"), md);
+    const s = readEntryDocument(dir, "t")!.sections[0]!;
+    expect(s.title).toBe("Part 4. Examples");
+    expect(s.extract).toBe("Purpose: worked use cases. Maturity levels Step 2. done");
+  });
+
+  test("a whole verbatim file is left as it is", () => {
+    const dir = entry(text("file"));
+    writeFileSync(join(dir, "sections", "s001-part-4.md"), md);
+    expect(readEntryDocument(dir, "t")!.sections[0]!.extract).toStartWith("# **Part 4\\. Examples**");
+  });
+});
