@@ -16,7 +16,7 @@
  * Moved rather than duplicated: the test imports these, so there is still one
  * reader of the table, and its own assertions did not change.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
 import { BASE_GRAPH_TYPOLOGIES, GRAPH_TYPOLOGY_ALIASES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -28,7 +28,15 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The instance root this reader is relative to. */
 export const KIND_TABLE_ROOT = join(HARNESS_ROOT);
-export const KIND_TABLE_DOC = "skills/kg/kg-core/directory-conventions.md";
+/**
+ * The page the table is published on, built at publish (cat-harness's
+ * `builtAtPublish`, owner 2026-10-14: "1"). It was a region of the skill
+ * `skills/kg/kg-core/directory-conventions.md`, and that made the skill a
+ * pin-dependent artefact: every kind any instance in the checkout declares is
+ * a row, so the committed skill went stale at each re-pin that brought a
+ * layer's new kind. The skill keeps its prose and names this page.
+ */
+export const KIND_TABLE_DOC = "docs/cat-harness/kind-table.md";
 /** The table's header row, verbatim. Renaming a column is a deliberate edit. */
 export const KIND_TABLE_HEADER = "| kind | declared by | contents | renderable |";
 
@@ -43,7 +51,10 @@ export const KIND_TABLE_HEADER = "| kind | declared by | contents | renderable |
  * merges that way).
  */
 export function documentedKinds(root: string = KIND_TABLE_ROOT): string[] {
-  const lines = readFileSync(join(root, KIND_TABLE_DOC), "utf8").split("\n");
+  // The built page when it is there; otherwise exactly what `kind:table` would
+  // write, so a gate that runs before the publish step reads the same table.
+  const path = join(root, KIND_TABLE_DOC);
+  const lines = (existsSync(path) ? readFileSync(path, "utf8") : renderKindPage(root)).split("\n");
   const at = lines.reduce<number[]>((acc, l, i) => (l.trim() === KIND_TABLE_HEADER ? [...acc, i] : acc), []);
   if (at.length !== 1) {
     throw new Error(
@@ -120,21 +131,44 @@ export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
   return [KIND_TABLE_HEADER, "|---|---|---|---|", ...rows].join("\n");
 }
 
-/** Write the table between its markers, or (`check`) say whether it is current. Throws when the markers are not there exactly once. */
+/** The whole published page: front matter, where it comes from, and the table. */
+export function renderKindPage(root: string = KIND_TABLE_ROOT): string {
+  return [
+    "---",
+    "layout: default",
+    "title: Graph typologies",
+    "lang: en",
+    'description: "Every kind of directory an instance in this checkout may declare: who declares it, what it holds, and whether it renders."',
+    "permalink: /cat-harness/kind-table/",
+    "---",
+    "",
+    KIND_TABLE_BEGIN,
+    "",
+    "# Graph typologies",
+    "",
+    "Every kind of directory an instance in this checkout may declare, grouped by who declares it: bootstrap, the harness, core, then each harness that declares its own. " +
+      "A row is its kind's `description`, so edit the kind, not this page. " +
+      "How to declare a directory of one is the skill `directory-conventions`.",
+    "",
+    // A BLANK LINE each side of the table. Without one, kramdown reads the
+    // table as part of the marker comment's HTML block and publishes its rows
+    // as pipes (`check:escaped-markup` caught it on the built skill page).
+    renderKindTable(root),
+    "",
+    KIND_TABLE_END,
+    "",
+  ].join("\n");
+}
+
+/** Write the page, or (`check`) say whether the written page is current. */
 export function writeKindTable(check: boolean, root: string = KIND_TABLE_ROOT): boolean {
   const path = join(root, KIND_TABLE_DOC);
-  const text = readFileSync(path, "utf8");
-  const b = text.indexOf(KIND_TABLE_BEGIN);
-  const e = text.indexOf(KIND_TABLE_END);
-  if (b < 0 || e < b || text.indexOf(KIND_TABLE_BEGIN, b + 1) >= 0) {
-    throw new Error(`${KIND_TABLE_DOC}: expected one generated kind-table region between its markers`);
+  const next = renderKindPage(root);
+  if (existsSync(path) && readFileSync(path, "utf8") === next) return true;
+  if (!check) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, next);
   }
-  // A BLANK LINE each side of the table. Without one, kramdown reads the table
-  // as part of the marker comment's HTML block and publishes its rows as
-  // pipes — `check:escaped-markup` caught it on the built skill page.
-  const next = `${text.slice(0, b + KIND_TABLE_BEGIN.length)}\n\n${renderKindTable(root)}\n\n${text.slice(e)}`;
-  if (next === text) return true;
-  if (!check) writeFileSync(path, next);
   return false;
 }
 

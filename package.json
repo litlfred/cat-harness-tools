@@ -529,7 +529,7 @@
     "skill:register:check": "bun run cat-harness-tools/scripts/skill-register.ts --check",
     "skill:register:declarations:check": "bun run cat-harness-tools/scripts/skill-register.ts --check --declarations-only",
     "kind:table": "bun run cat-harness-tools/scripts/kind-table.ts",
-    "kind:table:check": "bun run cat-harness-tools/scripts/kind-table.ts --check",
+    "kind:table:check": "bun run cat-harness-tools/scripts/publish-check.ts kind:table",
     "skills:docs": "bun run cat-harness-tools/scripts/gen-skill-docs.ts",
     "skills:install": "bun run cat-harness-tools/scripts/install-skills.ts",
     "skills:docs:check": "bun run cat-harness-tools/scripts/publish-check.ts skills:docs",
