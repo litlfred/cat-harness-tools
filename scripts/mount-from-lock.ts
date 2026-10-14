@@ -218,8 +218,54 @@ export interface InstallOutcome {
  * tools, and a typechecker or a browser is a per-session choice (`all`).
  * Leaves every lockfile as it found it; see the section comment above.
  */
+/**
+ * The enclosing `package.json` whose `workspaces` names `dir`, or undefined.
+ *
+ * A mounted instance that is a WORKSPACE MEMBER of the checkout's root is
+ * installed by the root's own `bun install`. Installing it again from inside
+ * the member is not local: bun resolves the whole workspace and rewrites the
+ * ROOT `node_modules/` — and with `--omit dev` it does so without the dev
+ * graph, so a package two versions of which coexist is re-hoisted to the
+ * production one. Measured on folio-assistant#2529 (2026-10-14): eslint
+ * (dev) needs ajv@6, the MCP SDK (prod) needs ajv@8; `state:mount` hoisted
+ * ajv@8 over the root, and `bun run cat lint` failed with "Cannot find
+ * module 'ajv/lib/refs/json-schema-draft-04.json'" after a clean
+ * `--frozen-lockfile` install had laid down ajv@6.
+ *
+ * Patterns are matched literally or as a trailing `/*`, the two forms the
+ * manifests here use; a pattern this cannot read never matches, so the
+ * fallback is the old behaviour (install), not a skipped install.
+ */
+export function enclosingWorkspaceRoot(dir: string): string | undefined {
+  const abs = resolve(dir);
+  for (let up = dirname(abs); ; up = dirname(up)) {
+    const manifest = join(up, "package.json");
+    if (existsSync(manifest)) {
+      let ws: unknown;
+      try {
+        ws = JSON.parse(readFileSync(manifest, "utf-8")).workspaces;
+      } catch {
+        ws = undefined;
+      }
+      const patterns = Array.isArray(ws) ? ws : Array.isArray((ws as { packages?: unknown })?.packages) ? (ws as { packages: unknown[] }).packages : [];
+      const rel = relative(up, abs).split("\\").join("/");
+      for (const p of patterns) {
+        if (typeof p !== "string") continue;
+        const pat = p.replace(/^\.\//, "").replace(/\/+$/, "");
+        if (pat === rel) return up;
+        if (pat.endsWith("/*") && dirname(rel) === pat.slice(0, -2)) return up;
+      }
+    }
+    if (dirname(up) === up) return undefined;
+  }
+}
+
 export function installDependencies(dir: string, mode: InstallMode = "production"): InstallOutcome {
   if (!existsSync(join(dir, "package.json"))) return { state: "none", detail: "no package.json" };
+  const ws = enclosingWorkspaceRoot(dir);
+  if (ws !== undefined) {
+    return { state: "none", detail: `a workspace member of ${ws}: the root's own \`bun install\` provides its dependencies, and installing from inside it would re-hoist the root's node_modules` };
+  }
   const before = new Map(LOCKFILES.map((f) => [f, existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : undefined]));
   const bun = /bun(\.exe)?$/i.test(process.execPath) ? process.execPath : "bun";
   // `--omit dev`, not `--production`: bun's `--production` implies
