@@ -272,6 +272,10 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
       "beans-cli ~ beans-manual",
       "ingest-extended ~ ingest-stdlib",
       "package-release-manual ~ release-please",
+      // Two runtimes for one server (bean `0hi8`: "at least two tools satisfy
+      // it"): same ports, same skill, and a `selection` on each that says Bun
+      // or Python. Substitutable by design, so it belongs in this list.
+      "serve-rendering ~ serve-rendering-py",
       "transcribe-faster-whisper ~ transcribe-vosk",
       "transcribe-faster-whisper ~ transcribe-whisper-cpp",
       "transcribe-vosk ~ transcribe-whisper-cpp",

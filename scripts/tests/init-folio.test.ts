@@ -567,7 +567,7 @@ describe("a contentless instance (mer2)", () => {
   test("the config names no adapter and the declaration no folio directory", () => {
     const d = tmp();
     initInstance(instanceOpts(d));
-    const config = scaffoldConfig(d) as Record<string, any>;
+    const config = scaffoldConfig(d);
     expect(config.contentType).toBeUndefined();
     expect(config.adapter).toBeUndefined();
     expect(config.adapterModule).toBeUndefined();
@@ -614,7 +614,7 @@ describe("a contentless instance (mer2)", () => {
   test("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper" }));
-    const config = scaffoldConfig(d) as Record<string, any>;
+    const config = scaffoldConfig(d);
     expect(config.contentType).toBe("paper");
     expect(config.adapter).toBe("paper");
   });
@@ -659,7 +659,7 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   test("a contentless instance stands on cat-harness, and reaches its skills through the stack", () => {
     const d = tmp();
     initInstance({ targetDir: d, slug: SLUG, title: "Cold Chain Guidance", link: "submodule", skipVcs: true });
-    const config = scaffoldConfig(d) as Record<string, any>;
+    const config = scaffoldConfig(d);
     expect(config.dependencies).toEqual({ folioAssistant: [{ name: "cat-harness", path: "folio-assistant/cat-harness" }] });
     symlinkSync(REPO_ROOT, join(d, "folio-assistant"));
     const chain = chainNames(d);

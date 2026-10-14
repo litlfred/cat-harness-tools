@@ -43,7 +43,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { parseQaRef, QaUsageError, readQa, readQaManifest, resolveQaLocation, type QaStoreOptions } from "./qa-store.js";
+import { parseQaRef, QaUsageError, readQa, readQaManifest, resolveQaLocation, type QaLocation, type QaStoreOptions } from "./qa-store.js";
 import type { QaResultFamily, QaResult } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { QaResultFamily, QaResult };
@@ -272,9 +272,13 @@ export type BaselineRead =
  * Such a directory's working copy is a measurement of the contributor's last
  * `qa:fetch`, not a record, so it is never read as a baseline.
  */
-function storedOn(absPath: string, repoRoot?: string): string | undefined {
+function storedOn(absPath: string, repoRoot?: string, location?: QaLocation): string | undefined {
   try {
-    const loc = resolveQaLocation(repoRoot);
+    // A caller judging many paths resolves the location ONCE and passes it:
+    // resolving it per path walks every instance each time, and over the 84
+    // library entries that ran the real-corpus test past bun's 5 s limit,
+    // whose SIGTERM to `git rev-parse` this catch then read as "not stored".
+    const loc = location ?? resolveQaLocation(repoRoot);
     const abs = resolve(absPath);
     const s = loc.directories.find((x) => x.storage && (abs === x.absPath || abs.startsWith(x.absPath + sep)))?.storage;
     // A qa directory is keyed by commit, so its storage is a single branch; the resolver refuses a family.
@@ -372,7 +376,7 @@ export function movedFrom(path: string): string | undefined {
  * still there today); once its directory declares `storage` it stops being
  * one, and with no `--against` the answer is `unknown`, never an empty read.
  */
-export function readBaseline(absPath: string, opts: { against?: string; store?: QaStoreOptions } = {}): BaselineRead {
+export function readBaseline(absPath: string, opts: { against?: string; store?: QaStoreOptions; location?: QaLocation } = {}): BaselineRead {
   if (opts.against !== undefined) {
     const from = `qa-reports:${opts.against}`;
     try {
@@ -384,7 +388,7 @@ export function readBaseline(absPath: string, opts: { against?: string; store?: 
       return { state: "unknown", reason: (e as Error).message, from };
     }
   }
-  const branch = storedOn(absPath, opts.store?.repoRoot);
+  const branch = storedOn(absPath, opts.store?.repoRoot, opts.location);
   if (branch !== undefined) {
     return {
       state: "unknown",
@@ -415,7 +419,7 @@ export type QaResultRead =
   | { state: "miss" | "corrupt" | "unknown"; reason: string; from: string };
 
 /** {@link readBaseline}, parsed — the thin wrapper over qa-store's `readQa`. */
-export function readQaResultFrom(absPath: string, opts: { against?: string; store?: QaStoreOptions } = {}): QaResultRead {
+export function readQaResultFrom(absPath: string, opts: { against?: string; store?: QaStoreOptions; location?: QaLocation } = {}): QaResultRead {
   const b = readBaseline(absPath, opts);
   if (b.state !== "hit") return b;
   try {
@@ -469,7 +473,7 @@ export function readQaResult(path: string): QaResult | undefined {
 export function qaResultState(
   committedPath: string,
   fresh: QaResult,
-  opts: { against?: string; store?: QaStoreOptions } = {},
+  opts: { against?: string; store?: QaStoreOptions; location?: QaLocation } = {},
 ): QaResultState {
   const r = readQaResultFrom(committedPath, opts);
   if (r.state !== "hit") return r.state === "miss" ? "absent" : r.state === "corrupt" ? "unreadable" : "unknown";
