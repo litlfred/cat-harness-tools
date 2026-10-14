@@ -349,7 +349,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     let best = null;
     for (const e of document.querySelectorAll("script[src], link[href]")) {
       let u;
-      try { u = new URL(e.getAttribute("src") || e.getAttribute("href"), location.href); } catch (x) { continue; }
+      try { u = new URL(e.getAttribute("src") || e.getAttribute("href"), location.href); } catch { continue; }
       const i = u.pathname.indexOf("/assets/");
       if (u.origin !== location.origin || i < 0) continue;
       const root = u.pathname.slice(0, i + 1);
@@ -392,7 +392,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     if (template) q.template = template;
     let url = "https://github.com/" + repo + "/issues/new?" + new URLSearchParams(q);
     if (url.length > 7000) {
-      try { await navigator.clipboard.writeText(body); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return false; }
+      try { await navigator.clipboard.writeText(body); } catch { status.textContent = "Too long for a link, and the clipboard is blocked."; return false; }
       url = "https://github.com/" + repo + "/issues/new?" + new URLSearchParams({ title: title, body: "The suggested change is on the clipboard: paste it here." });
     }
     window.open(url, "_blank", "noopener");
@@ -616,7 +616,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // The block's profile, when the site declares one for its kind. A profile
     // that fails to load leaves the generic editor and its generic checks.
     const prof = profileFor(c, kind, s);
-    let mod = null, notes = [];
+    let mod = null;
+    const notes = [];
     if (prof) {
       try { mod = await import(new URL(prof.module, location.href).href); }
       catch (e) { notes.push("The " + (prof.id || "profile") + " checks did not load (" + e.message + ")."); }
@@ -632,7 +633,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       let handle;
       try { handle = await mod.open(host, ctx); }
       catch (e) { status.textContent = "The " + (prof.id || "editor") + " did not open: " + e.message; return; }
-      surface = { name: "mode", get: () => handle.get(), base: original, destroy: () => { try { if (handle && handle.dispose) handle.dispose(); } catch (e) {} } };
+      surface = { name: "mode", get: () => handle.get(), base: original, destroy: () => { try { if (handle && handle.dispose) handle.dispose(); } catch {} } };
       status.textContent = notes.join(" ");
       send.disabled = false;
       send.onclick = async () => {
@@ -648,7 +649,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         const errs = found.filter((f) => f.severity === "error");
         if (errs.length) { status.textContent = "Fix first: " + errs.map((f) => String(f.message).slice(0, 60)).join(" \\u00b7 "); return; }
         let custom = null;
-        if (typeof mod.issue === "function") { try { custom = await mod.issue(original, now, ctx); } catch (e) { custom = null; } }
+        if (typeof mod.issue === "function") { try { custom = await mod.issue(original, now, ctx); } catch { custom = null; } }
         const title = (custom && custom.title) || "Suggested edit: " + s.label;
         const issueBody = (custom && custom.body) || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
         if (await openIssue(c.repo || repo, title, issueBody, custom && custom.template, status)) close.onclick();
@@ -723,7 +724,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       if (marks) view.dispatch(view.state.tr.setMeta(marks.key, true));
       return {
         name: "visual", get: get, base: visualBase, changes: () => (marks ? marks.count() : null),
-        destroy: () => { try { crepe.destroy(); } catch (e) {} },
+        destroy: () => { try { crepe.destroy(); } catch {} },
         bold: () => run(lib.toggleStrongCommand), italic: () => run(lib.toggleEmphasisCommand), strike: () => run(lib.toggleStrikethroughCommand),
         heading: () => run(lib.wrapInHeadingCommand, 3), bullets: () => run(lib.wrapInBulletListCommand), numbers: () => run(lib.wrapInOrderedListCommand),
         code: () => run(lib.toggleInlineCodeCommand), undo: () => run(lib.undoCommand), redo: () => run(lib.redoCommand),

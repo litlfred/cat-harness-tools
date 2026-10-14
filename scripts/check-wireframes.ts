@@ -74,7 +74,11 @@ export const VIEWPORTS = ["web", "mobile"] as const;
 
 type Index = { wireframes: Record<string, { covers: string[] }> };
 type ReportEntry = { viewport: string; criterion: string; result: string; notes?: string };
-type Report = { candidates: { file: string; entries: ReportEntry[] }[] };
+/**
+ * `use`, `topic` and `surface` are the skill's input, recorded by `wireframe:check`
+ * since 2026-10-14; a report written before then has none of them.
+ */
+type Report = { topic?: string; use?: string; surface?: string; candidates: { file: string; entries: ReportEntry[] }[] };
 
 export interface WireframeReport {
   declared: string[];
@@ -124,10 +128,14 @@ export function checkWireframes(repoRoot: string = REPO_ROOT, dir: string = WIRE
     }
     const reportFile = join(wdir, "checks", "report.json");
     if (!existsSync(reportFile)) {
-      r.incomplete.push({ wireframe: name, problem: "no checks/report.json: run `bun run cat wireframe:check`" });
+      r.incomplete.push({ wireframe: name, problem: `no checks/report.json: run \`bun run cat wireframe:check --use as-is --topic ${name} --surface <ref>\`` });
       continue;
     }
     const report: Report = JSON.parse(readFileSync(reportFile, "utf-8"));
+    if (report.topic !== undefined && report.topic !== name) {
+      r.incomplete.push({ wireframe: name, problem: `checks/report.json was written for topic "${report.topic}"` });
+      continue;
+    }
     for (const c of candidates) {
       const entries = report.candidates.find((x) => basename(x.file) === c)?.entries;
       if (entries === undefined) {

@@ -823,6 +823,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
 
 export function navbarRegionsHtml(m: NavbarModel): string {
   const c: Ctx = { liquid: m.hrefs === "liquid" };
+  const graphs = m.graphs && m.graphs.items.length > 0 ? m.graphs : undefined;
   return (
     // One checkbox behind two labels, so open and close cannot disagree.
     //
@@ -845,10 +846,12 @@ export function navbarRegionsHtml(m: NavbarModel): string {
     (m.documentIndex ? groupHtml(m.documentIndex, c) : "") +
     (m.fshGuts ? fshGutsHtml(m.fshGuts) : "") +
     `</div>` +
-    (m.graphs || m.visualiser
+    // A Graphs group with no rows is not drawn: an empty fold is a control
+    // that opens onto nothing (a site that holds none of its landing's graphs).
+    (graphs || m.visualiser
       ? `<div class="fa-nav-graphs">` +
         (m.visualiser ? groupHtml({ ...m.visualiser, collapsible: true, open: true }, c) : "") +
-        (m.graphs ? groupHtml(graphsOnArrival(m.graphs, m.visualiser !== undefined), c) : "") +
+        (graphs ? groupHtml(graphsOnArrival(graphs, m.visualiser !== undefined), c) : "") +
         `</div>`
       : "") +
     `<div class="fa-nav-bottom">` +

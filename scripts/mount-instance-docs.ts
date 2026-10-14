@@ -1024,6 +1024,20 @@ export interface ForeignSiteRail {
    * root, the others to their own pages. Absent, the rail is the platform's.
    */
   instance?: string;
+  /**
+   * `instance` is only the harness the site LANDS on, not the site's owner:
+   * the checkout declares no instance of its own (an IG repository whose
+   * `index.config.json` names `site.landing` and nothing else — the
+   * `build-instance-site.ts` identity route). Then the rail is the SITE's:
+   * its title in the header, a Graphs group of only the landing's graphs this
+   * site holds (linked within it), and a Harnesses list of the site itself,
+   * linking to its root, followed by the landing and what it is built on,
+   * each linking to its own page on the platform's site. The landing's other
+   * graphs are not this site's, and stay reachable from the landing's row.
+   * Owner, 2026-10-14, on smart-hiv: *"active graphs have broken links, they
+   * go back to smart-base, not smart-hiv"*.
+   */
+  landing?: boolean;
 }
 
 /**
@@ -1037,7 +1051,8 @@ export function instanceHarnesses(
   built: string,
   instance: string,
   linkRoot: string,
-  ownHref: string,
+  /** Where the instance's row links; `undefined` links it to its own page on `linkRoot`, as the others. */
+  ownHref: string | undefined,
   /** Where the instance's OWN mark resolves; default `linkRoot`. See {@link ownsCheckout}. */
   ownMarkRoot: string = linkRoot,
 ): NavItem[] | undefined {
@@ -1066,7 +1081,7 @@ export function instanceHarnesses(
     .sort((a, b) => (a.name === instance ? -1 : b.name === instance ? 1 : 0))
     .map((h) => {
       const label = h.label ?? h.title ?? h.name ?? "?";
-      const href = h.name === instance ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined;
+      const href = h.name === instance && ownHref !== undefined ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined;
       const markRoot = h.name === instance ? ownMarkRoot : linkRoot;
       return { label, ...(href ? { href } : {}), ...navMarkFields(h.mark, h.tone, (src) => `${markRoot}${src}`) };
     });
@@ -1144,6 +1159,23 @@ export function ownSiteGraphs(
   return out;
 }
 
+/**
+ * The landing's graphs that a site whose checkout declares no instance HOLDS
+ * ({@link ForeignSiteRail.landing}), by kind, each href relative to the site
+ * root. Every other graph of the landing is published on the platform's site,
+ * not this one, and is left out rather than listed as this site's.
+ */
+export function landedSiteGraphs(siteAbs: string, built: string, landing: string): Map<string, GraphFallback> {
+  const out = new Map<string, GraphFallback>();
+  for (const [kind, f] of publishedGraphs(built, landing, "")) {
+    if (f.href === undefined) continue;
+    const rel = f.href.replace(/^\/+/, "");
+    const page = rel.endsWith(".html") ? rel : `${rel === "" || rel.endsWith("/") ? rel : `${rel}/`}index.html`;
+    if (existsSync(join(siteAbs, page))) out.set(kind, { ...f, href: rel });
+  }
+  return out;
+}
+
 export function railStandalonePages(
   siteAbs: string,
   built: string,
@@ -1162,6 +1194,9 @@ export function railStandalonePages(
     NOT_THIS_PASS.some((r) => rel === r || rel.startsWith(`${r}/`)) ||
     rel === "STAGING" ||
     rel.startsWith("STAGING/");
+
+  // A site whose checkout declares no instance: computed once, it is the same on every page.
+  const landed = foreign?.landing === true && foreign.instance !== undefined ? landedSiteGraphs(siteAbs, built, foreign.instance) : undefined;
 
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -1204,17 +1239,26 @@ export function railStandalonePages(
       // The platform's links resolve against the platform's site; only home is this site's.
       const linkRoot = foreign?.platformBase ?? toRoot;
       // The folio's OWN graphs are on this site, and link only where it holds them.
-      const site = foreign && ownsCheckout(owner) ? ownSiteGraphs(siteAbs, built, owner, toRoot) : publishedGraphs(built, owner, linkRoot);
-      const links = declaredGraphs(owner, new Map(), site, named.harness);
+      const site = landed
+        ? new Map([...landed].map(([kind, f]) => [kind, { ...f, href: `${toRoot}/${f.href}` }]))
+        : foreign && ownsCheckout(owner)
+          ? ownSiteGraphs(siteAbs, built, owner, toRoot)
+          : publishedGraphs(built, owner, linkRoot);
+      const declared = declaredGraphs(owner, new Map(), site, named.harness);
+      // The landing's graphs this site does not hold are the landing's, not this site's.
+      const links = landed ? declared.filter((l) => l.href !== undefined) : declared;
       // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
       const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
-      const harnesses = foreign?.instance
-        ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
-        : instantiatedHarnesses(built, linkRoot);
-      const mark = instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
       const homeLabel = foreign ? foreign.homeLabel : named.site;
+      const harnesses = landed
+        ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
+        : foreign?.instance
+          ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
+          : instantiatedHarnesses(built, linkRoot);
+      // The landing's mark is not this site's: a site with no instance of its own draws none.
+      const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
       const after = injectRail(before, {
-        instance: named.harness ?? owner,
+        instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
         ...(homeLabel ? { homeLabel } : {}),
         toRoot,
         // The row's files are the PLATFORM's (bean `lhvt`). On a folio's site its
