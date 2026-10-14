@@ -107,7 +107,7 @@ import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
-import { foreignScopeFor, scopeNavbarRow } from "./lib/foreign-site-scope.ts";
+import { type ForeignScope, foreignScopeFor, scopeNavbarRow } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
@@ -679,7 +679,25 @@ export function navbarRowData(built: string): unknown {
  * re-based, absolute, onto the platform's site.
  */
 export function rebaseNavbarRow(row: unknown, platformBase: string, instance?: string): unknown {
-  return scopeNavbarRow(row, foreignScopeFor(REPO, { platformBase, ...(instance ? { instance } : {}) }));
+  return scopeNavbarRow(row, foreignScope(platformBase, instance));
+}
+
+/**
+ * The scope, read ONCE per run and site: it is the checkout's declarations,
+ * which a run does not change, and reading them walks every top-level
+ * directory. Read per page, that walk dominated the rail pass on an IG
+ * repository, whose `output/` holds the IG Publisher's thousands of JSON
+ * files: 0.5 s a page, about 50 minutes for one IG's 6,000 pages.
+ */
+const scopes = new Map<string, ForeignScope>();
+function foreignScope(platformBase: string, instance?: string): ForeignScope {
+  const key = `${platformBase}\u0000${instance ?? ""}`;
+  let s = scopes.get(key);
+  if (s === undefined) {
+    s = foreignScopeFor(REPO, { platformBase, ...(instance ? { instance } : {}) });
+    scopes.set(key, s);
+  }
+  return s;
 }
 
 /** The attribute marking the platform UI a foreign page loads, so a second pass adds none. */
