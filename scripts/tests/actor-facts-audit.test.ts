@@ -174,12 +174,17 @@ describe("real repository measurement", () => {
     });
 
     expect(res.result).toBe("fail");
-    // Exactly 17 unconsumed actor facts:
-    // 6 capabilities: fhir-validator, git-push, ig-publisher, jekyll, lean-toolchain, sushi-compiler
-    // 11 permissions: approval-authority, clinical-validation, content-authoring, first-pass-review,
+    // Exactly 14 unconsumed actor facts (17 until 2026-10-14; the count may
+    // only fall). Three found consumers since, in the processes of the
+    // instances the checkout mounts: lean-toolchain (folio-assistant-sci's
+    // lean-docs-publish and authoring-a-paper), release-management
+    // (fhir-harness's ig-incremental-build) and review-comments
+    // (folio-assistant-core's content-change-review).
+    // 5 capabilities: fhir-validator, git-push, ig-publisher, jekyll, sushi-compiler
+    // 9 permissions:  approval-authority, clinical-validation, content-authoring, first-pass-review,
     //                 perform-task, project-governance, qa-reporting, release-authorization,
-    //                 release-management, review-comments, sme-coordination
-    expect(res.findings).toHaveLength(17);
+    //                 sme-coordination
+    expect(res.findings).toHaveLength(14);
 
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere).toContain("git-push");
@@ -187,26 +192,27 @@ describe("real repository measurement", () => {
     expect(findingsWhere).toContain("sushi-compiler");
     expect(findingsWhere).toContain("ig-publisher");
     expect(findingsWhere).toContain("fhir-validator");
-    expect(findingsWhere).toContain("lean-toolchain");
 
     expect(findingsWhere).toContain("release-authorization");
     expect(findingsWhere).toContain("content-authoring");
     expect(findingsWhere).toContain("qa-reporting");
     expect(findingsWhere).toContain("clinical-validation");
-    expect(findingsWhere).toContain("review-comments");
     expect(findingsWhere).toContain("perform-task");
     expect(findingsWhere).toContain("approval-authority");
     expect(findingsWhere).toContain("project-governance");
-    expect(findingsWhere).toContain("release-management");
     expect(findingsWhere).toContain("first-pass-review");
     expect(findingsWhere).toContain("sme-coordination");
 
     // The consumed facts MUST NOT be reported as findings:
-    // signing-api, admin-settings, role-management, adjudication, translation
+    // signing-api, admin-settings, role-management, adjudication, translation,
+    // and the three consumed since the count was 17.
     expect(findingsWhere).not.toContain("signing-api");
     expect(findingsWhere).not.toContain("admin-settings");
     expect(findingsWhere).not.toContain("role-management");
     expect(findingsWhere).not.toContain("adjudication");
     expect(findingsWhere).not.toContain("translation");
+    expect(findingsWhere).not.toContain("lean-toolchain");
+    expect(findingsWhere).not.toContain("release-management");
+    expect(findingsWhere).not.toContain("review-comments");
   });
 });
