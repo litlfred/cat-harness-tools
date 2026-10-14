@@ -83,13 +83,25 @@ function isJsonLd(abs: string): boolean {
   }
 }
 
+/** One directory DECLARED inside a library entry with a kind that is a sub-graph of `library`. */
+export interface EntrySubgraphDir {
+  /** The typology that makes it a library sub-graph (e.g. `l1-extraction`). */
+  kind: string;
+  /** The directory on disk. */
+  abs: string;
+  /** Whether that kind is published (`published !== false`). */
+  published: boolean;
+}
+
 /**
- * Every file of every directory DECLARED inside `entryDir` whose typology is a
- * sub-graph of `library` (`within: "library"`) and is published. Sorted by
- * `rel`. Empty when the entry holds none, or its instance cannot be read —
- * an unreadable declaration is `check:harness-dirs`'s finding, not this one's.
+ * Every directory DECLARED inside `entryDir` whose typology is a sub-graph of
+ * `library` (`within: "library"`) and exists on disk — published or not. The
+ * one declaration lookup {@link entryGraphFiles} publishes from and
+ * `check:l1-complete` accepts as entry contents, so the two cannot disagree.
+ * Empty when the entry holds none, or its instance cannot be read — an
+ * unreadable declaration is `check:harness-dirs`'s finding, not this one's.
  */
-export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
+export function entrySubgraphDirs(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntrySubgraphDir[] {
   const entry = resolve(entryDir);
   const instRoot = declaringInstanceRoot(dirname(entry));
   if (instRoot === undefined) return [];
@@ -99,19 +111,32 @@ export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistr
   } catch {
     return [];
   }
-  const byRel = new Map<string, EntryGraphFile>();
+  const out: EntrySubgraphDir[] = [];
   for (const d of dirs) {
     if (d.scope === "repository") continue;
     const abs = resolve(instRoot, d.path);
     if (!abs.startsWith(entry + sep) || !existsSync(abs) || !statSync(abs).isDirectory()) continue;
-    const kind = (d.graphTypologies ?? []).find((k) => {
-      const def = registry.get(k);
-      return def?.within === "library" && def.published !== false;
-    });
-    if (kind === undefined) continue;
-    for (const f of filesUnder(abs)) {
+    const kinds = (d.graphTypologies ?? []).filter((k) => registry.get(k)?.within === "library");
+    if (kinds.length === 0) continue;
+    const pub = kinds.find((k) => registry.get(k)?.published !== false);
+    out.push({ kind: pub ?? kinds[0], abs, published: pub !== undefined });
+  }
+  return out;
+}
+
+/**
+ * Every file of every directory DECLARED inside `entryDir` whose typology is a
+ * sub-graph of `library` (`within: "library"`) and is published. Sorted by
+ * `rel`. Empty when the entry holds none, or its instance cannot be read.
+ */
+export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
+  const entry = resolve(entryDir);
+  const byRel = new Map<string, EntryGraphFile>();
+  for (const d of entrySubgraphDirs(entry, registry)) {
+    if (!d.published) continue;
+    for (const f of filesUnder(d.abs)) {
       const rel = relative(entry, f).split(sep).join("/");
-      if (!byRel.has(rel)) byRel.set(rel, { kind, abs: f, rel, jsonld: isJsonLd(f) });
+      if (!byRel.has(rel)) byRel.set(rel, { kind: d.kind, abs: f, rel, jsonld: isJsonLd(f) });
     }
   }
   return [...byRel.values()].sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
