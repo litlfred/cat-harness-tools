@@ -145,12 +145,17 @@ describe("declared, so a JSON-LD processor keeps it", () => {
     expect(undeclaredFields({ ...previewDoc([]), "@context": {} })).toEqual([...CHANGED_ASSETS_FIELDS]);
   });
   test("every term it mints is glossed in the vocabulary (ns:check)", () => {
-    const ctx = buildContext() as Record<string, any>;
+    type Term = string | { "@id": string };
+    const ctx = buildContext() as unknown as {
+      changedAssets: { "@id": string; "@context": Record<string, Term> };
+      changedAssetsComparedWith: { "@id": string };
+      changedAssetsUnavailable: string;
+    };
     const iris: string[] = [
       ctx.changedAssets["@id"],
       ctx.changedAssetsComparedWith["@id"],
       ctx.changedAssetsUnavailable,
-      ...Object.values(ctx.changedAssets["@context"]).map((v: any) => (typeof v === "string" ? v : v["@id"])),
+      ...Object.values(ctx.changedAssets["@context"]).map((v) => (typeof v === "string" ? v : v["@id"])),
     ];
     for (const iri of iris) expect(Object.keys(PROPERTY_GLOSSES)).toContain(iri.split("#").pop()!);
   });

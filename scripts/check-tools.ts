@@ -465,7 +465,9 @@ export function checkTools(instance?: string): ToolCheck {
       }
       for (const i of t.io.inputs) {
         const want = contract.types.get(i.name);
-        const have = jsonTypeOf(i.schema.split("#/$defs/")[1] ?? "");
+        // A repeated port takes several values: on the contract's side that is
+        // an array, whatever the type of each value.
+        const have = i.repeated ? "array" : jsonTypeOf(i.schema.split("#/$defs/")[1] ?? "");
         // An integer IS a number; the reverse does not hold.
         const compatible = want === have || (want === "number" && have === "integer");
         if (want !== undefined && have !== undefined && !compatible) {
