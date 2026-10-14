@@ -647,9 +647,12 @@ test.describe("the folio viewer page RUNS — not just 'the bytes are current'",
         return route.fulfill({ status: 200, contentType: "text/javascript", body: JS });
       }
       // The row's and the rail's own files, which docs-ui loads (beans `lhvt`, `lnoy`).
+      // Resolved through the site LAYERS, not the pages' directory alone: since
+      // the chrome moved to `site-chrome/`, `assets/js/navbar-row.js` is not
+      // under SITE_ABS, and the fallback below answered it with HTML.
       {
         const at = url.pathname.indexOf("/assets/");
-        const file = at < 0 ? "" : join(SITE_ABS, url.pathname.slice(at + 1));
+        const file = at < 0 ? "" : join(ROOT, siteFileFor(ROOT, url.pathname.slice(at + 1)));
         if (file && /\/assets\/(navbar\/|js\/navbar|css\/navbar)/.test(url.pathname) && existsSync(file)) {
           return route.fulfill({ status: 200, contentType: file.endsWith(".css") ? "text/css" : "text/javascript", body: readFileSync(file, "utf8") });
         }
