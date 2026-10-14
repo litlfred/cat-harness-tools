@@ -8,15 +8,18 @@
  * @covers none — a PUBLISHER, not an audit: it builds and deploys one preview and judges nothing
  *
  * ```sh
- * bun run cat-harness-tools/scripts/stage-local.ts --repo ../smart-ra [--branch B] [--plan | --dry-run | --artifact DIR]
+ * bun run cat-harness-tools/scripts/stage-local.ts --repo ../<repository> [--branch B] [--plan | --dry-run | --artifact DIR]
  * ```
  *
  * ## One command, every agent-run publish (owner, 2026-10-10)
  *
- * *"isnt this what is happening with smart-immz, smart-trust? i want one
- * consolidated worfklow."* smart-ra, smart-immunizations and smart-trust are
- * agent-run: their publish workflows are dispatch-only and are documentation
- * of what this path must match, never something an agent dispatches. So:
+ * The owner, asking on 2026-10-10 about the IG repositories then publishing
+ * by hand: *"i want one consolidated worfklow."* A repository is AGENT-RUN
+ * when it declares so in its own `index.config.json`, `"site": { "agentRun":
+ * true }` (owner, 2026-10-14, Q7: "Yes, declare it"; {@link agentRunOf}).
+ * Its publish workflows are dispatch-only, documentation of what this path
+ * must match and never something an agent dispatches, and every plan says
+ * whether the repository declares it. This file keeps no list of them. So:
  *
  * - **a declared site first**: a repository whose instance config (its
  *   `index.config.json` entry; a legacy `<instance>.config.json` is a reported fallback)
@@ -141,6 +144,7 @@ import {
 } from "./stage-local-ig.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { buildInstanceSite, keepPinned, lockedMountPaths, recipeFromConfig, siteFields, stagingDir, type SiteRecipe } from "./build-instance-site.ts";
@@ -540,6 +544,40 @@ export function applyIgChrome(repo: string, site: string, c: IgChrome, log: (s: 
   return cov;
 }
 
+/**
+ * Whether a repository declares itself AGENT-RUN: `site.agentRun` in its own
+ * `index.config.json` (owner, 2026-10-14, Q7 of the folio-assistant#2529
+ * reference-direction review: "Yes, declare it"). The declaration is the only
+ * source. No repository is agent-run because this file, or a skill, lists it.
+ *
+ * Three answers, never two: `true` when declared, `false` when the index says
+ * `false` or says nothing, and `unreadable` when the index cannot be read. An
+ * unreadable index is not the same as an absent flag, so the plan reports which
+ * one it found.
+ */
+export type AgentRunDeclaration =
+  | { agentRun: true; file: string }
+  | { agentRun: false; file: string; why: "absent" | "not-declared" | "declared-false" }
+  | { agentRun: "unreadable"; file: string; why: string };
+
+export function agentRunOf(repo: string): AgentRunDeclaration {
+  const r = readIndexConfig(resolve(repo));
+  if (r.state === "absent") return { agentRun: false, file: r.file, why: "absent" };
+  if (r.state === "unreadable") return { agentRun: "unreadable", file: r.file, why: r.why };
+  const v = r.config.site?.agentRun;
+  if (v === true) return { agentRun: true, file: r.file };
+  return { agentRun: false, file: r.file, why: v === false ? "declared-false" : "not-declared" };
+}
+
+/** The plan's `agent-run` line: what the repository declares, and what that means for this run. */
+export function agentRunLine(a: AgentRunDeclaration): string {
+  const where = basename(a.file);
+  if (a.agentRun === true) return `  agent-run   yes, declared in ${where} (site.agentRun): this is the only publish path; never dispatch the publish workflow`;
+  if (a.agentRun === "unreadable") return `  agent-run   unknown: ${where} cannot be read (${a.why})`;
+  const said = a.why === "absent" ? `no ${where}` : a.why === "declared-false" ? `${where} says site.agentRun: false` : `${where} declares no site.agentRun`;
+  return `  agent-run   not declared (${said}): this run publishes as asked, and the repository's own workflow may also publish`;
+}
+
 /** What a run will do, printed before it does anything. */
 export interface StagePlan {
   kind: "folio" | "ig";
@@ -762,6 +800,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   }
   const caller = `.github/workflows/${detected.caller}`;
   const workflow = `${detected.uses.owner}/${detected.uses.repo}/${detected.uses.path}@${detected.uses.ref}`;
+  log(agentRunLine(agentRunOf(repo)));
   if (detected.alsoCalls) log(`· this repository also calls ${detected.alsoCalls.file} (${detected.alsoCalls.caller}); building the ${detected.kind} — pass --publisher ${detected.alsoCalls.kind} for the other`);
 
   if (detected.kind === "ig") return stageIg({ o, log, repo, detected, branch, sha, ownerRepo, pagesRoot, runUrl, defaultBranch, target, caller, workflow });
@@ -1093,6 +1132,7 @@ export async function stageDeclared(
   const url = `https://${owner}.github.io/${name}/${target === "preview" ? `STAGING/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
   const publish = !o.plan && !o.dryRun;
   log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `STAGING/ preview of ${branch}`}`);
+  log(agentRunLine(agentRunOf(repo)).trimStart());
   log(`via         build-instance-site.ts --instance ${d.instance}${target === "preview" ? ` --staging ${branch}` : ""}${publish ? " --publish" : ""}`);
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
