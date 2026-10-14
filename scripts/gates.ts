@@ -814,6 +814,20 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "Covered by document-rendered-impact.test.ts in `bun test`",
   },
   {
+    // The docs site's half of the rendered-impact contract (bean `bnjs`;
+    // `g4dv`): feature-staging.yml lists the pages a pull request changes so
+    // its comment can deep-link each one. Its INPUT is the pull request's
+    // file list and the GitHub compare API across a re-pin, which exist only
+    // inside a pull_request run, and its output is a file in the staging
+    // `_site`. Its logic is not exempt: `docs-rendered-impact.test.ts` is in
+    // `bun test`.
+    match: "docs-rendered-impact.ts",
+    kind: "ci-only",
+    reason:
+      "reads a pull request's file list and the compare API across a re-pin, which exist only in a pull_request " +
+      "staging run, and writes into that run's ./_site. Covered by docs-rendered-impact.test.ts in `bun test`",
+  },
+  {
     // The measurement after it (bean `bnjs`): it diffs a FOLIO's staging build
     // against that folio's published main site, and this repository builds
     // neither. Its logic is not exempt: `measure-rendered-impact.test.ts` is in
