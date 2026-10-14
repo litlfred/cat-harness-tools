@@ -38,6 +38,7 @@ import { dirname, join } from "node:path";
 
 import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
+import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
@@ -55,6 +56,25 @@ function firstIn(dir: string, suffix: string): string {
   const f = readdirSync(join(REPO, dir)).filter((n) => n.endsWith(suffix)).sort()[0];
   if (f === undefined) throw new Error(`no *${suffix} under ${dir} — the fixture this case stales is gone`);
   return join(dir, f);
+}
+
+/**
+ * The first COMMITTED file in an instance directory with this suffix. A path
+ * the instance declares `builtAtPublish` has no committed bytes to be stale
+ * against: staling it is not a defect any check should report (B1).
+ */
+function firstCommittedIn(instance: string, dir: string, suffix: string): string {
+  const declared = builtAtPublishOf(join(REPO, instance));
+  const f = readdirSync(join(REPO, instance, dir))
+    .filter((n) => n.endsWith(suffix) && !declared.includes(`${dir}/${n}`))
+    .sort()[0];
+  if (f === undefined) throw new Error(`no committed *${suffix} under ${instance}/${dir} — the fixture this case stales is gone`);
+  return join(instance, dir, f);
+}
+
+/** Is this check routed through `publish-check.ts`, which runs its writer before it checks (B1)? */
+function checkRunsItsWriter(check: string): boolean {
+  return (SCRIPTS[check] ?? "").includes("publish-check.ts");
 }
 
 /** The outermost ancestor of `abs` that does not exist yet (it may be `abs` itself). */
@@ -108,7 +128,8 @@ const CASES: Case[] = [
   },
   {
     check: "render:bpmn:check",
-    artefact: () => firstIn("cat-harness/docs/assets/img/workflows", ".svg"),
+    // An own drawing: its .bpmn is cat-harness's, so the .svg stays committed.
+    artefact: () => firstCommittedIn("cat-harness", "docs/assets/img/workflows", ".svg"),
     stale: (t) => t.replace("</svg>", "<!-- stale (i1q7 fixture) --></svg>"),
     needsBrowser: true,
   },
@@ -139,7 +160,13 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
           // The control: without it a check that is ALWAYS green would pass this test.
           expect(runner(c.check), `${c.check} did not go red on a staled ${rel}`).toBe(false);
           const { results } = await regenPass([{ check: c.check, writer }], runner);
-          expect(results[0]).toEqual({ check: c.check, writer, outcome: "regenerated" });
+          // A check routed through publish-check runs the writer itself, so the
+          // red run above already redrew the artefact and regen finds it
+          // current. Either way the effect asserted below is the same: the
+          // staled bytes are gone and the check is green.
+          const repaired = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
+          expect(repaired).toContain(results[0]?.outcome);
+          expect(results[0]).toMatchObject({ check: c.check, writer });
           expect(readFileSync(abs, "utf-8"), `${writer} left ${rel} staled`).not.toBe(staled);
         } finally {
           if (createdDir !== undefined) rmSync(createdDir, { recursive: true, force: true });
