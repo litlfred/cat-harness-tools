@@ -329,6 +329,13 @@ jobs:
           else
             # shellcheck disable=SC2086 -- TEST_PATH may name several paths
             bun test $TEST_PATH --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
+            # A layer with no test files (bootstrap: prose and schemas) makes
+            # bun exit before writing a report. That is zero tests, not a
+            # failure, and the compare job reads it as such on both sides.
+            if [ ! -s "$RUNNER_TEMP/junit.xml" ]; then
+              echo "no test files under $TEST_PATH: no tests run"
+              echo '<?xml version="1.0"?><testsuites tests="0" failures="0"></testsuites>' > "$RUNNER_TEMP/junit.xml"
+            fi
           fi
           test -s "$RUNNER_TEMP/junit.xml"
       - name: Gates
