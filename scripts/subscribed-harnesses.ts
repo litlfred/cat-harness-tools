@@ -27,7 +27,7 @@ import { join, resolve } from "node:path";
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
 import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
 import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg-node.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
@@ -131,12 +131,16 @@ export interface SubscribedHarness {
 }
 
 /**
- * Every harness some subscription in `decls` chose, with whether its config
- * sits at `root`. Reads only what it is handed and the snapshots, so the
+ * Every harness some subscription in `decls` chose, with whether `root`
+ * instantiates it (its `index.config.json` lists it; without an index, a root
+ * `<name>.config.json`). Reads only what it is handed and the snapshots, so the
  * navbar's caller does not rescan the tree.
  */
 export function subscribedHarnesses(root: string, decls: readonly { dir: string; decl: CatHarnessDeclaration }[]): SubscribedHarness[] {
   const out: SubscribedHarness[] = [];
+  // Instantiated = what the index lists, else a root `<name>.config.json`
+  // (bean `ymvt`: the index is authoritative; the file scan is the fallback).
+  const instantiated = new Set(instantiatedSafely(root));
   for (const { dir, decl } of decls) {
     for (const s of decl.subscriptions ?? []) {
       const chosen = s.harnesses ?? [];
@@ -148,7 +152,7 @@ export function subscribedHarnesses(root: string, decls: readonly { dir: string;
           harness: h,
           subscriber: decl.name,
           subscription: s,
-          instantiated: existsSync(join(root, instanceConfigFilename(h))),
+          instantiated: instantiated.has(h),
           snapshot,
           // A tree whose instance could not be read cannot be attributed to a
           // harness, and is still the subscription's — listed under each.
@@ -255,4 +259,13 @@ function mountableTree(t: SubscribedTree): boolean {
   if (t.entry["composed"] === true || t.entry["igSite"] === true || !t.entry.graphTypologies.length) return false;
   const index = join(t.tree, "index.html");
   return existsSync(index) && statSync(index).isFile();
+}
+
+/** {@link instantiatedHarnessNames}, with an unreadable index read as "none instantiated" — `check:landing-instance` is where that fails. */
+function instantiatedSafely(root: string): string[] {
+  try {
+    return instantiatedHarnessNames(root);
+  } catch {
+    return [];
+  }
 }

@@ -20,13 +20,21 @@
  * nothing instantiated has no site landing to decide, and failing there
  * would make every bare fixture red.
  *
+ * It also reports every legacy `<name>.config.json` an index entry still
+ * imports ({@link legacyImports}, bean `ymvt`): a pending migration is said,
+ * a file that disagrees with its entry fails.
+ *
  * Exit codes: 0 decided (an instance, a hub, or nothing instantiated) · 1
- * several harnesses and none flagged, or a config that cannot be read.
+ * several harnesses and none flagged, a config that cannot be read, or a
+ * legacy config that disagrees with its index entry.
  */
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+
+import { readRawConfigFile } from "./instance-config.ts";
 
 /**
  * Resolved from this file, not `process.cwd()` (`check-folio-mount` says why:
@@ -89,6 +97,75 @@ export function formatAgreement(a: IndexAgreement | undefined): { text: string; 
   return { text: lines.join("\n"), ok };
 }
 
+/**
+ * A root `<name>.config.json` an index entry still IMPORTS (bean `ymvt`).
+ *
+ * Owner, 2026-10-14: *"i thought ONLY index.config.json"* — the file is
+ * imported only as a migration step, then retired. So it is reported every
+ * time, and it is one of two things:
+ *
+ * - `pending`: a migration not yet run. Every key it holds either is not
+ *   inline or is inline with the SAME value, so `index-config:migrate
+ *   --inline --write` moves it with no change to the effective config. Said,
+ *   not failed: the repository has one command left to run.
+ * - `diverged`: NOT merely a pending migration. The entry sets a key inline to
+ *   a different value, so the file's value is dead text that a reader of the
+ *   file alone (a person, a stale tool) takes for the config. Fails: two
+ *   places disagree about one instance, and nothing should pick silently.
+ */
+export interface LegacyImport {
+  name: string;
+  file: string;
+  /** Dotted paths the entry overrides with a different value. Empty: a pending migration. */
+  shadowed: string[];
+}
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/** Leaf paths of `base` that `top` sets to something else. Objects recurse; anything else compares as JSON. */
+export function shadowedPaths(base: Record<string, unknown>, top: Record<string, unknown>, at = ""): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(top)) {
+    if (!(k in base)) continue;
+    const path = at ? `${at}.${k}` : k;
+    const b = base[k];
+    if (isObj(b) && isObj(v)) out.push(...shadowedPaths(b, v, path));
+    else if (JSON.stringify(b) !== JSON.stringify(v)) out.push(path);
+  }
+  return out;
+}
+
+/** Every legacy config an index entry imports at `root`; `undefined` when there is no readable index. */
+export function legacyImports(root: string): LegacyImport[] | undefined {
+  const idx = readIndexConfig(root);
+  if (idx.state !== "ok") return undefined;
+  const out: LegacyImport[] = [];
+  for (const entry of idx.config.instances) {
+    const file = importedConfigFilename(entry);
+    const raw = readRawConfigFile(join(root, file));
+    if (raw === undefined) continue;
+    out.push({ name: entry.name, file, shadowed: shadowedPaths(raw, inlineOverrides(entry)) });
+  }
+  return out;
+}
+
+/** The report on {@link legacyImports}: pending ones are said, diverged ones fail. */
+export function formatLegacy(l: LegacyImport[] | undefined): { text: string; ok: boolean } {
+  if (l === undefined) return { text: "", ok: true };
+  if (l.length === 0) return { text: "legacy <name>.config.json: none — every instance is configured inline in index.config.json", ok: true };
+  const lines = ["legacy <name>.config.json still imported by index.config.json (bean ymvt — the index is the one config):"];
+  for (const x of l) {
+    lines.push(
+      x.shadowed.length === 0
+        ? `  · ${x.file} (\`${x.name}\`): a pending migration — \`bun run cat index-config:migrate --inline --write\` moves it inline and deletes it`
+        : `  ✗ ${x.file} (\`${x.name}\`) disagrees with its index entry at ${x.shadowed.join(", ")}: the entry wins, so the file's value is dead — reconcile, then \`index-config:migrate --inline --write\``,
+    );
+  }
+  return { text: lines.join("\n"), ok: l.every((x) => x.shadowed.length === 0) };
+}
+
 if (import.meta.main) {
   const landing = formatLanding(resolveLandingInstance(REPO));
   console.log(landing.text);
@@ -99,5 +176,12 @@ if (import.meta.main) {
     agreement = { text: `  ✗ ${(e as Error).message}`, ok: false };
   }
   console.log(agreement.text);
-  if (!landing.ok || !agreement.ok) process.exit(1);
+  let legacy: { text: string; ok: boolean };
+  try {
+    legacy = formatLegacy(legacyImports(REPO));
+  } catch (e) {
+    legacy = { text: `  ✗ ${(e as Error).message}`, ok: false };
+  }
+  if (legacy.text) console.log(legacy.text);
+  if (!landing.ok || !agreement.ok || !legacy.ok) process.exit(1);
 }

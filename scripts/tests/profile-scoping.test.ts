@@ -43,7 +43,6 @@ import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
 import { readDeclaredFolioProfile, readFolioProfile } from "../../pipeline/profile-check";
 import { initFolio } from "../init-folio";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const SWEEP = join(TOOLS_ROOT, "content", "pipeline", "qa-sweep.ts");
@@ -298,10 +297,10 @@ function sweepOnce(
     let configText: string | undefined;
     let profileAfterCorruption: ReturnType<typeof readDeclaredFolioProfile>["profile"] | undefined;
     if (corruptConfig) {
-      // Named after the SLUG the scaffold declared, not after the temp
-      // directory it landed in: `folio_init` writes the declaration and the
-      // config together, and the declaration is what the filename comes from.
-      const configPath = join(d, instanceConfigFilename("cold-chain-guidance"));
+      // The scaffold's config is INLINE in its `index.config.json` entry
+      // (bean `ymvt`: `folio_init` writes no `<slug>.config.json`), so the
+      // index is the config this case corrupts.
+      const configPath = join(d, "index.config.json");
       configText = readFileSync(configPath, "utf-8");
       // Corrupted rather than deleted, because deleting it also removes the
       // marker `findContentRepoRoot` walks up to — and a test that changed two

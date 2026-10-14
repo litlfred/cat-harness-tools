@@ -16,4 +16,5 @@ Part of [C@T Harness](../README.md) 0.1.0, declared as `cat-harness-deploy`, hol
 | [`docker-compose.yml`](docker-compose.yml) | a file |  |
 | [`provision.sh`](provision.sh) | a file |  |
 | [`self-update.sh`](self-update.sh) | a file |  |
+
 <!-- kg:subgraph:end -->

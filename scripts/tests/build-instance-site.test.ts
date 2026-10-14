@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, pinGeneratedData } from "../build-instance-site.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -135,3 +135,22 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     expect(r.upstreamMisses).toEqual(["sub/b.html: ../StructureDefinition-x.html"]);
   });
 });
+
+describe("pinGeneratedData — the build's data never stays in a mount (litlfred/smart-hiv, 2026-10-14)", () => {
+  test("the landing's stickies.json in a smart-base mount is put back, and one the build created is removed", () => {
+    const root = mkdtempSync(join(tmpdir(), "pin-data-"));
+    // A mounted landing with a declaration naming its site directory.
+    mkdirSync(join(root, "smart-base/docs/_data"), { recursive: true });
+    writeFileSync(join(root, "smart-base/smart-base.json"), JSON.stringify({ name: "smart-base" }));
+    writeFileSync(join(root, "smart-base/docs/_data/stickies.json"), "pinned");
+    // A mount with no declaration: nothing to keep, and no throw.
+    mkdirSync(join(root, "bootstrap"), { recursive: true });
+    const restore = pinGeneratedData(root, ["smart-base", "bootstrap"]);
+    writeFileSync(join(root, "smart-base/docs/_data/stickies.json"), "rewritten by gen-landing-data");
+    writeFileSync(join(root, "smart-base/docs/_data/harness.json"), "created by sync-docs-harness");
+    restore();
+    expect(readFileSync(join(root, "smart-base/docs/_data/stickies.json"), "utf-8")).toBe("pinned");
+    expect(existsSync(join(root, "smart-base/docs/_data/harness.json"))).toBe(false);
+  });
+});
+

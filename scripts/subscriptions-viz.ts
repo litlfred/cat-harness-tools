@@ -46,7 +46,7 @@ import {
   type KnownSubstrate,
   type Subscription,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { instanceRepositories } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
 import { partRecordsIn, snapshotDirOf, type PartView } from "./kg-subscribe.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -105,12 +105,21 @@ export interface SubscriptionCard {
   parts?: readonly PartView[];
   /** Bytes in that directory with no record, relative to the snapshot directory. */
   strays?: readonly string[];
-  /** Chosen harnesses whose `<name>.config.json` sits at the root (`kg:instantiate`, slice 7). */
+  /** Chosen harnesses the root instantiates — its index lists them, else a `<name>.config.json` (`kg:instantiate`, slice 7). */
   instantiated?: string[];
 }
 
 export function subscriptionCards(repoRoot: string): SubscriptionCard[] {
   const out: SubscriptionCard[] = [];
+  // Index first (bean `ymvt`): what `index.config.json` lists, else the root
+  // `<name>.config.json` stems. An unreadable index instantiates nothing here;
+  // `check:landing-instance` is the gate that fails on it.
+  let names: Set<string>;
+  try {
+    names = new Set(instantiatedHarnessNames(repoRoot));
+  } catch {
+    names = new Set();
+  }
   for (const root of instanceRootsIn(repoRoot)) {
     const d = readDeclaration(root);
     if (!d?.subscriptions?.length) continue;
@@ -119,7 +128,7 @@ export function subscriptionCards(repoRoot: string): SubscriptionCard[] {
     const snapshotDir = snapshotDirOf(root, raw);
     for (const s of d.subscriptions) {
       const { parts, strays } = snapshotDir ? partRecordsIn(snapshotDir, s.id) : { parts: [], strays: [] };
-      const instantiated = (s.harnesses ?? []).filter((h) => existsSync(join(repoRoot, instanceConfigFilename(h))));
+      const instantiated = (s.harnesses ?? []).filter((h) => names.has(h));
       out.push({ subscriber: d.name, subscription: s, parts, strays, ...(instantiated.length ? { instantiated } : {}) });
     }
   }

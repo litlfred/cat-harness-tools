@@ -34,9 +34,8 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { INDEX_CONFIG_FILENAME, INDEX_CONFIG_SCHEMA, formatIndexConfig, withIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
@@ -471,7 +470,10 @@ function instanceDeclaration(o: MaybeFolio): string {
 }
 
 /**
- * The scaffolded instance's CONFIG — `<slug>.config.json`, beside its declaration.
+ * The scaffolded instance's CONFIG — written INLINE in its `index.config.json`
+ * entry, never as a `<slug>.config.json` (bean `ymvt`, owner 2026-10-14: *"i
+ * thought ONLY index.config.json"*; the per-instance file is a legacy import,
+ * retired by `index-config:migrate --inline`).
  *
  * NO `site.landing` FLAG, on purpose (issue #1904). A scaffolded folio is the
  * one harness instantiated at its root, and the owner's ruling makes that the
@@ -482,9 +484,8 @@ function instanceDeclaration(o: MaybeFolio): string {
  * and `check:landing-instance` fails until one does. Writing it now would be
  * a decision nobody has made yet. Rule: the `harness-tiles` skill.
  */
-function instanceConfig(o: MaybeFolio, assistant: string): string {
-  return JSON.stringify(
-    {
+function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknown> {
+  return {
       // Omitted, not defaulted, for a contentless instance (bean `mer2`):
       // naming an adapter here would be inventing a content type for a layer
       // that has none.
@@ -503,19 +504,16 @@ function instanceConfig(o: MaybeFolio, assistant: string): string {
       // full of unreachable github.io URLs is not something the author finds
       // out about, because it renders fine for them.
       readme: { linkStyle: "blob", publishRef: "gh-pages" },
-    },
-    null,
-    2,
-  ) + "\n";
+  };
 }
 
 /**
  * The `index.config.json` a new folio starts with: one instance, the one
- * scaffolded, declared at the root and importing its own `<slug>.config.json`.
- * Exported for the test that holds `init-folio` to the schema.
+ * scaffolded, declared at the root, its config INLINE in the entry (bean
+ * `ymvt`). Exported for the test that holds `init-folio` to the schema.
  */
-export function newFolioIndex(slug: string): IndexConfig {
-  return { $schema: INDEX_CONFIG_SCHEMA, instances: [{ name: slug, source: { local: { at: "." } } }] };
+export function newFolioIndex(slug: string, config: Record<string, unknown> = {}): IndexConfig {
+  return { $schema: INDEX_CONFIG_SCHEMA, instances: [{ name: slug, source: { local: { at: "." } }, ...config }] };
 }
 
 /**
@@ -625,8 +623,10 @@ export default prose({
  */
 function starterBlockNode(root: string, slug: string): string {
   const block = { kind: "prose", label: "prose:overview", title: "Overview", uses: [] as string[] };
-  // declared-path-literal: the starter block's own manifest path, written above in initFolio: a scaffold reads no declaration.
-  const file = join(root, "folio", slug, "introduction", "overview.ts");
+  // The starter block's own manifest path, written above in initFolio at the
+  // convention, which is also the `folio/` its declaration names: a scaffold
+  // reads no declaration, because it is the one writing it.
+  const file = join(conventionalFolioDir(root), slug, "introduction", "overview.ts");
   return serialiseBlockNode(blockToJsonLd({ kind: block.kind, label: block.label, uses: [], file, block }, slug, []));
 }
 
@@ -1406,12 +1406,12 @@ function writeInstanceFiles(s: Scaffold): void {
   // filename a meaning. See `instanceConfig` above — ONE file now, its
   // declaration and its config, since `harness.json` was excised.
   write(instanceDeclarationFilename(o.slug), instanceDeclaration(o));
-  write(instanceConfigFilename(o.slug), instanceConfig(o, assistant));
   // The root INDEX (owner, 2026-10-07): which harnesses this checkout
-  // instantiates — today the one being scaffolded, at the root — importing its
-  // `<slug>.config.json`. No `site.landing`: a sole instance is the landing
+  // instantiates — today the one being scaffolded, at the root — with its
+  // config INLINE in the entry (bean `ymvt`: no `<slug>.config.json` is
+  // written; the index is the one config). No `site.landing`: a sole instance is the landing
   // with no flag, and naming one now would be a decision nobody has made.
-  const index = newFolioIndex(o.slug);
+  const index = newFolioIndex(o.slug, instanceConfig(o, assistant));
   write(INDEX_CONFIG_FILENAME, formatIndexConfig(index));
   write(".mcp.json", mcpJson(assistant));
   write(".claude/settings.json", claudeSettings(assistant));

@@ -20,7 +20,7 @@
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { z } from "zod";
 import { existsSync, readdirSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import {
@@ -30,7 +30,7 @@ import {
   slugify,
   type InitFolioOptions,
 } from "../../scripts/init-folio.js";
-import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /**
  * Is this directory already a folio?
@@ -42,8 +42,10 @@ import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-
  * a list of seventeen "already present" lines to interpret.
  */
 function existingFolio(root: string): string | undefined {
-  const cfg = resolveHarnessConfigPath(root);
-  if (cfg) return basename(cfg.path);
+  // Index first (bean `ymvt`): an instance configured by its
+  // `index.config.json` entry is a folio as much as one with a legacy file.
+  const cfg = readEffectiveConfig(root);
+  if (cfg.from !== undefined && (cfg.state !== "absent" || cfg.via === "index")) return cfg.from;
   const folioRoot = folioDir(root);
   if (existsSync(folioRoot)) {
     const docs = readdirSync(folioRoot, { withFileTypes: true })
@@ -59,7 +61,7 @@ export function registerFolioInitTools(server: McpServer): void {
     "folio_init",
     "Scaffold a new folio (content repository) that uses folio-assistant: " +
     "folio/, uploads/, library/, the document + chapter + first block " +
-    "manifests, <slug>.json and <slug>.config.json, the builder shim, AGENTS.md with CLAUDE.md " +
+    "manifests, <slug>.json and index.config.json (the instance config inline in its entry), the builder shim, AGENTS.md with CLAUDE.md " +
     "and GEMINI.md stubs, .mcp.json, and the beans work plan. Run this in an " +
     "empty repo before authoring anything. Pass content_type 'paper' for a " +
     "folio with Lean-backed mathematics, 'document' for prose (policy " +
@@ -122,7 +124,7 @@ export function registerFolioInitTools(server: McpServer): void {
               `folio_init scaffolds a new one and will not modify what is here. If you ` +
               `meant to add a document to this folio, add a directory under folio/ and ` +
               `a manifest named after it; if you meant to re-scaffold, pass force (it ` +
-              `overwrites AGENTS.md, <slug>.json, <slug>.config.json and the starter block). ` +
+              `overwrites AGENTS.md, <slug>.json, index.config.json and the starter block). ` +
               `Pass dry_run to see exactly what would change.`,
           }],
         };

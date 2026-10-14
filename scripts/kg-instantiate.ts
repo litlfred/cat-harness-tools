@@ -87,7 +87,7 @@ import {
   repoRootFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { INDEX_CONFIG_FILENAME, addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -283,26 +283,34 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
     }
   }
 
-  const configFile = join(root, instanceConfigFilename(opts.harness));
-  if (existsSync(configFile)) return { ok: true, state: "already-instantiated", configFile, stateDirs, written };
-
   const config = {
     _comment:
       `${opts.harness.toUpperCase()}, INSTANTIATED from a KG subscription: \`${subscriber.name}\` subscribes to ${sub.repository} ` +
       `as \`${sub.id}\`, pinned at ${sub.ref}, and chose this harness. Its declaration is the cached snapshot, not a local ` +
       `\`${opts.harness}.json\`; its state directories live under \`${opts.harness}/\`. Written by \`bun run cat kg:instantiate\`; ` +
-      `re-running reports this file rather than overwriting it.`,
+      `re-running reports this entry rather than overwriting it.`,
     _subscription: { subscriber: subscriber.name, id: sub.id, repository: sub.repository, ref: sub.ref },
   };
+  // With an `index.config.json` at the root, instantiation IS its entry, and
+  // the config goes INLINE there (bean `ymvt`: the index is the one config; a
+  // `<name>.config.json` beside it is legacy). Without an index, the root
+  // config file is the instantiation, as before.
+  const idx = readIndexConfig(root);
+  if (idx.state === "unreadable") return refuse(`${idx.file} is ${idx.why}; nothing was written`);
+  if (idx.state === "ok") {
+    const configFile = idx.file;
+    if (idx.config.instances.some((e) => e.name === opts.harness) || existsSync(join(root, instanceConfigFilename(opts.harness)))) {
+      return { ok: true, state: "already-instantiated", configFile, stateDirs, written };
+    }
+    written.push(configFile);
+    if (!opts.dryRun) addIndexInstance(root, { name: opts.harness, ...config });
+    return { ok: true, state: "instantiated", configFile, stateDirs, written };
+  }
+
+  const configFile = join(root, instanceConfigFilename(opts.harness));
+  if (existsSync(configFile)) return { ok: true, state: "already-instantiated", configFile, stateDirs, written };
   written.push(configFile);
   if (!opts.dryRun) writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
-  // With an `index.config.json` at the root, instantiation is its entry: the
-  // config alone would be an unlisted root config, which
-  // `check:landing-instance` fails on (skill `index-config`).
-  if (readIndexConfig(root).state === "ok") {
-    written.push(join(root, INDEX_CONFIG_FILENAME));
-    if (!opts.dryRun) addIndexInstance(root, { name: opts.harness });
-  }
   return { ok: true, state: "instantiated", configFile, stateDirs, written };
 }
 
