@@ -250,8 +250,12 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     const toolsRow = rows.find((r) => r.kind === "tools");
     expect(toolsRow).toBeDefined();
 
+    // What the name says: the record carries the row's state, whichever it is.
+    // It asserted "reviewed", which held only while the backfill test above
+    // wrote a reviewed sidecar into the REAL cat-harness tree before it ran.
     const record = asRecord(toolsRow!);
-    expect(record.adversarial).toBe("reviewed");
+    expect(["reviewed", "stale", "never"]).toContain(toolsRow!.adversarial);
+    expect(record.adversarial).toBe(toolsRow!.adversarial);
     expect(record).not.toHaveProperty("files");
     expect(record).not.toHaveProperty("sidecars");
     expect(record.hasFiles).toBe(true);
