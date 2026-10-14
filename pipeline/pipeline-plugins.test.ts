@@ -31,6 +31,7 @@ import {
   UnregisteredPipelinePluginError,
   optionalPipelinePlugin,
   pipelinePlugin,
+  slotDeclaredBy,
   stripLeanComments,
   usePipelinePluginRegistry,
 } from "./pipeline-plugins";
@@ -42,7 +43,12 @@ const TMP = mkdtempSync(join(tmpdir(), "test_pipeline_plugins-"));
 
 /** A fixture dependency declaring a pipeline-plugins node that fills `lean-lexer`. */
 function writeDep(name: string): string {
-  const dir = join(TMP, name);
+  return writeDepIn(TMP, name);
+}
+
+/** {@link writeDep}, under `parent` rather than the suite's scratch directory. */
+function writeDepIn(parent: string, name: string): string {
+  const dir = join(parent, name);
   const pluginsDir = join(dir, "pipeline-plugins");
   mkdirSync(pluginsDir, { recursive: true });
   writeFileSync(
@@ -175,6 +181,24 @@ describe("an unregistered kind", () => {
     const msg = (err as Error).message;
     expect(msg).toContain('"latex-preflight"');
     expect(msg).toContain("lean-lexer (dep-a)");
+  });
+
+  it("names the instances whose declarations fill the slot, read from the checkout", () => {
+    // It used to say "(normally <the science layer, by name>)", a lower layer
+    // naming a higher one (check:reference-direction). The candidates are now
+    // whatever the checkout's declarations say fills the kind.
+    const repo = mkdtempSync(join(tmpdir(), "test_pipeline_plugins_declared-"));
+    try {
+      writeDepIn(repo, "filler");
+      expect(slotDeclaredBy(repo, "lean-lexer")).toEqual(["filler"]);
+      expect(slotDeclaredBy(repo, "latex-preflight")).toEqual([]);
+      const named = new UnregisteredPipelinePluginError("lean-lexer", repo, [], ["filler"]).message;
+      expect(named).toContain("declared in this checkout by filler");
+      const none = new UnregisteredPipelinePluginError("latex-preflight", repo, [], []).message;
+      expect(none).toContain("no instance in this checkout declares it");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it("says so when nothing at all is filled", () => {
