@@ -43,6 +43,7 @@ import {
   promoteCommand,
   usableOutlineEntries,
   withDerivedArms,
+  withKnownTitle,
 } from "../ingest-document.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
@@ -718,7 +719,8 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // live pipeline, because the milnorlink checks passed over it (the
     // incomplete case refuses either way, and the complete case was staged by
     // hand straight into the entry directory).
-    expect(src).toContain("planFor(pdf, undefined, stagingRoot)");
+    // The third argument is what matters; `--text` adds two after it (2026-10-14).
+    expect(src).toContain("planFor(pdf, undefined, stagingRoot,");
     expect(src).not.toContain("const plan = planFor(pdf);");
 
     // AND THE SAME FOR THE SENTENCE IT PRINTS, which this test did not cover
@@ -1225,3 +1227,36 @@ describe("libraryRootFor (bean 12ws)", () => {
   });
 });
 
+
+// ── The text rung, through the one entry point (owner, 2026-10-14) ─────────
+//
+// A Markdown source reached `library/` through `text-structure.ts` alone and
+// never got its KG nodes (litlfred/dth-hrh): the skill named two more steps
+// and nothing ran them. Through `cat ingest --text` it takes the notebook's
+// derived arm, and `--promote` writes its nodes as for every rung.
+describe("--text: a text source through cat ingest", () => {
+  test("is routed to text-structure only when the caller says so, never by extension", () => {
+    const p = planFor("/tmp/HWF_Outline.md", undefined, LIB, null, true);
+    expect(p.rung).toBe("text");
+    expect(p.steps).toHaveLength(1);
+    const step = p.steps[0]!;
+    expect(step.join(" ")).toContain("text-structure.ts");
+    expect(step).toContain("--doc-id");
+    expect(step[step.length - 1]).toBe("/tmp/HWF_Outline.md");
+    // Without the flag the same file is not read as text: the extension decides nothing.
+    expect(planFor("/tmp/HWF_Outline.md", { outline: 0, chars: 50_000 }, LIB, null, false).rung).not.toBe("text");
+  });
+
+  test("a binary file is refused as text, not read", () => {
+    expect(planFor("/tmp/x.md", undefined, LIB, "application/pdf", true).rung).toBe("undetermined");
+    expect(planFor("/tmp/x.xml", undefined, LIB, "application/xml", true).rung).toBe("text");
+  });
+
+  test("it takes the l1-blocks arm, and a known title reaches the rung", () => {
+    const p = planFor("/tmp/HWF_Outline.md", undefined, LIB, null, true);
+    const armed = withDerivedArms(p, "/tmp/HWF_Outline.md", "/stage", "/stage/slug", "/lib");
+    expect(armed.steps).toHaveLength(2);
+    expect(armed.steps[1]!.join(" ")).toContain("l1-blocks.ts -o /stage/slug");
+    expect(withKnownTitle(p, "The Outline").steps[0]).toContain("--title");
+  });
+});
