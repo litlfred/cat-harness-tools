@@ -41,7 +41,7 @@
  * Usage:
  *   bun run cat-harness-tools/scripts/staging-changes.ts expand \
  *     --changed-files pr-files.txt --base-lock base.lock.json --head-lock index.lock.json \
- *     --out-list changed-expanded.txt --out-json sources.json
+ *     --out-list changed-expanded.txt --out-json sources.json [--out-impact rendered-impact.json]
  *   bun run cat-harness-tools/scripts/staging-changes.ts render --sources sources.json \
  *     [--predicted rendered-impact.json] [--before pages-root --after _site \
  *      --staging-base /repo/STAGING/slug --site-base /repo --base <sha>] \
@@ -49,6 +49,8 @@
  *     --repo o/repo --head <sha> --branch <b> --slug <s> [--pr <n>] --out _site/changes
  *
  * @module cat-harness-tools/scripts/staging-changes
+ * @covers none — it reports what a preview changed and judges no declared
+ * graph; its logic is covered by `scripts/tests/staging-changes.test.ts`
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -230,6 +232,24 @@ export const gitDiffer: Differ = (repository, from, to) => {
     rmSync(dir, { recursive: true, force: true });
   }
 };
+
+/**
+ * The docs renderer's prediction over `inputs`, by running its own CLI, so a
+ * workflow invokes this one script. It lives beside this file on the tools
+ * line and in cat-harness's `scripts/` on an older pin; the first that exists
+ * is used, and none is said rather than read as "no page".
+ */
+export function docsImpact(inputs: readonly string[], root: string, out: string): string | undefined {
+  const here = import.meta.dir;
+  const script = [join(here, "docs-rendered-impact.ts"), join(here, "..", "..", "cat-harness", "scripts", "docs-rendered-impact.ts")].find((p) => existsSync(p));
+  if (!script) return "no docs renderer (docs-rendered-impact.ts) on this checkout";
+  try {
+    execFileSync("bun", ["run", script, "--root", root, "--changed", inputs.join(","), "--out", out], { stdio: ["ignore", "inherit", "inherit"] });
+    return undefined;
+  } catch (e) {
+    return `the docs renderer failed: ${(e as Error).message.split("\n")[0]}`;
+  }
+}
 
 /** A PR's file list: `path`, or `status<TAB>path` as the REST API names statuses. */
 export function parseChangedList(text: string): { path: string; status: SourceStatus; from?: string }[] {
@@ -687,6 +707,10 @@ if (import.meta.main) {
     const list = coneInputs(sources);
     if (arg("--out-list")) writeFileSync(arg("--out-list")!, list.join("\n") + (list.length ? "\n" : ""));
     if (arg("--out-json")) writeFileSync(arg("--out-json")!, JSON.stringify(sources, null, 2) + "\n");
+    if (arg("--out-impact") && list.length) {
+      const why = docsImpact(list, arg("--root") ?? ".", arg("--out-impact")!);
+      if (why) console.error(`staging-changes: no docs prediction — ${why}`);
+    }
     console.error(`staging-changes: ${sources.changes.length} changed file(s), ${list.length} cone input(s), ${sources.repins.length} re-pinned mount(s)`);
     for (const r of sources.repins) console.error(`  · ${r.instance} ${short(r.from)}…${short(r.to)}: ${r.files ?? r.doubt}`);
   } else if (cmd === "render") {
