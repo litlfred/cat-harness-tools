@@ -716,11 +716,9 @@ function tileFor(
   // IS the page's site path — the rule core's `landingLinks` already links the
   // landing by. Without it every Folders row on that site read "viewer not
   // published" over pages the site serves (owner, 2026-10-14).
-  const generatedSite = isRepoRoot && !existsSync(join(instanceDir, siteDirFor(instanceDir)));
+  const generatedSite = isRepoRoot && isGeneratedSite(instanceDir);
   const generatedRefOf = (v: { ref: string; writer?: readonly string[] }): string | undefined =>
-    generatedSite && v.writer !== undefined && !existsSync(join(repoRoot, v.ref)) && !v.ref.startsWith("/") && !v.ref.split("/").includes("..")
-      ? publishedUrlOf(v.ref)
-      : undefined;
+    generatedSite ? generatedPageOf(repoRoot, v) : undefined;
 
   const declared = new Map<string, string>();
   for (const d of dirs) {
@@ -1557,6 +1555,27 @@ export function solveCrop(r: { x: number; y: number; w: number; h: number }): {
     left: +((-100 * r.x) / r.w).toFixed(4),
     top: +((-100 * r.y) / r.h).toFixed(4),
   };
+}
+
+/**
+ * Is this checkout-root instance's site GENERATED — no site directory on disk,
+ * every page written into the site source at publish (litlfred/smart-ra)?
+ */
+export function isGeneratedSite(instanceDir: string): boolean {
+  return !existsSync(join(instanceDir, siteDirFor(instanceDir)));
+}
+
+/**
+ * On a generated site, the published path of a viewer its `writer` builds:
+ * the ref IS the site path (core's `landingLinks` rule). Undefined for a ref
+ * on disk, one with no writer, or one that is absolute or climbs out. The
+ * one rule `harnessTiles` and `foreign-site-scope`'s `rootOwnPages` share, so
+ * the Folders row and the scope that keeps it on this site cannot disagree.
+ */
+export function generatedPageOf(repoRoot: string, v: { ref: string; writer?: readonly string[] }): string | undefined {
+  if (v.writer === undefined || v.ref.startsWith("/") || v.ref.split("/").includes("..")) return undefined;
+  if (existsSync(join(repoRoot, v.ref))) return undefined;
+  return publishedUrlOf(v.ref);
 }
 
 export function publishedUrlOf(relPathUnderSite: string): string {

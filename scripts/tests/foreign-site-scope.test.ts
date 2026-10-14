@@ -39,6 +39,7 @@ import {
   foreignScopeFor,
   isHostProjection,
   foreignFooterContent,
+  rootOwnPages,
   rootRelativeLeft,
   scopeHarnessData,
   scopeSiteConfig,
@@ -52,6 +53,7 @@ import { railStandalonePages } from "../mount-instance-docs.js";
 import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const BASE = "https://litlfred.github.io/folio-assistant";
@@ -451,5 +453,25 @@ describe("the landing stickies on a folio's site (who-iris, 2026-10-09)", () => 
   });
   test("a file with no stickies passes through", () => {
     expect(scopeStickies({ other: 1 }, scope)).toEqual({ other: 1 });
+  });
+});
+
+describe("rootOwnPages on a GENERATED folio site (smart-ra, 2026-10-14)", () => {
+  test("a writer-built viewer is the folio's own page at its ref; with a site directory on disk it is not", () => {
+    const repo = mkdtempSync(join(tmpdir(), "gen-site-"));
+    try {
+      mkdirSync(join(repo, "tools"), { recursive: true });
+      writeFileSync(join(repo, "tools", "gen.ts"), "");
+      const decl = {
+        name: "folio",
+        directories: [{ id: "m", path: "models/", graphTypologies: ["archimate"], coverage: { visualiser: [{ ref: "en/folio/models/index.html", writer: ["tools/gen.ts"] }] } }],
+      };
+      writeDeclaration(repo, JSON.stringify(decl, null, 2));
+      expect([...(rootOwnPages(repo, "folio") ?? [])]).toEqual(["/en/folio/models/"]);
+      mkdirSync(join(repo, siteDirFor(repo)), { recursive: true });
+      expect(rootOwnPages(repo, "folio")).toBeUndefined();
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

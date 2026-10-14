@@ -75,7 +75,7 @@ import { join, resolve } from "node:path";
 import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { publishedUrlOf } from "../harness-tiles.ts";
+import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-tiles.ts";
 
 /** What the scoping needs to know about the site and the declarations. */
 export interface ForeignScope {
@@ -501,11 +501,18 @@ export function rootOwnPages(repo: string, instance: string): ReadonlySet<string
   const decl = readDeclaration(root);
   if (decl?.name !== instance) return undefined;
   const prefix = `${siteDirFor(root)}/`;
+  // A GENERATED site (no site directory on disk) publishes a writer-built
+  // viewer at its ref — `generatedPageOf`, the rule the tiles link it by.
+  const generated = isGeneratedSite(root);
   const pages = new Set<string>();
   for (const d of decl.directories ?? []) {
     for (const v of visualisationsOf(d.coverage, d.id)) {
-      if (!v.ref.startsWith(prefix) || !visualisationResolves(v, (p) => existsSync(join(root, p)))) continue;
-      pages.add(publishedUrlOf(v.ref.slice(prefix.length)));
+      if (!visualisationResolves(v, (p) => existsSync(join(root, p)))) continue;
+      if (v.ref.startsWith(prefix)) pages.add(publishedUrlOf(v.ref.slice(prefix.length)));
+      else if (generated) {
+        const page = generatedPageOf(root, v);
+        if (page !== undefined) pages.add(page);
+      }
     }
   }
   return pages.size > 0 ? pages : undefined;
