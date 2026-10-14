@@ -559,9 +559,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/docs/cat-harness/published-graphs.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/cat-harness.json", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/smart-base-tools.md", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/ig-artifact-ingestion.md", names: 2 },
-  { file: "folio-assistant-core/scripts/ingest-ig-artifacts.ts", names: 3 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
@@ -570,17 +567,13 @@ const PENDING: readonly { file: string; names: number }[] = [
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "folio-assistant-core/schemas/fhir-artifact-index.ts", names: 2 },
   { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "fhir-harness/AGENTS.md", names: 4 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-preprocessing.md", names: 3 },
   { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
   { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
-  { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
   { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
@@ -590,17 +583,13 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
   { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
   { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
-  { file: "smart-ig/README.md", names: 2 },
-  { file: "smart-ig/AGENTS.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },
   { file: "smart-base/README.md", names: 2 },
   { file: "smart-base/AGENTS.md", names: 2 },
-  { file: "smart-base/tools/index.ts", names: 2 },
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
   { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
   { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
   { file: "cat-harness/docs/en/cat-harness/processes/index.md", names: 4 }, // moved by t4xb from docs/processes/ (ruling (i), 2026-10-11)
-  { file: "smart-ig/smart-ig.json", names: 2 },
 ];
 
 /**
