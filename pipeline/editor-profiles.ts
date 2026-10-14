@@ -20,6 +20,15 @@
  * | `latexConfig` | `crepe.latexConfig` | `latexConfig(katexMacros)` → Crepe's latex feature config |
  * | `nodeViews` | `crepe.nodeViews` | `nodeViews[name](katex, katexMacros)` → a ProseMirror node view |
  * | `remarkFirst` | `crepe.remarkFirst` | `remarkFirst(macros)` → a `remarkPlugins` updater |
+ * | `open` | `open` | a MODE: `open(host, ctx)` → `{ get(): string \| Promise<string>, dispose() }`, its own editor in place of Crepe |
+ * | `issue` | `issue` | `issue(before, after, ctx)` → `{ title?, body?, template? }` for the issue a mode opens |
+ *
+ * A mode's `ctx` is `{ text, src, path, label, kind, repo, branch, config, status(msg) }`.
+ * Its editor may live in another window (a form builder in a pop-up,
+ * answering by `postMessage`): `get()` is awaited on submit and never polled,
+ * and `dispose()` is where it closes that window. `extensions` lets a mode
+ * serve a source that is not Markdown (`[".json"]`), and a host can name a
+ * profile by id with `data-suggest-mode`.
  *
  * The node's schema is its declaring instance's (folio-assistant-sci
  * `schemas/editor-checker.ts`); it is read raw here, as `declared-nodes.ts`
@@ -44,7 +53,11 @@ export interface EditorCheckerNode {
   id: string;
   contentType: string;
   kinds?: string[];
-  check: string;
+  /** File types the profile serves, by ending (`.json`). Absent: Markdown. */
+  extensions?: string[];
+  check?: string;
+  open?: string;
+  issue?: string;
   macros?: string;
   crepe?: { latexConfig?: string; nodeViews?: Record<string, string>; remarkFirst?: string };
   rawLatexFirstFor?: string[];
@@ -63,6 +76,7 @@ export interface SuggestProfile {
   /** The bundle, relative to the page or absolute. */
   module: string;
   kinds?: string[];
+  extensions?: string[];
   rawLatexFirstFor?: string[];
 }
 
@@ -81,6 +95,8 @@ export function editorProfiles(repoRoot: string, contentType: string): FoundProf
           continue; // an unreadable node is its own instance's validator's finding
         }
         if (node?.$schema !== EDITOR_CHECKER_SCHEMA || node.contentType !== contentType) continue;
+        // A profile does something: checks an edit, or opens an editor.
+        if (!node.check && !node.open) continue;
         out.push({ node, root, file });
       }
     }
@@ -111,6 +127,8 @@ export function profileEntrySource(p: FoundProfile): string {
   role("macros", p.node.macros);
   role("latexConfig", p.node.crepe?.latexConfig);
   role("remarkFirst", p.node.crepe?.remarkFirst);
+  role("open", p.node.open);
+  role("issue", p.node.issue);
   const views = Object.entries(p.node.crepe?.nodeViews ?? {});
   views.forEach(([, ref], i) => {
     const { file, name } = at(ref);
@@ -142,6 +160,7 @@ export async function bundleEditorProfiles(repoRoot: string, contentType: string
         id: p.node.id,
         module: `${urlPrefix}${p.node.id}.js`,
         ...(p.node.kinds?.length ? { kinds: p.node.kinds } : {}),
+        ...(p.node.extensions?.length ? { extensions: p.node.extensions } : {}),
         ...(p.node.rawLatexFirstFor?.length ? { rawLatexFirstFor: p.node.rawLatexFirstFor } : {}),
       });
     }

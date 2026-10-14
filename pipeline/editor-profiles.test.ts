@@ -25,6 +25,8 @@ beforeAll(() => {
       "export function checkIt(before: string, after: string) { return after.includes('{') && !after.includes('}') ? [{ severity: 'error', message: 'unbalanced' }] : []; }",
       "export function tableOf(k: Record<string, string>) { return Object.fromEntries(Object.entries(k).map(([n, t]) => [n.slice(1), arity(t)])); }",
       "export function inline(katex: unknown, macros: unknown) { return { katex, macros }; }",
+      "export function openIt(host: unknown, ctx: { text: string }) { return { get: async () => ctx.text + '!', dispose() {} }; }",
+      "export function issueOf(before: string, after: string) { return { title: 'T', body: after }; }",
       "",
     ].join("\n"),
   );
@@ -32,6 +34,10 @@ beforeAll(() => {
     JSON.stringify({ $schema: "folio-editor-checker/v1", id, contentType, check: "suggest/check.ts#checkIt", ...extra });
   writeFileSync(join(sci, "editor-checkers", "paper-latex.json"), node("paper-latex", "paper", { macros: "suggest/check.ts#tableOf", crepe: { nodeViews: { math_inline: "suggest/check.ts#inline" } }, rawLatexFirstFor: ["proof"] }));
   writeFileSync(join(sci, "editor-checkers", "doc.json"), node("doc", "document"));
+  // A mode: its own editor, for a file type that is not Markdown, and no checker.
+  writeFileSync(join(sci, "editor-checkers", "form.json"), JSON.stringify({ $schema: "folio-editor-checker/v1", id: "form", contentType: "fhir", extensions: [".json"], open: "suggest/check.ts#openIt", issue: "suggest/check.ts#issueOf" }));
+  // Neither a checker nor an editor: nothing to load.
+  writeFileSync(join(sci, "editor-checkers", "empty.json"), JSON.stringify({ $schema: "folio-editor-checker/v1", id: "empty", contentType: "fhir" }));
   writeFileSync(join(sci, "editor-checkers", "other.json"), JSON.stringify({ $schema: "something-else/v1", id: "x", contentType: "paper" }));
 });
 afterAll(() => rmSync(repo, { recursive: true, force: true }));
@@ -40,7 +46,8 @@ describe("editor profiles", () => {
   test("found through the declaration, by content type", () => {
     expect(editorProfiles(repo, "paper").map((p) => p.node.id)).toEqual(["paper-latex"]);
     expect(editorProfiles(repo, "document").map((p) => p.node.id)).toEqual(["doc"]);
-    expect(editorProfiles(repo, "fhir")).toEqual([]);
+    expect(editorProfiles(repo, "fhir").map((p) => p.node.id)).toEqual(["form"]);
+    expect(editorProfiles(repo, "lean")).toEqual([]);
   });
 
   test("the bundle re-exports each code ref under its role", () => {
@@ -66,6 +73,16 @@ describe("editor profiles", () => {
     expect(mod.check("a", "a {")).toEqual([{ severity: "error", message: "unbalanced" }]);
     expect(mod.macros({ "\\pair": "#1,#2" })).toEqual({ pair: 2 });
     expect(Object.keys(mod.nodeViews)).toEqual(["math_inline"]);
-    expect(await bundleEditorProfiles(repo, "fhir", join(repo, "none"), "")).toEqual([]);
+    expect(await bundleEditorProfiles(repo, "lean", join(repo, "none"), "")).toEqual([]);
+  });
+
+  test("a mode bundles its open and issue, and names the file types it serves", async () => {
+    const out = join(repo, "site", "assets", "suggest");
+    expect(await bundleEditorProfiles(repo, "fhir", out, "")).toEqual([{ id: "form", module: "form.js", extensions: [".json"] }]);
+    const mod = await import(join(out, "form.js"));
+    const h = mod.open(null, { text: "{}" });
+    expect(await h.get()).toBe("{}!");
+    expect(mod.issue("a", "b")).toEqual({ title: "T", body: "b" });
+    expect(mod.check).toBeUndefined();
   });
 });

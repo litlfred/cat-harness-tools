@@ -98,7 +98,7 @@ export interface BlockActionsConfig {
     module?: string;
     katex?: string;
     katexMacros?: Record<string, string>;
-    profiles?: Array<{ id: string; module: string; kinds?: string[]; rawLatexFirstFor?: string[] }>;
+    profiles?: Array<{ id: string; module: string; kinds?: string[]; extensions?: string[]; rawLatexFirstFor?: string[] }>;
   };
 }
 
@@ -329,9 +329,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   };
   const raw = (repo, branch, path) => "https://raw.githubusercontent.com/" + repo + "/" + branch + "/" + path.split("/").map(encodeURIComponent).join("/");
   const sourceOf = (a) => {
-    const h = a.closest("[data-src]");
-    if (h && h.dataset.src) return { src: h.dataset.src, label: h.dataset.block || h.dataset.src, repo: h.dataset.repo, branch: h.dataset.branch };
-    if (a.dataset.src || adopt(a)) return { src: a.dataset.src, label: a.dataset.block || a.dataset.src, repo: a.dataset.repo, branch: a.dataset.branch };
+    // From the link's parent: ready() gives a link with no facts of its own
+    // (the ✍ link beside ✎ edit) a data-src adopted from its href, and the
+    // block's label is the host's, not the link's.
+    const h = a.parentElement && a.parentElement.closest("[data-src]");
+    if (h && h.dataset.src) return { src: h.dataset.src, label: h.dataset.block || h.dataset.src, repo: h.dataset.repo, branch: h.dataset.branch, mode: h.dataset.suggestMode };
+    if (a.dataset.src || adopt(a)) return { src: a.dataset.src, label: a.dataset.block || a.dataset.src, repo: a.dataset.repo, branch: a.dataset.branch, mode: a.dataset.suggestMode };
     return null;
   };
   const el = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); for (const k of kids || []) e.append(k); return e; };
@@ -358,10 +361,31 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   };
   // A profile (an editor-checker node the site bundled, e.g. folio-assistant-sci's
   // paper-latex) for the block's kind: its checker, and its Crepe settings.
-  const profileFor = (c, kind) => ((c.suggest && c.suggest.profiles) || []).find((p) => p && p.module && (!p.kinds || p.kinds.indexOf(kind) >= 0));
+  // Or a mode: a profile whose module opens its own editor (a Questionnaire
+  // form builder, in the page or in another window) over a file it declares by
+  // extension. A host names one with data-suggest-mode.
+  const profilesOf = (c) => ((c.suggest && c.suggest.profiles) || []).filter((p) => p && p.module);
+  const fileOk = (p, src) => (p.extensions && p.extensions.length ? p.extensions.some((x) => src.endsWith(x)) : /\\.md$/.test(src));
+  const suggestable = (c, s) => (!s.mode && /\\.md$/.test(s.src)) || profilesOf(c).some((p) => fileOk(p, s.src) && (!s.mode || p.id === s.mode));
+  const profileFor = (c, kind, s) => s.mode
+    ? profilesOf(c).find((p) => p.id === s.mode)
+    : profilesOf(c).find((p) => fileOk(p, s.src) && (!p.kinds || p.kinds.indexOf(kind) >= 0));
+  // The issue: prefilled by URL, or, past GitHub's URL limit, carried on the clipboard.
+  const openIssue = async (repo, title, body, template, status) => {
+    const q = { title: title, body: body };
+    if (template) q.template = template;
+    let url = "https://github.com/" + repo + "/issues/new?" + new URLSearchParams(q);
+    if (url.length > 7000) {
+      try { await navigator.clipboard.writeText(body); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return false; }
+      url = "https://github.com/" + repo + "/issues/new?" + new URLSearchParams({ title: title, body: "The suggested change is on the clipboard: paste it here." });
+    }
+    window.open(url, "_blank", "noopener");
+    return true;
+  };
+  const findingItem = (f) => el("li", { className: f.severity === "error" ? "bad" : "warn", textContent: (f.severity === "error" ? "Error" : "Warning") + (f.line ? " (line " + f.line + ")" : "") + ": " + f.message });
   const suggest = async (a) => {
     const s = sourceOf(a), c = config();
-    if (!s || !/\\.md$/.test(s.src)) return;
+    if (!s || !suggestable(c, s)) return;
     const repo = s.repo || c.repo, branch = s.branch || c.branch || "main";
     const status = el("p", { className: "fa-suggest-status", textContent: "Loading " + s.src + " …" });
     const host = el("div", { className: "fa-suggest-editor" });
@@ -397,11 +421,43 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     };
     // The block's profile, when the site declares one for its kind. A profile
     // that fails to load leaves the generic editor and its generic checks.
-    const prof = profileFor(c, kind);
+    const prof = profileFor(c, kind, s);
     let mod = null, notes = [];
     if (prof) {
       try { mod = await import(new URL(prof.module, location.href).href); }
       catch (e) { notes.push("The " + (prof.id || "profile") + " checks did not load (" + e.message + ")."); }
+    }
+    const facts = ["**Block:** \\u0060" + s.label + "\\u0060", "**Source:** https://github.com/" + repo + "/blob/" + branch + "/" + path, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(s.label)];
+    // A mode: its own editor, the same issue flow over the text it hands back.
+    // get() may be async (an editor in another window answers by postMessage);
+    // it is read on submit, not polled.
+    if (mod && typeof mod.open === "function") {
+      const ctx = { text: original, src: s.src, path: path, label: s.label, kind: kind, repo: repo, branch: branch, config: c, status: (m) => { status.textContent = String(m); } };
+      let handle;
+      try { handle = await mod.open(host, ctx); }
+      catch (e) { status.textContent = "The " + (prof.id || "editor") + " did not open: " + e.message; return; }
+      surface = { name: "mode", get: () => handle.get(), base: original, destroy: () => { try { if (handle && handle.dispose) handle.dispose(); } catch (e) {} } };
+      status.textContent = notes.join(" ");
+      send.disabled = false;
+      send.onclick = async () => {
+        let now;
+        try { now = await surface.get(); } catch (e) { status.textContent = "Could not read the edit: " + e.message; return; }
+        if (typeof now !== "string" || now === original) { status.textContent = "Nothing has changed yet."; return; }
+        let found = [];
+        if (typeof mod.check === "function") {
+          try { found = (await mod.check(original, now, { kg: (await kgReferences(c)) || undefined })) || []; }
+          catch (e) { found = [{ severity: "warning", message: "the checker failed: " + e.message }]; }
+        }
+        vars.replaceChildren(...found.map(findingItem));
+        const errs = found.filter((f) => f.severity === "error");
+        if (errs.length) { status.textContent = "Fix first: " + errs.map((f) => String(f.message).slice(0, 60)).join(" \\u00b7 "); return; }
+        let custom = null;
+        if (typeof mod.issue === "function") { try { custom = await mod.issue(original, now, ctx); } catch (e) { custom = null; } }
+        const title = (custom && custom.title) || "Suggested edit: " + s.label;
+        const body = (custom && custom.body) || facts.concat(["", "**Suggested change**, made in the " + (prof.id || "profile") + " editor:", "", "\\u0060\\u0060\\u0060diff", lineDiff(original, now), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
+        if (await openIssue(c.repo || repo, title, body, custom && custom.template, status)) close.onclick();
+      };
+      return;
     }
     const km = (c.suggest && c.suggest.katexMacros) || {};
     const macros = mod && typeof mod.macros === "function" ? mod.macros(km) : undefined;
@@ -487,7 +543,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const text = surface.get();
       const items = variablesIn(text).map((k) => { const v = valueOf(k); return el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) }); });
       for (const b of syntaxErrors(text, !mod)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
-      for (const f of findings(text)) items.push(el("li", { className: f.severity === "error" ? "bad" : "warn", textContent: (f.severity === "error" ? "Error" : "Warning") + (f.line ? " (line " + f.line + ")" : "") + ": " + f.message }));
+      for (const f of findings(text)) items.push(findingItem(f));
       vars.replaceChildren(...items);
     };
     const timer = setInterval(refresh, 800);
@@ -498,18 +554,9 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       if (now === surface.base) { status.textContent = "Nothing has changed yet."; return; }
       const errs = syntaxErrors(now, !mod).concat(findings(now).filter((f) => f.severity === "error").map((f) => f.message));
       if (errs.length) { status.textContent = "Fix the syntax first: " + errs.map((e) => e.slice(0, 60)).join(" \\u00b7 "); return; }
-      const facts = ["**Block:** \\u0060" + s.label + "\\u0060", "**Source:** https://github.com/" + repo + "/blob/" + branch + "/" + path, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(s.label)];
       const how = surface.name === "raw" ? "in the raw editor" : "in the visual editor (the diff is against the editor's rendering of the source)";
       const issue = facts.concat(["", "**Suggested change**, made " + how + ":", "", "\\u0060\\u0060\\u0060diff", lineDiff(surface.base, now), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
-      const q = new URLSearchParams({ title: "Suggested edit: " + s.label, body: issue });
-      let url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + q;
-      // GitHub refuses very long URLs: carry the body on the clipboard instead.
-      if (url.length > 7000) {
-        try { await navigator.clipboard.writeText(issue); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
-        url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + new URLSearchParams({ title: "Suggested edit: " + s.label, body: "The suggested change is on the clipboard: paste it here." });
-      }
-      window.open(url, "_blank", "noopener");
-      close.onclick();
+      if (await openIssue(c.repo || repo, "Suggested edit: " + s.label, issue, undefined, status)) close.onclick();
     };
   };
   const SUGGEST_TITLE = "Suggest a change in a visual editor (opens a GitHub issue)";
@@ -521,7 +568,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     for (const a of r.querySelectorAll('a[data-fa-link="edit"], a.ba-edit')) {
       if (a.nextElementSibling && a.nextElementSibling.dataset.faLink === "suggest") continue;
       const s = sourceOf(a);
-      if (!s || !/\\.md$/.test(s.src)) continue;
+      if (!s || !suggestable(config(), s)) continue;
       const b = el("a", { className: "ba-suggest", href: a.getAttribute("href") || "#", title: SUGGEST_TITLE, textContent: "✍ suggest", tabIndex: 0 });
       b.dataset.faLink = "suggest";
       a.after(b);
