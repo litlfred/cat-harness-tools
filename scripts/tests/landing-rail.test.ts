@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { publishedGraphs, railStandalonePages } from "../mount-instance-docs.js";
+import { declaredGraphs, publishedGraphs, railStandalonePages } from "../mount-instance-docs.js";
 import { railDataJson, railPageOf, type RailShared } from "../lib/harness-rail.ts";
 
 const BASE = "https://example.org/fa";
@@ -30,8 +30,12 @@ function railOf(root: string, rel: string): { shared: RailShared; toRoot: string
 }
 
 describe("a site that only LANDS on a harness: the rail is the site's, not the landing's", () => {
-  // The landing's graph whose page this fixture site holds, read from the same data the rail reads.
-  const held = [...publishedGraphs("cat-harness", "smart-base", "")].find(([, f]) => f.href !== undefined);
+  // The landing's graph whose page this fixture site holds, read from the same data the rail reads:
+  // one the landing DECLARES, since the rail lists no other. A closure without
+  // the landing mounted (the standalone check) has none, and the site holds none.
+  const held = [...publishedGraphs("cat-harness", "smart-base", "")].find(
+    ([kind, f]) => f.href !== undefined && f.sameAs === undefined && declaredGraphs("smart-base", new Map(), new Map([[kind, f]])).some((l) => l.href !== undefined),
+  );
 
   function build(): string {
     const root = mkdtempSync(join(tmpdir(), "landing-rail-"));
