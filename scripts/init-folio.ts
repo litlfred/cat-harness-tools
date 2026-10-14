@@ -625,7 +625,7 @@ export default prose({
  */
 function starterBlockNode(root: string, slug: string): string {
   const block = { kind: "prose", label: "prose:overview", title: "Overview", uses: [] as string[] };
-  // declared-path-literal: as above.
+  // declared-path-literal: the starter block's own manifest path, written above in initFolio: a scaffold reads no declaration.
   const file = join(root, "folio", slug, "introduction", "overview.ts");
   return serialiseBlockNode(blockToJsonLd({ kind: block.kind, label: block.label, uses: [], file, block }, slug, []));
 }
