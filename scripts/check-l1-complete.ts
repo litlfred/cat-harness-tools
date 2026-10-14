@@ -1430,8 +1430,15 @@ export function sidecarFor(root: string, report: EntryReport): string {
  * while the libraries sat in `who-iris/` and the others (measured 2026-10-09).
  * An entry no declared library holds stays at `root`, as before.
  */
-export function sidecarRootFor(root: string, slug: string): string {
-  for (const lib of corpusDirectoriesForGraph(root, "library")) {
+export function sidecarRootFor(
+  root: string,
+  slug: string,
+  // The libraries, when the caller already has them: {@link sidecarStates}
+  // asks once per entry, and resolving every declaration again for each of 87
+  // entries was most of its cost.
+  libs: readonly string[] = corpusDirectoriesForGraph(root, "library"),
+): string {
+  for (const lib of libs) {
     const entry = join(lib, slug);
     if (existsSync(entry)) return instanceConfigFor(entry)?.root ?? root;
   }
@@ -1456,8 +1463,10 @@ export function sidecarStates(
   reports: EntryReport[],
   against?: string,
 ): { slug: string; state: QaResultState }[] {
-  // Resolved once for every entry, not once per entry (see qa-results' storedOn).
-  // Unresolvable here means what it means there: no directory is stored.
+  // Resolved once for every entry, not once per entry: the libraries here, the
+  // qa location as in qa-results' storedOn. Unresolvable means what it means
+  // there: no directory is stored.
+  const libs = corpusDirectoriesForGraph(root, "library");
   let location: QaLocation | undefined;
   try {
     location = resolveQaLocation();
@@ -1466,7 +1475,7 @@ export function sidecarStates(
   }
   return reports.map((r) => ({
     slug: r.slug,
-    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug), join("library-qa", r.slug)), sidecarDocument(r), { against, location }),
+    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug, libs), join("library-qa", r.slug)), sidecarDocument(r), { against, location }),
   }));
 }
 
