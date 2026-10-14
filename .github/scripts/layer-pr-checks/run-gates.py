@@ -50,6 +50,14 @@ CHECKOUT_GATES = {
     "declaration-resolution": "bun cat-harness-tools/scripts/check-declaration-resolution.ts",
 }
 TIMEOUT_S = 1200
+# Gates that judge the REMOTE's live state, not the checkout: which workflows
+# are red on the default branch, whether a commit has a run, which advisories
+# the registry knows today. Base and head run minutes apart, so one can flip
+# between them with no change in the PR (fhir-harness#67: check:ci-health went
+# red on head because a workflow on main failed in between). The compare job
+# would charge that to the PR; these are reported by the session-start sweep
+# and their own workflows instead.
+LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories"}
 
 
 def read_json(path):
@@ -127,7 +135,7 @@ def declared_gates(root, name, path, runner):
     return {
         f"{name}:{s}": f"{runner} {s}"
         for s in sorted(scripts)
-        if s.startswith("check:") or s.endswith(":check")
+        if (s.startswith("check:") or s.endswith(":check")) and s not in LIVE_STATE_SCRIPTS
     }
 
 
