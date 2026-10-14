@@ -36,6 +36,7 @@ export const KIND_TABLE_ROOT = join(HARNESS_ROOT);
  * a row, so the committed skill went stale at each re-pin that brought a
  * layer's new kind. The skill keeps its prose and names this page.
  */
+// declared-path-literal: a page BUILT AT PUBLISH (cat-harness builtAtPublish), so no committed file resolves it; kind:table writes it.
 export const KIND_TABLE_DOC = "docs/cat-harness/kind-table.md";
 /** The table's header row, verbatim. Renaming a column is a deliberate edit. */
 export const KIND_TABLE_HEADER = "| kind | declared by | contents | renderable |";

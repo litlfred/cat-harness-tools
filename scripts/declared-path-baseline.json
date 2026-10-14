@@ -32,7 +32,6 @@
     "scripts/check-image-roles.ts::schemas/kg-node.ts",
     "scripts/eval-crdm-detect.ts::skills/sdlc/crdm/crdm-detect.md",
     "scripts/eval-crdm-detect.ts::test/results/crdm-detect-eval.test-run.json",
-    "scripts/kind-table.ts::skills/kg/kg-core/directory-conventions.md",
     "scripts/partition/instance-rules.ts::schemas/assistant-package.ts",
     "scripts/partition/instance-rules.ts::schemas/assistant-types.ts",
     "scripts/partition/instance-rules.ts::schemas/assistant-workflow.ts",
