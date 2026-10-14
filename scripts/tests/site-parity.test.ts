@@ -10,12 +10,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { publishedRoot, recipeFromConfig, siteStepEnv } from "../build-instance-site.ts";
-import { parityShortfall, siteFeatures } from "../site-parity.ts";
+import { droppedByRuling, matchesDropped, parityShortfall, siteFeatures } from "../site-parity.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
 const put = (root: string, rel: string, text = "x") => {
@@ -134,5 +134,43 @@ describe("publishedRoot — the root a publish would replace, read without cloni
     expect(f.dirs).toEqual(["artifact", "ast-data", "fhir-artifact-index", "openapi"]);
     expect(f.stamp).toBeDefined();
     expect(publishedRoot(`file://${bare}`, "no-such-branch", [])).toBeUndefined();
+  });
+});
+
+describe("directories dropped by the owner's ruling", () => {
+  const ruling = { dir: "comparison-v*", ruling: "owner, 2026-10-14, \"2a\"" };
+  const withComparison = () => {
+    const r = folioSiteRoot();
+    put(r, "comparison-v1.0.0/index.html", page("<p>comparison</p>"));
+    return r;
+  };
+  /** The root as rebuilt without `openapi/`: a loss no ruling excuses. */
+  const withoutOpenapi = () => {
+    const r = folioSiteRoot();
+    rmSync(join(r, "openapi"), { recursive: true, force: true });
+    return r;
+  };
+
+  test("the glob matches top-level directory names only", () => {
+    expect(matchesDropped("comparison-v1.0.0", ruling)).toBe(true);
+    expect(matchesDropped("comparison-v2", ruling)).toBe(true);
+    expect(matchesDropped("comparison", ruling)).toBe(false);
+    expect(matchesDropped("openapi", ruling)).toBe(false);
+    expect(matchesDropped("x", { dir: "a/b", ruling: "r" })).toBe(false);
+  });
+
+  test("a dropped directory is not a shortfall, and is said with its ruling", () => {
+    const current = siteFeatures(withComparison(), ["branches"]);
+    const cand = siteFeatures(withoutOpenapi(), ["branches"]);
+    expect(droppedByRuling(current, cand, [ruling])).toEqual([{ dir: "comparison-v1.0.0", ruling: ruling.ruling }]);
+    const short = parityShortfall(current, cand, [ruling]);
+    expect(short.join("\n")).not.toContain("comparison-v1.0.0");
+    // It excuses nothing else: openapi/ is still a shortfall.
+    expect(short.join("\n")).toContain("openapi/");
+  });
+
+  test("without the declaration the same drop is a shortfall", () => {
+    const current = siteFeatures(withComparison(), ["branches"]);
+    expect(parityShortfall(current, siteFeatures(folioSiteRoot(), ["branches"])).join("\n")).toContain("comparison-v1.0.0/");
   });
 });

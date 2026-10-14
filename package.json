@@ -115,6 +115,7 @@
     "beans:notes": "bun run cat-harness-tools/scripts/bean-notes.ts",
     "beans:notes:check": "bun run cat-harness-tools/scripts/bean-notes.ts --check",
     "check-deps": "bun run cat-harness-tools/src/index.ts --check-deps",
+    "ig-site:openapi": "bun run cat-harness-tools/openapi/scripts/ig-site-openapi.ts",
     "check:actor-reach": "bun run cat-harness-tools/scripts/check-actor-reach.ts",
     "check:agents-xref": "bun run cat-harness-tools/scripts/check-agents-xref.ts",
     "check:agents-xref:strict": "bun run cat-harness-tools/scripts/check-agents-xref.ts --strict",

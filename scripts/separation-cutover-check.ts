@@ -8,8 +8,8 @@
  * ## The question, and why it needs a gate
  *
  * kg-separation stage 13 (cutover) is "the one commit worth reverting", and
- * lessons 15–18 are each a cutover that was called done and was not: who-iris
- * still declared `livesAt` the parent and could not publish itself (15); every
+ * lessons 15–18 are each a cutover that was called done and was not: a content
+ * instance still declared `livesAt` the parent and could not publish itself (15); every
  * workflow bootstrapped through a path the cutover had just removed (16); a
  * downstream's CI went red on a cutover green in the parent (17); a separated
  * checkout's tests still read the composed tree (18). Each was found by hand,
@@ -134,7 +134,7 @@ export function monorepoPathFindings(files: ReadonlyArray<{ path: string; text: 
   const repo = mono.repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const dir = mono.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // `folio-assistant/<segment>` as a PATH: not preceded by `<owner>/` (a repository
-  // name) nor followed by `-` (a sibling layer such as folio-assistant-core).
+  // name) nor followed by `-` (a sibling layer such as `folio-assistant-<suffix>`).
   const pathRe = new RegExp(`(?<![\\w.-]/)(?<![\\w-])(?:\\.\\./)*${dir}/(?!\\.github/workflows/)[A-Za-z0-9_.][A-Za-z0-9_./-]*`);
   const usesRe = new RegExp(`\\buses:\\s*["']?${repo}/`);
   const submoduleRe = new RegExp(`url\\s*=\\s*\\S*${repo}(?:\\.git)?\\s*$`);

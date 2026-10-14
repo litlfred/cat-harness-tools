@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { OpenApiConfigSchema, fallbackOperationId, operationsOf, type OpenApiDocument } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
-import { checkCommitted, configPath } from "./ingest-openapi.ts";
+import { checkCommitted, configPath, provenanceFor } from "./ingest-openapi.ts";
+import { igOpenapiGraph, igSiteOpenapi } from "./ig-site-openapi.ts";
 import { PAGE_CONFIG_ID, pagesFor } from "./gen-openapi-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
 import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
@@ -159,3 +160,45 @@ describe("openapi typology validators", () => {
   });
 });
 
+
+describe("ig-site:openapi — an IG repository's OpenAPI pages, with no declaration (owner, 2026-10-14)", () => {
+  const sample = { openapi: "3.0.1", info: { title: "Gateway", version: "1" }, paths: { "/x": { get: { operationId: "getX" } } } };
+  const ig = (): string => {
+    const root = mkdtempSync(join(tmpdir(), "ig-openapi-"));
+    mkdirSync(join(root, "openapi"), { recursive: true });
+    writeFileSync(join(root, "openapi", "cat-openapi.config.json"), JSON.stringify({ $schema: "cat-openapi-config/v1", directory: "any-id", documents: [{ id: "gateway", source: { repository: "o/r", path: "api.json", ref: "main" } }] }));
+    const bytes = Buffer.from(JSON.stringify(sample));
+    writeFileSync(join(root, "openapi", "gateway.openapi.json"), bytes);
+    writeFileSync(join(root, "openapi", "gateway.source.json"), JSON.stringify(provenanceFor("gateway", bytes, { repository: "o/r", path: "api.json", ref: "main", commit: "a".repeat(40) }, "openapi")));
+    return root;
+  };
+
+  it("finds the graph by what the checkout holds, and none where it holds none", () => {
+    const root = ig();
+    expect(igOpenapiGraph(root)).toEqual({ config: join(root, "openapi", "cat-openapi.config.json"), dir: join(root, "openapi") });
+    expect(igOpenapiGraph(mkdtempSync(join(tmpdir(), "ig-none-")))).toBeUndefined();
+  });
+
+  it("writes the documents and a page per document and operation at openapi/, the graph's index included", () => {
+    const root = ig();
+    const site = mkdtempSync(join(tmpdir(), "ig-site-"));
+    const paths = igSiteOpenapi({ site, ig: root, log: () => {} });
+    for (const p of ["openapi/gateway.openapi.json", "openapi/gateway.source.json", "openapi/index.html", "openapi/gateway/index.html", "openapi/gateway/getX/index.html", "openapi/gateway/getX.jsonld"]) {
+      expect(paths).toContain(p);
+      expect(existsSync(join(site, p))).toBe(true);
+    }
+    expect(readFileSync(join(site, "openapi", "gateway", "getX.jsonld"), "utf8")).toContain("/openapi/gateway/getX.jsonld");
+  });
+
+  it("refuses to write over a path the site already holds", () => {
+    const root = ig();
+    const site = mkdtempSync(join(tmpdir(), "ig-site-"));
+    mkdirSync(join(site, "openapi"), { recursive: true });
+    writeFileSync(join(site, "openapi", "index.html"), "<p>already</p>");
+    expect(() => igSiteOpenapi({ site, ig: root, log: () => {} })).toThrow(/already holds[\s\S]*openapi\/index\.html/);
+  });
+
+  it("a checkout with no OpenAPI graph writes nothing", () => {
+    expect(igSiteOpenapi({ site: mkdtempSync(join(tmpdir(), "ig-site-")), ig: mkdtempSync(join(tmpdir(), "ig-none-")), log: () => {} })).toEqual([]);
+  });
+});

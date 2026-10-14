@@ -336,7 +336,7 @@ export function tipLocations(repoRoot: string = gitTopLevel(), keyedBy: BranchKe
  *
  * Until 2026-10-11 this kept the first location per id, which in an index
  * mounted cat-harness's `health` and silently dropped cat-harness-tools',
- * folio-assistant-core's and who-iris'. One per path is the real identity: two
+ * and two content instances'. One per path is the real identity: two
  * declarations of one path are one directory, two paths are two graphs.
  */
 function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = () => true): TipLocation[] {
@@ -423,7 +423,7 @@ export function resolveTipLocation(
   repoRoot: string = gitTopLevel(),
   keyedBy: BranchKeying | "any" = "any",
 ): TipLocation {
-  // A location KEY (`who-iris.health`) names one graph exactly; an id more
+  // A location KEY (`<instance>.health`) names one graph exactly; an id more
   // than one location declares names several, and guessing among them is how
   // the wrong instance's state gets read or pushed.
   // Only directories that could answer: the id itself, or the `<id>` a key
@@ -1238,7 +1238,7 @@ function allMarkers(repoRoot: string): Array<{ file: string; marker: MountMarker
  * existed from stranding its edits: in an index, cat-harness's `health` was
  * mounted as `health.json`, and the location is now keyed
  * `cat-harness.health`. Matching on the PATH, never on the id, is what keeps
- * who-iris's `health` from adopting cat-harness's marker.
+ * another instance's `health` from adopting cat-harness's marker.
  */
 export function markerFor(repoRoot: string, loc: Pick<TipLocation, "id" | "key" | "path">): MountMarker | undefined {
   const key = locationKey(loc);
