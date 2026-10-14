@@ -16,7 +16,6 @@ import { describe, expect, test } from "bun:test";
 import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } from "../todo-listing.js";
 import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { localSiteDir } from "../lib/local-site-dir.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 

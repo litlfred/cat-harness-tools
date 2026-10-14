@@ -28,7 +28,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);

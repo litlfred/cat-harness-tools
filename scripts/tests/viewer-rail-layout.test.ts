@@ -7,7 +7,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { layoutFlags, stripFlags, untippedControls } from "../check-viewer-nav.ts";
 import { injectRail } from "../lib/harness-rail.ts";
 import { withHeadingIds } from "../viewer-page.ts";
@@ -137,7 +137,6 @@ describe("ob3m finding 1 — tooltips on icon-only controls, ▦ Harnesses at re
 
 describe("stripFlags — the same two questions of the docs site's strip", () => {
   const INSTANCE = HARNESS_ROOT;
-  const DOCS = join(INSTANCE, siteDirFor(INSTANCE));
   const JS = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/js/docs-ui.js")), "utf-8");
   const CSS = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/css/docs-ui.css")), "utf-8");
   const ROW = readFileSync(join(INSTANCE, siteFileFor(INSTANCE, "assets/js/navbar-row.js")), "utf-8");

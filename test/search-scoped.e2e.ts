@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { Liquid } from "liquidjs";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { buildIndex } from "../scripts/search-split.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -31,7 +31,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 const UI = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 const LUNR = readFileSync(createRequire(import.meta.url).resolve("lunr/lunr.min.js"), "utf8");

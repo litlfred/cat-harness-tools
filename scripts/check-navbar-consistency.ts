@@ -91,7 +91,6 @@ import { dirname, join } from "node:path";
 import {
   instanceRootsIn,
   readDeclaration,
-  siteDirFor,
   siteFileFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { THEME_KINDS, type ThemeKind } from "@litlfred/cat-harness/schemas/theme.js";
@@ -554,7 +553,6 @@ function main(): number {
   // the way every generator reads them (`instanceThemes`), and each declared
   // kind is held to what its surface actually selects.
   const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
-  const siteRoot = join(instanceRoot, siteDirFor(instanceRoot));
   const headFile = join(instanceRoot, siteFileFor(instanceRoot, "_includes/head_custom.html"));
   const wiring: ThemeWiring = {
     webpageData: readWebpageData(join(instanceRoot, instanceThemesDataPath(instanceRoot))),

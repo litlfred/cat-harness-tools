@@ -34,7 +34,7 @@ import {
   tokenCount,
   type SearchManifest,
 } from "../search-split.ts";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCES = new Set(["smart-trust", "who-iris"]);

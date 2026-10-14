@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -34,7 +34,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 // `import.meta.dir` is a Bun extension and is undefined under Node, which is
 // what Playwright runs the spec with.
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 // The QR encoder must load FIRST: `mountQr` returns early without it, and

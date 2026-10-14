@@ -17,12 +17,11 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { fshGutsHtml } from "../scripts/lib/navbar.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.

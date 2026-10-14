@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { darkRules, withSavedScheme } from "../scripts/lib/scheme-css.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -24,7 +24,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const LIGHT_BG = "rgb(253, 253, 251)";

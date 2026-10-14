@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceStickyThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 

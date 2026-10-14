@@ -32,7 +32,6 @@ Usage:  heading-match-dryrun.py LIBRARY_DIR [-o report.json] [--only DOC_ID ...]
 from __future__ import annotations
 
 import argparse
-import contextlib
 import glob
 import importlib.util
 import json

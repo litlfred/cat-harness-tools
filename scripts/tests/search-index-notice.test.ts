@@ -34,11 +34,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-const DOCS = resolve(HARNESS_ROOT, "docs");
 const JS = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
 const CSS = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/docs-ui.css")), "utf8");
 const HEAD = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "_includes/head_custom.html")), "utf8");
