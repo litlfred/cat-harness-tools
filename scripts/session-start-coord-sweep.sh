@@ -19,6 +19,28 @@
 
 set -uo pipefail
 
+# ── -1. Is `origin`'s default branch `main`? ──────────────────────────────
+# GitHub makes the first branch pushed to an empty repository its default;
+# dth-hrh's became a feature branch that way (owner, 2026-10-14). The seeding
+# that prevents it lives where a repository's first commit is made
+# (`init-folio`, and `seed-main-if-remote-empty.ts`), because a repository
+# that has this hook has already been pushed. What a session CAN do is notice,
+# so the owner fixes it in settings before the next pull request targets the
+# wrong base. One `ls-remote`; read-only; never fails the session.
+SESSION_GIT_ROOT="$(git -C "${CLAUDE_PROJECT_DIR:-$PWD}" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$SESSION_GIT_ROOT" ] && git -C "$SESSION_GIT_ROOT" remote 2>/dev/null | grep -qx origin; then
+  REMOTE_HEADS="$(timeout 20 git -C "$SESSION_GIT_ROOT" ls-remote --symref origin HEAD refs/heads/main 2>/dev/null || true)"
+  REMOTE_DEFAULT="$(printf '%s\n' "$REMOTE_HEADS" | sed -n 's#^ref: refs/heads/\(.*\)[[:space:]]HEAD$#\1#p')"
+  if [ -n "$REMOTE_DEFAULT" ] && [ "$REMOTE_DEFAULT" != "main" ] \
+    && printf '%s\n' "$REMOTE_HEADS" | grep -q '[[:space:]]refs/heads/main$'; then
+    REMOTE_URL="$(git -C "$SESSION_GIT_ROOT" remote get-url origin 2>/dev/null | sed -E 's#^git@github.com:#https://github.com/#; s#\.git$##; s#^https?://[^/]*/git/#https://github.com/#')"
+    echo "## origin's default branch is \`$REMOTE_DEFAULT\`, not \`main\`"
+    echo ""
+    echo "- Pull requests and the site's publish step read the default branch. Ask the owner to set it to \`main\`: $REMOTE_URL/settings → Default branch."
+    echo ""
+  fi
+fi
+
 REPO_ROOT="$(bash "$(dirname "${BASH_SOURCE[0]}")/lib/harness-root.sh")"
 # THE REPOSITORY ROOT, which `REPO_ROOT` is NOT.
 #

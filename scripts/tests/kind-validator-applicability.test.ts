@@ -58,7 +58,8 @@ describe("a reason must name a FACT, not a preference", () => {
     // reason toward whichever words the regex happened to want. `vq8g`'s failure
     // exactly: a detector that recognised one form and called the corpus wrong.
     const SHAPES: { name: string; test: RegExp }[] = [
-      { name: "a file format", test: /`\.[a-z]+`|markdown|TypeScript|XML|PlantUML|Mermaid/ },
+      // An extension, bare (`.bpmn`) or as the glob that names its files (`*.lean`).
+      { name: "a file format", test: /`\*?\.[a-z]+`|markdown|TypeScript|XML|PlantUML|Mermaid/ },
       { name: "an absent subject", test: /no instance declares|has no nodes|nothing here to validate/ },
       { name: "several node families", test: /several node kinds|per \$schema family|each family is validated/i },
     ];

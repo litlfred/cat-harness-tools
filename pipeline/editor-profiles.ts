@@ -5,7 +5,7 @@
  * runtime imports on first use (bean folio-assistant-4dx7).
  *
  *   const profiles = await bundleEditorProfiles(repoRoot, "paper", join(out, "assets", "suggest"), "../../assets/suggest/");
- *   // → [{ id, module, kinds?, rawLatexFirstFor? }], for `cfg.suggest.profiles`
+ *   // → [{ id, module, kinds?, extensions?, rawFirstFor?, tokens? }], for `cfg.suggest.profiles`
  *
  * ## The contract with the runtime
  *
@@ -17,11 +17,23 @@
  * |---|---|---|
  * | `check` | `check` | `check(before, after, { macros, kg })` → findings; an `error` blocks submit |
  * | `macros` | `macros` | `macros(katexMacros)` → the table passed to `check` and `remarkFirst` |
- * | `latexConfig` | `crepe.latexConfig` | `latexConfig(katexMacros)` → Crepe's latex feature config |
+ * | `featureConfigs` | `crepe.featureConfigs` | `featureConfigs(Crepe.Feature, katexMacros)` → Crepe's `featureConfigs`, keyed by feature |
  * | `nodeViews` | `crepe.nodeViews` | `nodeViews[name](katex, katexMacros)` → a ProseMirror node view |
  * | `remarkFirst` | `crepe.remarkFirst` | `remarkFirst(macros)` → a `remarkPlugins` updater |
  * | `open` | `open` | a MODE: `open(host, ctx)` → `{ get(): string \| Promise<string>, dispose() }`, its own editor in place of Crepe |
  * | `issue` | `issue` | `issue(before, after, ctx)` → `{ title?, body?, template? }` for the issue a mode opens |
+ *
+ * Two fields are data the page config carries, not module roles, so they
+ * hold even when the module fails to load:
+ *
+ * - `rawFirstFor`: the block kinds whose raw surface opens first.
+ * - `tokens`: a code ref to a function returning the profile's token rules,
+ *   `{ id, shield?, find?, valid?, trim? }` with RegExp patterns. It is CALLED
+ *   HERE, at build time, and each pattern serialised as its `/source/flags`
+ *   string; the runtime (`SUGGEST_TOKENS_JS` in `src/core/edit-links.ts`)
+ *   shields and checks them beside the harness's own Liquid and directive
+ *   tokens. That is how a content type's syntax reaches the editor without
+ *   the runtime knowing it.
  *
  * A mode's `ctx` is `{ text, src, path, label, kind, repo, branch, config, status(msg) }`.
  * Its editor may live in another window (a form builder in a pop-up,
@@ -43,6 +55,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.ts";
+import type { SuggestTokenRule } from "../src/core/edit-links.ts";
 
 export const EDITOR_CHECKER_SCHEMA = "folio-editor-checker/v1";
 export const EDITOR_CHECKERS_TYPOLOGY = "editor-checkers";
@@ -59,8 +72,10 @@ export interface EditorCheckerNode {
   open?: string;
   issue?: string;
   macros?: string;
-  crepe?: { latexConfig?: string; nodeViews?: Record<string, string>; remarkFirst?: string };
-  rawLatexFirstFor?: string[];
+  crepe?: { featureConfigs?: string; nodeViews?: Record<string, string>; remarkFirst?: string };
+  rawFirstFor?: string[];
+  /** `path.ts#Export`: a function returning the profile's token rules (see the module header). */
+  tokens?: string;
 }
 
 /** A node and the instance root its code refs resolve against. */
@@ -77,7 +92,8 @@ export interface SuggestProfile {
   module: string;
   kinds?: string[];
   extensions?: string[];
-  rawLatexFirstFor?: string[];
+  rawFirstFor?: string[];
+  tokens?: SuggestTokenRule[];
 }
 
 /** Every editor-checker node the checkout declares for `contentType`, in declaration order. */
@@ -125,7 +141,7 @@ export function profileEntrySource(p: FoundProfile): string {
   };
   role("check", p.node.check);
   role("macros", p.node.macros);
-  role("latexConfig", p.node.crepe?.latexConfig);
+  role("featureConfigs", p.node.crepe?.featureConfigs);
   role("remarkFirst", p.node.crepe?.remarkFirst);
   role("open", p.node.open);
   role("issue", p.node.issue);
@@ -136,6 +152,38 @@ export function profileEntrySource(p: FoundProfile): string {
   });
   if (views.length) lines.push(`export const nodeViews = { ${views.map(([n], i) => `${JSON.stringify(n)}: nodeView${i}`).join(", ")} };`);
   return lines.join("\n") + "\n";
+}
+
+const RULE_PATTERNS = ["shield", "find", "valid", "trim"] as const;
+
+/**
+ * The profile's token rules, as the page config carries them: its `tokens`
+ * function called, and each pattern serialised as `/source/flags`. A rule
+ * that would do nothing, or a pattern that is not a RegExp, is refused here
+ * rather than ignored in a reader's browser.
+ */
+export async function profileTokens(p: FoundProfile): Promise<SuggestTokenRule[] | undefined> {
+  if (!p.node.tokens) return undefined;
+  const { file, name } = resolveCodeRef(p.root, p.node.tokens);
+  const fn = ((await import(file)) as Record<string, unknown>)[name];
+  if (typeof fn !== "function") throw new Error(`${p.node.id}: tokens "${p.node.tokens}" is not a function`);
+  const rules = (await fn()) as unknown;
+  if (!Array.isArray(rules)) throw new Error(`${p.node.id}: tokens "${p.node.tokens}" did not return an array`);
+  return rules.map((r: Record<string, unknown>, i) => {
+    const where = `${p.node.id}: token rule ${i}`;
+    if (typeof r?.id !== "string" || !r.id) throw new Error(`${where} has no id`);
+    const out: SuggestTokenRule = { id: r.id };
+    for (const k of RULE_PATTERNS) {
+      const v = r[k];
+      if (v === undefined) continue;
+      if (!(v instanceof RegExp)) throw new Error(`${where} (${r.id}): ${k} is not a RegExp`);
+      if ((k === "valid" || k === "trim") && v.global) throw new Error(`${where} (${r.id}): ${k} must not be global (a global RegExp's test() is stateful)`);
+      out[k] = String(v);
+    }
+    if (out.find && !out.valid) throw new Error(`${where} (${r.id}): a find needs a valid`);
+    if (!out.shield && !(out.find && out.valid)) throw new Error(`${where} (${r.id}): it needs a shield, or a find and a valid`);
+    return out;
+  });
 }
 
 /**
@@ -156,12 +204,14 @@ export async function bundleEditorProfiles(repoRoot: string, contentType: string
       const r = await Bun.build({ entrypoints: [entry], target: "browser", format: "esm", minify: true });
       if (!r.success || r.outputs.length !== 1) throw new Error(`editor profile ${p.node.id} (${p.file}) did not bundle: ${r.logs.map(String).join("; ")}`);
       writeFileSync(join(outDir, `${p.node.id}.js`), await r.outputs[0]!.text());
+      const tokens = await profileTokens(p);
       out.push({
         id: p.node.id,
         module: `${urlPrefix}${p.node.id}.js`,
         ...(p.node.kinds?.length ? { kinds: p.node.kinds } : {}),
         ...(p.node.extensions?.length ? { extensions: p.node.extensions } : {}),
-        ...(p.node.rawLatexFirstFor?.length ? { rawLatexFirstFor: p.node.rawLatexFirstFor } : {}),
+        ...(p.node.rawFirstFor?.length ? { rawFirstFor: p.node.rawFirstFor } : {}),
+        ...(tokens?.length ? { tokens } : {}),
       });
     }
   } finally {

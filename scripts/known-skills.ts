@@ -300,6 +300,9 @@ export function ownKgRoots(root: string): string[] {
   return [...new Set(kept.map((r) => resolve(r)))].sort();
 }
 
+/** A generator's own mark on the first line: `<!-- GENERATED from <source> … -->` (see {@link isSkillMd}). */
+const GENERATED_MARK = /^\uFEFF?\s*<!--\s*GENERATED from\s/;
+
 /**
  * NOTE ON THE EXAMPLES BELOW: the agent-memory nodes moved out of
  * `skills/memory/` to the declared `memory/` graph on 2026-09-20 (bean
@@ -336,6 +339,26 @@ export function ownKgRoots(root: string): string[] {
  * Unreadable is **not** "not a skill": an unreadable file returns `true` and is
  * counted, so a permissions error or a truncated read cannot silently shrink
  * the skill set. Undercounting here is what produces a clean run over nothing.
+ *
+ * ## A generated file is never a skill
+ *
+ * A skill is an instruction body somebody WROTE. A file a generator wrote is a
+ * rendering of something else, so it is not a node in its own right, whatever
+ * directory it sits in. Two marks say so, both read from the head of the file
+ * only, so a skill that DISCUSSES generation cannot exempt itself by quoting
+ * one further down:
+ *
+ * - front matter carrying `generated:` (the markdown form
+ *   `declaresGenerated` in check-reference-direction.ts reads); or
+ * - a first line `<!-- GENERATED from … -->`, the mark `bpmn-checklist.ts`
+ *   writes on each `<diagram>.checklist.md`.
+ *
+ * The second is why this exists. cat-harness#236 committed a checklist beside
+ * every BPMN diagram under `processes/<topic>/`, a declared knowledge-graph
+ * directory. None carries `$schema`, so each topic directory read as a skill
+ * package: `gen-skill-docs` threw "skill package(s) with no category: content,
+ * kg, library, process, sdlc, ui" on import, and every test that loads it
+ * failed with it.
  */
 export function isSkillMd(path: string): boolean {
   // A README is documentation ABOUT a directory, never a node IN it.
@@ -363,8 +386,9 @@ export function isSkillMd(path: string): boolean {
   } catch {
     return true;
   }
+  if (GENERATED_MARK.test(text)) return false;
   const fm = /^---\n([\s\S]*?)\n---/.exec(text);
-  return fm === null || !/^\$schema:\s*\S+/m.test(fm[1]!);
+  return fm === null || !/^(\$schema|generated):\s*\S+/m.test(fm[1]!);
 }
 
 /**

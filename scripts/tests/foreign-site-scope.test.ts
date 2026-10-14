@@ -33,7 +33,7 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { compose } from "../compose-docs.ts";
+import { compose, EMPTY_TODO_LISTING } from "../compose-docs.ts";
 import {
   HOST_DATA_PROJECTIONS,
   foreignScopeFor,
@@ -290,9 +290,19 @@ describe("the IG site's shell (compose-docs --shell), end to end", () => {
       "instance-themes.json": "which theme a URL prefix wears: configuration, read by prefix",
       "node-kinds.json": "the node-kind vocabulary: context, not a count",
       "stickies.json": "read only by the platform's landing page (index.md), which a shell does not carry",
+      "todo_listing.json": "written EMPTY ({pages:{}}): no page of the folio's site lists a platform note",
     };
     const left = readdirSync(join(out, "_data")).filter((f) => f.endsWith(".json"));
     expect(left.filter((f) => !(f in CHROME))).toEqual([]);
+  });
+
+  test("the platform's per-page todo listing is written EMPTY, never left out", () => {
+    // Left out, the footer would fall back to the platform's WHOLE listing.
+    const p = join(out, "_data", "todo_listing.json");
+    // The host's listing is built at publish; with none built there is nothing to empty.
+    const host = join(REPO, "cat-harness", siteDirFor(join(REPO, "cat-harness")), "_data", "todo_listing.json");
+    if (!existsSync(host)) return;
+    expect(JSON.parse(readFileSync(p, "utf-8"))).toEqual(EMPTY_TODO_LISTING);
   });
 
   test("its harness data is scoped: no count, no unresolved root-relative href", () => {

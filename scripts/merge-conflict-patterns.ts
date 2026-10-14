@@ -36,6 +36,12 @@
  * purpose — a hand-kept list of check names is the list that rots.
  */
 
+import { join, resolve } from "node:path";
+
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+
+import { declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
+
 export type ConflictStrategy = "take-base" | "owned-tree" | "generated-regions" | "qa-sidecar" | "refuse";
 
 export interface ConflictPattern {
@@ -55,6 +61,76 @@ export interface ConflictPattern {
    */
   prunedBy?: string;
 }
+
+/**
+ * The checkout git is asked about: the directory holding this layer and the
+ * harness beside it (the index checkout, where every instance is mounted).
+ */
+const CHECKOUT_ROOT = resolve(import.meta.dir, "..", "..");
+
+/** The harness site's directory, repo-relative, as every glob below spells it. */
+const SITE = "cat-harness/docs";
+
+/** The Tool that draws a glossary page; the routes of the visualisers it renders are the glossary pages. */
+export const GLOSSARY_RENDERER = "glossary-page";
+
+/** The visualiser id an instance declares for its catalogue viewer. */
+export const CATALOGUE_VISUALISER = "catalogue";
+
+/** The locales a generated glossary page is written in beside the English one. */
+const GLOSSARY_LOCALES = "{ar,es,fr,ru,zh}";
+
+/** A visualiser route and the Tool that draws it — declared, or recorded by the site. */
+export interface RouteOf {
+  harness: string;
+  id: string;
+  renderedBy: string;
+}
+
+/**
+ * The visualiser routes in the checkout at `repoRoot`: those the instances
+ * DECLARE, and — for a checkout where a declaring instance is not mounted, as
+ * when this layer stands alone beside the harness — those the harness site
+ * RECORDS through its generated pages' own front matter
+ * ({@link routesRecordedInSite}). A glob derived from nothing matches nothing,
+ * so a route neither knows is REFUSED (the safe default), never guessed.
+ */
+function routesIn(repoRoot: string): RouteOf[] {
+  const out = new Map<string, RouteOf>();
+  for (const r of routesRecordedInSite(join(repoRoot, SITE))) {
+    out.set(`${r.harness}/${r.visualiser}`, { harness: r.harness, id: r.visualiser, renderedBy: r.renderedBy });
+  }
+  try {
+    for (const v of declaredVisualisers(repoRoot)) out.set(`${v.harness}/${v.id}`, { harness: v.harness, id: v.id, renderedBy: v.renderedBy });
+  } catch {
+    // An unreadable declaration is `check:declaration-resolution`'s finding.
+  }
+  return [...out.values()];
+}
+
+/**
+ * The unlocalised route `<harness>/<visualiser>/` of each declared visualiser
+ * `pick` selects, under the harness site.
+ *
+ * Derived from the declarations — each instance's `visualisers[]`, through
+ * {@link visualiserRoute}, or the site's record of them when the declaring
+ * instance is not mounted ({@link routesIn}) — rather than written down, so this lower layer
+ * names no instance above it (check:reference-direction) and a renamed or
+ * newly declared visualiser is matched without an edit here.
+ */
+export function declaredRouteGlobs(
+  repoRoot: string,
+  pick: (v: RouteOf) => boolean,
+  suffix: string,
+  locale?: string,
+): string[] {
+  return routesIn(repoRoot)
+    .filter(pick)
+    .map((v) => `${SITE}/${locale === undefined ? "" : `${locale}/`}${visualiserRoute({ harness: v.harness, visualiser: v.id })}${suffix}`);
+}
+
+const isGlossary = (v: RouteOf): boolean => v.renderedBy === GLOSSARY_RENDERER;
+const isCatalogue = (v: RouteOf): boolean => v.id === CATALOGUE_VISUALISER;
 
 /**
  * Ordered: the FIRST pattern whose glob matches decides. Specific paths come
@@ -125,11 +201,13 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "glossary",
     // At their DECLARED routes since 2026-10-09 (`<harness>/<visualiser>/`):
-    // core's `glossary` visualiser and cat-harness's `lsi` — the latter under
-    // the page locale since folio-assistant#2527, and at its old address until
-    // the site is regenerated.
+    // every visualiser the glossary renderer draws (the content core declares
+    // one), and cat-harness's `lsi` — the latter under the page locale since
+    // folio-assistant#2527, and at its old address until the site is
+    // regenerated. The glossary routes are read from the declarations, so the
+    // glob is still repo-relative: the same path git reports.
     // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
-    globs: ["cat-harness/docs/folio-assistant-core/glossary/**", "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
+    globs: [...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**"), "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
     strategy: "take-base",
     why:
       "the generated glossary and LSI pages (173 + 34). Whole-corpus aggregates; concurrent term additions always collide. " +
@@ -138,7 +216,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "translated-glossary",
     // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
-    globs: ["cat-harness/docs/{ar,es,fr,ru,zh}/folio-assistant-core/glossary/index.md"],
+    globs: declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "index.md", GLOSSARY_LOCALES),
     strategy: "take-base",
     why: "the translated glossary pages, one per locale, written whole by glossary-page.ts beside the English one (check:glossary). Same aggregate, so the same collision; found 2026-10-01 when a merge refused on all five. The rest of each locale directory is authored translation and stays refused.",
   },
@@ -166,7 +244,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
       // document-kinds:viz writes these pages whole from the declared document
       // kinds: the index and one page per instance. The index and attestations/
       // above refused a merge of #2082 on 2026-10-04 with "no declared
-      // pattern"; the per-instance smart-base page refused the next one.
+      // pattern"; a content instance's per-instance page refused the next one.
       "cat-harness/docs/cat-harness/document-kinds/**/index.html",
       // node-kind:pages writes these whole from the node-kind index and the
       // nodes the typologies' directories hold (#2195): /<locale>/<declaring>/<kind>/.
@@ -184,7 +262,8 @@ export const PATTERNS: readonly ConflictPattern[] = [
     globs: [
       "cat-harness/docs/en/cat-harness/{folio,library,schemas,uploads,voices}/**",
       "cat-harness/docs/cat-harness/{folio,library,schemas,uploads,voices}/**",
-      "cat-harness/docs/who-iris/catalogue/**",
+      // Every declared catalogue visualiser's route, read from the declarations.
+      ...declaredRouteGlobs(CHECKOUT_ROOT, isCatalogue, "**"),
     ],
     strategy: "take-base",
     why: "the viewer namespace that gen-library-viz, gen-folio-viz and gen-schema-viz place through viewerPlacement(site, \"<handler>/<seg>/<subject>\"); every page is rewritten whole from the corpus and checked by its :viz --check. Its uploads/ pages render uploads/, they are not uploads, so this must precede the `uploads` refusal. Found 2026-10-01 when #1775 refused on four of them.",

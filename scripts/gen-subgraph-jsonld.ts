@@ -88,6 +88,13 @@
  * Output is deterministic — no timestamps, no commit, keys and members
  * sorted — so `--check` can compare bytes.
  *
+ * Every file it writes says so itself, in a top-level `_generated` key
+ * ({@link SUBGRAPH_GENERATED}): the convention `sync-docs-harness.ts` and
+ * `glossary-page.ts` use (bean `ws99`), which `check:reference-direction`
+ * reads as "a generator wrote this". A subgraph file names every instance
+ * whose nodes it frames, so without the key each one read as authored
+ * prose in the instance that commits it naming the layers above it.
+ *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts            # write
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts --check    # verify
@@ -682,6 +689,9 @@ function depth(plan: SubgraphPlan, e: SubgraphEntry): number {
 }
 
 /** Keys sorted at every level, except inside `@json` literals' own arrays. */
+/** The top-level `_generated` every subgraph file carries — bean `ws99`'s self-declaration. */
+export const SUBGRAPH_GENERATED = "gen-subgraph-jsonld.ts — do not hand-edit; run `bun run cat subgraph:jsonld`";
+
 function canonical(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(canonical);
   if (v !== null && typeof v === "object") {
@@ -724,7 +734,7 @@ export async function renderSubgraphFiles(
   const out = new Map<string, string>();
   const finish = (framed: Record<string, unknown>): string => {
     const { "@context": _inline, ...body } = framed;
-    return `${JSON.stringify(canonical({ "@context": plan.contextUrl, ...body }), null, 2)}\n`;
+    return `${JSON.stringify(canonical({ "@context": plan.contextUrl, _generated: SUBGRAPH_GENERATED, ...body }), null, 2)}\n`;
   };
 
   for (const e of [...plan.subgraphs.values()].sort((a, b) => a.iri.localeCompare(b.iri))) {
