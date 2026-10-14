@@ -65,12 +65,11 @@
  * @covers cat-harness
  */
 
-import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
-import { expectedInstanceConfigPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /**
  * Keys whose value records where THIS artefact came from.
@@ -169,8 +168,8 @@ function finding(
  * run is the `dh4f` shape**, and here it was hiding the only dependency edge
  * in the repository.
  *
- * `expectedInstanceConfigPath()` asks the instance what its config is called,
- * so a future rename moves this with it rather than past it.
+ * `readEffectiveConfig()` reads the instance's `index.config.json` entry first
+ * and its `<name>.config.json` only as a legacy fallback (bean `ymvt`).
  */
 export function dependencyRefs(repoRoot: string): CarrierReport {
   const findings: RefFinding[] = [];
@@ -178,26 +177,27 @@ export function dependencyRefs(repoRoot: string): CarrierReport {
   const seen: string[] = [];
 
   for (const root of instanceRootsIn(repoRoot)) {
-    const cfg = expectedInstanceConfigPath(root);
-    // `undefined` is "nothing here declares an instance", which is not the
-    // same as "an instance with no config" — neither is a finding, but only
-    // the second means this root was examined.
-    if (cfg === undefined || !existsSync(cfg)) continue;
-    seen.push(relative(repoRoot, cfg) || cfg);
-    let parsed: { dependencies?: { folioAssistant?: Array<{ name?: string; ref?: string; version?: string }> } };
-    try {
-      parsed = JSON.parse(readFileSync(cfg, "utf-8"));
-    } catch {
+    // INDEX FIRST (bean `ymvt`): an instance an `index.config.json` lists is
+    // configured by its entry; a `<name>.config.json` alone is the legacy
+    // fallback, named as such in `seen`. `absent` with no `from` is "nothing
+    // here declares an instance", which is not the same as "an instance with
+    // no config" — neither is a finding, but only the second was examined.
+    const eff = readEffectiveConfig(root);
+    if (eff.state === "absent") continue;
+    const where = eff.via === "index" ? `${relative(repoRoot, root) || "."}: ${eff.from}` : `${relative(repoRoot, root) || "."}/${eff.from} (legacy)`;
+    seen.push(where);
+    if (eff.state === "unreadable") {
       findings.push({
         carrier: "dependencies",
-        where: cfg,
+        where,
         ref: undefined,
         kind: "unpinned",
         severity: "major",
-        detail: `${relative(repoRoot, cfg) || cfg} is unreadable — not a clean run, and not an empty dependency set`,
+        detail: `${where} is unreadable — not a clean run, and not an empty dependency set (${eff.why})`,
       });
       continue;
     }
+    const parsed = eff.config as { dependencies?: { folioAssistant?: Array<{ name?: string; ref?: string; version?: string }> } };
     for (const dep of parsed.dependencies?.folioAssistant ?? []) {
       examined += 1;
       // `version` is the scheme's field and does not exist yet; when it does it

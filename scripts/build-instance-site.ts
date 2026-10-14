@@ -13,7 +13,8 @@
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> --instance <name>
  *
- * reads the steps from `<name>.config.json` `site.build` ({@link recipeFromConfig}).
+ * reads the steps from the instance's `index.config.json` entry `site.build` ({@link recipeFromConfig};
+ * a legacy `<name>.config.json` only as a reported fallback, bean `ymvt`).
  * Any step flag below replaces it whole (no merging of flags and recipe):
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
@@ -79,6 +80,7 @@ import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { describeFeatures, parityShortfall, siteFeatures } from "./site-parity.ts";
+import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -243,43 +245,62 @@ export const PROFILE_STEPS: Record<SiteProfile, ReadonlySet<string>> = {
 export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 /**
- * The recipe `<instance>.config.json` declares under `site.build`, or
- * undefined when it declares none. Owner, 2026-10-10: "i want one
- * consolidated worfklow". The recipe lived only as prose in a folio's
- * AGENTS.md, so `stage-local.ts` could not find it and every runner re-typed
- * it. The cat-harness schema is `HarnessSiteBuildSchema`. It is read here
+ * The recipe instance `instance` declares under `site.build`, or undefined
+ * when it declares none. Owner, 2026-10-10: "i want one consolidated
+ * worfklow". The recipe lived only as prose in a folio's AGENTS.md, so
+ * `stage-local.ts` could not find it and every runner re-typed it. The
+ * cat-harness schema is `HarnessSiteBuildSchema`. It is read here
  * structurally, so this compiles against a cat-harness pin from before that
  * schema, and every step is held to {@link SCRIPT_NAME} exactly as the flags are.
+ *
+ * READ INDEX FIRST (bean `ymvt`, owner 2026-10-14: *"i thought ONLY
+ * index.config.json"*): the instance's `index.config.json` entry, inline; a
+ * root `<instance>.config.json` only as a fallback that {@link recipeRead}
+ * reports as legacy. Until 2026-10-14 this read the file directly, so a
+ * repository had to keep one to publish (smart-trust#33).
  */
-export function recipeFromConfig(root: string, instance: string): SiteRecipe | undefined {
-  const file = join(resolve(root), `${instance}.config.json`);
-  if (!existsSync(file)) return undefined;
-  const build = (JSON.parse(readFileSync(file, "utf-8")) as { site?: { build?: Record<string, unknown> } }).site?.build;
-  if (build === undefined) return undefined;
+export function recipeRead(root: string, instance: string): { recipe?: SiteRecipe; read: InstanceConfigRead } {
+  const read = readInstanceConfig(root, instance);
+  const site = read.config?.site;
+  const build = site !== null && typeof site === "object" ? (site as { build?: unknown }).build : undefined;
+  if (build === undefined || build === null || typeof build !== "object") return { read };
+  const b = build as Record<string, unknown>;
   const list = (k: string): string[] => {
-    const v = build[k] ?? [];
+    const v = b[k] ?? [];
     if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && SCRIPT_NAME.test(x))) {
-      throw new Error(`${file}: site.build.${k} must be a list of package script names`);
+      throw new Error(`${read.from}: site.build.${k} must be a list of package script names`);
     }
     return v as string[];
   };
-  const home = build.home;
-  if (home !== undefined && typeof home !== "string") throw new Error(`${file}: site.build.home must be a path`);
-  const profile = build.profile ?? "folio";
-  if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${file}: site.build.profile must be folio or ig-repo-site`);
-  const links = build.links ?? "refuse";
-  if (links !== "refuse" && links !== "report") throw new Error(`${file}: site.build.links must be refuse or report`);
-  const keep = build.keep ?? [];
-  if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${file}: site.build.keep must be a list of root entry names`);
+  const home = b.home;
+  const where = read.from;
+  if (home !== undefined && typeof home !== "string") throw new Error(`${where}: site.build.home must be a path`);
+  const profile = b.profile ?? "folio";
+  if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${where}: site.build.profile must be folio or ig-repo-site`);
+  const links = b.links ?? "refuse";
+  if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
+  const keep = b.keep ?? [];
+  if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${where}: site.build.keep must be a list of root entry names`);
   return {
-    ...(home !== undefined ? { home } : {}),
-    pre: list("pre"),
-    sourceSteps: list("sourceSteps"),
-    siteSteps: list("siteSteps"),
-    ...(keep.length ? { keep: keep as string[] } : {}),
-    ...(profile !== "folio" ? { profile } : {}),
-    ...(links !== "refuse" ? { links } : {}),
+    recipe: {
+      ...(home !== undefined ? { home } : {}),
+      pre: list("pre"),
+      sourceSteps: list("sourceSteps"),
+      siteSteps: list("siteSteps"),
+      ...(keep.length ? { keep: keep as string[] } : {}),
+      ...(profile !== "folio" ? { profile } : {}),
+      ...(links !== "refuse" ? { links } : {}),
+    },
+    read,
   };
+}
+
+/** {@link recipeRead}'s recipe, saying on stderr when it came from a legacy `<instance>.config.json`. */
+export function recipeFromConfig(root: string, instance: string): SiteRecipe | undefined {
+  const { recipe, read } = recipeRead(root, instance);
+  const notice = legacyNotice(read);
+  if (recipe !== undefined && notice !== undefined) console.warn(notice);
+  return recipe;
 }
 
 /** owner and repository name from a GitHub remote URL (https or ssh). */
@@ -669,9 +690,11 @@ if (import.meta.main) {
   const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "keep" | "profile" | "links"> => {
     const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step") };
     if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length > 0) return { ...flags, keep: many("--keep") };
-    const r = recipeFromConfig(root, instance);
+    const { recipe: r, read } = recipeRead(root, instance);
     if (r === undefined) return flags;
-    console.log(`steps: from ${instance}.config.json site.build`);
+    console.log(`steps: from ${read.from} site.build`);
+    const notice = legacyNotice(read);
+    if (notice !== undefined) console.warn(notice);
     return r;
   };
   try {
