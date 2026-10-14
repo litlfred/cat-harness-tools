@@ -33,6 +33,7 @@ import {
   readWorkflow,
   splitArgs,
 } from "../stage-local-ig.ts";
+import { FAKE_RAIL, FAKE_SYNC } from "./ig-chrome-fixture.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
 const put = (root: string, rel: string, text = "x") => {
@@ -369,6 +370,9 @@ describe("stage-local end to end: an IG published to a local origin, preview the
     sh(repo, "remote", "add", "origin", "https://github.com/o/r");
     sh(repo, "config", `url.file://${bare}.insteadOf`, "https://github.com/o/r");
     put(repo, ".github/workflows/fhirbuild.yml", IG_CALLER.replace("WorldHealthOrganization/smart-base", "o/sb"));
+    // The platform's chrome scripts, as a mount lays them (stand-ins: stage-local-ig-chrome.test.ts runs the real rail).
+    put(repo, "cat-harness-tools/scripts/sync-docs-harness.ts", FAKE_SYNC);
+    put(repo, "cat-harness-tools/scripts/rail-standalone-pages.ts", FAKE_RAIL);
     sh(repo, "add", "-A");
     sh(repo, "commit", "-q", "-m", "ig");
     sh(repo, "push", "-q", "origin", "main");
@@ -404,7 +408,7 @@ jobs:
           D=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
           if [ "$GITHUB_REF_NAME" = "$D" ]; then echo "IS_DEFAULT_BRANCH=true" >> $GITHUB_ENV; else echo "IS_DEFAULT_BRANCH=false" >> $GITHUB_ENV; fi
       - name: Build
-        run: mkdir -p output && echo "$GITHUB_SHA" > output/index.html
+        run: mkdir -p output && echo "<html><body>$GITHUB_SHA</body></html>" > output/index.html
 ${IG_WORKFLOW.slice(IG_WORKFLOW.indexOf("      - name: Deploy candidate\n"), IG_WORKFLOW.indexOf("      - name: Commit README.md"))}`);
 
     const quiet = () => {};
@@ -417,7 +421,7 @@ ${IG_WORKFLOW.slice(IG_WORKFLOW.indexOf("      - name: Deploy candidate\n"), IG_
     const pre = await stageLocal({ repo, workflowSource: src, log: quiet });
     expect(pre).toMatchObject({ kind: "ig", target: "preview", pushed: true, url: "https://o.github.io/r/branches/feat/" });
     expect(sh(bare, "log", "-1", "--format=%s", "gh-pages")).toBe("Deploy candidate branch");
-    expect(sh(bare, "show", "gh-pages:branches/feat/index.html")).toBe(sh(repo, "rev-parse", "HEAD"));
+    expect(sh(bare, "show", "gh-pages:branches/feat/index.html")).toContain(sh(repo, "rev-parse", "HEAD"));
     expect(sh(bare, "show", "gh-pages:branches/other/index.html")).toBe("other");
     expect(sh(bare, "show", "gh-pages:stale.html")).toBe("stale");
 

@@ -104,7 +104,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";
@@ -113,6 +113,9 @@ import {
   applyIgDeploy,
   branchDirOf,
   callerInputs,
+  type ChromeCoverage,
+  chromeCoverage,
+  chromeShortfall,
   commandWorks,
   type Detected,
   detectPublisher,
@@ -139,7 +142,7 @@ import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { buildInstanceSite, recipeFromConfig, siteFields, stagingDir, type SiteRecipe } from "./build-instance-site.ts";
+import { buildInstanceSite, keepPinned, lockedMountPaths, recipeFromConfig, siteFields, stagingDir, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -439,10 +442,101 @@ export function composeMain(pages: string, site: string, o: { branch: string; sh
   return { commit: mainCommitMessage(o.sha, o.branch, o.runUrl), add: ["."] };
 }
 
-/** An IG's output, laid out as its workflow's deploy step lays it. */
-export function composeIg(pages: string, folder: string, t: IgTarget): Composed {
-  applyIgDeploy(pages, folder, t, (from, to) => cpSync(from, to, { recursive: true }));
+/** An IG's output, laid out as its workflow's deploy step lays it; `chromed` when the chrome step chromed it. */
+export function composeIg(pages: string, folder: string, t: IgTarget, chromed = false): Composed {
+  applyIgDeploy(pages, folder, t, (from, to) => cpSync(from, to, { recursive: true }), { chromed });
   return { commit: t.commit, add: [t.dest || "."] };
+}
+
+/**
+ * The harness chrome for an IG's own pages, and where its scripts are.
+ *
+ * Owner, 2026-10-14, decision "1": an IG site published by this path gets the
+ * chrome `folio-site.yml` gave it. Measured that morning: every live root page
+ * of smart-trust wore the icon row and the side navigation because a
+ * `folio-site.yml` run of 2026-10-12 laid it there, and a preview built by this
+ * path wrote 3654 bare IG Publisher pages, none with either. Published on
+ * `main`, that preview would have replaced the chromed root.
+ *
+ * The chrome is NOT rebuilt here. It is the two steps a folio's site already
+ * runs over pages Jekyll did not lay out (`build-instance-site.ts`, and
+ * `folio-site.yml`'s own last step): `sync-docs-harness.ts`, which writes the
+ * harness data the icon row is drawn from, then `rail-standalone-pages.ts
+ * --foreign-site --instance <the IG>`, which rails every page, scopes the row
+ * to the IG (#2263) and loads the platform's UI. The harness data is written
+ * into the cat-harness MOUNT, so the pinned bytes are put back afterwards
+ * (`keepPinned`), as `build-instance-site` does.
+ *
+ * A sync that fails is said and not fatal: the harness commits its own
+ * `_data/harness.json`, and the rail's foreign-site scope exists to rebase
+ * exactly that platform data onto another instance's site (#2263). Measured
+ * 2026-10-14 on smart-trust: the sync refuses there ("cannot decide the
+ * site's landing page", its `index.config.json` names no `landing`), and the
+ * rail over the pinned data still chromed every page. Whether the chrome
+ * landed is judged on the pages afterwards ({@link chromeShortfall}), never
+ * on the exit codes.
+ *
+ * What it does NOT give, and the plan says so: `folio-site.yml` composes the IG
+ * INTO a Jekyll shell (`stage-ig-sites --compose-at-root`), so its pages wear
+ * the theme's side bar and search box; railed pages wear the harness rail and
+ * the icon row, with the platform's UI loaded from the platform's site.
+ */
+export interface IgChrome {
+  sync: string;
+  rail: string;
+  /** The instance the checkout declares at its root: the IG whose site this is. Absent, the rail is the platform's. */
+  instance?: string;
+  homeLabel: string;
+}
+
+/** The chrome this checkout can apply, or why it cannot: the platform's scripts are read from its mounts, never named elsewhere. */
+export function igChromeFor(repo: string, fallbackLabel: string): IgChrome | { unavailable: string } {
+  let sync: string;
+  let rail: string;
+  try {
+    sync = platformScript(repo, "sync-docs-harness.ts");
+    rail = platformScript(repo, "rail-standalone-pages.ts");
+  } catch (e) {
+    return { unavailable: `the platform's chrome scripts are not mounted in this checkout (${(e as Error).message})` };
+  }
+  const declFile = findDeclarationFile(repo);
+  const decl = declFile === undefined ? undefined : siteFields(readFileSync(join(repo, declFile), "utf-8"), join(repo, declFile));
+  return { sync, rail, ...(decl ? { instance: decl.name } : {}), homeLabel: decl?.title ?? decl?.name ?? fallbackLabel };
+}
+
+/** What the plan says the chrome step does. */
+export function igChromeStep(c: IgChrome | { unavailable: string }, folder: string): { name: string; action: string; reason: string } {
+  const name = `the harness chrome over ${folder}/: sync-docs-harness.ts, then rail-standalone-pages.ts --foreign-site`;
+  if ("unavailable" in c) return { name, action: "chrome", reason: `UNAVAILABLE — ${c.unavailable}` };
+  return {
+    name: `${name} --instance ${c.instance ?? "(none declared)"} --home-label "${c.homeLabel}"`,
+    action: "chrome",
+    reason: "not in the workflow: folio-site.yml's chrome, as rail and icon row (no theme side bar or search box); a root publish is refused without it",
+  };
+}
+
+/**
+ * Apply the chrome to the built IG in `site`, in place, and count it. Throws,
+ * naming what is missing, when the root page or no page wears it: the caller
+ * refuses a root publish on that, rather than replace a chromed root with bare
+ * pages.
+ */
+export function applyIgChrome(repo: string, site: string, c: IgChrome, log: (s: string) => void): ChromeCoverage {
+  let restore = () => {};
+  try {
+    const harness = join(repo, "cat-harness");
+    if (existsSync(harness)) restore = keepPinned(join(harness, siteFileFor(harness, "_data/harness.json")), lockedMountPaths(repo), repo);
+    const sync = spawnSync("bun", ["run", c.sync], { cwd: repo, stdio: "inherit" });
+    if (sync.status !== 0) log(`· sync-docs-harness exited ${sync.status}: the rail reads the harness data the cat-harness mount pins`);
+    run(repo, "bun", ["run", c.rail, "--site", site, "--built", "cat-harness", "--foreign-site", "--home-label", c.homeLabel, ...(c.instance ? ["--instance", c.instance] : [])]);
+  } finally {
+    restore();
+  }
+  const cov = chromeCoverage(site);
+  const short = chromeShortfall(cov);
+  if (short) throw new Error(`the harness chrome was not applied: ${short}`);
+  log(`· chrome: ${cov.navbarRow} of ${cov.pages} page(s) wear the icon row, ${cov.railed} carry the rail`);
+  return cov;
 }
 
 /** What a run will do, printed before it does anything. */
@@ -780,6 +874,12 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   const folio = o.bareIg ? undefined : folioSiteFor(repo, ownerRepo);
   if (folio?.site) return stageIgFolio(a, { wf, path, note, steps, missing, github, inputs: planCtx.inputs, isDefault }, folio.site);
   if (folio?.why) log(`· ${folio.why}`);
+  const chrome = igChromeFor(repo, ownerRepo.split("/")[1]!);
+  // A root publish without the chrome would replace a chromed root with bare pages: a missing prerequisite there.
+  if (isDefault && "unavailable" in chrome) missing.push(`the harness chrome — ${chrome.unavailable}; a root publish is refused without it`);
+  const planned: { name: string; action: string; reason?: string }[] = steps.map((s) => ({ name: s.name, action: s.action, ...(s.reason ? { reason: s.reason } : {}) }));
+  const firstDeploy = planned.findIndex((s) => s.action === "deploy");
+  planned.splice(firstDeploy < 0 ? planned.length : firstDeploy, 0, igChromeStep(chrome, t0.deploy.folder));
   const url = `${pagesRoot}/${t0.dest ? `${t0.dest}/` : ""}`;
   const plan: StagePlan = {
     kind: "ig", caller: a.caller, workflow: `${u.owner}/${u.repo}/${path}@${u.ref}`, ...(note ? { note } : {}),
@@ -790,7 +890,7 @@ async function stageIg(a: IgRun): Promise<StageResult> {
     build: [`the runnable steps of ${path} below, in its order, in the checkout as on a runner (it writes input/scripts/, ${t0.deploy.folder}/, temp/ there)`],
     gate: "none, as the workflow: its deploy step pushes without one; 3 push attempts",
     commit: t0.commit,
-    steps: steps.map((s) => ({ name: s.name, action: s.action, ...(s.reason ? { reason: s.reason } : {}) })),
+    steps: planned,
     notRun: [
       ...(t0.deploy.singleCommit ? ["single-commit: the deploy action force-pushes one orphan commit, erasing the branch's history; this path commits on top and never force-pushes"] : []),
       ...(u.file !== PAGES_SIBLING ? [`${u.file}'s own job (the build.fhir.org trigger): an external build, not this repository's Pages`] : []),
@@ -817,8 +917,21 @@ async function stageIg(a: IgRun): Promise<StageResult> {
   const t = igTarget(deploys, { isDefault, branchDir: ctx.env.BRANCH_DIR || branchDirOf(branch), sha, runUrl });
   if (!existsSync(site) || listSite(site).size === 0) throw new Error(`the build produced nothing in ${site} — refusing to deploy`);
 
+  // The chrome, before anything is published: on the root it is required.
+  let chromed = false;
+  if ("unavailable" in chrome) log(`· no harness chrome: ${chrome.unavailable}; this preview is published bare, as the workflow publishes it`);
+  else {
+    try {
+      applyIgChrome(repo, site, chrome, log);
+      chromed = true;
+    } catch (e) {
+      if (isDefault) throw new Error(`${(e as Error).message} — refusing to publish the root: it would replace a chromed site with bare IG Publisher pages`);
+      log(`· ${(e as Error).message}; this preview is published bare, as the workflow publishes it`);
+    }
+  }
+
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, undefined, { slug: branchDirOf(branch), branch, sha }, log) });
-  const r = await pushLoop({ repo, publishBranch: t.deploy.branch, ...(o.dryRun ? { dryRun: true } : {}), gate: false, attempts: 3, compose: (pages) => composeIg(pages, site, t), url, log });
+  const r = await pushLoop({ repo, publishBranch: t.deploy.branch, ...(o.dryRun ? { dryRun: true } : {}), gate: false, attempts: 3, compose: (pages) => composeIg(pages, site, t, chromed), url, log });
   return done(r);
 }
 
@@ -983,6 +1096,12 @@ export async function stageDeclared(
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
+  log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
+  if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
+  if (target === "main") {
+    log(`keeps       STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
+    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
+  }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
   const r = await buildInstanceSite({
     root: repo,
@@ -993,11 +1112,15 @@ export async function stageDeclared(
     pre: d.recipe.pre,
     sourceSteps: d.recipe.sourceSteps,
     siteSteps: d.recipe.siteSteps,
+    ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
+    ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
+    ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(target === "preview" ? { staging: branch } : {}),
     mount: true,
     fresh: false,
     publish,
-    ...(publish ? { remote } : {}),
+    // The remote is read even when nothing is published: the root's guard measures what it would replace.
+    remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
 }
