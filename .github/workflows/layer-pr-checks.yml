@@ -113,7 +113,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
-          ref: ${{ inputs.mode == 'index' && (matrix.side == 'base' && (github.event.pull_request.base.sha || github.event.repository.default_branch) || '') || inputs.index-ref }}
+          # Index mode: the PR's merge commit on both sides; the base side then
+          # steps to its first parent (below). Never `pull_request.base.sha`:
+          # it is the base as of the PR's last push, older than the main the
+          # merge commit holds whenever main moved since, so head-vs-base would
+          # charge main's own changes to the PR (seen on smart-base#57, where
+          # smart-base#53 landed between).
+          ref: ${{ inputs.mode == 'index' && '' || inputs.index-ref }}
+          fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
       - &setup-bun
         uses: oven-sh/setup-bun@v2
@@ -223,14 +230,48 @@ jobs:
         side: [base, head]
     steps:
       - *checkout-index
+      - name: Base side of the root (index mode)
+        if: inputs.mode == 'index' && matrix.side == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: fa
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
       - *setup-bun
       - *mount
-      - name: Check out the caller (base or head)
+      - name: Check out the caller
         if: inputs.mode == 'layer'
         uses: actions/checkout@v4
         with:
           path: src
-          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || github.event.repository.default_branch) || '' }}
+          fetch-depth: 2
+      - name: Base side of the caller
+        if: inputs.mode == 'layer' && matrix.side == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: src
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
       - *lower-layers-main
       - name: The judging scripts, the same on both sides
         uses: actions/checkout@v4
@@ -241,6 +282,20 @@ jobs:
           sparse-checkout: .github/scripts/layer-pr-checks
       - *swap
       - *install
+      - name: Install Chromium, for the checks that draw through a browser
+        # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
+        # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
+        # the same reason). The index's OWN Playwright installs it, so the
+        # browser build is the one that Playwright expects: a bare `npx
+        # playwright` may fetch another (smart-base#57: "Executable doesn't
+        # exist at .../chromium_headless_shell-1243").
+        working-directory: fa
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the index: no browser installed"
+          fi
       - name: Mount every graph kept on a branch, and build the IG pages
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
