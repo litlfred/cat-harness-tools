@@ -99,8 +99,20 @@ export interface BlockActionsConfig {
     css?: string;
     katex?: string;
     katexMacros?: Record<string, string>;
-    profiles?: Array<{ id: string; module: string; kinds?: string[]; extensions?: string[]; rawLatexFirstFor?: string[] }>;
+    profiles?: Array<{ id: string; module: string; kinds?: string[]; extensions?: string[]; rawFirstFor?: string[]; tokens?: SuggestTokenRule[] }>;
   };
+}
+
+/**
+ * A content profile's token rule, as the page config carries it: each pattern
+ * a RegExp's `/source/flags` string (see {@link SUGGEST_TOKENS_JS}).
+ */
+export interface SuggestTokenRule {
+  id: string;
+  shield?: string;
+  find?: string;
+  valid?: string;
+  trim?: string;
 }
 
 export const DEFAULT_TEMPLATE = "block-feedback.yml";
@@ -221,6 +233,55 @@ export const BLOCK_URLS_JS = `function faBlockUrls(c, b) {
 }`;
 
 /**
+ * The tokens the ✍ suggest editor keeps intact: wrapped in ⟦ ⟧ so the
+ * editor's Markdown escaping cannot corrupt them, and checked for being
+ * well-formed, nothing more (owner, 2026-10-14: "I only want that the syntax
+ * is valid"). The harness's own are the Liquid variables and tags and the
+ * directives any harness page can carry. Any other syntax is a content
+ * profile's: its `folio-editor-checker/v1` node names a `tokens` rule list,
+ * which `pipeline/editor-profiles.ts` serialises into the page config
+ * (`suggest.profiles[].tokens`), so this runtime knows no content type's
+ * syntax (owner's ruling: a content type's syntax belongs to the layer that
+ * ships the type).
+ *
+ * A rule is `{ id, shield?, find?, valid?, trim? }`, each pattern a RegExp or
+ * its `/source/flags` string. A `shield` match is wrapped (only its source is
+ * kept: the shields join into one global alternation, the harness's first).
+ * Each `find` match, less `trim`, must match `valid`. With `ownOnly`, `wrap`
+ * and `errors` use the harness's rules alone: for a profile whose module keeps
+ * (`remarkFirst`) or checks (`check`) its own syntax itself. The tests
+ * evaluate it.
+ */
+export const SUGGEST_TOKENS_JS = `function faSuggestTokens(contributed) {
+  var re = function (s) { if (s instanceof RegExp) return s; var i = s.lastIndexOf("/"); return new RegExp(s.slice(1, i), s.slice(i + 1)); };
+  var withG = function (r) { return r.flags.indexOf("g") >= 0 ? r : new RegExp(r.source, r.flags + "g"); };
+  var own = [
+    { id: "liquid", shield: /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}/, find: /\\{\\{[\\s\\S]*?(?:\\}\\}|$)|\\{%[\\s\\S]*?(?:%\\}|$)/g,
+      valid: /^\\{\\{\\s*[A-Za-z_][\\w-]*(?:\\.[\\w-]+|\\[\\d+\\])*\\s*(?:\\|\\s*[A-Za-z_]\\w*(?:\\s*:\\s*[^|{}]+?)?\\s*)*\\}\\}$|^\\{%\\s*[A-Za-z_]\\w*[^%]*%\\}$/ },
+    { id: "directive", shield: /:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?/, find: /:{1,2}[A-Za-z][\\w-]*\\[[^\\n]*?(?:\\](?:\\{[^\\n]*?\\})?|$)/gm,
+      valid: /^:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^{}\\n]*\\})?$/ },
+  ];
+  var theirs = (contributed || []).filter(function (t) { return t && typeof t.id === "string"; }).map(function (t) {
+    return { id: t.id, shield: t.shield && re(t.shield), find: t.find && re(t.find), valid: t.valid && re(t.valid), trim: t.trim && re(t.trim) };
+  });
+  var shieldOf = function (rules) {
+    return new RegExp(rules.filter(function (r) { return r.shield; }).map(function (r) { return "(?:" + r.shield.source + ")"; }).join("|"), "g");
+  };
+  var both = own.concat(theirs), ownShield = shieldOf(own), allShield = shieldOf(both);
+  return {
+    wrap: function (md, ownOnly) { return md.replace(ownOnly ? ownShield : allShield, function (m) { return "\\u27e6" + m + "\\u27e7"; }); },
+    errors: function (md, ownOnly) {
+      var bad = [];
+      (ownOnly ? own : both).forEach(function (r) {
+        if (!r.find || !r.valid) return;
+        for (const m of md.matchAll(withG(r.find))) if (!r.valid.test(r.trim ? m[0].replace(r.trim, "") : m[0])) bad.push(m[0]);
+      });
+      return bad;
+    },
+  };
+}`;
+
+/**
  * The browser half, one script for every page: fills each `a[data-fa-link]`
  * (`edit`, `source` or `feedback`) from the facts on its nearest
  * `[data-src]` host the first time a pointer, focus or touch reaches it, so a
@@ -232,6 +293,7 @@ export const BLOCK_URLS_JS = `function faBlockUrls(c, b) {
 export const EDIT_LINKS_RUNTIME = `(() => {
   if (window.faEditLinks) return;
   ${BLOCK_URLS_JS}
+  ${SUGGEST_TOKENS_JS}
   let cfg = null;
   const config = () => {
     if (cfg) return cfg;
@@ -279,32 +341,11 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // The text is read through the block's KG node (<block>.jsonld, its text)
   // from the repository itself, and the change leaves as a GitHub issue the
   // reader submits: no OAuth, no token, no server. Variables, directives and
-  // LaTeX references are the reader's to change, add or delete; what is
-  // checked is that each is well-formed, and the panel under the editor shows
-  // each variable's current value from the site's values.jsonld. Nothing read
-  // is written as HTML.
-  const TOKENISH = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?|\\\\[A-Za-z]+\\{[^}\\n]*\\}/g;
-  // Variables, directives and LaTeX references stay the reader's to change,
-  // add or delete. They are wrapped in \\u27e6 \\u27e7 only so the editor's
-  // Markdown escaping cannot corrupt them, and unwrapped on submit; what is
-  // checked is that each one is still well-formed, nothing more (owner,
-  // 2026-10-14: "I only want that the syntax is valid").
-  const wrap = (md) => md.replace(TOKENISH, (m) => "\\u27e6" + m + "\\u27e7");
-  // The same, less the LaTeX references: for a profile that keeps LaTeX verbatim itself.
-  const TOKENS_NO_LATEX = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?/g;
+  // any syntax a content profile declares are the reader's to change, add or
+  // delete; what is checked is that each is well-formed (faSuggestTokens), and
+  // the panel under the editor shows each variable's current value from the
+  // site's values.jsonld. Nothing read is written as HTML.
   const unwrap = (md) => md.replace(/\\u27e6([^\\u27e6\\u27e7]*)\\u27e7/g, (m, inner) => inner.replace(/\\\\([!-\\/:-@\\[-\\u0060{-~])/g, "$1"));
-  const LIQUID = /^\\{\\{\\s*[A-Za-z_][\\w-]*(?:\\.[\\w-]+|\\[\\d+\\])*\\s*(?:\\|\\s*[A-Za-z_]\\w*(?:\\s*:\\s*[^|{}]+?)?\\s*)*\\}\\}$/;
-  const TAG = /^\\{%\\s*[A-Za-z_]\\w*[^%]*%\\}$/;
-  const DIRECTIVE = /^:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^{}\\n]*\\})?$/;
-  const LATEXREF = /^\\\\[A-Za-z]+\\{[^{}\\n]+\\}$/;
-  // latex === false: a profile's own checker reads the LaTeX, so this coarse check does not.
-  const syntaxErrors = (md, latex) => {
-    const bad = [];
-    for (const m of md.matchAll(/\\{\\{[\\s\\S]*?(?:\\}\\}|$)|\\{%[\\s\\S]*?(?:%\\}|$)/g)) if (!LIQUID.test(m[0]) && !TAG.test(m[0])) bad.push(m[0]);
-    for (const m of md.matchAll(/:{1,2}[A-Za-z][\\w-]*\\[[^\\n]*?(?:\\](?:\\{[^\\n]*?\\})?|$)/gm)) if (!DIRECTIVE.test(m[0])) bad.push(m[0]);
-    if (latex !== false) for (const m of md.matchAll(/\\\\(?:cite|ref|eqref|autoref|cref)\\b[^\\s]*/g)) if (!LATEXREF.test(m[0].replace(/[.,;:)]+$/, ""))) bad.push(m[0]);
-    return bad;
-  };
   // Variable names and, when the site published them, their current values.
   const variablesIn = (md) => Array.from(md.matchAll(/\\{\\{\\s*([A-Za-z_][\\w.\\-\\[\\]]*)/g), (m) => m[1]);
   const lineDiff = (a, b) => {
@@ -375,8 +416,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     kgRefs = keys.length ? { labels: labels, citeKeys: keys } : { labels: labels };
     return kgRefs;
   };
-  // A profile (an editor-checker node the site bundled, e.g. folio-assistant-sci's
-  // paper-latex) for the block's kind: its checker, and its Crepe settings.
+  // A profile (an editor-checker node a content layer declares, bundled by the
+  // site) for the block's kind: its checker, its tokens, and its Crepe settings.
   // Or a mode: a profile whose module opens its own editor (a Questionnaire
   // form builder, in the page or in another window) over a file it declares by
   // extension. A host names one with data-suggest-mode.
@@ -709,12 +750,16 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const km = (c.suggest && c.suggest.katexMacros) || {};
     const macros = mod && typeof mod.macros === "function" ? mod.macros(km) : undefined;
     const kg = mod && typeof mod.check === "function" ? await kgReferences(c) : null;
-    // A profile that keeps LaTeX verbatim itself (remarkFirst) must not have it wrapped in \\u27e6 \\u27e7 as well.
-    const latexOwned = !!(mod && mod.remarkFirst);
-    const shield = (t) => (latexOwned ? t.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(t));
+    // The harness's tokens and the profile's. A profile whose module keeps its
+    // own syntax verbatim (remarkFirst) must not have it wrapped in \\u27e6 \\u27e7
+    // as well, and one whose module loaded checks its own syntax: its tokens
+    // are shielded and checked here only when its module is not.
+    const tokens = faSuggestTokens(prof && prof.tokens);
+    const shield = (t) => tokens.wrap(t, !!(mod && mod.remarkFirst));
+    const syntaxErrors = (t) => tokens.errors(t, !!mod);
     const wrapped = shield(body);
     let katex = null, lib = null, visualBase = null;
-    // The visual surface: Crepe, with the profile's latex settings, node views
+    // The visual surface: Crepe, with the profile's feature settings, node views
     // and first remark transformer, the toolbar's commands and the change
     // marks. Its base is Crepe's round-trip of the SOURCE, kept across a
     // switch to raw and back, so escapes Crepe adds are not counted as the
@@ -736,7 +781,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       // The dialog's own toolbar replaces Crepe's selection toolbar, and
       // Crepe's block handle (the wide left gutter) is not used here.
       const opts = { root: box, defaultValue: text, features: { [Crepe.Feature.Toolbar]: false, [Crepe.Feature.BlockEdit]: false } };
-      if (mod && typeof mod.latexConfig === "function") opts.featureConfigs = { [Crepe.Feature.Latex]: mod.latexConfig(km) };
+      if (mod && typeof mod.featureConfigs === "function") opts.featureConfigs = mod.featureConfigs(Crepe.Feature, km);
       const crepe = new Crepe(opts);
       let baseBlocks = null;
       const marks = lib.Plugin && lib.DecorationSet ? changeMarks(lib, () => baseBlocks) : null;
@@ -781,7 +826,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         link: () => { const href = window.prompt("Link address"); if (href) run(lib.toggleLinkCommand, { href: href }); },
       };
     };
-    // The raw surface: the block's Markdown as it is, LaTeX and all; the toolbar types Markdown.
+    // The raw surface: the block's Markdown exactly as it is; the toolbar types Markdown.
     const rawSurface = (text) => {
       const ta = el("textarea", { value: text });
       ta.setAttribute("aria-label", "The block's Markdown");
@@ -808,7 +853,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       toolbar.append(b);
     }
     toolbar.append(el("span", { className: "fa-sg-note", textContent: "No underline: underlined text means added." }), mode);
-    const rawFirst = !!(prof && prof.rawLatexFirstFor && prof.rawLatexFirstFor.indexOf(kind) >= 0);
+    const rawFirst = !!(prof && prof.rawFirstFor && prof.rawFirstFor.indexOf(kind) >= 0);
     const show = () => {
       visualBtn.setAttribute("aria-pressed", String(surface.name === "visual"));
       rawBtn.setAttribute("aria-pressed", String(surface.name === "raw"));
@@ -821,7 +866,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       notes.push("The visual editor did not load (" + e.message + "); editing the Markdown directly.");
     }
     show();
-    const describe = () => (surface.name === "raw" ? "Editing the raw Markdown" + (mod ? " and LaTeX" : "") + "." : wrapped === body ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.");
+    const describe = () => (surface.name === "raw" ? "Editing the raw Markdown." : wrapped === body ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.");
     status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
     const switchTo = async (next) => {
       if (surface.name === next) return;
@@ -852,7 +897,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         items.push(li);
       } else if (text !== surface.base) items.push(el("li", { textContent: "Changed. Switch to Visual to see the changes marked." }));
       for (const k of variablesIn(text)) { const v = valueOf(k); items.push(el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) })); }
-      for (const b of syntaxErrors(text, !mod)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
+      for (const b of syntaxErrors(text)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
       for (const f of findings(text)) items.push(findingItem(f));
       vars.replaceChildren(...items);
     };
@@ -862,7 +907,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     send.onclick = async () => {
       const now = surface.get();
       if (now === surface.base) { status.textContent = "Nothing has changed yet."; return; }
-      const errs = syntaxErrors(now, !mod).concat(findings(now).filter((f) => f.severity === "error").map((f) => f.message));
+      const errs = syntaxErrors(now).concat(findings(now).filter((f) => f.severity === "error").map((f) => f.message));
       if (errs.length) { status.textContent = "Fix the syntax first: " + errs.map((e) => e.slice(0, 60)).join(" \\u00b7 "); return; }
       const how = surface.name === "raw" ? "in the raw editor" : "in the visual editor (the diff is against the editor's rendering of the source)";
       const issue = facts.concat(["", "**Suggested change**, made " + how + ":", "", "\\u0060\\u0060\\u0060diff", lineDiff(surface.base, now), "\\u0060\\u0060\\u0060", "", "**Why:**", reason(), ""]).join("\\n");
