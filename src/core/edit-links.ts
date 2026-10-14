@@ -81,8 +81,25 @@ export interface BlockActionsConfig {
    * editor shows each variable's current value from it.
    */
   values?: string;
-  /** Where the ✍ suggest editor loads Milkdown Crepe from, when not the pinned CDN copy (tests, an offline mirror). */
-  suggest?: { lib?: string; module?: string };
+  /**
+   * The page's KG (`<slug>/graph.jsonld`), relative to the page or absolute:
+   * the labels and bibliography keys a profile's checker warns against.
+   */
+  graph?: string;
+  /**
+   * The ✍ suggest editor. `lib`/`module`/`katex`: where Milkdown Crepe and
+   * KaTeX load from, when not the pinned CDN copies (tests, an offline
+   * mirror). `profiles`: the editor-checker bundles for this page's blocks
+   * (`bundleEditorProfiles` in `pipeline/editor-profiles.ts`), and
+   * `katexMacros` the page's KaTeX macro table they are handed.
+   */
+  suggest?: {
+    lib?: string;
+    module?: string;
+    katex?: string;
+    katexMacros?: Record<string, string>;
+    profiles?: Array<{ id: string; module: string; kinds?: string[]; rawLatexFirstFor?: string[] }>;
+  };
 }
 
 export const DEFAULT_TEMPLATE = "block-feedback.yml";
@@ -267,6 +284,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // is written as HTML.
   const SUGGEST_LIB = "https://cdn.jsdelivr.net/npm/@milkdown/crepe@7.22.2";
   const SUGGEST_KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.18.10/dist/katex.min.css";
+  const SUGGEST_KATEX = "https://cdn.jsdelivr.net/npm/katex@0.18.10/+esm";
   const TOKENISH = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?|\\\\[A-Za-z]+\\{[^}\\n]*\\}/g;
   // Variables, directives and LaTeX references stay the reader's to change,
   // add or delete. They are wrapped in \\u27e6 \\u27e7 only so the editor's
@@ -274,16 +292,19 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // checked is that each one is still well-formed, nothing more (owner,
   // 2026-10-14: "I only want that the syntax is valid").
   const wrap = (md) => md.replace(TOKENISH, (m) => "\\u27e6" + m + "\\u27e7");
+  // The same, less the LaTeX references: for a profile that keeps LaTeX verbatim itself.
+  const TOKENS_NO_LATEX = /\\{\\{[\\s\\S]*?\\}\\}|\\{%[\\s\\S]*?%\\}|:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^}\\n]*\\})?/g;
   const unwrap = (md) => md.replace(/\\u27e6([^\\u27e6\\u27e7]*)\\u27e7/g, (m, inner) => inner.replace(/\\\\([!-\\/:-@\\[-\\u0060{-~])/g, "$1"));
   const LIQUID = /^\\{\\{\\s*[A-Za-z_][\\w-]*(?:\\.[\\w-]+|\\[\\d+\\])*\\s*(?:\\|\\s*[A-Za-z_]\\w*(?:\\s*:\\s*[^|{}]+?)?\\s*)*\\}\\}$/;
   const TAG = /^\\{%\\s*[A-Za-z_]\\w*[^%]*%\\}$/;
   const DIRECTIVE = /^:{1,2}[A-Za-z][\\w-]*\\[[^\\]\\n]*\\](?:\\{[^{}\\n]*\\})?$/;
   const LATEXREF = /^\\\\[A-Za-z]+\\{[^{}\\n]+\\}$/;
-  const syntaxErrors = (md) => {
+  // latex === false: a profile's own checker reads the LaTeX, so this coarse check does not.
+  const syntaxErrors = (md, latex) => {
     const bad = [];
     for (const m of md.matchAll(/\\{\\{[\\s\\S]*?(?:\\}\\}|$)|\\{%[\\s\\S]*?(?:%\\}|$)/g)) if (!LIQUID.test(m[0]) && !TAG.test(m[0])) bad.push(m[0]);
     for (const m of md.matchAll(/:{1,2}[A-Za-z][\\w-]*\\[[^\\n]*?(?:\\](?:\\{[^\\n]*?\\})?|$)/gm)) if (!DIRECTIVE.test(m[0])) bad.push(m[0]);
-    for (const m of md.matchAll(/\\\\(?:cite|ref|eqref|autoref|cref)\\b[^\\s]*/g)) if (!LATEXREF.test(m[0].replace(/[.,;:)]+$/, ""))) bad.push(m[0]);
+    if (latex !== false) for (const m of md.matchAll(/\\\\(?:cite|ref|eqref|autoref|cref)\\b[^\\s]*/g)) if (!LATEXREF.test(m[0].replace(/[.,;:)]+$/, ""))) bad.push(m[0]);
     return bad;
   };
   // Variable names and, when the site published them, their current values.
@@ -314,6 +335,30 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     return null;
   };
   const el = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); for (const k of kids || []) e.append(k); return e; };
+  // A block's YAML front matter is not the reader's to edit: Crepe would turn
+  // it into a thematic break and a setext heading. It is kept aside, unchanged.
+  const FRONT_MATTER = /^---\\n[\\s\\S]*?\\n---\\n/;
+  // The KG labels and bibliography keys a profile's checker warns against, read once from the page's graph.
+  let kgRefs;
+  const kgReferences = async (c) => {
+    if (kgRefs !== undefined) return kgRefs;
+    kgRefs = null;
+    const g = c.graph ? await fetch(c.graph).then((r) => (r.ok ? r.json() : null)).catch(() => null) : null;
+    const nodes = g && (g["@graph"] || g);
+    if (!Array.isArray(nodes)) return kgRefs;
+    const labels = [], keys = [];
+    for (const n of nodes) {
+      if (n && typeof n.label === "string" && n.label) labels.push(n.label);
+      const m = n && typeof n["@id"] === "string" ? /(?:^|\\/)references\\/([^/#?]+)$/.exec(n["@id"]) : null;
+      if (m) keys.push(decodeURIComponent(m[1]));
+    }
+    // A graph with no reference nodes says nothing about citations: that check is skipped, not failed.
+    kgRefs = keys.length ? { labels: labels, citeKeys: keys } : { labels: labels };
+    return kgRefs;
+  };
+  // A profile (an editor-checker node the site bundled, e.g. folio-assistant-sci's
+  // paper-latex) for the block's kind: its checker, and its Crepe settings.
+  const profileFor = (c, kind) => ((c.suggest && c.suggest.profiles) || []).find((p) => p && p.module && (!p.kinds || p.kinds.indexOf(kind) >= 0));
   const suggest = async (a) => {
     const s = sourceOf(a), c = config();
     if (!s || !/\\.md$/.test(s.src)) return;
@@ -322,23 +367,27 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const host = el("div", { className: "fa-suggest-editor" });
     const send = el("button", { type: "button", textContent: "Submit as an issue", disabled: true });
     const close = el("button", { type: "button", textContent: "Cancel" });
+    const toggle = el("button", { type: "button", hidden: true });
     const vars = el("ul", { className: "fa-suggest-vars" });
-    const dlg = el("dialog", { className: "fa-suggest" }, [el("h2", { textContent: "Suggest a change: " + s.label }), status, host, vars, el("p", {}, [send, " ", close])]);
-    close.onclick = () => { dlg.close(); dlg.remove(); };
+    const dlg = el("dialog", { className: "fa-suggest" }, [el("h2", { textContent: "Suggest a change: " + s.label }), status, host, vars, el("p", {}, [send, " ", toggle, " ", close])]);
+    let surface = null;
+    close.onclick = () => { if (surface) surface.destroy(); dlg.close(); dlg.remove(); };
     if (!document.getElementById("fa-suggest-css"))
-      document.head.append(el("style", { id: "fa-suggest-css", textContent: "dialog.fa-suggest{width:min(60rem,95vw);max-height:90vh;overflow:auto;padding:1rem 1.25rem}dialog.fa-suggest h2{font-size:1.1rem;margin:0 0 .5rem}.fa-suggest-status{color:#5b6770;font-size:.9rem}.fa-suggest-editor{border:1px solid #d6dde2;min-height:12rem;margin:.5rem 0}.fa-suggest-vars{font-size:.85rem;color:#5b6770;margin:.25rem 0;padding-left:1.2rem}.fa-suggest-vars .bad{color:#b3261e}" }));
+      document.head.append(el("style", { id: "fa-suggest-css", textContent: "dialog.fa-suggest{width:min(60rem,95vw);max-height:90vh;overflow:auto;padding:1rem 1.25rem}dialog.fa-suggest h2{font-size:1.1rem;margin:0 0 .5rem}.fa-suggest-status{color:#5b6770;font-size:.9rem}.fa-suggest-editor{border:1px solid #d6dde2;min-height:12rem;margin:.5rem 0}.fa-suggest-editor textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:.9rem;border:0;padding:.5rem}.fa-suggest-vars{font-size:.85rem;color:#5b6770;margin:.25rem 0;padding-left:1.2rem}.fa-suggest-vars .bad{color:#b3261e}.fa-suggest-vars .warn{color:#8a5a00}" }));
     document.body.append(dlg);
     dlg.showModal();
-    let path = s.src, original;
+    let path = s.src, original, kind = String(s.label).split(":")[0];
     try {
-      // The KG node names the block's text; a page without one falls back to the source.
+      // The KG node names the block's text and its kind; a page without one falls back to the source.
       const node = await fetch(raw(repo, branch, s.src.replace(/\\.md$/, ".jsonld"))).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (node && typeof node.text === "string") path = s.src.replace(/[^/]*$/, "") + node.text;
+      if (node && typeof node.kind === "string") kind = node.kind;
       const r = await fetch(raw(repo, branch, path));
       if (!r.ok) throw new Error(r.status + " reading " + path);
       original = await r.text();
     } catch (e) { status.textContent = "Could not load the block: " + e.message; return; }
-    const wrapped = wrap(original);
+    const fm = FRONT_MATTER.exec(original);
+    const head = fm ? fm[0] : "", body = original.slice(head.length);
     // The site's variable values, as KG nodes (values.jsonld), when it publishes them.
     const values = c.values ? await fetch(c.values).then((r) => (r.ok ? r.json() : null)).catch(() => null) : null;
     const valueOf = (key) => {
@@ -346,48 +395,117 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const n = Array.isArray(nodes) ? nodes.find((x) => x.key === key) : null;
       return n ? String(n.formatted !== undefined ? n.formatted : n.value) : undefined;
     };
-    let get, base;
-    try {
+    // The block's profile, when the site declares one for its kind. A profile
+    // that fails to load leaves the generic editor and its generic checks.
+    const prof = profileFor(c, kind);
+    let mod = null, notes = [];
+    if (prof) {
+      try { mod = await import(new URL(prof.module, location.href).href); }
+      catch (e) { notes.push("The " + (prof.id || "profile") + " checks did not load (" + e.message + ")."); }
+    }
+    const km = (c.suggest && c.suggest.katexMacros) || {};
+    const macros = mod && typeof mod.macros === "function" ? mod.macros(km) : undefined;
+    const kg = mod && typeof mod.check === "function" ? await kgReferences(c) : null;
+    // A profile that keeps LaTeX verbatim itself (remarkFirst) must not have it wrapped in \\u27e6 \\u27e7 as well.
+    const latexOwned = !!(mod && mod.remarkFirst);
+    const wrapped = latexOwned ? body.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(body);
+    let katex = null;
+    // The visual surface: Crepe, with the profile's latex settings, node views
+    // and first remark transformer. Its base is Crepe's round-trip of the
+    // source, so escapes Crepe adds are not counted as the reader's change.
+    const visual = async (text) => {
       const lib = (c.suggest && c.suggest.lib) || SUGGEST_LIB;
       // The theme's own @import of KaTeX names a package, which a CDN cannot resolve: named here.
       for (const href of [lib + "/lib/theme/common/style.css", lib + "/lib/theme/frame/style.css", SUGGEST_KATEX_CSS])
         if (!document.querySelector('link[href="' + href + '"]')) document.head.append(el("link", { rel: "stylesheet", href: href }));
       const { Crepe } = await import((c.suggest && c.suggest.module) || lib + "/+esm");
-      const crepe = new Crepe({ root: host, defaultValue: wrapped });
+      if (mod && mod.nodeViews && !katex) katex = (await import((c.suggest && c.suggest.katex) || SUGGEST_KATEX)).default;
+      const box = el("div");
+      host.replaceChildren(box);
+      const opts = { root: box, defaultValue: text };
+      if (mod && typeof mod.latexConfig === "function") opts.featureConfigs = { [Crepe.Feature.Latex]: mod.latexConfig(km) };
+      const crepe = new Crepe(opts);
+      if (mod && (mod.remarkFirst || mod.nodeViews))
+        // Milkdown's own InitReady timer, found in the schema's wait list so no
+        // second copy of @milkdown/core is imported: after it, before the schema
+        // builds the parser, is when a remark plugin can still go first.
+        crepe.editor.use((ctx) => {
+          const init = (ctx.get("schemaTimer") || []).find((t) => t && t.name === "InitReady");
+          return async () => {
+            if (init) await ctx.wait(init);
+            if (typeof mod.remarkFirst === "function") ctx.update("remarkPlugins", mod.remarkFirst(macros));
+            if (mod.nodeViews && katex) ctx.update("nodeView", (v) => v.concat(Object.keys(mod.nodeViews).map((n) => [n, mod.nodeViews[n](katex, km)])));
+          };
+        });
       await crepe.create();
-      get = () => crepe.getMarkdown();
-      status.textContent = wrapped === original ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.";
+      const get = () => unwrap(crepe.getMarkdown());
+      return { name: "visual", get: get, base: get(), destroy: () => { try { crepe.destroy(); } catch (e) {} } };
+    };
+    // The raw surface: the block's Markdown as it is, LaTeX and all.
+    const rawSurface = (text) => {
+      const ta = el("textarea", { value: text, rows: 18 });
+      host.replaceChildren(ta);
+      return { name: "raw", get: () => ta.value, base: body, destroy: () => {} };
+    };
+    const rawFirst = !!(prof && prof.rawLatexFirstFor && prof.rawLatexFirstFor.indexOf(kind) >= 0);
+    try {
+      surface = rawFirst ? rawSurface(body) : await visual(wrapped);
     } catch (e) {
       // No editor (offline, blocked CDN): the same flow over plain Markdown.
-      const ta = el("textarea", { value: wrapped, rows: 16, style: "width:100%" });
-      host.append(ta);
-      get = () => ta.value;
-      status.textContent = "The visual editor did not load (" + e.message + "); editing the Markdown directly.";
+      surface = rawSurface(body);
+      notes.push("The visual editor did not load (" + e.message + "); editing the Markdown directly.");
     }
-    base = get();
-    // Live: each variable and its current value, and any item whose syntax is broken.
+    const describe = () => {
+      if (surface.name === "raw") return "Editing the raw Markdown" + (mod ? " and LaTeX" : "") + ".";
+      return wrapped === body ? "" : "Variables, glossary terms and references are shown in \\u27e6 \\u27e7: change, add or delete them freely; their syntax is checked when you submit.";
+    };
+    status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
+    // Both surfaces when a profile serves the block (owner, 2026-10-14: "both").
+    if (prof && mod) {
+      toggle.hidden = false;
+      const label = () => { toggle.textContent = surface.name === "raw" ? "Edit visually" : "Edit as raw text"; };
+      label();
+      toggle.onclick = async () => {
+        const text = surface.get();
+        const next = surface.name === "raw" ? "visual" : "raw";
+        surface.destroy();
+        try { surface = next === "raw" ? rawSurface(text) : await visual(latexOwned ? text.replace(TOKENS_NO_LATEX, (m) => "\\u27e6" + m + "\\u27e7") : wrap(text)); }
+        catch (e) { surface = rawSurface(text); notes.push("The visual editor did not load (" + e.message + ")."); }
+        label();
+        status.textContent = notes.concat([describe()]).filter(Boolean).join(" ");
+      };
+    }
+    // What the profile's checker says the edit introduces: errors block, warnings do not.
+    const findings = (text) => {
+      if (!mod || typeof mod.check !== "function" || text === surface.base) return [];
+      try { return mod.check(surface.base, text, { macros: macros, kg: kg || undefined }) || []; }
+      catch (e) { return [{ severity: "warning", message: "the checker failed: " + e.message, line: 0 }]; }
+    };
+    // Live: each variable and its current value, any item whose syntax is broken, and the profile's findings.
     const refresh = () => {
       if (!dlg.isConnected) return clearInterval(timer);
-      const text = unwrap(get());
+      const text = surface.get();
       const items = variablesIn(text).map((k) => { const v = valueOf(k); return el("li", { textContent: k + (v === undefined ? (values ? " \\u2014 not a published variable" : " \\u2014 value not published") : " = " + v) }); });
-      for (const b of syntaxErrors(text)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
+      for (const b of syntaxErrors(text, !mod)) items.push(el("li", { className: "bad", textContent: "Not well-formed: " + b.slice(0, 80) }));
+      for (const f of findings(text)) items.push(el("li", { className: f.severity === "error" ? "bad" : "warn", textContent: (f.severity === "error" ? "Error" : "Warning") + (f.line ? " (line " + f.line + ")" : "") + ": " + f.message }));
       vars.replaceChildren(...items);
     };
     const timer = setInterval(refresh, 800);
     refresh();
     send.disabled = false;
     send.onclick = async () => {
-      const now = get();
-      if (now === base) { status.textContent = "Nothing has changed yet."; return; }
-      const errs = syntaxErrors(unwrap(now));
+      const now = surface.get();
+      if (now === surface.base) { status.textContent = "Nothing has changed yet."; return; }
+      const errs = syntaxErrors(now, !mod).concat(findings(now).filter((f) => f.severity === "error").map((f) => f.message));
       if (errs.length) { status.textContent = "Fix the syntax first: " + errs.map((e) => e.slice(0, 60)).join(" \\u00b7 "); return; }
       const facts = ["**Block:** \\u0060" + s.label + "\\u0060", "**Source:** https://github.com/" + repo + "/blob/" + branch + "/" + path, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(s.label)];
-      const body = facts.concat(["", "**Suggested change**, made in the visual editor (the diff is against the editor's rendering of the source):", "", "\\u0060\\u0060\\u0060diff", lineDiff(unwrap(base), unwrap(now)), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
-      const q = new URLSearchParams({ title: "Suggested edit: " + s.label, body: body });
+      const how = surface.name === "raw" ? "in the raw editor" : "in the visual editor (the diff is against the editor's rendering of the source)";
+      const issue = facts.concat(["", "**Suggested change**, made " + how + ":", "", "\\u0060\\u0060\\u0060diff", lineDiff(surface.base, now), "\\u0060\\u0060\\u0060", "", "**Why:**", ""]).join("\\n");
+      const q = new URLSearchParams({ title: "Suggested edit: " + s.label, body: issue });
       let url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + q;
       // GitHub refuses very long URLs: carry the body on the clipboard instead.
       if (url.length > 7000) {
-        try { await navigator.clipboard.writeText(body); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
+        try { await navigator.clipboard.writeText(issue); } catch (e) { status.textContent = "Too long for a link, and the clipboard is blocked."; return; }
         url = "https://github.com/" + (c.repo || repo) + "/issues/new?" + new URLSearchParams({ title: "Suggested edit: " + s.label, body: "The suggested change is on the clipboard: paste it here." });
       }
       window.open(url, "_blank", "noopener");
