@@ -235,11 +235,23 @@ export type SiteProfile = "folio" | "ig-repo-site";
  * An IG repository's own site (`folio-site.yml`) never ran the folio's landing data, instance
  * mounts, PDF viewer, `lang` pass or identifier lookup: run there, `mount-instance-docs` laid
  * seven other instances' directories at an IG's root (smart-trust, measured 2026-10-14).
+ *
+ * `own-chrome`: the shell carries the chrome of the checkout root's OWN docs layers as well as
+ * the platform's. `folio-site.yml` composed the shell in a folio-assistant checkout, which
+ * declares no root docs layer, so an IG's shell never carried its own; run from the IG's
+ * checkout it did, and the IG's `docs/assets/` arrived twice — once in the shell, once from
+ * `stage-ig-sites`, which builds `docs/` into the IG site and refuses a path the host already
+ * holds (smart-trust, 2026-10-14). `stage-ig-sites` owns that directory.
  */
 export const PROFILE_STEPS: Record<SiteProfile, ReadonlySet<string>> = {
-  folio: new Set(["sync", "landing", "mount", "pdf", "lang", "lookup"]),
+  folio: new Set(["sync", "landing", "mount", "pdf", "lang", "lookup", "own-chrome"]),
   "ig-repo-site": new Set(),
 };
+
+/** The chrome step's `compose-docs` flags for a profile: always a shell, platform-only unless the profile carries its own chrome. */
+export function shellFlags(profile: SiteProfile = "folio"): string {
+  return PROFILE_STEPS[profile].has("own-chrome") ? "--shell" : "--shell --platform-only";
+}
 
 /** A root entry a recipe may keep: one plain path segment. */
 export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
@@ -610,7 +622,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
     if (has.has("landing")) run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
     const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
-    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
+    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} ${shellFlags(o.profile)} ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
     for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${JSON.stringify(docs)}`, root, env);

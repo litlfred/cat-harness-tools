@@ -591,6 +591,40 @@ describe("carriedInstances with the staging cone (bean 4j86)", () => {
   });
 });
 
+// smart-trust, 2026-10-14: an IG repository builds its own site from its own
+// checkout, where the root declares the IG's docs/ — which stage-ig-sites builds
+// into the IG site. A platform-only shell leaves that layer to it.
+describe("--shell --platform-only: the platform's chrome, not the checkout's own", () => {
+  test("a repository-scoped layer's assets are left out, and said to be", () => {
+    const root = fixture(
+      { "_config.yml": "title: base\n", "assets/base.css": "b", "index.md": "base" },
+      { "assets/ig-pages.css": "ig", "artifact/X.html": "page" },
+    );
+    try {
+      const whole = compose(out(root), root, { shell: true });
+      expect(Object.keys(whole.suppliedBy)).toContain("assets/ig-pages.css");
+      expect(whole.leftOut).toBeUndefined();
+
+      const r = compose(out(root), root, { shell: true, platformOnly: true });
+      expect(r.layers.map((l) => l.id)).toEqual(["docs"]);
+      expect(r.leftOut?.map((l) => l.id)).toEqual(["root-docs"]);
+      expect(Object.keys(r.suppliedBy).sort()).toEqual(["_config.yml", "assets/base.css"]);
+      expect(existsSync(join(out(root), "assets", "ig-pages.css"))).toBe(false);
+      expect(r.added).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test("it is a shell's option: asked of a whole-site compose, it is refused", () => {
+    const root = fixture({ "index.md": "base" }, {});
+    try {
+      expect(() => compose(out(root), root, { platformOnly: true })).toThrow(/needs --shell/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 // #2235 F1: an IG repository's own site is built inside the main site's CHROME.
 describe("--shell: the chrome only", () => {
   test("isChrome is the Jekyll machinery and assets, nothing else", () => {
