@@ -54,8 +54,14 @@ export const FOLIO_WORKFLOW = "folio-staging.yml";
 export const IG_WORKFLOWS = ["fhirbuild.yml", "ghbuild.yml"] as const;
 /** Where an IG workflow with no deploy step finds its Pages build: the sibling beside it. */
 export const PAGES_SIBLING = "ghbuild.yml";
-/** What marks a publish root as a folio's: `publish-main`'s manifest, the previews, the render log. */
-export const FOLIO_ROOT_MARKERS = ["_main-site.json", "STAGING", "_render-log"] as const;
+/**
+ * What marks a publish root as a folio's: `publish-main`'s manifest, the
+ * previews, the render log, and `folio-build.json`, the stamp every folio site
+ * build writes (`site-build-stamp.ts`). The stamp is the one a root deployed by
+ * an IG repository's `folio-site.yml` carries (smart-trust, smart-immunizations);
+ * without it a root IG deploy would replace that site with bare Publisher output.
+ */
+export const FOLIO_ROOT_MARKERS = ["_main-site.json", "STAGING", "_render-log", "folio-build.json"] as const;
 /**
  * Paths `JamesIves/github-pages-deploy-action@v4` never deletes under
  * `clean`, whatever `clean-exclude` says: the action's own built-in excludes.

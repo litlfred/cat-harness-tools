@@ -299,6 +299,16 @@ describe("stage-local: an IG lands where its workflow's deploy step puts it", ()
     expect(() => applyIgDeploy(pages, out, igTarget(deploys, { isDefault: true, branchDir: "main", sha: "a", runUrl: "u" }), () => {})).toThrow(/folio's site/);
     expect(existsSync(join(pages, "STAGING/x/index.html"))).toBe(true);
   });
+
+  test("so is one over the folio site an IG repository's folio-site.yml deployed, known by its build stamp", () => {
+    const pages = tmp("stage-local-ig-pages-");
+    put(pages, "index.html", "<title>WHO SMART Trust | folio-assistant</title>");
+    put(pages, "folio-build.json", "{}");
+    const out = tmp("stage-local-ig-out-");
+    put(out, "index.html");
+    expect(() => applyIgDeploy(pages, out, igTarget(deploys, { isDefault: true, branchDir: "main", sha: "a", runUrl: "u" }), () => {})).toThrow(/folio-build\.json/);
+    expect(existsSync(join(pages, "folio-build.json"))).toBe(true);
+  });
 });
 
 describe("stage-local: the IG build is the workflow's own steps, planned", () => {
