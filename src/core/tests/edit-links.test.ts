@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { BLOCK_URLS_JS, editLinkHtml, editLinksAsset, editUrl, feedbackUrl, sourceUrl } from "../edit-links.js";
+import { BLOCK_URLS_JS, SUGGEST_TOKENS_JS, editLinkHtml, editLinksAsset, editUrl, feedbackUrl, sourceUrl } from "../edit-links.js";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 
 describe("edit-links: one recipe for every page's edit and feedback links (bean v433)", () => {
@@ -33,4 +33,28 @@ describe("edit-links: one recipe for every page's edit and feedback links (bean 
     expect(html).toContain('href="https://github.com/o/r/edit/main/docs/a%20b.md"');
     expect(editLinkHtml({ repo: "o/r" }, { source: "x.md", kind: "feedback" })).not.toContain("href=");
   });
+
+  type Tokens = { wrap: (md: string, ownOnly?: boolean) => string; errors: (md: string, ownOnly?: boolean) => string[] };
+  const tokensOf = new Function(`${SUGGEST_TOKENS_JS}; return faSuggestTokens;`)() as (rules?: unknown[]) => Tokens;
+
+  test("the suggest editor's own tokens are Liquid and directives, and no content type's", () => {
+    const t = tokensOf();
+    const md = "A {{ x.y }} and :term[DPI]{#dpi} and \\name{a} and @cite{b}.";
+    expect(t.wrap(md)).toBe("A ⟦{{ x.y }}⟧ and ⟦:term[DPI]{#dpi}⟧ and \\name{a} and @cite{b}.");
+    expect(t.errors("{{ x | }} and :term[open")).toEqual(["{{ x | }}", ":term[open"]);
+    expect(t.errors("\\name{a b and @cite{")).toEqual([]);
+  });
+
+  test("a profile's token rules, serialised as the page config carries them, are shielded and checked", () => {
+    // What pipeline/editor-profiles.ts writes for a rule: each pattern as String(RegExp).
+    const rule = { id: "at-ref", shield: String(/@[a-z]+\{[^}\n]*\}/), find: String(/@[a-z]+\S*/g), valid: String(/^@[a-z]+\{[^{}\n]+\}$/), trim: String(/[.,;:)]+$/) };
+    const t = tokensOf([rule]);
+    expect(t.wrap("See @cite{b} and {{ v }}.")).toBe("See ⟦@cite{b}⟧ and ⟦{{ v }}⟧.");
+    expect(t.errors("See @cite{b}, and @ref{c}).")).toEqual([]);
+    expect(t.errors("See @cite{b and @ref.")).toEqual(["@cite{b", "@ref."]);
+    // ownOnly: the profile's module keeps or checks its own syntax itself.
+    expect(t.wrap("See @cite{b}.", true)).toBe("See @cite{b}.");
+    expect(t.errors("See @cite{b", true)).toEqual([]);
+  });
 });
+
