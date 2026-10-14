@@ -79,10 +79,10 @@ on:
         type: string
         default: "."
       layers-at-main:
-        description: "Lower layers taken at main instead of the lock (the caller is never replaced)."
+        description: "Lower layers taken at main instead of the lock (the caller is never replaced). 'auto': the instance's @litlfred/* dependencies, which it imports by package name and whose main it tracks."
         required: false
         type: string
-        default: "cat-harness cat-harness-tools"
+        default: "auto"
       state-graphs:
         description: "Branch-kept graphs to mount before tests and gates; each must come back mounted."
         required: false
@@ -151,23 +151,43 @@ jobs:
           done
           echo "::error::no mount-from-lock replayer at the cat-harness-tools or cat-harness commit fa/index.lock.json pins"
           exit 2
+      - name: Check out the PR
+        if: inputs.mode == 'layer'
+        uses: actions/checkout@v4
+        with:
+          path: src
       - &lower-layers-main
         name: Take the lower layers at main
         env:
           LAYERS: ${{ inputs.layers-at-main }}
           INSTANCE: ${{ inputs.instance }}
+          MODE: ${{ inputs.mode }}
+          SUBDIR: ${{ inputs.path-in-repo }}
         run: |
+          set -euo pipefail
+          if [ "$LAYERS" = "auto" ]; then
+            # The PR's own package.json in layer mode: its imports are what
+            # it is judged against, and the locked copy may predate them.
+            pkg="fa/package.json"
+            [ "$MODE" = "layer" ] && pkg="src/${SUBDIR:-.}/package.json"
+            LAYERS="$(python3 - "$pkg" <<'PY'
+          import json, sys
+          try:
+              p = json.load(open(sys.argv[1]))
+          except FileNotFoundError:
+              p = {}
+          deps = {**p.get("dependencies", {}), **p.get("devDependencies", {}), **p.get("peerDependencies", {})}
+          print(" ".join(sorted(d.split("/", 1)[1] for d in deps if d.startswith("@litlfred/"))))
+          PY
+          )"
+            echo "lower layers at main (from @litlfred/* dependencies): ${LAYERS:-none}"
+          fi
           for r in $LAYERS; do
             [ "$r" = "$INSTANCE" ] && continue
             rm -rf "fa/$r"
             git clone -q --depth 1 "https://github.com/litlfred/$r" "fa/$r"
             rm -rf "fa/$r/.git"
           done
-      - name: Check out the PR
-        if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
-        with:
-          path: src
       - &swap
         # A directory holding its own `.git` inside the index checkout is a
         # FOREIGN checkout to `instanceRootsIn`, so it would not be discovered
@@ -205,13 +225,13 @@ jobs:
       - *checkout-index
       - *setup-bun
       - *mount
-      - *lower-layers-main
       - name: Check out the caller (base or head)
         if: inputs.mode == 'layer'
         uses: actions/checkout@v4
         with:
           path: src
           ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || github.event.repository.default_branch) || '' }}
+      - *lower-layers-main
       - name: The judging scripts, the same on both sides
         uses: actions/checkout@v4
         with:
@@ -221,25 +241,27 @@ jobs:
           sparse-checkout: .github/scripts/layer-pr-checks
       - *swap
       - *install
-      - name: Mount the graphs kept on branches
-        # Tests and gates read them and refuse an unmounted copy; each must
-        # come back `mounted`.
+      - name: Mount every graph kept on a branch, and build the IG pages
+        # Every branch-kept graph the declarations name (beans, todos,
+        # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
+        # mounts them with `state:mount`, but through `mountState` directly:
+        # `state:mount` also re-lays the remote mounts against the lock, which
+        # would refuse the swapped-in caller. Then the IG instances' pages,
+        # which are built rather than committed (bean hupw); several gates
+        # read them (owner's session 01Pc8v, 2026-10-14: declaration-resolution
+        # was red only because neither was done).
         working-directory: fa
-        env:
-          GRAPHS: ${{ inputs.state-graphs }}
         run: |
-          for id in $GRAPHS; do
-            bun cat-harness-tools/scripts/state-mount.ts --id "$id" --json > "$RUNNER_TEMP/mount-$id.json"
-            python3 - "$RUNNER_TEMP/mount-$id.json" "$id" <<'PY'
-          import json, sys
-          d = json.load(open(sys.argv[1]))
-          bad = [g for g in d.get("graphs", []) if g.get("state") != "mounted"]
-          if d.get("state") != "mounted" or bad or not d.get("graphs"):
-              print(f"::error::{sys.argv[2]} did not mount: {json.dumps(d)}")
-              sys.exit(1)
-          print(f"{sys.argv[2]}: mounted")
-          PY
-          done
+          set -euo pipefail
+          bun -e '
+            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+            const r = mountState({});
+            console.log(report(r));
+            process.exit(r.state === "failed" || r.state === "partial" ? 1 : 0);
+          '
+          if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
+            bun run cat smart:pages
+          fi
       - name: bun test
         working-directory: fa
         # Judged by the compare job, not by this exit code.
