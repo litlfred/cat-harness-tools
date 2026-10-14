@@ -87,7 +87,8 @@ import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { writeAllSync } from "./lib/write-all-sync.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { corpusPredicate } from "@litlfred/cat-harness/schemas/git-corpus.ts";
@@ -3203,8 +3204,11 @@ if (orphans.length > 0) {
 if (asJson) {
   // Written synchronously: the judge below ends in `process.exit`, and a
   // multi-megabyte `console.log` to a PIPE is not flushed by then — the
-  // callers that parse this saw a truncated array (bean `oqe3`).
-  writeSync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
+  // callers that parse this saw a truncated array (bean `oqe3`). And written
+  // in FULL: one `writeSync` is one write(2), which a pipe takes 64 KiB of, so
+  // the report still arrived cut at 65,536 bytes until every byte was retried
+  // out (`writeAllSync`).
+  writeAllSync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
 } else {
   const rank: Record<KgSeverity, number> = { minor: 1, major: 2, critical: 3 };
   const counts: Record<KgResult, number> = { pass: 0, fail: 0, "n/a": 0, unknown: 0 };

@@ -54,7 +54,10 @@ describe("the profile partition", () => {
       // `figure` joined the document profile with bean `d5f1` (2026-09-20): an
       // image extracted from a source document asserts nothing formal, so it
       // belongs here rather than in the math set. Reviewed, not inherited.
-      ["algorithm", "diagram", "equation", "example", "figure", "prose", "remark", "simulator", "table"],
+      // `recommendation` joined with bean `55ao` (2026-10-10): core's kind for a
+      // normative statement, which a document folio carries instead of a
+      // `theorem`. It asserts nothing formal, so it is a document kind.
+      ["algorithm", "diagram", "equation", "example", "figure", "prose", "recommendation", "remark", "simulator", "table"],
     );
     expect([...(MATH_BLOCK_KINDS as readonly string[])].sort()).toEqual(
       ["conjecture", "corollary", "definition", "lemma", "proof", "proposition", "theorem"],
@@ -103,7 +106,10 @@ describe("profileAcceptsKind", () => {
 
   test("an unknown kind is admitted by no profile", () => {
     for (const p of CONTENT_PROFILES) {
-      expect(profileAcceptsKind(p, "recommendation")).toBe(false);
+      // Was "recommendation" until bean `55ao` made that a real document kind;
+      // the probe must be a name no layer declares, or this test asserts the
+      // opposite of a fact.
+      expect(profileAcceptsKind(p, "not-a-block-kind")).toBe(false);
       expect(profileAcceptsKind(p, "")).toBe(false);
     }
   });

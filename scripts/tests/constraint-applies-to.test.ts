@@ -58,6 +58,9 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
     kinds: [
       "definition", "theorem", "lemma", "proposition", "corollary",
       "conjecture", "example", "remark", "simulator", "prose",
+      // A recommendation is a prose carrier, so it owes its .md as prose does
+      // (core's `recommendation` kind, bean `55ao`; typed by cat-harness#109).
+      "recommendation",
     ],
     because:
       "whether equation/diagram/table/proof/algorithm blocks must have a " +

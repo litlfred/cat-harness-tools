@@ -53,6 +53,17 @@ function railedCount(): number {
 const FIXTURE = "cat-harness/railed-fixture/index.html";
 
 /**
+ * The Methodologies tile's destination, READ from the data rather than
+ * spelled. It was `/methodologies/` when this was written; since the
+ * visualisers moved to their declared routes it is the localised
+ * `/en/cat-harness/methodologies/`, and a rail row naming the old address
+ * named a destination nothing else names, so a planted label never collided.
+ */
+const METHODOLOGIES = (
+  JSON.parse(readFileSync(join(SITE, "_data", "harness.json"), "utf-8")) as { tiles: { title: string; href?: string }[] }
+).tiles.find((t) => t.title === "Methodologies")!.href!;
+
+/**
  * A copy of the parts of the site the check reads: the data, the include and
  * the landing templates, plus ONE railed page. A plant goes into the copy, so
  * the live tree is never edited (the restore-by-copy discipline in
@@ -74,13 +85,13 @@ function siteCopy(): { root: string; site: string; files: string[] } {
   return { root, site, files: [`site/${FIXTURE}`] };
 }
 
-/** A minimal railed viewer page whose one row names `/methodologies/` as `label`. */
+/** A minimal railed viewer page whose one row names {@link METHODOLOGIES} as `label`. */
 function writeRail(site: string, label: string): void {
   const page = join(site, FIXTURE);
   mkdirSync(join(page, ".."), { recursive: true });
   writeFileSync(
     page,
-    `<!doctype html><html><body><nav class="fa-nav"><a href="../../methodologies/"><span class="fa-nav-label">${label}</span></a></nav></body></html>\n`,
+    `<!doctype html><html><body><nav class="fa-nav"><a href="../..${METHODOLOGIES}"><span class="fa-nav-label">${label}</span></a></nav></body></html>\n`,
   );
 }
 
@@ -135,11 +146,11 @@ describe("a planted second name fails", () => {
   test("on the RAIL: one row's label changed in a viewer page", () => {
     const c = siteCopy();
     // Unplanted, the synthetic rail agrees with the data.
-    expect(checkNavNames(c.root, c.site, c.files).conflicts.find((x) => x.href === "/methodologies/")).toBeUndefined();
+    expect(checkNavNames(c.root, c.site, c.files).conflicts.find((x) => x.href === METHODOLOGIES)).toBeUndefined();
     writeRail(c.site, "methodology");
     const r = checkNavNames(c.root, c.site, c.files);
     expect(r.read.railPages).toBe(1);
-    const hit = r.conflicts.find((x) => x.href === "/methodologies/");
+    const hit = r.conflicts.find((x) => x.href === METHODOLOGIES);
     expect(hit).toBeDefined();
     expect(hit!.names.map((n) => n.label).sort()).toEqual(["Methodologies", "methodology"]);
   });

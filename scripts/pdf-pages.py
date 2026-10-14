@@ -332,6 +332,13 @@ def main() -> int:
         # `extractor` it used — and overwriting that with a subset would lose
         # provenance to fix an absence.
         existing.setdefault("source", tech_meta(str(pdf)))
+        # The page count, which this rung KNOWS (one section per page) and
+        # `tech_meta` does not record. Without it a document that only this
+        # rung touched — a scan, through pdf-ocr — published no `meta.pages`:
+        # who-iris's `who-pub-tps-931` lost its "121 pages" on re-ingest
+        # (bean `turh`) while its pdf-structure siblings kept theirs.
+        # `setdefault`, for the same reason as `source` above.
+        existing["source"].setdefault("pages", len(texts))
         # Where the section text came from, in ONE field with ONE vocabulary
         # (issue #1121): `source.text_source`, `embedded | ocr`, as
         # `pdf-structure.py` writes it. Set, not setdefault: these page sections

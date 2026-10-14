@@ -42,7 +42,19 @@ describe("tool groups derived from Tool nodes (zmdo)", () => {
         .filter((n) => n.invoke?.inProcess?.module === g.module && n.invoke?.mcp)
         .map((n) => n.invoke!.mcp!.tool)
         .sort();
-      expect({ module: g.module, names: names.sort() }).toEqual({ module: g.module, names: declared });
+      // A declared name ending in `*` is a FAMILY: `bpmn-engine` is one Tool
+      // node whose MCP arm is `workflow_*` (owner ruling 2026-10-10, bean
+      // `cy4p`: the engine as ONE discoverable node). Each registered name is
+      // then covered by an exact declared name or a family prefix, and each
+      // declaration must be served — an exact one by name, a family by at least
+      // one member — so neither direction of the drift goes unseen.
+      const families = declared.filter((d) => d.endsWith("*")).map((d) => d.slice(0, -1));
+      const exact = declared.filter((d) => !d.endsWith("*"));
+      const covered = (n: string) => exact.includes(n) || families.some((f) => n.startsWith(f));
+      expect({ module: g.module, undeclared: names.filter((n) => !covered(n)).sort() }).toEqual({ module: g.module, undeclared: [] });
+      expect({ module: g.module, unserved: exact.filter((d) => !names.includes(d)) }).toEqual({ module: g.module, unserved: [] });
+      expect({ module: g.module, emptyFamilies: families.filter((f) => !names.some((n) => n.startsWith(f))) }).toEqual({ module: g.module, emptyFamilies: [] });
+      expect(new Set(names).size).toBe(names.length);
     }
   });
 

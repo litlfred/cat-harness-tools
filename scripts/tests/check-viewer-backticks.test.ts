@@ -105,22 +105,24 @@ describe("the file set is derived, not listed", () => {
   test("it finds the generators, including the one outside cat-harness", () => {
     // `who-iris/scripts/gen-iris-pages.ts` was added to the old array by hand
     // on 2026-09-21, after the trap caught it for the third time in a session.
-    // Nothing names it now; the walk finds it.
+    // Nothing names it now; the walk finds it. The platform's own generators
+    // live in cat-harness-tools since the tools split (definitions in
+    // cat-harness, implementations in cat-harness-tools; bean `w2gr`).
     expect(sources).toContain("who-iris/scripts/gen-iris-pages.ts");
-    expect(sources).toContain("cat-harness/scripts/kg-viewer.ts");
+    expect(sources).toContain("cat-harness-tools/scripts/kg-viewer.ts");
     // A generator whose pages moved onto the theme's layout (2026-10-07) no
     // longer builds a standalone page, so it correctly drops out of the set.
     for (const themed of [
-      "cat-harness/scripts/gen-schema-viz.ts",
-      "cat-harness/scripts/gen-voices-viz.ts",
-      "cat-harness/scripts/gen-uploads-viz.ts",
-      "cat-harness/scripts/gen-document-kinds-viz.ts",
-      "cat-harness/scripts/gen-translation-status.ts",
+      "cat-harness-tools/scripts/gen-schema-viz.ts",
+      "cat-harness-tools/scripts/gen-voices-viz.ts",
+      "cat-harness-tools/scripts/gen-uploads-viz.ts",
+      "cat-harness-tools/scripts/gen-document-kinds-viz.ts",
+      "cat-harness-tools/scripts/gen-translation-status.ts",
       "cat-harness-tools/scripts/gen-auto-docs.ts",
     ]) expect(sources).not.toContain(themed);
     // And the one the old array could not include, because the old detector
     // reported it falsely.
-    expect(sources).toContain("cat-harness/scripts/dak-pdf.ts");
+    expect(sources).toContain("cat-harness-tools/scripts/dak-pdf.ts");
     expect(sources).not.toContain("cat-harness-tools/scripts/gen-auto-docs.ts");
   });
 

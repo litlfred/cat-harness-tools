@@ -35,7 +35,11 @@ describe("served-name collisions are chosen, never won by step order (Phase 4, b
   test("both workflows name exactly the one collision they chose", () => {
     for (const wf of ["docs-site.yml", "feature-staging.yml"]) {
       const text = readFileSync(join(REPO_ROOT, ".github", "workflows", wf), "utf-8");
-      const step = text.split("\n").find((l) => /^\s*bun run cat-harness\/scripts\/publish-instance-files\.ts/.test(l));
+      // The script is cat-harness-tools' since the code left cat-harness (bean
+      // `70lx`); a workflow still naming `cat-harness/scripts/` runs nothing.
+      // Found, or said so: a step this cannot find is not a step with no flag.
+      const step = text.split("\n").find((l) => /^\s*bun run cat-harness-tools\/scripts\/publish-instance-files\.ts/.test(l));
+      expect({ wf, found: step !== undefined }).toEqual({ wf, found: true });
       expect({ wf, allow: /--allow-collision\s+(\S+)/.exec(step ?? "")?.[1] }).toEqual({ wf, allow: "bootstrap.json" });
     }
     rmSync(tmp, { recursive: true, force: true });

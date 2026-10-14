@@ -1536,7 +1536,7 @@ export const SCRIPT_SIDECAR_DIR = "test/results/script-sidecars";
 /**
  * Resolve a criterion's script-sidecar path. `repoRoot` should be
  * the absolute path to the repo root; the sidecar lives under
- * `<repoRoot>/pipeline/script-sidecars/<id>.script.json`.
+ * `<repoRoot>/test/results/script-sidecars/<id>.script.json` ({@link SCRIPT_SIDECAR_DIR}).
  *
  * The id is {@link portableSegment}-encoded, because a criterion id is an
  * identifier rather than a filename and nothing constrains it to be one. Every

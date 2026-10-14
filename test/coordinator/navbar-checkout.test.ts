@@ -57,7 +57,10 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // `renderedBy` (owner: "Need harness to declare visualizer is renderedBy").
     // FOURTEEN with `folio`, which joined when who-iris's landing sticky moved
     // into its own `folio/` (bean `1yd7`). Same reason as every one above.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // FIFTEEN with `health`, which joined when who-iris declared its own
+    // repository health report (owner, 2026-10-10: "All repos need health
+    // check"), kept on its state branch. Same reason again.
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -75,6 +78,9 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `glossary` and `voices` arrived with the style guide (bean `qsx4`); no
       // page is passed in here, so both are declared-and-unlinked.
       "glossary",
+      // `health` (2026-10-10) is the repository's health report, on its state
+      // branch: declared, and no per-instance page is passed in here.
+      "health",
       "library",
       // `qa` is declared and publishes no page, like `code` above: the audit
       // writes sidecars, and the viewer for them is the QA index rather than a

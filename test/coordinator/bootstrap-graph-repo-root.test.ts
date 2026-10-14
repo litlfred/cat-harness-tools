@@ -74,7 +74,8 @@ function bootstrapGraphPublishers(workflowText: string): string[] {
 function siteOutputs(workflowText: string): string[] {
   const stubs = new Map<string, string>();
   for (const m of workflowText.matchAll(
-    /(\w+)=\$\(bun run cat-harness\/scripts\/print-stub\.ts\s+(\S+)\)/g,
+    // `print-stub.ts` is cat-harness-tools' since bean `70lx`.
+    /(\w+)=\$\(bun run cat-harness-tools\/scripts\/print-stub\.ts\s+(\S+)\)/g,
   )) {
     const decl = readDeclaration(join(repoRootFor(ROOT), m[2]!));
     if (decl) stubs.set(m[1]!, artefactStub(decl));

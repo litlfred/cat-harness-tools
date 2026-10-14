@@ -23,7 +23,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 describe("contentInstanceCode — this checkout", () => {
   // Owner ruling 2026-10-01: a QA WARNING, not a failure — but one that still
   // NAMES every file. Bean `eayu`.
-  test("who-iris is a QA warning, naming its ten IRIS-specific code files", () => {
+  test("who-iris is a QA warning, naming its twelve IRIS-specific code files", () => {
     expect(KG_CRITERIA_BY_ID["content-instance-holds-code"]?.severity).toBe("minor");
     const v = contentInstanceCode(join(REPO, "who-iris"));
     expect(v.state).toBe("judged");
@@ -38,6 +38,11 @@ describe("contentInstanceCode — this checkout", () => {
       "scripts/tests/catalogue-links.test.ts",
       "scripts/tests/gen-iris-pages.test.ts",
       "scripts/tests/iris-oxigraph.test.ts",
+      // The untainted round-trip check over who-iris's OWN catalogues
+      // (`site/iris-site.po`, `glossary/who-iris--who-terms.po`), as a
+      // `qa-results/v1` report, and its test (bean `folio-assistant-ktt2`).
+      "scripts/tests/translation-roundtrip-report.test.ts",
+      "scripts/translation-roundtrip-report.ts",
       "themes/themes.test.ts",
       "themes/themes.ts",
       // Its Tool node (2026-10-09): the `iris-pages` generator its catalogue

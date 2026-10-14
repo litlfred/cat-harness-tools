@@ -226,12 +226,31 @@ describe("declared and defaulted are different facts", () => {
       expect(element(r.file), `${r.file} is marked declared`).toBe(true);
     }
 
-    // Proper subset: the corpus contains at least one element carrying no
-    // value. If this ever goes empty the two oracles agree by accident, and
-    // the distinction above stops being load-bearing — which is worth being
-    // told about, because the doc explaining it would then read as pedantry.
-    const elementOnly = rows.filter((r) => !r.enforcementDeclared && element(r.file));
-    expect(elementOnly.length, "policy elements carrying no enforcement").toBeGreaterThan(0);
+    // Proper subset: an element can carry no value. This was measured on the
+    // corpus — "at least one file whose policy declares no enforcement" — and
+    // the corpus drained it: since every such file also declares a value on
+    // another element (`relaxable="false"` sits beside `enforcement=` in each),
+    // the two FILE-level oracles now agree on the corpus while still meaning
+    // different things. So the distinction is held on a witness rather than on
+    // whichever files happen to exist: a real file's own namespace binding,
+    // around one policy element that carries `relaxable` and no enforcement.
+    const withElement = rows.find((r) => element(r.file));
+    expect(withElement, "no process file carries a policy element — vacuous").toBeDefined();
+    const binding = /\bxmlns:[A-Za-z_][\w.-]*\s*=\s*"[^"]*"/g;
+    const own = [...readFileSync(join(REPO, withElement!.file), "utf-8").matchAll(binding)]
+      .map((m) => m[0])
+      .find((b) => ownElementPattern(`<x ${b}>`, "policy", "", "").source !== "(?!)");
+    expect(own, `${withElement!.file} binds none of our namespaces`).toBeDefined();
+    const prefix = /xmlns:([^=\s]+)/.exec(own!)![1];
+    const witness = `<bpmn:definitions ${own}><bpmn:process id="p"><${prefix}:policy relaxable="false"/></bpmn:process></bpmn:definitions>`;
+    expect(ownElementPattern(witness, "policy", "", "").test(witness), "the witness carries a policy element").toBe(true);
+    expect(ownElementPattern(witness, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(witness), "…and declares no enforcement").toBe(false);
+    // And the corpus still holds such ELEMENTS, even where no whole file does.
+    const valueless = rows.some((r) => {
+      const xml = readFileSync(join(REPO, r.file), "utf-8");
+      return [...xml.matchAll(ownElementPattern(xml, "policy", "[^>]*>", "g"))].some((m) => !/\benforcement\s*=/.test(m[0]));
+    });
+    expect(valueless, "policy elements carrying no enforcement").toBe(true);
   });
 });
 

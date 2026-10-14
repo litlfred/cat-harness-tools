@@ -36,8 +36,15 @@ import {
  */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
-const ROOT = resolve(ORIGIN_DIR, "../..");
-const REPO = resolve(ROOT, "..");
+const REPO = resolve(ORIGIN_DIR, "../../..");
+/**
+ * The instance that owns the QA registry and core's own checkers — this one,
+ * cat-harness-tools, since the tools split (bean `w2gr`). It was
+ * `cat-harness` when the test was written there, and after the move every
+ * core checker was labelled `cat-harness-tools/pipeline/…` against a resolver
+ * that answers the bare `pipeline/…` for its own root: 70 false mismatches.
+ */
+const ROOT = resolve(import.meta.dir, "../..");
 const CHECKER_DIR = "pipeline";
 
 /**
@@ -69,20 +76,27 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
  * repo-relative for core's own, `<contributor>/<path>` for a contributed one.
  */
 function checkerFiles(): Array<{ label: string; abs: string }> {
-  const out: Array<{ label: string; abs: string }> = [];
+  const out = new Map<string, string>();
   for (const instance of instanceRootsIn(REPO)) {
     const dir = resolve(instance, CHECKER_DIR);
     if (!existsSync(dir)) continue;
     const name = instance.split("/").pop() ?? "";
     for (const f of readdirSync(dir).filter((x) => /^qa-checkers-.*\.ts$/.test(x))) {
       const rel = `${CHECKER_DIR}/${f}`;
-      out.push({
-        label: instance === ROOT ? rel : `${name}/${rel}`,
-        abs: resolve(dir, f),
-      });
+      out.set(resolve(instance, rel) === resolve(ROOT, rel) ? rel : `${name}/${rel}`, resolve(dir, f));
     }
   }
-  return out.sort((a, b) => a.label.localeCompare(b.label));
+  // A CONTRIBUTED checker lives where its contributor's `qa-checkers/` node
+  // says — `content/pipeline/` in sci and smart-base, and wherever the next
+  // contributor puts it — so its file comes from the registry that loads it,
+  // labelled as the resolver labels it, rather than from a second guess at
+  // the directory name.
+  for (const c of registry.contributedQaCheckers()) {
+    const e = registry.qaCheckerEntry(c.criterion);
+    const abs = e && resolve(e.root, e.sourceFile);
+    if (e && abs && existsSync(abs)) out.set(e.label, abs);
+  }
+  return [...out].map(([label, abs]) => ({ label, abs })).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 const sources = new Map<string, string>(
