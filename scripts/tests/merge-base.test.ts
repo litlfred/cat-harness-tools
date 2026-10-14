@@ -108,6 +108,29 @@ describe("generated-page globs come from the declared visualisers, not instance 
     }
   });
 
+  test("standing alone, the routes come from the generated pages the harness site holds", () => {
+    // check-standalone lays out this layer and its `needs` only: the instance
+    // that DECLARES the glossary or catalogue visualiser is absent, but the
+    // harness site still holds the pages its generator wrote.
+    const repo = mkdtempSync(join(tmpdir(), "conflict-routes-site-"));
+    try {
+      const page = (rel: string, fm: string) => {
+        mkdirSync(join(repo, "cat-harness/docs", rel, ".."), { recursive: true });
+        writeFileSync(join(repo, "cat-harness/docs", rel), `---\n${fm}\n---\nbody\n`);
+      };
+      page("acme/terms/index.md", "generated: acme/scripts/glossary-page.ts — do not hand-edit");
+      page("acme/catalogue/index.html", "rendered-by: acme-pages");
+      page("acme/notes/index.md", "title: authored, says nothing about a generator");
+      const glossary = (v: { renderedBy: string }) => v.renderedBy === GLOSSARY_RENDERER;
+      const catalogue = (v: { id: string }) => v.id === CATALOGUE_VISUALISER;
+      expect(declaredRouteGlobs(repo, glossary, "**")).toEqual(["cat-harness/docs/acme/terms/**"]);
+      expect(declaredRouteGlobs(repo, catalogue, "**")).toEqual(["cat-harness/docs/acme/catalogue/**"]);
+      expect(declaredRouteGlobs(repo, (v) => v.id === "notes", "**")).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   test("a translated glossary page other than the generated index stays refused", () => {
     const translated = PATTERNS.find((p) => p.id === "translated-glossary")!;
     for (const g of translated.globs) expect(g.endsWith("/index.md")).toBe(true);

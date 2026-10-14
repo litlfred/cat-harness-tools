@@ -194,6 +194,26 @@ describe("the glossary pages are recorded at their DECLARED routes", () => {
     }
   });
 
+  test("standing alone, a glossary page the site holds is recorded at its route", () => {
+    // check-standalone lays out this layer and its `needs` only, so the
+    // instance declaring the glossary visualiser may be absent while the site
+    // still holds the page its generator wrote.
+    const repo = mkdtempSync(join(tmpdir(), "drift-glossary-site-"));
+    try {
+      const site = join(repo, "site");
+      mkdirSync(join(site, "acme", "terms"), { recursive: true });
+      writeFileSync(join(site, "acme", "terms", "index.md"), "---\ngenerated: acme/scripts/glossary-page.ts — do not hand-edit\n---\n# Terms\n");
+      mkdirSync(join(site, "acme", "notes"), { recursive: true });
+      writeFileSync(join(site, "acme", "notes", "index.md"), "---\ntitle: Notes\n---\n# Notes\n");
+      expect(uncatalogedGlossaries(repo, site).map((u) => u.translation)).toEqual(
+        ["ar", "es", "fr", "ru", "zh"].map((l) => `${l}/acme/terms`),
+      );
+      expect(uncatalogedGlossaries(repo).map((u) => u.translation)).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   test("the written-down backlog holds no glossary route", () => {
     expect(UNCATALOGED.filter((u) => /\/glossary$/.test(u.translation))).toEqual([]);
   });

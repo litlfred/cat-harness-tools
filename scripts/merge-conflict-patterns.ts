@@ -36,11 +36,11 @@
  * purpose — a hand-kept list of check names is the list that rots.
  */
 
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 
-import { declaredVisualisers, type DeclaredVisualiser } from "./viewer-declarations.ts";
+import { declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
 
 export type ConflictStrategy = "take-base" | "owned-tree" | "generated-regions" | "qa-sidecar" | "refuse";
 
@@ -80,18 +80,32 @@ export const CATALOGUE_VISUALISER = "catalogue";
 /** The locales a generated glossary page is written in beside the English one. */
 const GLOSSARY_LOCALES = "{ar,es,fr,ru,zh}";
 
+/** A visualiser route and the Tool that draws it — declared, or recorded by the site. */
+export interface RouteOf {
+  harness: string;
+  id: string;
+  renderedBy: string;
+}
+
 /**
- * The visualisers the instances in `repoRoot` declare, or none when they
- * cannot be read: a glob derived from nothing matches nothing, so an
- * unreadable checkout REFUSES those paths (the safe default) rather than
- * guessing a route.
+ * The visualiser routes in the checkout at `repoRoot`: those the instances
+ * DECLARE, and — for a checkout where a declaring instance is not mounted, as
+ * when this layer stands alone beside the harness — those the harness site
+ * RECORDS through its generated pages' own front matter
+ * ({@link routesRecordedInSite}). A glob derived from nothing matches nothing,
+ * so a route neither knows is REFUSED (the safe default), never guessed.
  */
-function visualisersIn(repoRoot: string): DeclaredVisualiser[] {
-  try {
-    return declaredVisualisers(repoRoot);
-  } catch {
-    return [];
+function routesIn(repoRoot: string): RouteOf[] {
+  const out = new Map<string, RouteOf>();
+  for (const r of routesRecordedInSite(join(repoRoot, SITE))) {
+    out.set(`${r.harness}/${r.visualiser}`, { harness: r.harness, id: r.visualiser, renderedBy: r.renderedBy });
   }
+  try {
+    for (const v of declaredVisualisers(repoRoot)) out.set(`${v.harness}/${v.id}`, { harness: v.harness, id: v.id, renderedBy: v.renderedBy });
+  } catch {
+    // An unreadable declaration is `check:declaration-resolution`'s finding.
+  }
+  return [...out.values()];
 }
 
 /**
@@ -99,23 +113,24 @@ function visualisersIn(repoRoot: string): DeclaredVisualiser[] {
  * `pick` selects, under the harness site.
  *
  * Derived from the declarations — each instance's `visualisers[]`, through
- * {@link visualiserRoute} — rather than written down, so this lower layer
+ * {@link visualiserRoute}, or the site's record of them when the declaring
+ * instance is not mounted ({@link routesIn}) — rather than written down, so this lower layer
  * names no instance above it (check:reference-direction) and a renamed or
  * newly declared visualiser is matched without an edit here.
  */
 export function declaredRouteGlobs(
   repoRoot: string,
-  pick: (v: DeclaredVisualiser) => boolean,
+  pick: (v: RouteOf) => boolean,
   suffix: string,
   locale?: string,
 ): string[] {
-  return visualisersIn(repoRoot)
+  return routesIn(repoRoot)
     .filter(pick)
     .map((v) => `${SITE}/${locale === undefined ? "" : `${locale}/`}${visualiserRoute({ harness: v.harness, visualiser: v.id })}${suffix}`);
 }
 
-const isGlossary = (v: DeclaredVisualiser): boolean => v.renderedBy === GLOSSARY_RENDERER;
-const isCatalogue = (v: DeclaredVisualiser): boolean => v.id === CATALOGUE_VISUALISER;
+const isGlossary = (v: RouteOf): boolean => v.renderedBy === GLOSSARY_RENDERER;
+const isCatalogue = (v: RouteOf): boolean => v.id === CATALOGUE_VISUALISER;
 
 /**
  * Ordered: the FIRST pattern whose glob matches decides. Specific paths come
