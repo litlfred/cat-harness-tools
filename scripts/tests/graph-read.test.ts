@@ -17,7 +17,7 @@ import { MOUNT_MARKER_SCHEMA, markerPath } from "../branch-store.ts";
 import { readBeanFiles, readBeanStore } from "../bean-store-read.ts";
 import { fallbackStoreDir, listBeans, readStoreConfig } from "../beans-fallback.ts";
 import { beanDefsDir, readBeans, resolveBeanDefs } from "../beans.ts";
-import { graphReadPath, mustReadGraph } from "../graph-read.ts";
+import { enclosingCheckout, graphReadPath, mustReadGraph } from "../graph-read.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 
 const made: string[] = [];
@@ -492,5 +492,27 @@ describe("a branch FAMILY (bean lehh)", () => {
     const r = graphReadPath("ig-ast", root);
     expect(r.state).toBe("refused");
     expect(JSON.stringify(r)).toContain("FAMILY");
+  });
+});
+
+describe("enclosingCheckout — markers are looked up in the checkout that holds the instance", () => {
+  const top = mkdtempSync(join(tmpdir(), "enclosing-checkout-"));
+  afterAll(() => rmSync(top, { recursive: true, force: true }));
+  mkdirSync(join(top, ".git"), { recursive: true });
+  mkdirSync(join(top, "cat-harness", "test"), { recursive: true });
+
+  test("an instance mounted in an index resolves to the index root, where the markers are", () => {
+    expect(enclosingCheckout(join(top, "cat-harness"))).toBe(top);
+  });
+  test("a checkout root is its own answer, so a caller that already passes it is unchanged", () => {
+    expect(enclosingCheckout(top)).toBe(top);
+  });
+  test("with no .git above, the root itself, as before", () => {
+    const bare = mkdtempSync(join(tmpdir(), "no-checkout-"));
+    try {
+      expect(enclosingCheckout(bare)).toBe(bare);
+    } finally {
+      rmSync(bare, { recursive: true, force: true });
+    }
   });
 });
