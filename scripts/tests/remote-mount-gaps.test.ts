@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { MountLockSchema } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { checkRemote, mountRemote, parseSeed, seedRemote } from "../remote-mount.ts";
-import { installDependencies, isInstallArtefact, run as replayLocks } from "../mount-from-lock.ts";
+import { enclosingWorkspaceRoot, installDependencies, isInstallArtefact, run as replayLocks } from "../mount-from-lock.ts";
 
 function git(cwd: string, ...args: string[]): string {
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
@@ -206,6 +206,27 @@ describe("(b) a mounted layer is runnable, and the install does not make it modi
     expect(isInstallArtefact("node_modules/a.js")).toBe(true);
     expect(isInstallArtefact("x/node_modules/a.js")).toBe(true);
     expect(isInstallArtefact("scripts/node_modules.ts")).toBe(false);
+  });
+
+  test("installDependencies: a workspace member of the root is left to the root's install (folio-assistant#2529, ajv)", () => {
+    // Installing from inside a member rewrote the ROOT node_modules with
+    // `--omit dev`, re-hoisting ajv@8 over eslint's ajv@6 and failing lint.
+    const root = mkdtempSync(join(base, "ws-"));
+    write(root, {
+      "package.json": { name: "@t/root", private: true, workspaces: ["inst", "pkgs/*"] },
+      "inst/package.json": { name: "@t/inst", version: "0.1.0" },
+      "pkgs/a/package.json": { name: "@t/a", version: "0.1.0" },
+      "other/package.json": { name: "@t/other", version: "0.1.0" },
+      "pkgs/a/deep/package.json": { name: "@t/deep", version: "0.1.0" },
+    });
+    expect(enclosingWorkspaceRoot(join(root, "inst"))).toBe(root);
+    expect(enclosingWorkspaceRoot(join(root, "pkgs", "a"))).toBe(root);
+    expect(enclosingWorkspaceRoot(join(root, "other"))).toBeUndefined();
+    expect(enclosingWorkspaceRoot(join(root, "pkgs", "a", "deep"))).toBeUndefined();
+    const r = installDependencies(join(root, "inst"));
+    expect(r.state).toBe("none");
+    expect(r.detail).toContain("workspace member");
+    expect(existsSync(join(root, "node_modules"))).toBe(false);
   });
 });
 
