@@ -520,6 +520,11 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * entries were DELETED rather than left, because an entry recording a choice
  * nobody has to make any more is a question the owner would be asked twice.
  * Neither file was edited to earn that — the generator was.
+ *
+ * The second time: `cat-harness/docs/en/cat-harness/processes/index.md`,
+ * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
+ * that generator began writing `generated:` into every page it draws
+ * (folio-assistant#2529, PR 3 of the reference-direction batch).
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
@@ -565,7 +570,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
   { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
   { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
-  { file: "cat-harness/docs/en/cat-harness/processes/index.md", names: 4 }, // moved by t4xb from docs/processes/ (ruling (i), 2026-10-11)
   { file: "smart-ig/smart-ig.json", names: 2 },
 ];
 

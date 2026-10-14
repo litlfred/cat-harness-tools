@@ -94,6 +94,14 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "processes-viewer";
+/**
+ * Every page this writes declares itself generated in its own front matter —
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`). A page
+ * names the diagram it was drawn from, which may belong to an instance above
+ * the one that commits the page; without the key that path read as authored
+ * prose naming a higher layer.
+ */
+const GENERATED_FM = "generated: gen-processes-viz.ts — do not hand-edit; edit the diagram, then run `bun run cat processes:viz`";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -487,6 +495,7 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("---");
   L.push("title: Processes");
   L.push("nav_exclude: true");
+  L.push(GENERATED_FM);
   L.push("---");
   L.push("");
   L.push("# Processes — every executable diagram, searchable");
@@ -712,6 +721,7 @@ export function processPage(
   L.push("---");
   L.push(`title: '${row.name.replace(/'/g, "''")}'`);
   L.push("nav_exclude: true");
+  L.push(GENERATED_FM);
   L.push("---");
   L.push("");
   L.push("{: .note }");
