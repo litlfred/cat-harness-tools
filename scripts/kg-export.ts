@@ -683,6 +683,31 @@ export function buildContext(): Record<string, unknown> {
         run: termIri("stagingRun"),
       },
     },
+    // What a staging preview's graph changed against the graph `main`
+    // publishes — written by `scripts/kg-changed-assets.ts` after the export,
+    // on a PREVIEW document only (owner, 2026-10-14). The `dependsOn` /
+    // `dependsOnUnavailable` pair's shape: the list, and beside it why there
+    // is no list, so an unreadable base never reads as "nothing changed".
+    //
+    // Scoped, for `staging`'s reason: `change`, `kind`, `before`, `after`,
+    // `source` and `pages` are words a node could use for something else.
+    // `before` / `after` / `title` are `StagingPageComparison`'s field names
+    // (cat-harness `schemas/staging.ts`), so a page row reads as one.
+    changedAssets: {
+      "@id": termIri("changedAssets"),
+      "@container": "@list",
+      "@context": {
+        change: termIri("assetChange"),
+        kind: termIri("assetKind"),
+        source: termIri("assetSource"),
+        before: { "@id": termIri("beforeVersion"), ...link },
+        after: { "@id": termIri("afterVersion"), ...link },
+        pages: { "@id": termIri("renderedPage"), "@container": "@list" },
+        pagesUnknown: termIri("renderedPagesUnknown"),
+      },
+    },
+    changedAssetsComparedWith: { "@id": termIri("changedAssetsComparedWith"), ...link },
+    changedAssetsUnavailable: termIri("changedAssetsUnavailable"),
 
     // ---- The DOCUMENT ROOT's own fields ------------------------------------
     //

@@ -50,6 +50,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";
@@ -617,6 +618,18 @@ export default prose({
 `;
 }
 
+/**
+ * The starter block's `.jsonld`, made by the generator itself from the same
+ * fields as {@link starterBlockManifest}, so the two cannot disagree; a test
+ * runs `gen-block-jsonld.ts --check` on a scaffold to hold that.
+ */
+function starterBlockNode(root: string, slug: string): string {
+  const block = { kind: "prose", label: "prose:overview", title: "Overview", uses: [] as string[] };
+  // declared-path-literal: the starter block's own manifest path, written above in initFolio: a scaffold reads no declaration.
+  const file = join(root, "folio", slug, "introduction", "overview.ts");
+  return serialiseBlockNode(blockToJsonLd({ kind: block.kind, label: block.label, uses: [], file, block }, slug, []));
+}
+
 function starterBlockBody(o: InitFolioOptions): string {
   const kinds =
     o.contentType === "document"
@@ -692,6 +705,7 @@ folio/${o.slug}/          the document
   <chapter>/<chapter>.ts   a chapter manifest — sections, in reading order
   <chapter>/<root>.ts      a block manifest
   <chapter>/<root>.md      that block's prose
+  <chapter>/<root>.jsonld  that block's knowledge-graph node (generated; committed)
 folio/schema/            re-export shim for the platform's builders
 test/results/block-qa/     QA verdicts, one per block, mirroring folio/ (machine-written working copy — published to qa-reports)
 test/attestations/        reviewer judgements and baseline attestations (committed on main)
@@ -708,7 +722,12 @@ todos/                    people's outstanding items (mounted likewise)
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
 bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
+
+Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
+and the document site publishes it. Re-run the generator after adding, moving
+or editing a block; the site build fails while a node is missing or stale.
 
 ## QA — every block is checked from the first commit
 
@@ -1573,6 +1592,10 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
   write(`folio/${o.slug}/introduction/overview.ts`, starterBlockManifest());
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
   write(`folio/${o.slug}/introduction/overview.md`, starterBlockBody(o));
+  // Its knowledge-graph node: every block is one from the first commit, and a
+  // document site fails without it (`gen-block-jsonld.ts --check` keeps it current).
+  // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
+  write(`folio/${o.slug}/introduction/overview.jsonld`, starterBlockNode(root, o.slug));
 
   // 4. The two source-material directories.
   //

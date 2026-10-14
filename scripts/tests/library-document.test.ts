@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractOf, readEntryDocument } from "../lib/library-document.ts";
+import { extractOf, plainHeading, readEntryDocument } from "../lib/library-document.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));
@@ -134,7 +134,6 @@ describe("a text source is shown by its own headings, not as a PDF (litlfred/dth
 });
 
 describe("plainHeading — a text heading as a reader sees it (litlfred/dth-hrh)", () => {
-  const { plainHeading } = require("../lib/library-document.ts") as typeof import("../lib/library-document.ts");
   test("strips emphasis and escapes, keeps the words", () => {
     expect(plainHeading("**Chapter 1\\. Why Digital Health Workforce Registries Matter**")).toBe("Chapter 1. Why Digital Health Workforce Registries Matter");
     expect(plainHeading("**1.1 Global challenges**")).toBe("1.1 Global challenges");

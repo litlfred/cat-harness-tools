@@ -499,6 +499,14 @@ export function scriptsFor(command: string, scripts: Record<string, string>): st
       const next = scripts[name];
       if (next !== undefined) walk(next, depth + 1);
     }
+    // `publish-check.ts <writer>` runs that writer and then its `--check` (B1):
+    // the writer's script is what the gate audits, and it carries the
+    // `@covers`. Without this hop every check routed through publish-check
+    // read as covering nothing, and its kinds as unaudited.
+    for (const m of cmd.matchAll(/publish-check\.ts\s+([\w:.-]+)/g)) {
+      const next = scripts[m[1]!];
+      if (next !== undefined) walk(next, depth + 1);
+    }
   };
   walk(command, 0);
   return out;
