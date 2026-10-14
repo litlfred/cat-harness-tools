@@ -20,6 +20,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { fileDeclaresName } from "../pipeline/lean-formal-ref.ts";
 
 export type LeanRefClassification = "built" | "sibling_only" | "dangling" | "unknown";
 
@@ -50,22 +51,11 @@ export interface LakeTargetLeanAuditOptions {
 }
 
 /**
- * Does `file` textually declare a top-level `name`?
+ * Does `file` textually declare a top-level `name`? The one implementation
+ * lives with the `lean.ref` grammar, in `pipeline/lean-formal-ref.ts`; this
+ * module carried a copy of it, and so a sixth declaration pattern.
  */
-export function fileDeclaresName(file: string, name: string): boolean {
-  let body: string;
-  try {
-    body = readFileSync(file, "utf-8");
-  } catch {
-    return false;
-  }
-  const short = name.includes(".") ? name.split(".").pop()! : name;
-  const esc = short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(
-    `\\b(?:theorem|lemma|def|abbrev|instance|structure|class|inductive|opaque|axiom)\\s+(?:[\\w'.\\u00C0-\\uFFFF]*\\.)?${esc}\\b`,
-    "u",
-  ).test(body);
-}
+export { fileDeclaresName };
 
 /**
  * Parse Lake target libraries and executables from lakefile.toml or lakefile.lean.
