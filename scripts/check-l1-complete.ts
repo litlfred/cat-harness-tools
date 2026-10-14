@@ -77,6 +77,8 @@ import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResu
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { entrySubgraphDirs } from "./lib/library-entry-graphs.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
 
@@ -527,7 +529,7 @@ export function sourceBlockOf(dir: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
-function derivableRequirements(dir: string): Requirement[] {
+function derivableRequirements(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Requirement[] {
   const out: Requirement[] = [];
   const has = (p: string) => existsSync(join(dir, p));
 
@@ -571,7 +573,18 @@ function derivableRequirements(dir: string): Requirement[] {
         return false;
       }
     };
-    const stray = children.filter((c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c));
+    // A DECLARED library sub-graph inside the entry (bean `8pzh` item 1, owner
+    // 2026-10-12: L1 extraction output lives beside its entry and is published
+    // with it). The instance declares the directory with a kind that is
+    // `within: "library"`, so it is the entry's own KG content, not an arm's
+    // misfiled output — the same lookup the library publisher follows. An
+    // UNDECLARED directory there is still a stray.
+    const declaredSubgraphs = new Set(
+      entrySubgraphDirs(dir, registry).map((d) => relative(resolve(dir), d.abs).split(/[\\/]/)[0]),
+    );
+    const stray = children.filter(
+      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c),
+    );
     if (stray.length > 0) {
       out.push({
         name: "contents",
@@ -1260,11 +1273,11 @@ export function expiredExceptions(
   return out;
 }
 
-export function checkEntry(dir: string): EntryReport {
+export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryReport {
   return {
     slug: dir.split("/").filter(Boolean).pop() ?? dir,
     requirements: [
-      ...derivableRequirements(dir),
+      ...derivableRequirements(dir, registry),
       ...NOT_DERIVABLE.map((nd) => ({
         name: nd.name,
         state: "not-derivable" as const,

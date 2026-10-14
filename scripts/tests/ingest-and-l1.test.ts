@@ -48,6 +48,7 @@ import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -1195,6 +1196,61 @@ describe("an entry's contents are a CLOSED set — `3psh`", () => {
     // and only one of them is executable.
     for (const d of ENTRY_DIRECTORIES) expect(contents(entry({ ...PAGED, [d]: null }))?.state).toBe("met");
     for (const f of ENTRY_SIDECARS) expect(contents(entry({ ...PAGED, [f]: "{}" }))?.state).toBe("met");
+  });
+});
+
+/**
+ * A DECLARED library sub-graph inside an entry is the entry's own KG content,
+ * not a stray — bean `8pzh` item 1 (owner, 2026-10-12: L1 extraction output
+ * lives beside its library entry and is published with it). The kind comes
+ * from the registry (`within: "library"`), never a directory name here.
+ */
+describe("an entry's declared library sub-graph is not a stray — `8pzh`", () => {
+  const PAGED = {
+    "structure.json": '{"$schema":"pdf-structure/v1","doc_id":"d","sections":[]}',
+    "manifest.jsonld": "{}",
+  };
+  const registry = (): GraphTypologyRegistry => {
+    const reg = new GraphTypologyRegistry();
+    reg.register("probe-extraction", { renderable: false, holds: "derived", summary: "x", within: "library" });
+    reg.register("probe-loose", { renderable: false, holds: "derived", summary: "x" });
+    return reg;
+  };
+  /** An instance whose `library/e1/` holds `out/`, declared with `kinds` (or not at all). */
+  const instance = (kinds: string[] | undefined): string => {
+    const root = mkdtempSync(join(tmpdir(), "l1-subgraph-"));
+    made.push(root);
+    const e1 = join(root, "library", "e1");
+    mkdirSync(join(e1, "out"), { recursive: true });
+    for (const [n, b] of Object.entries(PAGED)) writeFileSync(join(e1, n), b);
+    writeFileSync(join(e1, "out", "graph.json"), "{}");
+    writeFileSync(
+      join(root, "fixture.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "fixture",
+        directories: [
+          { id: "library", path: "library/", graphTypologies: ["library"] },
+          ...(kinds === undefined ? [] : [{ id: "e1-out", path: "library/e1/out/", graphTypologies: kinds }]),
+        ],
+      }),
+    );
+    return e1;
+  };
+  const contents = (dir: string) => checkEntry(dir, registry()).requirements.find((r) => r.name === "contents");
+
+  test("a directory declared with a within-library kind is MET", () => {
+    expect(contents(instance(["probe-extraction"]))?.state).toBe("met");
+  });
+
+  test("the same directory UNDECLARED is still a stray", () => {
+    const r = contents(instance(undefined));
+    expect(r?.state).toBe("unmet");
+    expect(r?.detail).toContain("out");
+  });
+
+  test("declared with a kind that is NOT within library is still a stray", () => {
+    expect(contents(instance(["probe-loose"]))?.state).toBe("unmet");
   });
 });
 
