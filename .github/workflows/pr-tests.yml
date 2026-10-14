@@ -135,43 +135,82 @@ jobs:
           name: junit-${{ matrix.side }}
           path: ${{ runner.temp }}/junit.xml
 
-  standalone:
+  standalone-run:
     # The standalone ratchet (bean `ho66`; owner, 2026-10-14). The tracked
     # files of this layer and of its declared closure (`needs`: cat-harness,
     # bootstrap-tools) are laid out as sibling git repositories with no index
     # around them, and `bun test` is run in this layer. A test that fails there
-    # reads something only the monorepo has. Many do today, so this judges the
-    # run against the committed `scripts/standalone-baseline.json`: a failure
-    # the baseline does not list is red (exit 1), and so is a run that could
-    # not be measured (exit 2). A listed test that now passes is printed, not
-    # red; `standalone:baseline:tools` writes the shorter list, so
-    # the count only goes down. See scripts/check-standalone.ts.
-    #
-    # The baseline is measured in THIS layout (the index mounts, cat-harness
-    # main, bun 1.3.14) with no state graphs mounted: a mount is the
-    # monorepo's, and the rehearsal copies only the closure anyway.
-    name: Standalone (no new failures)
+    # reads something only the monorepo has. Measured on BOTH main and the PR,
+    # like run-tests: both stand on cat-harness main, which moves, so a test
+    # that starts failing on main because cat-harness changed is not this PR's.
+    # The `standalone` job below judges the pair against the committed
+    # `scripts/standalone-baseline.json`. The baseline is measured in THIS
+    # layout (the index mounts, cat-harness main, bun 1.3.14) with no state
+    # graphs mounted: a mount is the monorepo's, and the rehearsal copies only
+    # the closure anyway.
+    name: standalone (${{ matrix.side }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
     steps:
       - *checkout-index
       - *setup-bun
       - *mount
       - *cat-harness-main
-      - name: Put the PR in place of the locked cat-harness-tools
+      - name: Put cat-harness-tools in place of the locked mount
         run: rm -rf fa/cat-harness-tools
       - uses: actions/checkout@v4
         with:
           path: fa/cat-harness-tools
+          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+      - name: Measure with the PR's checker on both sides
+        # So a main that predates --measured-out is still measured. Only the
+        # checker file is taken from the PR; the tree it measures is main's.
+        if: matrix.side == 'base'
+        uses: actions/checkout@v4
+        with:
+          path: pr-checker
+          sparse-checkout: scripts/check-standalone.ts
+          sparse-checkout-cone-mode: false
+      - if: matrix.side == 'base'
+        run: cp pr-checker/scripts/check-standalone.ts fa/cat-harness-tools/scripts/check-standalone.ts && rm -rf pr-checker
       - *unnest
       - *install
-      - name: cat-harness-tools fails standalone no more than its baseline
+      - name: Measure cat-harness-tools standalone
         working-directory: fa
         # Called directly, not through `bun run cat`: folio-assistant's root
         # `cat` alias points at cat-harness/scripts/run-script.ts, which has
-        # moved to this repository, so it does not resolve against cat-harness
-        # main. Same command as `check:cat-harness-tools-standalone`.
-        run: bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools
+        # moved to this repository. The result is judged by the standalone job,
+        # not by this exit code; a side that could not be measured is judged
+        # as such (head) or leaves the baseline alone to judge (base).
+        run: |
+          bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
+          test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.side }}
+          path: ${{ runner.temp }}/standalone.json
+
+  standalone:
+    name: Standalone (no new failures)
+    needs: standalone-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/scripts
+            scripts/standalone-baseline.json
+      - uses: actions/download-artifact@v4
+        with:
+          path: standalone
+      - name: Judge the PR against main and the baseline
+        run: >-
+          python3 .github/scripts/compare-standalone.py scripts/standalone-baseline.json cat-harness-tools
+          standalone/standalone-base/standalone.json standalone/standalone-head/standalone.json
 
   tests:
     name: Tests (no new failures)
