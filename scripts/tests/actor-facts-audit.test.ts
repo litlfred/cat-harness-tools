@@ -174,45 +174,38 @@ describe("real repository measurement", () => {
     });
 
     expect(res.result).toBe("fail");
-    // Exactly 14 unconsumed actor facts (17 until 2026-10-14; the count may
-    // only fall). Three found consumers since, in the processes of the
-    // instances the checkout mounts: lean-toolchain (folio-assistant-sci's
+    // A RATCHET that fits both settings the test runs in. In the index, the
+    // processes of the instances mounted beside cat-harness consume three more
+    // facts than cat-harness's own do: lean-toolchain (folio-assistant-sci's
     // lean-docs-publish and authoring-a-paper), release-management
     // (fhir-harness's ig-incremental-build) and review-comments
-    // (folio-assistant-core's content-change-review).
-    // 5 capabilities: fhir-validator, git-push, ig-publisher, jekyll, sushi-compiler
-    // 9 permissions:  approval-authority, clinical-validation, content-authoring, first-pass-review,
-    //                 perform-task, project-governance, qa-reporting, release-authorization,
-    //                 sme-coordination
-    expect(res.findings).toHaveLength(14);
-
+    // (folio-assistant-core's content-change-review) — 14 there, 17 standing
+    // alone. So the bound is 17 and may only fall, and every finding must be
+    // one of the 17 known: a NEW unconsumed fact fails here in either setting.
+    const KNOWN = new Set([
+      // capabilities
+      "fhir-validator", "git-push", "ig-publisher", "jekyll", "lean-toolchain", "sushi-compiler",
+      // permissions
+      "approval-authority", "clinical-validation", "content-authoring", "first-pass-review",
+      "perform-task", "project-governance", "qa-reporting", "release-authorization",
+      "release-management", "review-comments", "sme-coordination",
+    ]);
+    expect(res.findings.length).toBeLessThanOrEqual(17);
     const findingsWhere = res.findings.map((f) => f.where);
-    expect(findingsWhere).toContain("git-push");
-    expect(findingsWhere).toContain("jekyll");
-    expect(findingsWhere).toContain("sushi-compiler");
-    expect(findingsWhere).toContain("ig-publisher");
-    expect(findingsWhere).toContain("fhir-validator");
-
-    expect(findingsWhere).toContain("release-authorization");
-    expect(findingsWhere).toContain("content-authoring");
-    expect(findingsWhere).toContain("qa-reporting");
-    expect(findingsWhere).toContain("clinical-validation");
-    expect(findingsWhere).toContain("perform-task");
-    expect(findingsWhere).toContain("approval-authority");
-    expect(findingsWhere).toContain("project-governance");
-    expect(findingsWhere).toContain("first-pass-review");
-    expect(findingsWhere).toContain("sme-coordination");
+    expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
+    // Unconsumed in either setting: no process mounted anywhere consumes these yet.
+    for (const w of ["git-push", "jekyll", "sushi-compiler", "ig-publisher", "fhir-validator",
+      "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
+      "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
+      expect(findingsWhere).toContain(w);
+    }
 
     // The consumed facts MUST NOT be reported as findings:
-    // signing-api, admin-settings, role-management, adjudication, translation,
-    // and the three consumed since the count was 17.
+    // signing-api, admin-settings, role-management, adjudication, translation
     expect(findingsWhere).not.toContain("signing-api");
     expect(findingsWhere).not.toContain("admin-settings");
     expect(findingsWhere).not.toContain("role-management");
     expect(findingsWhere).not.toContain("adjudication");
     expect(findingsWhere).not.toContain("translation");
-    expect(findingsWhere).not.toContain("lean-toolchain");
-    expect(findingsWhere).not.toContain("release-management");
-    expect(findingsWhere).not.toContain("review-comments");
   });
 });
