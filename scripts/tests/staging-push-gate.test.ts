@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { RenderedImpact } from "@litlfred/cat-harness/schemas/rendered-impact.ts";
 import {
   COMMENT_MARKER,
   EXIT_WAITED,
@@ -136,10 +137,14 @@ describe("the PR comment", () => {
 describe("the pages to review (deep links, bean g4dv)", () => {
   const STAGING = "https://o.github.io/r/STAGING/s/";
   const MAIN = "https://o.github.io/r/";
-  const impact = (files: object[], undetermined: object[] = []) => ({
-    $schema: "rendered-impact/v1" as const,
+  type ImpactFile = RenderedImpact["files"][number];
+  const impact = (
+    files: Array<Omit<ImpactFile, "via"> & { via?: string[] }>,
+    undetermined: RenderedImpact["undetermined"] = [],
+  ): RenderedImpact => ({
+    $schema: "rendered-impact/v1",
     renderer: "docs-site",
-    method: "cone" as const,
+    method: "cone",
     inputs: [],
     files: files.map((f) => ({ via: [], ...f })),
     undetermined,
@@ -181,7 +186,7 @@ describe("the pages to review (deep links, bean g4dv)", () => {
   });
 
   test(`capped at ${MAX_REVIEW_ROWS} rows, with how many more and where`, () => {
-    const files = Array.from({ length: MAX_REVIEW_ROWS + 5 }, (_, i) => ({ path: `p${String(i).padStart(2, "0")}.html`, change: "changed", role: "content" }));
+    const files = Array.from({ length: MAX_REVIEW_ROWS + 5 }, (_, i) => ({ path: `p${String(i).padStart(2, "0")}.html`, change: "changed" as const, role: "content" as const }));
     const s = reviewSection(STAGING, MAIN, [impact(files)]);
     expect(s.split("\n").filter((l) => l.startsWith("- [")).length).toBe(MAX_REVIEW_ROWS);
     expect(s).toContain("… and 5 more");
