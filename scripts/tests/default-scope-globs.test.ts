@@ -16,8 +16,8 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse as parseYaml } from "yaml";
 
-import { expandGlobScopes, globScopeMatches, isGlobScopePath } from "../lib/default-scope-globs.ts";
-import { compose, docsLayers } from "../compose-docs.ts";
+import { expandGlobScopes, globScopeMatches, isGlobScopePath, spliceDefaults } from "../lib/default-scope-globs.ts";
+import { compose, docsLayers, expandComposedScopes } from "../compose-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -170,6 +170,40 @@ describe("expandGlobScopes", () => {
   });
 });
 
+describe("spliceDefaults rewrites the defaults block and no other byte", () => {
+  const text = [
+    "# head comment",
+    "title: 'quoted: kept'",
+    "footer_content: >-",
+    "  folded text,",
+    "  kept as written.",
+    "defaults:",
+    "  - scope:",
+    '      path: "start/*"',
+    "    values:",
+    "      permalink: /x",
+    "# a comment that belongs to the next key",
+    "",
+    "exclude:",
+    "  - vendor",
+    "",
+  ].join("\n");
+
+  test("everything outside the block is byte-identical", () => {
+    const next = [{ scope: { path: "start/a.md" }, values: { permalink: "/x" } }];
+    const out = spliceDefaults(text, next);
+    const lines = out.split("\n");
+    expect(lines.slice(0, 5)).toEqual(text.split("\n").slice(0, 5));
+    expect(out.endsWith("# a comment that belongs to the next key\n\nexclude:\n  - vendor\n")).toBe(true);
+    expect((parseYaml(out) as { defaults: unknown }).defaults).toEqual(next);
+  });
+
+  test("a config with no block `defaults:` is refused, not re-serialised", () => {
+    expect(() => spliceDefaults("title: t\n", [])).toThrow();
+    expect(() => spliceDefaults("defaults: [{scope: {path: a}}]\n", [])).toThrow();
+  });
+});
+
 describe("on the REAL composed tree", () => {
   test("no glob scope is left, and each one became exactly its glob's matches", () => {
     const docs = docsLayers(REPO).layers.filter((l) => !l.repositoryScoped);
@@ -189,21 +223,28 @@ describe("on the REAL composed tree", () => {
     expect(authored.size).toBeGreaterThan(0);
 
     const dest = join(mkdtempSync(join(tmpdir(), "scopesreal-")), "site");
-    const report = compose(dest, REPO);
+    compose(dest, REPO);
+    const merged = readFileSync(join(dest, "_config.yml"), "utf-8");
+    const scopes = expandComposedScopes(dest);
     const composed = parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8")) as {
       defaults: { scope: { path: string } }[];
     };
     expect(composed.defaults.filter((e) => isGlobScopePath(e.scope?.path))).toEqual([]);
 
-    expect(new Set(report.scopes.map((s) => s.glob))).toEqual(authored);
-    for (const s of report.scopes) {
+    // Every OTHER key keeps its value: only `defaults` was rewritten.
+    const { defaults: _a, ...restBefore } = parseYaml(merged) as Record<string, unknown>;
+    const { defaults: _b, ...restAfter } = composed as unknown as Record<string, unknown>;
+    expect(restAfter).toEqual(restBefore);
+
+    expect(new Set(scopes.map((s) => s.glob))).toEqual(authored);
+    for (const s of scopes) {
       expect(s.paths).toEqual(bunGlob(dest, s.glob));
       const ruby = rubyGlob(dest, s.glob);
       if (ruby) expect(s.paths).toEqual(ruby);
       for (const p of s.paths) expect(composed.defaults.some((e) => e.scope.path === p)).toBe(true);
     }
     // `process/*` reaches nothing under `processes/`.
-    const proc = report.scopes.find((s) => s.glob === "process/*");
+    const proc = scopes.find((s) => s.glob === "process/*");
     if (proc) expect(proc.paths.every((p) => p.startsWith("process/"))).toBe(true);
     rmSync(join(dest, ".."), { recursive: true, force: true });
   }, 120_000);

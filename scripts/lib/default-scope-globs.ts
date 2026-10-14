@@ -38,8 +38,10 @@
  * within a path segment. `**`, `[...]`, `{...}`, escapes, a leading `/` or
  * `..`, and a trailing `/` are REFUSED with an error rather than approximated.
  */
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
 import { join } from "node:path";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 /** A `defaults` entry as Jekyll reads it. */
 interface DefaultsEntry {
@@ -183,4 +185,45 @@ export function expandGlobScopes(config: unknown, root: string): { config: unkno
     expanded.push({ glob, paths });
   }
   return { config: { ...(config as Record<string, unknown>), defaults: next }, expanded };
+}
+
+/**
+ * Replace the top-level `defaults:` block of a YAML config's TEXT with
+ * `defaults`, leaving every other byte as it was: the other keys, their
+ * quoting and folding, and the comments around them. A run of comment or
+ * blank lines at the block's end, before the next key, belongs to that key and
+ * is kept.
+ *
+ * Checked, not trusted: the result must parse to the original with only
+ * `defaults` replaced, or it throws. A config this cannot splice (no block
+ * `defaults:` key at column 0, say) is therefore refused rather than
+ * re-serialised wholesale.
+ */
+export function spliceDefaults(text: string, defaults: unknown[]): string {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => /^defaults:\s*(#.*)?$/.test(l));
+  if (start < 0) throw new Error("default-scope-globs: no top-level `defaults:` block to splice");
+  let end = start + 1;
+  while (end < lines.length && !/^[^\s#-]/.test(lines[end]!)) end++;
+  while (end > start + 1 && /^(#.*)?\s*$/.test(lines[end - 1]!)) end--;
+  const block = stringifyYaml({ defaults }).replace(/\n$/, "").split("\n");
+  const out = [...lines.slice(0, start), ...block, ...lines.slice(end)].join("\n");
+  const before = parseYaml(text) as Record<string, unknown>;
+  const after = parseYaml(out) as Record<string, unknown>;
+  if (!isDeepStrictEqual(after, { ...before, defaults })) {
+    throw new Error("default-scope-globs: splicing `defaults` would change another key; refusing");
+  }
+  return out;
+}
+
+/**
+ * Expand the glob scopes of the Jekyll config at `configPath` over `root`,
+ * rewriting only its `defaults` block. Untouched when it has no glob scope.
+ */
+export function expandGlobScopesInFile(configPath: string, root: string): ExpandedScope[] {
+  const text = readFileSync(configPath, "utf-8");
+  const r = expandGlobScopes(parseYaml(text), root);
+  if (r.expanded.length === 0) return [];
+  writeFileSync(configPath, spliceDefaults(text, (r.config as { defaults: unknown[] }).defaults));
+  return r.expanded;
 }
