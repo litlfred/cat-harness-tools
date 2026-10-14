@@ -54,6 +54,12 @@ beforeAll(() => {
   put("low/src/table.ts", 'export const T = [{ module: "../high/y.ts" }];\nexport const load = (p: string) => import(p);\n');
   // NOT counted: a docblock quoting an import, and a `../` literal naming no instance.
   put("low/quiet.ts", '/** import { y } from "../high/y.ts"; */\n// require("../high/y.ts")\nexport const p = "../fixtures/x.ts";\n');
+  // By PACKAGE name: wrong-direction up to `high`, allowed down to `low`, and a
+  // third-party package skipped (bean `7pvn`).
+  put("high/package.json", JSON.stringify({ name: "@fx/high" }));
+  put("low/package.json", JSON.stringify({ name: "@fx/low" }));
+  put("low/pkg-up.ts", 'import { y } from "@fx/high/y.js";\nimport { z } from "zod";\nexport { y, z };\n');
+  put("high/pkg-down.ts", 'import { x } from "@fx/low/x.js";\nexport { x };\n');
   // Undetermined: an importer whose instance declares no `needs`.
   put("odd/o.ts", 'import { x } from "../low/x.ts";\nexport { x };\n');
 
@@ -69,6 +75,7 @@ describe("check:import-direction", () => {
       [
         "low/up.ts specifier → high",
         "low/sibling.ts specifier → side",
+        "low/pkg-up.ts specifier → high",
         "low/src/table.ts module-path-literal → high",
       ].sort(),
     );
