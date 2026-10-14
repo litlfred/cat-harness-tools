@@ -329,6 +329,23 @@ export function routePresence(
 }
 
 /**
+ * The directories this instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
+ * `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
+ * ending in the separator. A declared directory among them is never on disk in
+ * a checkout that has not run `derive:publish`, and that is its correct state,
+ * not an `absent` one: whether the publish step built it is
+ * `derive:publish`'s question, which it answers by refusing an entry that came
+ * out empty.
+ */
+export function builtAtPublishDirs(instanceRoot: string): Set<string> {
+  const decl = readDeclaration(instanceRoot) as { builtAtPublish?: Array<{ path: string }> } | undefined;
+  return new Set(
+    (decl?.builtAtPublish ?? []).filter((e) => e.path.endsWith("/")).map((e) => resolve(instanceRoot, e.path) + sep),
+  );
+}
+const isBuiltAtPublishDir = (dirs: ReadonlySet<string>, abs: string): boolean => dirs.has(resolve(abs) + sep);
+
+/**
  * @param otherInstances every instance root in the checkout; a
  *   repository-scoped entry inside one of them other than the declaring
  *   instance is a `mirror`. An instance that CONTAINS the declaring one (the
@@ -355,8 +372,10 @@ export function auditInstance(
   if (!decl?.directories) return [];
 
   const findings: DirFinding[] = [];
+  const publishTime = builtAtPublishDirs(instanceRoot);
   for (const e of decl.directories) {
     const abs = resolveDeclaredPath(e, instanceRoot, repoRoot);
+    if (isBuiltAtPublishDir(publishTime, abs)) continue;
     // A FILE at the declared path is not the directory being there. Checking
     // `existsSync` alone would pass on one, and a consumer that calls
     // `readdirSync` on it throws rather than reporting an empty graph.
@@ -648,6 +667,7 @@ export function auditNested(
   decl: { directories?: ReadonlyArray<{ id: string; path: string; graphTypologies?: readonly string[] }> } | undefined,
 ): DirFinding[] {
   const findings: DirFinding[] = [];
+  const publishTime = builtAtPublishDirs(instanceRoot);
   // `nestedDirectories` wants the whole declaration shape; only `directories`
   // is read, and a structural parameter keeps this callable from a test
   // fixture that has no reason to carry an instance `name`.
@@ -674,6 +694,7 @@ export function auditNested(
   for (const n of nested) {
     const e = n as typeof n & { absent?: { reason: string }; storage?: { branch: string }; source?: SubgraphSource };
     const abs = join(baseFor(n.id), n.path);
+    if (isBuiltAtPublishDir(publishTime, abs)) continue;
     if (contentIsOffCheckout(e)) {
       // The same answers a top-level entry gets, from the same function — but
       // keyed on the id the MOUNT uses, which for a from-within entry is its

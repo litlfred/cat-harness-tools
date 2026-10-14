@@ -12,8 +12,12 @@
  * counts OPEN beans (`openBeanCount` in `scripts/bean-store-read.ts`), the
  * owner's choice for the headline (`gkv6`), and says so in its name and tip.
  *
- * Run against the COMMITTED projections, not a fixture: the failure was two
+ * Run against the GENERATED projections, not a fixture: the failure was two
  * generated files disagreeing, and a fixture would agree by construction.
+ * Since B1 (owner, 2026-10-14) they are not committed: `e2e-global-setup.ts`
+ * builds both with `derive:publish`, from one `state:mount`, as the deploy
+ * does — the committed pair had disagreed (190 against 179) only because each
+ * was a snapshot of `cat/cat-harness/beans` taken at a different time.
  * `count.json` is what the icon row reads (`rail-icon-row.e2e.ts` holds that
  * it renders it), so each other surface is compared with that file.
  */

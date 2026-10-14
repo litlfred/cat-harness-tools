@@ -25,6 +25,18 @@ import { artefactStubFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 export default function globalSetup(): void {
+  // B1 (owner, 2026-10-14): the pages the specs read that no instance commits
+  // any more — built at publish because they are computed over the checkout's
+  // other instances or from a branch-kept graph (`builtAtPublish`). Built here
+  // the way the deploy builds them, from the mounted state, so the beans count
+  // in `_data/harness.json` and in `assets/beans/count.json` come from ONE
+  // mount (`beans-count-agrees` failed on two snapshots taken at different
+  // times). Needs `state:mount` first, which the e2e job runs; a missing mount
+  // fails here, loudly, rather than in forty specs. `E2E_DERIVED=present`
+  // skips it when a local run has already built them.
+  if (process.env.E2E_DERIVED !== "present") {
+    execFileSync("bun", ["run", "cat", "derive:publish"], { stdio: "inherit" });
+  }
   // The same resolution both specs use: the instance directory above `test/`.
   const stub = artefactStubFor(join(HARNESS_ROOT));
   for (const [file, script] of [
