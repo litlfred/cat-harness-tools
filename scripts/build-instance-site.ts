@@ -46,7 +46,7 @@
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
  *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
- *     mount-instance-docs, pdf-viewer, set-html-lang, publish-id-lookup,
+ *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages, `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
@@ -250,7 +250,7 @@ export type SiteProfile = "folio" | "ig-repo-site";
  * holds (smart-trust, 2026-10-14). `stage-ig-sites` owns that directory.
  */
 export const PROFILE_STEPS: Record<SiteProfile, ReadonlySet<string>> = {
-  folio: new Set(["sync", "landing", "mount", "pdf", "lang", "lookup", "own-chrome"]),
+  folio: new Set(["sync", "landing", "mount", "pdf", "suggest", "lang", "lookup", "own-chrome"]),
   "ig-repo-site": new Set(),
 };
 
@@ -657,6 +657,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
     if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
+    if (has.has("suggest")) run("suggest editor", `bun run ${TOOLS}/suggest-editor.ts --site ${s}`, root);
     if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
