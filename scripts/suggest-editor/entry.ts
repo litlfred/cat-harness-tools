@@ -1,8 +1,9 @@
-// The ✍ suggest editor's one browser module: Crepe, the KaTeX it renders
-// with, and what the dialog's toolbar and change marks need, all from ONE
-// copy of Milkdown and ProseMirror. `suggest-editor.ts` bundles it.
+// The ✍ suggest editor's one browser module: Crepe, and what the dialog's
+// toolbar and change marks need, all from ONE copy of Milkdown and
+// ProseMirror. `suggest-editor.ts` bundles it, adding as the default export
+// the KaTeX Crepe itself depends on (resolved through Crepe, not declared
+// here: a second KaTeX beside the root's would shadow it).
 export { Crepe } from "@milkdown/crepe";
-export { default } from "katex";
 // The toolbar: Milkdown's own commands, run through the editor's context.
 export { callCommand } from "@milkdown/kit/utils";
 export {

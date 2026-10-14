@@ -75,7 +75,6 @@
     "fast-xml-parser": "^5.10.1",
     "glob": "^13.0.6",
     "jsonld": "8",
-    "katex": "0.18.11",
     "liquidjs": "^10.29.0",
     "lunr": "2.3.9",
     "mdast-util-directive": "^3.1.0",

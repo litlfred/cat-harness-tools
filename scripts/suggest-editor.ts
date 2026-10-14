@@ -31,12 +31,17 @@ export const SUGGEST_EDITOR_DIR = "assets/vendor/crepe";
 
 const ENTRY = join(import.meta.dir, "suggest-editor");
 
-/** A package's directory, as module resolution from the bundle entry finds it. */
-export function packageDir(name: string): string {
-  const main = Bun.resolveSync(name, ENTRY);
+/** A package's directory, as module resolution from `from` (default: the bundle entry) finds it. */
+export function packageDir(name: string, from: string = ENTRY): string {
+  const main = Bun.resolveSync(name, from);
   const at = main.lastIndexOf(`/${name}/`);
   if (at < 0) throw new Error(`cannot place ${name} from ${main}`);
   return main.slice(0, at + name.length + 1);
+}
+
+/** The KaTeX Crepe depends on, found from Crepe's own directory. */
+export function katexDir(): string {
+  return packageDir("katex", packageDir("@milkdown/crepe"));
 }
 
 /** Bundle `crepe.js` (exports `Crepe`, and KaTeX as the default) and `crepe.css` (with KaTeX's fonts) into `<siteDir>/assets/vendor/crepe/`. */
@@ -44,7 +49,13 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
   const dir = join(resolve(siteDir), ...SUGGEST_EDITOR_DIR.split("/"));
   const work = mkdtempSync(join(tmpdir(), "suggest-editor-"));
   try {
-    const js = await Bun.build({ entrypoints: [join(ENTRY, "entry.ts")], target: "browser", format: "esm", minify: true });
+    // KaTeX is Crepe's own dependency, resolved from Crepe's directory, so the
+    // node views render with the KaTeX the editor ships and this package
+    // declares no second copy beside the root's.
+    const katex = katexDir();
+    const jsEntry = join(work, "entry.ts");
+    writeFileSync(jsEntry, `export * from ${JSON.stringify(join(ENTRY, "entry.ts"))};\nexport { default } from ${JSON.stringify(Bun.resolveSync("katex", katex))};\n`);
+    const js = await Bun.build({ entrypoints: [jsEntry], target: "browser", format: "esm", minify: true });
     if (!js.success || js.outputs.length !== 1) throw new Error(`the editor did not bundle: ${js.logs.map(String).join("; ")}`);
     // The stylesheet entry names each package's CSS by the path module
     // resolution finds, not by a relative node_modules path: standing alone, a
@@ -53,7 +64,7 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
     writeFileSync(cssEntry, [
       `${packageDir("@milkdown/crepe")}/lib/theme/common/style.css`,
       `${packageDir("@milkdown/crepe")}/lib/theme/frame/style.css`,
-      `${packageDir("katex")}/dist/katex.min.css`,
+      `${katexDir()}/dist/katex.min.css`,
     ].map((f) => `@import ${JSON.stringify(f)};`).join("\n") + "\n");
     const out = join(work, "out");
     const css = await Bun.build({ entrypoints: [cssEntry], outdir: out, minify: true, naming: { entry: "crepe.css", asset: "fonts/[name]-[hash].[ext]" } });
