@@ -659,9 +659,24 @@ describe("a DECLARED visualiser is a viewer — the other half of `flh4`", () =>
     expect(folio.visualisations.find((v) => v.kind === "schemas")?.path).toBe("/en/folio/models/");
   });
 
-  test("...but not when the folio HAS a site directory on disk", () => {
+  test("a data-only site directory (the build's own docs/_data) does not make the site authored", () => {
+    const f = fixture({ host: host(), "": { name: "folio", directories: [] } });
+    mkdirSync(join(f.repo, siteDirFor(f.repo), "_data"), { recursive: true });
+    writeFileSync(join(f.repo, siteDirFor(f.repo), "_data", "stickies.json"), "{}");
+    mkdirSync(join(f.repo, "tools"), { recursive: true });
+    writeFileSync(join(f.repo, "tools", "gen.ts"), "");
+    const viewer = { ref: "en/folio/models/index.html", writer: ["tools/gen.ts"] };
+    writeDeclaration(
+      f.repo,
+      JSON.stringify(decorate({ name: "folio", directories: [{ id: "m", path: "models/", graphTypologies: ["schemas"], coverage: { visualiser: [viewer] } }] }), null, 2),
+    );
+    expect(tilesOf(f).find((t) => t.name === "folio")!.visualisations.find((v) => v.kind === "schemas")?.path).toBe("/en/folio/models/");
+  });
+
+  test("...but not when the folio HAS an authored site on disk", () => {
     const f = fixture({ host: host(), "": { name: "folio", directories: [] } });
     mkdirSync(join(f.repo, siteDirFor(f.repo)), { recursive: true });
+    writeFileSync(join(f.repo, siteDirFor(f.repo), "_config.yml"), "title: x\n");
     mkdirSync(join(f.repo, "tools"), { recursive: true });
     writeFileSync(join(f.repo, "tools", "gen.ts"), "");
     const dir = (ref: string) => ({ id: "m", path: "models/", graphTypologies: ["schemas"], coverage: { visualiser: [{ ref, writer: ["tools/gen.ts"] }] } });

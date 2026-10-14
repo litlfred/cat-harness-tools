@@ -1558,11 +1558,18 @@ export function solveCrop(r: { x: number; y: number; w: number; h: number }): {
 }
 
 /**
- * Is this checkout-root instance's site GENERATED — no site directory on disk,
+ * Is this checkout-root instance's site GENERATED — no authored site on disk,
  * every page written into the site source at publish (litlfred/smart-ra)?
+ *
+ * "Authored" is a Jekyll config or a home page, not the directory existing:
+ * the build's own `gen-landing-data` step writes `docs/_data/stickies.json`
+ * into such a checkout before `compose-docs` runs, and a test on the
+ * directory alone flipped the answer mid-build — the Folders rows then
+ * linked to the platform (found on smart-ra's preview, 2026-10-14).
  */
 export function isGeneratedSite(instanceDir: string): boolean {
-  return !existsSync(join(instanceDir, siteDirFor(instanceDir)));
+  const site = join(instanceDir, siteDirFor(instanceDir));
+  return !["_config.yml", "index.md", "index.html"].some((f) => existsSync(join(site, f)));
 }
 
 /**

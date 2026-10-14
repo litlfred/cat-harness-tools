@@ -468,7 +468,9 @@ describe("rootOwnPages on a GENERATED folio site (smart-ra, 2026-10-14)", () => 
       };
       writeDeclaration(repo, JSON.stringify(decl, null, 2));
       expect([...(rootOwnPages(repo, "folio") ?? [])]).toEqual(["/en/folio/models/"]);
-      mkdirSync(join(repo, siteDirFor(repo)), { recursive: true });
+      mkdirSync(join(repo, siteDirFor(repo), "_data"), { recursive: true });
+      expect([...(rootOwnPages(repo, "folio") ?? [])]).toEqual(["/en/folio/models/"]);
+      writeFileSync(join(repo, siteDirFor(repo), "_config.yml"), "title: x\n");
       expect(rootOwnPages(repo, "folio")).toBeUndefined();
     } finally {
       rmSync(repo, { recursive: true, force: true });
