@@ -50,7 +50,10 @@ export default tseslint.config(
       // GENERATED and minified: `gen-navbar-assets.ts` bundles it from
       // `navbar-client.ts`, which IS linted; `navbar-assets.test.ts` holds the
       // bundle to its source byte for byte (bean `lnoy`).
-      "cat-harness/docs/assets/js/navbar.js",
+      // By NAME, not by site root: the chrome moved `docs/` → `site-chrome/`
+      // (2026-10) and a root-anchored path silently stopped matching — 31
+      // prefer-const errors in a minified bundle nobody wrote.
+      "**/assets/js/navbar.js",
       "**/.lake/**",
       // `**/`, not root-anchored: a PUBLISHABLE package builds into its own
       // `dist/`, and since `check:published-packages` builds it (bean `rsi6`),
@@ -85,7 +88,7 @@ export default tseslint.config(
       // ("Parsing error: Expression expected" at 1:2). Its behaviour is pinned
       // by `cat-harness-tools/test/search-lazy.e2e.ts`, which renders it through
       // Liquid and runs it.
-      "cat-harness/docs/assets/js/just-the-docs.js",
+      "**/assets/js/just-the-docs.js",
     ],
   },
   ...tseslint.configs.recommended,
@@ -168,7 +171,11 @@ export default tseslint.config(
     // its instance stub (`docs/<stub>/`) to package it for the repo split, and
     // a glob pinned to the old depth silently stops matching — which is a lint
     // rule that quietly covers nothing rather than one that fails loudly.
-    files: ["**/docs/**/_includes/**/*.js"],
+    // Now `**/_includes/`: the chrome left `docs/` for `site-chrome/`, the
+    // fourth move this glob has had to chase. A Jekyll `_includes/` is a
+    // Liquid fragment wherever it sits, so the relationship is the directory
+    // name alone.
+    files: ["**/_includes/**/*.js"],
     rules: {
       "@typescript-eslint/no-unused-expressions": "off",
     },

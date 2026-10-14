@@ -36,7 +36,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { navbarCss } from "../lib/navbar.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

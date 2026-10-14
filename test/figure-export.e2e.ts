@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -15,7 +15,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * page inlines — exactly the UML overview's shape.
  */
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 

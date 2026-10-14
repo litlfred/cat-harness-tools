@@ -21,11 +21,10 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SITE = join(ROOT, siteDirFor(ROOT));
 const read = (p: string) => readFileSync(join(ROOT, siteFileFor(ROOT, p)), "utf8");
 const CSS = read("assets/css/docs-ui.css");
 const JS = read("assets/js/docs-ui.js");

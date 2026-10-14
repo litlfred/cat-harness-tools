@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -27,7 +27,6 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * test that read a dependant instance's source would point the wrong way.
  */
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 

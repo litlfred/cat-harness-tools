@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readDeclaration, siteDir, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 export interface UmlPalette {
   /** `schema` | `scenario` | `process` | `state` | `test` → hex. */
