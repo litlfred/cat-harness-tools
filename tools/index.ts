@@ -28,11 +28,32 @@
  * depend on, not an implementation detail of one MCP server. Its checklist
  * projection, `bpmn-checklist`, is invoked by shell and stays in cat-harness.
  */
+import { existsSync, readFileSync } from "node:fs";
+
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { toolTypeIri } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+
+/**
+ * The base the I/O type IRIs are minted against when the caller names none:
+ * the HARNESS's declared `canonicalUrl`, because the tool-type vocabulary is
+ * the harness's and is published once, at its base — the same answer
+ * `discover.ts` passes every instance's `tools()`. An empty base would mint
+ * relative IRIs, which the Tool schema refuses at load (measured standalone).
+ */
+function harnessBase(): string {
+  const p = declarationPathIn(HARNESS_ROOT);
+  if (p === undefined || !existsSync(p)) return "";
+  try {
+    return (JSON.parse(readFileSync(p, "utf-8")) as { canonicalUrl?: string }).canonicalUrl ?? "";
+  } catch {
+    return "";
+  }
+}
 
 export function tools(baseUrl?: string): ToolDefinition[] {
-  const B = baseUrl ?? "";
+  const B = baseUrl ?? harnessBase();
   const t = (n: Parameters<typeof toolTypeIri>[1]): string => toolTypeIri(B, n);
 
   return [
