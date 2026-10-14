@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { publishedRoot, recipeFromConfig, stepEnv } from "../build-instance-site.ts";
+import { publishedRoot, recipeFromConfig, siteStepEnv } from "../build-instance-site.ts";
 import { parityShortfall, siteFeatures } from "../site-parity.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
@@ -111,7 +111,7 @@ describe("the recipe an IG declares (site.build)", () => {
   });
 
   test("every step is told the build's own values in its environment", () => {
-    expect(stepEnv({ instance: "r", title: "R", baseurl: "/r", url: "https://o.github.io", linkRoot: "L", work: "/w", source: "/w/s", site: "/w/_site", repository: "o/r", commit: "abc", ref: "main" })).toEqual({
+    expect(siteStepEnv({ instance: "r", title: "R", baseurl: "/r", url: "https://o.github.io", linkRoot: "L", work: "/w", source: "/w/s", site: "/w/_site", repository: "o/r", commit: "abc", ref: "main" })).toEqual({
       SITE_REPOSITORY: "o/r", SITE_COMMIT: "abc", SITE_REF: "main",
       SITE_INSTANCE: "r", SITE_TITLE: "R", SITE_BASEURL: "/r", SITE_URL: "https://o.github.io", SITE_LINK_ROOT: "L",
       SITE_WORK: "/w", SITE_SOURCE: "/w/s", SITE_DIR: "/w/_site",

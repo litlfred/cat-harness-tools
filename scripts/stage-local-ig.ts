@@ -657,3 +657,90 @@ export function runIgBuild(repo: string, wf: Workflow, ctx: ExprContext, log: (s
   }
   return ctx;
 }
+
+// ── An IG repository's folio site ──────────────────────────────────────────
+
+/**
+ * The checkout scripts that compose an IG repository into the folio site:
+ * a source step (before Jekyll, into the site source) and a site step (after
+ * it, on the built site). This layer names the SLOTS; a layer above fills them
+ * by declaring scripts of these names (`checkoutScripts`), and the script
+ * table finds them. Nothing here names that layer.
+ */
+export const IG_SITE_STEPS = { source: "ig-site:compose", site: "ig-site:publisher-pages" } as const;
+
+/**
+ * Root entries an IG repository's publish keeps besides the folio's own:
+ * `branches/`, where its IG workflow's per-branch previews are. Deleting them
+ * is a separate question for the owner, never a side effect of a publish.
+ */
+export const IG_KEEP = ["branches"] as const;
+
+/**
+ * The root file an IG repository's folio site must carry before it is
+ * published: `folio-build.json`, which `ig-site:publisher-pages` writes, and
+ * by which {@link FOLIO_ROOT_MARKERS} recognises the root as a folio's, so a
+ * later `--bare-ig` deploy refuses to clean it away.
+ */
+export const IG_SITE_STAMP = "folio-build.json" as const;
+
+/** The site's title and description, from the IG's `sushi-config.yaml`; the repository's name when it says none. */
+export function igIdentity(sushiText: string | undefined, repoName: string): { title: string; description?: string } {
+  let y: { title?: unknown; name?: unknown; description?: unknown } = {};
+  try {
+    y = (sushiText ? parseYaml(sushiText) : {}) ?? {};
+  } catch {
+    y = {};
+  }
+  const s = (v: unknown) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined);
+  const title = s(y.title) ?? s(y.name) ?? repoName;
+  const description = s(y.description);
+  return { title, ...(description ? { description } : {}) };
+}
+
+export interface IgFolioSite {
+  /** The mounted instance whose chrome the site wears: `index.config.json` `site.landing`. */
+  scope: string;
+  title: string;
+  description?: string;
+  sourceSteps: string[];
+  siteSteps: string[];
+  keep: string[];
+}
+
+/**
+ * Whether an IG repository publishes as a folio site, and how. Pure over what
+ * the checkout holds. Owner, 2026-10-14: an IG repository needs no harness of
+ * its own, only `index.config.json` mounting its base harness, and publishes
+ * as the folio's just-the-docs site with the IG composed in, not as bare
+ * IG Publisher output. So:
+ *
+ * - no `index.config.json`: not harnessed — the bare IG route (`why`);
+ * - no mounted layer provides {@link IG_SITE_STEPS}: the bare route (`why`),
+ *   since nothing can compose the IG;
+ * - otherwise the folio route, scoped to the landing instance the index
+ *   names; an index that names none is REFUSED, because the chrome cannot be
+ *   scoped by guessing among the layers the repository mounts.
+ */
+export function igFolioSite(o: {
+  hasIndexConfig: boolean;
+  scripts: ReadonlySet<string>;
+  landing: { kind: string; name?: string; reason?: string };
+  identity: { title: string; description?: string };
+}): { site?: IgFolioSite; why?: string } {
+  if (!o.hasIndexConfig) return { why: "no index.config.json: this IG mounts no harness, so its site is the IG Publisher's output" };
+  const lacking = Object.values(IG_SITE_STEPS).filter((n) => !o.scripts.has(n));
+  if (lacking.length) return { why: `no mounted layer provides ${lacking.join(" and ")}: nothing here composes the IG into a folio site, so its site is the IG Publisher's output` };
+  if (o.landing.kind !== "instance" || !o.landing.name) {
+    throw new Error(`index.config.json names no landing instance (${o.landing.kind}${o.landing.reason ? `: ${o.landing.reason}` : ""}): add "site": { "landing": "<the harness this IG is built on>" } so the site's chrome is scoped to it`);
+  }
+  return {
+    site: {
+      scope: o.landing.name,
+      ...o.identity,
+      sourceSteps: [IG_SITE_STEPS.source],
+      siteSteps: [IG_SITE_STEPS.site],
+      keep: [...IG_KEEP],
+    },
+  };
+}

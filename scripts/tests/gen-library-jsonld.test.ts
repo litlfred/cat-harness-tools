@@ -30,6 +30,7 @@ import {
   licenceProperties,
   LICENCE_FILENAME,
   libraryInstanceOf,
+  unknownArgument,
 } from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.ts";
@@ -658,5 +659,16 @@ describe("the instance an entry belongs to", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("an argument run() would not read is refused before anything is written", () => {
+  test("--help, a typo, or a stray value is named; the real flags and their values pass", () => {
+    expect(unknownArgument(["--help"])).toBe("--help");
+    expect(unknownArgument(["--chek"])).toBe("--chek");
+    expect(unknownArgument(["library/x"])).toBe("library/x");
+    expect(unknownArgument([])).toBeUndefined();
+    expect(unknownArgument(["--check", "--prune", "--doc", "x"])).toBeUndefined();
+    expect(unknownArgument(["--entry", "ingest-staging/x"])).toBeUndefined();
   });
 });
