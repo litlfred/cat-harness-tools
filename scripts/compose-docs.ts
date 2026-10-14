@@ -120,6 +120,7 @@ import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visua
 import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
+import { expandGlobScopes, type ExpandedScope } from "./lib/default-scope-globs.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -707,6 +708,13 @@ export interface ComposeReport {
    * the site carries still stands there (a site not yet regenerated).
    */
   readonly forwards: { written: string[]; superseded: string[] };
+  /**
+   * Each GLOB front-matter scope of the composed `_config.yml` and the exact
+   * paths it was expanded to (owner, 2026-10-14: "Explicit scopes"; see
+   * `lib/default-scope-globs.ts`). Empty when the config has none, and then
+   * the config's bytes are untouched.
+   */
+  readonly scopes: ExpandedScope[];
 }
 
 /**
@@ -986,6 +994,24 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   // ever writes over the other or over a page.
   const forwards = opts.shell ? { written: [], superseded: [] } : writeForwardingPages(out, repo, withheld);
 
+  // THE GLOB SCOPES, EXPANDED, over the FINISHED tree (owner, 2026-10-14:
+  // "Explicit scopes"). Jekyll re-runs a glob scope's `Dir.glob` on every
+  // `to_liquid` of every page, which was most of the docs build's CPU; one
+  // exact-path scope per match is the same set of pages in Jekyll 3.10 and 4
+  // at a fraction of the cost. Generated here, never written by hand, so a
+  // page added to a globbed folder is covered by the next compose. Last,
+  // after the aliases and forwarding pages, so it sees every file this step
+  // writes; the config is rewritten only when it held a glob.
+  let scopes: ExpandedScope[] = [];
+  const configPath = join(out, "_config.yml");
+  if (existsSync(configPath)) {
+    const r = expandGlobScopes(parseYaml(readFileSync(configPath, "utf-8")), out);
+    if (r.expanded.length > 0) {
+      writeFileSync(configPath, stringifyYaml(r.config));
+      scopes = r.expanded;
+    }
+  }
+
   // DEDUPED. A path present in two layers is withheld once per layer, and a
   // report listing it twice made `withheld.length` stop meaning "files this
   // tree does not carry" — which is the only thing a reader would use it for.
@@ -1002,6 +1028,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     carried: carry,
     aliases,
     forwards,
+    scopes,
     ...(scoped ? { scoped } : {}),
   };
 }
@@ -1113,6 +1140,9 @@ if (import.meta.main) {
     console.log(`  ${d.carry ? "CARRIED " : "STUBBED "} ${d.instance.under} — ${d.why}`);
   }
 
+  // Each glob scope with what it became, so a reader can see a folder's pages
+  // were covered rather than trust a count.
+  for (const x of r.scopes) console.log(`  SCOPE    ${x.glob} -> ${x.paths.length} exact path(s): ${x.paths.join(", ")}`);
   console.log(`  ${r.aliases.written.length} alias redirect(s) written`);
   console.log(
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +

@@ -51,6 +51,7 @@ import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { parse as parseYaml } from "yaml";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { expandGlobScopes } from "../lib/default-scope-globs.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -150,7 +151,12 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // D1: the config is the merge of the two, setting for setting.
     const chromeCfg = parseYaml(readFileSync(join(instanceLayers[0]!.dir, "_config.yml"), "utf-8"));
     const docsCfg = parseYaml(readFileSync(join(instanceLayers[1]!.dir, "_config.yml"), "utf-8"));
-    expect(parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8"))).toEqual(mergeConfig(chromeCfg, docsCfg).merged);
+    // ...with its GLOB scopes expanded over the composed tree (owner,
+    // 2026-10-14: "Explicit scopes"), which `default-scope-globs.test.ts`
+    // holds to the globs' own match sets.
+    expect(parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8"))).toEqual(
+      expandGlobScopes(mergeConfig(chromeCfg, docsCfg).merged, dest).config,
+    );
 
     const before = new Map<string, string>();
     for (const l of instanceLayers) for (const [p, h] of treeDigest(l.dir)) before.set(p, h);
