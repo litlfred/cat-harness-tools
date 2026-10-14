@@ -394,6 +394,39 @@ const LAYERING_SPECIFICATIONS = [
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
+ * X5 — a DATED DECISION RECORD (owner, 2026-10-14, Q1 of the #2529
+ * reference-direction review: "Exempt as records").
+ *
+ * A proposal under an instance's `docs/proposals/` whose file name ends in the
+ * date it was written (`<topic>-YYYY-MM-DD.md`, or the `.json` measurement it
+ * carries) is a RECORD: it states the options, the measurements and the
+ * layering as they stood on that day, and the owner answered it as written.
+ * Rewording it afterwards so that it no longer names a higher layer would
+ * falsify what was asked and what was decided — the same reason X3 leaves the
+ * layering specifications naming the layers they define.
+ *
+ * Deliberately narrow, and each half is held by a test:
+ *
+ *  - **dated** — the file name must END in `-YYYY-MM-DD`. The undated pages
+ *    beside them (`index.md`, `README.md`, a proposal still being argued
+ *    without a date) are living documents, edited as the answer changes, and
+ *    stay `wrong-direction`.
+ *  - **a proposal** — directly under `docs/proposals/` of an instance root,
+ *    not in a sub-directory and not in any other `docs/` section.
+ *
+ * A pattern rather than a named list, unlike X3, because the owner ruled on
+ * the CLASS ("dated decision records"), not on three files: every dated record
+ * written later is the same kind of thing for the same reason.
+ */
+// declared-path-literal: the shape of a dated proposal record, repo-root-relative because that is how an occurrence's file is reported
+const DATED_PROPOSAL_RECORD_FILE = /^[a-z0-9][a-z0-9-]*\/docs\/proposals\/[a-z0-9][a-z0-9-]*-\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\.(?:md|json)$/;
+export const DATED_PROPOSAL_RECORD: ReferenceExemption = {
+  file: DATED_PROPOSAL_RECORD_FILE,
+  reason:
+    "X5, a DATED DECISION RECORD (owner, 2026-10-14, Q1: \"Exempt as records\"): a proposal whose file name carries the date it was written records the layering, the options and the measurements as they stood that day, and the owner answered it as written. Rewording it to stop naming a higher layer would falsify the record. Dated files directly under an instance's `docs/proposals/` only; the undated index and living pages beside them are read",
+};
+
+/**
  * X4 — a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z,
  * session_01UC1NuEuSy1MBNpEhnDuiGj: "2 y", ruling (ii) — *"rule that a harness
  * skill may name a cat-harness-tools script"*).
@@ -469,6 +502,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
     reason:
       "X3, a LAYERING SPECIFICATION (owner, Q-B 2026-10-01): the file's subject IS the instance graph — it defines the layers, so it names them. Moved to any one layer it could no longer describe the others. A named list of three, ruled by the owner, never a pattern",
   },  DEFINITION_NAMES_IMPLEMENTATION,
+  DATED_PROPOSAL_RECORD,
 ];
 
 /**
@@ -520,14 +554,16 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * entries were DELETED rather than left, because an entry recording a choice
  * nobody has to make any more is a question the owner would be asked twice.
  * Neither file was edited to earn that — the generator was.
+ *
+ * The second time: `cat-harness/docs/en/cat-harness/processes/index.md`,
+ * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
+ * that generator began writing `generated:` into every page it draws
+ * (folio-assistant#2529, PR 3 of the reference-direction batch).
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/docs/cat-harness/published-graphs.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/cat-harness.json", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/smart-base-tools.md", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/ig-artifact-ingestion.md", names: 2 },
-  { file: "folio-assistant-core/scripts/ingest-ig-artifacts.ts", names: 3 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
@@ -536,17 +572,13 @@ const PENDING: readonly { file: string; names: number }[] = [
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "folio-assistant-core/schemas/fhir-artifact-index.ts", names: 2 },
   { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "fhir-harness/AGENTS.md", names: 4 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-preprocessing.md", names: 3 },
   { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
   { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
-  { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
   { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
@@ -556,17 +588,12 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
   { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
   { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
-  { file: "smart-ig/README.md", names: 2 },
-  { file: "smart-ig/AGENTS.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },
   { file: "smart-base/README.md", names: 2 },
   { file: "smart-base/AGENTS.md", names: 2 },
-  { file: "smart-base/tools/index.ts", names: 2 },
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
   { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
   { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
-  { file: "cat-harness/docs/en/cat-harness/processes/index.md", names: 4 }, // moved by t4xb from docs/processes/ (ruling (i), 2026-10-11)
-  { file: "smart-ig/smart-ig.json", names: 2 },
 ];
 
 /**

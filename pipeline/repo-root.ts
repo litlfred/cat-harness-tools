@@ -105,7 +105,7 @@ export function findContentRepoRoot(): string {
  *
  * Measured 2026-09-29 (folio-assistant#1492): qa-sweep loaded from
  * `cat-harness/` and registered 0 contributed checkers, so
- * folio-assistant-sci's `proof-compile-cost` and `proof-no-cost-regression`
+ * the contributed `proof-compile-cost` and `proof-no-cost-regression`
  * never ran in a real sweep, while `qa-checker-discovery.test.ts`, which
  * loads from the repository root, found both.
  */

@@ -9,6 +9,14 @@
 # `.git` directories are removed so they are discovered as instances, the
 # same as a lock mount.
 #
+# bootstrap-tools and bootstrap are put at main beside cat-harness main, for
+# the same reason one level down: cat-harness main's generated files are
+# produced with bootstrap-tools main. The index lock pinned an older
+# bootstrap-tools, whose `subgraph-readmes` splice predates the blank line
+# before the end marker (bootstrap-tools e9fb7d1d). Every library README that
+# cat-harness main committed then read as stale, and `library-readmes` failed
+# on main and on every PR for a reason no PR here could fix.
+#
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
 # PR newly breaks. The step summary lists every failure, old and new.
@@ -16,11 +24,13 @@
 # NO E2E JOB, and why (bean cat-tools-g9m3, Done-when 3). The Playwright suite
 # (`bun run cat test:e2e`, 83 `*.e2e.ts` specs under `test/` on 2026-10-12) cannot be run
 # meaningfully against this mount yet: with the paths fixed (#65), collection
-# still stops at a spec that throws "no instance named who-iris declares a
-# visualiser catalogue", because the who-iris pinned in folio-assistant's
-# `index.lock.json` predates that visualiser. A job here would report 0 specs,
+# still stops at a spec that throws "no instance named <catalogue instance>
+# declares a visualiser catalogue", because the instance that declares the
+# visualiser catalogue the spec needs is pinned, in folio-assistant's
+# `index.lock.json`, at a commit that predates that visualiser. A job here would report 0 specs,
 # which reads as a pass and is the 1xhc shape this repository keeps paying for.
-# The job belongs here once who-iris is re-pinned (lane A, bean kpci): then add
+# The job belongs here once that instance is re-pinned (lane A, bean kpci) --
+# or in the index's CI, which mounts every layer: then add
 # a job that fails when `playwright test --list` collects fewer than the specs
 # on disk, and runs them.
 
@@ -49,12 +59,16 @@ jobs:
     timeout-minutes: 5
     outputs:
       cat-harness: ${{ steps.pin.outputs.cat-harness }}
+      bootstrap-tools: ${{ steps.pin.outputs.bootstrap-tools }}
+      bootstrap: ${{ steps.pin.outputs.bootstrap }}
       index: ${{ steps.pin.outputs.index }}
     steps:
       - id: pin
         run: |
           set -euo pipefail
           echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "bootstrap-tools=$(git ls-remote https://github.com/litlfred/bootstrap-tools refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "bootstrap=$(git ls-remote https://github.com/litlfred/bootstrap refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -79,16 +93,24 @@ jobs:
         name: Mount every instance from the index lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
-        name: Use cat-harness main, at the pinned commit
+        # cat-harness and the closure its main is generated with: all three at
+        # the commits the pin job read (see the header).
+        name: Use cat-harness, bootstrap-tools and bootstrap main, at the pinned commits
         env:
-          SHA: ${{ needs.pin.outputs.cat-harness }}
+          CAT_HARNESS: ${{ needs.pin.outputs.cat-harness }}
+          BOOTSTRAP_TOOLS: ${{ needs.pin.outputs.bootstrap-tools }}
+          BOOTSTRAP: ${{ needs.pin.outputs.bootstrap }}
         run: |
           set -euo pipefail
-          rm -rf fa/cat-harness
-          git init -q fa/cat-harness
-          git -C fa/cat-harness fetch -q --depth 1 https://github.com/litlfred/cat-harness "$SHA"
-          git -C fa/cat-harness checkout -q --detach FETCH_HEAD
-          rm -rf fa/cat-harness/.git
+          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP"; do
+            name="${pair%%:*}" sha="${pair#*:}"
+            test -n "$sha" || { echo "::error::no pinned commit for $name"; exit 1; }
+            rm -rf "fa/$name"
+            git init -q "fa/$name"
+            git -C "fa/$name" fetch -q --depth 1 "https://github.com/litlfred/$name" "$sha"
+            git -C "fa/$name" checkout -q --detach FETCH_HEAD
+            rm -rf "fa/$name/.git"
+          done
       - name: Put the PR in place of the locked cat-harness-tools
         run: rm -rf fa/cat-harness-tools
       - uses: actions/checkout@v4

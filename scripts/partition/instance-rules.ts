@@ -1261,21 +1261,10 @@ export const RULES: Rule[] = [
   {
     repo: "base",
     exact: [
-      // Measures whether an IG's SOURCE graph carries dependency edges for its
-      // logic layer — Library, PlanDefinition, Measure (bean `f4gj`). Its name
-      // carries none of the keyword rule's tokens, so it fell through every
-      // rule when it arrived.
-      //
-      // BASE rather than core, although its subject is content and
-      // `check-artifact-index.ts` was core on exactly that reasoning — it has since
-      // MOVED to `folio-assistant-core/scripts/` under bean `yj6r`, so no rule in
-      // this file adjudicates it any more; see the note where its entry stood. The
-      // difference is the import: this one reads `pipeline/fsh-cone.ts`
-      // to compare against what that tool extracts, and `fsh-cone` is base by
-      // the keyword rule underneath. Calling this core would buy the one thing
-      // the partition exists to prevent — a `folio-assist-core -> smart-base`
-      // wrong-direction edge — to gain nothing, since FHIR Shorthand and a
-      // cpg/cqfmeasures profile URL are as WHO-specific as a subject gets.
+      // `measure-logic-layer-edges.ts` (bean `f4gj`) stood here. It left this
+      // layer with the FSH cone it measures, on the owner's ruling of 2026-10-14
+      // (Q3: FHIR Shorthand belongs to the FHIR IG layer), so no rule in this
+      // file adjudicates either any more.
     ],
   },
   {

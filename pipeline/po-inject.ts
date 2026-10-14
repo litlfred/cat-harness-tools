@@ -1,11 +1,11 @@
 /**
  * PO injection — produces translated Markdown from a PO file.
  *
- * ## Origin: smart-base `inject_translations.py`
+ * ## Origin: the upstream `inject_translations.py`
  *
  * This module is a TypeScript port of the markdown injection logic in
- * `WorldHealthOrganization/smart-base/input/scripts/inject_translations.py`
- * (lines 608–818, function `inject_markdown` and helpers). The Python
+ * <https://github.com/WorldHealthOrganization/smart-base/blob/main/input/scripts/inject_translations.py>
+ * ("upstream" below; lines 608–818, function `inject_markdown` and helpers). The Python
  * original injects translations into `input/pagecontent/*.md` files;
  * this injects into folio content blocks.
  *
@@ -17,7 +17,7 @@
  * it looks up the `msgid` (after cleaning) in the PO translations
  * dictionary and substitutes the `msgstr`.
  *
- * Key design choices (from smart-base):
+ * Key design choices (from upstream):
  *
  * - **Paragraph re-wrapping:** When a multi-line paragraph is translated,
  *   the first line is replaced with the full translated text and
@@ -25,10 +25,10 @@
  *   non-blank lines as one paragraph, so this is functionally equivalent.
  *
  * - **Liquid variable restoration:** `{lqd_expr}` in the translated text
- *   is restored to `{{ expr }}` Liquid syntax (smart-base compat).
+ *   is restored to `{{ expr }}` Liquid syntax (upstream compat).
  *
  * - **Fuzzy entries skipped:** Entries flagged `#, fuzzy` in the PO file
- *   are not injected, matching smart-base's conservative approach.
+ *   are not injected, matching the upstream script's conservative approach.
  *
  * @module pipeline/po-inject
  */
@@ -59,7 +59,7 @@ const LQD_VAR_RE = new RegExp("\\{" + LQD_PREFIX + "([^{}\n]+)\\}", "g");
 
 /**
  * Restore `{lqd_expr}` gettext variables back to `{{ expr }}` Liquid
- * syntax. Mirrors smart-base `_gettext_to_liquid()`.
+ * syntax. Mirrors upstream `_gettext_to_liquid()`.
  */
 function gettextToLiquid(text: string): string {
   return text.replace(LQD_VAR_RE, (_match, expr: string) => `{{ ${expr} }}`);
@@ -86,7 +86,7 @@ export interface PoEntry {
 /**
  * Parse a PO file into a msgid → msgstr dictionary.
  *
- * Mirrors smart-base `parse_po_file()`: only entries with a non-empty
+ * Mirrors upstream `parse_po_file()`: only entries with a non-empty
  * msgstr are included. **Fuzzy entries are skipped** to avoid injecting
  * uncertain translations.
  */
@@ -264,7 +264,7 @@ export interface InjectionResult {
  * cleaned msgid, restores Liquid `{{ }}` syntax in the translated
  * string, and writes it back into the source lines.
  *
- * Mirrors smart-base `inject_markdown()` in `inject_translations.py`
+ * Mirrors upstream `inject_markdown()` in `inject_translations.py`
  * lines 608–818.
  */
 export function injectMarkdown(

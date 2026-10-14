@@ -43,6 +43,8 @@ import { discoverTools } from "../tools/discover.js";
 
 /** The harness this layer implements: its Tool nodes are served for every folio. */
 const HARNESS_ROOT = resolve(import.meta.dir, "..", "..", "cat-harness");
+/** This layer, which declares the Tool nodes whose in-process module is its own code (`tools/index.ts`). */
+const TOOLS_LAYER_ROOT = resolve(import.meta.dir, "..");
 
 /**
  * Which layer owns a group: the name of the instance whose Tool node declares
@@ -268,7 +270,12 @@ export async function registerServedToolGroups(
   folioRoot: string,
   extraArgs: readonly unknown[] = [],
 ): Promise<{ outcomes: ToolGroupOutcome[]; failures: string[] }> {
-  const { sets, failures } = servedToolGroups(folioRoot, [{ name: "cat-harness", root: HARNESS_ROOT }]);
+  const { sets, failures } = servedToolGroups(folioRoot, [
+    { name: "cat-harness", root: HARNESS_ROOT },
+    // A server runs from this layer, so the Tool nodes it declares are served
+    // whether or not the folio's `needs` chain names it (`bpmn-engine`).
+    { name: "cat-harness-tools", root: TOOLS_LAYER_ROOT },
+  ]);
   const outcomes: ToolGroupOutcome[] = [];
   for (const set of sets) outcomes.push(...(await registerDeclaredToolGroups(server, set.groups, set.root, extraArgs)));
   return { outcomes, failures };

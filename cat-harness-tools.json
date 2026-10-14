@@ -71,10 +71,8 @@
     {
       "id": "cat-harness-tools-tools",
       "path": "tools/",
-      "description": "`discover.ts`, the reader that finds every declared `tools` graph's Tool nodes by asking the declarations (bean `p0za`). Code, not Tool nodes: the nodes stay declared in `cat-harness/tools/`. Undeclared until 2026-10-14, so a remote mount (which lays down declared directories only) left it out and `folio-assistant-core`'s `glossary-extract.ts`, which imports it, had nothing to import; declared now as a named `code` subgraph, which is also what exports it by package name (`scripts/package-exports.ts`, bean `7pvn`).",
-      "graphTypologies": [
-        "code"
-      ]
+      "description": "`discover.ts`, the reader that finds every declared `tools` graph's Tool nodes by asking the declarations (bean `p0za`), and `index.ts`, this layer's own `tools` graph: the Tool nodes whose in-process module is code here (`bpmn-engine`), declared beside that code so the module path is instance-relative (owner, 2026-10-14: \"Move the node to tools\"). Every other Tool node, the shell-invoked ones included, stays declared in `cat-harness/tools/`. Undeclared until 2026-10-14, so a remote mount (which lays down declared directories only) left it out and `folio-assistant-core`'s `glossary-extract.ts`, which imports it, had nothing to import; declared now as a named `code` subgraph, which is also what exports it by package name (`scripts/package-exports.ts`, bean `7pvn`).",
+      "graphTypologies": ["tools", "code"]
     },
     {
       "id": "cat-harness-tools-python",

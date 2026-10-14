@@ -87,6 +87,7 @@ import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
+import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -3096,7 +3097,7 @@ for (const r of reports) {
   written.add(resolve(p));
   // Never overwrite a sidecar whose judgements could not be moved.
   if (attUnknown.has(r)) continue;
-  const text = serialise(r);
+  const text = serialise(withPriorAdversarialReviews(r, p));
   if (check) {
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
     if (current !== text) stale.push(relative(root, p));
