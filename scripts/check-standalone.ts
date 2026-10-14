@@ -37,7 +37,7 @@
  * - **could not determine** (2): the probe could not produce a summary, or no
  *   baseline is committed. Never rendered as held.
  *
- * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--update]
+ * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--update | --measured-out <file>]
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -181,7 +181,18 @@ function main(argv: string[]): number {
     return STANDALONE_EXIT.undetermined;
   }
 
-  const verdict = judge(probeStandalone(repoRoot, name, decls), readBaseline(name), name);
+  const probe = probeStandalone(repoRoot, name, decls);
+  const out = arg("--measured-out", argv);
+  if (out) {
+    // CI measures base and head with this, and judges the pair against the
+    // baseline in .github/scripts/compare-standalone.py: cat-harness main moves
+    // under both, so only what head newly breaks is the PR's.
+    const keyed = probe.state === "measured" ? { ...probe, findings: [...new Set(probe.findings.map((k) => layerRelativeKey(k, name)))].sort() } : probe;
+    writeFileSync(out, JSON.stringify(keyed, null, 2) + "\n");
+    console.log(`wrote ${out}: ${probe.state}${probe.state === "measured" ? `, ${probe.count} failing` : ` (${probe.note})`}`);
+    return probe.state === "measured" ? STANDALONE_EXIT.held : STANDALONE_EXIT.undetermined;
+  }
+  const verdict = judge(probe, readBaseline(name), name);
   if (argv.includes("--update") && verdict.measured) {
     writeBaseline(name, verdict.measured);
     console.log(`wrote ${relative(repoRoot, BASELINE_PATH)} for ${name}: ${verdict.measured.failed} failing standalone.`);
