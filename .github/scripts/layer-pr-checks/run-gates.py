@@ -107,13 +107,25 @@ def closure(own, known, root):
     return seen
 
 
-def declared_gates(root, name, path):
+def script_runner(root):
+    """The command that resolves a script name against every instance's
+    declared scripts: the root's own `cat` script where it has one (the
+    folio-assistant index), else the harness runner it would call. A root with
+    no `cat` script (smart-ra) turned `bun run cat X` into /usr/bin/cat X, so
+    every declared gate "failed" on both sides and was judged on nothing."""
+    pkg = read_json(os.path.join(root, "package.json")) or {}
+    if "cat" in (pkg.get("scripts") or {}):
+        return "bun run cat"
+    return "bun cat-harness-tools/scripts/run-script.ts"
+
+
+def declared_gates(root, name, path, runner):
     pkg = read_json(os.path.join(root, path, "package.json")) or {}
     scripts = {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}
     # Through the index's own runner, as the index's CI runs them: it resolves
     # a name against every instance's declared scripts.
     return {
-        f"{name}:{s}": f"bun run cat {s}"
+        f"{name}:{s}": f"{runner} {s}"
         for s in sorted(scripts)
         if s.startswith("check:") or s.endswith(":check")
     }
@@ -149,8 +161,10 @@ def main():
             gates[f"graph:{n}:{k}"] = v.format(tmp=tmp, instance=n, path=path)
     gates.update({f"graph:{k}": v for k, v in CHECKOUT_GATES.items()})
     seen_scripts = set()
+    runner = script_runner(root)
+    print(f"script runner: {runner}", flush=True)
     for n in harness:
-        for gname, command in declared_gates(root, n, known[n]).items():
+        for gname, command in declared_gates(root, n, known[n], runner).items():
             if command in seen_scripts:
                 continue  # one script, run once, named by the first instance that declares it
             seen_scripts.add(command)
