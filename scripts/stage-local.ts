@@ -908,6 +908,7 @@ export async function stageDeclared(
     ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
+    ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
     ...(target === "preview" ? { staging: branch } : {}),
     mount: true,
     fresh: false,
