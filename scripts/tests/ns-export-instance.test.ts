@@ -6,13 +6,17 @@
  */
 import { describe, expect, test } from "bun:test";
 
+import { join } from "node:path";
+
 import {
+  bootstrapVocabularyPath,
   buildVocabulary,
   conceptSchemeIriFor,
   findPlatformRoot,
   instancesPublishingNs,
   namespaceForPrefixOrLayer,
 } from "../ns-export.ts";
+import { buildVocabularyOne } from "../publish-instance-context.ts";
 
 type Node = Record<string, unknown>;
 interface Doc {
@@ -189,3 +193,24 @@ describe("ns:check fails on a folioType whose owner does not publish an ns defin
     expect(report.undefinedTerms).toContain("unpublishing-owner:WeirdKind");
   });
 });
+
+describe("bootstrapVocabularyPath resolves from both the index root and the cat-harness root (bean 63q4)", () => {
+  test("bootstrapVocabularyPath returns <platformRoot>/bootstrap/ns.jsonld for both roots", () => {
+    const platform = findPlatformRoot();
+    const expected = join(platform, "bootstrap", "ns.jsonld");
+    expect(bootstrapVocabularyPath()).toBe(expected);
+    expect(bootstrapVocabularyPath(join(platform, "cat-harness"))).toBe(expected);
+    expect(bootstrapVocabularyPath(platform)).toBe(expected);
+  });
+
+  test("buildVocabularyOne builds bootstrap's vocabulary when given the index root", () => {
+    const platform = findPlatformRoot();
+    const out = buildVocabularyOne(platform, "bootstrap");
+    expect(out.kind).toBe("built");
+    if (out.kind !== "built") return;
+    expect(out.url).toBe("https://litlfred.github.io/bootstrap/0.1.0/ns");
+    expect(out.paths).toEqual(["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"]);
+    expect(out.terms).toBeGreaterThan(0);
+  });
+});
+
