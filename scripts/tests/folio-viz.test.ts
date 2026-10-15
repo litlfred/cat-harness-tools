@@ -10,6 +10,7 @@ import { basename, join } from "node:path";
 
 import { readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
 import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
+import { FolioGraphProjectionSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
@@ -228,6 +229,32 @@ describe("the 'list' view is the harness's own file list (bean ohx6)", () => {
       if (!d.present) expect(d.files).toEqual([]);
       for (const f of d.files) expect(f.size).toMatch(/^\d+(\.\d)? (B|KB|MB|GB)$/);
     }
+  });
+
+  // The writer and the schema check:kind-validators parses its output with
+  // are two files in two layers; they disagreed once ("directories.0:
+  // Unrecognized key: files", after the list view added the field), and only
+  // the gate over the committed artefact said so. This states the contract
+  // where the writer is: what projection() emits, the schema accepts.
+  test("the projection parses with FolioGraphProjectionSchema, files included", () => {
+    const r = FolioGraphProjectionSchema.safeParse(projection(g!));
+    expect(r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([]);
+    const withFiles = projection({
+      directories: [
+        { dir: "folio", present: true, nodes: 0, files: [{ path: "README.md", bytes: 1131 }] },
+        { dir: "gone", present: false, nodes: 0, files: [] },
+      ],
+      nodes: [],
+    });
+    expect(FolioGraphProjectionSchema.safeParse(withFiles).success).toBe(true);
+  });
+
+  test("the schema is still strict: a file row with a key the writer never emits is refused", () => {
+    const p = projection({ directories: [{ dir: "folio", present: true, nodes: 0, files: [{ path: "a", bytes: 1 }] }], nodes: [] }) as {
+      directories: Array<{ files: Array<Record<string, unknown>> }>;
+    };
+    p.directories[0]!.files[0]!.mtime = "2026-10-15";
+    expect(FolioGraphProjectionSchema.safeParse(p).success).toBe(false);
   });
 
   test("the page has a place for the list view, drawn before the node table", () => {

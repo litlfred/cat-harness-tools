@@ -32,7 +32,9 @@
  *  2. `bun install --no-save` in the checkout and in every mounted instance
  *     with a package.json, so a mount still hashes to its lock and the next mount can verify it
  *  3. each `--pre` package script (`bun run <name>`), in the checkout: the instance's own gates
- *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, compose-docs --shell,
+ *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, the publish-time
+ *     writers whose `builtAtPublish` output lies in the chrome ({@link chromeArtefacts}:
+ *     `avatars:css`), compose-docs --shell,
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
  *
@@ -81,6 +83,8 @@ import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
+import { chromeLayers } from "./compose-docs.ts";
+import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 
@@ -453,6 +457,55 @@ export async function checkLinks(site: string, base: string, upstream: ReadonlyS
   return { pages: pages.length, files, misses, upstreamMisses };
 }
 
+/**
+ * The publish-time artefacts the site CHROME holds: every `builtAtPublish`
+ * entry of any instance in the checkout whose path lies inside one of the
+ * harness's chrome layers ({@link chromeLayers}). Derived from the
+ * declarations, so the next stylesheet or script a chrome writer adds is run
+ * without a change here.
+ *
+ * Why the build runs them itself: a folio's site build composes the chrome
+ * and never runs `derive:publish`, whose job is the platform's own site. So
+ * `site-chrome/assets/css/avatars.css` (writer `avatars:css`), linked from
+ * every page's head, was never written, and smart-ra's link check refused the
+ * publish over `/smart-ra/assets/css/avatars.css` (2026-10-15).
+ */
+export function chromeArtefacts(root: string, plan: readonly DeclaredArtefact[] = declaredPlan(root), layers: readonly string[] = chromeLayers(root).map((l) => l.dir)): DeclaredArtefact[] {
+  const dirs = layers.map((d) => resolve(d) + sep);
+  return plan.filter((a) => dirs.some((d) => resolve(a.abs).startsWith(d)));
+}
+
+/**
+ * Run the chrome's publish-time writers ({@link chromeArtefacts}) as
+ * `derive:publish` runs them, and judge them the same way: a writer that fails
+ * refuses the build; one that says it does not apply to this root (exit 78,
+ * `lib/not-applicable.ts`) is reported and its artefacts excused; any other
+ * artefact that came out missing or empty refuses the build, since the chrome
+ * links it.
+ */
+export function buildChrome(
+  root: string,
+  artefacts: readonly DeclaredArtefact[] = chromeArtefacts(root),
+  runOne: (writer: string) => WriterOutcome = (w) => runWriter(["bun", "run", "cat", w], root),
+): { ran: string[]; skipped: Map<string, string> } {
+  const ran: string[] = [];
+  const skipped = new Map<string, string>();
+  for (const w of writersOf(artefacts)) {
+    console.log(`▶ chrome artefact writer: ${w}`);
+    const o = runOne(w);
+    if (o.kind === "failed") throw new Error(`chrome artefact writer ${w} failed (exit ${o.exit ?? "on a signal"})`);
+    if (o.kind === "skipped") {
+      skipped.set(w, o.why);
+      console.log(`  skipped ${w} — it does not apply to this root: ${o.why}`);
+    } else ran.push(w);
+  }
+  const empty = artefacts.filter((a) => !a.writer.some((w) => skipped.has(w)) && !built(a));
+  if (empty.length > 0) {
+    throw new Error(`the site chrome's publish-time artefact(s) ${empty.map((a) => `${a.instance}/${a.path}`).join(", ")} came out missing or empty after ${writersOf(empty).join(", ")}`);
+  }
+  return { ran, skipped };
+}
+
 function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
   console.log(`▶ ${label}`);
   const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit", env: { ...process.env, ...env } });
@@ -650,6 +703,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
     if (has.has("landing")) run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
     const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
+    // Before the chrome is composed: what it links that only a publish-time writer builds.
+    buildChrome(root);
     run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} ${shellFlags(o.profile)} ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
