@@ -27,7 +27,41 @@ import { join, relative, resolve } from "node:path";
 
 import { extractBpmn } from "../../pipeline/bpmn-translate.js";
 import { checkLanes } from "../check-lane-documentation.js";
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { BpmnModdle } from "bpmn-moddle";
+
+/** A moddle element, as far as counting lanes needs one. */
+type El = { $type: string; laneSets?: El[]; lanes?: El[]; childLaneSet?: El; rootElements?: El[] };
+
+/**
+ * Every lane bpmn-moddle parses, in EVERY process of the diagram.
+ *
+ * Not `loadProcessModel(f).lanes`: that is the model of the diagram's FIRST
+ * `bpmn:process`, which is what the engine runs, while the check reads every
+ * lane in the file. The two agreed while every diagram held one process;
+ * smart-base's `SGAuthoring.DAKLifecycle.bpmn` (a collaboration of eight
+ * pools, one lane each) is the first that does not, and comparing against the
+ * first process alone reported 1 lane against the check's 8.
+ */
+async function moddleLaneCount(xml: string): Promise<number | null> {
+  let defs: El;
+  try {
+    defs = (await new BpmnModdle().fromXML(xml)).rootElement as unknown as El;
+  } catch {
+    return null;
+  }
+  let n = 0;
+  const walkSet = (set: El | undefined): void => {
+    for (const lane of set?.lanes ?? []) {
+      n++;
+      walkSet(lane.childLaneSet);
+    }
+  };
+  for (const e of defs.rootElements ?? []) {
+    if (e.$type !== "bpmn:Process") continue;
+    for (const set of e.laneSets ?? []) walkSet(set);
+  }
+  return n;
+}
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
@@ -154,18 +188,18 @@ describe("the lane check's extractor copy has not drifted", () => {
     // A clean run over a set it never scanned — `dh4f` — inside the gate
     // written to catch exactly that, and green for two days.
     //
-    // Comparing against `loadProcessModel` rather than against a fixture is
+    // Comparing against the parser rather than against a fixture is
     // what makes the shortcut legitimate: a fixture proves agreement on the
     // cases somebody thought to write down, and this one was not thought of.
     const drift: string[] = [];
     for (const f of files) {
       const rel = relative(REPO, f);
-      const model = await loadProcessModel(f).catch(() => null);
-      if (model === null) continue;
       const xml = readFileSync(f, "utf-8");
+      const parsed = await moddleLaneCount(xml);
+      if (parsed === null) continue;
       const seen = [...xml.matchAll(/<(?:bpmn:)?lane\b([^>]*?)(?:\/>|>)/g)].length;
-      if (seen !== model.lanes.length) {
-        drift.push(`${rel}: parser ${model.lanes.length} lane(s), regex ${seen}`);
+      if (seen !== parsed) {
+        drift.push(`${rel}: parser ${parsed} lane(s), regex ${seen}`);
       }
     }
     expect(drift).toEqual([]);
