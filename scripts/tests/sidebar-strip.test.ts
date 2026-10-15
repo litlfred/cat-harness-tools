@@ -161,7 +161,8 @@ describe("at rest it is a strip, not an absence", () => {
   it("the browser-built document index is gone, rules and script alike (owner, 2026-10-15)", () => {
     // If it came back it would come back uncapped: the 25% cap went with it.
     expect(whole).not.toContain(".fa-doc-index");
-    expect(read("cat-harness/site-chrome/assets/js/docs-ui.js")).not.toContain("mountDocumentIndex");
+    // The function, not the name: docs-ui.js's comments still say why it went.
+    expect(read("cat-harness/site-chrome/assets/js/docs-ui.js")).not.toMatch(/function\s+mountDocumentIndex\b/);
   });
 
   it("is scoped above the theme's breakpoint, never applied to the phone", () => {
