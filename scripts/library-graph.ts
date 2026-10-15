@@ -98,7 +98,7 @@ import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
-import { entryGraphFiles, entryGraphSitePath } from "./lib/library-entry-graphs.ts";
+import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -793,9 +793,12 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
 
   for (const libDir of [...libDirs].sort()) {
     const instance = instanceOf(libDir, repoRoot);
+    const notEntries = nonEntryDirs(libDir);
     for (const slug of readdirSync(libDir).sort()) {
       const dir = join(libDir, slug);
       if (!statSync(dir).isDirectory()) continue;
+      // Another kind's directory kept in the library is not an entry.
+      if (notEntries.has(dir.replace(/[/\\]+$/, ""))) continue;
       const has = (f: string): boolean => existsSync(join(dir, f));
       const manifest = readJson<{
         title?: string;
