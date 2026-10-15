@@ -95,7 +95,11 @@ TIMEOUT_S = 1200
 # the pre-merge check an agent runs, which this job already does on the PR's
 # merge commit. On a runner it has no git identity, and in an index root it
 # merges an unrelated base, so it exits 2 (smart-immunizations#35).
-LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories", "check:merged"}
+# check:prs-have-runs lists the index's OPEN pull requests and asks whether
+# each has a CI run: a fact about other PRs at the moment the job runs, so it
+# moved between base and head on fhir-harness#83 (an unrelated folio-assistant
+# PR was "too-new" on base and "no-run" on head).
+LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories", "check:merged", "check:prs-have-runs"}
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
 # its usage and exits 2 ("could not determine") on base and head alike, so it
 # judges nothing about the PR -- and where base exits 1 for another reason,
