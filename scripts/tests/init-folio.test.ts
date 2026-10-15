@@ -548,6 +548,9 @@ describe("a contentless instance (mer2)", () => {
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
+    // Bean folio-assistant-63q4 (owner, 2026-10-15): initiation turns on the
+    // publishing of the instance's JSON-LD context.
+    ".github/workflows/publish-context.yml",
   ];
 
   test("writes every instance-level artefact, and nothing an adapter owns", () => {
@@ -558,10 +561,65 @@ describe("a contentless instance (mer2)", () => {
       expect(existsSync(join(d, f))).toBe(true);
     }
     // declared-path-literal: asserting the scaffold did NOT create the folio layout.
-    for (const absent of ["folio", "uploads", "library", ".github"]) {
+    for (const absent of ["folio", "uploads", "library"]) {
       expect(existsSync(join(d, absent))).toBe(false);
     }
     expect(r.created.some((f) => f.startsWith("folio/"))).toBe(false);
+    // The one workflow is the context publisher: no staging or QA workflow.
+    expect(r.created.filter((f) => f.startsWith(".github/"))).toEqual([".github/workflows/publish-context.yml"]);
+  });
+
+  test("the publish-context workflow calls the harness's reusable workflow for THIS instance, on push to main", () => {
+    const d = tmp();
+    initInstance(instanceOpts(d));
+    const wf = parseYaml(readFileSync(join(d, ".github/workflows/publish-context.yml"), "utf-8")) as {
+      on: { push: { branches: string[] } };
+      permissions: Record<string, string>;
+      jobs: { publish: { uses: string; with: Record<string, string> } };
+    };
+    expect(wf.on.push.branches).toEqual(["main"]);
+    expect(wf.permissions).toEqual({ contents: "write" });
+    expect(wf.jobs.publish.uses).toBe("litlfred/cat-harness-tools/.github/workflows/layer-publish-context.yml@main");
+    expect(wf.jobs.publish.with).toEqual({ instance: SLUG });
+  });
+
+  test("no GitHub origin: no iriBase is invented, and the note says how to add one", () => {
+    const d = tmp();
+    const r = initInstance(instanceOpts(d));
+    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBeUndefined();
+    expect(r.notes.join("\n")).toContain("No iriBase was declared");
+  });
+
+  test("a GitHub origin gives iriBase https://<owner>.github.io/<repo>/, and the note says to switch Pages on", () => {
+    const d = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: d });
+    spawnSync("git", ["remote", "add", "origin", "https://github.com/LitlFred/new-layer.git"], { cwd: d });
+    const r = initInstance(instanceOpts(d));
+    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBe("https://litlfred.github.io/new-layer/");
+    expect(r.notes.join("\n")).toContain("Deploy from a branch: gh-pages, / (root)");
+  });
+
+  test("an origin that is not github.com derives no iriBase", () => {
+    const d = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: d });
+    spawnSync("git", ["remote", "add", "origin", "http://proxy@127.0.0.1:1234/git/litlfred/new-layer"], { cwd: d });
+    initInstance(instanceOpts(d));
+    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBeUndefined();
+  });
+
+  test("--iri-base is declared as given", () => {
+    const d = tmp();
+    initInstance({ ...instanceOpts(d), iriBase: "https://example.org/x/" });
+    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBe("https://example.org/x/");
+  });
+
+  test("inside another repository no workflow is written (GitHub would never read it), and the note says why", () => {
+    const outer = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: outer });
+    const d = join(outer, "inner");
+    const r = initInstance(instanceOpts(d));
+    expect(existsSync(join(d, ".github"))).toBe(false);
+    expect(r.notes.join("\n")).toContain("no publish-context workflow was written");
   });
 
   test("the config names no adapter and the declaration no folio directory", () => {
@@ -583,7 +641,9 @@ describe("a contentless instance (mer2)", () => {
     const folio = tmp();
     initInstance(instanceOpts(bare));
     const r = initFolio(opts(folio));
-    for (const f of INSTANCE_LEVEL) expect(r.created).toContain(f);
+    // Except the context publisher: a folio's gh-pages is its staging site's,
+    // which the folio's own publish workflow writes.
+    for (const f of INSTANCE_LEVEL.filter((x) => !x.endsWith("publish-context.yml"))) expect(r.created).toContain(f);
     // The files with no content-type dependence are byte-identical.
     for (const f of [".mcp.json", ".claude/settings.json", ".beans.yml"]) {
       expect(readFileSync(join(folio, f), "utf-8")).toBe(readFileSync(join(bare, f), "utf-8"));
