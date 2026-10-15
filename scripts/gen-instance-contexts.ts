@@ -83,7 +83,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, INSTANCE_CONTEXT_PATH as HARNESS_INSTANCE_CONTEXT_PATH, instanceContextUrl } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { NS_PREFIXES, ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
@@ -98,11 +98,12 @@ import {
   type UsedPrefixes,
   type UsedTerms,
 } from "../pipeline/jsonld-contexts.ts";
+import { INSTANCE_CONTEXT_PATH as BOUNDARY_INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
 import { contentDocuments } from "./lib/jsonld-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** Instance-relative, and why it is this path: see the module note. Defined once, in cat-harness `schemas/jsonld.ts`. */
-export const INSTANCE_CONTEXT_PATH = HARNESS_INSTANCE_CONTEXT_PATH;
+/** Instance-relative, and why it is this path: see the module note. Defined once, beside the write boundary. */
+export const INSTANCE_CONTEXT_PATH = BOUNDARY_INSTANCE_CONTEXT_PATH;
 
 const DEFAULT_ROOT = resolve(dirname(HARNESS_ROOT));
 

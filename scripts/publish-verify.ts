@@ -54,7 +54,8 @@ import { join, relative, resolve } from "node:path";
 
 import jsonld from "jsonld";
 
-import { CONTENT_CONTEXT_URL, INSTANCE_CONTEXT_PATH, instanceContextUrl } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { OWN_NAMESPACE_VALUES } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";

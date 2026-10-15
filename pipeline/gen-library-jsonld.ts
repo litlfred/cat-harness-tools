@@ -80,7 +80,7 @@ import {
 import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
-import { serialisedAtInstanceContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
