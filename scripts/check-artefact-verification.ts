@@ -84,9 +84,17 @@ export interface ArtefactCheck {
 export function deriveArtefactChecks(root: string = ROOT): ArtefactCheck[] {
   const scripts = scriptsOf(root);
   const out: ArtefactCheck[] = [];
-  for (const [check, cmd] of Object.entries(scripts)) {
-    if (!cmd.includes("--check")) continue;
+  for (const [check, raw] of Object.entries(scripts)) {
     if (!check.endsWith(":check") && !check.startsWith("check:")) continue;
+    // A generator whose output is (partly) BUILT AT PUBLISH is gated by
+    // `publish-check.ts <writer>` (owner, 2026-10-14, "B1"), which runs the
+    // writer and then its own `--check` against what it wrote. It is the same
+    // artefact check as before the move, so it stays in the inventory, read
+    // through the writer it names; otherwise every B1 conversion read as a
+    // stale declaration and its consumer verification was dropped.
+    const viaPublish = /publish-check\.ts\s+([A-Za-z0-9:._-]+)/.exec(raw);
+    const cmd = viaPublish ? `${scripts[viaPublish[1]!] ?? ""} --check` : raw;
+    if (!cmd.includes("--check")) continue;
     const m = /([a-zA-Z0-9/._-]+\.ts)/.exec(cmd);
     if (!m) continue;
     const script = m[1];
