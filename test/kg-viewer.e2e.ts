@@ -340,7 +340,11 @@ test.describe("kg viewer", () => {
       ([] as unknown[]).concat(n.satisfies ?? []).some((v) =>
         typeof v === "string" && /^https?:/.test(v) && !ids.has(v)));
     test.skip(!target, "the export has no node linking only into another graph");
-    await page.locator("#q").fill(String(target!["@id"]).split("#").pop()!);
+    // The id as the list shows it (kg-viewer.ts `short`): the fragment, or a
+    // per-Tool document IRI's `tool/<id>` (bean tdir), which has no fragment.
+    const id = String(target!["@id"]);
+    const tool = /\/tools\/([^/]+)\.jsonld$/.exec(id);
+    await page.locator("#q").fill(id.includes("#") ? id.split("#").pop()! : tool ? `tool/${decodeURIComponent(tool[1])}` : id);
     await page.locator("#list li button").first().click();
     await expect(page.locator(".detail td .elsewhere").first()).toContainText("in another graph");
     await expect(page.locator(".detail p.empty")).not.toHaveText("No links to or from this node.");
