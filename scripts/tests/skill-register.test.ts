@@ -47,9 +47,11 @@ import {
   missingScripts,
   retiredKeys,
   skillPackages,
+  stepsToRun,
   unlisted,
   withoutKey,
 } from "../skill-register.js";
+import { BUILDING_ENV } from "../qa-working-copy.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
@@ -499,5 +501,28 @@ describe("the report", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("inside a build of the QA working copy, the steps that read it are deferred (2026-10-15)", () => {
+  // Measured in a derive:publish: uml:overview → qa:refresh (its stale copy) →
+  // skill:register → uml:overview, and uml:overview:check → uml:overview. A
+  // writer ran from inside the build of its own input.
+  test("outside a build, every step runs", () => {
+    const { run, deferred } = stepsToRun(STEPS, {});
+    expect(run).toEqual([...STEPS]);
+    expect(deferred).toEqual([]);
+  });
+
+  test("inside one, the readers of the copy are deferred, and only they", () => {
+    const { run, deferred } = stepsToRun(STEPS, { [BUILDING_ENV]: "1" });
+    expect(deferred.map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
+    expect(run.map((s) => s.write.join(" "))).toEqual(CHAIN.filter((c) => c !== "uml:overview"));
+  });
+
+  test("the step that draws the QA tree is the one marked", () => {
+    // uml:overview calls requireCurrentWorkingCopy; a step that reads the copy
+    // and is not marked would bring the cycle back.
+    expect(STEPS.filter((s) => s.readsQaCopy).map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
   });
 });
