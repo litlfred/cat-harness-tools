@@ -76,6 +76,19 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     expect(resolveFor("who-iris", "library")).toMatch(committed("cat-harness/library/who-iris/index.html"));
     // A declared nested sub-graph path (`subgraphUnder`), never one inferred from the pages.
     expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
+    // ...and for `subgraphs: "instance"` too (owner, 2026-10-15, "3a"): each
+    // instance's glossary tile opens `glossary/instance/<instance>/`, never
+    // the shared page, so it cannot meet `glossary/skills/` and the like.
+    // Asserted where the mounted core declares the nesting.
+    const glossaryVis = declaredVisualisers(REPO).find((v) => v.renderedBy === "glossary-page");
+    if (glossaryVis?.subgraphUnder?.glossary === "instance") {
+      for (const inst of ["who-iris", "cat-harness"]) {
+        if (!dirs.some((d) => d.instance === inst && d.dir.id === "glossary")) continue;
+        expect(resolveFor(inst, "glossary")).toMatch(
+          new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?folio-assistant-core/glossary/instance/${inst}/index\\.(html|md)$`),
+        );
+      }
+    }
     expect(resolveFor("cat-harness", "beans")).toMatch(committed("cat-harness/beans/index.html"));
     // Built at publish, never committed: its declared route, under the page locale.
     expect(resolveFor("cat-harness", "fsh-guts")).toMatch(
