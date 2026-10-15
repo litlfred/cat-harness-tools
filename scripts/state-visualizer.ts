@@ -392,7 +392,7 @@ function projectionFor(id: string): string | null {
 export function declaredVisualiserFor(
   id: string,
   cov: string | undefined,
-  roots: { site: string; repoRoot: string; pageDir?: string } = { site: SITE, repoRoot: REPO_ROOT },
+  roots: { site: string; repoRoot: string; pageDir?: string; built?: (abs: string) => boolean } = { site: SITE, repoRoot: REPO_ROOT },
 ): Pick<StateGraph, "state" | "declaredVisualiser" | "href"> {
   const { site: SITE, repoRoot: REPO_ROOT } = roots;
   const pageDir = roots.pageDir ?? join(SITE, id);
@@ -400,7 +400,12 @@ export function declaredVisualiserFor(
   // REPO-root relative — see `REPO_ROOT`. This is the line that would silently
   // report all 27 as missing if it used `ROOT`.
   const target = join(REPO_ROOT, cov);
-  if (!existsSync(target)) return { state: "unresolved", declaredVisualiser: cov };
+  // A target the harness BUILDS AT PUBLISH (`built`, its `builtAtPublish`) is
+  // there, not unresolved, though it is not on disk yet: often this very run
+  // writes it, after this page (a per-instance page of the same visualiser).
+  // Asked of the disk alone, a fresh publish drew "not there" on the page and
+  // only a second run said "elsewhere" — the committed copy hid that.
+  if (!existsSync(target) && !(roots.built?.(target) ?? false)) return { state: "unresolved", declaredVisualiser: cov };
   // Linkable only if the target is published BY THIS SITE. Asked of the site
   // directly rather than by inspecting the relative path for leading `..`,
   // which answers the same question by a proxy that a sibling directory named
@@ -447,6 +452,7 @@ function stateGraphsOf(decl: CatHarnessDeclaration, visOf: ReadonlyMap<string, s
             site: SITE,
             repoRoot: REPO_ROOT,
             pageDir: pageDirOf(vis),
+            built: builtAtPublishHere,
           })
         : { state: "live" as const }),
       // The declaration's own words, clipped to its first sentence. Restating
