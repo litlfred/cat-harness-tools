@@ -30,6 +30,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { forgeLocation } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { repoOf } from "../../src/core/edit-links.ts";
 
 /** The branch every repository link names — the same one the [source] and README links use. */
@@ -164,8 +165,9 @@ export function entryRepoLinks(o: {
   const dir = forgeAt(o.repoRoot, o.dir, o.checkoutRepo);
   if (dir) {
     const at = (rel: string): ForgeAt => ({ repo: dir.repo, path: `${dir.path}/${rel}` });
-    if (existsSync(join(o.repoRoot, o.dir, "structure.json")))
-      out.push({ label: "structure.json", href: blobUrl(at("structure.json")), what: "ingestion structure (JSON), on GitHub" });
+    // Existence and a link only: the file is never parsed here, so its variant is not read.
+    if (existsSync(join(o.repoRoot, o.dir, STRUCTURE_FILENAME)))
+      out.push({ label: STRUCTURE_FILENAME, href: blobUrl(at(STRUCTURE_FILENAME)), what: "ingestion structure (JSON), on GitHub" });
     if (existsSync(join(o.repoRoot, o.dir, "sections")))
       out.push({ label: "sections/", href: treeUrl(at("sections")), what: "section nodes (JSON-LD) and their text, on GitHub" });
     if (existsSync(join(o.repoRoot, o.dir, "blocks")))
