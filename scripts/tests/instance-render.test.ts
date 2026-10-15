@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { declaredKinds, instancesIn, renderInstance } from "../check-instance-render.ts";
+import { declaredKinds, formatReport, instancesIn, renderInstance } from "../check-instance-render.ts";
 import { repoRootFor, declarationPathIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
@@ -70,10 +70,44 @@ describe("an empty render is a failure, not an empty success", () => {
     // bootstrap's declared directory against the wrong root, found nothing,
     // and continued — the export succeeded and the graph silently lost every
     // skill. "Did it throw" cannot see that; a node count can.
-    const r = await renderInstance(instance({ name: "empty", directories: [] }));
+    //
+    // The fixture DECLARES a directory and renders nothing from it (its kind,
+    // `fsh-guts`, is unpublished, so not even the directory's node is
+    // emitted): the defect's shape. It declared `directories: []` until the
+    // owner ruled an instance declaring no directories acceptable (C1,
+    // 2026-10-15), which is the case below.
+    const r = await renderInstance(instance({ name: "empty", directories: [{ id: "guts", path: "fsh-guts/", graphTypologies: ["fsh-guts"] }] }, { "fsh-guts/.keep": "" }));
     expect(r.verdict).toBe("failed");
     expect(r.nodeCount).toBe(0);
+    expect(r.noDirectories).toBeUndefined();
     expect(r.reasons.join(" ")).toContain("empty graph is a failure");
+  });
+});
+
+describe("an instance that declares no directories is accepted, and reported (C1)", () => {
+  test("`directories: []` renders nothing of its own and is rendered, flagged noDirectories", async () => {
+    // Owner, 2026-10-15: smart-immunizations declares `directories: []` (the
+    // index mounts none of its directories, B1). Empty by declaration is not
+    // a directory that resolved to nothing.
+    const r = await renderInstance(instance({ name: "bare", directories: [] }));
+    expect(r.verdict).toBe("rendered");
+    expect(r.nodeCount).toBe(0);
+    expect(r.noDirectories).toBe(true);
+    expect(r.reasons).toEqual([]);
+  });
+
+  test("leaving `directories` out is not declaring none: it still fails when it renders nothing", async () => {
+    const r = await renderInstance(instance({ name: "unsaid" }));
+    expect(r.verdict).toBe("failed");
+    expect(r.noDirectories).toBeUndefined();
+    expect(r.reasons.join(" ")).toContain("empty graph is a failure");
+  });
+
+  test("the report says so, in the instance's line and in the summary", async () => {
+    const r = await renderInstance(instance({ name: "bare", directories: [] }));
+    const text = formatReport([r]);
+    expect(text).toContain("declares no directories");
+    expect(text).toMatch(/1 rendered \(1 declare no directories: render-\w+\), 0 failed/);
   });
 });
 
@@ -240,11 +274,23 @@ describe("this repository's own instances", () => {
     expect(instancesIn(REPO).map((p) => resolve(p))).not.toContain(resolve(REPO));
   });
 
-  test("every instance renders, and none renders nothing", async () => {
+  test("every instance renders, and none renders nothing unless it declares nothing", async () => {
+    // An instance declaring `directories: []` (smart-immunizations here, owner
+    // B1 and C1, 2026-10-15) renders zero nodes of its own BY DECLARATION and
+    // is accepted, flagged; every other instance must render something.
     for (const root of instancesIn(REPO)) {
       const r = ownRender(root);
       expect({ [r.name]: r.verdict }).toEqual({ [r.name]: "rendered" });
-      expect(r.nodeCount).toBeGreaterThan(0);
+      if (r.noDirectories) continue;
+      expect({ [r.name]: r.nodeCount > 0 }).toEqual({ [r.name]: true });
+    }
+  });
+
+  test("only an instance that declares no directories is let off rendering nothing", async () => {
+    for (const root of instancesIn(REPO)) {
+      const r = ownRender(root);
+      if (!r.noDirectories) continue;
+      expect(readDeclaration(root)?.directories).toEqual([]);
     }
   });
 
