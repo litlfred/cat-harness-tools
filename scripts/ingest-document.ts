@@ -53,6 +53,7 @@
  * it, the catalogue's Dublin Core `dc.title` is passed when the instance has a
  * catalogue node for this entry — the first authority of the 2026-10-01 title
  * ruling, so a scan no longer carries its OCR's misreading as `doc_title`.
+ *   bun run cat ingest ../qou/uploads/FILE.pdf --instance ../qou   # a content folio's library
  *
  * `--library` is required only when the repository declares more than one, and
  * then it is REQUIRED rather than defaulted: since bean `frs5` there are two,
@@ -77,6 +78,7 @@ import { IntakeSchema } from "@litlfred/cat-harness/schemas/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -93,8 +95,43 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * Derived from the module's location rather than from the caller's, because
  * this script BELONGS to this instance. A caller who means a different one
  * passes `root`, which is what the parameter is for.
+ *
+ * ## `--instance <dir>`: ingest into a CONTENT instance's library
+ *
+ * Without it this is cat-harness, and that is still the default. With it, the
+ * staging tree and the destination library are resolved against `<dir>`, which
+ * must hold an instance declaration (`<name>.json`). This is the case of a
+ * content folio such as `litlfred/qou`, checked out beside the harness: before
+ * the flag the only route was to re-implement this module's steps against the
+ * folio's paths (qou's `scripts/library-ingest.ts` did exactly that, importing
+ * `planFor` / `withDerivedArms` / `checkEntry` / `buildEntryNodes`), which is
+ * the second implementation of "how a document is ingested" this module exists
+ * to prevent. `--harness` cannot serve: it accepts only a directory whose
+ * declaration names `cat-harness`.
+ *
+ * Refused, never guessed, when `<dir>` declares nothing: filing into a
+ * directory no declaration names is filing where nothing scans it.
  */
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
+
+/** `--instance <dir>` or `--instance=<dir>`, else the harness. Exported for tests. */
+export function resolveInstanceRoot(argv: readonly string[], fallback: string = HARNESS_ROOT): string {
+  let chosen: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--instance" && i + 1 < argv.length) chosen = argv[++i];
+    else if (a.startsWith("--instance=")) chosen = a.slice("--instance=".length);
+  }
+  if (chosen === undefined || chosen === "") return resolve(fallback);
+  const root = resolve(chosen);
+  if (readDeclaration(root) === undefined) {
+    throw new Error(
+      `--instance names ${root}, which holds no instance declaration (<name>.json) — ` +
+        "ingesting there would file the document where nothing scans it",
+    );
+  }
+  return root;
+}
 
 /**
  * A python helper beside this module, as an ABSOLUTE path.
@@ -1049,7 +1086,7 @@ if (import.meta.main) {
   // was boolean; `--library who-iris` breaks it, because `who-iris` does not
   // start with `--` and would be ingested as a filename — producing "who-iris:
   // not there" while the real argument sat untouched two places along.
-  const takesValue = new Set(["--library", "--reference", "--title"]);
+  const takesValue = new Set(["--library", "--reference", "--title", "--instance"]);
   let pdf: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
