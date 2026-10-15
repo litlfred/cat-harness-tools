@@ -889,6 +889,30 @@ export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string
 export const NAVBAR_CSS = "assets/css/navbar.css";
 
 /**
+ * THE RAIL'S SECTION NAMES — one vocabulary on every site (owner,
+ * 2026-10-15, "folio rail everywhere"). The just-the-docs sidebar
+ * (`docs-ui.js`, `gen-navbar-include.ts`) and this rail used to name the same
+ * sections differently: "Graphs" here, "Folders" there; "Contents" here, "On
+ * this page" there. A section a reader learns on one site must be called the
+ * same on the next, so every surface takes its heading from here, and
+ * `rail-section-parity.test.ts` holds `docs-ui.js` (which cannot import this)
+ * to the same strings.
+ *
+ * - `pages` — the site's own page tree (the theme's site-nav).
+ * - `onThisPage` — the open document's headings.
+ * - `folders` — the instance's graphs, one row per folder.
+ * - `harnesses` — the harnesses this site is built on.
+ *
+ * The home row is not a section: it is named after the site.
+ */
+export const RAIL_SECTION_LABELS = {
+  pages: "Pages",
+  onThisPage: "On this page",
+  folders: "Folders",
+  harnesses: "Harnesses",
+} as const;
+
+/**
  * The open document's own index, read off the page it is being injected into.
  *
  * Owner, 2026-09-21: *"when a document or other indexed object is opened, the
@@ -926,7 +950,7 @@ export const NAVBAR_CSS = "assets/css/navbar.css";
  * that is one extra row in a menu, which is why it is an acceptable trade
  * here and would not be in a validator.
  */
-export function documentIndexOf(html: string, label = "Contents"): NavGroup | undefined {
+export function documentIndexOf(html: string, label: string = RAIL_SECTION_LABELS.onThisPage): NavGroup | undefined {
   const flat: NavItem[] = [];
   const re = /<(h2|h3)\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/gi;
   for (const m of html.matchAll(re)) {
@@ -974,7 +998,7 @@ export const VISUALISER_NAV_ATTR = "data-fa-visualiser-nav";
 /**
  * What a page calls its own section, declared beside its section:
  * `<meta name="fa-visualiser-label" content="…">`. A railed page's section is
- * "Contents" unless it says otherwise; an IG site names it after the IG
+ * "On this page" ({@link RAIL_SECTION_LABELS}) unless it says otherwise; an IG site names it after the IG
  * (owner, 2026-10-05, bean `mftp`: *"WHO SMART Trust"*). Undefined when the
  * page declares none.
  */

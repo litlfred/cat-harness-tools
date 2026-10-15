@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -150,7 +150,7 @@ export interface RailOptions {
   shareNavbarRow?: boolean;
   /**
    * What the page's own section is CALLED — the visualiser's name, `todos` on
-   * `/todos/`. Absent on a mounted document, whose section is its "Contents".
+   * `/todos/`. Absent on a mounted document, whose section is "On this page".
    */
   visualiserLabel?: string;
   /**
@@ -172,7 +172,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
       ? undefined
-      : { label: "Harnesses", icon: "\u25A6", items: o.harnesses, collapsible: true };
+      : { label: RAIL_SECTION_LABELS.harnesses, icon: "\u25A6", items: o.harnesses, collapsible: true };
   return {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -190,7 +190,9 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // "Graphs" section start closed on LHS navbar"*. It was open whenever the
     // page had no section of its own. `navbarRegionsHtml` still opens it when
     // one of its rows is the current page, so the reader's place stays visible.
-    graphs: { label: "Graphs", icon: "\u25A4", items: o.links, collapsible: true, open: false },
+    // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
+    // for the same rows, so the section reads the same on every site.
+    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     home: { href: `${o.toRoot}/`, label: o.homeLabel ?? "folio-assistant", icon: "\u2302" },
   };
@@ -243,7 +245,7 @@ export function wantsLinkedRail(html: string): boolean {
  * answer than the headings — a declared index in the graph, say.
  */
 export function injectRail(html: string, o: RailOptions): string | undefined {
-  const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? "Contents";
+  const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? RAIL_SECTION_LABELS.onThisPage;
   const documentIndex = o.documentIndex ?? visualiserNavOf(html, label) ?? documentIndexOf(html, label);
   const root = o.assetRoot ?? o.toRoot;
   if (o.emitRailData) {
