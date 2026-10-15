@@ -7,7 +7,7 @@
  * chrome — `navbar.js`, `navbar.css`, `navbar-row.*`, `docs-ui.*` — is copied
  * from the harness, so the browser runs the shipped bytes.
  *
- *   bun run test/one-rail-fixture.build.ts <out-dir>
+ *   bun run cat-harness-tools/test/one-rail-fixture.build.ts <out-dir>
  *
  * @module test/one-rail-fixture.build
  */
