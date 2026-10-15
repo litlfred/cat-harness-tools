@@ -41,18 +41,37 @@
  * throw that away and invent a second, weaker reader of the same file —
  * which would then be free to disagree with the one the server uses.
  *
+ * ## One page per instance — bean `folio-assistant-1nu0`
+ *
+ * Owner, 2026-10-15: *"per-instance pages"*. The page used to import
+ * `cat-harness/tools/index.ts`, which holds cat-harness's own Tools and no
+ * one else's, and its visualiser `covers` only cat-harness's `tools`
+ * directory by id — so six instances that declare a `tools` graph read
+ * *"no viewer yet"* in the navbar. It now reads every declared `tools` graph
+ * through auto-discovery (`tools/discover.ts`, bean `p0za`), the reader
+ * `check:tools` gates, and draws the way the schemas viewer does: the full KG
+ * at `<locale>/<harness>/tools/`, and one sub-graph page per instance at
+ * `<locale>/<harness>/tools/<instance>/`. The visualiser covers the KIND with
+ * `subgraphs: "instance"`, and `viewersOf` covers a directory by kind only
+ * where its sub-graph page exists — so an instance whose graph yields no
+ * Tool gets no page and stays reported, never an empty page claiming to
+ * show it.
+ *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-tools-viz.ts
  *   bun run cat-harness-tools/scripts/gen-tools-viz.ts --check
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { discoverTools, toolsOf } from "../tools/discover.ts";
 import { baseDocsDir } from "./compose-docs.js";
 import { kgRoots } from "./known-skills.js";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
-import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { pageParts, renderedByOf, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { localSiteDir } from "./lib/local-site-dir.ts";
@@ -182,14 +201,57 @@ function instanceDeclarations(repo: string): string[] {
  * Where the page goes: the declared directory's own name (#1168 B7a-2b,
  * `conventionalPage`). Never a literal — `site-dir-single-answer` refuses one.
  */
-export function pageRelPath(repo = REPO): string | undefined {
+export function pageRelPath(repo = REPO, subgraph?: string): string | undefined {
   // The route cat-harness DECLARES for this Tool's visualiser (owner,
-  // 2026-10-09): `<locale>/<harness>/<id>/index.md`, never chosen here.
+  // 2026-10-09): `<locale>/<harness>/<id>/index.md`, never chosen here. A
+  // sub-graph page is `<locale>/<harness>/<id>/<instance>/index.md`.
   try {
-    return visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL).rel;
+    const { rel, visualiser: v } = visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL);
+    if (subgraph === undefined) return rel;
+    return visualiserRoute({ ...pageParts({ harness: v.harness, visualiser: v.id }), subgraph, asset: "index.md" });
   } catch {
     return undefined;
   }
+}
+
+/** One instance's slice of the tools graph: its declared name and its Tool rows. */
+export interface ToolSubject {
+  readonly name: string;
+  readonly rows: ToolRow[];
+}
+
+/**
+ * Every instance that declares a `tools` graph, with the Tools it yields, in
+ * the order `instanceRootsIn` lists them. `empty` names the ones whose graph
+ * yields no Tool: they get no page, and are reported rather than drawn.
+ *
+ * Read through auto-discovery (`toolsOf`), which THROWS on a declared graph
+ * that does not load — a partial list would draw an instance as having fewer
+ * Tools than it declares.
+ */
+export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: string[] } {
+  const subjects: ToolSubject[] = [];
+  const empty: string[] = [];
+  for (const inst of instanceRootsIn(repo)) {
+    if (instanceDirectoryForGraph(inst, "tools") === undefined) continue;
+    const p = declarationPathIn(inst);
+    const name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
+    if (!name) continue;
+    const rows = toolRows(toolsOf(inst));
+    if (rows.length === 0) empty.push(name);
+    else subjects.push({ name, rows });
+  }
+  return { subjects, empty };
+}
+
+/** How {@link page} titles and introduces the slice it draws. */
+export interface PageScope {
+  /** `undefined` for the full KG; else the instance whose Tools the page shows. */
+  readonly instance?: string;
+  /** The per-instance pages, for the full view's index of them. */
+  readonly subjects?: readonly { name: string; count: number; href: string }[];
+  /** The full view, relative to a sub-graph page. */
+  readonly upHref?: string;
 }
 
 /** The base docs layer — the same answer `compose-docs.ts` uses. */
@@ -271,6 +333,7 @@ export function page(
   known: ReadonlySet<string>,
   skillPages: ReadonlySet<string> = new Set(),
   fromPage = "",
+  scope: PageScope = {},
 ): string {
   const invoke = new Map<string, number>();
   const install = new Map<string, number>();
@@ -282,13 +345,26 @@ export function page(
   const unresolved = [...allSkills].filter((s) => !known.has(s)).sort();
   const noSatisfies = rows.filter((r) => r.satisfies.length === 0);
 
+  const title = scope.instance === undefined ? "Tools" : `Tools — ${scope.instance}`;
+  const whose =
+    scope.instance === undefined
+      ? scope.subjects !== undefined
+        ? "every instance in this checkout declares"
+        : "this instance declares"
+      : `${scope.instance} declares`;
   const b: string[] = [
     "---",
-    'title: "Tools"',
-    'description: "The Tool nodes this instance declares — how each is installed and invoked, and which skill it satisfies."',
+    `title: "${title}"`,
+    `description: "The Tool nodes ${whose} — how each is installed and invoked, and which skill it satisfies."`,
     "---",
     `<style>${CSS}</style>`,
     "",
+    ...(scope.instance !== undefined
+      ? [
+          `The Tool nodes **${scope.instance}** declares in its \`tools\` graph${scope.upHref ? ` — one instance's slice of [every instance's tools](${scope.upHref})` : ""}.`,
+          "",
+        ]
+      : []),
     "A **skill** states a capability generically: what an actor needs to know to",
     "perform a task. A **Tool** is one concrete way to exercise it, with an",
     "installation, an invocation and typed inputs and outputs. One skill may be",
@@ -305,6 +381,18 @@ export function page(
     `<a class="tg-stat" href="#how-they-are-invoked-and-installed"><b>${invoke.get("mcp") ?? 0}</b><span>reachable over MCP</span></a>`,
     "</div>",
     "",
+    ...(scope.subjects !== undefined && scope.subjects.length > 0
+      ? [
+          "## By instance",
+          "",
+          "Each instance that declares a `tools` graph has its own page.",
+          "",
+          "| instance | tools |",
+          "|---|---|",
+          ...scope.subjects.map((x) => `| [${cell(x.name)}](${x.href}) | ${x.count} |`),
+          "",
+        ]
+      : []),
     "## How they are invoked, and installed",
     "",
     "A tool may declare more than one invocation, so these do not sum to the total.",
@@ -381,21 +469,32 @@ export function page(
 }
 
 /** The page as committed: {@link page} plus the directories it draws (#1168 B7a-2). */
-export function publishedPage(rows: Parameters<typeof page>[0], known: Parameters<typeof page>[1], repo = REPO): string {
+export function publishedPage(
+  rows: Parameters<typeof page>[0],
+  known: Parameters<typeof page>[1],
+  repo = REPO,
+  scope: PageScope = {},
+): string {
   // With no declared page there is no base to link from: render codes, never
   // guess a location.
-  const rel = pageRelPath(repo);
+  const rel = pageRelPath(repo, scope.instance);
   const skillPages = rel === undefined ? new Set<string>() : skillPagesOf(repo);
   return withRenderedByFrontMatter(
-    page(rows, known, skillPages, rel ?? ""),
+    page(rows, known, skillPages, rel ?? "", scope),
     VIEWER_TOOL,
   );
 }
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  const { tools } = (await import("@litlfred/cat-harness/tools/index.js")) as { tools: () => unknown[] };
-  const rows = toolRows(tools());
+  // Every declared `tools` graph, not cat-harness's alone (bean 1nu0). A
+  // discovery failure is reported, never folded into "no tools".
+  const found = discoverTools(REPO);
+  if (found.failures.length > 0) {
+    for (const f of found.failures) console.error(`::error::gen-tools-viz: ${f.dir ?? f.instance}: ${f.reason}`);
+    process.exit(1);
+  }
+  const rows = toolRows(found.tools);
   if (rows.length === 0) {
     // A declared graph that yields nothing is the `dh4f` shape — scanning
     // nothing and reporting a clean run. Refuse rather than write an empty page.
@@ -407,23 +506,70 @@ if (import.meta.main) {
     console.error(`::error::gen-tools-viz: no visualiser declared for graph typology '${KIND}'`);
     process.exit(1);
   }
-  const rendered = publishedPage(rows, skillIds(REPO));
+  const known = skillIds(REPO);
+  const { subjects, empty } = toolSubjects(REPO);
   const localDocs = localSiteDir(resolve(HARNESS_ROOT));
-  const out = join(siteTarget(localDocs ?? baseDocsDir(REPO)), PAGE);
+  const site = siteTarget(localDocs ?? baseDocsDir(REPO));
+
+  /** Every page this run draws, site-relative, with its content. */
+  const pages = new Map<string, string>();
+  pages.set(
+    PAGE,
+    publishedPage(rows, known, REPO, {
+      subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
+    }),
+  );
+  for (const x of subjects) {
+    const rel = pageRelPath(REPO, x.name)!;
+    pages.set(rel, publishedPage(x.rows, known, REPO, { instance: x.name, upHref: "../" }));
+  }
+
+  // ORPHANS: a sub-graph page this viewer drew for an instance that no
+  // longer declares Tools. Only a page that says it is ours is touched.
+  const viewDir = join(site, PAGE, "..");
+  const drawn = new Set(subjects.map((x) => x.name));
+  const orphans = existsSync(viewDir)
+    ? readdirSync(viewDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !drawn.has(e.name))
+        .map((e) => join(viewDir, e.name))
+        .filter((d) => {
+          const f = join(d, "index.md");
+          return existsSync(f) && renderedByOf(readFileSync(f, "utf-8")) === VIEWER_TOOL;
+        })
+    : [];
 
   if (check) {
-    const current = existsSync(out) ? readFileSync(out, "utf-8") : "";
-    if (current !== rendered) {
-      console.error(`::error::gen-tools-viz: ${PAGE} is stale — run \`bun run cat tools:viz\``);
-      process.exit(1);
+    let stale = 0;
+    for (const [rel, rendered] of pages) {
+      const out = join(site, rel);
+      const current = existsSync(out) ? readFileSync(out, "utf-8") : "";
+      if (current !== rendered) {
+        console.error(`::error::gen-tools-viz: ${rel} is stale — run \`bun run cat tools:viz\``);
+        stale++;
+      }
     }
-    console.log(`✓ tools viewer is current — ${rows.length} tool(s)`);
+    for (const d of orphans) {
+      console.error(`::error::gen-tools-viz: ${d} is an orphan — its instance declares no Tools now`);
+      stale++;
+    }
+    if (stale > 0) process.exit(1);
+    console.log(`✓ tools viewer is current — ${rows.length} tool(s), ${subjects.length} instance page(s)`);
   } else {
-    mkdirSync(join(out, ".."), { recursive: true });
-    writeFileSync(out, rendered);
-    const known = skillIds(REPO);
+    for (const [rel, rendered] of pages) {
+      const out = join(site, rel);
+      mkdirSync(join(out, ".."), { recursive: true });
+      writeFileSync(out, rendered);
+    }
+    for (const d of orphans) {
+      rmSync(d, { recursive: true });
+      console.log(`  ✗ pruned ${d}`);
+    }
     const bad = [...new Set(rows.flatMap((r) => r.satisfies))].filter((s) => !known.has(s));
     console.log(`tools viewer: ${rows.length} tool(s) → ${PAGE}`);
+    for (const x of subjects) console.log(`  ${x.name}: ${x.rows.length} tool(s) → ${pageRelPath(REPO, x.name)}`);
     console.log(bad.length === 0 ? "  every satisfies resolves" : `  ${bad.length} unresolved — shown on the page`);
   }
+  // An instance that declares a `tools` graph yielding no Tool gets no page —
+  // and is said, so its tile's "no viewer yet" is explained rather than silent.
+  for (const n of empty) console.log(`  · ${n} declares a tools graph with no Tool nodes — no page drawn`);
 }
