@@ -98,13 +98,21 @@ export interface InstanceDecl {
   /** The declared table, or the error that made it unreadable. */
   prefixes: JsonldPrefixTable;
   prefixError?: string;
+  /**
+   * The instance declares its context as built at publish (a `builtAtPublish`
+   * entry for {@link INSTANCE_CONTEXT_PATH}). The declaration promises the
+   * file, so it is written even when no document of the instance is mounted
+   * here — an index that mounts none of an instance's directories otherwise
+   * fails `derive:publish` with "declared built at publish, and built nothing".
+   */
+  declaresContext?: boolean;
 }
 
 export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
   return instanceRootsIn(repoRoot).flatMap((root) => {
     const file = findDeclarationFile(root);
     if (file === undefined) return [];
-    let raw: { name?: unknown; stub?: unknown; needs?: unknown; jsonldPrefixes?: unknown };
+    let raw: { name?: unknown; stub?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };
     try {
       raw = JSON.parse(readFileSync(join(root, file), "utf-8"));
     } catch {
@@ -119,6 +127,9 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
         stub: typeof raw.stub === "string" ? raw.stub : raw.name,
         needs: Array.isArray(raw.needs) ? raw.needs.filter((n): n is string => typeof n === "string") : undefined,
         prefixes: parsed?.success ? parsed.data : {},
+        declaresContext:
+          Array.isArray(raw.builtAtPublish) &&
+          raw.builtAtPublish.some((e) => typeof e === "object" && e !== null && (e as { path?: unknown }).path === INSTANCE_CONTEXT_PATH),
         ...(parsed && !parsed.success
           ? { prefixError: `${relative(repoRoot, join(root, file))}: jsonldPrefixes — ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` }
           : {}),
@@ -154,7 +165,7 @@ export interface InstanceReport extends InstanceContext {
   /** The tables, in the dependency order they were flattened in. */
   flattenedFrom: string[];
   prefixError?: string;
-  /** The file to write: `undefined` when the instance has no documents. */
+  /** The file to write: `undefined` when the instance has no documents and does not declare its context built at publish. */
   expected: string | undefined;
   /** What is on disk now, `undefined` when absent. */
   current: string | undefined;
@@ -295,7 +306,7 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
       unparseable: slot.unparseable.sort(),
       flattenedFrom: tables.map((t) => t.instance),
       ...(d.prefixError !== undefined ? { prefixError: d.prefixError } : {}),
-      expected: slot.docs.size === 0 ? undefined : render(built.context),
+      expected: slot.docs.size === 0 && !d.declaresContext ? undefined : render(built.context),
       current: existsSync(out) ? readFileSync(out, "utf-8") : undefined,
     };
   });
