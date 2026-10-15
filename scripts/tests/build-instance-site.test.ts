@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
 import type { DeclaredArtefact } from "../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -109,6 +109,16 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { "fsh-sushi": "^3" } }));
     expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
     expect(() => stepCommand(d, "x; rm -rf /")).toThrow();
+  });
+
+  test("a chrome writer runs through the checkout's `cat` runner, or run-script.ts where it has none (dth-hrh)", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-writer-"));
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { "site:document": "echo" } }));
+    const [bun, run, script, writer] = writerCommand(d, "avatars:css");
+    expect([bun, run, writer]).toEqual(["bun", "run", "avatars:css"]);
+    expect(script).toMatch(/run-script\.ts$/);
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { cat: "bun cat-harness-tools/scripts/run-script.ts" } }));
+    expect(writerCommand(d, "avatars:css")).toEqual(["bun", "run", "cat", "avatars:css"]);
   });
 
   test("the pages a step lists as the content's own: one per line, comments and blanks ignored", () => {

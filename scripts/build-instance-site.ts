@@ -167,6 +167,17 @@ export function stepCommand(root: string, name: string): string {
 }
 
 /**
+ * How a chrome writer runs: `bun run cat <writer>` where the checkout's own
+ * package.json has the `cat` runner, else `run-script.ts` from here, as
+ * {@link stepCommand} does for a step. dth-hrh had no root `cat` script, so
+ * `bun run cat avatars:css` ran /usr/bin/cat and refused the build (owner's
+ * repin window, 2026-10-15); `init-folio` writes none either.
+ */
+export function writerCommand(root: string, writer: string): string[] {
+  return ownsScript(root, "cat") ? ["bun", "run", "cat", writer] : ["bun", "run", join(import.meta.dir, "run-script.ts"), writer];
+}
+
+/**
  * Whether the checkout's own package.json defines the script. An IG repository
  * may carry a package.json for its own tooling (smart-immunizations' holds
  * only fsh-sushi) that names none of the site's steps: `bun run <step>` there
@@ -486,7 +497,7 @@ export function chromeArtefacts(root: string, plan: readonly DeclaredArtefact[] 
 export function buildChrome(
   root: string,
   artefacts: readonly DeclaredArtefact[] = chromeArtefacts(root),
-  runOne: (writer: string) => WriterOutcome = (w) => runWriter(["bun", "run", "cat", w], root),
+  runOne: (writer: string) => WriterOutcome = (w) => runWriter(writerCommand(root, w), root),
 ): { ran: string[]; skipped: Map<string, string> } {
   const ran: string[] = [];
   const skipped = new Map<string, string>();
