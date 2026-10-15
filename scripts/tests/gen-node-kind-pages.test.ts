@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, plannedPages,
+  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, pageBuiltAtPublish, plannedPages,
   unresolvedPages, type FieldInfo,
 } from "../gen-node-kind-pages.ts";
 import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
@@ -231,5 +231,19 @@ describe("the pages are THEMED, so they carry the site's top band (2026-10-07)",
     const html = nodeHtml(k, nodes[0]!, "en", [], "standalone");
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain(`<body ${PAGE_MARK}>`);
+  });
+});
+
+describe("pages under a route built at publish", () => {
+  const decl = { list: [{ path: "docs/en/cat-harness/node-kind-index/" }], siteDir: "docs" };
+
+  test("a page under a declared route is built at publish; one beside it is not", () => {
+    expect(pageBuiltAtPublish("en/cat-harness/node-kind-index", decl)).toBe(true);
+    expect(pageBuiltAtPublish("en/cat-harness/node-kind-index/cat-harness/docs/_data/node-kinds", decl)).toBe(true);
+    expect(pageBuiltAtPublish("en/cat-harness/bean", decl)).toBe(false);
+  });
+
+  test("with no declaration nothing is skipped (a folio's site)", () => {
+    expect(pageBuiltAtPublish("en/cat-harness/node-kind-index", undefined)).toBe(false);
   });
 });

@@ -72,10 +72,10 @@ on:
         type: string
         default: ""
       gate-jobs:
-        description: "Gates run at once within one shard (the dependency harness is ~300 gates). Leave at 1: run-gates.py pools writers too, which would race."
+        description: "Gates run at once within one shard (the dependency harness is ~300 gates)."
         required: false
         type: number
-        default: 1
+        default: 4
       gate-shards:
         description: "Jobs each side's gates (and, in layer mode, its tests) are split across, each on its own machine and checkout (bean lpcs). 1 is one job per side."
         required: false
@@ -140,6 +140,7 @@ jobs:
   # commit.
   pin:
     name: Resolve the index commit
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -221,6 +222,18 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
+      - id: base-cache
+        if: false
+        run: ":"
+      - &mount-cache
+        name: Cache remote mounts (bean cis1)
+        if: steps.base-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/cat-mount
+          key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
+          restore-keys: |
+            cat-mount-v1-
       - &mount
         # A root that carries its own replayer (folio-assistant's
         # `.github/mount-from-lock.sh`) is mounted with it: it knows which
@@ -230,6 +243,9 @@ jobs:
         # 70lx); it imports only node:*, so that one file is enough, as
         # the IRIS instance's checks.yml does.
         name: Mount every instance from the root's lock
+        if: steps.base-cache.outputs.cache-hit != 'true'
+        env:
+          CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: |
           set -euo pipefail
           if [ -f fa/.github/mount-from-lock.sh ]; then
@@ -260,6 +276,7 @@ jobs:
           path: src
       - &lower-layers-main
         name: Take the lower layers at main
+        if: steps.base-cache.outputs.cache-hit != 'true'
         env:
           LAYERS: ${{ inputs.layers-at-main }}
           MODE: ${{ inputs.mode }}
@@ -295,7 +312,7 @@ jobs:
         # as an instance. Lock mounts carry no `.git`; the swapped-in copy is
         # made to look the same.
         name: Put the caller in place of its locked mount
-        if: inputs.mode == 'layer'
+        if: inputs.mode == 'layer' && steps.base-cache.outputs.cache-hit != 'true'
         env:
           SUBDIR: ${{ inputs.path-in-repo }}
         run: |
@@ -306,6 +323,7 @@ jobs:
           test -f "fa/$INSTANCE/$INSTANCE.json" || { echo "::error::fa/$INSTANCE/$INSTANCE.json is missing: is path-in-repo right?"; exit 2; }
       - &install
         name: Install
+        if: steps.base-cache.outputs.cache-hit != 'true'
         working-directory: fa
         run: bun install
       - name: tsc --noEmit
@@ -348,7 +366,6 @@ jobs:
           fi
           git log -1 --format='base side: %h %s'
       - *setup-bun
-      - *mount
       - name: Check out the caller
         if: inputs.mode == 'layer'
         uses: actions/checkout@v4
@@ -372,8 +389,48 @@ jobs:
             git checkout -q --detach FETCH_HEAD
           fi
           git log -1 --format='base side: %h %s'
+      - name: Compute base ratchet cache key (bean cis2)
+        id: base-key
+        if: matrix.side == 'base'
+        env:
+          MODE: ${{ inputs.mode }}
+          LAYERS: ${{ inputs.layers-at-main }}
+          TOOLS_REF: ${{ inputs.tools-ref }}
+          TEST_PATH: ${{ inputs.test-path }}
+          # Each shard caches its own slice (bean lpcs): without the shard in
+          # the key, shard 1's results would be restored into every shard.
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ inputs.gate-shards }}
+        run: |
+          set -euo pipefail
+          fa_sha="$(git -C fa rev-parse HEAD)"
+          src_sha="none"
+          if [ "$MODE" = "layer" ] && [ -d src/.git ]; then
+            src_sha="$(git -C src rev-parse HEAD)"
+          fi
+          cht_sha="$(git ls-remote https://github.com/litlfred/cat-harness-tools.git "refs/heads/$TOOLS_REF" | cut -f1 || echo "$TOOLS_REF")"
+          ch_sha="$(git ls-remote https://github.com/litlfred/cat-harness.git refs/heads/main | cut -f1 || echo main)"
+          raw="${MODE}|${fa_sha}|${src_sha}|${cht_sha}|${ch_sha}|${LAYERS}|${TEST_PATH}|shard ${SHARD}/${SHARDS}"
+          key="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+      - name: Cache base test and gate results (bean cis2)
+        id: base-cache
+        if: matrix.side == 'base'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: layer-pr-checks-base-v2-${{ github.repository }}-${{ steps.base-key.outputs.key }}
+      - name: Restore cached base results
+        if: matrix.side == 'base' && steps.base-cache.outputs.cache-hit == 'true'
+        run: |
+          cp "$RUNNER_TEMP/base-results/junit.xml" "$RUNNER_TEMP/junit.xml"
+          cp "$RUNNER_TEMP/base-results/gates.json" "$RUNNER_TEMP/gates.json"
+          cp "$RUNNER_TEMP/base-results/gates-shard.json" "$RUNNER_TEMP/gates-shard.json"
+      - *mount-cache
+      - *mount
       - *lower-layers-main
       - name: The judging scripts, the same on both sides
+        if: steps.base-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: litlfred/cat-harness-tools
@@ -382,6 +439,7 @@ jobs:
           sparse-checkout: .github/scripts/layer-pr-checks
       - *swap
       - name: Give the root the `cat` script the harness's commands assume
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # The harness's scripts spawn `bun run cat <name>` from the root
         # (qa:refresh, kg:detangle, regen, ...). A root without that entry
         # (smart-ra) ran /usr/bin/cat instead (smart-ra#65: "/usr/bin/cat:
@@ -390,6 +448,7 @@ jobs:
         run: python3 ci/.github/scripts/layer-pr-checks/root-cat-script.py fa
       - *install
       - name: Install Chromium, for the checks that draw through a browser
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -405,6 +464,7 @@ jobs:
             echo "no playwright in the index: no browser installed"
           fi
       - name: Mount every graph kept on a branch, and build the IG pages
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
         # mounts them with `state:mount`, but through `mountState` directly:
@@ -431,6 +491,7 @@ jobs:
             bun run cat smart:pages
           fi
       - name: Build the publish-time pages (derive:publish), on this side
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -516,6 +577,7 @@ jobs:
           PY
           fi
       - name: bun test
+        if: steps.base-cache.outputs.cache-hit != 'true'
         working-directory: fa
         # Judged by the compare job, not by this exit code.
         #
@@ -544,6 +606,7 @@ jobs:
           fi
           test -s "$RUNNER_TEMP/junit.xml"
       - name: Gates
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # Judged by the compare job, not by this exit code.
         #
         # The inputs gates take from this run (run-gates.py SUPPLIED_INPUTS):
@@ -582,6 +645,13 @@ jobs:
           fi
           export GATE_DIFF_BASE
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
+      - name: Populate base ratchet cache directory (bean cis2)
+        if: matrix.side == 'base' && steps.base-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/base-results"
+          cp "$RUNNER_TEMP/junit.xml" "$RUNNER_TEMP/base-results/junit.xml"
+          cp "$RUNNER_TEMP/gates.json" "$RUNNER_TEMP/base-results/gates.json"
+          cp "$RUNNER_TEMP/gates-shard.json" "$RUNNER_TEMP/base-results/gates-shard.json"
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}

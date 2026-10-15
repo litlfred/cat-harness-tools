@@ -1122,6 +1122,18 @@ export function instanceHubPage(vis: { id: string; title?: string }, subjects: r
 }
 
 /**
+ * Whether a per-instance visualiser's OWN route gets {@link instanceHubPage}:
+ * when no state dashboard draws it, it has instance pages, and its kinds are
+ * not state — a registry, or `code`. Without it `en/cat-harness/code/` had a
+ * page per instance and none at its own route, which `site-coverage.ts`
+ * refuses (dth-hrh and smart-immunizations, 2026-10-15).
+ */
+export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
+  if (drawnByDashboard || subjects === 0 || kinds.length === 0) return false;
+  return kinds.every((k) => k === "code") || kinds.every((k) => REGISTRY_KINDS.has(k));
+}
+
+/**
  * The kinds that make up ONE bean store: the store (`beans`) and the parts its
  * `beans.json` declares from within — work items, PR addenda and running BPMN
  * instances (bean `folio-assistant-750a`). A visualiser covering any of them
@@ -1696,8 +1708,10 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
-  // state), so its hub is drawn here, listing the instance pages.
-  if (!graphs.some((g) => g.vis === v.id) && subjects.length > 0 && kinds.every((k) => REGISTRY_KINDS.has(k))) {
+  // state, and neither is `code`), so its hub is drawn here, listing the
+  // instance pages. Without it `code/` had a page per instance and none at
+  // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
+  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), subjects.length)) {
     hubs.push(v.id);
     emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }
