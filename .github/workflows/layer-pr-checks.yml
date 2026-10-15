@@ -96,10 +96,9 @@ on:
         description: "layer mode: the folio-assistant ref to check out (main, or a re-pin branch while main's pins are behind)."
         required: false
         type: string
-        # folio-assistant main pins pre-70lx layers until folio-assistant#2529
-        # merges, so every caller pinned this branch by hand. It is pinned
-        # here once instead; set it back to "main" when #2529 merges.
-        default: "claude/nifty-johnson-w3mspn"
+        # It was "claude/nifty-johnson-w3mspn" while folio-assistant main pinned
+        # pre-70lx layers; folio-assistant#2529 merged on 2026-10-15.
+        default: "main"
       tools-ref:
         description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
         required: false
