@@ -94,12 +94,14 @@ const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-cor
 const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
 /**
  * Where a term's entry is: on the page of the instance that owns its scheme,
- * `<route>/authored/<instance>/` (folio-assistant-core, owner 2026-10-15: the
- * authored terms left the glossary index for one page per owning instance).
+ * `<route>/instance/<instance>/` (folio-assistant-core, owner 2026-10-15: the
+ * authored terms left the glossary index for one page per owning instance;
+ * the route was `authored/` until the owner's option 3a the same day,
+ * folio-assistant-core#128, which nested it as `instance/`).
  * The instance is the anchor's first segment, `<instance>--<scheme>--<id>`.
  */
 export function termPageRoute(term: string): string {
-  return `${GLOSSARY_ROUTE}/authored/${term.split("--", 1)[0]}/`;
+  return `${GLOSSARY_ROUTE}/instance/${term.split("--", 1)[0]}/`;
 }
 
 // ── JSON Schema, reduced to what a class box shows ────────────────────────
@@ -339,7 +341,9 @@ function assertEdges(classes: ClassDef[], edges: Edge[]): string[] {
  */
 function glossaryAnchors(): Set<string> | null {
   if (!existsSync(GLOSSARY_PAGE)) return null;
-  const authored = join(dirname(GLOSSARY_PAGE), "authored");
+  // `instance/` since folio-assistant-core#128; `authored/` is the route it
+  // replaced, still read so an older core pin keeps the anchors it had.
+  const authored = [join(dirname(GLOSSARY_PAGE), "instance"), join(dirname(GLOSSARY_PAGE), "authored")].find((d) => existsSync(d)) ?? join(dirname(GLOSSARY_PAGE), "instance");
   const pages = existsSync(authored)
     ? readdirSync(authored, { withFileTypes: true })
         .filter((e) => e.isDirectory() && existsSync(join(authored, e.name, "index.md")))

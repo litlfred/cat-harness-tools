@@ -30,8 +30,8 @@ describe("arrows run from the dependent to the general node", () => {
 describe("every class links to its glossary definition", () => {
   test("in the PlantUML", () => {
     expect(classes.length).toBeGreaterThan(0);
-    // On the owning instance's authored page, which the anchor's first segment names.
-    const linked = classes.map((l) => l.match(/\[\[\.\.\/\.\.\/\.\.\/([\w/-]+)\/authored\/([\w-]+)\/#(([\w-]+?)--[\w-]+)\]\]/));
+    // On the owning instance's instance page (`instance/`, folio-assistant-core#128), which the anchor's first segment names.
+    const linked = classes.map((l) => l.match(/\[\[\.\.\/\.\.\/\.\.\/([\w/-]+)\/instance\/([\w-]+)\/#(([\w-]+?)--[\w-]+)\]\]/));
     expect(classes.filter((_, i) => !linked[i])).toEqual([]);
     for (const m of linked) expect(m![2]).toBe(m![4]);
   });
@@ -42,8 +42,8 @@ describe("every class links to its glossary definition", () => {
   });
 
   test("a term's page is its owning instance's authored glossary page", () => {
-    expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/authored\/cat-harness\/$/);
-    expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/authored\/bootstrap\/$/);
+    expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/instance\/cat-harness\/$/);
+    expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/instance\/bootstrap\/$/);
   });
 
   test("a class whose term the page lacks is reported, and no page is could-not-determine", () => {
