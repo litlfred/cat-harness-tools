@@ -302,6 +302,13 @@ jobs:
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - *swap
+      - name: Give the root the `cat` script the harness's commands assume
+        # The harness's scripts spawn `bun run cat <name>` from the root
+        # (qa:refresh, kg:detangle, regen, ...). A root without that entry
+        # (smart-ra) ran /usr/bin/cat instead (smart-ra#65: "/usr/bin/cat:
+        # 'qa:refresh': No such file or directory"). Added to the working copy
+        # only, the same on base and head; a root that has one keeps it.
+        run: python3 ci/.github/scripts/layer-pr-checks/root-cat-script.py fa
       - *install
       - name: Install Chromium, for the checks that draw through a browser
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
@@ -366,11 +373,40 @@ jobs:
           test -s "$RUNNER_TEMP/junit.xml"
       - name: Gates
         # Judged by the compare job, not by this exit code.
+        #
+        # The inputs gates take from this run (run-gates.py SUPPLIED_INPUTS):
+        #   GATE_JUNIT     the report the tests step above wrote, for
+        #                  check:test-budgets.
+        #   GATE_DIFF_BASE the commit the PR's diff starts from, for
+        #                  check:corpus-gate --since. Index mode only: the root
+        #                  IS the caller, a merge commit fetched at depth 2. On
+        #                  head it is the merge's first parent, so the gate
+        #                  judges exactly what the PR adds; on base it is base
+        #                  itself, so main is judged on nothing it did not
+        #                  already hold. Layer mode leaves it unset: the root is
+        #                  the folio-assistant index and the caller was swapped
+        #                  in without its .git, so the gate is skipped with that
+        #                  reason rather than judging folio-assistant's history.
         env:
           GATE_JOBS: ${{ inputs.gate-jobs }}
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
+          MODE: ${{ inputs.mode }}
+          SIDE: ${{ matrix.side }}
         # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
-        run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN
+        run: |
+          set -euo pipefail
+          export GATE_JUNIT="$RUNNER_TEMP/junit.xml"
+          GATE_DIFF_BASE=""
+          if [ "$MODE" = "index" ]; then
+            if [ "$SIDE" = "head" ] && git -C fa rev-parse -q --verify 'HEAD^2' >/dev/null; then
+              GATE_DIFF_BASE="$(git -C fa rev-parse 'HEAD^1')"
+            else
+              GATE_DIFF_BASE="$(git -C fa rev-parse HEAD)"
+            fi
+            echo "corpus-gate diff base ($SIDE): $GATE_DIFF_BASE"
+          fi
+          export GATE_DIFF_BASE
+          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.side }}

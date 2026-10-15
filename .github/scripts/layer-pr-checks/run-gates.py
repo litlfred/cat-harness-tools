@@ -34,6 +34,12 @@ written with a `skipped` reason in place of `exit` (owner, 2026-10-15, "b1"):
 one that judges the remote's live state (`LIVE_STATE_SCRIPTS`), one that needs
 an argument or artefact this runner never supplies (`NEEDS_INPUT_SCRIPTS`),
 and one whose prerequisite file is absent at the root (`PREREQUISITE_FILES`).
+
+A gate whose input this runner DOES have is given it instead
+(`SUPPLIED_INPUTS`): `check:corpus-gate` gets `--since $GATE_DIFF_BASE`, the
+PR's diff base, and `check:test-budgets` the junit report at `$GATE_JUNIT`
+that the tests step wrote. Either is skipped, with its reason, only on a side
+that holds no such input.
 """
 import json
 import os
@@ -71,8 +77,6 @@ LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency
 # entry was confirmed by reading the script and running it with no argument;
 # the workflow that does supply the input runs it there.
 NEEDS_INPUT_SCRIPTS = {
-    "check:corpus-gate": "needs --staged or --since <ref>; bare, it prints its usage and exits 2",
-    "check:test-budgets": "needs a junit report path; bare, 'no junit report given' and exit 2",
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
@@ -92,6 +96,55 @@ PREREQUISITE_FILES = {
     "uml:overview:check": (GATES_WORKFLOW, QA_WORKING_COPY),
     "readme:subgraphs:check": (GATES_WORKFLOW, QA_WORKING_COPY),
 }
+
+
+# Gates whose input this runner DOES have, given it when it has it: the
+# workflow passes the PR's diff base (`GATE_DIFF_BASE`) and the junit report
+# its tests step wrote (`GATE_JUNIT`). Run bare they printed their usage and
+# exited 2 (smart-ra#65, run 38640286019). Each returns (extra arguments, None)
+# to run, or (None, reason) when this side holds no such input; a reason is a
+# skip, reported, never a pass.
+def corpus_gate_input(env):
+    base = env.get("GATE_DIFF_BASE", "").strip()
+    if not base:
+        return None, ("needs --since <ref>, and this run has no PR diff in the root's own history "
+                      "(layer mode swaps the caller in without its .git; GATE_DIFF_BASE is unset)")
+    return ["--since", base], None
+
+
+def junit_cases(path):
+    """The number of <testcase> elements in a junit report, or None when it will not read."""
+    import xml.etree.ElementTree as ET
+    try:
+        return sum(1 for _ in ET.parse(path).getroot().iter("testcase"))
+    except (OSError, ET.ParseError):
+        return None
+
+
+def test_budgets_input(env):
+    path = env.get("GATE_JUNIT", "").strip()
+    if not path:
+        return None, "needs a junit report path, and GATE_JUNIT is unset"
+    cases = junit_cases(path)
+    if cases is None:
+        return None, f"needs a junit report, and {path} is absent or will not parse"
+    if cases == 0:
+        # check-test-budgets.ts exits 2 on a report of no cases (bean 6tkl):
+        # index mode runs no tests unless test-path is given.
+        return None, "the tests step ran no test cases on this side, so there is nothing to budget"
+    return [path], None
+
+
+SUPPLIED_INPUTS = {
+    "check:corpus-gate": corpus_gate_input,
+    "check:test-budgets": test_budgets_input,
+}
+
+
+def gate_args(script, env=None):
+    """(extra arguments, skip reason) for a declared gate: ([], None) for one that needs none."""
+    fn = SUPPLIED_INPUTS.get(script)
+    return fn(os.environ if env is None else env) if fn else ([], None)
 
 
 def skip_reason(root, script):
@@ -184,7 +237,9 @@ def declared_gates(root, name, path, runner):
     for s in sorted(scripts):
         if not (s.startswith("check:") or s.endswith(":check")):
             continue
-        command, why = f"{runner} {s}", skip_reason(root, s)
+        extra, why = gate_args(s)
+        command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
+        why = why or skip_reason(root, s)
         if why:
             skipped[f"{name}:{s}"] = (command, why)
         else:
