@@ -81,6 +81,7 @@ import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "folio-viewer";
@@ -369,7 +370,7 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   const seg = basename(g.directories[0]!.dir);
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {

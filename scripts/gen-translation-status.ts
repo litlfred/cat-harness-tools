@@ -58,6 +58,8 @@ import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./view
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
+import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
+import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -417,8 +419,17 @@ export function statusPage(doc: {
    * the default is that same shape, never a hand-counted `../`.
    */
   siteRoot?: string;
+  /**
+   * Whether the site carries the `translation-manager` skill's page. False in
+   * a repository's own site (`--site`), which holds no harness reference pages:
+   * the skill is then named, not linked. True when absent.
+   */
+  skillPage?: boolean;
 }): string {
   const siteRoot = doc.siteRoot ?? siteRootFrom(pageParts({ harness: "harness", visualiser: "visualiser" }));
+  const skill = doc.skillPage === false
+    ? "<code>translation-manager</code> skill"
+    : `<a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>`;
   const others = (doc.instances ?? [])
     .map(
       (i) => `
@@ -523,7 +534,7 @@ ${localeTable(i.locales, `${i.instance}-`, i.scope)}`,
 <h1 id="ts-title">translations — status</h1>
 <p class="ts-sub">The gettext side of the <code>translation-sources</code> graph, measured from the files in
 <code>${esc(doc.scope)}</code>. Every number here is derived on each run; none is written down. Governed by the
-<a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>. These
+${skill}. These
 numbers last <strong>changed</strong> on ${esc(doc.changedAt)}.</p>
 
 <div class="ts-questions-legend">
@@ -555,7 +566,7 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
 <div class="ts-onward">
 <h2 id="onward-links">Onward links</h2>
 <ul>
-  <li><strong>Skill:</strong> <a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a> — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
+  <li><strong>Skill:</strong> ${skill} — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
   <li><strong>Sources:</strong> <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(doc.scope)}"><code>${esc(doc.scope)}</code> on GitHub</a> — catalogues (<code>.po</code>) and extractable templates (<code>.pot</code>).</li>
 </ul>
 </div>
@@ -580,7 +591,7 @@ function main(): void {
   const ownScope = `${declName}/translations`;
   const locales = localeStatuses(translationsDir);
   const instances = otherInstances(REPO_ROOT, ROOT);
-  const site = localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT)));
 
   // The projection first, the page second: the page is a rendering OF the
   // projection, and writing them the other way round invites a page whose
@@ -628,7 +639,7 @@ function main(): void {
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
   // front matter.
   const page = (changedAt: string) =>
-    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up }), VIEWER_TOOL);
+    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up, skillPage: siteArg() === undefined || sitePageAt(site, `${SKILL_PAGES_DIR}/translation-manager.html`) }), VIEWER_TOOL);
   const json = (changedAt: string) => `${JSON.stringify({ ...doc, changedAt }, null, 2)}\n`;
 
   // The date the NUMBERS last changed is the projection's to say. When the

@@ -157,12 +157,13 @@ import {
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "state-viewer";
 
 const ROOT = HARNESS_ROOT;
-const SITE = join(ROOT, siteDirFor(ROOT));
+const SITE = siteTarget(join(ROOT, siteDirFor(ROOT)));
 /**
  * `coverage.*` is REPO-root relative, while a directory's `path` is relative
  * to the INSTANCE. Measured across both declarations 2026-09-20: of 27
