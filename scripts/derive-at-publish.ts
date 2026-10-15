@@ -76,11 +76,11 @@
  *   kinds.
  *
  * The case the second exists for (measured 2026-10-15): cat-harness's
- * `docs/_data/harness.json` (`docs:harness`) gives smart-trust a folio link and
- * a rail scope only when `smart-trust/docs/` exists, and that directory is
- * smart-trust's own publish-time artefact (`smart-trust:pages`). Lowest-first
- * wrote the tiles first, so one clean `derive:publish` published the platform
- * site with smart-trust as a landing-page section and no rail scope
+ * `docs/_data/harness.json` (`docs:harness`) gives an IG instance a folio
+ * link and a rail scope only when that IG's `docs/` exists, and that
+ * directory is the IG's own publish-time artefact (its `<ig>:pages` writer).
+ * Lowest-first wrote the tiles first, so one clean `derive:publish` published
+ * the platform site with the IG as a landing-page section and no rail scope
  * (`foreign-site-scope.test.ts` (a), `viewer-undiscovered.test.ts`). An
  * interim fix ran every instance consumers first; the ruling replaced it with
  * the declared edge, `reads: ["docs"]` on that entry, because which way a read

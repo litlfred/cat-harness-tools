@@ -14,7 +14,7 @@
  * standing alone too.
  */
 import { beforeAll, describe, expect, it } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawnBounded } from "../support/bounded-spawn.ts";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -47,8 +47,11 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 // other test files were reading. This file needs one page; it builds one page.
 const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
-  const r = spawnSync("bun", ["run", "cat", "fsh-guts:viz"], { cwd: REPO, encoding: "utf8" });
-  if (r.status !== 0) console.warn(`fsh-guts:viz did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
+  // Bounded, and its whole process group killed on a timeout (`spawnBounded`):
+  // a writer left running would keep writing into the tree after this hook.
+  const r = spawnBounded(["bun", "run", "cat", "fsh-guts:viz"], REPO, BUILD_BUDGET_MS);
+  if (r.timedOut) console.warn(`fsh-guts:viz did not finish within ${BUILD_BUDGET_MS} ms; its process group was killed`);
+  else if (r.status !== 0) console.warn(`fsh-guts:viz did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
 }, BUILD_BUDGET_MS);
 
 function composeTo(opts: { staging?: boolean }): { dir: string; report: ReturnType<typeof compose> } {

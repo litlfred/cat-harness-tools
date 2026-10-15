@@ -29,6 +29,7 @@ import {
   coverage,
 } from "../audit-coverage.ts";
 import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -162,6 +163,15 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     expect(parsed.success).toBe(true);
     expect(review.coverage.files_reviewed).toBe(1);
     expect(review.flags).toHaveLength(findings.filter((f) => f.weight === "blocking").length);
+  });
+
+  it("records the declared not-disclosed model, never a hard-coded id (owner E1, 2026-10-15)", () => {
+    const { review } = reviewNodeAdversarially(
+      { id: "test-gates", kind: "tool" as AdversarialContentKind, path: "scripts/gates.ts", sourceHash: "abc123456789" },
+      ROOT,
+    );
+    expect(review.reviewer.model).toBe(NOT_DISCLOSED);
+    expect(review.reviewer.session).toBeTruthy();
   });
 
   it("detects known defect pattern in review (narrative asserts code)", () => {

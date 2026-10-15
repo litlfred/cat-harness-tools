@@ -50,8 +50,8 @@
  * ## An instance that declares no directories renders nothing, and passes
  *
  * Owner, 2026-10-15 ("C1"): an instance may declare `directories: []` — an
- * index that mounts none of a repository's directories (smart-immunizations
- * in folio-assistant) declares only what it has, which is nothing (B1). Its
+ * index that mounts none of a repository's directories declares only what it
+ * has there, which is nothing (B1). Its
  * render is then empty BY DECLARATION, which is a different fact from the
  * `dh4f` defect this check exists for (a declared directory resolving to
  * nothing). So such an instance is **rendered**, flagged `noDirectories`, and

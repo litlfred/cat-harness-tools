@@ -107,7 +107,7 @@ import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
-import { type ForeignScope, foreignScopeFor, scopeNavbarRow } from "./lib/foreign-site-scope.ts";
+import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
@@ -118,6 +118,10 @@ import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.t
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+
+/** The platform's published site, no trailing slash: where a folio's own site links the platform's pages. */
+const PLATFORM_BASE = DOCS_SITE_BASE.replace(/\/$/, "");
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -887,9 +891,21 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       }
 
       const named = railNames(built, m.name);
-      const links: NavItem[] = declaredGraphs(m.name, linked, publishedGraphs(built, m.name, toRoot), named.harness);
+      // THE FOLIO'S OWN SITE (owner, 2026-10-15, on who-iris: the rail's Graphs
+      // group was empty, then linked pages the site does not hold). In the
+      // checkout that declares this instance, the site being built is the
+      // instance's own, not the platform's: `harness.json`'s paths name the
+      // platform's handler viewers, so composed against this site most of them
+      // are 404s. The standalone pass already answers this with
+      // `ownSiteGraphs` and `instanceHarnesses` (bean `mftp`); the mount pass
+      // now asks the same functions, so one site's rail says one thing.
+      const ownSite = ownsCheckout(m.name);
+      const site = ownSite ? ownSiteGraphs(siteAbs, built, m.name, toRoot) : publishedGraphs(built, m.name, toRoot);
+      const links: NavItem[] = declaredGraphs(m.name, linked, site, named.harness);
 
-      const harnesses = instantiatedHarnesses(built, toRoot);
+      const harnesses = ownSite
+        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot)
+        : instantiatedHarnesses(built, toRoot);
       const before = readFileSync(file, "utf-8");
       const mark = instanceMark(built, m.name, toRoot);
       const after = injectRail(before, {
@@ -900,7 +916,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         ...(root[0] ? { root: root[0] } : {}),
         links,
         ...(harnesses ? { harnesses } : {}),
-        navbarRow: navbarRowData(built),
+        ...(ownSite ? { rowRoot: toRoot } : {}),
+        navbarRow: ownSite ? rebaseNavbarRow(navbarRowData(built), PLATFORM_BASE, m.name) : navbarRowData(built),
         emitRailData: railDataWriter(siteAbs),
       });
       if (after === undefined) {
@@ -1151,7 +1168,12 @@ export function ownSiteGraphs(
   const out = new Map<string, GraphFallback>();
   for (const [kind, f] of publishedGraphs(built, instance, "")) {
     const { href, note: _note, ...named } = f;
-    const at = (href !== undefined ? held(href) : undefined) ?? declared.get(kind);
+    // `harness.json` names the platform's routes: the folio's own pages are under
+    // `/<instance>/` there and at this site's root here (`/who-iris/catalogue/` is
+    // who-iris's `/catalogue/`). Scoped the way compose-docs scopes the shell's
+    // copy of the same file (`siteHref`), so the rail and the sidebar agree.
+    const scopedHref = href !== undefined ? siteHref(href, { instance, platformBase: PLATFORM_BASE }) : undefined;
+    const at = (href !== undefined ? (held(href) ?? (scopedHref !== href ? held(scopedHref!) : undefined)) : undefined) ?? declared.get(kind);
     if (at !== undefined) out.set(kind, { href: `${toRoot}/${at}`, ...named });
     else out.set(kind, { note: f.note ?? "not published on this site", ...named });
   }
