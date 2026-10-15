@@ -54,6 +54,9 @@ import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-e
 import { parseRemote } from "./pages-bootstrap.ts";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
+/** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
+export const INITIAL_VERSION = "0.1.0";
+
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";
 
@@ -461,8 +464,12 @@ function instanceDeclaration(o: MaybeFolio): string {
       title: o.title,
       // Where its IRIs are minted and its context is published (bean
       // folio-assistant-63q4). Only when known: an invented address is worse
-      // than none.
-      ...(o.iriBase !== undefined ? { iriBase: o.iriBase } : {}),
+      // than none. With a `version` beside it, always: `releaseIris` mints
+      // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
+      // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
+      // which is how the restored smart-trust and smart-immunizations
+      // declarations broke their IG publish on 2026-10-15.
+      ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
       // A contentless instance declares no `folio` directory: declaring one it
       // does not hold would be the `dh4f` defect (a consumer scans nothing and
       // reports a clean run). Bean `mer2`.

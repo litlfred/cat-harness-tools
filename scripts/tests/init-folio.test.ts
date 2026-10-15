@@ -39,6 +39,7 @@ import {
 } from "../init-folio";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
@@ -586,7 +587,9 @@ describe("a contentless instance (mer2)", () => {
   test("no GitHub origin: no iriBase is invented, and the note says how to add one", () => {
     const d = tmp();
     const r = initInstance(instanceOpts(d));
-    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBeUndefined();
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBeUndefined();
+    expect(decl.version).toBeUndefined();
     expect(r.notes.join("\n")).toContain("No iriBase was declared");
   });
 
@@ -595,7 +598,11 @@ describe("a contentless instance (mer2)", () => {
     spawnSync("git", ["init", "-q"], { cwd: d });
     spawnSync("git", ["remote", "add", "origin", "https://github.com/LitlFred/new-layer.git"], { cwd: d });
     const r = initInstance(instanceOpts(d));
-    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBe("https://litlfred.github.io/new-layer/");
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBe("https://litlfred.github.io/new-layer/");
+    // An iriBase without a version breaks releaseIris, and with it the IG publish.
+    expect(decl.version).toBe("0.1.0");
+    expect(releaseIris(decl)?.agent).toBe("https://litlfred.github.io/new-layer/0.1.0/");
     expect(r.notes.join("\n")).toContain("Deploy from a branch: gh-pages, / (root)");
   });
 
@@ -610,7 +617,10 @@ describe("a contentless instance (mer2)", () => {
   test("--iri-base is declared as given", () => {
     const d = tmp();
     initInstance({ ...instanceOpts(d), iriBase: "https://example.org/x/" });
-    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBe("https://example.org/x/");
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBe("https://example.org/x/");
+    expect(decl.version).toBe("0.1.0");
+    expect(() => releaseIris(decl)).not.toThrow();
   });
 
   test("inside another repository no workflow is written (GitHub would never read it), and the note says why", () => {
