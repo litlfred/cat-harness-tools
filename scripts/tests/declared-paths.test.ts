@@ -26,7 +26,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { absentResultDirs, isTestFile, newWitnesses, scanDeclaredPaths, underAbsentResults, underBuiltAtPublish, witnessesOf } from "../check-declared-paths.js";
+import { absentResultDirs, isTestFile, newWitnesses, relocatedWitnesses, scanDeclaredPaths, underAbsentResults, underBuiltAtPublish, witnessesOf } from "../check-declared-paths.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -136,6 +136,20 @@ describe("declared-path literals", () => {
     expect(newWitnesses(recorded, ["a.ts::nowhere/one.md", "c.ts::nowhere/three.md"])).toEqual(["c.ts::nowhere/three.md"]);
     // A witness that went is `lost`'s business, not this one's.
     expect(newWitnesses(recorded, ["b.ts::nowhere/two.md"])).toEqual([]);
+  });
+
+  /**
+   * A move carries a witness; an edit does not (cat-harness #286 split
+   * `tools/index.ts` into `tools/<id>/<id>.ts`). Falsified both ways: an
+   * edited literal pairs with nothing, and one lost witness hands on to one
+   * new one, never two.
+   */
+  test("relocatedWitnesses pairs a lost witness with the same literal in another file, one to one", () => {
+    const lost = ["tools/index.ts::schemas/a.ts", "tools/index.ts::schemas/b.ts"];
+    const added = ["tools/a/a.ts::schemas/a.ts", "tools/x/x.ts::schemas/a.ts", "tools/c/c.ts::schemas/c.ts"];
+    expect(relocatedWitnesses(lost, added)).toEqual([{ from: "tools/index.ts::schemas/a.ts", to: "tools/a/a.ts::schemas/a.ts" }]);
+    // `schemas/b.ts` edited to `schemas/c.ts` is a new literal, not a move.
+    expect(relocatedWitnesses(["tools/index.ts::schemas/b.ts"], ["tools/c/c.ts::schemas/c.ts"])).toEqual([]);
   });
 
   /**

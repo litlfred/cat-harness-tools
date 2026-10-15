@@ -1,12 +1,6 @@
 {
   "_comment": "TWO records, with different jobs. `files`: per-file counts of declared-path literals that neither resolve nor carry a `declared-path-literal: <reason>` marker — recorded debt for SOURCE files, which may only go DOWN. `resolves`: the WITNESS list — every literal that resolves to a real artefact today, as `<file>::<literal>`. A witness that stops resolving means the artefact moved and the code naming it did not follow; that fails the gate. The list only SHRINKS: a new literal naming an existing file fails too, and `--update` never adds one (bean gz47, owner ruling 2026-10-04). *.test.ts files appear ONLY in `resolves`, never in `files`: a test that builds a mkdtemp fixture names declared directories by necessity, so counting its unresolved literals would fire on every new test (measured 2026-09-20 — a sibling's schemas/folio-dir.test.ts tripped it with two correct literals). Both are WRITTEN by `bun run cat check:declared-paths --update`; raising a count or dropping a witness is a diff somebody reviews. See the module header of scripts/check-declared-paths.ts.",
   "files": {
-    "pipeline/conjectural-propagation-sweep.ts": 1,
-    "pipeline/content-graph.ts": 1,
-    "pipeline/lean-atlas-ingest.ts": 1,
-    "pipeline/lean-profile-ingest.ts": 1,
-    "pipeline/qa-checkers-extended.ts": 5,
-    "pipeline/qa-criteria-registry.ts": 8,
     "scripts/audit-wiring-migrate.ts": 1,
     "scripts/external-schemas.ts": 2,
     "scripts/gen-schema-docs.ts": 1,
@@ -138,13 +132,13 @@
     "scripts/tests/uml-overview-orphans.test.ts::uml/overview/cat-harness.mmd",
     "scripts/tests/voices-viz.test.ts::skills/authoring/authoring-core/technical-documentation.md",
     "src/upstream/pins.test.ts::docs/_config.yml",
-    "tools/index.ts::schemas/avatars.ts",
-    "tools/index.ts::schemas/cat-harness.ts",
-    "tools/index.ts::schemas/jsonld.ts",
-    "tools/index.ts::schemas/themes.ts",
-    "tools/index.ts::schemas/tool-types.ts",
-    "tools/index.ts::schemas/tool.ts",
-    "tools/index.ts::schemas/vocabulary.ts",
-    "tools/vocab-map.ts::schemas/vocab-mapping.ts"
+    "tools/avatars-css/avatars-css.ts::schemas/avatars.ts",
+    "tools/cat-harness-schema/cat-harness-schema.ts::schemas/cat-harness.ts",
+    "tools/content-context/content-context.ts::schemas/jsonld.ts",
+    "tools/ns-vocabulary/ns-vocabulary.ts::schemas/vocabulary.ts",
+    "tools/themes-css/themes-css.ts::schemas/themes.ts",
+    "tools/tool-schema/tool-schema.ts::schemas/tool.ts",
+    "tools/tool-types-schema/tool-types-schema.ts::schemas/tool-types.ts",
+    "tools/vocab-map/vocab-map.ts::schemas/vocab-mapping.ts"
   ]
 }
