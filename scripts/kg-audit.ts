@@ -3201,11 +3201,34 @@ if (orphans.length > 0) {
   console.error("  It fails `kg:audit:check`; removing a dead sidecar is still yours to authorise.");
 }
 
+/**
+ * Write all of `text` to `fd`, synchronously.
+ *
+ * One `writeSync` is not enough on a pipe: it returns after filling the pipe's
+ * buffer (64 KiB on Linux) and the rest is dropped, so a parent reading
+ * `kg-audit --json` got exactly 65536 bytes of a larger report and could not
+ * parse it (resolution-across-needs.test.ts, CI run 38696377785). So: loop on
+ * the count written, and wait out EAGAIN while the reader drains the pipe.
+ */
+function writeFullySync(fd: number, text: string): void {
+  const buf = Buffer.from(text, "utf-8");
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  let off = 0;
+  while (off < buf.length) {
+    try {
+      off += writeSync(fd, buf, off, buf.length - off);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EAGAIN") throw e;
+      Atomics.wait(pause, 0, 0, 5);
+    }
+  }
+}
+
 if (asJson) {
   // Written synchronously: the judge below ends in `process.exit`, and a
   // multi-megabyte `console.log` to a PIPE is not flushed by then — the
   // callers that parse this saw a truncated array (bean `oqe3`).
-  writeSync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
+  writeFullySync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
 } else {
   const rank: Record<KgSeverity, number> = { minor: 1, major: 2, critical: 3 };
   const counts: Record<KgResult, number> = { pass: 0, fail: 0, "n/a": 0, unknown: 0 };
