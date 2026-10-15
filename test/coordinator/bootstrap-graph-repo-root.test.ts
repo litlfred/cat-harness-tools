@@ -52,7 +52,7 @@ function bootstrapGraphPublishers(workflowText: string): string[] {
     .split("\n")
     .filter((l) => !/^\s*#/.test(l))
     .join("\n");
-  return [...code.matchAll(/(?:cat-harness|bootstrap-tools)\/scripts\/([a-z0-9-]+)\.ts([^\n]*)/g)]
+  return [...code.matchAll(/(?:cat-harness(?:-tools)?|bootstrap-tools)\/scripts\/([a-z0-9-]+)\.ts([^\n]*)/g)]
     .filter((m) => {
       const [script, rest] = [m[1]!, m[2] ?? ""];
       if (!/--out\s/.test(rest)) return false;
@@ -74,7 +74,7 @@ function bootstrapGraphPublishers(workflowText: string): string[] {
 function siteOutputs(workflowText: string): string[] {
   const stubs = new Map<string, string>();
   for (const m of workflowText.matchAll(
-    /(\w+)=\$\(bun run cat-harness\/scripts\/print-stub\.ts\s+(\S+)\)/g,
+    /(\w+)=\$\(bun run cat-harness(?:-tools)?\/scripts\/print-stub\.ts\s+(\S+)\)/g,
   )) {
     const decl = readDeclaration(join(repoRootFor(ROOT), m[2]!));
     if (decl) stubs.set(m[1]!, artefactStub(decl));
