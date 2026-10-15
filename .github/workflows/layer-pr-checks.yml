@@ -455,8 +455,12 @@ jobs:
             injected=1
             echo "root has no \`cat\` script: one is added for derive:publish and removed after it"
           fi
-          bun run cat derive:publish 2>&1 | tee "$log"
-          code=${PIPESTATUS[0]}
+          # GitHub runs this step as `bash -e`, and pipefail is set above, so a
+          # failing build would end the step at this pipeline before the
+          # recording below (smart-ra#66, job 116366855337). `|| code=$?` keeps
+          # the step alive with derive:publish's own exit (tee's is 0).
+          code=0
+          bun run cat derive:publish 2>&1 | tee "$log" || code=$?
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
           # A root that is not the folio-assistant index (no
           # code-quality-gates.yml: a folio, an IG repository) mounts fewer
