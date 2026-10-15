@@ -83,8 +83,12 @@ TIMEOUT_S = 1200
 # between them with no change in the PR (fhir-harness#67: check:ci-health went
 # red on head because a workflow on main failed in between). The compare job
 # would charge that to the PR; these are reported by the session-start sweep
-# and their own workflows instead.
-LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories"}
+# and their own workflows instead. check:merged belongs here too: it fetches
+# the remote's CURRENT base, merges it in a worktree and reruns every gate --
+# the pre-merge check an agent runs, which this job already does on the PR's
+# merge commit. On a runner it has no git identity, and in an index root it
+# merges an unrelated base, so it exits 2 (smart-immunizations#35).
+LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories", "check:merged"}
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
 # its usage and exits 2 ("could not determine") on base and head alike, so it
 # judges nothing about the PR -- and where base exits 1 for another reason,
