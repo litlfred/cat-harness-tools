@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { initFolio } from "../init-folio";
+import { SCRIPT_SIDECAR_DIR } from "../../pipeline/qa-utils.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -65,7 +66,7 @@ describe("a new folio is QA'd from its first commit", () => {
     // would also be satisfied by a flag that silently disabled the write, or
     // by a sweep that found no automated criteria at all — and this test would
     // pass over exactly the emptiness it is supposed to rule out.
-    const wrote = readdirSync(join(sidecars, "pipeline/script-sidecars"));
+    const wrote = readdirSync(join(sidecars, SCRIPT_SIDECAR_DIR));
     expect(wrote.length).toBeGreaterThan(0);
     expect(wrote.every((f) => f.endsWith(".script.json"))).toBe(true);
     expect(existsSync(join(folio, "test/results/block-qa/folio/qa-sub/introduction/overview.qa.json"))).toBe(true);
