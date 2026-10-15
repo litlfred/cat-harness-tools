@@ -34,8 +34,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, INSTANCE_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
 
+import { INSTANCE_CONTEXT_PATH } from "../pipeline/instance-document-context.ts";
 import { contentDocuments } from "./lib/jsonld-corpus.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
