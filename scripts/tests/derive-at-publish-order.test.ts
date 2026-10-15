@@ -23,6 +23,9 @@ import { declaredPlan, writerEdges, writersOf, writingOrder, type DeclaredArtefa
 
 let tmp: string;
 
+// declared-path-literal: a fixture instance's own builtAtPublish entry, written into a temp tree, not a path of this checkout
+const PLATFORM_DATA = "docs/_data/harness.json";
+
 type Entry = { path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string };
 
 function instance(name: string, needs: string[], builtAtPublish: Entry[], directories: unknown[] = []): void {
@@ -35,7 +38,7 @@ beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), "derive-order-"));
   // `a-platform` stands below the others, as cat-harness stands below smart-trust.
   instance("a-platform", [], [
-    { path: "docs/_data/harness.json", writer: ["platform:pages", "platform:harness"], because: "checkout", reads: ["docs"] },
+    { path: PLATFORM_DATA, writer: ["platform:pages", "platform:harness"], because: "checkout", reads: ["docs"] },
     { path: "docs/_includes/navbar.html", writer: ["platform:navbar"], because: "checkout" },
     { path: "docs/other/", writer: ["platform:other"], because: "checkout" },
   ]);
@@ -62,7 +65,7 @@ describe("the base order is lowest layer first", () => {
 
   test("an entry carries the kinds it reads, and the kinds of the directory it fills", () => {
     const plan = declaredPlan(tmp);
-    expect(plan.find((a) => a.path === "docs/_data/harness.json")?.reads).toEqual(["docs"]);
+    expect(plan.find((a) => a.path === PLATFORM_DATA)?.reads).toEqual(["docs"]);
     expect(plan.find((a) => a.instance === "b-ig" && a.path === "docs/")?.fills).toEqual(["docs", "ig-pages"]);
   });
 });
