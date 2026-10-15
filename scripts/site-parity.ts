@@ -13,8 +13,13 @@
  * root it would replace, on the PAGES, never on the exit codes of the steps
  * that made them:
  *
- * - the theme's side bar (`#site-nav`) and its search box (`#search-input`),
- *   which only a page Jekyll laid out with just-the-docs carries;
+ * - the theme's side bar (`#site-nav`) and a search box (`#search-input`),
+ *   which a page Jekyll laid out with just-the-docs carries, and which an IG
+ *   site's own search box carries too (fhir-harness `ig-search.ts`);
+ * - the language picker's block (`#fa-translation-meta`), from which docs-ui
+ *   draws the language picker at the top of the page (owner, 2026-10-15:
+ *   *"what happened to search/language select at top of display window?"* —
+ *   the IG route's pages had dropped it, and this guard did not look);
  * - the harness icon row (`#fa-navbar-row`) and the rail (`nav.fa-nav`, or the
  *   theme's `#site-nav`, which is where the rail sits on a laid-out page);
  * - every top-level directory (`openapi/`, `fhir-artifact-index/`, `ast-data/`,
@@ -28,14 +33,21 @@
  * (previews under `branches/`, `STAGING/`) are not the candidate's to carry
  * and are left out of both sides.
  *
- * ## Directories dropped by a ruling
+ * ## Directories and features dropped by a ruling
  *
- * A directory the current root serves that the owner ruled is NOT to be
- * published any more is not a shortfall, but only when the caller names it in
- * a {@link DroppedByRuling} with the ruling's own words. Each entry matches
- * top-level DIRECTORY names only (a `*` glob), so it cannot excuse a missing
- * feature, a missing `index.html`, the stamp, or any directory it does not
- * name. What it excuses is said, never silent ({@link droppedByRuling}).
+ * A directory the current root serves, or a page feature its pages wear, that
+ * the owner ruled is NOT to be published any more is not a shortfall, but only
+ * when the caller names it in a {@link DroppedByRuling} with the ruling's own
+ * words. An entry names EITHER top-level directory names (a `*` glob) OR one
+ * page feature, by its key in {@link PAGE_FEATURES}; it excuses exactly that,
+ * so a directory entry cannot excuse a feature, a feature entry cannot excuse
+ * another feature, and neither excuses a missing `index.html` or the stamp.
+ * What it excuses is said, never silent ({@link droppedByRuling}).
+ *
+ * The case that needed features: owner, 2026-10-15, layout "C" for an IG
+ * repository's site — the folio rail stands in for the theme's side menu, so
+ * `#site-nav` is dropped by ruling, while the search box and the rail stay
+ * required.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -46,15 +58,17 @@ export const PAGE_FEATURES = {
   search: /id="search-input"/,
   navbarRow: /id="fa-navbar-row"/,
   rail: /<nav class="fa-nav"|id="site-nav"/,
+  translationMeta: /id="fa-translation-meta"/,
 } as const;
 export type PageFeature = keyof typeof PAGE_FEATURES;
 
 /** Words for each feature, as a refusal says them. */
 const FEATURE_WORDS: Record<PageFeature, string> = {
   siteNav: "the theme's side bar (#site-nav)",
-  search: "the theme's search box (#search-input)",
+  search: "the search box (#search-input)",
   navbarRow: "the harness icon row (#fa-navbar-row)",
   rail: "the rail (nav.fa-nav or #site-nav)",
+  translationMeta: "the language picker's block (#fa-translation-meta)",
 };
 
 export interface SiteFeatures {
@@ -105,38 +119,67 @@ export function siteFeatures(site: string, exclude: readonly string[] = []): Sit
   return f;
 }
 
-/** A top-level directory the root no longer serves by the owner's ruling, and the ruling that says so. */
+/**
+ * A top-level directory, or a page feature, the root no longer serves by the
+ * owner's ruling, and the ruling that says so. Exactly one of `dir` and
+ * `feature`; an entry with both or neither excuses nothing.
+ */
 export interface DroppedByRuling {
   /** A top-level directory name; `*` matches any run of characters other than `/`. */
-  dir: string;
+  dir?: string;
+  /** A page feature, by its key in {@link PAGE_FEATURES}. */
+  feature?: PageFeature;
   /** The ruling, quoted with its date: what a reader of the refusal is shown. */
   ruling: string;
 }
 
 /** Whether a top-level directory name matches a dropped entry's glob. Pure. */
 export function matchesDropped(name: string, d: DroppedByRuling): boolean {
-  if (d.dir === "" || d.dir.includes("/")) return false;
+  if (d.feature !== undefined || d.dir === undefined || d.dir === "" || d.dir.includes("/")) return false;
   const re = new RegExp(`^${d.dir.split("*").map((x) => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*")}$`);
   return re.test(name);
 }
 
-/** The directories `current` serves that `candidate` lacks and a ruling drops, each with its ruling. Pure. */
-export function droppedByRuling(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[]): { dir: string; ruling: string }[] {
-  return current.dirs
+/** The ruling that drops a page feature, if one does. Pure. */
+export function featureRuling(k: PageFeature, dropped: readonly DroppedByRuling[]): DroppedByRuling | undefined {
+  return dropped.find((x) => x.feature === k && x.dir === undefined);
+}
+
+/** Whether `candidate` lacks feature `k` where `current` has it: on every page, or on `index.html`. Pure. */
+function lacksFeature(current: SiteFeatures, candidate: SiteFeatures, k: PageFeature): "pages" | "index" | undefined {
+  if (current.counts[k] > 0 && candidate.counts[k] === 0) return "pages";
+  if (current.index?.includes(k) && candidate.index !== undefined && !candidate.index.includes(k)) return "index";
+  return undefined;
+}
+
+/**
+ * What a ruling excuses: the directories `current` serves that `candidate`
+ * lacks, and the page features it carries that `candidate` lacks, each with
+ * its ruling. Pure.
+ */
+export function droppedByRuling(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[]): { dir?: string; feature?: PageFeature; words: string; ruling: string }[] {
+  const dirs = current.dirs
     .filter((d) => !candidate.dirs.includes(d))
     .flatMap((d) => {
       const hit = dropped.find((x) => matchesDropped(d, x));
-      return hit ? [{ dir: d, ruling: hit.ruling }] : [];
+      return hit ? [{ dir: d, words: `${d}/`, ruling: hit.ruling }] : [];
     });
+  const features = (Object.keys(PAGE_FEATURES) as PageFeature[]).flatMap((k) => {
+    const hit = lacksFeature(current, candidate, k) ? featureRuling(k, dropped) : undefined;
+    return hit ? [{ feature: k, words: FEATURE_WORDS[k], ruling: hit.ruling }] : [];
+  });
+  return [...dirs, ...features];
 }
 
 /** Everything `current` has that `candidate` lacks, in words; empty when the candidate loses nothing. Pure. */
 export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[] = []): string[] {
   const out: string[] = [];
   for (const k of Object.keys(PAGE_FEATURES) as PageFeature[]) {
-    if (current.counts[k] > 0 && candidate.counts[k] === 0) {
+    const lack = lacksFeature(current, candidate, k);
+    if (!lack || featureRuling(k, dropped)) continue;
+    if (lack === "pages") {
       out.push(`${FEATURE_WORDS[k]}: on ${current.counts[k]} of the current root's ${current.pages} page(s), on none of the candidate's ${candidate.pages}`);
-    } else if (current.index?.includes(k) && candidate.index !== undefined && !candidate.index.includes(k)) {
+    } else {
       out.push(`${FEATURE_WORDS[k]}: on the current root's index.html, not on the candidate's`);
     }
   }
@@ -150,7 +193,7 @@ export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures, 
 /** One line per measure, for a log or a report. */
 export function describeFeatures(label: string, f: SiteFeatures): string {
   const c = f.counts;
-  return `${label}: ${f.pages} page(s); #site-nav ${c.siteNav}, search ${c.search}, #fa-navbar-row ${c.navbarRow}, rail ${c.rail}; dirs ${f.dirs.join(" ") || "(none)"}; stamp ${f.stamp ? "yes" : "no"}`;
+  return `${label}: ${f.pages} page(s); #site-nav ${c.siteNav}, search ${c.search}, #fa-navbar-row ${c.navbarRow}, rail ${c.rail}, language ${c.translationMeta}; dirs ${f.dirs.join(" ") || "(none)"}; stamp ${f.stamp ? "yes" : "no"}`;
 }
 
 if (import.meta.main) {

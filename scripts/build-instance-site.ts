@@ -679,7 +679,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       const cand = siteFeatures(site, keep);
       console.log(`parity: ${describeFeatures("current root", cur)}`);
       console.log(`parity: ${describeFeatures("this build  ", cand)}`);
-      for (const d of droppedByRuling(cur, cand, o.parityDropped ?? [])) console.log(`parity: ${d.dir}/ is dropped by ruling, not a shortfall — ${d.ruling}`);
+      for (const d of droppedByRuling(cur, cand, o.parityDropped ?? [])) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
       const short = parityShortfall(cur, cand, o.parityDropped ?? []);
       for (const m of short) console.error(`  ✗ ${m}`);
       if (short.length && o.publish && o.parity !== "report") throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);

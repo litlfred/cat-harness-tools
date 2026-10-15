@@ -18,6 +18,7 @@
  *   bun run cat-harness-tools/scripts/check-mount-collisions.ts --root <dir>
  *   bun run cat check:mount-collisions
  *
+ * @covers cat-harness — it reads the index's declared mounts, each declaration's directories and its visualiser routes
  * @module scripts/check-mount-collisions
  */
 
