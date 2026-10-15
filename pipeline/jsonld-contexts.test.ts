@@ -259,6 +259,37 @@ describe("buildInstanceContext — terms", () => {
     expect(r.terms).toEqual([{ term: "cites", context: CONTENT_URL, documents: 2 }]);
   });
 
+  test("the same IRI spelled as a CURIE in one context and in full in another is ONE definition", () => {
+    // The content context writes `dcterms:title`; the generated subgraph
+    // context writes the full IRI. Comparing the text failed derive:publish.
+    const SUB = "https://example.org/harness/ns/subgraph/v1.jsonld";
+    const subCtx = { title: `${dcterms}title`, cites: { "@id": `${cito}cites`, "@type": "@id", "@container": "@set" } };
+    const both = new Map<string, TermSource>([...sources, [SUB, { instance: "harness", context: subCtx }]]);
+    const r = buildInstanceContext({
+      instance: "top",
+      tables: [harness, top],
+      termSources: both,
+      documents: new Map([
+        ["a.jsonld", doc({ title: "dcterms:title", cites: contentCtx.cites })],
+        ["b.jsonld", doc({ title: subCtx.title, cites: subCtx.cites }, SUB)],
+      ]),
+    });
+    expect(r.termConflicts).toEqual([]);
+    expect(r.terms.map((t) => [t.term, t.documents])).toEqual([["cites", 2], ["title", 2]]);
+  });
+
+  test("a CURIE whose prefix means another IRI is still a conflict", () => {
+    const SUB = "https://example.org/harness/ns/subgraph/v1.jsonld";
+    const both = new Map<string, TermSource>([...sources, [SUB, { instance: "harness", context: { title: "http://other.example/title" } }]]);
+    const r = buildInstanceContext({
+      instance: "top",
+      tables: [harness, top],
+      termSources: both,
+      documents: new Map([["a.jsonld", doc({ title: "dcterms:title" })], ["b.jsonld", doc({ title: "http://other.example/title" }, SUB)]]),
+    });
+    expect(r.termConflicts.map((c) => c.term)).toEqual(["title"]);
+  });
+
   test("a term sharing its name with a bound prefix is a conflict, never resolved by order", () => {
     const r = buildInstanceContext({
       instance: "top",
