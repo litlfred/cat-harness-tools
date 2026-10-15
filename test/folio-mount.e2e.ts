@@ -208,6 +208,15 @@ test.describe("the replica is unchanged with the glass closed", () => {
           [c.color, c.backgroundColor, c.fontFamily, c.fontSize, c.fontWeight, c.lineHeight,
             c.margin, isBody ? "" : c.padding, c.border, c.display, c.textDecorationLine].join("|") +
           "#" + (isBody ? [r.width] : [r.x - ox, r.y - oy, r.width, r.height]).map((n) => Math.round(n)).join(",");
+        // AN ELEMENT WITH NO BOX HAS NO POSITION TO KEEP. A `display: none`
+        // element (the replica's `<script type="application/json"
+        // data-fa-visualiser-nav>`, the data its rail is drawn from) reports
+        // a zero rectangle at the VIEWPORT's origin whatever the page does,
+        // so measured from the content edge it "moved" by exactly the band
+        // (0,0 -> 0,-36) while nothing was drawn anywhere. Its styles are
+        // still compared, and so is whether it has a box at all: an element
+        // that gains or loses one still fails.
+        if (!isBody && el.getClientRects().length === 0) out[path] = out[path].replace(/#.*$/, "#no box");
         let i = 0;
         for (const kid of Array.from(el.children)) walk(kid, `${path}/${kid.tagName}[${i++}]`);
       };
