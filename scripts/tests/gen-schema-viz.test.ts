@@ -26,7 +26,8 @@ describe("schemas visualiser wireframe fixes (folio-assistant-nnpk)", () => {
   });
 
   it("Finding 2: sets compact #items max-height on small viewports to prevent nested scroll trapping", () => {
-    expect(html).toMatch(/@media\s*\(max-width:\s*640px\)\s*\{\s*#items\s*\{\s*max-height:\s*35vh;\s*\}\s*\}/);
+    // Scoped under `.sc-page` since aa499bc dropped the unscoped duplicates.
+    expect(html).toMatch(/@media\s*\(max-width:\s*640px\)\s*\{\s*\.sc-page ul#items\s*\{\s*max-height:\s*35vh;\s*\}\s*\}/);
   });
 
   it("Finding 3: points to filter below and collapses empty #ov-svg", () => {
