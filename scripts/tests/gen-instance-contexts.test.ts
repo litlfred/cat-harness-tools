@@ -7,7 +7,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { contentDocuments as checkCorpus } from "../check-context-emission.ts";
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, render } from "../gen-instance-contexts.ts";
+import { contentDocuments } from "../lib/jsonld-corpus.ts";
 
 const root = mkdtempSync(join(tmpdir(), "gen-instance-contexts-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -31,7 +33,7 @@ put("top/refs/r.jsonld", { "@context": { fhir: "https://smart.who.int/base/DataT
 put("top/bad.jsonld", "{ not json");
 put("orphan.jsonld", { "@type": "skos:Concept" });
 
-const opts = { ownNamespaceOf: () => undefined, remoteContexts: new Map(), bindingContexts: new Map() };
+const opts = { ownNamespaceOf: () => undefined, remoteContexts: new Map(), bindingContexts: new Map(), termSources: new Map() };
 
 describe("gen-instance-contexts over a fixture tree", () => {
   const result = generateInstanceContexts(root, opts);
@@ -94,5 +96,50 @@ describe("gen-instance-contexts over a fixture tree", () => {
 
   test(`the path is instance-relative: ${INSTANCE_CONTEXT_PATH}`, () => {
     expect(by("top").path).toBe(`top/${INSTANCE_CONTEXT_PATH}`);
+  });
+});
+
+describe("gen-instance-contexts — remote-context terms", () => {
+  const troot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-terms-"));
+  afterAll(() => rmSync(troot, { recursive: true, force: true }));
+  const tput = (rel: string, value: unknown): void => {
+    const p = join(troot, rel);
+    mkdirSync(join(p, ".."), { recursive: true });
+    writeFileSync(p, JSON.stringify(value));
+  };
+  const URL = "https://example.org/ns/content/v1.jsonld";
+  const content = { dcterms: "http://purl.org/dc/terms/", title: "dcterms:title", cites: { "@id": "cito:cites", "@type": "@id" } };
+  tput("harness/harness.json", { name: "harness", needs: [], jsonldPrefixes: { dcterms: "http://purl.org/dc/terms/", cito: "http://purl.org/spar/cito/" } });
+  tput("leaf/leaf.json", { name: "leaf", needs: ["harness"] });
+  tput("lone/lone.json", { name: "lone", needs: [] });
+  tput("leaf/a.jsonld", { "@context": [URL, { "@base": "https://x/" }], "@id": "a", title: "A", cites: ["b"] });
+  tput("lone/a.jsonld", { "@context": URL, "@id": "a", title: "A" });
+  const topts = {
+    ownNamespaceOf: () => undefined,
+    remoteContexts: new Map([[URL, content as Record<string, unknown>]]),
+    bindingContexts: new Map(),
+    termSources: new Map([[URL, { instance: "harness", context: content as Record<string, unknown> }]]),
+  };
+  const result = generateInstanceContexts(troot, topts);
+  const by = (n: string) => result.reports.find((r) => r.instance === n)!;
+
+  test("the context DEFINES the terms its documents use, flattened over needs, prefixes bound alongside", () => {
+    expect(by("leaf").expected).toBe(
+      render({ "@version": 1.1, "@protected": true, cito: "http://purl.org/spar/cito/", dcterms: "http://purl.org/dc/terms/", cites: { "@id": "cito:cites", "@type": "@id" }, title: "dcterms:title" }),
+    );
+    // the harness has no documents of its own, so nothing a later instance uses lands in it
+    expect(by("harness").expected).toBeUndefined();
+  });
+
+  test("a term whose context's owner is not needed is a PROBLEM naming file and term", () => {
+    expect(by("lone").terms).toEqual([]);
+    const { problems } = findings(result);
+    expect(problems.some((l) => l.startsWith("lone/a.jsonld: term `title`") && l.includes("which lone does not need"))).toBe(true);
+  });
+});
+
+describe("the corpus lives in lib/jsonld-corpus.ts", () => {
+  test("check-context-emission re-exports the same function, so the check can be deleted without the generator noticing", () => {
+    expect(checkCorpus).toBe(contentDocuments);
   });
 });

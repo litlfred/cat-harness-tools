@@ -31,13 +31,27 @@
  *   it comes from cat-harness's `NS_PREFIXES` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
- *   plus remote mounts — `contentDocuments`, the same corpus
- *   `check:context-emission` reads), each assigned to its innermost instance.
+ *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`, the
+ *   same corpus `check:context-emission` reads, held apart from that check so
+ *   this generator outlives it), each assigned to its innermost instance.
  *   EXCLUDED: a context document under `ns/` (a file whose only key is
  *   `@context`). The emission check counts those, so the published content
  *   context's own CURIE-valued term definitions were counted as documents
  *   speaking `dcterms` and `cito`; a context binding a prefix is not a document
  *   using it.
+ *
+ * ## Terms, not only prefixes
+ *
+ * A document naming the content context speaks its TERMS — `title`, `cites`,
+ * `meta` — and binding `dcterms` and `cito` alone does not make `cites` an
+ * `@id`-typed set or `meta` a JSON literal. So the generated context also
+ * DEFINES every content- and subgraph-context term the instance's documents
+ * use, copied verbatim, `@protected` with the rest, and with the prefixes those
+ * definitions are written in bound alongside. A term's context must belong to
+ * an instance in the flattened `needs` (both belong to `cat-harness`); only
+ * the instance's own documents' terms are carried, never a later instance's.
+ * The point is that the generated context can REPLACE `ns/content/v1.jsonld`
+ * in a document with no triple lost — the acceptance measurement for this.
  *
  * ## What `--check` fails on
  *
@@ -45,7 +59,9 @@
  * not drift, since the contexts are built at publish and never committed), a prefix used
  * in an IRI position that neither the flattened table nor the document's own
  * inline context binds, a prefix two instances in a flattened table bind
- * differently, and a malformed `jsonldPrefixes` table. Each names the file and
+ * differently, a term two contexts define differently (or that a bound prefix
+ * shares a name with), a term whose context or prefixes do not resolve here,
+ * and a malformed `jsonldPrefixes` table. Each names the file and
  * the prefix. A prefix met only as a literal string (`leanRef: "qou:QOU.x"`) is
  * REPORTED, never failed on — see `pipeline/jsonld-contexts.ts`.
  *
@@ -75,13 +91,15 @@ import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-ma
 
 import {
   buildInstanceContext,
+  documentUses,
   isContextDocument,
   ownBindings,
-  usedPrefixes,
   type InstanceContext,
+  type TermSource,
   type UsedPrefixes,
+  type UsedTerms,
 } from "../pipeline/jsonld-contexts.ts";
-import { contentDocuments } from "./check-context-emission.ts";
+import { contentDocuments } from "./lib/jsonld-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** Instance-relative, and why it is this path: see the module note. */
@@ -177,6 +195,8 @@ export interface GenerateOptions {
   remoteContexts?: ReadonlyMap<string, Record<string, unknown>>;
   /** Remote contexts whose prefixes count as the DOCUMENT's own binding — third-party contexts only. */
   bindingContexts?: ReadonlyMap<string, Record<string, unknown>>;
+  /** Remote contexts whose TERMS an instance context carries, with their owning instance. Defaults to the platform's. */
+  termSources?: ReadonlyMap<string, TermSource>;
   /** Override the corpus (tests). */
   documents?: string[];
 }
@@ -185,16 +205,24 @@ export interface GenerateOptions {
 export function platformContexts(repoRoot: string): {
   aliases: Map<string, Record<string, unknown>>;
   bindings: Map<string, Record<string, unknown>>;
+  /** The contexts an instance context stands in for — content and subgraph, both `cat-harness`'s. */
+  terms: Map<string, TermSource>;
 } {
   const aliases = new Map<string, Record<string, unknown>>([[CONTENT_CONTEXT_URL, CONTENT_CONTEXT as Record<string, unknown>]]);
   const bindings = new Map<string, Record<string, unknown>>();
+  // Both live in cat-harness (`schemas/jsonld.ts`, `ns/subgraph/v1.jsonld`):
+  // the owner is a fact about where they are published, so it is named here
+  // once rather than inferred from a path.
+  const terms = new Map<string, TermSource>([[CONTENT_CONTEXT_URL, { instance: "cat-harness", context: CONTENT_CONTEXT as Record<string, unknown> }]]);
   // The subgraph context is the harness's own, generated beside the content
   // one: read for its term aliases, NOT as a resolver, for the same reason the
   // content context is not — both are what per-instance contexts replace.
   const subgraphUrl = CONTENT_CONTEXT_URL.replace(/ns\/content\/v1\.jsonld$/, SUBGRAPH_CONTEXT_PATH);
   const subgraphFile = join(repoRoot, "cat-harness", SUBGRAPH_CONTEXT_PATH);
   if (existsSync(subgraphFile)) {
-    aliases.set(subgraphUrl, (JSON.parse(readFileSync(subgraphFile, "utf-8")) as { "@context": Record<string, unknown> })["@context"]);
+    const subgraph = (JSON.parse(readFileSync(subgraphFile, "utf-8")) as { "@context": Record<string, unknown> })["@context"];
+    aliases.set(subgraphUrl, subgraph);
+    terms.set(subgraphUrl, { instance: "cat-harness", context: subgraph });
   }
   // PROV-JSONLD is a THIRD-PARTY context, held sha-pinned: what it binds, a
   // document naming it binds itself.
@@ -206,7 +234,7 @@ export function platformContexts(repoRoot: string): {
     // Not held here (a fixture, or a checkout without the library copy): a
     // document naming it then reports what it cannot resolve, never a pass.
   }
-  return { aliases, bindings };
+  return { aliases, bindings, terms };
 }
 
 /** Innermost instance root containing `abs`. */
@@ -246,9 +274,11 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
   const ancestors = ancestorsOf(flat.order);
   const order = flat.order.map((s) => s.id);
   const own = options.ownNamespaceOf ?? defaultOwnNamespace;
-  const platform = options.remoteContexts === undefined || options.bindingContexts === undefined ? platformContexts(root) : undefined;
+  const platform =
+    options.remoteContexts === undefined || options.bindingContexts === undefined || options.termSources === undefined ? platformContexts(root) : undefined;
   const aliases = options.remoteContexts ?? platform!.aliases;
   const bindings = options.bindingContexts ?? platform!.bindings;
+  const termSources = options.termSources ?? platform!.terms;
 
   const tableOf = (d: InstanceDecl): DeclaredPrefixes => {
     const ns = own(d.stub);
@@ -259,7 +289,7 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
     return order.filter((n) => n === d.name || reach.has(n)).map((n) => tableOf(byName.get(n)!));
   };
 
-  const perInstance = new Map<string, { docs: Map<string, { used: UsedPrefixes; own: Map<string, string> }>; unparseable: string[] }>();
+  const perInstance = new Map<string, { docs: Map<string, { used: UsedPrefixes; own: Map<string, string>; terms: UsedTerms }>; unparseable: string[] }>();
   for (const d of decls) perInstance.set(d.name, { docs: new Map(), unparseable: [] });
   const unowned: string[] = [];
   const namespaceMaps = new Map<string, Map<string, string>>();
@@ -286,9 +316,11 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
       for (const t of tablesFor(owner)) for (const [p, iri] of Object.entries(t.prefixes)) if (!ns.has(iri)) ns.set(iri, p);
       namespaceMaps.set(owner.name, ns);
     }
+    const uses = documentUses(doc, { remoteContexts: aliases, namespacePrefixes: ns });
     slot.docs.set(rel, {
-      used: usedPrefixes(doc, { remoteContexts: aliases, namespacePrefixes: ns }),
+      used: uses.prefixes,
       own: ownBindings(doc, { remoteContexts: bindings }),
+      terms: uses.terms,
     });
   }
 
@@ -296,7 +328,7 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
     const d = byName.get(name)!;
     const slot = perInstance.get(name)!;
     const tables = tablesFor(d);
-    const built = buildInstanceContext({ instance: name, tables, documents: slot.docs });
+    const built = buildInstanceContext({ instance: name, tables, documents: slot.docs, termSources });
     const out = join(d.root, INSTANCE_CONTEXT_PATH);
     return {
       instance: name,
@@ -341,6 +373,13 @@ export function findings(result: GenerateResult): { drift: string[]; problems: s
     for (const c of r.conflicts) {
       out.push(`${r.instance}: prefix \`${c.prefix}\` is bound differently by ${c.bindings.map((b) => `${b.instance} → ${b.iri}`).join(" and ")}`);
     }
+    for (const t of r.termConflicts) {
+      const docs = t.definitions.flatMap((d) => d.documents);
+      out.push(`${docs[0] ?? r.instance}: term \`${t.term}\` — ${t.reason} (${docs.length} document(s)); left out of ${r.instance}'s context`);
+    }
+    for (const t of r.unresolvedTerms) {
+      out.push(`${t.documents[0]}: term \`${t.term}\` from ${t.context} — ${t.reason} (${t.documents.length} document(s)); left out of ${r.instance}'s context`);
+    }
   }
   return { drift, problems: out };
 }
@@ -360,6 +399,7 @@ function main(argv: readonly string[]): number {
       const bound = r.bound.map((b) => `${b.prefix}(${b.documents})`).join(" ") || "—";
       console.log(`  ${r.instance.padEnd(22)} ${String(r.documents).padStart(5)} doc(s)  flattened: ${r.flattenedFrom.join(" → ")}`);
       console.log(`  ${"".padEnd(22)}       bound: ${bound}`);
+      if (r.terms.length > 0) console.log(`  ${"".padEnd(22)}       terms: ${r.terms.length} (${r.terms.map((t) => t.term).join(" ")})`);
       for (const l of r.literalOnly) console.log(`  ${"".padEnd(22)}       · literal only, unbound: ${l.prefix} ×${l.documents.length} e.g. ${l.documents[0]}`);
       if (r.unparseable.length > 0) console.log(`  ${"".padEnd(22)}       ? ${r.unparseable.length} unparseable, e.g. ${r.unparseable[0]}`);
     }
@@ -375,7 +415,7 @@ function main(argv: readonly string[]): number {
     const { drift, problems } = findings(result);
     const f = [...drift, ...problems];
     if (f.length === 0) {
-      console.log("✓ every instance context is current, and every prefix used in an IRI position resolves");
+      console.log("✓ every instance context is current, and every prefix used in an IRI position and every term used resolves");
       return 0;
     }
     for (const l of f) console.error(`  ✗ ${l}`);

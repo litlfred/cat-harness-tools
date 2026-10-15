@@ -63,13 +63,14 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { join, resolve } from "node:path";
 
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { stubOfNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+
+import { contentDocuments } from "./lib/jsonld-corpus.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 
@@ -121,55 +122,12 @@ export const FORWARD_DECLARED: Readonly<Record<string, string>> = {
 };
 
 /**
- * Every `.jsonld` document in the REPOSITORY — asked of git, not of the disk.
- *
- * **The corpus of a repository is what git says it is.** Bean `ramz`: this
- * walked the filesystem behind a hand-written denylist
- * (`node_modules`, `_kg`, `_site`, `_docs`, `.git`) and therefore swept every
- * gitignored path the list did not happen to name. On 2026-09-25 a clean
- * checkout of `main` failed `bun test` on **145 documents** under
- * `cat-harness/ingest-staging/` — gitignored, untracked, residue of one
- * machine's ingestion five days earlier. The assertion is named *"the real
- * corpus"*, and what it read was not the repository's.
- *
- * Two failures in one, and the second is the worse: a denylist is wrong
- * whenever somebody adds an ignored directory it does not name (a false
- * finding about code the contributor did not touch), and it cannot tell
- * anybody WHICH set it read, so a pass over the wrong corpus reads exactly
- * like a pass over the right one.
- *
- * `--cached --others --exclude-standard` is tracked files PLUS untracked ones
- * git would not ignore. Not `--cached` alone: a `.jsonld` a contributor has
- * just written and not yet staged is part of the change under test, and a
- * check that cannot see it passes on the file it exists to examine.
- *
- * The git half is `gitCorpus`, shared rather than restated: `xd1g` counted 11
- * scanners here walking a root with no gitignore awareness and said the rule
- * wants stating once. It was copied a second time within a day of being
- * written (bean `rsi6`, `check-subgraphs`), which settled the question.
- *
- * **Falls back to the walk, and says so**, when `repo` is not a git work tree
- * — every test fixture is such a directory, and refusing there would trade a
- * false finding for an unrunnable check. The fallback is the LOOSER set, so
- * it can only over-report; could-not-determine is never rendered as clean.
+ * Every `.jsonld` document in the repository — moved to `lib/jsonld-corpus.ts`
+ * (bean `folio-assistant-63q4`) so `gen-instance-contexts` reads the same
+ * corpus without importing this check, which it is meant to outlive. Re-exported
+ * here for this file's own callers and tests; the reasoning is kept with the code.
  */
-export function contentDocuments(repo = REPO): string[] {
-  const listed = gitCorpus(repo, ["*.jsonld"]);
-  if (listed !== undefined) return listed;
-
-  const out: string[] = [];
-  const skip = new Set(["node_modules", "_kg", "_site", "_docs", ".git"]);
-  const walk = (dir: string): void => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.name.startsWith(".") || skip.has(e.name)) continue;
-      const p = join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith(".jsonld")) out.push(p);
-    }
-  };
-  walk(repo);
-  return out;
-}
+export { contentDocuments };
 
 
 const curiePrefix = (s: string): string | undefined => {
