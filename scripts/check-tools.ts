@@ -33,7 +33,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
-import { TOOL_TYPES, isInjectionSafe } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "@litlfred/cat-harness/schemas/tool.js";
 import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
@@ -467,7 +467,7 @@ export function checkTools(instance?: string): ToolCheck {
         const want = contract.types.get(i.name);
         // A repeated port takes several values: on the contract's side that is
         // an array, whatever the type of each value.
-        const have = i.repeated ? "array" : jsonTypeOf(i.schema.split("#/$defs/")[1] ?? "");
+        const have = i.repeated ? "array" : jsonTypeOf(toolTypeNameOf(i.schema) ?? "");
         // An integer IS a number; the reverse does not hold.
         const compatible = want === have || (want === "number" && have === "integer");
         if (want !== undefined && have !== undefined && !compatible) {
@@ -476,7 +476,7 @@ export function checkTools(instance?: string): ToolCheck {
       }
     }
     for (const p of [...t.io.inputs, ...t.io.outputs]) {
-      const name = p.schema.split("#/$defs/")[1];
+      const name = toolTypeNameOf(p.schema);
       if (name === undefined || !typeNames.has(name)) {
         unknownTypes.push({ tool: t.id, port: p.name, ref: p.schema });
       }
@@ -486,7 +486,7 @@ export function checkTools(instance?: string): ToolCheck {
     // goes on stdin, where it is data instead of program text.
     for (const i of t.io.inputs) {
       if (i.arg === undefined || "stdin" in i.arg) continue;
-      const name = i.schema.split("#/$defs/")[1] ?? "";
+      const name = toolTypeNameOf(i.schema) ?? "";
       if (!isInjectionSafe(name)) unsafeArgs.push({ tool: t.id, port: i.name, type: name });
     }
   }

@@ -49,7 +49,7 @@ import {
 import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { tools } from "../tools/discover.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, toolTypeIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -144,9 +144,55 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
     title: "Tool I/O types",
     description:
       "The shared types a Tool's io.inputs/io.outputs reference by absolute IRI. " +
+      "Each is also published as its own document, tool-types/<Name>.schema.json, which is the IRI a port names. " +
       "Generated from schemas/tool-types.ts, which is authoritative.",
     $defs: defs,
   };
+}
+
+/**
+ * One JSON Schema document per shared type, `tool-types/<Name>.schema.json`,
+ * each with the `$id` a port's `schema` names — bean `tdir`.
+ *
+ * The owner, 2026-10-15: *"input ouput schemas should be their own files/json
+ * schema when published w/ IRIs so can be referernced easy."* `toolTypeIri`
+ * mints the IRI and `toolTypePath` the published path, from one definition in
+ * `schemas/tool-types.ts`, so a port and the file it names cannot drift.
+ *
+ * ## The combined document stays, inline
+ *
+ * {@link buildToolTypes} keeps its `$defs` as they were rather than turning
+ * each into a `$ref` to these. Its readers (`tools.test.ts`, `mcp-contract`,
+ * anything holding a pre-`tdir` IRI into it) dereference locally, and a
+ * `$ref` would make each of them fetch 49 more documents to read what they
+ * read today. Both are generated from the same Zod in the same run, so they
+ * are one answer printed twice, not two answers.
+ *
+ * ## Written on publish, never committed
+ *
+ * Like `tool-types.schema.json` itself and the per-skill contracts' published
+ * copies: the deploy's `--out-dir ./_site` writes them, and nothing under
+ * source control carries one. They are NOT in {@link schemaFiles}, which is
+ * the list the `maintains` drift check reads; the type vocabulary is declared
+ * there once, by `tool-types.schema.json`, as the skill contracts are
+ * declared by their directory rather than per file.
+ */
+export function buildToolTypeFiles(opts: SchemaExportOptions = {}): Array<[string, Record<string, unknown>]> {
+  const decl = readDeclaration(ROOT);
+  const base = (opts.baseUrl ?? decl?.canonicalUrl ?? "").replace(/\/+$/, "");
+  return (Object.entries(TOOL_TYPES) as Array<[ToolTypeName, z.ZodType]>).map(([name, schema]) => {
+    const { $schema: _drop, ...body } = toJsonSchema(schema);
+    return [
+      toolTypePath(name),
+      {
+        $schema: "http://json-schema.org/draft-07/schema#",
+        // Absolute or absent, as everywhere in this module.
+        ...(base ? { $id: toolTypeIri(base, name) } : {}),
+        title: name,
+        ...body,
+      },
+    ];
+  });
 }
 
 /** What a Tool node is. Generated from `ToolDefinitionSchema`. */
@@ -898,6 +944,16 @@ const outDir = arg("--out-dir") ?? join(repoRootFor(ROOT), "_kg");
     console.log(`${relative(ROOT, out)}`);
     console.log(`  $id  ${schema.$id ?? "(none — no canonicalUrl declared)"}`);
   }
+
+  // One document per shared type, at the IRI each port names (bean `tdir`).
+  const typeFiles = buildToolTypeFiles({ baseUrl });
+  for (const [name, schema] of typeFiles) {
+    const out = join(outDir, name);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify({ ...schema, ...staging }, null, 2) + "\n");
+  }
+  console.log(`${relative(ROOT, join(outDir, "tool-types"))}/  (${typeFiles.length} type(s))`);
+  console.log(`  $id  ${typeFiles[0]?.[1].$id ?? "(none — no canonicalUrl declared)"}  …`);
 
   // The per-skill I/O contracts, published at the `$id` each one claims.
   const contracts = buildSkillIoContracts({ baseUrl });

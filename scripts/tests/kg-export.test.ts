@@ -45,6 +45,7 @@ import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
 import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { dirname } from "node:path";
 
 /**
@@ -735,6 +736,10 @@ describe("every self-URL the export publishes resolves to something published", 
     // deploy's `kg-export --out ./_site/<stub>.jsonld` writes. Read from the
     // FOLDERS on disk, not from the nodes, for the depiction's reason below:
     // a Tool IRI naming a file the deploy does not write must fail here.
+    // One JSON Schema per shared I/O type (bean `tdir`), which the deploy's
+    // `harness-schema-export --out-dir ./_site` writes beside
+    // `tool-types.schema.json`. A port's `schema` names one of these.
+    for (const n of Object.keys(TOOL_TYPES)) out.add(`tool-types/${n}.schema.json`);
     const toolDir = join(HARNESS_ROOT, "tools");
     for (const f of readdirSync(toolDir, { withFileTypes: true })) if (f.isDirectory()) out.add(`tools/${f.name}.jsonld`);
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
