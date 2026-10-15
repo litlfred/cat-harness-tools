@@ -193,11 +193,15 @@ export const BUILDING_ENV = "QA_WORKING_COPY_BUILDING";
 /**
  * Why `repoRoot` cannot build the QA working copy at all, or null when it can.
  *
- * `qa:refresh`'s writers are the harness's own CI recipe, and they read the
- * gates workflow (`audit:coverage` through `gates.ts` `loadGates`). A root
- * without it — a document folio such as smart-ra, an IG index, a layer
- * repository — cannot build the copy, and three minutes of `qa:refresh` then
- * end in ENOENT (smart-ra#66, run 38714163952). The same rule
+ * A root without the gates workflow is a CONTENT root (a document folio such
+ * as smart-ra, an IG index, a layer repository). Until cat-harness-tools#281
+ * `qa:refresh` there ended in ENOENT on the workflow (smart-ra#66, run
+ * 38714163952); now `audit:coverage` reads the root's own gate set and the
+ * writers that do not apply are reported as not applicable, but the copy
+ * still ends INCOMPLETE where the root has content gaps (measured in smart-ra
+ * 2026-10-15: `check:l1-complete`, `check:wireframes`). A generator that read
+ * it would exit 2 at every publish over gaps that are not its own, so it stays
+ * not applicable there until the root's qa:refresh is COMPLETE. The same rule
  * `run-gates.py` applies to `uml:overview:check` and `readme:subgraphs:check`
  * (`PREREQUISITE_FILES`), stated once for every generator that reads the copy.
  * The folio-assistant index has the workflow, so this never fires there.
@@ -205,7 +209,7 @@ export const BUILDING_ENV = "QA_WORKING_COPY_BUILDING";
 export function workingCopyUnbuildable(repoRoot: string): string | null {
   return existsSync(join(repoRoot, GATES_WORKFLOW))
     ? null
-    : `${GATES_WORKFLOW} is absent at the root, and the QA working copy it reads is built by qa:refresh, whose writers read that workflow`;
+    : `${GATES_WORKFLOW} is absent, so this is a content root: qa:refresh measures it against its own gate set, and the copy stays INCOMPLETE while the root has content gaps of its own (cat-harness-tools#281)`;
 }
 
 /**

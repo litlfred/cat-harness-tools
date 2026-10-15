@@ -120,6 +120,7 @@ import {
 } from "./content-compile-gates.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
+import { rootGateSet, rootProfile } from "./lib/root-gate-set.ts";
 
 export {
   CONTENT_COMPILE_GATES,
@@ -147,6 +148,9 @@ const ROOT = repoRootFor(resolve(HARNESS_ROOT));
 
 /** The workflow that defines the FAST set. One place, declared: `lib/gates-workflow.ts`. */
 export { GATES_WORKFLOW };
+
+/** The job a content root's gates are reported under: the shared PR checks that run them. */
+export const LAYER_PR_CHECKS = "layer-pr-checks.yml";
 
 /** Where every workflow lives. `--all` reads all of them, not just the one. */
 export const WORKFLOW_DIR = join(".github", "workflows");
@@ -1241,6 +1245,14 @@ export class NoGatesFound extends Error {
  * silent one.
  */
 export function loadUnresolved(root: string, opts: { all?: boolean } = {}): Gate[] {
+  // A content root: the gates its CI runs with an input this side does not
+  // hold (`run-gates.py` SUPPLIED_INPUTS, kind `input-absent`). CI runs them;
+  // this tool cannot (cat-harness-tools#281).
+  if (rootProfile(root) === "content") {
+    return Object.entries(rootGateSet(root).skipped)
+      .filter(([, s]) => s.kind === "input-absent")
+      .map(([name, s]) => ({ job: LAYER_PR_CHECKS, step: name, command: s.command }));
+  }
   // Publishers are dropped here as in `loadGates`: they are not gates, so
   // they are neither run nor reported as unrunnable (bean `16ei`).
   return unresolvedGatesFrom(readFileSync(join(root, GATES_WORKFLOW), "utf-8"), { ...opts, skipPublishers: true });
@@ -1266,6 +1278,15 @@ export function loadGatesCiRuns(root: string, opts: { all?: boolean } = {}): Gat
 
 /** Read and parse, refusing an empty result. The RUNNER's list — see {@link loadGatesCiRuns}. */
 export function loadGates(root: string, opts: { all?: boolean } = {}): Gate[] {
+  // A root that is not a harness is measured against its OWN gate set: the
+  // gates `layer-pr-checks.yml` runs for it, derived once by `run-gates.py`
+  // (owner, cat-harness-tools#281: "hold smart-ra to its own gate set").
+  // `--all` adds nothing there: that set is everything its PR checks run.
+  if (rootProfile(root) === "content") {
+    const gates = Object.entries(rootGateSet(root).gates).map(([name, command]) => ({ job: LAYER_PR_CHECKS, step: name, command }));
+    if (gates.length === 0) throw new NoGatesFound(`${LAYER_PR_CHECKS} (run-gates.py --list)`);
+    return gates;
+  }
   const path = join(root, GATES_WORKFLOW);
   // The RUNNER's list, so the filter belongs here rather than in `gatesFrom`:
   // a command referencing a shell variable this reader discarded cannot be run
