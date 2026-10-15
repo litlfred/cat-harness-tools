@@ -26,8 +26,9 @@
  *       its own, so its count is not fetched from a site that has none
  *       (it showed "?").
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -82,10 +83,50 @@ const SMART_TRUST = join(REPO, "smart-trust");
 // The writers resolve their paths from the checkout they belong to, so they
 // write into this tree's ignored, publish-time paths, as a site build does.
 //
+// And it takes away again what it ADDED, once its tests have run. `docs:pages`
+// writes far more than harness.json (the todos pages, the bean and QA
+// projections, the witnesses under test/results/) and smart-trust:pages a
+// whole site; a test file run after this one in the same `bun test` must see
+// the tree it would have seen without it. pr-tests.yml runs no
+// `derive:publish`, so left behind they gave every later file a tree main's
+// run never has: "Tests (no new failures)" went red on PR #306, and locally
+// compose-docs' "the cut, on the REAL tree" passes with them absent and
+// fails with them present. A path that existed before is left as the
+// writers made it: they are deterministic over the same inputs (harness.json
+// rebuilt twice is byte-identical).
+//
 // Where they cannot be built — a layer standing alone without smart-trust
 // (the standalone ratchet), or no state mounted — this says why and builds
 // nothing, and the tests that read the data fail on their own, by name, as
 // they do without it; it does not turn the whole file into one load error.
+/** Every file and directory under `roots`, so what this file's build adds can be taken away again. */
+function inventory(roots: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (d: string): void => {
+    let es: Dirent[];
+    try {
+      es = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of es) {
+      if (e.name === "node_modules" || e.name === ".git") continue;
+      const p = join(d, e.name);
+      out.add(p);
+      if (e.isDirectory()) walk(p);
+    }
+  };
+  for (const r of roots) walk(r);
+  return out;
+}
+const BUILD_ROOTS = [CAT_HARNESS, SMART_TRUST];
+const BEFORE_BUILD = inventory(BUILD_ROOTS);
+afterAll(() => {
+  const added = [...inventory(BUILD_ROOTS)].filter((p) => !BEFORE_BUILD.has(p));
+  // Deepest first, so a directory goes after what it holds; one the build made goes whole.
+  for (const p of added.sort((a, b) => b.length - a.length)) rmSync(p, { recursive: true, force: true });
+});
+
 try {
   const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
   const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
