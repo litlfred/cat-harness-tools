@@ -57,6 +57,8 @@ import { dirname, join } from "node:path";
 import { CACHE_FILE, FileDigests, cacheEnabled, trackedTreeDigest } from "./input-hash.ts";
 import { movedInventory } from "./qa-verify-moved.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /** Where the stamp lives, beside the input-hash cache. `build/` is git-ignored. */
 export const STAMP_PATH = join(dirname(CACHE_FILE), "qa-working-copy.json");
@@ -189,17 +191,41 @@ export function ensureWorkingCopy(repoRoot: string, opts: EnsureOptions = {}): E
 export const BUILDING_ENV = "QA_WORKING_COPY_BUILDING";
 
 /**
+ * Why `repoRoot` cannot build the QA working copy at all, or null when it can.
+ *
+ * `qa:refresh`'s writers are the harness's own CI recipe, and they read the
+ * gates workflow (`audit:coverage` through `gates.ts` `loadGates`). A root
+ * without it — a document folio such as smart-ra, an IG index, a layer
+ * repository — cannot build the copy, and three minutes of `qa:refresh` then
+ * end in ENOENT (smart-ra#66, run 38714163952). The same rule
+ * `run-gates.py` applies to `uml:overview:check` and `readme:subgraphs:check`
+ * (`PREREQUISITE_FILES`), stated once for every generator that reads the copy.
+ * The folio-assistant index has the workflow, so this never fires there.
+ */
+export function workingCopyUnbuildable(repoRoot: string): string | null {
+  return existsSync(join(repoRoot, GATES_WORKFLOW))
+    ? null
+    : `${GATES_WORKFLOW} is absent at the root, and the QA working copy it reads is built by qa:refresh, whose writers read that workflow`;
+}
+
+/**
  * For a generator that reads the QA copy from disk (`uml:overview`,
  * `readme:subgraphs`): make the copy current before reading it, whoever ran
  * the generator. regen does this before every pass, but `skill:register`
  * runs `uml:overview` on its own, and so does a person — measured on this
  * branch 2026-10-06, `skill:register` in a worktree with no built copy
  * rewrote the QA-overview UML from the few tracked files under `test/results/`.
- * Exits 2 (could not determine) when the copy cannot be built.
+ * Exits 2 (could not determine) when the copy could be built and was not, and
+ * 78 (not applicable, {@link workingCopyUnbuildable}) in a root that has
+ * nothing to build it from.
  */
 export function requireCurrentWorkingCopy(repoRoot: string, who: string): void {
   // input-site: env QA_WORKING_COPY_BUILDING #6496713b — set by the build for its own steps
   if (process.env[BUILDING_ENV] === "1") return;
+  // Not applicable, rather than UNKNOWN: there is nothing here the copy could
+  // be built from, so the generator has nothing to draw (exit 78, `lib/not-applicable.ts`).
+  const unbuildable = workingCopyUnbuildable(repoRoot);
+  if (unbuildable !== null) exitNotApplicable(who, unbuildable);
   const r = ensureWorkingCopy(repoRoot);
   if (!r.ran) return;
   if (!r.ok) {

@@ -119,6 +119,7 @@ import {
   type GateStatus,
 } from "./content-compile-gates.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 
 export {
   CONTENT_COMPILE_GATES,
@@ -144,8 +145,8 @@ export function contentCompileGates(paths: readonly string[]): ContentCompileGat
 // `loadGates` would have thrown `NoGatesFound` on a workflow that is fine.
 const ROOT = repoRootFor(resolve(HARNESS_ROOT));
 
-/** The workflow that defines the FAST set. One place, declared. */
-export const GATES_WORKFLOW = join(".github", "workflows", "code-quality-gates.yml");
+/** The workflow that defines the FAST set. One place, declared: `lib/gates-workflow.ts`. */
+export { GATES_WORKFLOW };
 
 /** Where every workflow lives. `--all` reads all of them, not just the one. */
 export const WORKFLOW_DIR = join(".github", "workflows");
