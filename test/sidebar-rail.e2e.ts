@@ -178,7 +178,7 @@ async function captureScreenshot(p: Page, name: string): Promise<void> {
   }
 }
 
-async function load(p: Page, scoped = false): Promise<string[]> {
+async function _load(p: Page, scoped = false): Promise<string[]> {
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(String(e)));
   // Served from an origin rather than set as content, so localStorage works.
@@ -195,7 +195,7 @@ async function load(p: Page, scoped = false): Promise<string[]> {
 }
 
 /** Every element in the sidebar that actually scrolls, and whether the bar clips. */
-async function scrolling(p: Page): Promise<{ scrollers: string[]; clipped: number }> {
+async function _scrolling(p: Page): Promise<{ scrollers: string[]; clipped: number }> {
   return p.evaluate(() => {
     const bar = document.querySelector(".side-bar") as HTMLElement;
     const scrollers = [bar, ...Array.from(bar.querySelectorAll<HTMLElement>("*"))]
@@ -221,7 +221,7 @@ async function scrolling(p: Page): Promise<{ scrollers: string[]; clipped: numbe
 }
 
 /** Page-list links a pointer can actually land on, in the window. */
-async function visiblePageLinks(p: Page): Promise<number> {
+async function _visiblePageLinks(p: Page): Promise<number> {
   return p.evaluate(() => {
     let n = 0;
     for (const a of Array.from(document.querySelectorAll<HTMLElement>(".side-bar .site-nav a"))) {

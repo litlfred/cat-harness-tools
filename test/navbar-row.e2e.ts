@@ -867,7 +867,7 @@ test.describe("a sub-graph is drawn INSIDE its parent's row, folded — issue #1
   /* Owner, 2026-09-23: proposals live in *"a docs/proposals/ sub-graph
    * declared sub-sub-graph (which starts closed in navbar, general
    * behavior)"*. GENERAL: whatever carries `within`, not a case for docs. */
-  const NESTED: NavbarRow = {
+  const _NESTED: NavbarRow = {
     icons: ["close"],
     hrefs: {},
     folders: [
