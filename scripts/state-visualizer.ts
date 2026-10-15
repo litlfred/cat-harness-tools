@@ -1010,8 +1010,8 @@ export interface QaSubject {
  * directory that is NOT on disk still gets one, and that page says the corpus
  * is unknown in this build: derived QA lives on the `qa-reports` branch, so an
  * absent tree is the normal case, not an empty graph — and with no page the
- * instance's tile would have nowhere to go (measured: fhir-harness,
- * folio-assistant-sci and smart-base have no `test/results/` in the index).
+ * instance's tile would have nowhere to go (measured: three of the content
+ * instances have no `test/results/` in the index).
  */
 export function qaSubjectsOf(
   dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
