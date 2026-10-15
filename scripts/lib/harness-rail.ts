@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -362,7 +362,7 @@ export function withNavbarRow(
   let out = html;
   let sharedTag = "";
   if (!out.includes(`id="${NAVBAR_ROW_ID}"`)) {
-    const body = /<body\b[^>]*>/i.exec(out);
+    const body = bodyTag(out);
     if (!body) return html;
     const pos = body.index + body[0].length;
     const json = JSON.stringify(row).replace(/</g, "\\u003c");
@@ -390,7 +390,7 @@ export function withNavbarRow(
     // AHEAD of any reader already linked, else before `</head>`: deferred
     // scripts run in document order, and the readers are deferred too.
     const reader = out.search(/<script\b[^>]*(navbar-row\.js|docs-ui\.js)/i);
-    const head = /<\/head\s*>/i.exec(out);
+    const head = headEndTag(out);
     const at2 = reader >= 0 ? reader : head ? head.index : -1;
     if (at2 >= 0) out = out.slice(0, at2) + sharedTag + out.slice(at2);
   }
@@ -398,9 +398,9 @@ export function withNavbarRow(
   const tags = at.inline
     ? `<style ${NAVBAR_ROW_INLINE}>${at.inline.css}</style><script ${NAVBAR_ROW_INLINE}>${at.inline.js}</script>`
     : `<link rel="stylesheet" href="${at.root}/${NAVBAR_ROW_CSS}">` + `<script src="${at.root}/${NAVBAR_ROW_JS}" defer></script>`;
-  const head = /<\/head\s*>/i.exec(out);
+  const head = headEndTag(out);
   if (head) return out.slice(0, head.index) + tags + out.slice(head.index);
-  const body = /<body\b[^>]*>/i.exec(out);
+  const body = bodyTag(out);
   return body ? out.slice(0, body.index + body[0].length) + tags + out.slice(body.index + body[0].length) : out;
 }
 
@@ -421,6 +421,12 @@ export function withNavbarRow(
 
 /** Stands for the site root inside shared data; each page puts back its own. */
 export const RAIL_ROOT = "@fa-rail-root@";
+/**
+ * Stands for the page's OWN site root inside shared data, when that is not
+ * {@link RAIL_ROOT} — a foreign site, whose rail links the platform's pages
+ * (`RAIL_ROOT`) and its own (its Pages, its own graphs) from one file.
+ */
+export const RAIL_TO_ROOT = "@fa-rail-to-root@";
 /** Where shared rail data is published, relative to the site root. */
 export const RAIL_DATA_DIR = "assets/navbar";
 /** The bundle that draws a rail from shared data. */
@@ -478,7 +484,8 @@ export function railSharedJson(o: RailOptions, root: string): string {
   };
   // Every root-relative value the caller composed starts `<root>/`; put the
   // placeholder there so the SAME data serves a page at any depth.
-  return JSON.stringify(shared).split(`"${root}/`).join(`"${RAIL_ROOT}/`);
+  const json = JSON.stringify(shared).split(`"${root}/`).join(`"${RAIL_ROOT}/`);
+  return o.toRoot === root ? json : json.split(`"${o.toRoot}/`).join(`"${RAIL_TO_ROOT}/`);
 }
 
 /** The shared data file's name and its script body. */
@@ -490,7 +497,7 @@ export function railDataAsset(json: string): { name: string; file: string; body:
 
 /** The rail's regions for one page, from its shared data — what `navbar.js` runs. */
 export function renderRailRegions(sharedJson: string, page: RailPage): string {
-  const shared = JSON.parse(sharedJson.split(RAIL_ROOT).join(page.root)) as RailShared;
+  const shared = JSON.parse(sharedJson.split(RAIL_TO_ROOT).join(page.toRoot).split(RAIL_ROOT).join(page.root)) as RailShared;
   // "You are here": the page's own row loses its link (a link to here is a
   // control that does nothing — `state-visualizer.test.ts`).
   const links =
@@ -505,7 +512,8 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
   const markHere = (items: readonly NavItem[]): NavItem[] =>
     items.map((item) => {
       const kids = item.children ? { children: markHere(item.children) } : {};
-      if (page.here === undefined || item.href !== `${page.root}${page.here}`) return { ...item, ...kids };
+      // The site's own pages are linked from the page's own root.
+      if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
       const { href: _here, ...rest } = item;
       return { ...rest, ...kids, current: true };
     });
@@ -525,7 +533,7 @@ const PENDING = 'data-fa-rail="pending"';
 /** Inject the page block, the placeholder `<nav>` and the three links; emit the shared data. */
 function withSharedRail(html: string, o: RailOptions, root: string, documentIndex: NavGroup | undefined): string | undefined {
   if (html.includes('class="fa-nav"')) return undefined;
-  const body = /<body\b[^>]*>/i.exec(html);
+  const body = bodyTag(html);
   if (!body) return undefined;
   const asset = railDataAsset(railSharedJson(o, root));
   o.emitRailData!(asset.file, asset.body);
@@ -550,7 +558,7 @@ function withSharedRail(html: string, o: RailOptions, root: string, documentInde
     // this page's own root.
     `<script src="${o.toRoot}/${asset.file}" defer></script>` +
     `<script src="${chrome}/${NAVBAR_JS}" defer></script>`;
-  const head = /<\/head\s*>/i.exec(out);
+  const head = headEndTag(out);
   out = head ? out.slice(0, head.index) + tags + out.slice(head.index) : out.slice(0, at) + tags + out.slice(at);
   return out;
 }

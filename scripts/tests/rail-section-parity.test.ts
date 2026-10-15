@@ -19,22 +19,14 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
  *   server and (bundled as `navbar.js`) in the browser.
  *
  * Until 2026-10-15 Path B said "Graphs" and "Contents" for the sections Path A
- * calls "Folders" and "On this page". The sections are read off what each path
- * actually renders — `docs-ui.js`'s heading literals, the rail's `<summary>`
- * labels — never off the constant alone, which would make this a test of
- * itself.
+ * called "Folders" and "On this page". Then the owner chose ONE rail on every
+ * page (option A): the theme sidebar is replaced after Jekyll and Path A's
+ * browser-built sections are retired. So this holds two things: the rail
+ * draws the whole vocabulary, read off its rendered `<summary>` labels, and
+ * `docs-ui.js` draws none of it a second time.
  */
 
 const DOCS_UI = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf-8");
-
-/** The section headings `docs-ui.js` writes for the theme sidebar, by the class it gives each. */
-function pathAHeadings(): Record<string, string | undefined> {
-  return {
-    onThisPage: /className = "fa-doc-index__heading";[\s\S]{0,400}?sum\.textContent = "([^"]+)";/.exec(DOCS_UI)?.[1],
-    folders: /el\("summary", \{ class: "fa-nav-folders__heading" \}, "([^"]+)"\)/.exec(DOCS_UI)?.[1],
-    pages: /class: "fa-nav-pages",[\s\S]{0,200}?\}, "([^"]+)"\)\);/.exec(DOCS_UI)?.[1],
-  };
-}
 
 /** The group labels a rendered `fa-nav` shows, in order. */
 function summaries(html: string): string[] {
@@ -52,11 +44,13 @@ const OPTS = {
 };
 
 describe("the rail's sections are named alike on both paths (bean 9rq1)", () => {
-  test("Path A — docs-ui.js — names every section it draws with the shared vocabulary", () => {
-    const a = pathAHeadings();
-    expect(a.onThisPage).toBe(RAIL_SECTION_LABELS.onThisPage);
-    expect(a.folders).toBe(RAIL_SECTION_LABELS.folders);
-    expect(a.pages).toBe(RAIL_SECTION_LABELS.pages);
+  test("Path A is retired: docs-ui.js builds none of the sections in the browser any more (2026-10-15)", () => {
+    // One rail on every page: the theme sidebar's sections were drawn here
+    // (`mountDocumentIndex`, `mountNavPagesHeading`, `mountInstanceGraphs`,
+    // `mountSidebarRail`). A second drawing is how the two came apart.
+    for (const gone of ["function mountDocumentIndex", "function mountNavPagesHeading", "function mountInstanceGraphs", "function mountSidebarRail"]) {
+      expect(DOCS_UI).not.toContain(gone);
+    }
   });
 
   test("Path B — the fa-nav rail — draws On this page, Folders and Harnesses, in that order", () => {
@@ -73,7 +67,6 @@ describe("the rail's sections are named alike on both paths (bean 9rq1)", () => 
     const retired = ["Graphs", "Contents"];
     const b = summaries(injectRail(PAGE, OPTS)!);
     for (const r of retired) expect(b).not.toContain(r);
-    for (const v of Object.values(pathAHeadings())) expect(retired).not.toContain(v);
   });
 
   test("a page that names its own section keeps that name (an IG, a visualiser)", () => {
