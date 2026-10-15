@@ -62,9 +62,9 @@
  * ## One page per instance — bean `folio-assistant-1nu0`
  *
  * Owner, 2026-10-15: *"per-instance pages"*. The visualiser covered
- * cat-harness's own `folio` directory by id, so folio-assistant-core
- * (`folios/`) and who-iris (`folio/`) read *"no viewer yet"* in the navbar
- * although each declares a folio graph. It now covers the KIND with
+ * cat-harness's own `folio` directory by id, so the two content instances
+ * holding one (a `folios/` and a `folio/`) read *"no viewer yet"* in the
+ * navbar although each declares a folio graph. It now covers the KIND with
  * `subgraphs: "instance"`: the full view stays cat-harness's own graph at
  * `<locale>/<harness>/folio/`, and every OTHER instance in the checkout
  * holding a folio directory gets `<locale>/<harness>/folio/<instance>/`,

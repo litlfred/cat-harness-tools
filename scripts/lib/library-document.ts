@@ -113,7 +113,7 @@ export interface DocumentView {
   variant: "pdf" | "notebook" | "text";
   /**
    * The source's page count, or `null` when the ingestion recorded none. An
-   * older ingestion (smart-base `9789241511766-eng`, page granularity) has no
+   * older ingestion (`9789241511766-eng`, page granularity) has no
    * `source.pages` and no `pages[]`, and `0` read as "an empty PDF" on the
    * page (owner, 2026-10-15: "(0 pages)"). Unknown is not zero.
    */

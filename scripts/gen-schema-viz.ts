@@ -221,7 +221,7 @@ export async function nodeKindRows(g: SchemaGraph, root: string, repoRoot: strin
  *
  * The `schemas` graph typology admits `folio-source-descriptor/v1` as a node
  * schema (`graph-typology-registry.ts`, `nodeSchemas`), so a directory of
- * descriptors — `who-iris/sources/`, `folio-assistant-sci/sources/` — is a
+ * descriptors — an instance's `sources/`, as two content instances hold — is a
  * `schemas` directory by declaration. That classification is deliberate and
  * this generator does not second-guess it.
  *
@@ -466,8 +466,8 @@ function projection(
  * the rendering instance's name and the graph typology. That gives the right
  * answer for `cat-harness/schemas/` by coincidence — the directory happens to
  * sit at owner/kind — and the WRONG one for every directory that does not:
- * `who-iris/library/` would have been addressed as `cat-harness/library`,
- * naming the machinery where the rule names the data. Taking the path means
+ * a content instance's `<instance>/library/` would have been addressed as
+ * `cat-harness/library`, naming the machinery where the rule names the data. Taking the path means
  * the two can never disagree, because there is only one of them.
  *
  * ## Why the data path is computed rather than written
@@ -1611,8 +1611,9 @@ if (import.meta.main) {
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/who-iris/`. The handler is THIS instance, the
-  // kind names what it renders, the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
+  // subject. The handler is THIS instance, the kind names what it renders,
+  // the subject scopes it to one instance.
   //
   // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
   // subject page must never be published there: it would squat on that
@@ -1647,7 +1648,7 @@ if (import.meta.main) {
   /**
    * Each subject page's tile count, keyed by the DECLARED directory id.
    *
-   * Nothing is composed from the subject name. `folio-assistant-core`'s
+   * Nothing is composed from the subject name. The content core's
    * directory is declared `folio-assist-core-schemas` while its three
    * siblings follow `${subject}-schemas`, so a composed key would badge three
    * tiles and leave the fourth silently uncounted — see
@@ -1717,8 +1718,9 @@ if (import.meta.main) {
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/who-iris/`. The handler is THIS instance, the
-  // kind names what it renders, the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
+  // subject. The handler is THIS instance, the kind names what it renders,
+  // the subject scopes it to one instance.
   //
   // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
   // subject page must never be published there: it would squat on that

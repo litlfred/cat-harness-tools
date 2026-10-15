@@ -298,7 +298,8 @@ export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
  * index.config.json"*): the instance's `index.config.json` entry, inline; a
  * root `<instance>.config.json` only as a fallback that {@link recipeRead}
  * reports as legacy. Until 2026-10-14 this read the file directly, so a
- * repository had to keep one to publish (smart-trust#33).
+ * repository had to keep one to publish
+ * (https://github.com/litlfred/smart-trust/pull/33).
  */
 export function recipeRead(root: string, instance: string): { recipe?: SiteRecipe; read: InstanceConfigRead } {
   const read = readInstanceConfig(root, instance);
