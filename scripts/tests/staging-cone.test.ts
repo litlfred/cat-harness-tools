@@ -18,7 +18,9 @@ const REPO = resolve(dirname(HARNESS_ROOT));
  * instances that hold them. Standing alone (check:cat-harness-standalone)
  * those are absent: skipped and named as skipped, never passed over nothing.
  */
-const HAS_IGS = ["fhir-harness", "smart-base", "smart-trust", "smart-immunizations"].every((i) => existsSync(join(REPO, i)));
+// smart-immunizations declares no directories since the owner's B1 ruling
+// (2026-10-15, `directories: []`): it has no IG pages in this index.
+const HAS_IGS = ["fhir-harness", "smart-base", "smart-trust"].every((i) => existsSync(join(REPO, i)));
 
 const dirs: ConeDir[] = [
   { node: "a/index", path: "a/index/" },
@@ -82,11 +84,11 @@ describe.skipIf(!HAS_IGS)("the Done-when measurements, on this checkout", () => 
   });
   it("a gen-ig-pages.ts change carries every IG", () => {
     expect(igPages(["fhir-harness/scripts/gen-ig-pages.ts"]).sort()).toEqual(
-      ["smart-base/smart-base-docs", "smart-immunizations/smart-immunizations-docs", "smart-trust/smart-trust-docs"],
+      ["smart-base/smart-base-docs", "smart-trust/smart-trust-docs"],
     );
   });
   it("a chrome change carries every IG, through derivedFrom", () => {
-    expect(igPages(["smart-base/themes/chrome.json"])).toHaveLength(3);
+    expect(igPages(["smart-base/themes/chrome.json"])).toHaveLength(2);
   });
 });
 

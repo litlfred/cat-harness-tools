@@ -18,8 +18,9 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     const routes = servedDirectories().map((s) => s.route).sort();
     // `smart-trust/openapi` added 2026-10-03 (bean `s4ta`): the OpenAPI
     // graph (cat-harness's `openapi` subgraph renders it), whose thin pages fetch the document beside them.
-    // `smart-immunizations/fhir-artifact-index` since smart-immunizations joined
-    // the index (bean `mftp`): it serves its artefact index as smart-base does.
-    expect(routes).toEqual(["smart-base/fhir-artifact-index", "smart-immunizations/fhir-artifact-index", "smart-trust/fhir-artifact-index", "smart-trust/openapi"]);
+    // `smart-immunizations/fhir-artifact-index` served from bean `mftp` until
+    // the owner's B1 ruling (2026-10-15): smart-immunizations now declares no
+    // directories in this index (`directories: []`), so it serves nothing.
+    expect(routes).toEqual(["smart-base/fhir-artifact-index", "smart-trust/fhir-artifact-index", "smart-trust/openapi"]);
   });
 });
