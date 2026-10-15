@@ -895,6 +895,7 @@ export async function stageDeclared(
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
+  const pr = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
   const r = await buildInstanceSite({
     root: repo,
     instance: d.instance,
@@ -909,7 +910,7 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
-    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}) }, site, log) } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -917,6 +918,31 @@ export async function stageDeclared(
     remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
+}
+
+/**
+ * The open pull request whose head is `branch`, or `undefined`, said in the
+ * log. A preview's review comments are the tagged comments on that PR (bean
+ * 423d), and the workflow is handed its number by the event; a local build has
+ * to ask. A lookup that fails (no network, a rate limit) costs the preview its
+ * comments, not its publish.
+ */
+export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<number | undefined> {
+  const q = `https://api.github.com/repos/${owner}/${name}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`;
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    const r = await fetch(q, { headers: { accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) } });
+    if (!r.ok) {
+      log(`· no PR looked up for ${branch} (GitHub answered ${r.status}): no review comments on this preview`);
+      return undefined;
+    }
+    const prs = (await r.json()) as { number: number }[];
+    if (!prs.length) log(`· ${branch} has no open pull request: no review comments on this preview`);
+    return prs[0]?.number;
+  } catch (e) {
+    log(`· no PR looked up for ${branch} (${(e as Error).message}): no review comments on this preview`);
+    return undefined;
+  }
 }
 
 /**
@@ -930,16 +956,48 @@ export async function stageDeclared(
  */
 export function previewData(
   repo: string,
-  f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string },
+  f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string; pr?: number },
   site: string,
   log: (s: string) => void,
 ): void {
   git(repo, ["fetch", "-q", "origin", f.base]);
+  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform instance resolved by inPlatform against each instance's root.
   const folio = join("folio", f.instance);
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
   else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no ChangeSet on this preview`);
   else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json")]);
+  // The PR's tagged review comments, as the workflow's `stage` job ingests them:
+  // `blocks.json` from the head's manifests and `review-comments.json`, with the
+  // statuses committed to the folio's todos graph winning (bean 423d).
+  const comments = inPlatform(repo, "scripts/review-comments.ts");
+  if (f.pr === undefined) {
+    // said by openPrFor
+  } else if (!comments) log("· this platform has no review-comments Tool: no review comments on this preview");
+  else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no review comments on this preview`);
+  else {
+    // declared-path-literal: the folio's todos graph root, as `review-comment-move.ts` reads it (`todos/todos.json`).
+    const todos = join(repo, "todos");
+    const hasTodos = existsSync(join(todos, "todos.json"));
+    run(repo, "bun", [
+      "run", comments, "--repo", `${f.owner}/${f.name}`, "--pr", String(f.pr), "--commit", f.sha,
+      "--folio", folio, "--blocks-out", join(site, "blocks.json"), "--out", join(site, "review-comments.json"),
+      ...(hasTodos ? ["--todos", todos, "--write-decided"] : []),
+    ]);
+    // A `resolve:` decision applied above is RECORDED, not only published
+    // (owner, 2026-10-15): the Tool wrote each decided comment into the todos
+    // graph's feedback directory, and a graph kept on its own state branch is
+    // spliced there by `state:push` (a no-op when nothing changed, and when the
+    // graph is not branch-kept). A todos graph in the feature branch's tree is
+    // left for the editor to commit. A push that fails costs the record, which
+    // the next build writes again, not the preview.
+    const push = hasTodos ? inPlatform(repo, "scripts/state-push.ts") : undefined;
+    if (push) {
+      const r = spawnSync("bun", ["run", push, "--id", "todos", "-m", `review decisions from PR #${f.pr}`], { cwd: repo, encoding: "utf-8" });
+      const said = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n").slice(-2).join(" ");
+      log(r.status === 0 ? `· todos: ${said || "pushed"}` : `⚠ todos not pushed (${said}): the next build records the decisions again`);
+    }
+  }
   const banner = inPlatform(repo, "scripts/staging-banner.ts");
   if (!banner) { log("· this platform has no staging banner: no staging.json on this preview"); return; }
   const gh = `https://github.com/${f.owner}/${f.name}`;
@@ -947,7 +1005,9 @@ export function previewData(
     "run", banner,
     "--site", site, "--branch", f.branch, "--sha", f.sha.slice(0, 7),
     "--built", `${new Date().toISOString().replace(/\.\d+Z$/, "Z")} (built locally by an agent)`,
-    "--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`,
+    ...(f.pr !== undefined
+      ? ["--pr", String(f.pr), "--pr-url", `${gh}/pull/${f.pr}`]
+      : ["--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`]),
     "--branch-url", `${gh}/tree/${f.branch}`, "--issues-url", `${gh}/issues`,
     "--run-url", f.runUrl ?? `${gh}/commit/${f.sha}`, "--main-site", `https://${f.owner}.github.io/${f.name}/`, "--before-ref", f.base,
   ]);

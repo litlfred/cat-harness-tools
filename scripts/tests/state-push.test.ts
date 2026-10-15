@@ -9,7 +9,7 @@
  * @module scripts/tests/state-push
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, lstatSync, readFileSync, readlinkSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, rmSync, readFileSync, readlinkSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { mountState } from "../state-mount.js";
@@ -85,6 +85,37 @@ describe("what the mount holds becomes a splice", () => {
     writeFileSync(join(root, "todos/a.md"), "A3\n");
     expect(push().state).toBe("pushed");
     expect(f.remoteFile("todos/a.md")?.toString()).toBe("A3\n");
+  });
+});
+
+describe("an emptied mount is not pushed as a deletion (bean sp0e)", () => {
+  test("a mount whose files are all gone is refused, and the branch keeps them", () => {
+    const { f, root, push } = mounted();
+    const before = f.tip();
+    rmSync(join(root, "todos"), { recursive: true, force: true });
+    const r = push();
+    expect(r.state).not.toBe("pushed");
+    expect(r.graphs.find((g) => g.path.startsWith("todos"))?.state).toBe("refused");
+    expect(report(r)).toContain("--allow-empty");
+    expect(f.tip()).toBe(before);
+  });
+
+  test("--allow-empty deletes the graph when that is meant", () => {
+    const { f, root, push } = mounted();
+    const before = f.tip();
+    rmSync(join(root, "todos"), { recursive: true, force: true });
+    expect(push({ allowEmpty: true }).state).toBe("pushed");
+    expect(f.tip()).not.toBe(before);
+  });
+
+  test("deleting SOME files is an ordinary edit and still pushes", () => {
+    const { root, push } = mounted();
+    unlinkSync(join(root, "todos/keep.md"));
+    expect(push().state).toBe("pushed");
+  });
+
+  test("the flag is understood", () => {
+    expect(unknownArgs(["--allow-empty"])).toEqual([]);
   });
 });
 

@@ -5,14 +5,20 @@
  * @graphNode none — a test
  */
 import { describe, expect, test } from "bun:test";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import {
+  bootstrapVocabularyPath,
   buildVocabulary,
   conceptSchemeIriFor,
   findPlatformRoot,
   instancesPublishingNs,
   namespaceForPrefixOrLayer,
 } from "../ns-export.ts";
+import { buildVocabularyOne } from "../publish-instance-context.ts";
 
 type Node = Record<string, unknown>;
 interface Doc {
@@ -187,5 +193,33 @@ describe("ns:check fails on a folioType whose owner does not publish an ns defin
     ] as ReturnType<typeof discoverBlockKinds>;
     const { report } = buildVocabulary(undefined, undefined, false, kinds);
     expect(report.undefinedTerms).toContain("unpublishing-owner:WeirdKind");
+  });
+});
+
+describe("bootstrapVocabularyPath resolves from both the index root and the cat-harness root (bean 63q4)", () => {
+  test("bootstrapVocabularyPath returns <workspace>/bootstrap/ns.jsonld for both roots", () => {
+    const workspace = resolve(HARNESS_ROOT, "..");
+    const expected = join(workspace, "bootstrap", "ns.jsonld");
+    expect(bootstrapVocabularyPath()).toBe(expected);
+    expect(bootstrapVocabularyPath(resolve(HARNESS_ROOT))).toBe(expected);
+    expect(bootstrapVocabularyPath(workspace)).toBe(expected);
+  });
+
+  test("buildVocabularyOne builds bootstrap's vocabulary when given the index root", () => {
+    const workspace = resolve(HARNESS_ROOT, "..");
+    const tmp = mkdtempSync(join(tmpdir(), "bootstrap-vocab-index-"));
+    try {
+      // Mirrors layer-publish-context.yml: the caller is mounted at <index>/bootstrap without .git.
+      cpSync(join(workspace, "bootstrap", "bootstrap.json"), join(tmp, "bootstrap", "bootstrap.json"), { recursive: true });
+      cpSync(join(workspace, "bootstrap", "ns.jsonld"), join(tmp, "bootstrap", "ns.jsonld"), { recursive: true });
+      const out = buildVocabularyOne(tmp, "bootstrap");
+      expect(out.kind).toBe("built");
+      if (out.kind !== "built") return;
+      expect(out.url).toBe("https://litlfred.github.io/bootstrap/0.1.0/ns");
+      expect(out.paths).toEqual(["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"]);
+      expect(out.terms).toBeGreaterThan(0);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

@@ -254,8 +254,12 @@ export interface VocabularyReport {
 }
 
 /** Assemble the vocabulary, and report what is missing rather than guessing. */
-/** Where bootstrap's own vocabulary is, relative to the cat-harness instance root. */
+/** Where bootstrap's own vocabulary is, whether `root` is the index/workspace root or an instance root under it. */
 export function bootstrapVocabularyPath(root = ROOT): string {
+  const atRoot = join(root, "bootstrap", "ns.jsonld");
+  if (existsSync(atRoot)) return atRoot;
+  const inPlatform = join(findPlatformRoot(root), "bootstrap", "ns.jsonld");
+  if (existsSync(inPlatform)) return inPlatform;
   return join(root, "..", "bootstrap", "ns.jsonld");
 }
 

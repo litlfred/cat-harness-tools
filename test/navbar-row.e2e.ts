@@ -442,219 +442,9 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     await expect(page.locator(".fa-nav-icons")).toHaveCount(0);
     expect(logs.join("\n")).toContain("not valid JSON");
     // The point of the assertion below: a parse failure in one region must not
-    // be a blank navbar. The document index is built from the page, not from
-    // this element, and it is still there.
-    await expect(page.locator(".fa-doc-index")).toHaveCount(1);
-  });
-});
-
-test.describe("the middle — controlled folders, then the harness navigation, ONE scroll", () => {
-  test("the theme's nav is MOVED into the wrapper, under the folders", async ({ page }) => {
-    // The owner's three-region layout is explicit that the middle is *"a
-    // scrollable stacks between fixed top an bottom parts"* — singular.
-    // Leaving the folders outside it would make a fourth fixed region.
-    const { errors } = await load(page, CUSTOM);
-    expect(errors).toEqual([]);
-    await expect(page.locator(".side-bar > .fa-nav-middle > .site-nav")).toHaveCount(1);
-    await expect(page.locator(".side-bar > .site-nav")).toHaveCount(0);
-    const order = await page
-      .locator(".fa-nav-middle > *")
-      .evaluateAll((ns) => ns.map((n) => n.className));
-    // The viewer rail's order (ob3m finding 7, owner 2026-10-01): the page's
-    // own index, the page list's heading and the list, then Folders as a
-    // top-level section of its own -- no "Graphs" wrapper since the owner's
-    // ruling on #2150. sidebar-rail.e2e.ts asserts the layout against the
-    // real footer; this asserts the move in this fixture.
-    expect(order[0]).toContain("fa-doc-index");
-    expect(order[1]).toContain("fa-nav-pages");
-    expect(order[2]).toContain("site-nav");
-    expect(order[3]).toContain("fa-nav-folders");
-    await expect(page.locator(".fa-nav-middle > .fa-nav-folders")).toHaveCount(1);
-  });
-
-  test("every declared kind is listed; one with no viewer is a non-link", async ({ page }) => {
-    await load(page, CUSTOM);
-    await expect(page.locator(".fa-nav-folders__count")).toHaveText(String(CUSTOM.folders.length));
-    await expect(page.locator(".fa-nav-folders__item")).toHaveCount(CUSTOM.folders.length);
-    // The baseurl is applied BEFORE the safety check, so what is asserted is
-    // the href that is actually written.
-    await expect(page.locator('.fa-nav-folders__link[href]')).toHaveAttribute(
-      "href",
-      BASEURL + "/library/",
-    );
-    const dead = page.locator(".fa-nav-folders__link--dead");
-    // THREE: `memory` has no viewer, `scenarios` has no recorded reason, and
-    // `fsh-guts` has a page that is withheld from this deploy. Three different
-    // facts, all inert — which is the point of the note beside each.
-    await expect(dead).toHaveCount(3);
-    expect(await dead.first().evaluate((n) => n.tagName)).toBe("SPAN");
-  });
-
-  test("an inert row SAYS WHICH CASE, in text a reader can actually get", async ({ page }) => {
-    // Owner ruling on #1036: shown, inert and LABELLED, with the label saying
-    // which of the four states it is. This row carried it as `opacity: 0.45`,
-    // a strikethrough and a `title` tooltip — a channel a keyboard user never
-    // reaches and a touch user cannot produce.
-    //
-    // The wording is CARRIED from `harness-tiles.ts`, never composed here:
-    // `inertNote` words four states and the single string this replaced was
-    // wrong for two of them.
-    await load(page, CUSTOM);
-    await page.hover(".side-bar");
-    const row = (kind: string) =>
-      page.locator(".fa-nav-folders__item", { hasText: kind }).locator(".fa-nav-folders__note");
-    await expect(row("memory")).toHaveText("no viewer by design");
-    // ABSENT is not a fourth state — it is data older than the note, and
-    // inventing "no viewer yet" for it is the guess the rule is against.
-    await expect(row("scenarios")).toHaveText("reason not recorded");
-    await expect(row("memory")).not.toHaveText(await row("scenarios").innerText());
-  });
-
-  test("an inert row is not a CONTROL — `gjli`", async ({ page }) => {
-    // A greyed thing that takes a tab and then does nothing costs a keyboard
-    // user an interaction to discover it is dead. Not an anchor, not a button,
-    // and nothing focusable anywhere inside it.
-    await load(page, CUSTOM);
-    const inert = page.locator(".fa-nav-folders__link--dead");
-    for (const tag of await inert.evaluateAll((ns) => ns.map((n) => n.tagName))) {
-      expect(tag).toBe("SPAN");
-    }
-    expect(
-      await inert.evaluateAll((ns) =>
-        ns.flatMap((n) => [n, ...Array.from(n.querySelectorAll("*"))]).filter(
-          (x) => x.hasAttribute("href") || x.hasAttribute("tabindex") || x.tagName === "BUTTON",
-        ).length,
-      ),
-    ).toBe(0);
-  });
-
-  test("the state is NOT carried by colour alone", async ({ page }) => {
-    // The other half of `gjli`. Strip the styling that makes a dead row LOOK
-    // dead and the row must still say so — which is what a screen reader, a
-    // high-contrast mode and a printed page all get.
-    await load(page, CUSTOM);
-    await page.hover(".side-bar");
-    const text = await page
-      .locator(".fa-nav-folders__item", { hasText: "memory" })
-      .evaluate((n) => (n.textContent ?? "").replace(/\s+/g, " ").trim());
-    expect(text).toContain("memory");
-    expect(text).toContain("no viewer by design");
-  });
-
-  test("it arrives CLOSED and opens in one click", async ({ page }) => {
-    // Owner, 2026-09-23: *"any indices/toc should be closed."* It arrived open
-    // until then. The count stays on the summary, so a folded block still says
-    // how many there are — folded is not hidden.
-    await load(page, CUSTOM);
-    await expect(page.locator(".fa-nav-folders")).not.toHaveAttribute("open", "");
-    // The count is read with the bar OPEN. At rest the whole block is a text
-    // region and is held invisible with the rest — see the collapsed-strip
-    // tests below — so asserting it visible here would be asserting that the
-    // strip still shows words.
-    await page.hover(".side-bar");
-    await expect(page.locator(".fa-nav-folders__count")).toBeVisible();
-    await page.locator(".fa-nav-folders__heading").click();
-    await expect(page.locator(".fa-nav-folders")).toHaveAttribute("open", "");
-  });
-
-  test("the document index arrives closed too — both, from one instruction", async ({ page }) => {
-    await load(page, CUSTOM);
-    await expect(page.locator(".fa-doc-index")).not.toHaveAttribute("open", "");
-    await page.hover(".side-bar");
-    await expect(page.locator(".fa-doc-index__count")).toBeVisible();
-  });
-
-  test("it DEGRADES — with no row there is no folder list, and still one scroller", async ({ page }) => {
-    // Neither "could not read" nor "declared none" is a reason to draw an
-    // empty folder list. The middle is still built, so the page index shares
-    // the one scroll region with the nav rather than keeping its own.
-    const { errors } = await load(page, null);
-    expect(errors).toEqual([]);
-    await expect(page.locator(".fa-nav-folders")).toHaveCount(0);
-    await expect(page.locator(".side-bar > .fa-nav-middle > .site-nav")).toHaveCount(1);
-    await expect(page.locator(".side-bar > .fa-nav-middle > .fa-doc-index")).toHaveCount(1);
-  });
-});
-
-test.describe("the document index — the fixed top, about the page rather than the graph", () => {
-  test("lists h2 and h3 that carry an id, nesting the h3s", async ({ page }) => {
-    const { errors } = await load(page, CUSTOM);
-    expect(errors).toEqual([]);
-    const rows = await page
-      .locator(".fa-doc-index__link")
-      .evaluateAll((ns) => ns.map((n) => n.textContent + " -> " + n.getAttribute("href")));
-    expect(rows).toEqual(["One -> #one", "One A -> #one-a", "Two -> #two"]);
-    await expect(page.locator(".fa-doc-index__count")).toHaveText("3");
-    // `h1` is the title and `h4` is past where an index helps; a heading with
-    // no id is not a destination (`pb04`) and is skipped rather than linked to
-    // nothing.
-    expect(rows.join(" ")).not.toContain("Title");
-    expect(rows.join(" ")).not.toContain("Unlinkable");
-    expect(rows.join(" ")).not.toContain("Too deep");
-    await expect(page.locator(".fa-doc-index__item--sub")).toHaveCount(1);
-  });
-
-  test("sub-sections FOLD under their section, closed, below its link — owner, 2026-10-05", async ({ page }) => {
-    // "on this page should have sub-sections collapsible" (bean `r2ld`).
-    const { errors } = await load(page, CUSTOM);
-    expect(errors).toEqual([]);
-    await page.hover(".side-bar");
-    await page.locator(".fa-doc-index__heading").click();
-    const one = page.locator(".fa-doc-index__list:not(.fa-doc-index__list--sub) > .fa-doc-index__item").first();
-    const fold = one.locator(":scope > details.fa-doc-index__fold");
-    await expect(fold).toHaveCount(1);
-    await expect(fold).not.toHaveAttribute("open", "");
-    // The section's own link stays a link, OUTSIDE the summary.
-    await expect(one.locator(":scope > a.fa-doc-index__link")).toHaveText("One");
-    await expect(fold.locator("summary a")).toHaveCount(0);
-    await expect(fold.locator("summary")).toHaveText("1 sub-section");
-    await expect(page.locator(".fa-doc-index__item--sub .fa-doc-index__link")).toBeHidden();
-    await fold.locator("summary").click();
-    await expect(fold).toHaveAttribute("open", "");
-    await expect(page.locator(".fa-doc-index__item--sub .fa-doc-index__link")).toBeVisible();
-    // A section with no sub-sections has no fold.
-    await expect(page.locator(".fa-doc-index__fold")).toHaveCount(1);
-  });
-
-  test("is ABSENT below two rows, not an empty or one-row menu", async ({ page }) => {
-    // A "Contents" holding the one section the reader is looking at is a row
-    // that buys nothing in a region that does not scroll.
-    const { errors } = await load(page, CUSTOM, '<h1 id="t">T</h1><h2 id="only">Only</h2>');
-    expect(errors).toEqual([]);
-    await expect(page.locator(".fa-doc-index")).toHaveCount(0);
-  });
-
-  test("sits FIRST in the one scrolling middle — the viewer rail's place for it", async ({ page }) => {
-    // THE POP-OUT PANELS ARE FILTERED, and they are siblings rather than
-    // children of anything: `.fa-panel-in-sidebar` is `position: static`, so a
-    // naive child list has `.fa-tiles` sitting between the icon row and this
-    // index — measured, not assumed, when the first version of this assertion
-    // failed on it. Where a panel is placed is `sidebar-panels.e2e.ts`'s
-    // property (it must not be clipped by the height-capped header) and is
-    // deliberately not restated here: two specs asserting one placement are
-    // two answers free to disagree.
-    await load(page, CUSTOM);
-    // THE CHECKBOX IS FILTERED TOO: it is clipped off-screen, so it is not a
-    // region in the column's flow.
-    const order = await page
-      .locator(".side-bar > *:not(.fa-panel-in-sidebar):not(.fa-nav-open)")
-      .evaluateAll((ns) => ns.map((n) => n.className || n.tagName.toLowerCase()));
-    expect(order).toEqual([
-      expect.stringContaining("site-header"),
-      expect.stringContaining("fa-nav-icons"),
-      expect.stringContaining("fa-nav-middle"),
-      expect.stringContaining("site-footer"),
-    ]);
-  });
-
-  test("survives the DOM move that once took the rest of init() with it", async ({ page }) => {
-    // The measured regression: `mountInstanceGraphs` reparents `.site-nav`,
-    // and an `insertBefore` assuming the old shape throws `NotFoundError`.
-    // Both regions here, and no exception, is the whole assertion.
-    const { errors } = await load(page, CUSTOM);
-    expect(errors).toEqual([]);
-    await expect(page.locator(".fa-doc-index")).toHaveCount(1);
-    await expect(page.locator(".fa-nav-middle > .site-nav")).toHaveCount(1);
+    // be a blank page chrome. The glass handle is mounted after the row, from
+    // nothing this element holds, and it is still there.
+    await expect(page.locator("body > .fa-glass-handle")).toHaveCount(1);
   });
 });
 
@@ -749,8 +539,9 @@ test.describe("at rest the strip carries marks and nothing else", () => {
     await page.hover(".side-bar");
     await page.waitForTimeout(250);
     const shown = (await page.evaluate(visibleText)).join(" | ");
-    for (const region of ["fa-site-title", "fa-doc-index__heading", "fa-nav-folders__heading",
-                          "fa-harness-tabs__heading", "fa-harness-tab__label", "fa-nav-home__label"]) {
+    // "On this page" and "Folders" are the rail's own sections since 2026-10-15
+    // (one rail on every page), so this sidebar no longer carries them.
+    for (const region of ["fa-site-title", "fa-harness-tabs__heading", "fa-harness-tab__label", "fa-nav-home__label"]) {
       expect(shown).toContain(region);
     }
   });
@@ -801,29 +592,6 @@ test.describe("at rest the strip carries marks and nothing else", () => {
     expect(new Set(open).size).toBe(1);
   });
 
-
-  test("a CLOSED document index never yields its one row — the `flex-shrink` fix", async ({ page }) => {
-    // Owner, 2026-09-23, with a screenshot: *"on this page is cut off"*.
-    // Measured at a 500px viewport: the region was 22px around a 25px summary,
-    // so the row read as `ON THIS PAG` with its descenders sliced off. The
-    // region is `flex: 0 1 auto` and its own rule says why that is safe —
-    // *"it scrolls inside its cap"* — which is true while it is OPEN. Closed,
-    // there is nothing to scroll, so every pixel the layout takes is a pixel
-    // of the only row it has and the reader cannot recover it.
-    await page.setViewportSize({ width: 1200, height: 500 });
-    await load(page, CUSTOM);
-    await page.hover(".side-bar");
-    await page.waitForTimeout(250);
-    const fits = await page.evaluate(() => {
-      const box = document.querySelector(".fa-doc-index");
-      const sum = document.querySelector(".fa-doc-index__heading");
-      if (!box || !sum) return null;
-      return Math.round(sum.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom);
-    });
-    // Zero or negative: the summary's bottom is at or above the region's.
-    expect(fits).not.toBeNull();
-    expect(fits!).toBeLessThanOrEqual(0);
-  });
 
   test("the fixed bottom stays ANCHORED to the bottom in both states", async ({ page }) => {
     // The measurement that decided `flex-basis: 0`: with `flex: 1 1 auto` the
@@ -1095,69 +863,11 @@ test.describe("the navbar can be closed, and the hover peek comes back", () => {
   });
 });
 
-/**
- * A PATH THAT RESOLVES AND A PAGE THAT IS NOT THERE.
- *
- * `compose-docs.ts` lays a `publish: "staging-only"` page into the site only
- * under `--staging`, and `harness-tiles.ts` resolves `path` against the SOURCE
- * tree — so on the canonical deploy the path is present, correct and dead.
- *
- * Measured 2026-09-23 by sweeping a canonical-shaped local build: `fsh-guts`,
- * reached from two places in this sidebar. The graph TILE has skipped such a
- * page since it was written — *"Conflating them would let 'show hidden'
- * resurrect a link to a 404"* — and neither navbar surface did, because
- * `stagingOnly` did not reach them.
- *
- * SHOWN, not skipped, unlike the tile: the owner's ruling on #1036 is that a
- * graph a reader cannot open is rendered inert and labelled, and this list is
- * the one surface that enumerates every declared kind.
- */
-test.describe("a page withheld from this deploy is not linked", () => {
-  test("on the canonical deploy it is INERT and says why", async ({ page }) => {
-    await load(page, CUSTOM);
-    await page.hover(".side-bar");
-    const row = page.locator(".fa-nav-folders__item", { hasText: "fsh-guts" });
-    await expect(row.locator("a[href]")).toHaveCount(0);
-    await expect(row.locator(".fa-nav-folders__note")).toHaveText("staging only");
-  });
-
-  test("...and NOT confused with a kind that has no viewer at all", async ({ page }) => {
-    // `flh4` again: withheld-on-purpose and never-built are different facts
-    // with different remedies, and `inertNote` words them differently. Until
-    // now the `staging-only` bucket had no live case, so this is the first
-    // time the two can be seen apart on a page.
-    await load(page, CUSTOM);
-    await page.hover(".side-bar");
-    // OPENED FIRST. `innerText` is "" for an element inside a collapsed
-    // `<details>`, so comparing two of them there compares "" with "" and
-    // passes whatever the notes say — which is how the first version of this
-    // test passed while asserting nothing.
-    await page.locator(".fa-nav-folders__heading").click();
-    await page.waitForTimeout(200);
-    const note = (kind: string) =>
-      page.locator(".fa-nav-folders__item", { hasText: kind }).locator(".fa-nav-folders__note");
-    const withheld = await note("fsh-guts").innerText();
-    const never = await note("memory").innerText();
-    expect(withheld).not.toBe("");
-    expect(withheld).not.toBe(never);
-  });
-
-  test("ON A STAGING PREVIEW the same row IS a link", async ({ page }) => {
-    // The other half, and the one that proves the guard is about the DEPLOY
-    // rather than about the row: staging is where that page is published, and
-    // withholding the link there would hide a working viewer.
-    await load(page, CUSTOM, undefined, "claude-some-branch");
-    await page.hover(".side-bar");
-    const row = page.locator(".fa-nav-folders__item", { hasText: "fsh-guts" });
-    await expect(row.locator("a[href]")).toHaveAttribute("href", BASEURL + "/fsh-guts/");
-  });
-});
-
 test.describe("a sub-graph is drawn INSIDE its parent's row, folded — issue #1164", () => {
   /* Owner, 2026-09-23: proposals live in *"a docs/proposals/ sub-graph
    * declared sub-sub-graph (which starts closed in navbar, general
    * behavior)"*. GENERAL: whatever carries `within`, not a case for docs. */
-  const NESTED: NavbarRow = {
+  const _NESTED: NavbarRow = {
     icons: ["close"],
     hrefs: {},
     folders: [
@@ -1173,31 +883,6 @@ test.describe("a sub-graph is drawn INSIDE its parent's row, folded — issue #1
     ],
   };
 
-  test("the children sit under their parent, in a disclosure that starts CLOSED", async ({ page }) => {
-    await load(page, NESTED);
-    await page.hover(".side-bar");
-    await page.locator(".fa-nav-folders__heading").click();
-    const docs = page.locator(".fa-nav-folders__list > .fa-nav-folders__item", { hasText: /^docs/ });
-    const sub = docs.locator(":scope > .fa-nav-folders__sub");
-    await expect(sub).toHaveCount(1);
-    await expect(sub).not.toHaveAttribute("open", "");
-    await expect(sub.locator(".fa-nav-folders__item")).toHaveCount(2);
-    // Not also at the top level.
-    await expect(page.locator(".fa-nav-folders__list:not(.fa-nav-folders__list--sub) > .fa-nav-folders__item"))
-      .toHaveCount(3);
-    await sub.locator("summary").click();
-    await expect(sub).toHaveAttribute("open", "");
-    await expect(sub.locator('a[href]').first()).toHaveAttribute("href", BASEURL + "/proposals/");
-  });
-
-  test("a child whose parent is not listed stands on its own", async ({ page }) => {
-    await load(page, NESTED);
-    await page.hover(".side-bar");
-    await page.locator(".fa-nav-folders__heading").click();
-    await expect(page.locator(".fa-nav-folders__list:not(.fa-nav-folders__list--sub) > .fa-nav-folders__item",
-      { hasText: "orphan" })).toHaveCount(1);
-  });
-
   test("the LIVE data nests proposals and requirements under docs", () => {
     // Asked of the harness that DECLARES them. Until the separation the
     // landing row was cat-harness's own; since the owner set the landing to
@@ -1207,23 +892,6 @@ test.describe("a sub-graph is drawn INSIDE its parent's row, folded — issue #1
     const f = HARNESS.harnesses.find((h) => h.name === "cat-harness")?.visualisations ?? [];
     expect(f.find((x) => x.kind === "proposals")?.within).toBe("docs");
     expect(f.find((x) => x.kind === "requirements")?.within).toBe("docs");
-  });
-});
-
-test.describe("the page list has a heading and folds — owner, 2026-09-27", () => {
-  test("a 'Pages' button with a count sits in front of the nav and folds it", async ({ page }) => {
-    const { errors } = await load(page, CUSTOM);
-    expect(errors).toEqual([]);
-    const btn = page.locator(".fa-nav-pages");
-    await expect(btn).toHaveCount(1);
-    await expect(btn).toContainText("Pages");
-    await expect(btn).toHaveAttribute("aria-expanded", "true");
-    await page.hover(".side-bar");
-    await btn.click();
-    await expect(btn).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator(".site-nav")).toBeHidden();
-    await page.locator(".fa-nav-pages").click();
-    await expect(page.locator(".site-nav")).toBeVisible();
   });
 });
 
@@ -1248,45 +916,6 @@ test.describe("the avatar opens and closes the bar — owner, 2026-09-27", () =>
     await page.mouse.move(900, 400);
     await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
   });
-});
-
-/* THE PAGES LIST IN THE READER'S ALPHABET — bean `xka5`. Owner, 2026-10-05:
- * "(and alphebatization//locale depnenddent)". just-the-docs orders by a
- * hand-kept `nav_order`; `sortNavByLocale` re-sorts each level with
- * `Intl.Collator` in the page's `lang`. Swedish is the probe because it puts
- * "Å" AFTER "Z" while English puts it beside "A" — one list, two orders. */
-test.describe("the Pages list is sorted in the page's own language (bean xka5)", () => {
-  const list =
-    '<nav class="site-nav"><ul class="nav-list">' +
-    `<li class="nav-list-item"><a class="nav-list-link" href="${BASEURL}/">Home</a></li>` +
-    '<li class="nav-list-item"><a class="nav-list-link" href="#z">Zebra</a></li>' +
-    '<li class="nav-list-item"><a class="nav-list-link" href="#aa">Ångström</a>' +
-    '<ul class="nav-list"><li class="nav-list-item"><a class="nav-list-link" href="#b">beta</a></li>' +
-    '<li class="nav-list-item"><a class="nav-list-link" href="#a">Alpha</a></li></ul></li>' +
-    '<li class="nav-list-item"><a class="nav-list-link" href="#ap">apple</a></li>' +
-    "</ul></nav>";
-  const order = (p: import("@playwright/test").Page) =>
-    p.locator(".side-bar .site-nav > ul.nav-list > li > a.nav-list-link").allTextContents();
-
-  for (const [lang, want] of [
-    ["en", ["Home", "Ångström", "apple", "Zebra"]],
-    ["sv", ["Home", "apple", "Zebra", "Ångström"]],
-  ] as const) {
-    test(`lang="${lang}": Home first, then the ${lang} collation, at every level`, async ({ page: p }) => {
-      const html = page(CUSTOM)
-        .replace('<nav class="site-nav"><a href="#">Navigation link</a></nav>', list)
-        .replace('<html lang="en">', `<html lang="${lang}">`);
-      const errors: string[] = [];
-      p.on("pageerror", (e) => errors.push(String(e)));
-      await p.route("http://navbar.fixture/**", (r) => r.fulfill({ contentType: "text/html", body: html }));
-      await p.goto("http://navbar.fixture/nav", { waitUntil: "load" });
-      expect(errors).toEqual([]);
-      expect((await order(p)).map((t) => t.trim())).toEqual([...want]);
-      // A nested level is sorted too: Alpha before beta, case ignored.
-      const nested = await p.locator(".side-bar .site-nav ul.nav-list ul.nav-list > li > a").allTextContents();
-      expect(nested.map((t) => t.trim())).toEqual(["Alpha", "beta"]);
-    });
-  }
 });
 
 test.describe("on a folio's site the fish is not this site's trashcan — #2263 follow-up", () => {

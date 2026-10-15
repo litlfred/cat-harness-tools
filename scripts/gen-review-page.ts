@@ -295,8 +295,23 @@ const SCRIPT = `
     d.appendChild(el("span", c.summary));
     if (r.anchoredFrom && r.anchoredFrom.length) d.appendChild(el("span", " (made on " + r.anchoredFrom.join(", ") + ")", "muted"));
     if (r.commentUrl) { d.appendChild(el("span", " ")); var a = el("a", "read on the pull request"); a.href = r.commentUrl; d.appendChild(a); }
+    // Deciding it is a pull-request comment too (bean 423d, owner 2026-10-15):
+    // the page is static and writes nothing. The words offered are the moves
+    // the review-comment table allows from this status; the build applies
+    // the tag for a repository owner, member or collaborator.
+    var next = DECIDE[c.status];
+    if (next && c.id) {
+      var h = el("div", null, "muted");
+      h.appendChild(el("span", "To decide it, comment "));
+      h.appendChild(el("code", "resolve: " + c.id, "tagline"));
+      h.appendChild(el("span", " with the line "));
+      next.forEach(function (w, i) { if (i) h.appendChild(el("span", i === next.length - 1 ? " or " : ", ")); h.appendChild(el("code", "decision: " + w, "tagline")); });
+      d.appendChild(h);
+    }
     return d;
   }
+  // From each status, the decisions the review-comment table allows (folio-assistant-core review-comment.ts).
+  var DECIDE = { open: ["addressed", "adjudicated", "withdrawn"], addressed: ["resolved", "reopened", "adjudicated", "withdrawn"] };
   function commentList(cs) {
     var box = el("div", null, "comments");
     cs.forEach(function (c) { box.appendChild(commentEl(c)); });
@@ -571,7 +586,7 @@ const SCRIPT = `
         section("Orphaned: the block these were made on is gone", rc.comments
           .filter(function (c) { return c.review && c.review.orphaned; })
           .map(function (c) { var d = el("div"); d.appendChild(el("span", c.targetLabel, "label")); d.appendChild(commentList([c])); return d; }));
-        section("Comments whose tag could not be read", rc.malformed.map(function (m) {
+        section("Tags that could not be read or applied", rc.malformed.map(function (m) {
           var d = el("div");
           d.appendChild(el("span", m.error + " "));
           var a = el("a", "fix it on the pull request"); a.href = m.url; d.appendChild(a);

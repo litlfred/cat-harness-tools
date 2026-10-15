@@ -107,6 +107,14 @@ import { siteArg } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
+/**
+ * Every page this writes declares itself generated in its own front matter —
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
+ * `gen-processes-viz.ts` does. A page lists the declared prose graphs and the instances that own them, which belong to every
+ * instance in the checkout, so without the key those names read as authored
+ * prose in the committing layer naming the layers above it.
+ */
+const GENERATED_FM = "generated: gen-lsi-viz.ts — do not hand-edit; run `bun run cat lsi:viz`";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 // declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
@@ -208,6 +216,7 @@ function draw(read?: Extract<IndexesRead, { state: "hit" }>): string {
   L.push("---");
   L.push('title: "Latent semantic indexes"');
   L.push('description: "Every published LSI index over a declared prose graph — its latent dimensions, its findings, and which graphs still need one."');
+  L.push(GENERATED_FM);
   L.push("---");
   L.push("<style>");
   L.push(".lv-grid{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}");

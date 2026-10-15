@@ -74,6 +74,14 @@ import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "methodologies-viewer";
+/**
+ * Every page this writes declares itself generated in its own front matter —
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
+ * `gen-processes-viz.ts` does. A page lists the methodologies and the instances that adopt them, which belong to every
+ * instance in the checkout, so without the key those names read as authored
+ * prose in the committing layer naming the layers above it.
+ */
+const GENERATED_FM = "generated: gen-methodologies-viz.ts — do not hand-edit; run `bun run cat methodologies:viz`";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 const REPO = resolve(INSTANCE_ROOT, "..");
@@ -304,6 +312,7 @@ export function page(
     "---",
     'title: "Methodologies"',
     'description: "The methodologies this repository has adopted — what each is for, where it came from, and whether the source it rests on is held here."',
+    GENERATED_FM,
     "---",
     `<style>${CSS}</style>`,
     "",

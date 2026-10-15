@@ -58,7 +58,7 @@ describe("review page", () => {
   test("keeps the three groups that would otherwise vanish, and the tag to start a comment with", () => {
     expect(html).toContain("Comments on blocks this pull request did not change");
     expect(html).toContain("Orphaned: the block these were made on is gone");
-    expect(html).toContain("Comments whose tag could not be read");
+    expect(html).toContain("Tags that could not be read or applied");
     expect(html).toContain('"block: " + c.label');
   });
 

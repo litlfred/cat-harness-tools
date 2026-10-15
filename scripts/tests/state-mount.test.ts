@@ -91,6 +91,19 @@ describe("it never discards work", () => {
     expect(report(r)).toContain("Nothing was discarded");
   });
 
+  // 2026-10-15: a layer re-laid over a nested mount took its files and left
+  // its marker; "stale — push them" then sent the deletion of the whole graph.
+  test("a mount that is GONE is re-mounted, not reported stale with its deletion to push", () => {
+    const { root, store } = stateFixture("state-mount-t-").checkout("a");
+    expect(mountState({ repoRoot: root, store }).state).toBe("mounted");
+    rmSync(join(root, "todos"), { recursive: true, force: true });
+
+    const r = mountState({ repoRoot: root, store });
+    expect(r.state).toBe("mounted");
+    expect(r.graphs[0]).toMatchObject({ id: "todos", state: "mounted", files: 2 });
+    expect(readFileSync(join(root, "todos/a.md"), "utf-8")).toBe("A\n");
+  });
+
   test("a directory the checkout still tracks is refused, never overwritten, and NOT read as stale", () => {
     const { root, store } = stateFixture("state-mount-t-").checkout("a");
     // `todos/` tracked on this branch: the cutover has not happened here.
@@ -209,7 +222,7 @@ describe("a store state:mount does not mount names the Tool that does (bean j9cs
       };
       writeFileSync(join(root, "t.json"), JSON.stringify({ name: "t", directories: [entry] }, null, 2) + "\n");
       expect(delegatedStores(root)).toEqual([
-        { id: "cache", path: "cache/", branch: "p/cache/", keyedBy: "family", tool: "site-build-local", invoke: "cat-harness-tools/scripts/preview-site.sh" },
+        { id: "cache", path: "cache/", branch: "p/cache/", keyedBy: "family", tool: "site-build-local", invoke: "bun run cat preview:site" },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

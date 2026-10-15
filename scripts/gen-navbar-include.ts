@@ -71,6 +71,7 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
+import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import {
   RAIL_SECTION_LABELS,
   navbarOpenInputHtml,
@@ -246,6 +247,7 @@ function model(
   staging: boolean,
   openControl: "input" | "labels",
   fshGuts: boolean,
+  pages?: readonly NavItem[],
 ): NavbarModel {
   const shown = harnesses.filter((h) => h.instantiated === true);
   const group: NavGroup = {
@@ -260,6 +262,10 @@ function model(
     openControl,
     // The theme's `.site-title` avatar IS the header here (#1757).
     head: "none",
+    // The site's page tree, server-built (owner, 2026-10-15, "folio rail
+    // everywhere"). Given only with `--pages`: while the theme's own
+    // `site-nav` is on the page, a second copy here would be the tree twice.
+    ...(pages && pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: pages, collapsible: true, open: false } } : {}),
     ...(shown.length > 0 ? { harnesses: group } : {}),
     // fsh-guts in the FIXED top (#1925, owner 2026-10-02: *"also add fsh-guts
     // icon to LHS top navbar"*), only when this instance DECLARES the
@@ -297,9 +303,9 @@ const BANNER =
  * that cannot say it is a preview is treated as canonical, which is the safe
  * direction and the one `isStagingPreview` already takes.
  */
-export function render(harnesses: Harness[], title: string, fshGuts = false): string {
+export function render(harnesses: Harness[], title: string, fshGuts = false, pages?: readonly NavItem[]): string {
   const region = (staging: boolean): string =>
-    navbarRegionsHtml(model(harnesses, title, staging, "labels", fshGuts));
+    navbarRegionsHtml(model(harnesses, title, staging, "labels", fshGuts, pages));
   return (
     `${BANNER}\n` +
     `{%- assign fa_nav_copy = fa_nav_copy | default: 0 | plus: 1 -%}\n` +
@@ -324,6 +330,13 @@ function main(): void {
   // site's composed shell, never over the committed include.
   const argv = process.argv;
   const opt = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
+  // `--pages <site source dir>`: the site's page tree as the rail's "Pages"
+  // section, read from the same front matter the theme reads
+  // (`lib/jekyll-pages-nav.ts`). Hrefs are site-absolute and go through
+  // `relative_url` like every other row here.
+  const pagesDir = opt("--pages");
+  const pages = pagesDir ? pagesNav(jekyllNavPages(pagesDir)) : undefined;
+  if (pages?.orphans.length) console.warn(`gen-navbar-include: ${pages.orphans.length} page(s) name a parent no listed page has; kept at the top level: ${pages.orphans.slice(0, 5).join(", ")}`);
   const instance = opt("--instance");
   if (instance) {
     const linkRoot = opt("--link-root");
@@ -338,11 +351,11 @@ function main(): void {
       process.exit(2);
     }
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, render(rows, opt("--title") ?? instance, false));
+    writeFileSync(out, render(rows, opt("--title") ?? instance, false, pages?.items));
     console.log(`wrote ${out} — ${instance}'s own navbar: ${rows.map((h) => h.name).join(", ")}`);
     return;
   }
-  const next = render(data.harnesses ?? [], data.title ?? "folio-assistant", false);
+  const next = render(data.harnesses ?? [], data.title ?? "folio-assistant", false, pages?.items);
 
   let current: string | undefined;
   try {

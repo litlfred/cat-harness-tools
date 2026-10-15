@@ -163,9 +163,10 @@ jobs:
       # The instance's own VOCABULARY, at the address its term IRIs name
       # (`<iriBase><version>/ns#Term`), read off the vocabulary's `@id` by the
       # script rather than written here (owner, 2026-10-15, "Serve vocab at own
-      # iriBase"). Before this, cat-harness and folio-assistant-core had no
-      # `0.1.0/` on gh-pages and every term IRI they mint answered 404. An
-      # instance that mints no terms is a skip with a notice.
+      # iriBase"). Before this, an instance's gh-pages had no `<version>/`
+      # (measured on two of them, cat-harness one) and every term IRI it
+      # mints answered 404. An instance that mints no terms is a skip with a
+      # notice.
       - name: Build the vocabulary
         id: vocab
         working-directory: fa
