@@ -202,7 +202,7 @@ export function leadParagraph(markdown: string): string | undefined {
     .replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, "");
   const h1 = text.search(/^#\s+/m);
   const body = h1 < 0 ? text : text.slice(text.indexOf("\n", h1) + 1);
-  for (const para of body.split(/\n\s*\n/)) {
+  for (const para of markdownBlocks(body)) {
     const p = para.trim();
     if (p === "") continue;
     if (/^(?:>|\||#|<|[-*+]\s|\d+\.\s|!\[|\[!\[)/.test(p)) continue;
@@ -210,6 +210,42 @@ export function leadParagraph(markdown: string): string | undefined {
     return p;
   }
   return undefined;
+}
+
+/**
+ * Split markdown into blocks the way a reader sees them, not only at blank
+ * lines: an ATX heading (`#`, even an empty one) and a thematic break end a
+ * paragraph without one, and a line underlined with `---` or `===` is a
+ * setext heading, not prose. A heading or a rule comes back as its own block
+ * starting with `#`, so the lead-paragraph filter skips it. Without this, a
+ * README written as an IG's boilerplate ("Title\n---\nText\n###\n### H")
+ * handed its headings over as part of the lead paragraph.
+ */
+function markdownBlocks(body: string): string[] {
+  const out: string[] = [];
+  let cur: string[] = [];
+  const flush = (): void => {
+    if (cur.length) out.push(cur.join("\n"));
+    cur = [];
+  };
+  const lines = body.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (/^\s*$/.test(line)) { flush(); continue; }
+    if (/^ {0,3}#{1,6}(?:\s|$)/.test(line)) { flush(); out.push(line.trim()); continue; }
+    const next = lines[i + 1];
+    if (next !== undefined && /^ {0,3}(?:=+|-+)\s*$/.test(next) && !/^ {0,3}(?:[-*+]\s|>|\||\d+\.\s)/.test(line)) {
+      cur.push(line);
+      out.push("# " + cur.map((l) => l.trim()).join(" "));
+      cur = [];
+      i++;
+      continue;
+    }
+    if (/^ {0,3}([-*_])(?: *\1){2,} *$/.test(line)) { flush(); out.push("# ---"); continue; }
+    cur.push(line);
+  }
+  flush();
+  return out;
 }
 
 /** Bootstrap's cold start: its `AGENTS.md` between the h1 and the footer rule, links rebased. */

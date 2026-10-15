@@ -43,6 +43,7 @@ import {
   type AdversarialReview,
 } from "@litlfred/cat-harness/schemas/red-flag.js";
 import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
@@ -340,7 +341,11 @@ export function reviewNodeAdversarially(
     reviewer: {
       by: "agent",
       session: "session_backfill_lvlv",
-      model: "claude-3-7-sonnet",
+      // This runner is a script: no model reviews anything, and the running
+      // session's model is not known here. A literal id would be an
+      // unverified claim the model-ids check rightly refuses (owner E1,
+      // 2026-10-15), so it records the declared non-identifier.
+      model: NOT_DISCLOSED,
     },
     author_sessions: [],
     skill_hash: "hash:adversarial-checklist:v1",
@@ -375,7 +380,7 @@ export function executeBackfillBatch(
   for (const node of batch) {
     const { review, findings, durationMs, tokens } = reviewNodeAdversarially(node, repoRoot);
 
-    // Cost estimation based on Claude 3.7 Sonnet pricing ($3/M input, $15/M output approx $0.000006/token blended)
+    // Cost estimate: a flat blended rate (about $3/M input, $15/M output, so ~$0.000006/token), not any one model's price list
     const costUsd = Number((tokens * 0.000006).toFixed(6));
 
     // Update or create sidecar

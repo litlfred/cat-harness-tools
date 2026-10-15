@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { auditInstance, isCheckable, markdownLinks } from "../check-declared-assets.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { checkIndexRender, renderIndex } from "../index-render.js";
+import { checkIndexRender, leadParagraph, renderIndex } from "../index-render.js";
 
 const ROOT = resolve(import.meta.dir, "../..");
 
@@ -149,5 +149,16 @@ describe("what it will not pretend to have checked", () => {
     // `readme-links.ts`'s own fence stripping.
     const src = "real [a](a.md)\n```\nfake [b](b.md)\n```\n";
     expect(markdownLinks(src)).toEqual(["a.md"]);
+  });
+});
+
+describe("leadParagraph reads headings the way a reader does", () => {
+  test("a setext title and an unseparated ATX heading are not prose (smart-trust's IG README)", () => {
+    const md = "<!--badges-->\n![b](x.png)\n<!--/badges-->\nWHO SMART Trust \n--- \nThis is the guide\n###\n### Publication\nPublished here.\n";
+    expect(leadParagraph(md)).toBe("This is the guide");
+  });
+
+  test("a thematic break is not a lead paragraph, and an ATX h1 still opens the body", () => {
+    expect(leadParagraph("# T\n\n---\n\nThe lead.\n")).toBe("The lead.");
   });
 });
