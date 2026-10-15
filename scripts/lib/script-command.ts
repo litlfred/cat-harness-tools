@@ -15,8 +15,8 @@ export const RUN_SCRIPT = resolve(import.meta.dir, "..", "run-script.ts");
 
 /**
  * Whether the checkout's own package.json defines the script. An IG repository
- * may carry a package.json for its own tooling (smart-immunizations' holds
- * only fsh-sushi) that names none of the site's steps: `bun run <step>` there
+ * may carry a package.json for its own tooling (one measured holds only
+ * fsh-sushi) that names none of the site's steps: `bun run <step>` there
  * fails "Script not found", so the step goes through the mounted layers'
  * script table instead, as it does where there is no package.json at all.
  */
