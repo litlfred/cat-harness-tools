@@ -43,13 +43,14 @@
  *
  * @module scripts/publish-instance-context
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";
+import { buildVocabulary, instancesPublishingNs } from "./ns-export.ts";
 
 export const PAGES_BRANCH = "gh-pages";
 
@@ -113,6 +114,80 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
     bound: report.bound.map((b) => b.prefix),
     context: report.expected,
   };
+}
+
+// ── vocabulary ───────────────────────────────────────────────────
+
+/**
+ * The instance's own VOCABULARY, served where its term IRIs point.
+ *
+ * Owner, 2026-10-15 ("2 Serve vocab at own iriBase"): a term IRI is
+ * `<iriBase><version>/ns#Term` (`cat-harness/schemas/namespaces.ts`), so the
+ * document `<iriBase><version>/ns` has to exist on the instance's own Pages or
+ * every term it mints answers 404 — which was the state of cat-harness and
+ * folio-assistant-core when this was written (no `0.1.0/` on either gh-pages).
+ *
+ * The path is read off the vocabulary's own `@id`, never composed here: the
+ * document says where it lives, and a second spelling of that address is the
+ * drift this repository keeps paying for. It must sit under the instance's
+ * `iriBase`, and must not be `ns` itself — that address is the DIRECTORY
+ * holding `ns/context/v1.jsonld`, and a static host cannot serve both
+ * (folio-assistant#2560 is the same clash on the aggregate site).
+ *
+ * Published three times, as `ns-export --out-dir` does: extensionless because
+ * the IRI is, `.jsonld` for the canonical extension, `.json` because Pages
+ * sends no correct Content-Type for `.jsonld`.
+ */
+export type VocabularyOutcome =
+  | { kind: "built"; instance: string; iriBase: string; url: string; paths: string[]; terms: number; content: string }
+  | { kind: "skipped"; instance: string; reason: string }
+  | { kind: "failed"; instance: string; problems: string[] };
+
+export function buildVocabularyOne(repoRoot: string, instance: string): VocabularyOutcome {
+  const root = resolve(repoRoot);
+  const decl = readInstanceDecls(root).find((d) => d.name === instance);
+  if (decl === undefined) return { kind: "failed", instance, problems: [`no instance named \`${instance}\` under ${root}`] };
+  const iriBase = iriBaseOf(decl.root);
+  if (iriBase === undefined) return { kind: "skipped", instance, reason: `${instance} declares no iriBase, so its vocabulary has no address` };
+  const owners = new Set(["bootstrap", ...instancesPublishingNs(root)]);
+  if (!owners.has(instance)) return { kind: "skipped", instance, reason: `${instance} mints no terms of its own, so it has no vocabulary to publish` };
+  let built;
+  try {
+    built = buildVocabulary(root, instance, true);
+  } catch (e) {
+    return { kind: "failed", instance, problems: [e instanceof Error ? e.message : String(e)] };
+  }
+  const { doc, report } = built;
+  const problems = [
+    ...report.undefinedTerms.map((t) => `minted term with no definition: ${t}`),
+    ...report.doublyDefined.map((t) => `term defined twice: ${t}`),
+  ];
+  if (problems.length > 0) return { kind: "failed", instance, problems };
+  const id = (doc as { "@id"?: unknown })["@id"];
+  const where = vocabularyPaths(id, iriBase);
+  if ("problem" in where) return { kind: "failed", instance, problems: [`${instance}: ${where.problem}`] };
+  return {
+    kind: "built",
+    instance,
+    iriBase,
+    url: String(id),
+    paths: where.paths,
+    terms: report.defined.length,
+    content: `${JSON.stringify(doc, null, 2)}\n`,
+  };
+}
+
+/** Where a vocabulary whose `@id` is `id` is served on the Pages at `iriBase`: the three paths, or why it cannot be. */
+export function vocabularyPaths(id: unknown, iriBase: string): { paths: string[] } | { problem: string } {
+  const base = `${iriBase.replace(/\/+$/, "")}/`;
+  if (typeof id !== "string" || !id.startsWith(base)) {
+    return { problem: `the vocabulary's @id ${String(id)} is not under the iriBase ${base}, so that Pages site cannot serve it` };
+  }
+  const rel = id.slice(base.length).replace(/[#/]+$/, "");
+  if (rel === "" || rel === "ns" || rel.startsWith("ns/")) {
+    return { problem: `the vocabulary's @id ${id} would be served at \`${rel || "/"}\`, which collides with the context directory ns/` };
+  }
+  return { paths: [rel, `${rel}.jsonld`, `${rel}.json`] };
 }
 
 // ── publish ──────────────────────────────────────────────────────
@@ -268,6 +343,32 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log(`built ${outcome.instance}'s context: ${outcome.documents} document(s), binds ${outcome.bound.join(" ") || "nothing"}; to be served at ${outcome.url}`);
     return 0;
   }
+  if (cmd === "vocab") {
+    const instance = arg(argv, "--instance");
+    const outDir = arg(argv, "--out-dir");
+    if (!instance || !outDir) {
+      console.error("usage: publish-instance-context.ts vocab --root <index> --instance <name> --out-dir <dir>");
+      return 2;
+    }
+    const outcome = buildVocabularyOne(arg(argv, "--root") ?? ".", instance);
+    if (outcome.kind === "skipped") {
+      console.log(`::notice::${outcome.reason}; no vocabulary to publish`);
+      return 0;
+    }
+    if (outcome.kind === "failed") {
+      for (const p of outcome.problems) console.error(`::error::${p}`);
+      return 1;
+    }
+    for (const p of outcome.paths) {
+      const dest = join(outDir, p);
+      mkdirSync(dirname(dest), { recursive: true });
+      writeFileSync(dest, outcome.content);
+    }
+    // The list the workflow publishes, one path per line, so it never restates them.
+    writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);
+    console.log(`built ${outcome.instance}'s vocabulary: ${outcome.terms} term(s); to be served at ${outcome.url} (${outcome.paths.join(", ")})`);
+    return 0;
+  }
   if (cmd === "publish") {
     const repo = arg(argv, "--repo");
     const file = arg(argv, "--file");
@@ -293,7 +394,7 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log(`${outcome.kind}: ${outcome.detail}`);
     return 0;
   }
-  console.error("usage: publish-instance-context.ts build|publish …");
+  console.error("usage: publish-instance-context.ts build|vocab|publish …");
   return 2;
 }
 
