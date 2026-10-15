@@ -222,7 +222,9 @@ describe("fhir-artifact-index — a viewer inside a COMPOSED directory is linked
   // route page that opens the IG site's own `artifacts` page. The IG keeps
   // its URL; the tile links the declared route (owner: "<base URL>/<harness>/
   // <visualizer>/<sub-graph>").
-  for (const name of ["smart-trust", "smart-base", "smart-immunizations"]) {
+  // Not smart-immunizations: it declares no directories in this index since
+  // the owner's B1 ruling (2026-10-15, `directories: []`).
+  for (const name of ["smart-trust", "smart-base"]) {
     it(`${name}'s fhir-artifact-index tile links its declared route, which opens its IG site's artifacts page`, () => {
       const h = harnesses.find((x) => x.name === name);
       expect(h, `${name} is not in the report`).toBeDefined();

@@ -54,24 +54,24 @@ import { dirname } from "node:path";
 const REPO = resolve(dirname(HARNESS_ROOT));
 
 // The page is BUILT AT PUBLISH (bean 0b8c, #2230): derived from a graph kept on
-// a branch, so it is never committed. Build it the way the site build does —
-// `state:mount`, then `derive:publish`, then compose — so the compose below
-// sees what a real build sees. Fails loudly, like the build, when unmounted.
-// Where it cannot be built (no mount; a standalone layer with no root script),
-// the tests that need the page fail on their own, by name, rather than this
-// hook failing the whole file.
+// a branch, so it is never committed. Build it with the writer cat-harness
+// declares for it (`visualisers`: fsh-guts, writer `scripts/gen-fsh-guts-viz.ts`,
+// the `fsh-guts:viz` script), so the compose below sees the page a real build
+// writes. Fails loudly, like the build, when fsh-guts is unmounted. Where it
+// cannot be built (no mount; a standalone layer with no root script), the
+// tests that need the page fail on their own, by name, rather than this hook
+// failing the whole file.
 //
-// The hook gets an explicit budget, as its sibling in
-// `test/coordinator/staging-only-publish-repo-root.test.ts` does. It spawns a
-// whole build: since B1 (owner, 2026-10-14) `derive:publish` also runs every
-// declared `builtAtPublish` writer, which measured 112 s on the run's own
-// publish-pages job (folio-assistant run 38696377785), so bun's 5 s default
-// killed it mid-write (SIGTERM) and failed the file with no assertion run.
-// 300 s bounds a hang without racing an honest build on a shared runner.
-const BUILD_BUDGET_MS = 300_000;
+// Not the whole `derive:publish`. Since B1 (owner, 2026-10-14) that runs
+// every declared `builtAtPublish` writer of every instance: 112 s on run
+// 38696377785's publish job, and past this hook's 300 s budget in bun-test
+// shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
+// timed out" with no assertion run. It also rewrote, mid-shard, artefacts
+// other test files were reading. This file needs one page; it builds one page.
+const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
-  const r = spawnSync("bun", ["run", "cat", "derive:publish"], { cwd: REPO, encoding: "utf8" });
-  if (r.status !== 0) console.warn(`derive:publish did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
+  const r = spawnSync("bun", ["run", "cat", "fsh-guts:viz"], { cwd: REPO, encoding: "utf8" });
+  if (r.status !== 0) console.warn(`fsh-guts:viz did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
 }, BUILD_BUDGET_MS);
 
 function composeTo(opts: { staging?: boolean }): { dir: string; report: ReturnType<typeof compose> } {
