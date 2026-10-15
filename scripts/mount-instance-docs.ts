@@ -1380,6 +1380,12 @@ export function railStandalonePages(
       const before = themed ? stripThemeSidebar(read) : read;
       if (NAVIGATED.test(before)) {
         alreadyNavigated++;
+        // Its rail is its own, but its first paint is the site's rule: a page
+        // a generator railed itself (who-iris's replica pages, 2026-10-15)
+        // carried no first-paint snippet, so it painted the static dark sheet
+        // and flipped once the rail's script ran. Idempotent.
+        const schemed = withSavedScheme(read);
+        if (schemed !== read) writeFileSync(abs, schemed);
         continue;
       }
       // A REDIRECT STUB is not a page anybody stays on — the mount writes one
@@ -1457,7 +1463,7 @@ export function railStandalonePages(
       }
       // The top bar, the same on every page (owner, 2026-10-15: "Top bar, like IG sites").
       const after = withSiteBar(railed, { toRoot, title: homeLabel ?? named.site ?? named.harness ?? owner, ...(themeSearch ? { search: themeSearch } : {}) });
-      writeFileSync(abs, foreign ? withPinnedData(withPlatformUi(after, toRoot, foreign.platformBase), toRoot) : after);
+      writeFileSync(abs, foreign ? withPinnedData(withPlatformUi(after, toRoot, foreign.platformBase), toRoot) : withSavedScheme(after));
       if (themed) replacedThemeSidebar++;
       injected++;
     }
