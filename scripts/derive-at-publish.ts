@@ -29,8 +29,9 @@
  * no commit of it can hold current — computed over the checkout's other
  * instances (`checkout`), or from a branch-kept graph (`state`) — and names
  * each one's writer as a package script. After the branch-derived artefacts
- * above, this runs every such writer once, in declaration order (instances
- * dependency-first), and then REFUSES an entry that came out missing or empty:
+ * above, this runs every such writer once — instances CONSUMERS FIRST, each
+ * instance's entries in its declared order — and then REFUSES an entry that
+ * came out missing or empty:
  * a declared page nobody built is a broken publish, not an absent one.
  * `--cause state` runs only the state-derived ones (what an e2e job reading the
  * beans and todos projections needs after `state:mount`).
@@ -58,6 +59,22 @@
  * roots lives here — so a root that has the prerequisite (the folio-assistant
  * index) runs it exactly as before, and any other non-zero exit still fails.
  *
+ * ## Why consumers first
+ *
+ * A `checkout` artefact is, by the B1 rule, computed over the instances ABOVE
+ * the one that serves it — the ones that `need` it. When one of those builds
+ * part of its own tree at publish, the artefact below reads that output, so
+ * its writer must run after it. Measured 2026-10-15: smart-trust's `docs/`
+ * (`smart-trust:pages`) is built at publish, and cat-harness's
+ * `docs/_data/harness.json` (`docs:harness`) gives smart-trust a folio link
+ * and a rail scope only when that directory exists. In index order
+ * cat-harness ran first, so one clean `derive:publish` published the platform
+ * site with smart-trust as a landing-page section and no rail scope, and
+ * `foreign-site-scope.test.ts` went red or green with whichever concurrent
+ * build had reached `smart-trust:pages` first (cat-harness-tools PR #298, run
+ * 38734014626). The other direction does not arise: an instance above reads a
+ * lower layer at the checkout's pins, which is committed, never built here.
+ *
  * ```
  * bun run cat derive:publish            # run every writer
  * bun run cat derive:publish --list     # print what would run, run nothing
@@ -71,6 +88,7 @@ import { join, resolve } from "node:path";
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { dirname } from "node:path";
@@ -97,9 +115,25 @@ export interface DeclaredArtefact {
   because: "checkout" | "state";
 }
 
-/** Every instance's `builtAtPublish`, instances dependency-first (the order `readTree` gives), entries as declared. */
+/**
+ * The order instances' publish-time writers run in: every instance before the
+ * ones it `needs` (see "Why consumers first" above). It is the reverse of the
+ * dependency-first order `flattenDependencies` gives, so it is a function of
+ * the declared `needs` alone, never of the index's listing order.
+ */
+export function writingOrder(repoRoot = REPO_ROOT): string[] {
+  const all = readInstances(repoRoot);
+  const names = new Set(all.map((i) => i.name));
+  const flat = flattenDependencies(all.map((i) => ({ id: i.name, needs: (i.needs ?? []).filter((n) => names.has(n)), fatal: false })));
+  if (flat.problems.length > 0) {
+    throw new Error(`derive:publish: the instance needs graph is broken — ${flat.problems.map((p) => p.detail).join("; ")}`);
+  }
+  return flat.order.map((s) => s.id).reverse();
+}
+
+/** Every instance's `builtAtPublish`, instances consumers first ({@link writingOrder}), entries as declared. */
 export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state"): DeclaredArtefact[] {
-  const order = readTree(repoRoot).map((i) => i.name);
+  const order = writingOrder(repoRoot);
   const roots = new Map(readInstances(repoRoot).map((i) => [i.name, i.root] as const));
   const out: DeclaredArtefact[] = [];
   for (const name of order) {
