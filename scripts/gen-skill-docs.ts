@@ -583,7 +583,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // caught it: `tools.test.ts`'s deliberately INVERTED
   // `expect(s.has("confirm-harness")).toBe(false)`, and `kg-export.test.ts`'s
   // `a Tool satisfying a sibling's skill links into the SIBLING's document` —
-  // `#tool/discuss` stopped pointing into bootstrap's document the moment this
+  // the `discuss` Tool's `satisfies` stopped pointing into bootstrap's document the moment this
   // instance claimed the skill. Removing the key rather than rekeying it is
   // the fix, because the key WAS the lure: `discoverGroups` throws on an id
   // with no heading and never on a heading with no id, so a stale one is

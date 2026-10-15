@@ -28,6 +28,24 @@ import {
   resolveCoveragePath,
   siteDirFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+
+/**
+ * The REAL repository's audit, made once per root and shared by every test
+ * that reads it (bean `lpcs`, measured 2026-10-15). `auditAll` over the index
+ * took 6.7–7.4 s per call on both the base and head sides of a pull request,
+ * so each of the seven tests that ran it on its own was a coin-flip against
+ * bun's 5 s default timeout and went red on PRs that touched nothing here
+ * (cat-harness-tools#337, #360). The same shape as
+ * `check-declaration-filename.test.ts`: share the result, and give the one
+ * test that pays for it a measured budget.
+ */
+const CORPUS_TIMEOUT = 60_000;
+const realAudits = new Map<string, ReturnType<typeof auditAll>>();
+function realAuditAll(repo: string): ReturnType<typeof auditAll> {
+  let r = realAudits.get(repo);
+  if (!r) realAudits.set(repo, (r = auditAll(repo)));
+  return r;
+}
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /**
@@ -273,10 +291,10 @@ describe("bootstrap's exemption is by layer, and is a second criterion not a hol
     // Asserting against the instances discovery really finds turns that
     // silence into a failure.
     const repo = resolve(import.meta.dir, "..", "..", "..");
-    const real = auditAll(repo).map((r) => r.instance);
+    const real = realAuditAll(repo).map((r) => r.instance);
     const matched = [...VISUALISER_EXEMPT_INSTANCES].filter((n) => real.includes(n));
     expect(matched.length).toBeGreaterThan(0);
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("an unmet OBLIGATION outranks an unanswered question", () => {
@@ -403,11 +421,11 @@ describe("this repository", () => {
     // Against the REAL repo, like `instanceRootsIn`'s own test: a fixture
     // would keep passing if the axis silently stopped seeing an instance.
     const repo = resolve(import.meta.dir, "..", "..", "..");
-    const rs = auditAll(repo);
+    const rs = realAuditAll(repo);
     expect(rs.map((r) => r.instance)).toContain("cat-harness");
     expect(rs.map((r) => r.instance)).toContain("bootstrap");
     expect(rs.every((r) => r.verdict === "checked")).toBe(true);
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () => {
@@ -467,9 +485,9 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
     // zero and a check that stopped looking are indistinguishable from a
     // deleted test, and this is the fix's only durable witness.
     const repo = resolve(import.meta.dir, "..", "..", "..");
-    const offenders = auditAll(repo).filter((r) => r.readme !== undefined).map((r) => r.instance);
+    const offenders = realAuditAll(repo).filter((r) => r.readme !== undefined).map((r) => r.instance);
     expect(offenders.sort()).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 
   it("the AGENT half is asked about too, and no instance is mute any more", () => {
     // Measured 2026-09-20 when the criterion was added: ten of eleven
@@ -484,9 +502,9 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
     // to zero and a check that stopped looking are indistinguishable once the
     // assertion is gone, and this is the fix's only durable witness.
     const repo = resolve(import.meta.dir, "..", "..", "..");
-    const mute = auditAll(repo).filter((r) => r.agentInstructions !== undefined).map((r) => r.instance);
+    const mute = realAuditAll(repo).filter((r) => r.agentInstructions !== undefined).map((r) => r.instance);
     expect(mute.sort()).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("the own-docs axis — an instance owes documentation of its own", () => {
@@ -702,19 +720,19 @@ describe("this repository declares nothing that fails to resolve — bean `bsay`
     // `…/glossary/glossary/`. Both were REPORTED the whole time and the check
     // exited 0, because `--strict` fails on the 20-item `undeclared` backlog
     // too and so could not be turned on.
-    const unresolvable = auditAll(repo)
+    const unresolvable = realAuditAll(repo)
       .flatMap((r) => r.findings.filter((f) => f.unmet === "unresolvable"))
       .map((f) => `${f.instance}/${f.directory}/${f.criterion}: ${f.detail}`);
     expect(unresolvable).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 
   it("and the check is still REPORTING findings, so the line above is not vacuous", () => {
     // Without this, an `auditAll` that returned nothing at all would satisfy
     // the assertion above — the failure mode an advisory axis is most likely
     // to have, as this file's own header says.
-    const undeclared = auditAll(repo).flatMap((r) => r.findings.filter((f) => f.unmet === "undeclared"));
+    const undeclared = realAuditAll(repo).flatMap((r) => r.findings.filter((f) => f.unmet === "undeclared"));
     expect(undeclared.length).toBeGreaterThan(0);
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 /**

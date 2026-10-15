@@ -77,7 +77,10 @@ export function rootGateSet(root: string, opts: { instances?: readonly string[];
   const script = opts.script ?? RUN_GATES;
   if (!existsSync(script)) throw new GateSetUndetermined(`${script} is absent`);
   const args = ["-I", script, resolve(root), "--list", ...(opts.instances ?? []).flatMap((i) => ["--instance", i])];
-  const r = spawnSync("python3", args, { encoding: "utf-8", maxBuffer: 1 << 24 });
+  // Never a shard: a `GATE_SHARD` left in the environment would narrow the set
+  // `audit:coverage` and `qa:refresh` measure the root against (bean `lpcs`).
+  const { GATE_SHARD: _shard, ...env } = process.env;
+  const r = spawnSync("python3", args, { encoding: "utf-8", maxBuffer: 1 << 24, env });
   if (r.error) throw new GateSetUndetermined(`python3 could not be run (${r.error.message})`);
   let parsed: RootGateSet;
   try {

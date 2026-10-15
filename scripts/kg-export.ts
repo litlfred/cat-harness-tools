@@ -124,6 +124,7 @@ import { auditSchemaNodes } from "./schema-nodes.js";
 import { loadSpecs } from "./external-schemas.js";
 import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
+import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
 import { declaresOwnCanonical, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,
@@ -2040,16 +2041,31 @@ export function firstSentence(s: string, max = 260): string {
 /** One answer per skill per build: roles and Tools ask about the same names many times. */
 const skillHomes = new Map<string, string>();
 
-function skillHome(base: string, ownDoc: string, skillId: string, scope: CorpusScope = corpusScopeFor(ROOT)): string {
-  const key = `${base}\0${ownDoc}\0${scope}\0${skillId}`;
+/**
+ * `ownRoot` is the instance whose document `ownDoc` IS. It was always `ROOT`
+ * until instance exports began collecting Tools (bean `tdir`): smart-base's
+ * `extract-dak` satisfies a skill smart-base declares, and asking cat-harness
+ * "do you have it?" first would either keep a cat-harness-only skill in
+ * smart-base's document (a dangling link) or send smart-base's own skill to a
+ * sibling's. So the "this document wins" test asks the instance being
+ * exported, and every OTHER instance, the host included, is a sibling.
+ */
+function skillHome(
+  base: string,
+  ownDoc: string,
+  skillId: string,
+  scope: CorpusScope = corpusScopeFor(ROOT),
+  ownRoot: string = ROOT,
+): string {
+  const key = `${base}\0${ownDoc}\0${scope}\0${resolve(ownRoot)}\0${skillId}`;
   const hit = skillHomes.get(key);
   if (hit !== undefined) return hit;
-  const home = skillHomeUncached(base, ownDoc, skillId, scope);
+  const home = skillHomeUncached(base, ownDoc, skillId, scope, ownRoot);
   skillHomes.set(key, home);
   return home;
 }
 
-function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope: CorpusScope): string {
+function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope: CorpusScope, ownRoot: string): string {
   // THIS DOCUMENT WINS WHENEVER IT HAS THE SKILL, and that check has to come
   // first rather than fall out of iteration order.
   //
@@ -2060,9 +2076,9 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   // because those instances declare ids cat-harness also declares, and the
   // published-paths walk in `kg-export.test.ts` caught it as two documents
   // the deploy does not write.
-  if (knownSkills(ROOT, scope).has(skillId)) return ownDoc;
+  if (knownSkills(ownRoot, scope).has(skillId)) return ownDoc;
   for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
-    if (resolve(instance) === resolve(ROOT)) continue;
+    if (resolve(instance) === resolve(ownRoot)) continue;
     if (!knownSkills(instance).has(skillId)) continue;
     // `publishedIdentity`, not `exportIdentity` with this base: an instance
     // that declares its own `canonicalUrl` is published under it, so passing
@@ -2072,17 +2088,53 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   return ownDoc;
 }
 
-function collectTools(doc: string, base: string, problems: string[], scope: CorpusScope = corpusScopeFor(ROOT)): Node[] {
+/**
+ * The Tool nodes of the instance at `root` — the host's when `root` is `ROOT`,
+ * a sibling's when `collectInstanceNodes` asks.
+ *
+ * ## Why it takes the root (bean `tdir`)
+ *
+ * It read `toolsOf(ROOT)` and nothing called it outside the host's branch of
+ * `buildExport`, so `kg-export --instance ./smart-base` published 0 of
+ * smart-base's 11 Tools and `--instance ./fhir-harness` 0 of its 32 —
+ * measured 2026-10-15, both exports otherwise complete and silent about it.
+ * Discovery (`tools/discover.ts`, bean `p0za`) had already made the Tools of
+ * every instance loadable; the export simply never asked for them.
+ *
+ * ## Two bases, and they are not the same question
+ *
+ * - `base` is where THIS document is published: a Tool's `maintains` and
+ *   `satisfies` resolve against it, as every other node's links do.
+ * - `typeBase` is where the I/O type vocabulary is published, which is the
+ *   HARNESS's base for every instance (`harnessBase` in `discover.ts`).
+ *   Minting smart-base's port types against smart-base's canonical named
+ *   `http://smart.who.int/base/tool-types/...`, a document WHO does not
+ *   publish (bean `p0za`). `undefined` lets discovery use the harness's
+ *   declared base; a preview passes its own `--base-url`.
+ */
+function collectTools(
+  doc: string,
+  base: string,
+  problems: string[],
+  scope: CorpusScope = corpusScopeFor(ROOT),
+  root: string = ROOT,
+  // No default: a default parameter fires on an explicit `undefined`, which
+  // is exactly what an instance export passes to mean "the harness's base",
+  // and it then minted smart-base's types under `http://smart.who.int/base/`.
+  typeBase: string | undefined,
+): Node[] {
   let defs;
   try {
-    // The SAME base the document is published against — see tools/index.ts.
-    defs = toolsOf(ROOT, base);
+    defs = toolsOf(root, typeBase);
   } catch (e) {
     problems.push(`tools/ did not load: ${e instanceof Error ? e.message : String(e)}`);
     return [];
   }
   return defs.map((t) => ({
-    "@id": makeIri(doc, "tool", t.id),
+    // Its OWN document, `tools/<id>.jsonld` beside this one — not a fragment
+    // of it (bean `tdir`, owner 2026-10-15: "a seperate jsonld for each Tool
+    // w/ its own IRI"). `writeToolDocuments` publishes the bytes there.
+    "@id": toolIri(doc, t.id),
     "@type": termIri("Tool"),
     name: t.id,
     title: t.title,
@@ -2095,7 +2147,13 @@ function collectTools(doc: string, base: string, problems: string[], scope: Corp
     // an environment descriptor (`{ runtime: ["go"], network: true }`) whose
     // values are not capability ids. Two relations, two terms.
     requirements: t.requires,
-    satisfies: t.satisfies.map((k) => makeIri(skillHome(base, doc, k, scope), "skill", k)),
+    // A sibling's skill is re-homed against the deploy's own base when this
+    // is an instance export (`typeBase`, the `--base-url`), never against
+    // this instance's canonical: `publishedIdentity` would otherwise mint a
+    // sibling's document under `http://smart.who.int/base/`.
+    satisfies: t.satisfies.map((k) =>
+      makeIri(skillHome(root === ROOT ? base : (typeBase ?? ""), doc, k, scope, root), "skill", k),
+    ),
     // `satisfiesSkillNames` was here. REMOVED as denormalised: every
     // `satisfies` link lands on a Skill node carrying that same name, and none
     // of them dangles — see {@link skillHome} for the ones that land in
@@ -2152,7 +2210,7 @@ function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkou
   try {
     for (const t of toolsOf(ROOT, base)) {
       for (const m of t.maintains ?? []) {
-        keeper.set(m.source, (keeper.get(m.source) ?? []).concat(makeIri(doc, "tool", t.id)));
+        keeper.set(m.source, (keeper.get(m.source) ?? []).concat(toolIri(doc, t.id)));
       }
     }
   } catch {
@@ -2570,7 +2628,7 @@ const LINK_TERMS = [
  */
 export const COLLECTOR_SCOPE = {
   /** Reads only DECLARED directories, so any instance with a declaration works. */
-  generic: ["skills", "processes", "declaredRoles", "declaration"],
+  generic: ["skills", "processes", "declaredRoles", "declaration", "tools"],
   /** Reads nothing instance-specific at all — the global graph-typology registry. */
   universal: ["graphTypologies"],
   /**
@@ -2579,11 +2637,15 @@ export const COLLECTOR_SCOPE = {
    * - `registry` — `.claude/skills/<group>` as a path literal.
    * - `packages` — `package-manifest.json` plus directories named in code.
    * - `schemas` — `auditSchemaNodes`, which audits this repo's `schemas/`.
-   * - `tools` — **compile-time `import`** of `tools/index.ts`. This one is the
-   *   sharpest: it is not root-hardcoded, it is IMPORT-BOUND, so threading a
-   *   root through it reaches nothing. It would need the tool set passed in.
+   *
+   * `tools` WAS listed here as import-bound: a compile-time `import` of
+   * `tools/index.ts`, which a root could not redirect. Discovery (bean
+   * `p0za`) replaced that import with a read of each instance's declared
+   * `tools` graph, and `collectTools` takes the root (bean `tdir`), so it is
+   * generic now. The stale entry is what let `--instance` exports publish no
+   * Tools while `omitted` said only that they had not been looked for.
    */
-  instanceBound: ["registry", "packages", "schemas", "tools"],
+  instanceBound: ["registry", "packages", "schemas"],
 } as const;
 
 /**
@@ -2631,6 +2693,10 @@ export async function collectInstanceNodes(
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
     ...collectDeclaredAssets(doc, problems, root),
+    // Every declared `tools` graph is read by discovery, so Tools are generic
+    // (bean `tdir`). The type vocabulary is the harness's: `baseUrl`, the
+    // deploy's own `--base-url`, or the harness's declared base when none.
+    ...collectTools(doc, base, problems, corpusScopeFor(root), root, baseUrl),
   ];
   // A LINK TO AN OMITTED COLLECTOR'S NODES MUST NOT BE EMITTED.
   //
@@ -3306,7 +3372,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectRegistryNodes(docIri, problems),
           ...collectPackages(docIri, problems, scope),
           ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope)),
-          ...collectTools(docIri, base, problems, scope),
+          ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
           ...collectExternalSchemas(docIri),
           ...collectGraphTypologies(),
@@ -3337,6 +3403,12 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
       // document, so they are byte-identical in both graphs — giving them an
       // `alternateOf` pointing at a canonical fragment that does not exist was
       // a broken link generated by a blanket loop.
+      // A Tool is its own document BESIDE this one (bean `tdir`), so its
+      // alternate is the same Tool beside the canonical document.
+      if (n["@type"] === termIri("Tool") && id === toolIri(docIri, String(n.name))) {
+        n.alternateOf = toolIri(canonicalIri, String(n.name));
+        continue;
+      }
       if (!id.startsWith(`${docIri}#`)) continue;
       n.alternateOf = `${canonicalIri}#${id.slice(docIri.length + 1)}`;
     }
@@ -3677,6 +3749,68 @@ async function sidecarMode(mode: "check" | "write", baseUrl: string | undefined)
   return bad > 0 ? 1 : 0;
 }
 
+/**
+ * One JSON-LD document per Tool, written beside the instance document —
+ * bean `tdir`.
+ *
+ * The owner, 2026-10-15: *"i want a seperate jsonld for each Tool w/ its own
+ * IRI"* and *"dont externalize the json on main, only when rendered in
+ * gh-pages."* So these are BUILD OUTPUT, written where `--out` is (the deploy
+ * passes `./_site/<stub>.jsonld`, `instance-exports.ts`
+ * `./_site/<stub>/<stub>.jsonld`; the default is the gitignored `_kg/`), and
+ * never committed beside the source: the source of a Tool is its
+ * `tools/<id>/<id>.ts`.
+ *
+ * ## Where, and why that is the IRI
+ *
+ * `toolIri(docIri, id)` is `<dir of the document IRI>/tools/<id>.jsonld`, and
+ * the document is served at `--out`, so `<dir of --out>/tools/<id>.jsonld` is
+ * where that IRI resolves. Same relation `instance-exports.ts` uses for
+ * `schema/` beside each document. A node whose `@id` is NOT that IRI (a
+ * document-relative export has no `/`) is skipped rather than written to a
+ * guessed path.
+ *
+ * ## What is in one
+ *
+ * The SAME `@context` as the instance document, the Tool node as the single
+ * node of its `@graph`, and `partOf` naming the instance document, so a
+ * reader holding only the Tool can get back to the graph it came from. The
+ * staging stamp is carried over from `published` for the reason it is on the
+ * schemas: "which build is this from" is the question with most riding on it.
+ *
+ * Linking a Tool to its QA sidecar (`kg-qa`, subject kind `tool`) is NOT
+ * done here: the sidecars live on the `cat/<instance>/qa-reports` state branch
+ * and no step publishes them at a URL a node could name, so a link would be
+ * one this site does not serve. That is a follow-up for whichever bean
+ * publishes `test/results/kg-qa/tools/<id>.kg-qa.json`.
+ *
+ * @returns the paths written
+ */
+export function writeToolDocuments(published: Record<string, unknown>, out: string): string[] {
+  const docIri = String(published["@id"]);
+  const graph = (published["@graph"] ?? []) as Node[];
+  const stamp = Object.fromEntries(
+    Object.entries(stagingFields()).filter(([k]) => k in published),
+  );
+  const written: string[] = [];
+  for (const n of graph) {
+    if (n["@type"] !== termIri("Tool") || typeof n.name !== "string") continue;
+    if (n["@id"] !== toolIri(docIri, n.name) || !String(n["@id"]).includes("/")) continue;
+    const file = join(dirname(out), toolDocumentPath(n.name));
+    mkdirSync(dirname(file), { recursive: true });
+    const doc = {
+      "@context": published["@context"],
+      "@id": n["@id"],
+      partOf: docIri,
+      ...stamp,
+      "@graph": [n],
+    };
+    writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
+    written.push(file);
+  }
+  return written;
+}
+
 if (import.meta.main) {
   const arg = (flag: string): string | undefined => {
     const i = process.argv.indexOf(flag);
@@ -3752,8 +3886,10 @@ if (import.meta.main) {
   // `test/results/` below instead. See `publishedDocument`.
   const published = { ...publishedDocument(data), ...stagingFields() };
   writeFileSync(out, JSON.stringify(published, null, 2) + "\n");
+  const toolDocs = writeToolDocuments(published, out);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
+  if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);
   for (const [t, n] of Object.entries(data.counts).sort()) console.log(`  ${String(n).padStart(5)}  ${t}`);
   console.log(`  ${String(data["@graph"].length).padStart(5)}  total`);
 
