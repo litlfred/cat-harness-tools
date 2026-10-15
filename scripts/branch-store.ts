@@ -1435,9 +1435,27 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
   }
   const store = BranchStore.open(loc.branch, { repoRoot, ...storeOptionsFor(loc, repoRoot, opts.store) });
   const prior = markerFor(repoRoot, loc);
+  // A marker lives in the per-worktree git directory, but a COPY of a linked
+  // worktree shares that directory: its `.git` file names the same one. The
+  // marker then records the other checkout's mount, and re-mounting here
+  // would delete that checkout's files and move its marker away from it — so
+  // a later push from there reads every file as deleted (`emptyingReason`).
+  // Refused while the other mount is still on disk; a checkout that was moved
+  // leaves nothing behind and is re-mounted.
+  if (prior && resolve(prior.into) !== into && existsSync(prior.into)) {
+    return {
+      state: "refused",
+      reason:
+        `this worktree's marker for ${loc.id} records its mount at ${prior.into}, not ${into}: another checkout shares this git directory ` +
+        `(a copied linked worktree). Mounting here would delete that checkout's files; mount from there, or make this checkout its own worktree (\`git worktree add\`)`,
+    };
+  }
   if (prior) {
     const pending = localChanges(prior, repoRoot);
-    if (pending.length) return { state: "refused", reason: `${prior.into} has ${pending.length} unpushed change(s); push or discard them before re-mounting` };
+    // A mount that is GONE — every file deleted, nothing written — holds no
+    // edit to lose: re-mounting it is the remedy `emptyingReason` names, so it
+    // is not refused as "unpushed changes".
+    if (pending.length && !emptyingReason(prior, pending)) return { state: "refused", reason: `${prior.into} has ${pending.length} unpushed change(s); push or discard them before re-mounting` };
   } else if (existsSync(into)) {
     // Files the checkout itself ignores are local scratch, not a competing
     // copy: `fsh-guts/logs/` is written by the log writer whether or not the
@@ -1505,6 +1523,47 @@ export function pendingMountChanges(id: string | TipLocation, opts: MountOptions
 }
 
 /**
+ * Why `changes` must not be sent for the mount `m`: they delete EVERY file the
+ * mount was read with and write nothing, or `undefined` when they do not.
+ *
+ * A push like that leaves the declared path absent on the branch, which
+ * {@link mountTip} reports as a `miss` — so every later `state:mount`, and the
+ * publish builds that run it, fails. It is also what a mount that is GONE
+ * looks like: {@link walkFiles} finds nothing under an absent directory, so a
+ * mount deleted from under its marker (a layer re-laid over it, a cleaned
+ * worktree) reads as "the editor deleted every file". On 2026-10-15 one bare
+ * `state:push` from such a checkout emptied five graphs on four repositories
+ * at once (cat-harness-tools `2fba7961c0cb`, cat-harness `294128d08c45`, …),
+ * and the docs site stopped publishing.
+ *
+ * A miss is never an empty mount on the way in; an empty mount is never a
+ * deletion of the graph on the way out. Retiring a graph is a steward act on
+ * its branch, not an edit.
+ */
+export function emptyingReason(m: MountMarker, changes: readonly Change[]): string | undefined {
+  const recorded = Object.keys(m.files).length;
+  if (recorded === 0 || changes.some((c) => c.content !== null)) return undefined;
+  if (changes.length < recorded) return undefined;
+  const why = existsSync(m.into) ? `${m.into} holds no files` : `${m.into} does not exist`;
+  return (
+    `${why}, so this push would delete all ${recorded} file(s) of ${m.key ?? m.id} on ${m.branch} and leave ` +
+    `${m.branchPath ?? m.path} absent there, which every later \`state:mount\` reports as a miss. Nothing was sent. ` +
+    `If the mount was removed from under its marker, re-mount it (\`bun run cat state:mount\`); retiring a graph is a steward act on its branch, not a push`
+  );
+}
+
+/**
+ * {@link emptyingReason} for a mounted location, or `undefined` when it is
+ * not mounted or its pending changes do not empty it. For a `--dry-run` that
+ * must refuse what the push would refuse.
+ */
+export function mountEmptyingReason(id: string | TipLocation, opts: MountOptions = {}): string | undefined {
+  const repoRoot = opts.repoRoot ?? gitTopLevel();
+  const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
+  return m ? emptyingReason(m, localChanges(m, repoRoot)) : undefined;
+}
+
+/**
  * Where a declared directory's content can be READ right now (bean `9c7h`).
  *
  * The declared path alone does not answer that once a directory lives on a
@@ -1564,9 +1623,11 @@ export function pushMount(id: string | TipLocation, message: string, opts: Mount
   if (!m) return { state: "refused", reason: `${name} is not mounted in ${repoRoot}` };
   // The MARKER says where the mount came from, not the declaration: a mount
   // pushes back to the repository it was read from.
-  const store = BranchStore.open(m.branch, { repoRoot, ...storeOptionsFor(m, repoRoot, opts.store) });
   const changes = localChanges(m, repoRoot);
   if (!changes.length) return { state: "unchanged", reason: `no local edits under ${m.into}`, branch: m.branch, attempts: 0 };
+  const emptying = emptyingReason(m, changes);
+  if (emptying) return { state: "refused", reason: emptying };
+  const store = BranchStore.open(m.branch, { repoRoot, ...storeOptionsFor(m, repoRoot, opts.store) });
   const w = store.write(changes, message);
   if (w.state === "pushed" && w.commit) {
     const onBranch = m.branchPath ?? m.path;
