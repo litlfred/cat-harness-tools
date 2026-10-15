@@ -121,8 +121,56 @@ env:
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || (inputs.mode == 'layer' && github.event.repository.name || '') }}
 
 jobs:
+  # The folio-assistant commit every job checks out, resolved ONCE per run.
+  #
+  # `index-ref` names a branch, and a branch moves. Each job used to check it
+  # out when it started, so whenever the index was re-pinned while a run was
+  # queued, base and head mounted DIFFERENT layer pins and the compare job
+  # charged the difference to the PR. fhir-harness#86, run 38695852469: head
+  # checked out claude/nifty-johnson-w3mspn at 07:01:56Z (a3fa2e5), the branch
+  # moved to 725d8f8 at 07:04:45Z, base checked out at 07:08Z, and
+  # `render:bpmn:check`, red at the first pins and green at the second, was
+  # reported as a NEW FAILURE of a PR that touched no diagram. One sha, read
+  # here and passed to both sides, makes the two sides judge the same index.
+  # Index mode needs none of this: the caller IS the root, at the PR's merge
+  # commit.
+  pin:
+    name: Resolve the index commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - id: resolve
+        env:
+          MODE: ${{ inputs.mode }}
+          REF: ${{ inputs.index-ref }}
+        run: |
+          set -euo pipefail
+          if [ "$MODE" = "index" ]; then
+            echo "index mode: the caller is the root; nothing to resolve"
+            echo "sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s' "$REF" | grep -Eq '^[0-9a-f]{40}$'; then
+            sha="$REF"
+          else
+            # A branch, else an annotated tag's commit, else a light tag.
+            refs="$(git ls-remote https://github.com/litlfred/folio-assistant.git "refs/heads/$REF" "refs/tags/$REF" "refs/tags/$REF^{}")"
+            sha="$(printf '%s\n' "$refs" | awk -v r="refs/heads/$REF" '$2 == r { print $1 }')"
+            [ -n "$sha" ] || sha="$(printf '%s\n' "$refs" | awk -v r="refs/tags/$REF^{}" '$2 == r { print $1 }')"
+            [ -n "$sha" ] || sha="$(printf '%s\n' "$refs" | awk -v r="refs/tags/$REF" '$2 == r { print $1 }')"
+          fi
+          if [ -z "$sha" ]; then
+            echo "::error::index-ref '$REF' names no branch or tag of litlfred/folio-assistant"
+            exit 2
+          fi
+          echo "index-ref $REF is $sha for every job of this run"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   typecheck:
     name: Typecheck
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -142,7 +190,9 @@ jobs:
           # `index-ref` default, `main`, and judged main against its own
           # first parent instead of the PR (smart-immunizations#35, run
           # 38633852296: `-B main refs/remotes/origin/main`).
-          ref: ${{ inputs.mode == 'index' && github.ref || inputs.index-ref }}
+          # Layer mode: the one commit the `pin` job resolved `index-ref` to,
+          # never the ref itself, so base and head mount the same pins.
+          ref: ${{ inputs.mode == 'index' && github.ref || needs.pin.outputs.sha }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
       - &setup-bun
@@ -243,6 +293,7 @@ jobs:
 
   run:
     name: ${{ matrix.side }} — tests and gates
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
