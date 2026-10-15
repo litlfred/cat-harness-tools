@@ -233,11 +233,12 @@ describe("the reader's saved scheme reaches a standalone viewer — bean `dc64`"
     expect(js).toContain(`var SCHEME_KEY = "${schemeKey()}";`);
   });
 
-  test("a script in the HEAD applies only a stored light or dark, before first paint", () => {
+  test("a script in the HEAD decides the scheme before first paint — stored, else the OS, else light (2026-10-15)", () => {
     const out = withSavedScheme(PAGE("<p>x</p>"));
     const head = out.slice(0, out.search(/<\/head>/i));
     expect(head).toContain(`localStorage.getItem(${JSON.stringify(schemeKey())})`);
-    expect(head).toContain('s==="light"||s==="dark"');
+    expect(head).toContain('s="light"');
+    expect(head).toContain('(prefers-color-scheme: dark)');
     expect(head).toContain('setAttribute("data-fa-scheme",s)');
   });
 

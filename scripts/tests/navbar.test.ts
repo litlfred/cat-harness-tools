@@ -656,7 +656,7 @@ describe("the document index — `documentIndexOf`", () => {
     const graphs = region(html!, "fa-nav-graphs");
     expect(graphs).toContain('href="#a"');
     const open = [...graphs.matchAll(/<details class="fa-nav-group"( open)?><summary>[\s\S]*?<span class="fa-nav-label">([^<]*)</g)];
-    expect(open.filter((m) => m[1]).map((m) => m[2])).toEqual(["Contents"]);
+    expect(open.filter((m) => m[1]).map((m) => m[2])).toEqual(["On this page"]);
   });
 
   it("is named for the visualiser when the caller says which", () => {
@@ -1256,8 +1256,8 @@ describe("a page's declared section label", () => {
     const railed = injectRail(page('<meta name="fa-visualiser-label" content="WHO SMART Trust">'), { instance: "x", toRoot: "..", links: [] })!;
     expect(railed).toContain("WHO SMART Trust");
   });
-  it("is absent when undeclared, and the section stays Contents", () => {
+  it("is absent when undeclared, and the section is \"On this page\" (the theme sidebar's name, 2026-10-15)", () => {
     expect(visualiserLabelOf(page(""))).toBeUndefined();
-    expect(injectRail(page(""), { instance: "x", toRoot: "..", links: [] })!).toContain("Contents");
+    expect(injectRail(page(""), { instance: "x", toRoot: "..", links: [] })!).toContain("On this page");
   });
 });

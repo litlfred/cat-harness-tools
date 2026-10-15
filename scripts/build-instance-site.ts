@@ -37,6 +37,9 @@
  *     `avatars:css`), compose-docs --shell,
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
+ *  4b. the writer of every declared visualiser page the site source does not hold yet — the
+ *     checkout's own instance and every instance it needs — as its Tool declares it, pointed at
+ *     the site source by the Tool's `site` input (`visualiser-writers.ts`; owner, 2026-10-15)
  *
  * `--pre`, `--source-step`, `--site-step` and `--final-step` take package SCRIPT NAMES, never commands: the
  * Tool contract admits no input that can carry a shell payload (check:tools),
@@ -84,9 +87,11 @@ import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { chromeLayers } from "./compose-docs.ts";
+import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
 import { siteCoverageShortfall } from "./site-coverage.ts";
+import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -152,6 +157,8 @@ export interface BuildOptions {
   coverage?: "refuse" | "report";
   /** Root files the built site must hold before it is published (a step's promise, checked). */
   require?: string[];
+  /** The visualiser-writer step, replaceable in a test; {@link writeMissingVisualisers} by default. */
+  writeVisualisers?: (root: string, source: string, opts: { staging?: boolean }) => unknown;
 }
 
 /** The `require`d root files a built site does not hold. */
@@ -178,33 +185,10 @@ export function stepCommand(root: string, name: string): string {
 }
 
 /**
- * How a chrome writer runs: `bun run cat <writer>` where the checkout's own
- * package.json has the `cat` runner, else `run-script.ts` from here, as
- * {@link stepCommand} does for a step. dth-hrh had no root `cat` script, so
- * `bun run cat avatars:css` ran /usr/bin/cat and refused the build (owner's
- * repin window, 2026-10-15); `init-folio` writes none either.
+ * How a chrome writer runs: `lib/script-command.ts`, shared with the
+ * visualiser writers. Re-exported here, where its callers first found it.
  */
-export function writerCommand(root: string, writer: string): string[] {
-  return ownsScript(root, "cat") ? ["bun", "run", "cat", writer] : ["bun", "run", join(import.meta.dir, "run-script.ts"), writer];
-}
-
-/**
- * Whether the checkout's own package.json defines the script. An IG repository
- * may carry a package.json for its own tooling (smart-immunizations' holds
- * only fsh-sushi) that names none of the site's steps: `bun run <step>` there
- * fails "Script not found", so the step goes through the mounted layers'
- * script table instead, as it does where there is no package.json at all.
- */
-function ownsScript(root: string, name: string): boolean {
-  const file = join(root, "package.json");
-  if (!existsSync(file)) return false;
-  try {
-    const scripts = (JSON.parse(readFileSync(file, "utf-8")) as { scripts?: Record<string, unknown> }).scripts;
-    return typeof scripts?.[name] === "string";
-  } catch {
-    return false;
-  }
-}
+export { writerCommand };
 
 /**
  * The site-relative pages a step listed as carrying the content's own links:
@@ -369,13 +353,28 @@ export function ownerRepo(url: string): { owner: string; repo: string } | undefi
   return m ? { owner: m[1]!, repo: m[2]! } : undefined;
 }
 
-/** Jekyll's build config: the instance's own, minus the remote theme it cannot fetch. */
+/**
+ * The front-matter default that gives a page with no `layout:` the theme's
+ * `default`. GitHub Pages does this itself (`jekyll-default-layout`, which the
+ * `github-pages` gem always enables), so the platform site never needed it; a
+ * local `jekyll build` does not, and a viewer page written for the platform
+ * site (`gen-methodologies-viz.ts`, `gen-processes-viz.ts`, …: front matter and
+ * a body, no layout) came out of this build as a bare fragment — no chrome, no
+ * `<body>` for the staging banner. The path `""` is the least specific scope,
+ * so a page's own `layout:` and every narrower default still win.
+ */
+export const DEFAULT_LAYOUT = ['  - scope:', '      path: ""', "    values:", "      layout: default"];
+
+/** Jekyll's build config: the instance's own, minus the remote theme it cannot fetch, plus {@link DEFAULT_LAYOUT}. */
 export function buildConfig(configYml: string): string {
-  return configYml
+  const lines = configYml
     .split("\n")
     .filter((l) => !/^remote_theme:/.test(l))
-    .map((l) => l.replace(/^(\s*)- jekyll-remote-theme\s*$/, "$1- jekyll-seo-tag"))
-    .join("\n");
+    .map((l) => l.replace(/^(\s*)- jekyll-remote-theme\s*$/, "$1- jekyll-seo-tag"));
+  const at = lines.findIndex((l) => /^defaults:\s*$/.test(l));
+  if (at >= 0) lines.splice(at + 1, 0, ...DEFAULT_LAYOUT);
+  else lines.push(...(lines.at(-1) === "" ? [] : [""]), "defaults:", ...DEFAULT_LAYOUT, "");
+  return lines.join("\n");
 }
 
 /** The override layered on top: what the declaration and the remote say, never a guess. */
@@ -725,6 +724,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   // every mount stays as the lock pins it.
   const restoreHarnessData = pinGeneratedData(root, mounted);
   const s = JSON.stringify(site);
+  const writeVisualisers = o.writeVisualisers ?? writeMissingVisualisers;
   try {
     const has = PROFILE_STEPS[o.profile ?? "folio"];
     if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
@@ -736,6 +736,12 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
     for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${JSON.stringify(docs)}`, root, env);
+    // Every declared visualiser page the site owes (its own instance and every one it needs),
+    // written by the writer its Tool declares, into the site source — the pages a recipe
+    // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
+    // that fails or cannot be pointed at a site is said here, and its pages are judged
+    // below by the coverage guard, which refuses or reports as the recipe says.
+    writeVisualisers(root, docs, { staging: Boolean(staging) });
 
     // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
     const harness = join(root, "cat-harness");

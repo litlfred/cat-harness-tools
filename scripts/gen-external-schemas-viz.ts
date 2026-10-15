@@ -64,6 +64,7 @@ import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { declaredDirectory, localSiteDir } from "./lib/local-site-dir.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "external-schemas-viewer";
@@ -445,7 +446,7 @@ if (import.meta.main) {
     page(specs, users, inUse, fileHref),
     VIEWER_TOOL,
   );
-  const docsBase = localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO);
+  const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const out = join(docsBase, PAGE);
 
   if (check) {

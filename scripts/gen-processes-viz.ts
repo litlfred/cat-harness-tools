@@ -91,6 +91,7 @@ import { processPresentations, type Presentation } from "./process-presentations
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteArg, sitePageAt } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "processes-viewer";
@@ -867,7 +868,8 @@ if (import.meta.main) {
     console.error("no visualiser declared for the `processes` graph — nothing to write");
     process.exit(1);
   }
-  const out = join(baseDocsDir(REPO), rel);
+  const into = siteArg();
+  const out = join(into ?? baseDocsDir(REPO), rel);
   const rows = await processRows();
   // VACUITY GUARD. A sweep that found nothing reports a clean corpus, which is
   // the `dh4f` shape this page's own Findings section exists to raise — and the
@@ -885,7 +887,8 @@ if (import.meta.main) {
   const presented = new Map<string, Presentation[]>();
   for (const root of instanceRoots(REPO)) {
     for (const [source, list] of await processPresentations(root)) {
-      presented.set(relative(REPO, join(root, source)), list);
+      // Into a site being built, only the presenting pages that site carries are linked.
+      presented.set(relative(REPO, join(root, source)), into === undefined ? list : list.filter((p) => sitePageAt(into, p.href)));
     }
   }
   const pages = new Map<string, string>([[out, html]]);

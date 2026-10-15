@@ -72,6 +72,7 @@ import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import {
+  RAIL_SECTION_LABELS,
   navbarOpenInputHtml,
   navbarRegionsHtml,
   type NavGroup,
@@ -248,7 +249,7 @@ function model(
 ): NavbarModel {
   const shown = harnesses.filter((h) => h.instantiated === true);
   const group: NavGroup = {
-    label: "Harnesses",
+    label: RAIL_SECTION_LABELS.harnesses,
     icon: "▦",
     items: shown.map((h) => harnessRow(h, staging)),
     collapsible: true,

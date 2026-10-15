@@ -49,7 +49,10 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     // A committed page under the page locale — or, until the committed site is
     // regenerated (folio-assistant#2527), at the address without it.
     const committed = (route: string) => new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?${route.replace(/\./g, "\\.")}$`);
-    expect(resolveFor("cat-harness", "tools")).toMatch(committed("cat-harness/tools/index.md"));
+    // Covered by kind with per-instance sub-graphs (bean 1nu0): each instance's
+    // tools directory opens its own instance's page.
+    expect(resolveFor("cat-harness", "tools")).toMatch(committed("cat-harness/tools/cat-harness/index.md"));
+    expect(resolveFor("smart-base", "tools")).toMatch(committed("cat-harness/tools/smart-base/index.md"));
     expect(resolveFor("cat-harness", "processes")).toMatch(committed("cat-harness/processes/index.md"));
     // A corpus-wide visualiser with per-instance sub-graphs opens the subject's view.
     expect(resolveFor("who-iris", "library")).toMatch(committed("cat-harness/library/who-iris/index.html"));
