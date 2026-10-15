@@ -43,7 +43,6 @@ import {
   checkoutRootFor,
   publishedAssetPath,
   readDeclaration,
-  repoRootFor,
   siteDirFor,
   sourceLinks,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -103,8 +102,25 @@ function contributorSiteDir(contributor: string | undefined): string {
   return join(ROOT, siteDirFor(ROOT));
 }
 
+/**
+ * The checkout the landing instance lives in, and the only place its themes'
+ * owners are looked for.
+ *
+ * `repoRootFor(ROOT)` until 2026-10-15, which is `dirname`: right while the
+ * landing was a NESTED instance (cat-harness in the monorepo), and an escape
+ * the moment it is the checkout-root instance — a folio such as smart-ra,
+ * whose landing is the repository itself. There it answered the directory
+ * HOLDING the clone, so `themeByRef` read every sibling clone's declaration on
+ * the machine and a stranger's invalid one (`qou.json`, next to smart-ra in
+ * `~/space_cats`) failed this build. `dh4f` in the other direction: not a
+ * clean run over nothing, a failed run over somebody else's tree. The forge
+ * URL went the same way, read off a parent with no `.git`, so every source
+ * link was silently dropped.
+ */
+const CHECKOUT = checkoutRootFor(ROOT);
+
 /** The forge this checkout points at, or `undefined` when it has none. */
-const REPO_URL = detectRepoUrl(repoRootFor(ROOT));
+const REPO_URL = detectRepoUrl(CHECKOUT);
 
 /**
  * The branch the source links point at.
@@ -236,7 +252,7 @@ const stickies = readLandingStickies(ROOT).map((st) => {
   // By REFERENCE, owner first (bean `v8n5`): a card citing another
   // instance's theme resolves against that instance's declared themes, and a
   // bare id against the contributing instance's own, then the platform's.
-  const found = themeByRef(st.theme, repoRootFor(ROOT), st.contributedBy);
+  const found = themeByRef(st.theme, CHECKOUT, st.contributedBy);
   const theme = found.ok ? found.theme : undefined;
   const resolved = theme ? resolveThemeBackdrop(theme, decl?.images) : undefined;
   const art: Record<string, unknown> = {};
