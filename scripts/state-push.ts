@@ -84,6 +84,12 @@ export interface PushOptions {
   store?: BranchStoreOptions;
   /** Retag the mounted beans before splicing (default true). */
   retag?: boolean;
+  /**
+   * Push a graph whose mount is EMPTY while its branch holds files, deleting
+   * every file on it. Off by default: an empty mount is far more often a
+   * mount that was cleared than a graph someone means to delete (bean `sp0e`).
+   */
+  allowEmpty?: boolean;
 }
 
 /**
@@ -182,6 +188,11 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         continue;
       }
       const changes = pendingMountChanges(loc, { repoRoot: root });
+      const emptied = changes === undefined || opts.allowEmpty ? undefined : emptiedGraph(root, loc, changes);
+      if (emptied !== undefined) {
+        graphs.push({ ...base, state: "refused", reason: emptied, changes });
+        continue;
+      }
       const message = opts.message ?? `state: ${loc.id} from its mount`;
       const w = pushMount(loc, message, { repoRoot: root, store: opts.store });
       if (w.state === "refused") graphs.push({ ...base, state: "refused", reason: w.reason });
@@ -257,6 +268,36 @@ export function pushState(opts: PushOptions = {}): PushResult {
   return retag ? { ...result, retag } : result;
 }
 
+/**
+ * Why a push of `loc` would delete the WHOLE graph, or `undefined` when it
+ * would not (bean `sp0e`).
+ *
+ * A mount whose every file is gone while the branch still holds them looks,
+ * to the splice, exactly like an editor who deleted every file — so it is
+ * pushed, and the branch is emptied. Measured 2026-10-15: an index worktree
+ * whose instance directories were cleared and remounted lost the state graphs
+ * mounted inside them, and one `state:push` for a single bean edit emptied
+ * five branches (`<instance>/health` x4 and `marks`). Deleting a whole graph
+ * is rare and deliberate, so it takes `--allow-empty`; anything else is
+ * refused for that graph only, and the other graphs still push.
+ */
+export function emptiedGraph(root: string, loc: TipLocation, changes: readonly Change[]): string | undefined {
+  let held: number;
+  try {
+    held = Object.keys(markerFor(root, loc)?.files ?? {}).length;
+  } catch {
+    return undefined;
+  }
+  if (held === 0) return undefined;
+  if (changes.some((c) => c.content !== null)) return undefined;
+  if (changes.filter((c) => c.content === null).length < held) return undefined;
+  return (
+    `the mount of ${locationKey(loc)} is empty while its branch holds ${held} file(s): ` +
+    `pushing would delete the whole graph. Re-mount it (\`bun run cat state:mount\`), ` +
+    `or pass \`--allow-empty\` if deleting every file is meant`
+  );
+}
+
 /** Whether `loc` has a mount here; a marker that cannot be read is not one (the fan-out reports it). */
 function isMounted(root: string, loc: TipLocation): boolean {
   try {
@@ -316,7 +357,7 @@ export function report(r: PushResult): string {
 }
 
 /** The flags `state:push` understands; `-m` and `--id` each take one value. */
-const FLAGS = new Set(["--dry-run", "--json"]);
+const FLAGS = new Set(["--dry-run", "--json", "--allow-empty"]);
 const VALUED = new Set(["-m", "--id"]);
 
 /**
@@ -347,13 +388,14 @@ if (import.meta.main) {
   const bad = unknownArgs(argv);
   if (bad.length > 0) {
     console.error(`state:push: not understood: ${bad.join(", ")}. Nothing was pushed.`);
-    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--json]");
+    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--allow-empty] [--json]");
     process.exit(2);
   }
   const at = argv.indexOf("-m");
   const i = argv.indexOf("--id");
   const r = pushState({
     dryRun: argv.includes("--dry-run"),
+    allowEmpty: argv.includes("--allow-empty"),
     message: at === -1 ? undefined : argv[at + 1],
     id: i === -1 ? undefined : argv[i + 1],
   });
