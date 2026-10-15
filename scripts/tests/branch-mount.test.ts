@@ -307,6 +307,25 @@ describe("push", () => {
     expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
   });
 
+  test("a copy of a linked worktree, sharing its git directory, cannot re-mount over the original's mount", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    // The copy: same files, and a `.git` FILE naming the original's git directory.
+    const copy = `${root}-copy`;
+    made.push(copy);
+    spawnSync("cp", ["-a", root, copy]);
+    rmSync(join(copy, ".git"), { recursive: true, force: true });
+    writeFileSync(join(copy, ".git"), `gitdir: ${join(root, ".git")}\n`);
+    const r = mountTip(LOC, { ...opts, repoRoot: copy });
+    expect(r.state).toBe("refused");
+    if (r.state === "refused") expect(r.reason).toContain("shares this git directory");
+    // The original's files and marker are untouched, so its push still has nothing to send.
+    expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
+    expect(readMarker(root, "fsh-guts")!.into).toBe(join(root, "fsh-guts"));
+    expect(pushMount("fsh-guts", "x", opts).state).toBe("unchanged");
+  });
+
   test("deleting all but one file, or replacing every file, is an edit and still pushes", () => {
     const f = fixture();
     const { root, opts } = f.checkout("a");

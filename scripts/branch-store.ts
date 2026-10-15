@@ -1435,6 +1435,21 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
   }
   const store = BranchStore.open(loc.branch, { repoRoot, ...storeOptionsFor(loc, repoRoot, opts.store) });
   const prior = markerFor(repoRoot, loc);
+  // A marker lives in the per-worktree git directory, but a COPY of a linked
+  // worktree shares that directory: its `.git` file names the same one. The
+  // marker then records the other checkout's mount, and re-mounting here
+  // would delete that checkout's files and move its marker away from it — so
+  // a later push from there reads every file as deleted (`emptyingReason`).
+  // Refused while the other mount is still on disk; a checkout that was moved
+  // leaves nothing behind and is re-mounted.
+  if (prior && resolve(prior.into) !== into && existsSync(prior.into)) {
+    return {
+      state: "refused",
+      reason:
+        `this worktree's marker for ${loc.id} records its mount at ${prior.into}, not ${into}: another checkout shares this git directory ` +
+        `(a copied linked worktree). Mounting here would delete that checkout's files; mount from there, or make this checkout its own worktree (\`git worktree add\`)`,
+    };
+  }
   if (prior) {
     const pending = localChanges(prior, repoRoot);
     // A mount that is GONE — every file deleted, nothing written — holds no
