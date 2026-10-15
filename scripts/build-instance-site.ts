@@ -353,13 +353,28 @@ export function ownerRepo(url: string): { owner: string; repo: string } | undefi
   return m ? { owner: m[1]!, repo: m[2]! } : undefined;
 }
 
-/** Jekyll's build config: the instance's own, minus the remote theme it cannot fetch. */
+/**
+ * The front-matter default that gives a page with no `layout:` the theme's
+ * `default`. GitHub Pages does this itself (`jekyll-default-layout`, which the
+ * `github-pages` gem always enables), so the platform site never needed it; a
+ * local `jekyll build` does not, and a viewer page written for the platform
+ * site (`gen-methodologies-viz.ts`, `gen-processes-viz.ts`, …: front matter and
+ * a body, no layout) came out of this build as a bare fragment — no chrome, no
+ * `<body>` for the staging banner. The path `""` is the least specific scope,
+ * so a page's own `layout:` and every narrower default still win.
+ */
+export const DEFAULT_LAYOUT = ['  - scope:', '      path: ""', "    values:", "      layout: default"];
+
+/** Jekyll's build config: the instance's own, minus the remote theme it cannot fetch, plus {@link DEFAULT_LAYOUT}. */
 export function buildConfig(configYml: string): string {
-  return configYml
+  const lines = configYml
     .split("\n")
     .filter((l) => !/^remote_theme:/.test(l))
-    .map((l) => l.replace(/^(\s*)- jekyll-remote-theme\s*$/, "$1- jekyll-seo-tag"))
-    .join("\n");
+    .map((l) => l.replace(/^(\s*)- jekyll-remote-theme\s*$/, "$1- jekyll-seo-tag"));
+  const at = lines.findIndex((l) => /^defaults:\s*$/.test(l));
+  if (at >= 0) lines.splice(at + 1, 0, ...DEFAULT_LAYOUT);
+  else lines.push(...(lines.at(-1) === "" ? [] : [""]), "defaults:", ...DEFAULT_LAYOUT, "");
+  return lines.join("\n");
 }
 
 /** The override layered on top: what the declaration and the remote say, never a guess. */
