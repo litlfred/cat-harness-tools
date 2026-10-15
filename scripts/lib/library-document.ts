@@ -111,7 +111,15 @@ export interface DocumentView {
    * than "0 pages" and "the PDF carries no outline" (litlfred/dth-hrh).
    */
   variant: "pdf" | "notebook" | "text";
-  pages: number;
+  /**
+   * The source's page count, or `null` when the ingestion recorded none. An
+   * older ingestion (smart-base `9789241511766-eng`, page granularity) has no
+   * `source.pages` and no `pages[]`, and `0` read as "an empty PDF" on the
+   * page (owner, 2026-10-15: "(0 pages)"). Unknown is not zero.
+   */
+  pages: number | null;
+  /** The last page a section reaches, when the count is unknown: what the sections DO say. */
+  pagesCovered?: number;
   tocSource: string | null;
   tocMethod: string | null;
   toc: DocTocEntry[];
@@ -333,7 +341,7 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
     id,
     title: s.metadata?.title ?? null,
     variant: read.variant,
-    pages: s.source?.pages ?? 0,
+    pages: s.source?.pages ?? (Array.isArray(s.pages) && s.pages.length ? s.pages.length : null),
     tocSource: s.toc_source ?? null,
     tocMethod: d.toc_inferred_method ?? null,
     toc,
@@ -341,6 +349,10 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
     checks: {},
     withheld,
   };
+  if (view.pages == null) {
+    const last = Math.max(0, ...sections.map((x) => x.pageEnd ?? x.pageStart ?? 0));
+    if (last > 0) view.pagesCovered = last;
+  }
   if (kj) view.keywords = kw(kj.document);
   if (Array.isArray(s.pages)) {
     view.pageLabels = s.pages.map((p) => ({
@@ -545,7 +557,11 @@ function renderDocument(id, d, err){
   var tab = DOC_TABS.filter(function(t){ return t[0] === DOC_TAB; })[0] || DOC_TABS[0];
   var whole = d.links ? ' <span class="doc-actions" data-src="' + esc(d.links.dir) + '" data-block="' + esc(id) + '"><a data-fa-link="source">source</a> ' +
     '<a data-fa-link="feedback" title="Give feedback on this document (opens a GitHub issue)">📣 feedback</a></span>' : '';
-  var size = d.variant && d.variant !== "pdf" ? d.sections.length + ' sections' : d.pages + ' pages';
+  /* An unknown page count is said as unknown, never as "0 pages". */
+  var size = d.variant && d.variant !== "pdf" ? d.sections.length + ' sections'
+    : d.pages ? d.pages + ' pages'
+    : d.pagesCovered ? 'page count not recorded; sections reach page ' + d.pagesCovered
+    : 'page count not recorded';
   el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + size + ')</span>' + whole + '</h2>' +
     '<div class="seg" role="tablist" aria-label="Document view">' + DOC_TABS.map(function(t){
       return '<button type="button" role="tab" aria-selected="' + (t[0] === tab[0]) + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>';

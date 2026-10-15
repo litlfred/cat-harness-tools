@@ -15,7 +15,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import {
   avatarCopies,
@@ -31,6 +31,9 @@ import {
 import { entryGraphSitePath } from "../lib/library-entry-graphs.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import type { LibraryGraph } from "../library-graph.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf } from "../lib/library-source.ts";
+import { readEntryDocument } from "../lib/library-document.ts";
+import { VIEWER_PATH } from "../pdf-viewer.ts";
 
 const SITE = "/site";
 const DATA = join(SITE, "assets", "library");
@@ -125,5 +128,119 @@ describe("which instances a site composes (owner, 2026-10-15)", () => {
     const repo = checkout({ a: { name: "a" }, b: { name: "b" } });
     expect(composedInstanceRoots(repo)).toBeUndefined();
     expect(inComposition(undefined, repo, "b/library/x")).toBe(true);
+  });
+});
+
+/**
+ * A page-granularity `structure.json` of the shape smart-base's
+ * `9789241511766-eng` carries: no `source.pages`, no `pages[]`, one section per page.
+ */
+function pageGranular(id: string, n: number): Record<string, unknown> {
+  return {
+    _schema: "pdf-structure/v1",
+    doc_id: id,
+    source: { file: `${id}.pdf`, sha256: "0".repeat(64), bytes: 1, mtime: null, mimetype_sniffed: "application/pdf", mimetype_source: "magic-bytes", text_source: "embedded" },
+    toc_source: "none",
+    granularity: "page",
+    metadata: { title: null, docinfo: {} },
+    sections: Array.from({ length: n }, (_, k) => ({ id: `page-${k + 1}`, number: null, title: `Page ${k + 1}`, level: 1, page_start: k + 1, page_end: k + 1, n_chars: 1, n_words: 1 })),
+  };
+}
+
+/**
+ * Owner, 2026-10-15: the [source] link of smart-base's `9789241511766-eng`
+ * opened `github.com/litlfred/cat-harness/blob/main/smart-base/library/…` — a
+ * 404, because it was built from the HANDLER's repository. An entry's links
+ * name the repository that HOLDS it, from the mount lock; and the entry page
+ * links its source PDF (through the PDF viewer) and its KG files there.
+ */
+describe("an entry's repository links name the repository that holds it", () => {
+  const sha = "a".repeat(40);
+  const repo = mkdtempSync(join(tmpdir(), "lib-forge-"));
+  // A remote mount whose instance sits at `smart-base/` in its own repository (upstreamRoot).
+  writeFileSync(
+    join(repo, "index.lock.json"),
+    JSON.stringify({
+      $schema: "cat-harness-mount-lock/v1",
+      mounts: [{ harness: "smart-base", repository: "o/smart-base", ref: sha }],
+      instances: [{
+        instance: "smart-base", repository: "o/smart-base", sha, upstreamRoot: "smart-base", path: "smart-base", via: "smart-base",
+        pinnedBy: "declared", declaration: { file: "smart-base.json", sha256: "0".repeat(64) },
+        directories: [{ id: "library", path: "smart-base/library", upstreamPath: "smart-base/library", treeDigest: "0".repeat(64), files: 1 }],
+      }],
+    }),
+  );
+  const dir = "smart-base/library/e1";
+  mkdirSync(join(repo, dir, "sections"), { recursive: true });
+  mkdirSync(join(repo, dir, "blocks"), { recursive: true });
+  writeFileSync(join(repo, dir, "structure.json"), "{}");
+  // The source, held in the checkout's own uploads queue as an intake.
+  mkdirSync(join(repo, "uploads", "e1"), { recursive: true });
+  writeFileSync(join(repo, "uploads", "e1", "e 1.pdf"), "%PDF");
+  writeFileSync(join(repo, "uploads", "e1", "intake.json"), JSON.stringify({ doc_id: "e1", files: [{ path: "meta.pdf", sha256: "1".repeat(64) }, { path: "e 1.pdf", sha256: "f".repeat(64) }] }));
+  const entry = { id: "e1", dir, sourceFile: "e 1.pdf", sourceSha256: "f".repeat(64) };
+  const uploads = [{ kind: "intake" as const, path: "uploads/e1", ingestedBy: "e1", docId: "e1" }];
+
+  test("a mounted entry is in the mounted repository, under its upstream root — not the handler's", () => {
+    expect(forgeAt(repo, dir, "o/cat-harness")).toEqual({ repo: "o/smart-base", path: "smart-base/library/e1" });
+    // A path no mount covers is the checkout's own.
+    expect(forgeAt(repo, "uploads/e1", "o/host")).toEqual({ repo: "o/host", path: "uploads/e1" });
+    expect(forgeAt(repo, "uploads/e1", undefined)).toBeUndefined();
+  });
+
+  test("the Document panel's [source] and [feedback] are built in that repository", () => {
+    writeFileSync(join(repo, dir, "structure.json"), JSON.stringify(pageGranular("e1", 1)));
+    const at = forgeAt(repo, dir, "o/cat-harness")!;
+    const d = readEntryDocument(join(repo, dir), "e1", { links: { repo: at.repo, dir: at.path } });
+    expect(d?.links).toEqual({ repo: "o/smart-base", branch: "main", dir: "smart-base/library/e1" });
+  });
+
+  test("the source file is found in the intake by its sha256", () => {
+    expect(sourceFileOf(repo, entry, uploads)).toBe("uploads/e1/e 1.pdf");
+    expect(sourceFileOf(repo, { ...entry, sourceSha256: "" }, uploads)).toBe("uploads/e1/e 1.pdf");
+    expect(sourceFileOf(repo, entry, [])).toBeUndefined();
+  });
+
+  const viewerHref = relative(SHELL, join(SITE, VIEWER_PATH));
+  const links = entryRepoLinks({ repoRoot: repo, dir, source: sourceFileOf(repo, entry, uploads), checkoutRepo: "o/host", viewerHref });
+  const by = (label: string): string => links.find((l) => l.label === label)!.href;
+
+  test("a PDF opens in the site's PDF viewer, pointed at the raw file in its repository", () => {
+    const raw = "https://raw.githubusercontent.com/o/host/main/uploads/e1/e%201.pdf";
+    expect(by("e 1.pdf")).toBe(`${viewerHref}?src=${encodeURIComponent(raw)}`);
+    expect(resolve(SHELL, by("e 1.pdf").split("?")[0]!)).toBe(join(SITE, VIEWER_PATH));
+    expect(by("e 1.pdf (raw)")).toBe(raw);
+  });
+
+  test("a non-PDF source links to the file directly", () => {
+    writeFileSync(join(repo, dir, "notes.docx"), "x");
+    const l = entryRepoLinks({ repoRoot: repo, dir, source: `${dir}/notes.docx`, checkoutRepo: "o/host", viewerHref });
+    expect(l[0]).toMatchObject({ label: "notes.docx", href: "https://raw.githubusercontent.com/o/smart-base/main/smart-base/library/e1/notes.docx" });
+    expect(l.some((x) => x.href.includes("viewer.html"))).toBe(false);
+  });
+
+  test("the KG files link into the entry's own repository", () => {
+    expect(by("structure.json")).toBe("https://github.com/o/smart-base/blob/main/smart-base/library/e1/structure.json");
+    expect(by("sections/")).toBe("https://github.com/o/smart-base/tree/main/smart-base/library/e1/sections");
+    expect(by("blocks/")).toBe("https://github.com/o/smart-base/tree/main/smart-base/library/e1/blocks");
+  });
+
+  test("the entry page draws them beside the published manifest", () => {
+    const all = entrySources({ site: SITE, dataDir: DATA, shellDir: SHELL, instance: "smart-base", entry: { id: "e1" }, manifest: true, files: [], repo: links });
+    expect(all.map((l) => l.label)).toEqual(["manifest.jsonld", "e 1.pdf", "e 1.pdf (raw)", "structure.json", "sections/", "blocks/", "e1.doc.json", "e1.json"]);
+  });
+
+  test("a withheld entry links none of it", () => {
+    expect(entryRepoLinks({ repoRoot: repo, dir, source: "uploads/e1/e 1.pdf", checkoutRepo: "o/host", viewerHref, withheld: true })).toEqual([]);
+  });
+});
+
+describe("an unknown page count is not zero (owner, 2026-10-15: \"(0 pages)\")", () => {
+  test("a page-granularity ingestion with no source.pages reads null, and says how far its sections reach", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lib-pages-"));
+    writeFileSync(join(dir, "structure.json"), JSON.stringify(pageGranular("x", 3)));
+    const d = readEntryDocument(dir, "x")!;
+    expect(d.pages).toBeNull();
+    expect(d.pagesCovered).toBe(3);
   });
 });

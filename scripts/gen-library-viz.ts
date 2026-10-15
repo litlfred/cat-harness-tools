@@ -57,7 +57,10 @@ import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEnt
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
-import { EDIT_LINKS_RUNTIME } from "../src/core/edit-links.ts";
+import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
+import { detectRepoUrl } from "../src/core/git-refs.ts";
+import { VIEWER_PATH } from "./pdf-viewer.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -90,7 +93,12 @@ const check = process.argv.includes("--check");
  * URL pattern under it is the same declared route.
  */
 const SITE_ARG = parseArgs({ args: process.argv.slice(2), options: { site: { type: "string" } }, strict: false }).values.site;
-/** The GitHub repository the entries' source and feedback links point into. */
+/**
+ * This harness's own repository. NOT where an entry's links point: an entry
+ * is held by its own instance, in that instance's repository, which
+ * `forgeAt` reads from the mount lock (`lib/library-source.ts`). This is the
+ * fallback for a path no mount covers when the checkout's origin is unknown.
+ */
 const LINK_REPO = (() => {
   const d = readDeclaration(ROOT) as { livesAt?: { repository?: string }; repository?: string } | undefined;
   return d?.livesAt?.repository ?? d?.repository;
@@ -1007,6 +1015,8 @@ export function entrySources(
     manifest: boolean;
     /** The sub-graph files published for it (`entryGraphFiles`; none for a withheld entry). */
     files: readonly EntryGraphFile[];
+    /** The source file and the KG files in the repository that holds the entry (`entryRepoLinks`). */
+    repo?: readonly RepoLink[];
   },
 ): SourceLink[] {
   const { site, shellDir, instance, entry: e } = o;
@@ -1019,6 +1029,7 @@ export function entrySources(
       href: at(entryGraphSitePath(instance, e.id, f.rel)),
       what: f.jsonld ? `${f.kind} sub-graph (JSON-LD)` : `${f.kind} sub-graph file`,
     })),
+    ...(o.repo ?? []),
     { label: basename(data.doc), href: hrefFrom(shellDir, data.doc), what: "document projection (JSON)" },
     { label: basename(data.blocks), href: hrefFrom(shellDir, data.blocks), what: "block projection (JSON)" },
     ...(e.avatar ? [{ label: basename(e.avatar.href), href: at(e.avatar.href.slice(1)), what: `avatar (${e.avatar.source})` }] : []),
@@ -1601,6 +1612,8 @@ if (import.meta.main) {
   // index, and never into the asset ("asset doesnt know about its
   // renderings"). See `entryView` for the rule.
   const roots = instanceRootRoutes(repoRoot);
+  // The checkout's own repository, for a path no mount covers.
+  const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || LINK_REPO;
   for (const e of g.entries) {
     e.view = entryView(e, roots, relative(site, join(pageDir, e.instance, e.id)).split(sep).join("/"));
   }
@@ -1632,9 +1645,12 @@ if (import.meta.main) {
   for (const e of g.entries) {
     // [source] and [feedback] on the document and each section (bean zcak).
     // No [edit]: an entry is frozen, and this instance materialises none.
+    // In the repository that HOLDS the entry, at its path there — never this
+    // harness's repository plus the checkout path (owner, 2026-10-15: a 404).
+    const at = forgeAt(repoRoot, e.dir, checkoutRepo);
     const doc = readEntryDocument(join(repoRoot, e.dir), e.id, {
       withheld: !!e.withheld,
-      ...(LINK_REPO ? { links: { repo: LINK_REPO, dir: e.dir } } : {}),
+      ...(at ? { links: { repo: at.repo, dir: at.path } } : {}),
     });
     // The entry's resolved title, not the page-1 guess in structure.json
     // (issue #1794: the guess is never a library entry's title).
@@ -1776,7 +1792,17 @@ if (import.meta.main) {
           id: e.id,
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
-          sources: entrySources({ site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files }),
+          sources: entrySources({
+            site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
+            repo: entryRepoLinks({
+              repoRoot,
+              dir: e.dir,
+              source: sourceFileOf(repoRoot, e, g.uploads),
+              checkoutRepo,
+              viewerHref: hrefFrom(shellDir, join(site, VIEWER_PATH)),
+              withheld: !!e.withheld,
+            }),
+          }),
         }),
       );
     }
