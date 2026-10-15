@@ -118,6 +118,10 @@ import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.t
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
+import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
+import { writePageLayout } from "./page-layout.ts";
+import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
 
 /** The platform's published site, no trailing slash: where a folio's own site links the platform's pages. */
@@ -669,6 +673,35 @@ export function navbarRowData(built: string): unknown {
 }
 
 /**
+ * The instances whose folio pages a page can be INSIDE (`railScopes` in
+ * `_data/harness.json`, sorted longest href first by `sync-docs-harness.ts`;
+ * issue #1902). The rail of a page under one of them lists that instance's
+ * Pages and Folders, as the theme sidebar's client did with `#fa-rail-scope`.
+ */
+export function railScopesOf(built: string): { name: string; href: string }[] {
+  const prefix = publishedDocsPrefix(REPO, built);
+  if (prefix === undefined) return [];
+  const data = join(REPO, prefix, "_data", "harness.json");
+  if (!existsSync(data)) return [];
+  try {
+    const d = JSON.parse(readFileSync(data, "utf-8")) as { railScopes?: { name?: unknown; href?: unknown }[] };
+    return (d.railScopes ?? []).flatMap((s) => (typeof s.name === "string" && typeof s.href === "string" ? [{ name: s.name, href: s.href }] : []));
+  } catch {
+    return [];
+  }
+}
+
+/** The page tree cut to the pages under `href` (a scope), keeping a branch that leads to one. */
+export function pagesUnder<T extends { href?: string; children?: readonly T[] }>(items: readonly T[], under: string): T[] {
+  return items.flatMap((i) => {
+    const kids = i.children ? pagesUnder(i.children, under) : [];
+    const inside = i.href !== undefined && i.href.startsWith(under);
+    if (!inside && kids.length === 0) return [];
+    return [{ ...i, ...(i.children ? { children: inside ? i.children : kids } : {}) }];
+  });
+}
+
+/**
  * The icon row on a FOLIO's site — its destinations scoped to that folio.
  *
  * The row's hrefs and folder paths are site-absolute (`/todos/`). On a FOLIO's
@@ -733,6 +766,41 @@ export function withPlatformUi(html: string, chromeRoot: string, platformBase?: 
   return withSavedScheme(html.slice(0, head) + tags + html.slice(head));
 }
 
+/** What else the rail pass may do beyond railing standalone pages. */
+export interface RailPassOptions {
+  /**
+   * The Jekyll SOURCE of the site (the composed docs directory). Given, the
+   * theme's own pages are railed as well, their `.side-bar` replaced, and
+   * every page's rail carries the site's Pages (owner, 2026-10-15, "folio
+   * rail everywhere", option A).
+   */
+  themeSource?: string;
+}
+
+/**
+ * The platform's generated DATA `docs-ui.js` reads, shipped with a foreign
+ * site beside {@link PINNED_CHROME_FILES} — owner, 2026-10-15, "Yes, ship
+ * with each site": a site never changes until it is republished. Site-relative
+ * paths, the same on the platform's site and on the copy; `docs-ui.js` reads
+ * them from `<meta name="fa-pinned-data">` ({@link withPinnedData}).
+ */
+export const PINNED_DATA_FILES: readonly string[] = [
+  "assets/css/themes.css",
+  "assets/css/avatars.css",
+  "assets/harness/tiles.json",
+  "assets/harness/glass-strip.json",
+  "assets/semantic-zoom.json",
+];
+
+/** The attribute marking the pinned-data declaration, so a second pass adds none. */
+export const PINNED_DATA_META = "fa-pinned-data";
+
+/** The page told that the platform DATA it reads is the site's own pinned copy, `toRoot` away. */
+export function withPinnedData(html: string, toRoot: string): string {
+  if (html.includes(`name="${PINNED_DATA_META}"`)) return html;
+  return html.replace(/<\/head>/i, `<meta name="${PINNED_DATA_META}" content="${toRoot.replace(/"/g, "&quot;")}"></head>`);
+}
+
 /**
  * The platform's chrome CODE a foreign site ships as its own pinned copy —
  * owner, 2026-10-15, "pinned copy per site": every site carries the shared
@@ -762,10 +830,13 @@ export const PINNED_CHROME_FILES: readonly string[] = [
  */
 export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS_ROOT): { copied: string[]; same: string[]; differing: string[] } {
   const out = { copied: [] as string[], same: [] as string[], differing: [] as string[] };
-  for (const rel of PINNED_CHROME_FILES) {
+  for (const rel of [...PINNED_CHROME_FILES, ...PINNED_DATA_FILES]) {
     const from = join(harnessRoot, siteFileFor(harnessRoot, rel));
-    if (!existsSync(from)) throw new Error(`pinPlatformChrome: the harness has no ${rel} (looked at ${from}) — the rail would link a file nobody shipped`);
-    const bytes = readFileSync(from);
+    // `avatars.css` is generated, not committed (`avatars:css`): a mount that
+    // has not run the writer is given its bytes from the same renderer.
+    const generated = !existsSync(from) && rel === "assets/css/avatars.css" ? Buffer.from(renderAvatarsCss()) : undefined;
+    if (!existsSync(from) && !generated) throw new Error(`pinPlatformChrome: the harness has no ${rel} (looked at ${from}) — the rail would link a file nobody shipped`);
+    const bytes = generated ?? readFileSync(from);
     const to = join(siteAbs, rel);
     if (existsSync(to)) {
       (readFileSync(to).equals(bytes) ? out.same : out.differing).push(rel);
@@ -866,8 +937,12 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
   mounts: readonly T[],
   docsPrefix: string | undefined,
   built: string,
+  opts: RailPassOptions = {},
 ): { injected: number; skipped: string[]; unpublished: { route: string; visualiser: string }[] } {
   const byInstance = new Map<string, T[]>();
+  // The same Pages and top bar as every other page of the site (owner, 2026-10-15).
+  const pageTree = opts.themeSource && existsSync(opts.themeSource) ? jekyllNavPages(opts.themeSource) : undefined;
+  const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
   for (const m of mounts) byInstance.set(m.name, [...(byInstance.get(m.name) ?? []), m]);
 
   const htmlUnder = (dir: string): string[] => {
@@ -959,7 +1034,10 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         : instantiatedHarnesses(built, toRoot);
       const before = readFileSync(file, "utf-8");
       const mark = instanceMark(built, m.name, toRoot);
-      const after = injectRail(before, {
+      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const rel = file.slice(siteAbs.length + 1);
+      const railed = injectRail(before, {
+        ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
         instance: named.harness ?? m.name,
         ...(named.site ? { homeLabel: named.site } : {}),
         toRoot,
@@ -971,10 +1049,11 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         navbarRow: ownSite ? rebaseNavbarRow(navbarRowData(built), PLATFORM_BASE, m.name) : navbarRowData(built),
         emitRailData: railDataWriter(siteAbs),
       });
-      if (after === undefined) {
+      if (railed === undefined) {
         skipped.push(file.slice(siteAbs.length + 1));
         continue;
       }
+      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) });
       // The docs pages' own locale chrome, on a page Jekyll never laid out (#2219).
       writeFileSync(file, m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after);
       injected++;
@@ -1255,12 +1334,25 @@ export function railStandalonePages(
   instanceName: string,
   mountRoutes: readonly string[],
   foreign?: ForeignSiteRail,
-): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; pinned?: ReturnType<typeof pinPlatformChrome> } {
+  opts: RailPassOptions = {},
+): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; replacedThemeSidebar: number; pinned?: ReturnType<typeof pinPlatformChrome> } {
   const skipped: string[] = [];
   let injected = 0;
   let alreadyNavigated = 0;
   let redirects = 0;
   let declined = 0;
+  let replacedThemeSidebar = 0;
+
+  // ONE RAIL ON EVERY PAGE (owner, 2026-10-15, option A): given the Jekyll
+  // source, the theme's own pages are railed too — their `.side-bar` is
+  // replaced by the rail, whose Pages section is the same tree, built here
+  // once (`lib/jekyll-pages-nav.ts`) and given to every page of the site.
+  const pageTree = opts.themeSource ? jekyllNavPages(opts.themeSource) : undefined;
+  // The theme's search, where the site publishes it: the top bar of a page
+  // the theme did not lay out searches the same index (`lib/site-bar.ts`).
+  const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
+  // A page inside an instance's folio pages is railed as that instance's (#1902).
+  const scopes = pageTree && !foreign ? railScopesOf(built) : [];
 
   const owned = (rel: string): boolean =>
     mountRoutes.some((r) => rel === r || rel.startsWith(`${r}/`)) ||
@@ -1282,7 +1374,9 @@ export function railStandalonePages(
       }
       if (!e.name.endsWith(".html") || owned(rel)) continue;
 
-      const before = readFileSync(abs, "utf-8");
+      const read = readFileSync(abs, "utf-8");
+      const themed = pageTree !== undefined && hasThemeSidebar(read);
+      const before = themed ? stripThemeSidebar(read) : read;
       if (NAVIGATED.test(before)) {
         alreadyNavigated++;
         continue;
@@ -1307,7 +1401,9 @@ export function railStandalonePages(
       const toRoot = depth === 0 ? "." : new Array(depth).fill("..").join("/");
       // A page of an `igSite` instance's own IG site (bean `mftp`) is THAT
       // instance's page: its name, mark and graphs, not the platform's.
-      const owner = foreign ? (foreign.instance ?? instanceName) : (igSiteOwner(rel.split("/")[0]!) ?? instanceName);
+      const here = `/${rel.replace(/(^|\/)index\.html$/, "$1")}`;
+      const scope = scopes.find((s) => here.startsWith(s.href));
+      const owner = foreign ? (foreign.instance ?? instanceName) : (igSiteOwner(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
       const named = railNames(built, owner);
       // The platform's links resolve against the platform's site; only home is this site's.
       const linkRoot = foreign?.platformBase ?? toRoot;
@@ -1330,7 +1426,10 @@ export function railStandalonePages(
           : instantiatedHarnesses(built, linkRoot);
       // The landing's mark is not this site's: a site with no instance of its own draws none.
       const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
-      const after = injectRail(before, {
+      // The page tree, cut to the instance's own pages when the page is inside one.
+      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
+      const railed = injectRail(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
         ...(homeLabel ? { homeLabel } : {}),
         toRoot,
@@ -1349,19 +1448,25 @@ export function railStandalonePages(
         // written once beside the rail's data rather than into each page
         // (2026-10-10 — 849 KB of 1.76 MB of railed HTML on one folio).
         ...(foreign ? { shareNavbarRow: true } : {}),
+        ...(pages && pages.length ? { pages, here } : {}),
       });
-      if (after === undefined) {
+      if (railed === undefined) {
         skipped.push(rel);
         continue;
       }
-      writeFileSync(abs, foreign ? withPlatformUi(after, toRoot, foreign.platformBase) : after);
+      // The top bar, the same on every page (owner, 2026-10-15: "Top bar, like IG sites").
+      const after = withSiteBar(railed, { toRoot, title: homeLabel ?? named.site ?? named.harness ?? owner, ...(themeSearch ? { search: themeSearch } : {}) });
+      writeFileSync(abs, foreign ? withPinnedData(withPlatformUi(after, toRoot, foreign.platformBase), toRoot) : after);
+      if (themed) replacedThemeSidebar++;
       injected++;
     }
   };
   if (existsSync(siteAbs)) walk(siteAbs);
   // The files those pages now link, shipped with them — only when a page was railed.
   const pinned = foreign && injected > 0 ? pinPlatformChrome(siteAbs) : undefined;
-  return { injected, alreadyNavigated, redirects, declined, skipped, ...(pinned ? { pinned } : {}) };
+  // The page layout the top bar is laid out by, beside the pages that link it.
+  if (injected > 0) writePageLayout(siteAbs);
+  return { injected, alreadyNavigated, redirects, declined, skipped, replacedThemeSidebar, ...(pinned ? { pinned } : {}) };
 }
 
 /**
@@ -2174,7 +2279,9 @@ async function main(): Promise<number> {
         `Rail links fall back to mount routes.`,
     );
   }
-  const railed = injectRails(siteAbs, mounts, docsPrefix, built);
+  const themeSource = arg("theme-source");
+  const railed = injectRails(siteAbs, mounts, docsPrefix, built, themeSource ? { themeSource: resolve(themeSource) } : {});
+  if (railed.injected > 0) writePageLayout(siteAbs);
   for (const u of railed.unpublished) {
     console.error(
       `  ? /${u.route}/ declares the visualiser ${u.visualiser}, which is not under ` +

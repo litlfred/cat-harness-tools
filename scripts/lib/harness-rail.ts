@@ -421,6 +421,12 @@ export function withNavbarRow(
 
 /** Stands for the site root inside shared data; each page puts back its own. */
 export const RAIL_ROOT = "@fa-rail-root@";
+/**
+ * Stands for the page's OWN site root inside shared data, when that is not
+ * {@link RAIL_ROOT} — a foreign site, whose rail links the platform's pages
+ * (`RAIL_ROOT`) and its own (its Pages, its own graphs) from one file.
+ */
+export const RAIL_TO_ROOT = "@fa-rail-to-root@";
 /** Where shared rail data is published, relative to the site root. */
 export const RAIL_DATA_DIR = "assets/navbar";
 /** The bundle that draws a rail from shared data. */
@@ -478,7 +484,8 @@ export function railSharedJson(o: RailOptions, root: string): string {
   };
   // Every root-relative value the caller composed starts `<root>/`; put the
   // placeholder there so the SAME data serves a page at any depth.
-  return JSON.stringify(shared).split(`"${root}/`).join(`"${RAIL_ROOT}/`);
+  const json = JSON.stringify(shared).split(`"${root}/`).join(`"${RAIL_ROOT}/`);
+  return o.toRoot === root ? json : json.split(`"${o.toRoot}/`).join(`"${RAIL_TO_ROOT}/`);
 }
 
 /** The shared data file's name and its script body. */
@@ -490,7 +497,7 @@ export function railDataAsset(json: string): { name: string; file: string; body:
 
 /** The rail's regions for one page, from its shared data — what `navbar.js` runs. */
 export function renderRailRegions(sharedJson: string, page: RailPage): string {
-  const shared = JSON.parse(sharedJson.split(RAIL_ROOT).join(page.root)) as RailShared;
+  const shared = JSON.parse(sharedJson.split(RAIL_TO_ROOT).join(page.toRoot).split(RAIL_ROOT).join(page.root)) as RailShared;
   // "You are here": the page's own row loses its link (a link to here is a
   // control that does nothing — `state-visualizer.test.ts`).
   const links =
@@ -505,7 +512,8 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
   const markHere = (items: readonly NavItem[]): NavItem[] =>
     items.map((item) => {
       const kids = item.children ? { children: markHere(item.children) } : {};
-      if (page.here === undefined || item.href !== `${page.root}${page.here}`) return { ...item, ...kids };
+      // The site's own pages are linked from the page's own root.
+      if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
       const { href: _here, ...rest } = item;
       return { ...rest, ...kids, current: true };
     });
