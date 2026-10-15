@@ -49,7 +49,7 @@ import {
 import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { tools } from "../tools/discover.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, toolTypeIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -144,7 +144,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
     title: "Tool I/O types",
     description:
       "The shared types a Tool's io.inputs/io.outputs reference by absolute IRI. " +
-      "Each is also published as its own document, tool-types/<Name>.schema.json, which is the IRI a port names. " +
+      "Each is also published as its own document, tool-types/<Name>.schema.json (its own IRI). " +
       "Generated from schemas/tool-types.ts, which is authoritative.",
     $defs: defs,
   };
@@ -155,7 +155,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
  * each with the `$id` a port's `schema` names — bean `tdir`.
  *
  * The owner, 2026-10-15: *"input ouput schemas should be their own files/json
- * schema when published w/ IRIs so can be referernced easy."* `toolTypeIri`
+ * schema when published w/ IRIs so can be referernced easy."* `toolTypeDocumentIri`
  * mints the IRI and `toolTypePath` the published path, from one definition in
  * `schemas/tool-types.ts`, so a port and the file it names cannot drift.
  *
@@ -187,7 +187,7 @@ export function buildToolTypeFiles(opts: SchemaExportOptions = {}): Array<[strin
       {
         $schema: "http://json-schema.org/draft-07/schema#",
         // Absolute or absent, as everywhere in this module.
-        ...(base ? { $id: toolTypeIri(base, name) } : {}),
+        ...(base ? { $id: toolTypeDocumentIri(base, name) } : {}),
         title: name,
         ...body,
       },

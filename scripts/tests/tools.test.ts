@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 
 import { tools } from "../../tools/discover.js";
 import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../check-tools.js";
 import { knownSkills as canonicalKnownSkills } from "../known-skills.js";
 import { buildExport } from "../kg-export.js";
@@ -193,7 +193,7 @@ describe("tools", () => {
     const combined = buildToolTypes({ baseUrl: BASE }).$defs as Record<string, Record<string, unknown>>;
     for (const [path, doc] of files) {
       const name = toolTypeNameOf(path)!;
-      expect(doc.$id).toBe(toolTypeIri(BASE, name));
+      expect(doc.$id).toBe(toolTypeDocumentIri(BASE, name));
       expect(doc.$id).toBe(`${BASE}/${path}`);
       // The same Zod, printed twice: the body is the combined document's.
       const { $schema: _a, $id: _b, title: _c, ...body } = doc;
@@ -261,7 +261,9 @@ describe("tools", () => {
     for (const t of toolNodes) {
       const io = t.io as { inputs: Array<{ schema: string }>; outputs: Array<{ schema: string }> };
       for (const port of [...io.inputs, ...io.outputs]) {
-        expect(port.schema.startsWith(`${STAGING}/tool-types/`)).toBe(true);
+        // Minted by toolTypeIri against the staging base, whichever form it
+        // has in this phase (fragment now, per-type document next; bean tdir).
+        expect(port.schema.startsWith(`${STAGING}/tool-types`)).toBe(true);
         expect(port.schema).toBe(toolTypeIri(STAGING, toolTypeNameOf(port.schema)!));
       }
     }
@@ -271,7 +273,7 @@ describe("tools", () => {
     const B = "https://example.invalid/other";
     for (const t of tools(B)) {
       for (const p of [...t.io.inputs, ...t.io.outputs]) {
-        expect(p.schema.startsWith(`${B}/tool-types/`)).toBe(true);
+        expect(p.schema.startsWith(`${B}/tool-types`)).toBe(true);
       }
     }
   });
