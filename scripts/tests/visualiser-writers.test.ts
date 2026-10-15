@@ -133,6 +133,22 @@ describe("writersFor and runVisualiserWriters", () => {
     expect(owed[0]!.visualisers.map((v) => v.visualiser)).toEqual(["qa"]);
   });
 
+  test("a Tool run for one instance at a time is run for each instance whose sub-graph page is owed (smart-trust, 2026-10-15)", () => {
+    // gen-ig-pages, bound to smart-base by its declaration, writes
+    // `artifact-index/<instance>/` only for the instance it is run for.
+    const ig: VisualiserWriter = { tool: "ig-pages", visualisers: [ref("sb", "artifact-index")], invoke: ["bun", "run", "g.ts"], siteFlag: "--site", instance: { flag: "--instance", root: "/r/sb" } };
+    const sub = (instance: string, instanceRoot: string): ExpectedPage => ({ ...page("sb", "artifact-index"), route: `en/sb/artifact-index/${instance}/`, instance, instanceRoot });
+    // Only another instance's page owed: one run, for THAT instance, and none for the declarer.
+    expect(writersFor([ig], [sub("smart-trust", "/co")]).map((w) => w.instance!.root)).toEqual(["/co"]);
+    // The declarer's own pages and another's: one run each, the declarer's first.
+    const both = writersFor([ig], [page("sb", "artifact-index"), sub("sb", "/r/sb"), sub("smart-trust", "/co")]);
+    expect(both.map((w) => w.instance!.root)).toEqual(["/r/sb", "/co"]);
+    expect(both.every((w) => w.visualisers.length === 1)).toBe(true);
+    const seen: string[][] = [];
+    runVisualiserWriters("/r", both, "/s", (argv) => (seen.push([...argv]), { kind: "ran" as const }));
+    expect(seen).toEqual([["bun", "run", "g.ts", "--instance", "/r/sb", "--site", "/s"], ["bun", "run", "g.ts", "--instance", "/co", "--site", "/s"]]);
+  });
+
   test("a failure, a decline and an unrunnable writer are returned for the caller to judge", () => {
     const seen: string[][] = [];
     const runs = runVisualiserWriters("/r", writers, "/s", (argv) => {

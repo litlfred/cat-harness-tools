@@ -162,12 +162,39 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
   ];
 }
 
-/** The writers of the expected pages in `pages`: each writer once, with only the visualisers it owes. */
+/**
+ * The writers of the expected pages in `pages`: each writer once, with only
+ * the visualisers it owes.
+ *
+ * A Tool run for ONE instance at a time (it declares an `instance` input) is
+ * run once per instance whose page is owed. `visualiserWriters` binds that
+ * input to the DECLARING harness, and such a writer draws a `subgraphs:
+ * "instance"` page only for the instance it is run for: `gen-ig-pages
+ * --instance <smart-base>` writes `smart-base/artifact-index/smart-base/` and
+ * never `…/smart-trust/`, so on smart-trust's own site that page was owed,
+ * never written, and the coverage gate refused the publish (2026-10-15). A
+ * sub-graph page of another instance is run for that instance's root; the
+ * declaring harness's run is kept only when one of its own pages is owed.
+ */
 export function writersFor(writers: readonly VisualiserWriter[], pages: readonly ExpectedPage[]): VisualiserWriter[] {
-  const owed = new Set(pages.map((p) => `${p.harness}/${p.visualiser}`));
-  return writers
-    .map((w) => ({ ...w, visualisers: w.visualisers.filter((v) => owed.has(`${v.harness}/${v.visualiser}`)) }))
-    .filter((w) => w.visualisers.length > 0);
+  const same = (v: VisualiserRef, p: ExpectedPage): boolean => v.harness === p.harness && v.visualiser === p.visualiser;
+  const out: VisualiserWriter[] = [];
+  for (const w of writers) {
+    const owed = pages.filter((p) => w.visualisers.some((v) => same(v, p)));
+    if (owed.length === 0) continue;
+    const drawing = (ps: readonly ExpectedPage[]): VisualiserRef[] => w.visualisers.filter((v) => ps.some((p) => same(v, p)));
+    if (w.instance === undefined) {
+      out.push({ ...w, visualisers: drawing(owed) });
+      continue;
+    }
+    const byRoot = new Map<string, ExpectedPage[]>();
+    for (const p of owed) {
+      const at = p.instanceRoot !== undefined ? resolve(p.instanceRoot) : w.instance.root;
+      byRoot.set(at, [...(byRoot.get(at) ?? []), p]);
+    }
+    for (const [at, ps] of byRoot) out.push({ ...w, visualisers: drawing(ps), instance: { ...w.instance, root: at } });
+  }
+  return out;
 }
 
 /** What one writer did. */

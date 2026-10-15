@@ -47,6 +47,12 @@ export interface ExpectedPage {
   visualiser: string;
   /** The instance sub-graph, for a `subgraphs: "instance"` view. */
   instance?: string;
+  /**
+   * That instance's root, absolute. A writer run for ONE instance at a time
+   * (a Tool with an `instance` input, `visualiser-writers.ts`) writes this
+   * page only when it is run for this root, not for the declaring harness's.
+   */
+  instanceRoot?: string;
   /** The same view at its address before the locale segment (`forwardingParts`). */
   legacyRoute: string;
   /**
@@ -69,13 +75,24 @@ function children(dir: string): { files: number; dirs: number } {
   }
 }
 
+/**
+ * The root of the instance a resolved directory belongs to: the checkout for a
+ * `repository`-scoped entry, else its absolute path with the declared path
+ * taken off (a member's `absPath` is its own root joined with the declarer's path).
+ */
+function rootOf(d: { absPath: string; path: string; scope?: string }, checkout: string): string {
+  if (d.scope === "repository") return resolve(checkout);
+  const up = d.path.split("/").filter((s) => s !== "" && s !== ".").map(() => "..");
+  return resolve(d.absPath, ...up);
+}
+
 /** The covered directories of one visualiser, with the instance each belongs to. */
-function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string }[] {
+function coveredDirectories(v: DeclaredVisualiser, checkout: string): { instance: string; instanceRoot: string; absPath: string }[] {
   return checkoutDirectories(v.harnessRoot, { stackedOn: v.harnessRoot })
     .filter((d) =>
       (v.coversKinds ?? []).some((k) => (d.graphTypologies as readonly string[]).includes(k)) ||
       ((v.covers ?? []) as readonly string[]).includes(d.id) && (d.member ?? d.declaredBy) === v.harness)
-    .map((d) => ({ instance: d.member ?? d.declaredBy, absPath: d.absPath }));
+    .map((d) => ({ instance: d.member ?? d.declaredBy, instanceRoot: rootOf(d, checkout), absPath: d.absPath }));
 }
 
 /**
@@ -90,18 +107,19 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     opts.ownInstance !== undefined && harness === opts.ownInstance && legacy.startsWith(`${harness}/`) ? { ownSiteRoute: legacy.slice(harness.length + 1) } : {};
   for (const v of declaredVisualisers(root)) {
     if (!opts.staging && v.publish === "staging-only") continue;
-    const dirs = coveredDirectories(v).filter((d) => existsSync(d.absPath));
+    const dirs = coveredDirectories(v, root).filter((d) => existsSync(d.absPath));
     const withAnything = dirs.filter((d) => { const c = children(d.absPath); return c.files + c.dirs > 0; });
     if (withAnything.length === 0) continue;
     const parts = pageParts({ harness: v.harness, visualiser: v.id });
     const legacy = visualiserRoute(forwardingParts(parts));
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
-    const instances = [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
-    for (const instance of instances) {
+    const rootOfInstance = new Map<string, string>();
+    for (const d of dirs) if (children(d.absPath).dirs > 0 && !rootOfInstance.has(d.instance)) rootOfInstance.set(d.instance, d.instanceRoot);
+    for (const instance of [...rootOfInstance.keys()].sort()) {
       const sub = { ...parts, subgraph: instance };
       const subLegacy = visualiserRoute(forwardingParts(sub));
-      out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
+      out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance, instanceRoot: rootOfInstance.get(instance)! });
     }
   }
   return out;

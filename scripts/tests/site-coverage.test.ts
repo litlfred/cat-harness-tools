@@ -4,6 +4,7 @@
  * `en/cat-harness/library/`, and nothing noticed).
  */
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 
 import { expectedPages, legacyOnlyPages, missingPages, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -44,6 +45,15 @@ describe("expectedPages over this checkout", () => {
     const library = pages.filter((p) => p.visualiser === "library");
     expect(library.some((p) => p.instance === undefined && p.route.endsWith("/library/"))).toBe(true);
     for (const p of library.filter((x) => x.instance !== undefined)) expect(p.route).toMatch(new RegExp(`/library/${p.instance}/$`));
+  });
+
+  test("each sub-graph page names its instance's root, for a writer run one instance at a time", () => {
+    const subs = pages.filter((p) => p.instance !== undefined);
+    expect(subs.length).toBeGreaterThan(0);
+    for (const p of subs) {
+      expect(p.instanceRoot).toBeDefined();
+      expect(existsSync(p.instanceRoot!)).toBe(true);
+    }
   });
 
   test("a staging-only visualiser is expected in a preview, never on a root publish", () => {
