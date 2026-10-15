@@ -4,7 +4,19 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { buildInstanceContext, curiePrefix, isContextDocument, ownBindings, usedPrefixes, type UsedPrefixes } from "./jsonld-contexts.ts";
+import jsonld from "jsonld";
+
+import {
+  buildInstanceContext,
+  curiePrefix,
+  definitionPrefixes,
+  documentUses,
+  isContextDocument,
+  ownBindings,
+  usedPrefixes,
+  type TermSource,
+  type UsedPrefixes,
+} from "./jsonld-contexts.ts";
 
 const CONTENT_URL = "https://example.org/ns/content/v1.jsonld";
 const remote = new Map<string, Record<string, unknown>>([
@@ -129,5 +141,179 @@ describe("usedPrefixes — inline full-IRI terms", () => {
     const ns = new Map([["http://www.w3.org/ns/prov#", "prov"]]);
     const doc = { "@context": { generatedAt: { "@id": "http://www.w3.org/ns/prov#generatedAtTime" } }, generatedAt: "2026-01-01" };
     expect([...usedPrefixes(doc, { namespacePrefixes: ns }).keys()]).toEqual([]);
+  });
+});
+
+describe("documentUses — remote-context terms", () => {
+  const remoteC = new Map<string, Record<string, unknown>>([
+    [CONTENT_URL, { dcterms: "http://purl.org/dc/terms/", title: "dcterms:title", cites: { "@id": "cito:cites", "@type": "@id" }, Section: "doco:Section" }],
+    ["https://third.party/ctx", { activity: "http://www.w3.org/ns/prov#activity" }],
+  ]);
+
+  test("a key or @type value that is a remote term is recorded with its context and definition, verbatim", () => {
+    const { terms } = documentUses({ "@context": CONTENT_URL, "@type": "Section", title: "T", cites: ["a"], "dcterms:x": "y" }, { remoteContexts: remoteC });
+    expect([...terms.keys()].sort()).toEqual(["Section", "cites", "title"]);
+    expect(terms.get("cites")).toEqual({ context: CONTENT_URL, definition: { "@id": "cito:cites", "@type": "@id" } });
+  });
+
+  test("a term the document redefines inline is its own, not the remote one", () => {
+    const { terms } = documentUses({ "@context": [CONTENT_URL, { title: "http://example.org/title" }], title: "T" }, { remoteContexts: remoteC });
+    expect(terms.size).toBe(0);
+  });
+
+  test("no context named, no terms; a third-party context's terms are recorded with THAT context", () => {
+    expect(documentUses({ title: "T" }, { remoteContexts: remoteC }).terms.size).toBe(0);
+    const { terms } = documentUses({ "@context": "https://third.party/ctx", activity: "x" }, { remoteContexts: remoteC });
+    expect(terms.get("activity")!.context).toBe("https://third.party/ctx");
+  });
+
+  test("usedPrefixes is unchanged by the term record", () => {
+    const doc = { "@context": CONTENT_URL, title: "T", cites: ["skos:z"] };
+    expect([...usedPrefixes(doc, { remoteContexts: remoteC }).keys()].sort()).toEqual([...documentUses(doc, { remoteContexts: remoteC }).prefixes.keys()].sort());
+  });
+});
+
+describe("definitionPrefixes", () => {
+  test("@id, @type, @reverse and a scoped context's terms; never @container or a full IRI", () => {
+    expect(definitionPrefixes("dcterms:title")).toEqual(["dcterms"]);
+    expect(definitionPrefixes({ "@id": "cito:cites", "@type": "@id", "@container": "@set" })).toEqual(["cito"]);
+    expect(definitionPrefixes({ "@id": "x:a", "@type": "xsd:integer" })).toEqual(["x", "xsd"]);
+    expect(definitionPrefixes({ "@reverse": "prov:used" })).toEqual(["prov"]);
+    expect(definitionPrefixes({ "@id": "http://a.org/b", "@context": { after: { "@id": "ch:after", "@type": "@id" } } })).toEqual(["ch"]);
+    expect(definitionPrefixes({ "@id": "http://www.w3.org/ns/prov#alternateOf", "@type": "@id" })).toEqual([]);
+  });
+});
+
+describe("buildInstanceContext — terms", () => {
+  const dcterms = "http://purl.org/dc/terms/";
+  const cito = "http://purl.org/spar/cito/";
+  const harness = { instance: "harness", prefixes: { dcterms, cito } };
+  const top = { instance: "top", prefixes: {} };
+  const contentCtx = { dcterms, cito, title: "dcterms:title", cites: { "@id": "cito:cites", "@type": "@id", "@container": "@set" } };
+  const sources = new Map<string, TermSource>([[CONTENT_URL, { instance: "harness", context: contentCtx }]]);
+  const doc = (terms: Record<string, unknown>, context = CONTENT_URL) => ({
+    used: new Map(),
+    own: new Map(),
+    terms: new Map(Object.entries(terms).map(([t, definition]) => [t, { context, definition }])),
+  });
+
+  test("a used term is defined verbatim, after the prefixes, and its definition's prefixes are bound", () => {
+    const r = buildInstanceContext({ instance: "top", tables: [harness, top], termSources: sources, documents: new Map([["a.jsonld", doc({ cites: contentCtx.cites })]]) });
+    expect(r.context).toEqual({ "@version": 1.1, "@protected": true, cito, cites: { "@id": "cito:cites", "@type": "@id", "@container": "@set" } });
+    expect(Object.keys(r.context)).toEqual(["@version", "@protected", "cito", "cites"]);
+    expect(r.terms).toEqual([{ term: "cites", context: CONTENT_URL, documents: 1 }]);
+    expect(r.bound).toEqual([{ prefix: "cito", iri: cito, documents: 1 }]);
+    // `title` is defined in the source and unused: absent — nothing a later instance uses is carried.
+    expect("title" in r.context).toBe(false);
+  });
+
+  test("the copy is a copy: mutating the context does not touch the source definition", () => {
+    const r = buildInstanceContext({ instance: "top", tables: [harness, top], termSources: sources, documents: new Map([["a.jsonld", doc({ cites: contentCtx.cites })]]) });
+    (r.context.cites as Record<string, unknown>)["@id"] = "changed";
+    expect(contentCtx.cites["@id"]).toBe("cito:cites");
+  });
+
+  test("a term from a context whose owner the instance does not need is reported, not carried", () => {
+    const r = buildInstanceContext({ instance: "top", tables: [top], termSources: sources, documents: new Map([["a.jsonld", doc({ title: "dcterms:title" })]]) });
+    expect("title" in r.context).toBe(false);
+    expect(r.unresolvedTerms).toEqual([{ term: "title", context: CONTENT_URL, reason: "its context belongs to `harness`, which top does not need", documents: ["a.jsonld"] }]);
+  });
+
+  test("a term from a context it does not stand in for (third-party) is neither carried nor reported", () => {
+    const r = buildInstanceContext({ instance: "top", tables: [harness, top], termSources: sources, documents: new Map([["a.jsonld", doc({ activity: "prov:activity" }, "https://third.party/ctx")]]) });
+    expect(r.terms).toEqual([]);
+    expect(r.unresolvedTerms).toEqual([]);
+  });
+
+  test("a term whose prefix the table binds to a DIFFERENT IRI than its context is reported, not silently re-meant", () => {
+    const other = { instance: "harness", prefixes: { dcterms: "http://example.org/not-dcterms/", cito } };
+    const r = buildInstanceContext({ instance: "top", tables: [other, top], termSources: sources, documents: new Map([["a.jsonld", doc({ title: "dcterms:title" })]]) });
+    expect("title" in r.context).toBe(false);
+    expect(r.unresolvedTerms[0]!.reason).toContain("means http://purl.org/dc/terms/ in its context but http://example.org/not-dcterms/");
+  });
+
+  test("a term whose prefix no table binds is reported", () => {
+    const r = buildInstanceContext({ instance: "top", tables: [{ instance: "harness", prefixes: {} }, top], termSources: sources, documents: new Map([["a.jsonld", doc({ title: "dcterms:title" })]]) });
+    expect(r.unresolvedTerms.map((u) => u.reason)).toEqual(["its prefix `dcterms` is bound by no instance in the flattened table"]);
+  });
+
+  test("a term defined two ways is a conflict, left out, both definitions named", () => {
+    const r = buildInstanceContext({
+      instance: "top",
+      tables: [harness, top],
+      termSources: sources,
+      documents: new Map([["a.jsonld", doc({ title: "dcterms:title" })], ["b.jsonld", doc({ title: { "@id": "dcterms:title", "@language": "en" } })]]),
+    });
+    expect("title" in r.context).toBe(false);
+    expect(r.termConflicts.map((c) => [c.term, c.definitions.map((d) => d.documents)])).toEqual([["title", [["a.jsonld"], ["b.jsonld"]]]]);
+  });
+
+  test("the same definition with keys in another order is ONE definition", () => {
+    const r = buildInstanceContext({
+      instance: "top",
+      tables: [harness, top],
+      termSources: sources,
+      documents: new Map([["a.jsonld", doc({ cites: { "@id": "cito:cites", "@type": "@id" } })], ["b.jsonld", doc({ cites: { "@type": "@id", "@id": "cito:cites" } })]]),
+    });
+    expect(r.termConflicts).toEqual([]);
+    expect(r.terms).toEqual([{ term: "cites", context: CONTENT_URL, documents: 2 }]);
+  });
+
+  test("a term sharing its name with a bound prefix is a conflict, never resolved by order", () => {
+    const r = buildInstanceContext({
+      instance: "top",
+      tables: [harness, top],
+      termSources: sources,
+      documents: new Map([["a.jsonld", { ...doc({ dcterms: "cito:x" }), used: new Map([["dcterms", new Set(["iri" as const])]]) }]]),
+    });
+    expect(r.context.dcterms).toBe(dcterms);
+    expect(r.termConflicts.map((c) => c.term)).toEqual(["dcterms"]);
+  });
+});
+
+describe("the generated context stands in for the remote one with no triple lost", () => {
+  // A small content context, a document naming it, and the instance context
+  // built from that document. Both expansions must give the same quads.
+  const contentCtx = {
+    "@version": 1.1,
+    cito: "http://purl.org/spar/cito/",
+    dcterms: "http://purl.org/dc/terms/",
+    ch: "https://example.org/ch/ns#",
+    title: "dcterms:title",
+    cites: { "@id": "cito:cites", "@type": "@id", "@container": "@set" },
+    meta: { "@id": "ch:meta", "@type": "@json" },
+    tags: { "@id": "ch:tag", "@container": "@set" },
+  };
+  const GEN = "https://example.org/top/ns/context/v1.jsonld";
+  const doc = { "@context": [CONTENT_URL, { "@base": "https://example.org/top/" }], "@id": "a", "@type": "dcterms:BibliographicResource", title: "A", cites: ["b", "c"], meta: { "fhir:x": [1, 2] } };
+
+  test("same quads, and fewer without the term definitions", async () => {
+    const remoteC = new Map([[CONTENT_URL, contentCtx as Record<string, unknown>]]);
+    const uses = documentUses(doc, { remoteContexts: remoteC });
+    const tables = [{ instance: "harness", prefixes: { cito: contentCtx.cito, dcterms: contentCtx.dcterms, ch: contentCtx.ch } }];
+    const built = buildInstanceContext({
+      instance: "harness",
+      tables,
+      termSources: new Map([[CONTENT_URL, { instance: "harness", context: contentCtx }]]),
+      documents: new Map([["a.jsonld", { used: uses.prefixes, own: new Map(), terms: uses.terms }]]),
+    });
+    expect(built.unresolvedTerms).toEqual([]);
+    const contexts = new Map<string, unknown>([[CONTENT_URL, { "@context": contentCtx }], [GEN, { "@context": built.context }]]);
+    const documentLoader = async (url: string) => ({ contextUrl: null, documentUrl: url, document: contexts.get(url) });
+    const quads = async (d: unknown): Promise<string[]> =>
+      ((await jsonld.toRDF(d as jsonld.JsonLdDocument, { format: "application/n-quads", documentLoader, safe: true } as unknown as jsonld.Options.ToRdf)) as unknown as string)
+        .split("\n")
+        .filter(Boolean)
+        .sort();
+    const before = await quads(doc);
+    const after = await quads({ ...doc, "@context": [GEN, { "@base": "https://example.org/top/" }] });
+    expect(before.length).toBe(5);
+    expect(after).toEqual(before);
+
+    // The control: prefixes alone (what the context held before terms) lose the term-keyed triples.
+    const prefixOnly = Object.fromEntries(Object.entries(built.context).filter(([k]) => !built.terms.some((t) => t.term === k)));
+    contexts.set(GEN, { "@context": prefixOnly });
+    const lossy = await quads({ ...doc, "@context": [GEN, { "@base": "https://example.org/top/" }] }).catch(() => []);
+    expect(lossy.length).toBeLessThan(before.length);
   });
 });

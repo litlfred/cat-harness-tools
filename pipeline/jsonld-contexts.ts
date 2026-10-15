@@ -8,6 +8,12 @@
  * resolved through its table flattened with the tables of the instances it
  * `needs`. A bound-but-unused prefix cannot exist, so nothing needs excusing.
  *
+ * Since the follow-up on the same bean it also DEFINES every content- and
+ * subgraph-context TERM those documents use ({@link documentUses},
+ * {@link buildInstanceContext} §Terms): prefixes alone cannot stand in for the
+ * content context — a 60-document sample per instance lost 352–593 triples
+ * when the prefix-only context was swapped in, and loses none with the terms.
+ *
  * This module reads no files. `scripts/gen-instance-contexts.ts` walks the
  * checkout, reads each declaration as data, and calls these.
  *
@@ -84,6 +90,13 @@ export function curiePrefix(s: string): string | undefined {
 
 /** A term definition, reduced to what this module reads. */
 interface TermDef {
+  /**
+   * The remote context the term came from, by URL, with its definition as
+   * written there — set only for REMOTE terms, since those are what an
+   * instance context must carry when it stands in for that remote context.
+   * An inline term is the document's own and needs nothing from anyone.
+   */
+  remote?: { context: string; definition: unknown };
   /** The prefix the term's IRI is written with, when it is a CURIE. */
   prefix?: string;
   /** The term coerces its values to IRIs (`@type: @id` or `@vocab`). */
@@ -94,6 +107,20 @@ interface TermDef {
 
 /** The result of {@link usedPrefixes}: every prefix met, with the positions it was met in. */
 export type UsedPrefixes = Map<string, Set<PrefixPosition>>;
+
+/**
+ * A remote-context TERM a document uses — as a property key, or as an `@type`
+ * value — with the context it came from and its definition there, verbatim.
+ */
+export interface UsedTerm {
+  /** The remote context's URL. */
+  context: string;
+  /** The term's definition in that context, as written (a string or an object). */
+  definition: unknown;
+}
+
+/** The terms of {@link documentUses}: term → where it was defined. */
+export type UsedTerms = Map<string, UsedTerm>;
 
 export interface UsedPrefixesOptions {
   /**
@@ -135,12 +162,12 @@ function addContext(
   terms: Map<string, TermDef>,
   remote: ReadonlyMap<string, Record<string, unknown>>,
   namespaces: ReadonlyMap<string, string>,
-  fromRemote = false,
+  fromRemote?: string,
 ): void {
   if (Array.isArray(c)) return void c.forEach((x) => addContext(x, terms, remote, namespaces, fromRemote));
   if (typeof c === "string") {
     const r = remote.get(c);
-    if (r !== undefined) addContext(r, terms, remote, namespaces, true);
+    if (r !== undefined) addContext(r, terms, remote, namespaces, c);
     return;
   }
   if (!isRecord(c)) return;
@@ -152,8 +179,13 @@ function addContext(
     // REMOTE context: an inline full-IRI term (a SMART IG's `generatedAt` →
     // `prov#generatedAtTime`) is complete as written and needs no prefix bound
     // anywhere, so counting it would put `prov` in a context nobody needs it in.
-    const prefix = id === undefined ? undefined : (curiePrefix(id) ?? (fromRemote ? namespacePrefixOf(id, namespaces) : undefined));
-    terms.set(k, { ...(prefix !== undefined ? { prefix } : {}), idValued: type === "@id" || type === "@vocab", json: type === "@json" });
+    const prefix = id === undefined ? undefined : (curiePrefix(id) ?? (fromRemote !== undefined ? namespacePrefixOf(id, namespaces) : undefined));
+    terms.set(k, {
+      ...(prefix !== undefined ? { prefix } : {}),
+      ...(fromRemote !== undefined ? { remote: { context: fromRemote, definition: v } } : {}),
+      idValued: type === "@id" || type === "@vocab",
+      json: type === "@json",
+    });
   }
 }
 
@@ -162,9 +194,24 @@ function addContext(
  * walked, what is skipped, and what the two positions mean.
  */
 export function usedPrefixes(doc: unknown, options: UsedPrefixesOptions = {}): UsedPrefixes {
+  return documentUses(doc, options).prefixes;
+}
+
+/**
+ * Every prefix a document uses ({@link usedPrefixes}) AND every remote-context
+ * term it uses: a property key, or an `@type` value, that resolves to a term
+ * of a remote context in `options.remoteContexts`. A term an inline context
+ * redefines is the document's own, and is not counted.
+ *
+ * The terms are what an instance context must DEFINE when it stands in for
+ * the remote context: binding `cito` alone does not make `cites` mean
+ * `cito:cites` as an `@id`-typed set.
+ */
+export function documentUses(doc: unknown, options: UsedPrefixesOptions = {}): { prefixes: UsedPrefixes; terms: UsedTerms } {
   const remote = options.remoteContexts ?? new Map<string, Record<string, unknown>>();
   const namespaces = options.namespacePrefixes ?? new Map<string, string>();
   const out: UsedPrefixes = new Map();
+  const termsUsed: UsedTerms = new Map();
   const note = (p: string | undefined, pos: PrefixPosition): void => {
     if (p === undefined) return;
     const s = out.get(p) ?? new Set<PrefixPosition>();
@@ -175,7 +222,10 @@ export function usedPrefixes(doc: unknown, options: UsedPrefixesOptions = {}): U
   const str = (s: string, pos: PrefixPosition, terms: ReadonlyMap<string, TermDef>, aliasable: boolean): void => {
     const p = curiePrefix(s);
     if (p !== undefined) return note(p, pos);
-    if (aliasable) note(terms.get(s)?.prefix, pos);
+    if (!aliasable) return;
+    const def = terms.get(s);
+    note(def?.prefix, pos);
+    if (def?.remote !== undefined && !termsUsed.has(s)) termsUsed.set(s, { context: def.remote.context, definition: def.remote.definition });
   };
 
   /** Inside a `@json` literal: every key and value is data, so every string is a literal. */
@@ -222,7 +272,7 @@ export function usedPrefixes(doc: unknown, options: UsedPrefixesOptions = {}): U
   };
 
   walk(doc, new Map(), "literal");
-  return out;
+  return { prefixes: out, terms: termsUsed };
 }
 
 /**
@@ -277,6 +327,18 @@ export interface UnresolvedPrefix {
   documents: string[];
 }
 
+/**
+ * A remote context an instance context may stand in for, and the instance
+ * that owns it. Its terms are available to an instance only when the owner is
+ * in that instance's flattened `needs` — the same rule its prefixes follow.
+ */
+export interface TermSource {
+  /** The instance that publishes the context (`cat-harness` for the content and subgraph contexts). */
+  instance: string;
+  /** The context object itself (the value of its `@context`): read for its own prefix bindings. */
+  context: Record<string, unknown>;
+}
+
 export interface InstanceContextInput {
   /** The instance this context is for. */
   instance: string;
@@ -288,22 +350,101 @@ export interface InstanceContextInput {
   tables: readonly DeclaredPrefixes[];
   /**
    * Every prefix the instance's documents use, per document: the prefix map
-   * from {@link usedPrefixes} and the bindings from {@link ownBindings}.
+   * from {@link usedPrefixes} and the bindings from {@link ownBindings}, and
+   * the remote-context terms from {@link documentUses}.
    */
-  documents: ReadonlyMap<string, { used: UsedPrefixes; own: ReadonlyMap<string, string> }>;
+  documents: ReadonlyMap<string, { used: UsedPrefixes; own: ReadonlyMap<string, string>; terms?: UsedTerms }>;
+  /**
+   * The remote contexts whose TERMS this instance context carries — the ones
+   * it stands in for — by URL. A term from a context not listed here (a
+   * third-party context the document goes on naming) is neither copied nor
+   * reported; one from a listed context owned by an instance outside the
+   * flattened `needs` is reported in {@link InstanceContext.unresolvedTerms}.
+   */
+  termSources?: ReadonlyMap<string, TermSource>;
+}
+
+/** A remote-context term two places define differently, left OUT of the context. */
+export interface TermConflict {
+  term: string;
+  /** Each distinct definition, with the context it came from and the documents that used it. */
+  definitions: { context: string; definition: unknown; documents: string[] }[];
+  /** Why it conflicts: two definitions, or a name a bound prefix already holds. */
+  reason: string;
+}
+
+/** A remote-context term the instance context cannot carry faithfully. */
+export interface UnresolvedTerm {
+  term: string;
+  context: string;
+  reason: string;
+  documents: string[];
 }
 
 export interface InstanceContext {
-  /** The `@context` object to publish: `@version`, `@protected`, and only used, resolved, unconflicted prefixes. */
+  /**
+   * The `@context` object to publish: `@version`, `@protected`, the used,
+   * resolved, unconflicted prefixes, then the used remote-context terms.
+   */
   context: Record<string, unknown>;
-  /** Each prefix in {@link context}, with how many documents use it. */
+  /** Each prefix in {@link context}, with how many documents use it (directly, or through a term defined with it). */
   bound: { prefix: string; iri: string; documents: number }[];
+  /** Each remote-context term in {@link context}, with where it is defined and how many documents use it. */
+  terms: { term: string; context: string; documents: number }[];
   /** Used in an IRI position and bound by neither the flattened table nor the document itself — a FINDING. */
   unresolved: UnresolvedPrefix[];
   /** Met only as a literal string and not bound — reported, never failed on. */
   literalOnly: UnresolvedPrefix[];
   /** Prefixes two instances in the flattened table bind differently — a FINDING; never resolved by order. */
   conflicts: PrefixConflict[];
+  /** Terms defined two ways, or colliding with a prefix — a FINDING; never resolved by order. */
+  termConflicts: TermConflict[];
+  /** Terms whose context is not available here, or whose prefixes do not resolve to what the context meant — a FINDING. */
+  unresolvedTerms: UnresolvedTerm[];
+}
+
+/**
+ * Every CURIE prefix a term definition needs bound to expand — in `@id`,
+ * `@type`, `@reverse`, and the terms of a scoped `@context` — or `[]` for a
+ * definition written in full IRIs.
+ */
+export function definitionPrefixes(definition: unknown): string[] {
+  const out = new Set<string>();
+  const visit = (v: unknown): void => {
+    if (typeof v === "string") {
+      const p = curiePrefix(v);
+      if (p !== undefined) out.add(p);
+      return;
+    }
+    if (Array.isArray(v)) return void v.forEach(visit);
+    if (!isRecord(v)) return;
+    for (const [k, x] of Object.entries(v)) {
+      if (k === "@container" || k === "@language" || k === "@direction" || k === "@nest" || k === "@prefix" || k === "@protected" || k === "@version") continue;
+      if (k === "@context") {
+        // A scoped context: its terms' definitions, not its keys.
+        if (isRecord(x)) for (const [tk, tv] of Object.entries(x)) if (!tk.startsWith("@")) visit(tv);
+        continue;
+      }
+      visit(x);
+    }
+  };
+  visit(definition);
+  return [...out].sort();
+}
+
+/** Stable JSON for comparing two definitions: key order does not make them different. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+  if (isRecord(v)) return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(",")}}`;
+  return JSON.stringify(v);
+}
+
+/** A prefix binding written in a context: a string IRI ending `/` or `#`, or `{ "@id", "@prefix": true }`. */
+function contextBinding(context: Record<string, unknown>, prefix: string): string | undefined {
+  const v = context[prefix];
+  if (typeof v === "string") return v;
+  if (isRecord(v) && typeof v["@id"] === "string") return v["@id"];
+  return undefined;
 }
 
 /**
@@ -315,17 +456,47 @@ export interface InstanceContext {
  * {@link InstanceContext.literalOnly}; a conflicting prefix is left OUT of the
  * context and reported in `conflicts`, since `@protected` terms are exactly
  * what a higher layer must not quietly redefine.
+ *
+ * ## Terms
+ *
+ * A document naming a remote context (`ns/content/v1.jsonld`) uses its TERMS —
+ * `title`, `cites`, `meta` — with no prefix in sight. Binding the prefixes
+ * those terms expand through is not enough to stand in for that context: the
+ * term itself, with its `@type: @id`, `@container` and `@json`, is what a
+ * processor reads. So each remote term a document uses is copied into the
+ * instance context VERBATIM, under the same rules as a prefix:
+ *
+ * - only from a context it stands in for (`termSources`) — a third-party
+ *   context the document keeps naming carries its own terms — and only when
+ *   that context's owning instance is in the flattened `needs`; otherwise the
+ *   term is {@link InstanceContext.unresolvedTerms};
+ * - only terms the instance's OWN documents use — nothing a later instance uses;
+ * - every prefix the definition is written with is bound too, resolved
+ *   through the flattened table, and must resolve to the SAME IRI the source
+ *   context binds it to — otherwise the copied term would expand differently,
+ *   which is a silent change of meaning and is reported instead;
+ * - a term two contexts define differently, or a term whose name a bound
+ *   prefix holds, is left OUT and reported in `termConflicts`.
  */
 export function buildInstanceContext(input: InstanceContextInput): InstanceContext {
   const { prefixes: table, conflicts } = mergePrefixTables(input.tables);
   const conflicted = new Set(conflicts.map((c) => c.prefix));
+  const available = new Set(input.tables.map((t) => t.instance));
+  const sources = input.termSources ?? new Map<string, TermSource>();
 
-  const users = new Map<string, number>();
+  const users = new Map<string, Set<string>>();
+  const use = (prefix: string, where: string): void => {
+    const s = users.get(prefix) ?? new Set<string>();
+    s.add(where);
+    users.set(prefix, s);
+  };
   const missing = new Map<string, { positions: Set<PrefixPosition>; documents: Set<string> }>();
-  for (const [where, { used, own }] of input.documents) {
+  /** term → canonical definition → { context, definition, documents } */
+  const termUses = new Map<string, Map<string, { context: string; definition: unknown; documents: Set<string> }>>();
+  for (const [where, { used, own, terms }] of input.documents) {
     for (const [prefix, positions] of used) {
       if (prefix in table) {
-        users.set(prefix, (users.get(prefix) ?? 0) + 1);
+        use(prefix, where);
         continue;
       }
       if (own.has(prefix)) continue;
@@ -334,14 +505,80 @@ export function buildInstanceContext(input: InstanceContextInput): InstanceConte
       m.documents.add(where);
       missing.set(prefix, m);
     }
+    for (const [term, t] of terms ?? []) {
+      const byDef = termUses.get(term) ?? new Map();
+      const key = canonical(t.definition);
+      const slot = byDef.get(key) ?? { context: t.context, definition: t.definition, documents: new Set<string>() };
+      slot.documents.add(where);
+      byDef.set(key, slot);
+      termUses.set(term, byDef);
+    }
+  }
+
+  const termConflicts: TermConflict[] = [];
+  const unresolvedTerms: UnresolvedTerm[] = [];
+  const keptTerms: { term: string; context: string; definition: unknown; documents: Set<string> }[] = [];
+  for (const [term, byDef] of termUses) {
+    const defs = [...byDef.values()];
+    const docs = (): string[] => [...new Set(defs.flatMap((d) => [...d.documents]))].sort();
+    if (defs.length > 1) {
+      termConflicts.push({
+        term,
+        definitions: defs.map((d) => ({ context: d.context, definition: d.definition, documents: [...d.documents].sort() })),
+        reason: "defined differently by the contexts its documents name",
+      });
+      continue;
+    }
+    const d = defs[0]!;
+    const source = sources.get(d.context);
+    // A term from a context this one does NOT stand in for (a third-party
+    // context such as PROV-JSONLD, which the document keeps naming) is that
+    // context's business: nothing to carry, nothing to report.
+    if (source === undefined) continue;
+    if (!available.has(source.instance)) {
+      unresolvedTerms.push({ term, context: d.context, reason: `its context belongs to \`${source.instance}\`, which ${input.instance} does not need`, documents: docs() });
+      continue;
+    }
+    let ok = true;
+    for (const p of definitionPrefixes(d.definition)) {
+      const meant = contextBinding(source.context, p);
+      if (conflicted.has(p)) {
+        unresolvedTerms.push({ term, context: d.context, reason: `its prefix \`${p}\` is bound differently by two instances in the flattened table`, documents: docs() });
+        ok = false;
+      } else if (!(p in table)) {
+        unresolvedTerms.push({ term, context: d.context, reason: `its prefix \`${p}\` is bound by no instance in the flattened table`, documents: docs() });
+        ok = false;
+      } else if (meant !== undefined && meant !== table[p]) {
+        unresolvedTerms.push({ term, context: d.context, reason: `its prefix \`${p}\` means ${meant} in its context but ${table[p]} in the flattened table`, documents: docs() });
+        ok = false;
+      }
+    }
+    if (!ok) continue;
+    for (const p of definitionPrefixes(d.definition)) for (const w of d.documents) use(p, w);
+    keptTerms.push({ term, context: d.context, definition: d.definition, documents: d.documents });
+  }
+
+  // A term whose name is also a BOUND prefix: one key, two meanings. Left out,
+  // reported — never resolved by which was written last.
+  for (let i = keptTerms.length - 1; i >= 0; i--) {
+    const t = keptTerms[i]!;
+    if (!users.has(t.term) || conflicted.has(t.term)) continue;
+    termConflicts.push({
+      term: t.term,
+      definitions: [{ context: t.context, definition: t.definition, documents: [...t.documents].sort() }],
+      reason: `\`${t.term}\` is also a prefix this context binds (${table[t.term]})`,
+    });
+    keptTerms.splice(i, 1);
   }
 
   const bound = [...users]
     .filter(([p]) => !conflicted.has(p))
-    .map(([prefix, documents]) => ({ prefix, iri: table[prefix]!, documents }))
+    .map(([prefix, documents]) => ({ prefix, iri: table[prefix]!, documents: documents.size }))
     .sort((a, b) => a.prefix.localeCompare(b.prefix));
   const context: Record<string, unknown> = { "@version": 1.1, "@protected": true };
   for (const b of bound) context[b.prefix] = b.iri;
+  keptTerms.sort((a, b) => a.term.localeCompare(b.term));
+  for (const t of keptTerms) context[t.term] = structuredClone(t.definition);
 
   const toList = (want: (pos: Set<PrefixPosition>) => boolean): UnresolvedPrefix[] =>
     [...missing]
@@ -352,8 +589,11 @@ export function buildInstanceContext(input: InstanceContextInput): InstanceConte
   return {
     context,
     bound,
+    terms: keptTerms.map((t) => ({ term: t.term, context: t.context, documents: t.documents.size })),
     unresolved: toList((pos) => pos.has("iri")),
     literalOnly: toList((pos) => !pos.has("iri")),
     conflicts,
+    termConflicts: termConflicts.sort((a, b) => a.term.localeCompare(b.term)),
+    unresolvedTerms: unresolvedTerms.sort((a, b) => a.term.localeCompare(b.term) || a.reason.localeCompare(b.reason)),
   };
 }
