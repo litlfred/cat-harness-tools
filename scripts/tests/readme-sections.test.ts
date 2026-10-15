@@ -305,6 +305,28 @@ describe("cat-harness:instances — both entries, per instance (issue #592)", ()
     rmSync(root, { recursive: true, force: true });
   });
 
+  it("a docs directory built at publish is not linked, whether or not a writer has run", () => {
+    // smart-trust's docs/ is written by `smart:pages`; CI runs it before the
+    // test that checks the committed README is current. Linking on presence
+    // made that README depend on the run.
+    const root = repoWith({
+      built: {
+        name: "built",
+        assets: [{ id: "r", src: "README.md", role: "instance-readme" }],
+        directories: [{ id: "built-docs", path: "docs/", graphTypologies: ["docs"] }],
+        builtAtPublish: [{ path: "docs/", writer: ["built:pages"], because: "checkout", directory: "built-docs", reason: "rendered at publish" }],
+      },
+    });
+    const render = () => section.render({ root, cfg: loadReadmeConfig(root), fetch: false }).markdown;
+    const before = render();
+    mkdirSync(join(root, "built", "docs"), { recursive: true });
+    const after = render();
+    expect(after).toBe(before);
+    expect(after).not.toContain("built/docs/");
+    expect(after).toContain("built at publish, never committed");
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it("states the gap as a count AND says which check names them", () => {
     // A count in prose is a claim; this one has to carry where the list is.
     const root = repoWith({
