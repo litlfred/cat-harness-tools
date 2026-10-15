@@ -46,6 +46,7 @@ import {
   directionStates,
   SIDECAR_STEM,
   type PendingEntry,
+  WORKFLOW_USES_ADDRESS,
 } from "../check-reference-direction.ts";
 import { judgeQaResult, qaResultPath, writeQaResult, type QaResult } from "../qa-results.ts";
 
@@ -1127,6 +1128,89 @@ describe("X5 — a dated proposal record may name the layers it was written abou
     expect(verdict("cat-harness/docs/proposals/old/checkout-layout-2026-10-12.md")).toBe("wrong-direction");
     expect(verdict("cat-harness/proposals/checkout-layout-2026-10-12.md")).toBe("wrong-direction");
     expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.ts")).toBe("wrong-direction");
+  });
+});
+
+// ── Ruling 3a (2026-10-15): a workflow `uses:` names an address ──
+
+describe("3a — a workflow `uses:` names the repository a reusable workflow lives in, not a layer (owner, 2026-10-15)", () => {
+  const LAYERS = new Map<string, readonly string[]>([
+    ["bootstrap", []],
+    ["cat-harness", ["bootstrap"]],
+    ["cat-harness-tools", ["cat-harness"]],
+  ]);
+  const LAYER_RULE: LayerRule = {
+    allowed: allowedFromNeeds(
+      LAYERS,
+      ancestorsOf(flattenDependencies([...LAYERS].map(([id, needs]) => ({ id, needs: [...needs], fatal: false }))).order),
+    ),
+  };
+  const WF = "cat-harness/.github/workflows/harness-pr-checks.yml";
+  const REUSABLE = "uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main";
+  // Trimmed, as `analyse` reports a line.
+  const verdict = (text: string, file = WF, from = "cat-harness") =>
+    classifyReference(occ(from, "cat-harness-tools", text, file), LAYER_RULE, never, [WORKFLOW_USES_ADDRESS]).verdict;
+
+  test("the reusable-workflow caller each lower layer carries is exempt", () => {
+    expect(verdict(REUSABLE)).toBe("exempt");
+    expect(verdict(REUSABLE, "bootstrap/.github/workflows/harness-pr-checks.yml", "bootstrap")).toBe("exempt");
+    expect(verdict(REUSABLE, "bootstrap-tools/.github/workflows/harness-pr-checks.yaml", "bootstrap")).toBe("exempt");
+    // The repository root's own workflows, with no instance prefix.
+    expect(verdict(REUSABLE, ".github/workflows/ci.yml")).toBe("exempt");
+  });
+
+  test("an action address is exempt too: as a step, quoted, at a SHA, with a path, with a version comment", () => {
+    expect(verdict("- uses: litlfred/cat-harness-tools@main")).toBe("exempt");
+    expect(verdict("uses: \"litlfred/cat-harness-tools/.github/actions/mount@v2\"")).toBe("exempt");
+    expect(verdict("- uses: 'litlfred/cat-harness-tools/actions/mount@0123abcd'")).toBe("exempt");
+    expect(verdict("- uses: litlfred/cat-harness-tools@0123456789abcdef0123456789abcdef01234567 # v1.2.3")).toBe("exempt");
+    expect(verdict("uses: litlfred/cat-harness-tools/.github/workflows/x.yml@refs/heads/main")).toBe("exempt");
+  });
+
+  test("FAILS for a `run:` that executes the higher layer's scripts, and for every other key", () => {
+    expect(verdict("run: bun run cat-harness-tools/scripts/check-reference-direction.ts")).toBe("wrong-direction");
+    expect(verdict("- run: bun run cat-harness-tools/scripts/x.ts")).toBe("wrong-direction");
+    expect(verdict("path: cat-harness-tools")).toBe("wrong-direction");
+    expect(verdict("repository: litlfred/cat-harness-tools")).toBe("wrong-direction");
+    expect(verdict("tools-ref: cat-harness-tools")).toBe("wrong-direction");
+    expect(verdict("name: uses: litlfred/cat-harness-tools@main")).toBe("wrong-direction");
+  });
+
+  test("FAILS for a comment, even one that quotes a `uses:` line", () => {
+    expect(verdict("# The checks themselves live in cat-harness-tools")).toBe("wrong-direction");
+    expect(verdict(`# ${REUSABLE}`)).toBe("wrong-direction");
+  });
+
+  test("FAILS when the value is not a remote address, or carries more than one", () => {
+    // A local action is a path in the checkout, which IS the higher layer's files.
+    expect(verdict("- uses: ./cat-harness-tools/.github/actions/mount")).toBe("wrong-direction");
+    expect(verdict("uses: ./cat-harness-tools/.github/workflows/layer-pr-checks.yml")).toBe("wrong-direction");
+    expect(verdict("- uses: docker://ghcr.io/litlfred/cat-harness-tools:latest")).toBe("wrong-direction");
+    // No ref: not an address GitHub resolves.
+    expect(verdict("uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml")).toBe("wrong-direction");
+    // A trailing comment that is not a version names something else on the line.
+    expect(verdict(`${REUSABLE} # the checks live in cat-harness-tools`)).toBe("wrong-direction");
+    // Unbalanced quotes.
+    expect(verdict("uses: \"litlfred/cat-harness-tools@main'")).toBe("wrong-direction");
+  });
+
+  test("FAILS outside a `.github/workflows/` file: Markdown quoting it, an action.yml, a template, a nested directory", () => {
+    expect(verdict(REUSABLE, "cat-harness/skills/kg/kg-core/index-config.md")).toBe("wrong-direction");
+    expect(verdict(REUSABLE, "cat-harness/.github/actions/mount/action.yml")).toBe("wrong-direction");
+    expect(verdict(REUSABLE, "cat-harness/templates/paper/github/workflows/blueprint.yml")).toBe("wrong-direction");
+    expect(verdict(REUSABLE, "cat-harness/.github/workflows/old/harness-pr-checks.yml")).toBe("wrong-direction");
+    expect(verdict(REUSABLE, "cat-harness/.github/workflows/harness-pr-checks.json")).toBe("wrong-direction");
+  });
+
+  test("it is counted on its own line", () => {
+    const counts = exemptionCounts([
+      { verdict: { verdict: "exempt" as const, basis: "", exemption: WORKFLOW_USES_ADDRESS } },
+      { verdict: { verdict: "exempt" as const, basis: "", exemption: WORKFLOW_USES_ADDRESS } },
+      { verdict: { verdict: "exempt" as const, basis: "", exemption: DATED_PROPOSAL_RECORD } },
+    ]);
+    expect(counts.get(WORKFLOW_USES_ADDRESS.reason)).toBe(2);
+    expect(counts.get(DATED_PROPOSAL_RECORD.reason)).toBe(1);
+    expect(counts.size).toBe(EXEMPTIONS_DECLARED);
   });
 });
 
