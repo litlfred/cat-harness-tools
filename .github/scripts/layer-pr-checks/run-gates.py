@@ -18,6 +18,9 @@ harness":
   (from their declarations), and the own instances themselves, every script
   of its `package.json` -- `scripts` and `checkoutScripts` alike -- whose
   name starts `check:` or ends `:check`, named `<owning-instance>:<script>`.
+- **checkout scripts**: the few declared scripts that judge the root's own
+  files (`CHECKOUT_SCRIPTS` below), run for every caller under the same name,
+  whether or not its dependency harness includes the declaring instance.
 
 The OWN instances are the `--instance` arguments; with none, the instance the
 repository declares at its root (a folio or an index with a declaration of
@@ -54,6 +57,18 @@ GRAPH_GATES = {
 CHECKOUT_GATES = {
     "check-tools": "bun cat-harness-tools/scripts/check-tools.ts",
     "declaration-resolution": "bun cat-harness-tools/scripts/check-declaration-resolution.ts",
+}
+# Declared scripts that judge the ROOT's own files, run for EVERY caller, not
+# only for one whose dependency harness happens to include the declaring
+# instance. Script name -> the instance that declares it; the gate keeps the
+# name the derived set gives it (`<instance>:<script>`), and is run once.
+#   - index-config:inline:check (cat-harness-tools#222, bean `ymvt`): red
+#     while index.config.json still imports a legacy `<name>.config.json`.
+#     cat-harness, bootstrap and bootstrap-tools do not need cat-harness-tools,
+#     so the derived set never reached them (owner, 2026-10-15: every
+#     harnessed repository's PR checks run it).
+CHECKOUT_SCRIPTS = {
+    "index-config:inline:check": "cat-harness-tools",
 }
 TIMEOUT_S = 1200
 # Gates that judge the REMOTE's live state, not the checkout: which workflows
@@ -224,6 +239,10 @@ def main():
     seen_scripts = set()
     runner = script_runner(root)
     print(f"script runner: {runner}", flush=True)
+    for script, owner in CHECKOUT_SCRIPTS.items():
+        command = f"{runner} {script}"
+        seen_scripts.add(command)
+        gates[f"{owner}:{script}"] = command
     skipped = {}
     for n in harness:
         run_these, skip_these = declared_gates(root, n, known[n], runner)
