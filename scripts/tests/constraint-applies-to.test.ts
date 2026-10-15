@@ -57,9 +57,11 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
   "md-exists": {
     kinds: [
       "definition", "theorem", "lemma", "proposition", "corollary",
-      "conjecture", "example", "remark", "simulator", "prose",
+      "conjecture", "example", "remark", "simulator", "prose", "recommendation",
     ],
     because:
+      // `recommendation` joined when cat-harness admitted the normative
+      // statement kind: its body is prose, so it carries a companion .md.
       "whether equation/diagram/table/proof/algorithm blocks must have a " +
       "companion .md is an editorial policy question, not drift — left as " +
       "found, deliberately. Its description says 'every block', which is " +
