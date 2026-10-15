@@ -265,6 +265,16 @@ export interface NavbarModel {
    */
   visualiser?: NavGroup;
   /**
+   * The SITE's own page tree — "Pages" (owner, 2026-10-15, "folio rail
+   * everywhere"): on a just-the-docs site the rail carries what the theme's
+   * `site-nav` carried, built on the server (`lib/jekyll-pages-nav.ts`).
+   * Drawn in the scrolling middle after the page's own section and before the
+   * graphs; folded on arrival unless it holds the current page and the page
+   * has no section of its own — the same rule as {@link graphs}. Absent on a
+   * site with no page tree, and then not drawn at all.
+   */
+  pages?: NavGroup;
+  /**
    * The instance's own themed root — its front door, in the fixed top.
    *
    * NOT inside the graphs group: a group labelled "Graphs" that contains the
@@ -824,6 +834,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
 export function navbarRegionsHtml(m: NavbarModel): string {
   const c: Ctx = { liquid: m.hrefs === "liquid" };
   const graphs = m.graphs && m.graphs.items.length > 0 ? m.graphs : undefined;
+  const pages = m.pages && m.pages.items.length > 0 ? m.pages : undefined;
   return (
     // One checkbox behind two labels, so open and close cannot disagree.
     //
@@ -848,9 +859,10 @@ export function navbarRegionsHtml(m: NavbarModel): string {
     `</div>` +
     // A Graphs group with no rows is not drawn: an empty fold is a control
     // that opens onto nothing (a site that holds none of its landing's graphs).
-    (graphs || m.visualiser
+    (graphs || pages || m.visualiser
       ? `<div class="fa-nav-graphs">` +
         (m.visualiser ? groupHtml({ ...m.visualiser, collapsible: true, open: true }, c) : "") +
+        (pages ? groupHtml(graphsOnArrival(pages, m.visualiser !== undefined), c) : "") +
         (graphs ? groupHtml(graphsOnArrival(graphs, m.visualiser !== undefined), c) : "") +
         `</div>`
       : "") +
