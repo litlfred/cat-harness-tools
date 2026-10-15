@@ -39,6 +39,8 @@
  *   bun run cat check:l1-complete -- --write   # commit the verdict as a sidecar
  *
  * Exit: 0 complete (or nothing to check), 1 a requirement unmet, 2 could not check.
+ * An unmet requirement in {@link QA_ONLY} is a QA finding: reported and
+ * written, never exit 1.
  *
  * @module scripts/check-l1-complete
  * @covers library
@@ -527,6 +529,23 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
 export function entryKind(has: (file: string) => boolean): EntryKind {
   for (const [kind, file] of KIND_SIDECAR) if (has(file)) return kind;
   return "undetermined";
+}
+
+/**
+ * Requirements reported as QA findings, never as a failed check (owner,
+ * 2026-10-15: "make QA check"). An unmet one stays `unmet` in the entry's
+ * verdict and in the `library-qa` sidecar `--write` commits, so the QA views
+ * still show it; it just does not set the exit code, so it cannot stop a
+ * publish. `image-descriptions` is here because a document gains images the
+ * moment it is ingested, while a narrative for each is written later by a
+ * person or an agent: smart-immunizations' library stopped every publish on
+ * 42 undescribed figures (folio-assistant run 38801998160).
+ */
+export const QA_ONLY: ReadonlySet<string> = new Set(["image-descriptions"]);
+
+/** The unmet requirements that fail the check: every unmet one not in {@link QA_ONLY}. */
+export function blockingUnmet(requirements: readonly Requirement[]): Requirement[] {
+  return requirements.filter((q) => q.state === "unmet" && !QA_ONLY.has(q.name));
 }
 
 /** Requirements that only make sense for a PAGED document. */
@@ -1572,14 +1591,15 @@ function format(reports: EntryReport[]): string {
   const mark = { met: "✓", unmet: "✗", "not-derivable": "·" } as const;
   const out: string[] = [];
   for (const r of reports) {
-    const unmet = r.requirements.filter((q) => q.state === "unmet");
+    const unmet = blockingUnmet(r.requirements);
     // `<library>/<slug>/` when several libraries are in play, `library/<slug>/`
     // when there is only one — an instance with a single library reads exactly
     // as it always did.
     out.push(`${unmet.length ? "✗" : "✓"} ${r.library ?? "library"}/${r.slug}/`);
     for (const q of r.requirements) {
       if (q.state === "not-derivable") continue;
-      out.push(`    ${mark[q.state]} ${q.name.padEnd(16)} ${q.detail}`);
+      const qa = q.state === "unmet" && QA_ONLY.has(q.name);
+      out.push(`    ${qa ? "◦" : mark[q.state]} ${q.name.padEnd(16)} ${qa ? "QA finding, not gating: " : ""}${q.detail}`);
     }
     for (const q of unmet) void q;
   }
@@ -1703,5 +1723,12 @@ if (import.meta.main) {
         `(${t.stale} stale), ${t.draft} draft(s) awaiting a person. Advisory — bun run cat summaries`,
     );
   }
-  process.exit(reports.some((r) => r.requirements.some((q) => q.state === "unmet")) ? 1 : 0);
+  const findings = reports.filter((r) => r.requirements.some((q) => q.state === "unmet" && QA_ONLY.has(q.name)));
+  if (findings.length) {
+    console.log(
+      `\n  ◦ ${findings.length} entr${findings.length === 1 ? "y carries" : "ies carry"} QA findings ` +
+        `(${[...QA_ONLY].join(", ")}): recorded in the library-qa verdicts, not gating`,
+    );
+  }
+  process.exit(reports.some((r) => blockingUnmet(r.requirements).length > 0) ? 1 : 0);
 }
