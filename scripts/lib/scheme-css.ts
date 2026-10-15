@@ -79,7 +79,8 @@ export function darkRules(rules: string): string {
  * just-the-docs its theme-sheet swap finds no `jtd` and does nothing.
  */
 export function withSavedScheme(html: string): string {
-  if (html.includes(SCHEME_MARK)) return html;
+  // A themed page already carries the snippet itself, from head_custom.html.
+  if (html.includes(SCHEME_MARK) || html.includes(firstPaintSchemeScript())) return html;
   const head = /<head\b[^>]*>/i.exec(html);
   if (!head) return html;
   const script = firstPaintSchemeScript().replace(/^<script\b/i, `<script ${SCHEME_MARK}`) + "\n";
