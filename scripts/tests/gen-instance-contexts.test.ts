@@ -133,3 +133,24 @@ describe("the corpus lives in lib/jsonld-corpus.ts", () => {
     expect(checkCorpus).toBe(contentDocuments);
   });
 });
+
+describe("gen-instance-contexts — a fixed point once the emitters switch", () => {
+  // A document naming its instance's OWN context (what the switched emitters
+  // write) must still yield that context's terms, or the next run drops them.
+  const froot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-fixed-"));
+  afterAll(() => rmSync(froot, { recursive: true, force: true }));
+  const fput = (rel: string, value: unknown): void => {
+    const p = join(froot, rel);
+    mkdirSync(join(p, ".."), { recursive: true });
+    writeFileSync(p, JSON.stringify(value));
+  };
+  fput("cat-harness/cat-harness.json", { name: "cat-harness", needs: [], jsonldPrefixes: { dcterms: "http://purl.org/dc/terms/" } });
+  fput("leaf/leaf.json", { name: "leaf", needs: ["cat-harness"], iriBase: "https://example.org/leaf/" });
+  fput("leaf/a.jsonld", { "@context": ["https://example.org/leaf/ns/context/v1.jsonld", { "@base": "https://x/" }], "@id": "a", title: "A" });
+
+  test("the instance URL reads as the content context: `title` is still defined", () => {
+    const r = generateInstanceContexts(froot, { ownNamespaceOf: () => undefined }).reports.find((x) => x.instance === "leaf")!;
+    expect(r.terms.map((t) => t.term)).toEqual(["title"]);
+    expect(JSON.parse(r.expected!)["@context"].title).toBe("dcterms:title");
+  });
+});

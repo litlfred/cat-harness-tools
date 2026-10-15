@@ -41,7 +41,7 @@
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
-import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { atInstanceContext, documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
 import {
   resolveLabel,
   mintNodeId,
@@ -249,7 +249,9 @@ async function run(): Promise<number> {
 
     for (const loaded of [...blocks.values()].sort((a, b) => a.file.localeCompare(b.file))) {
       const out = loaded.file.replace(/\.ts$/, ".jsonld");
-      const next = serialise(blockToJsonLd(loaded, paper, dangling, unconventional, contributions));
+      // The block names the context of the instance its file sits in (bean
+      // folio-assistant-63q4), applied here because this is where `out` is known.
+      const next = serialise(atInstanceContext(blockToJsonLd(loaded, paper, dangling, unconventional, contributions), out));
       const prev = existsSync(out) ? readFileSync(out, "utf-8") : undefined;
 
       if (prev === next) {
