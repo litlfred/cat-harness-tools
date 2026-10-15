@@ -11,10 +11,10 @@
  * bean is a test that gets deleted.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import {
   declaredVisualiserFor,
@@ -22,8 +22,10 @@ import {
   GENERATED_BY,
   ownVisualiserRefs,
   prunableDashboards,
-  qaSubjectPage,
-  qaSubjectsOf,
+  instanceSubjectPage,
+  instanceSubjectsOf,
+  PER_INSTANCE_KINDS,
+  projectInstanceSubject,
 } from "../state-visualizer.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -140,10 +142,12 @@ describe("each page reads the projection that already exists", () => {
 describe("what a page may claim", () => {
   test("a graph with no projection says so instead of rendering zeros", () => {
     // `qa` was the example here until 2026-09-21, when bean `py74` gave it a
-    // projection. `health` (1 file) and `issue-marks` (2) are the ones this
-    // repository has DECIDED are too thin to earn a dashboard, so they are the
-    // stable examples rather than merely the currently-empty ones.
-    const html = read("health");
+    // projection. `issue-marks` (2 files) is the one this repository has
+    // DECIDED is too thin to earn a dashboard, so it is the stable example
+    // rather than merely a currently-empty one. `health` was beside it until
+    // 2026-10-15, when it gained per-instance pages (bean
+    // `folio-assistant-1nu0`).
+    const html = read("issue-marks");
     expect(html).toContain("declared");
     expect(html).toContain("2krx");
     // No container in the BODY, so the renderer never mounts. Matched as the
@@ -288,10 +292,21 @@ describe("no projection here is not the same as nothing renders this", () => {
     // The other direction, and the reason this change is scoped rather than a
     // blanket rewrite: these declare no visualiser, so their pages were right
     // and must not move. `qa` was in this list until 2026-09-21 and left it by
-    // GAINING a projection (bean `py74`), not by the rule changing.
-    for (const id of ["health", "issue-marks"]) {
+    // GAINING a projection (bean `py74`), not by the rule changing; `health`
+    // left it on 2026-10-15 by GAINING a declared viewer (per-instance pages,
+    // bean `folio-assistant-1nu0`).
+    for (const id of ["issue-marks"]) {
       expect(read(id)).toContain("nothing publishes a projection for it yet");
       expect(read(id)).not.toContain("rendered elsewhere");
+    }
+  });
+
+  test("health and attestations point at this instance's own per-instance page (bean folio-assistant-1nu0)", () => {
+    for (const id of ["health", "attestations"]) {
+      const html = read(id);
+      expect(html).toContain("rendered elsewhere");
+      expect(html).toContain(`href="cat-harness/"`);
+      expect(html).not.toContain("nothing publishes a projection for it yet");
     }
   });
 
@@ -675,7 +690,7 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
   });
 
   test("one subject per instance holding the kind, named by its member, sorted", () => {
-    const subjects = qaSubjectsOf(
+    const subjects = instanceSubjectsOf(
       [
         dir({ absPath: "/x/who-iris/test/results", declaredBy: "who-iris" }),
         dir({ absPath: "/x/cat-harness-tools/test/results", declaredBy: "cat-harness", member: "cat-harness-tools" }),
@@ -688,7 +703,7 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
   });
 
   test("the instance root is recovered from the declared path, not composed", () => {
-    const [s] = qaSubjectsOf([dir({ absPath: "/x/who-iris/test/results", declaredBy: "who-iris" })], ["qa"]);
+    const [s] = instanceSubjectsOf([dir({ absPath: "/x/who-iris/test/results", declaredBy: "who-iris" })], ["qa"]);
     expect(s!.instanceRoot).toBe("/x/who-iris");
   });
 
@@ -696,18 +711,18 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
     // Derived QA lives on qa-reports: an absent tree is the normal case.
     const absent = join(tmpdir(), "sv-qa-absent-xyz", "test", "results");
     expect(existsSync(absent)).toBe(false);
-    expect(qaSubjectsOf([dir({ absPath: absent, declaredBy: "smart-base" })], ["qa"]).map((s) => s.name)).toEqual(["smart-base"]);
+    expect(instanceSubjectsOf([dir({ absPath: absent, declaredBy: "smart-base" })], ["qa"]).map((s) => s.name)).toEqual(["smart-base"]);
   });
 
   test("an instance page with no corpus says UNKNOWN, links back and to its siblings", () => {
-    const subjects = qaSubjectsOf(
+    const subjects = instanceSubjectsOf(
       [
         dir({ absPath: "/x/a/test/results", declaredBy: "a" }),
         dir({ absPath: "/x/b/test/results", declaredBy: "b" }),
       ],
       ["qa"],
     );
-    const html = qaSubjectPage({ id: "qa", title: "QA results" }, subjects[0]!, subjects, {
+    const html = instanceSubjectPage({ id: "qa", title: "QA results" }, subjects[0]!, subjects, {
       $schema: "folio-qa-graph/v1",
       availability: "unknown",
       reason: "not fetched",
@@ -720,8 +735,8 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
   });
 
   test("an instance page with a corpus renders its families", () => {
-    const [s] = qaSubjectsOf([dir({ absPath: "/x/a/test/results", declaredBy: "a" })], ["qa"]);
-    const html = qaSubjectPage({ id: "qa" }, s!, [s!], {
+    const [s] = instanceSubjectsOf([dir({ absPath: "/x/a/test/results", declaredBy: "a" })], ["qa"]);
+    const html = instanceSubjectPage({ id: "qa" }, s!, [s!], {
       $schema: "folio-qa-graph/v1",
       files: 2,
       families: [{ schema: "kg-qa/v1", files: 2, rollUpField: "totals", buckets: { pass: 3 } }],
@@ -730,5 +745,67 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
     } as never);
     expect(html).toContain("<code>kg-qa/v1</code>");
     expect(html).toContain("over 2 document(s)");
+  });
+});
+
+describe("per-instance health and attestations pages (bean folio-assistant-1nu0)", () => {
+  const dir = (o: { id: string; path: string; absPath: string; declaredBy: string; member?: string; kinds: string[] }) => ({
+    ...o,
+    graphTypologies: o.kinds,
+  });
+
+  test("health and attestations have a per-instance renderer; a kind without one does not", () => {
+    expect(PER_INSTANCE_KINDS.has("health")).toBe(true);
+    expect(PER_INSTANCE_KINDS.has("attestations")).toBe(true);
+    expect(PER_INSTANCE_KINDS.has("beans")).toBe(false);
+  });
+
+  test("subjects of `health` are every instance declaring it, whatever its path", () => {
+    const subjects = instanceSubjectsOf(
+      [
+        dir({ id: "health", path: "test/health/results/", absPath: "/x/cat-harness/test/health/results", declaredBy: "cat-harness", kinds: ["health"] }),
+        dir({ id: "health", path: "health/", absPath: "/x/cat-harness-tools/health", declaredBy: "cat-harness-tools", kinds: ["health"] }),
+        dir({ id: "qa", path: "test/results/", absPath: "/x/who-iris/test/results", declaredBy: "who-iris", kinds: ["qa"] }),
+      ],
+      ["health"],
+    );
+    expect(subjects.map((s) => s.name)).toEqual(["cat-harness", "cat-harness-tools"]);
+    expect(subjects[1]!.instanceRoot).toBe("/x/cat-harness-tools");
+  });
+
+  test("an absent health directory is UNKNOWN, not zero, and the page says no QA no-total claim", () => {
+    const absent = join(tmpdir(), "sv-health-absent-xyz", "test", "health", "results");
+    expect(existsSync(absent)).toBe(false);
+    const [s] = instanceSubjectsOf(
+      [dir({ id: "health", path: "test/health/results/", absPath: absent, declaredBy: "who-iris", kinds: ["health"] })],
+      ["health"],
+    );
+    const ix = projectInstanceSubject(s!, ["health"]);
+    expect((ix as { availability?: string }).availability).toBe("unknown");
+    const html = instanceSubjectPage({ id: "health", coversKinds: ["health"] }, s!, [s!], ix);
+    expect(html).toContain("<strong>unknown</strong>, not zero");
+    expect(html).toContain("test/health/results/");
+    expect(html).toContain(GENERATED_BY);
+  });
+
+  test("a present attestations directory is counted by its documents' $schema", () => {
+    const root = mkdtempSync(join(tmpdir(), "sv-att-"));
+    const at = join(root, "test", "attestations", "kg-qa");
+    mkdirSync(at, { recursive: true });
+    writeFileSync(join(at, "a.attestations.json"), JSON.stringify({ $schema: "qa-attestations/v1", subject: "a" }));
+    writeFileSync(join(at, "b.attestations.json"), JSON.stringify({ $schema: "qa-attestations/v1", subject: "b" }));
+    try {
+      const [s] = instanceSubjectsOf(
+        [dir({ id: "attestations", path: "test/attestations/", absPath: join(root, "test", "attestations"), declaredBy: "folio-assistant-sci", kinds: ["attestations"] })],
+        ["attestations"],
+      );
+      expect(s!.instanceRoot).toBe(resolve(root));
+      const html = instanceSubjectPage({ id: "attestations", coversKinds: ["attestations"] }, s!, [s!]);
+      expect(html).toContain("<code>qa-attestations/v1</code>");
+      expect(html).toContain("over 2 document(s)");
+      expect(html).not.toContain("three silent decisions");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
