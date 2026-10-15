@@ -189,13 +189,23 @@ export function entryGraphSitePath(instance: string, docId: string, rel: string)
  * `library/l1-recommendation-scenarios/` as `l1-extraction`, and a reader that
  * walked it as an entry graded it for a manifest and sections it never had.
  */
-export function nonEntryDirs(lib: string): Set<string> {
+export function nonEntryDirs(lib: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Set<string> {
   const out = new Set<string>();
   const inst = findInstanceRoot(lib);
   if (inst === undefined) return out;
-  for (const e of readDeclaration(inst)?.directories ?? []) {
+  // The RESOLVED directories, not the declaration file alone: a library names
+  // a directory of another kind FROM WITHIN (`library/library.json`'s
+  // `directories`, the #980 shape `check:layout-norms` sanctions), and a
+  // reader of the root file alone graded that directory as an entry missing
+  // its manifest, sections and blocks (cat-harness-tools#281). The raw
+  // declaration stays the fallback for a declaration the resolver refuses.
+  const resolved = declaredDirectoriesOf(inst, registry);
+  const entries: { path: string; graphTypologies?: readonly string[]; scope?: string }[] =
+    resolved ?? readDeclaration(inst)?.directories ?? [];
+  for (const e of entries) {
+    if (e.scope === "repository") continue;
     const abs = join(inst, e.path).replace(/[/\\]+$/, "");
-    if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies as readonly string[]).includes("library")) out.add(abs);
+    if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies ?? []).includes("library")) out.add(abs);
   }
   return out;
 }
