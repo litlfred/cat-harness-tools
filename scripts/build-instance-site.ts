@@ -91,6 +91,18 @@ import { chromeLayers } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
+
+/**
+ * The rail pass ("rail on every page") replaces the theme's side bar on every
+ * page it builds, so a theme site's build never carries `#site-nav`. That is
+ * the owner's ruling, not a shortfall. Owner, 2026-10-15, "Replace sidebar
+ * after build" (one rail everywhere): the folio rail stands in for the theme's
+ * side menu. The search box and the rail itself stay required.
+ */
+export const THEME_SIDEBAR_RULING: DroppedByRuling = {
+  feature: "siteNav",
+  ruling: 'owner, 2026-10-15, "Replace sidebar after build": the rail pass replaces the theme\'s side bar on every page (one rail everywhere)',
+};
 import { siteCoverageShortfall } from "./site-coverage.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
@@ -800,12 +812,13 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
     else {
+      const dropped = [...(o.parityDropped ?? []), ...((o.parityDropped ?? []).some((x) => x.feature === "siteNav") ? [] : [THEME_SIDEBAR_RULING])];
       const cur = siteFeatures(against, keep);
       const cand = siteFeatures(site, keep);
       console.log(`parity: ${describeFeatures("current root", cur)}`);
       console.log(`parity: ${describeFeatures("this build  ", cand)}`);
-      for (const d of droppedByRuling(cur, cand, o.parityDropped ?? [])) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
-      const short = parityShortfall(cur, cand, o.parityDropped ?? []);
+      for (const d of droppedByRuling(cur, cand, dropped)) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
+      const short = parityShortfall(cur, cand, dropped);
       for (const m of short) console.error(`  ✗ ${m}`);
       if (short.length && o.publish && o.parity !== "report") throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
       if (!short.length) console.log("parity: ✓ this build carries everything the published root does");

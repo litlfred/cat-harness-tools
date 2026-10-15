@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import { publishedRoot, recipeFromConfig, siteStepEnv } from "../build-instance-site.ts";
 import { droppedByRuling, matchesDropped, parityShortfall, siteFeatures } from "../site-parity.ts";
+import { THEME_SIDEBAR_RULING } from "../build-instance-site.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
 const put = (root: string, rel: string, text = "x") => {
@@ -227,5 +228,21 @@ describe("page features dropped by the owner's ruling (layout \"C\", 2026-10-15)
     const short = parityShortfall(current, siteFeatures(noOpenapi), [both]).join("\n");
     expect(short).toContain("openapi/");
     expect(short).toContain("#site-nav");
+  });
+});
+
+describe("the theme side bar the rail pass replaces", () => {
+  // who-iris, 2026-10-15: the one-rail build replaced #site-nav on every page,
+  // and the guard refused the publish for losing it.
+  test("its loss is the ruling's, not a shortfall; a lost search box or rail still is", () => {
+    const cur = tmp("parity-theme-cur-");
+    put(cur, "index.html", THEMED);
+    const cand = tmp("parity-theme-cand-");
+    put(cand, "index.html", page(`<nav class="fa-nav"></nav><input id="search-input"><script type="application/json" id="fa-navbar-row">{}</script>`, META));
+    expect(parityShortfall(siteFeatures(cur), siteFeatures(cand))).toHaveLength(1);
+    expect(parityShortfall(siteFeatures(cur), siteFeatures(cand), [THEME_SIDEBAR_RULING])).toEqual([]);
+    const bare = tmp("parity-theme-bare-");
+    put(bare, "index.html", page(`<nav class="fa-nav"></nav><script type="application/json" id="fa-navbar-row">{}</script>`, META));
+    expect(parityShortfall(siteFeatures(cur), siteFeatures(bare), [THEME_SIDEBAR_RULING]).map((x) => x.split(":")[0])).toEqual(["the search box (#search-input)"]);
   });
 });
