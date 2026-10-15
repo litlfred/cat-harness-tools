@@ -47,6 +47,19 @@
  * - **failed** — the render threw, or it published nothing, or it published a
  *   kind it does not own. Exit 1.
  *
+ * ## An instance that declares no directories renders nothing, and passes
+ *
+ * Owner, 2026-10-15 ("C1"): an instance may declare `directories: []` — an
+ * index that mounts none of a repository's directories declares only what it
+ * has there, which is nothing (B1). Its
+ * render is then empty BY DECLARATION, which is a different fact from the
+ * `dh4f` defect this check exists for (a declared directory resolving to
+ * nothing). So such an instance is **rendered**, flagged `noDirectories`, and
+ * reported as "declares no directories" in the summary, never silently. The
+ * exemption is exactly the explicit empty list: an instance that declares a
+ * directory and renders nothing still fails, and so does one whose
+ * declaration leaves `directories` out, which has not said it holds nothing.
+ *
  * Usage:
  *   bun run cat check:instance-render
  *   bun run cat check:instance-render -- --json
@@ -55,9 +68,11 @@
  * @covers docs, cat-harness
  */
 
-import { basename, relative, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 
 import {
+  findDeclarationFile,
   instanceRootFor,
   instanceRootsIn,
   declaredKinds,
@@ -126,6 +141,11 @@ export interface InstanceRender {
   notes?: readonly string[];
   /** Why, when the verdict is not `rendered`. */
   reasons: string[];
+  /**
+   * It declares `directories: []`, so it has no nodes of its own to render and
+   * a zero `nodeCount` is accepted (C1, see the module note). Reported.
+   */
+  noDirectories?: boolean;
 }
 
 /**
@@ -135,6 +155,22 @@ export interface InstanceRender {
  * more, and those are equally the instance's. Reading only `harness.json`
  * makes `bean-defs` look like something bootstrap smuggled in.
  */
+
+/**
+ * Whether the declaration as WRITTEN says `directories: []` (C1). Read raw:
+ * the parsed declaration gives an instance that leaves `directories` out the
+ * same empty list, and that one has not declared that it holds nothing.
+ */
+export function declaresNoDirectories(root: string): boolean {
+  const file = findDeclarationFile(root);
+  if (file === undefined) return false;
+  try {
+    const d = (JSON.parse(readFileSync(join(root, file), "utf-8")) as { directories?: unknown }).directories;
+    return Array.isArray(d) && d.length === 0;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Render one instance and judge it.
@@ -202,7 +238,10 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
   // this repository's own precedent, stated in `code-quality-gates.yml` for
   // ruff: "a check is an error only once its count is zero". These three are
   // at zero and so are errors; `undeclared` is at 16 and so is a finding.
-  if (ownNodes === 0) {
+  // An explicit `directories: []` is an instance that declares nothing to
+  // render (C1): its empty graph is the declaration's, not a lost directory's.
+  const noDirectories = declaresNoDirectories(root);
+  if (ownNodes === 0 && !noDirectories) {
     reasons.push(
       "rendered zero nodes of its own — an empty graph is a failure, not an empty success. " +
         `(${nodes.nodes.length} node(s) total, all contributed by the universal graph-typology registry.)`,
@@ -221,6 +260,7 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
     omitted: nodes.omitted,
     notes: nodes.notes,
     reasons,
+    ...(noDirectories ? { noDirectories: true } : {}),
   };
 }
 
@@ -251,6 +291,7 @@ export function formatReport(rs: InstanceRender[]): string {
         `${r.nodeCount} own node(s) of ${r.totalNodes}, ${r.declared.length} declared, ${r.published.length} published`,
     );
     for (const why of r.reasons) out.push(`      ${why}`);
+    if (r.noDirectories) out.push("      declares no directories (`directories: []`): nothing of its own to render, accepted by declaration");
     if (r.undeclared.length) {
       out.push(
         `      \u2717 publishes ${r.undeclared.length} kind(s) it does not declare — ` +
@@ -266,7 +307,10 @@ export function formatReport(rs: InstanceRender[]): string {
   const undet = rs.filter((r) => r.verdict === "undetermined").length;
   out.push("");
   const findings = rs.reduce((n, r) => n + r.undeclared.length, 0);
-  out.push(`${rs.length - failed - undet} rendered, ${failed} failed, ${undet} undetermined.`);
+  const empty = rs.filter((r) => r.verdict === "rendered" && r.noDirectories);
+  out.push(
+    `${rs.length - failed - undet} rendered${empty.length ? ` (${empty.length} declare no directories: ${empty.map((r) => r.name).join(", ")})` : ""}, ${failed} failed, ${undet} undetermined.`,
+  );
   if (findings) {
     // FATAL since bean `3jj9`. The line here used to read "reported and not
     // fatal … they become fatal when collectGraphTypologies() is instance-scoped

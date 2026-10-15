@@ -2,7 +2,9 @@
 # workflow (bean folio-assistant-63q4).
 #
 # Owner, 2026-10-15: each instance's context is published by its own
-# repository at `<iriBase>ns/context/v1.jsonld`, through a reusable workflow
+# repository at `<iriBase>ns/context/v1.jsonld` (or, for an instance whose `ns`
+# is a document, beside it at `<iriBase>ns.context.v1.jsonld`: owner D1,
+# `contextPathFor` in scripts/gen-instance-contexts.ts), through a reusable workflow
 # the harness owns, and the harness's initiation process sets the caller up.
 # Until then the per-instance contexts were "built at publish" (f94bae4) and
 # nothing published them, so every per-instance context URL a document named
@@ -30,7 +32,7 @@
 #      (`publish-instance-context.ts build`): another instance's unresolved
 #      prefix is that repository's to fix, and must not stop this publish.
 #      No `iriBase`, or no `.jsonld` documents, is a skip with a notice.
-#   5. Put `ns/context/v1.jsonld` on the caller's `gh-pages` with the caller's
+#   5. Put the context, at the path the build reported, on the caller's `gh-pages` with the caller's
 #      GITHUB_TOKEN (contents API, one path, skipped when unchanged, nothing
 #      else on the branch touched). No `gh-pages` yet: an orphan one is created
 #      holding `.nojekyll`, the context and a placeholder `index.html`.
@@ -75,7 +77,7 @@ env:
 
 jobs:
   publish:
-    name: Publish ns/context/v1.jsonld
+    name: Publish the JSON-LD context
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -147,6 +149,8 @@ jobs:
           out="$RUNNER_TEMP/context.jsonld"
           bun run cat-harness-tools/scripts/publish-instance-context.ts build --root . --instance "$INSTANCE" --out "$out" --report "$RUNNER_TEMP/context-report.json"
           if [ -s "$out" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; else echo "built=false" >> "$GITHUB_OUTPUT"; fi
+          # Where it is served is the build's answer (D1), never spelled here.
+          echo "path=$(jq -r '.path // empty' "$RUNNER_TEMP/context-report.json")" >> "$GITHUB_OUTPUT"
       - name: Publish to gh-pages
         if: steps.build.outputs.built == 'true'
         working-directory: fa
@@ -154,7 +158,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-        run: bun run cat-harness-tools/scripts/publish-instance-context.ts publish --repo "$REPO" --file "$RUNNER_TEMP/context.jsonld" --sha "$SHA"
+          CONTEXT_PATH: ${{ steps.build.outputs.path }}
+        run: bun run cat-harness-tools/scripts/publish-instance-context.ts publish --repo "$REPO" --file "$RUNNER_TEMP/context.jsonld" --path "$CONTEXT_PATH" --sha "$SHA"
       # The instance's own VOCABULARY, at the address its term IRIs name
       # (`<iriBase><version>/ns#Term`), read off the vocabulary's `@id` by the
       # script rather than written here (owner, 2026-10-15, "Serve vocab at own
@@ -193,5 +198,5 @@ jobs:
               cat "$RUNNER_TEMP/context-report.json"
               echo '```'
             fi
-            echo "Served once GitHub Pages is on (Settings → Pages → Deploy from a branch: gh-pages, / (root)). Check: \`curl -sI <iriBase>ns/context/v1.jsonld\` answers 200 with \`content-type: application/ld+json\`."
+            echo "Served once GitHub Pages is on (Settings → Pages → Deploy from a branch: gh-pages, / (root)). Check: \`curl -sI <iriBase><path above>\` answers 200 with \`content-type: application/ld+json\`."
           } >> "$GITHUB_STEP_SUMMARY"
