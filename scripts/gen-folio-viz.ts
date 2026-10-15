@@ -59,14 +59,28 @@
  * `bmr0` gated this after four warnings did not work, and it caught the
  * author of this file on 2026-09-22 in `gen-library-viz.ts`.
  *
+ * ## One page per instance — bean `folio-assistant-1nu0`
+ *
+ * Owner, 2026-10-15: *"per-instance pages"*. The visualiser covered
+ * cat-harness's own `folio` directory by id, so folio-assistant-core
+ * (`folios/`) and who-iris (`folio/`) read *"no viewer yet"* in the navbar
+ * although each declares a folio graph. It now covers the KIND with
+ * `subgraphs: "instance"`: the full view stays cat-harness's own graph at
+ * `<locale>/<harness>/folio/`, and every OTHER instance in the checkout
+ * holding a folio directory gets `<locale>/<harness>/folio/<instance>/`,
+ * over a projection of that instance's directories alone at
+ * `assets/folio/<instance>/index.json`. Those pages describe instances above
+ * this layer, so they are built at publish (`builtAtPublish`) and never
+ * committed here.
+ *
  * Usage:
  *   bun run cat folio:viz
  *   bun run cat folio:viz -- --check
  *
  * Exit: 0 written or up to date · 1 stale under `--check`.
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { basename, join, relative, sep } from "node:path";
 
 import { viewerPlacement } from "./gen-schema-viz.ts";
 import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio-render/file-list.ts";
@@ -79,7 +93,9 @@ import {
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { declaredPageRoute, renderedByOf, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
@@ -128,6 +144,15 @@ export function readFolioGraph(roots: string[], repo?: string): FolioGraph | nul
   const dirs = new Set<string>();
   for (const root of roots) for (const d of directoriesForGraph(root, "folio")) dirs.add(d);
   if (dirs.size === 0) return null;
+  return readFolioDirs([...dirs], repo ?? roots[roots.length - 1] ?? "");
+}
+
+/**
+ * {@link readFolioGraph} over directories already resolved — one instance's,
+ * for its own page. Absent directories are rows here too.
+ */
+export function readFolioDirs(dirList: readonly string[], repo: string): FolioGraph {
+  const dirs = new Set(dirList);
 
   // REPO-RELATIVE, AND THE COMMITTED ARTEFACT IS WHY.
   //
@@ -141,7 +166,7 @@ export function readFolioGraph(roots: string[], repo?: string): FolioGraph | nul
   // Caught by the gate this same change added, on its first CI run. Its
   // siblings (`library/`, `voices/`) already emit relative paths; this one
   // did not, and nothing said so until the path differed.
-  const base = repo ?? roots[roots.length - 1] ?? "";
+  const base = repo;
   const rel = (p: string): string => (base ? relative(base, p) : p).split("\\").join("/");
 
   const g: FolioGraph = { directories: [], nodes: [] };
@@ -224,10 +249,16 @@ export function projection(g: FolioGraph): unknown {
  * site's own scheme switch (data-fa-scheme), dark first because the site's
  * ground is, and everything else is neutral and translucent.
  */
-export function viewerHtml(dataHref: string): string {
+export function viewerHtml(dataHref: string, instance?: string): string {
+  const heading = instance === undefined ? "folio — the graph" : "folio — " + instance;
+  const scope =
+    instance === undefined
+      ? ""
+      : " This page is <strong>" + escText(instance) + "</strong>'s folio graph alone; " +
+        '<a href="../">the full view</a> is cat-harness\'s.';
   // NO BACKTICKS BELOW THIS LINE — see the module header.
   return themedPage({
-    title: "folio — the graph",
+    title: heading,
     generator: "cat-harness-tools/scripts/gen-folio-viz.ts",
     command: "bun run folio:viz",
     body: `<style>
@@ -253,10 +284,10 @@ export function viewerHtml(dataHref: string): string {
 .fo-page .empty { opacity:.9; }
 </style>
 <div class="fo-page">
-  <h1 id="fo-title">folio — the graph</h1>
+  <h1 id="fo-title">${escText(heading)}</h1>
   <p class="lede">Every node the folio graph holds: what it anchors to, the theme it claims,
      where it was declared, and the links it carries. The folio's <em>content</em> renders as
-     the landing board; this is a view of the graph behind it.</p>
+     the landing board; this is a view of the graph behind it.${scope}</p>
   <div id="badges"></div>
   <div id="dirs"></div>
   <div id="files"></div>
@@ -354,6 +385,40 @@ fetch(DATA_HREF).then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.
   });
 }
 
+/** HTML-escape text placed in the page at generate time. */
+function escText(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** One instance's folio graph: its declared name and its folio directories. */
+export interface FolioSubject {
+  name: string;
+  dirs: string[];
+}
+
+/**
+ * Every instance in the checkout holding a folio directory, EXCEPT the
+ * directories the visualiser names by id (`covers`) on its declarer — those
+ * are the full view's. Read from the resolved checkout, so a new instance
+ * declaring a folio graph gets its page with no edit here.
+ */
+export function folioSubjects(
+  dirs: ReadonlyArray<{ id: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
+  handler: string,
+  coversById: readonly string[],
+): FolioSubject[] {
+  const out = new Map<string, FolioSubject>();
+  for (const d of dirs) {
+    if (!d.graphTypologies.includes("folio")) continue;
+    if (d.declaredBy === handler && coversById.includes(d.id)) continue;
+    const name = d.member ?? d.declaredBy;
+    const s = out.get(name) ?? { name, dirs: [] };
+    if (!s.dirs.includes(d.absPath)) s.dirs.push(d.absPath);
+    out.set(name, s);
+  }
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 let stale = 0;
 /**
  * The viewer `emit`, for the projection and the page alike. No `nav` since
@@ -393,10 +458,51 @@ if (import.meta.main) {
   // The page names the Tool that drew it; the route is the declaration's.
   emit(join(pageDir, "index.html"), withRenderedByFrontMatter(viewerHtml(dataHref), VIEWER_TOOL));
 
+  // PER-INSTANCE PAGES (bean `folio-assistant-1nu0`), for a visualiser that
+  // asks for them. A page built at publish has no committed bytes for
+  // `--check` to compare, so it is skipped there and written otherwise.
+  const decl = readDeclaration(ROOT);
+  const vis = (decl?.visualisers ?? []).find((v) => v.renderedBy === VIEWER_TOOL);
+  const builtHere = (p: string): boolean =>
+    isBuiltAtPublish(decl?.builtAtPublish ?? [], relative(ROOT, p).split(sep).join("/"));
+  const subjects =
+    vis?.subgraphs === "instance" ? folioSubjects(checkoutDirectories(ROOT), handler, vis.covers ?? []) : [];
+  for (const sub of subjects) {
+    const subPage = join(pageDir, sub.name);
+    const subData = join(dataDir, sub.name);
+    const subHref = relative(subPage, join(subData, "index.json")).split(sep).join("/");
+    const sg = readFolioDirs(sub.dirs, repoRoot);
+    if (check && builtHere(join(subPage, "index.html"))) continue;
+    emit(join(subData, "index.json"), JSON.stringify(projection(sg), null, 2) + "\n");
+    emit(join(subPage, "index.html"), withRenderedByFrontMatter(viewerHtml(subHref, sub.name), VIEWER_TOOL));
+  }
+  // ORPHANS: a page this viewer drew for an instance that no longer holds a
+  // folio graph. Only a page that names this Tool as its renderer is touched.
+  const drawn = new Set(subjects.map((x) => x.name));
+  const orphans = existsSync(pageDir)
+    ? readdirSync(pageDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !drawn.has(e.name))
+        .map((e) => e.name)
+        .filter((n) => {
+          const f = join(pageDir, n, "index.html");
+          return existsSync(f) && renderedByOf(readFileSync(f, "utf-8")) === VIEWER_TOOL;
+        })
+    : [];
+  for (const n of orphans) {
+    if (check && builtHere(join(pageDir, n, "index.html"))) continue;
+    console.error(`  ${check ? "!" : "-"} orphan instance page ${check ? "" : "removed "}${relative(site, join(pageDir, n))}`);
+    if (check) stale++;
+    else {
+      rmSync(join(pageDir, n), { recursive: true });
+      rmSync(join(dataDir, n), { recursive: true, force: true });
+    }
+  }
+
   const absent = g.directories.filter((d) => !d.present).length;
   console.log(
     `  ${g.nodes.length} sticky(ies) across ${g.directories.length} declared director(ies)` +
-      (absent ? `, ${absent} declared but absent` : ""),
+      (absent ? `, ${absent} declared but absent` : "") +
+      (subjects.length ? `; ${subjects.length} instance page(s): ${subjects.map((x) => x.name).join(", ")}` : ""),
   );
   if (check && stale > 0) {
     console.error(`\n${stale} artefact(s) stale — run \`bun run cat folio:viz\``);

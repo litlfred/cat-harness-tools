@@ -22,6 +22,7 @@ import {
   GENERATED_BY,
   ownVisualiserRefs,
   prunableDashboards,
+  beansSubjectPage,
   instanceSubjectPage,
   instanceSubjectsOf,
   PER_INSTANCE_KINDS,
@@ -745,6 +746,32 @@ describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
     } as never);
     expect(html).toContain("<code>kg-qa/v1</code>");
     expect(html).toContain("over 2 document(s)");
+  });
+});
+
+describe("per-instance beans pages (bean folio-assistant-1nu0)", () => {
+  const subj = (name: string) => ({ name, path: "beans/", absPath: `/x/${name}/beans`, instanceRoot: `/x/${name}` });
+  const bean = (id: string, status: string, priority = "normal") => ({
+    id, file: `beans/defs/${id}.md`, title: `title of ${id}`, status, type: "task", priority, parent: "",
+    blocking: [], blockedBy: [], createdAt: "", updatedAt: "", body: "", tags: [], targets: [],
+  });
+
+  test("lists the store's OPEN beans, by priority, and counts the rest", () => {
+    const s = [subj("a"), subj("b")];
+    const html = beansSubjectPage({ id: "beans" }, s[0]!, s, {
+      beans: [bean("a-1", "todo"), bean("a-2", "completed"), bean("a-3", "in-progress", "high")] as never,
+    });
+    expect(html).toContain("Open — 2 of 3 bean(s)");
+    expect(html.indexOf("a-3")).toBeLessThan(html.indexOf("a-1"));
+    expect(html).not.toContain("<code>a-2</code>");
+    expect(html).toContain('href="../b/"');
+    expect(html).toContain(GENERATED_BY);
+  });
+
+  test("an unreachable store is UNKNOWN, and no store is not an empty one", () => {
+    const s = [subj("a")];
+    expect(beansSubjectPage({ id: "beans" }, s[0]!, s, { unreachable: "not mounted" })).toContain("<strong>unknown</strong>, not zero");
+    expect(beansSubjectPage({ id: "beans" }, s[0]!, s, { beans: null })).toContain("no store, not an empty one");
   });
 });
 
