@@ -887,6 +887,7 @@ export async function stageDeclared(
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
+  if (d.recipe.finalSteps?.length) log(`final       ${d.recipe.finalSteps.join(", ")} (after the platform's own writers)`);
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
   if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
   if (target === "main") {
@@ -903,6 +904,7 @@ export async function stageDeclared(
     pre: d.recipe.pre,
     sourceSteps: d.recipe.sourceSteps,
     siteSteps: d.recipe.siteSteps,
+    ...(d.recipe.finalSteps ? { finalSteps: d.recipe.finalSteps } : {}),
     ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
