@@ -79,6 +79,14 @@ import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "tools-viewer";
+/**
+ * Every page this writes declares itself generated in its own front matter —
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
+ * `gen-processes-viz.ts` does. A page lists the Tool nodes and the instances that declare them, which belong to every
+ * instance in the checkout, so without the key those names read as authored
+ * prose in the committing layer naming the layers above it.
+ */
+const GENERATED_FM = "generated: gen-tools-viz.ts — do not hand-edit; run `bun run cat tools:viz`";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 /** The graph typology this renders. A KIND, never a path. */
@@ -356,6 +364,7 @@ export function page(
     "---",
     `title: "${title}"`,
     `description: "The Tool nodes ${whose} — how each is installed and invoked, and which skill it satisfies."`,
+    GENERATED_FM,
     "---",
     `<style>${CSS}</style>`,
     "",

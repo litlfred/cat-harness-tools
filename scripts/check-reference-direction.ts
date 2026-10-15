@@ -707,10 +707,15 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
  * that generator began writing `generated:` into every page it draws
  * (folio-assistant#2529, PR 3 of the reference-direction batch).
+ *
+ * The third: `cat-harness/docs/en/cat-harness/methodologies/index.md`, held
+ * naming three, is `gen-methodologies-viz.ts`'s, and left when that generator
+ * — with `gen-tools-viz.ts` and `gen-lsi-viz.ts` — began writing `generated:`
+ * (D1 aftermath, 2026-10-15). `cat-harness/docs/cat-harness/published-graphs.md`
+ * left the same day: nothing in it names a layer above any more.
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "cat-harness/docs/cat-harness/published-graphs.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/cat-harness.json", names: 2 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
@@ -725,7 +730,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
-  { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
