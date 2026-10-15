@@ -93,7 +93,10 @@
  * `glossary-page.ts` use (bean `ws99`), which `check:reference-direction`
  * reads as "a generator wrote this". A subgraph file names every instance
  * whose nodes it frames, so without the key each one read as authored
- * prose in the instance that commits it naming the layers above it.
+ * prose in the instance that commits it naming the layers above it. The
+ * subgraph context declares `_generated` as a `@json` term
+ * ({@link subgraphContext}), so the files stay valid JSON-LD: an unmapped key
+ * is an `invalid property` to a processor, not something it silently drops.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts            # write
@@ -333,6 +336,12 @@ export function subgraphContext(): Record<string, unknown> {
   ctx.payload = { "@id": propertyIri("payload") };
   ctx.sha256 = { "@id": propertyIri("sha256") };
   ctx.bytes = { "@id": propertyIri("bytes") };
+  // The top-level `_generated` note ({@link SUBGRAPH_GENERATED}) is a TERM, not
+  // a bare key: a key the context does not map is an `invalid property` to a
+  // JSON-LD processor, and `publish-verify`'s `jsonld-expand` fails on every
+  // subgraph file that carries one (folio-assistant#2545). `@json` keeps the
+  // note verbatim; it says who wrote the file, not anything about the graph.
+  ctx._generated = { "@id": propertyIri("generatedNote"), "@type": "@json" };
   return ctx;
 }
 
