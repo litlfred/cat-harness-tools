@@ -110,14 +110,26 @@ NEEDS_INPUT_SCRIPTS = {
 }
 # Gates that read something only a root with a given file can build: skipped
 # where that file is absent, run wherever it is present, so the rule follows
-# the root rather than naming any repository. The QA working copy that
-# uml:overview and readme:subgraphs read is built by `qa:refresh`, whose
-# writers are this harness's own CI recipe and read the gates workflow
-# (`gates.ts` GATES_WORKFLOW, via audit:coverage); in an IG index root or a
-# layer repository there is no such workflow, the build fails, and the gate
-# exits 2 on both sides (smart-immunizations#35).
+# the root rather than naming any repository. uml:overview and readme:subgraphs
+# read the QA working copy that `qa:refresh` builds, and a root without the
+# harness's gates workflow is a CONTENT root.
+#
+# Since cat-harness-tools#281 ("hold smart-ra to its own gate set") a content
+# root is no longer measured against that workflow: `audit:coverage` reads the
+# gate set `derive` below gives it, and `qa:refresh` reports the writers that
+# do not apply there (an undeclared script, unmounted state branches) as not
+# applicable. So the workflow's absence no longer makes the copy unbuildable by
+# itself. The skip stays because qa:refresh in a content root still ends
+# INCOMPLETE on the root's own content gaps, and the gate would exit 2 on both
+# sides: measured in smart-ra on 2026-10-15, `check:l1-complete` (L1 entries
+# with no manifest.jsonld / images.json) and `check:wireframes` (two surfaces
+# with no wireframe, a catalogue naming an undeclared instance) fail. Those are
+# the root's to fix; when its qa:refresh is COMPLETE this skip is what to drop.
 GATES_WORKFLOW = ".github/workflows/code-quality-gates.yml"
-QA_WORKING_COPY = "reads the QA working copy, which qa:refresh cannot build without it"
+QA_WORKING_COPY = ("marks a content root, where the QA working copy these read is built by qa:refresh "
+                   "against the root's own gate set and stays INCOMPLETE while the root has content gaps "
+                   "of its own (failed writers such as check:l1-complete, check:wireframes), so the gate "
+                   "could only report UNKNOWN (cat-harness-tools#281)")
 PREREQUISITE_FILES = {
     "uml:overview:check": (GATES_WORKFLOW, QA_WORKING_COPY),
     "readme:subgraphs:check": (GATES_WORKFLOW, QA_WORKING_COPY),
@@ -174,16 +186,16 @@ def gate_args(script, env=None):
 
 
 def skip_reason(root, script):
-    """Why a declared gate cannot determine anything in this run, or None to run it."""
+    """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it."""
     if script in LIVE_STATE_SCRIPTS:
-        return "judges the remote's live state, not the checkout"
+        return "live-state", "judges the remote's live state, not the checkout"
     if script in NEEDS_INPUT_SCRIPTS:
-        return NEEDS_INPUT_SCRIPTS[script]
+        return "needs-input", NEEDS_INPUT_SCRIPTS[script]
     if script in PREREQUISITE_FILES:
         path, why = PREREQUISITE_FILES[script]
         if not os.path.exists(os.path.join(root, path)):
-            return f"{path} is absent at the root; it {why}"
-    return None
+            return "prerequisite", f"{path} is absent at the root; it {why}"
+    return None, None
 
 
 def read_json(path):
@@ -253,8 +265,8 @@ def script_runner(root):
     return "bun cat-harness-tools/scripts/run-script.ts"
 
 
-def declared_gates(root, name, path, runner):
-    """(gate name -> command, gate name -> (command, skip reason))."""
+def declared_gates(root, name, path, runner, env=None):
+    """(gate name -> command, gate name -> (command, skip reason, skip kind))."""
     pkg = read_json(os.path.join(root, path, "package.json")) or {}
     scripts = {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}
     # Through the index's own runner, as the index's CI runs them: it resolves
@@ -263,11 +275,13 @@ def declared_gates(root, name, path, runner):
     for s in sorted(scripts):
         if not (s.startswith("check:") or s.endswith(":check")):
             continue
-        extra, why = gate_args(s)
+        extra, why = gate_args(s, env)
         command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
-        why = why or skip_reason(root, s)
+        kind = "input-absent" if why else None
+        if not why:
+            kind, why = skip_reason(root, s)
         if why:
-            skipped[f"{name}:{s}"] = (command, why)
+            skipped[f"{name}:{s}"] = (command, why, kind)
         else:
             run[f"{name}:{s}"] = command
     return run, skipped
@@ -283,20 +297,27 @@ def run(root, name, command):
     return name, command, code, text
 
 
-def main():
-    args = sys.argv[1:]
-    root, out_path = args[0], args[1]
-    given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
-    records = [args[i + 1] for i, a in enumerate(args) if a == "--record" and i + 1 < len(args)]
-    tmp = os.environ.get("RUNNER_TEMP", "/tmp")
+def derive(root, given, tmp, env=None):
+    """The gate set a root's CI runs, without running it -- the ONE definition.
+
+    Returns (own, harness, runner, gates, skipped): gate name -> command for
+    the gates this runner runs, and gate name -> {command, skipped, kind} for
+    the declared ones it does not. `kind` says why: `live-state`,
+    `needs-input`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    on a side that holds no such input -- CI runs it where the input exists).
+
+    `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads
+    for a root that is not a harness (no `code-quality-gates.yml`), so
+    `audit:coverage` and `qa:refresh` measure such a root against the gates
+    its own CI runs (owner, cat-harness-tools#281: "hold smart-ra to its own
+    gate set"). A rule added here reaches both with no second list.
+    """
+    env = os.environ if env is None else env
     known = instances_in(root)
     own = own_instances(root, given, known)
     if not own:
-        print("::error::no own instance: pass --instance, declare one at the root, or mount one from index.config.json")
-        sys.exit(2)
+        return own, [], None, {}, {}
     harness = closure(own, known, root)
-    print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
-
     gates = {}
     for n in own:
         path = "./" if known.get(n, n) == "." else f"./{known.get(n, n)}"
@@ -305,24 +326,46 @@ def main():
     gates.update({f"graph:{k}": v for k, v in CHECKOUT_GATES.items()})
     seen_scripts = set()
     runner = script_runner(root)
-    print(f"script runner: {runner}", flush=True)
     for script, owner in CHECKOUT_SCRIPTS.items():
         command = f"{runner} {script}"
         seen_scripts.add(command)
         gates[f"{owner}:{script}"] = command
     skipped = {}
     for n in harness:
-        run_these, skip_these = declared_gates(root, n, known[n], runner)
+        run_these, skip_these = declared_gates(root, n, known[n], runner, env)
         for gname, command in run_these.items():
             if command in seen_scripts:
                 continue  # one script, run once, named by the first instance that declares it
             seen_scripts.add(command)
             gates[gname] = command
-        for gname, (command, why) in skip_these.items():
+        for gname, (command, why, kind) in skip_these.items():
             if command in seen_scripts:
                 continue
             seen_scripts.add(command)
-            skipped[gname] = {"command": command, "skipped": why}
+            skipped[gname] = {"command": command, "skipped": why, "kind": kind}
+    return own, harness, runner, gates, skipped
+
+
+def main():
+    args = sys.argv[1:]
+    given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
+    tmp = os.environ.get("RUNNER_TEMP", "/tmp")
+    if len(args) >= 2 and args[1] == "--list":
+        # `run-gates.py <root> --list [--instance <name>]...`: the derived set
+        # as JSON on stdout, nothing run. Exit 2 when there is no own instance:
+        # no gate set is "could not determine", never an empty pass.
+        own, harness, runner, gates, skipped = derive(args[0], given, tmp)
+        json.dump({"own": own, "harness": harness, "runner": runner, "gates": gates, "skipped": skipped}, sys.stdout, indent=1)
+        sys.exit(0 if own else 2)
+    root, out_path = args[0], args[1]
+    records = [args[i + 1] for i, a in enumerate(args) if a == "--record" and i + 1 < len(args)]
+    own, harness, runner, gates, skipped = derive(root, given, tmp)
+    if not own:
+        print("::error::no own instance: pass --instance, declare one at the root, or mount one from index.config.json")
+        sys.exit(2)
+    print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
+    print(f"script runner: {runner}", flush=True)
+    skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
 
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}

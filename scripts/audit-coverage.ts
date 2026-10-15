@@ -176,6 +176,9 @@ import {
 } from "./qa-results.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { stateMountedDirs } from "./mount-from-lock.ts";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */
 const ROOT = resolve(HARNESS_ROOT);
@@ -1013,6 +1016,17 @@ function main(): number {
   if (!check) {
     // Bean `loxz`: an unmounted tree must not leave a committed sidecar that
     // drops unmounted graphs as `undetermined`. Refuse to write.
+    // A CONTENT root with no state branch mounted (a document folio in its
+    // PR checks): the undetermined graphs are the ones kept on state branches,
+    // which that root does not hold. Not a failure of the root, and not a
+    // verdict either — not applicable, exit 78 (cat-harness-tools#281).
+    if (undet.length > 0 && rootProfile(REPO) === "content" && stateMountedDirs(REPO).length === 0) {
+      exitNotApplicable(
+        GATE,
+        `${undet.length} declared graph(s) are undetermined (${undet.map((u) => u.kind).join(", ")}) and no state branch is mounted in this content root, ` +
+          "so no complete census can be written here (`bun run cat state:mount` to write one)",
+      );
+    }
     if (undet.length > 0) {
       console.error(
         `\nRefusing to write audit-coverage.qa-results.json: ${undet.length} declared graph(s) are undetermined (${undet.map((u) => u.kind).join(", ")}). ` +
