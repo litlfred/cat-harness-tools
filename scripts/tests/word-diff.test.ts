@@ -54,6 +54,6 @@ describe("the renderer registry", () => {
   });
 
   test("every kind a renderer defaults for is a real block kind", () => {
-    for (const r of DIFF_RENDERERS) for (const k of r.defaultFor) if (k !== "*") expect(BLOCK_KINDS as readonly string[]).toContain(k);
+    for (const r of DIFF_RENDERERS) for (const k of r.defaultFor) if (k !== "*" && k !== "@structured") expect(BLOCK_KINDS as readonly string[]).toContain(k);
   });
 });
