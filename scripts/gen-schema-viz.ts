@@ -436,7 +436,7 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page input { flex: 1 1 180px; min-width: 0; }
 .sc-page ul#items { list-style: none; margin: 0; padding: 0 0 24px; max-height: 70vh; overflow: auto; }
 @media (max-width: 640px) {
-  #items { max-height: 35vh; }
+  .sc-page ul#items { max-height: 35vh; }
 }
 .sc-page #items > li { margin: 0; padding: 0; }
 .sc-page #items > li::before { content: none; }
@@ -459,9 +459,6 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page table { display: table; border-collapse: collapse; width: 100%; font-size: .86rem; margin: 8px 0 16px; }
 .sc-page th, .sc-page td { border: 0; background: transparent; text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .sc-page th { color: var(--muted); font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
-td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }
-#detail table td code { word-break: normal; overflow-wrap: anywhere; }
-#detail table td:first-child code { white-space: nowrap; }
 .sc-page td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }
 .sc-page #detail table td code { word-break: normal; overflow-wrap: anywhere; }
 .sc-page #detail table td:first-child code { white-space: nowrap; }
@@ -490,7 +487,6 @@ td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-b
 .sc-page .ov-body { padding: 0 16px 14px; }
 .sc-page .ov-cap { color: var(--muted); font-size: .8rem; margin: 0 0 8px; }
 .sc-page #ov-svg { width: 100%; height: auto; display: block; max-height: 78vh; }
-#ov-svg:empty { display: none; }
 .sc-page #ov-svg:empty { display: none; }
 .sc-page .dia-e { fill: none; stroke-width: 1.6; }
 .sc-page .dia-field { stroke: var(--accent); }
