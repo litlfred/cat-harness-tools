@@ -23,6 +23,8 @@ import {
   ownVisualiserRefs,
   prunableDashboards,
   beansSubjectPage,
+  beanStorePartsSection,
+  BEAN_STORE_KINDS,
   instanceSubjectPage,
   instanceSubjectsOf,
   PER_INSTANCE_KINDS,
@@ -779,6 +781,59 @@ describe("per-instance beans pages (bean folio-assistant-1nu0)", () => {
     const s = [subj("a")];
     expect(beansSubjectPage({ id: "beans" }, s[0]!, s, { unreachable: "not mounted" })).toContain("<strong>unknown</strong>, not zero");
     expect(beansSubjectPage({ id: "beans" }, s[0]!, s, { beans: null })).toContain("no store, not an empty one");
+  });
+});
+
+describe("a bean store's notes and workflow instances (bean folio-assistant-750a)", () => {
+  test("the store's parts are the kinds its page draws", () => {
+    expect([...BEAN_STORE_KINDS].sort()).toEqual(["bean-defs", "bean-notes", "beans", "workflow-state"]);
+  });
+
+  test("lists the notes and the instances its beans.json declares, read from disk", () => {
+    const store = mkdtempSync(join(tmpdir(), "bean-store-"));
+    try {
+      writeFileSync(
+        join(store, "beans.json"),
+        JSON.stringify({
+          name: "x",
+          directories: [
+            { id: "notes", path: "notes", graphTypologies: ["bean-notes"] },
+            { id: "workflows", path: "workflows", graphTypologies: ["workflow-state"] },
+          ],
+        }),
+      );
+      mkdirSync(join(store, "notes"));
+      writeFileSync(join(store, "notes", "x-ab12--2026-10-15--claude-some-branch.md"), "---\n---\n");
+      writeFileSync(join(store, "notes", "README.md"), "index\n");
+      mkdirSync(join(store, "workflows"));
+      writeFileSync(
+        join(store, "workflows", "crdm--x-ab12.json"),
+        JSON.stringify({ $schema: "folio-workflow-instance/v1", id: "crdm--x-ab12", processId: "Process_CRDM", status: "running", tokens: ["A_Step"], bean: "x-ab12" }),
+      );
+      const html = beanStorePartsSection(store);
+      expect(html).toContain("Bean notes — 1");
+      expect(html).toContain("<td>claude-some-branch</td>");
+      expect(html).not.toContain("README");
+      expect(html).toContain("Workflow instances — 1");
+      expect(html).toContain("<td>Process_CRDM</td><td>running</td><td>A_Step</td>");
+      // Liquid-safe: the data sits inside one raw block.
+      expect(html.startsWith("{% raw %}")).toBe(true);
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
+  });
+
+  test("a store declaring no parts lists none, rather than guessing paths", () => {
+    const store = mkdtempSync(join(tmpdir(), "bean-store-"));
+    try {
+      mkdirSync(join(store, "notes"));
+      writeFileSync(join(store, "notes", "x-1--2026-10-15--b.md"), "");
+      const html = beanStorePartsSection(store);
+      expect(html).toContain("Bean notes — 0");
+      expect(html).toContain("Workflow instances — 0");
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
   });
 });
 
