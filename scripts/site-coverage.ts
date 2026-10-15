@@ -25,7 +25,10 @@
  *     anything;
  *   - with `subgraphs: "instance"`, also `…/<instance>/` for each instance
  *     whose covered directory holds an ENTRY (a sub-directory): a library
- *     whose only file is its `library.json` has no entries to show.
+ *     whose only file is its `library.json` has no entries to show. Where the
+ *     writer reads its instances with a reader of its own
+ *     ({@link SUBJECT_READERS}), that reader decides instead, so the guard and
+ *     the writer cannot disagree about which instances have a page.
  * A page is there when the route holds `index.html` (the built site) or
  * `index.md` (a Jekyll source).
  *
@@ -37,6 +40,7 @@ import { join, resolve } from "node:path";
 
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { toolSubjects } from "./gen-tools-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
 /** One page the declarations say the site must carry. */
@@ -85,6 +89,46 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
 }
 
 /**
+ * The instances a writer draws a sub-graph page for, read by the WRITER's own
+ * reader, keyed by the Tool the visualiser is `renderedBy`.
+ *
+ * "A sub-directory is an entry" is the right test for a library, an uploads
+ * queue or a bean store, and the wrong one for a `tools` graph: a Tool is a
+ * node the writer loads (`toolSubjects`), not a folder. smart-immunizations
+ * (2026-10-15) inherits smart-base's `tools` declaration as a member, and its
+ * repository root holds the IG's own `tools/` folder of FHIR scripts: the guard
+ * expected `en/cat-harness/tools/smart-immunizations/`, the writer rightly drew
+ * nothing (no Tool node there), and the build failed on a page nobody owed.
+ * Owner ruling B1: a declaration names only what an index mounting the
+ * instance has — a folder that merely matches a declared path is not a graph.
+ *
+ * A writer with no entry here keeps the sub-directory test. A reader that
+ * throws (a declared graph that does not load) falls back to it too, so the
+ * guard still reports rather than goes quiet.
+ */
+export const SUBJECT_READERS: Readonly<Record<string, (root: string) => readonly string[]>> = {
+  "tools-viewer": (root) => toolSubjects(root).subjects.map((s) => s.name),
+};
+
+/** The instances `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
+export function subjectInstances(
+  v: Pick<DeclaredVisualiser, "renderedBy">,
+  root: string,
+  dirs: readonly { instance: string; absPath: string }[],
+  readers: Readonly<Record<string, (root: string) => readonly string[]>> = SUBJECT_READERS,
+): string[] {
+  const read = readers[v.renderedBy];
+  if (read !== undefined) {
+    try {
+      return [...new Set(read(root))].sort();
+    } catch {
+      // fall through: the generic test still names what is expected
+    }
+  }
+  return [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
+}
+
+/**
  * Every page the declarations of the checkout at `root` say a built site must
  * carry. A visualiser declared `publish: "staging-only"` (fsh-guts, the
  * trashcan kept but not published) is expected in a preview and never on a
@@ -103,10 +147,9 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     const legacy = visualiserRoute(forwardingParts(parts));
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
-    const withEntries = dirs.filter((d) => children(d.absPath).dirs > 0);
-    const instances = [...new Set(withEntries.map((d) => d.instance))].sort();
+    const instances = subjectInstances(v, root, dirs);
     for (const instance of instances) {
-      const under = withEntries.find((d) => d.instance === instance && d.under)?.under;
+      const under = dirs.find((d) => d.instance === instance && d.under)?.under;
       const sub = { ...parts, subgraph: under ? `${under}/${instance}` : instance };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
