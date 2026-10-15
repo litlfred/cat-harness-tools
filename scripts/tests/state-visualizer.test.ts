@@ -27,6 +27,9 @@ import {
   instanceSubjectsOf,
   PER_INSTANCE_KINDS,
   projectInstanceSubject,
+  REGISTRY_KINDS,
+  registryRowsOf,
+  instanceHubPage,
 } from "../state-visualizer.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -834,5 +837,57 @@ describe("per-instance health and attestations pages (bean folio-assistant-1nu0)
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
+  test("every registry kind draws per instance", () => {
+    for (const k of ["typologies", "validators", "qa-checkers", "block-kinds", "content-adapters", "code-list"]) {
+      expect(REGISTRY_KINDS.has(k)).toBe(true);
+      expect(PER_INSTANCE_KINDS.has(k)).toBe(true);
+    }
+  });
+
+  test("a registry page lists each node, by id and title, and is not run through Liquid", () => {
+    const root = mkdtempSync(join(tmpdir(), "sv-reg-"));
+    const at = join(root, "validators");
+    mkdirSync(at, { recursive: true });
+    writeFileSync(join(at, "b.json"), JSON.stringify({ $schema: "folio-validator/v1", id: "b-check", title: "Checks {{ b }}" }));
+    writeFileSync(join(at, "a.json"), JSON.stringify({ $schema: "folio-validator/v1", summary: "no id here" }));
+    writeFileSync(join(at, "bad.json"), "{not json");
+    try {
+      const rows = registryRowsOf(at);
+      expect(rows.map((r) => r.id)).toEqual(["a", "b-check", "bad"]);
+      expect(rows[0]!.text).toBe("no id here");
+      expect(rows[2]!.note).toBe("does not parse as JSON");
+      const [s] = instanceSubjectsOf(
+        [{ id: "v", path: "validators/", absPath: at, declaredBy: "x", graphTypologies: ["validators"] }],
+        ["validators"],
+      );
+      const html = instanceSubjectPage({ id: "validators", title: "Validators", coversKinds: ["validators"] }, s!, [s!]);
+      expect(html).toContain("render_with_liquid: false");
+      expect(html).toContain("Nodes — 3");
+      expect(html).toContain("<code>b-check</code>");
+      expect(html).toContain("Checks {{ b }}");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a QA page carries no node table and keeps Liquid as it was", () => {
+    const [s] = instanceSubjectsOf([{ id: "qa", path: "test/results/", absPath: "/x/a/test/results", declaredBy: "a", graphTypologies: ["qa"] }], ["qa"]);
+    const html = instanceSubjectPage({ id: "qa", coversKinds: ["qa"] }, s!, [s!], { $schema: "folio-qa-graph/v1", availability: "unknown", reason: "x" } as never);
+    expect(html).not.toContain("render_with_liquid");
+    expect(html).not.toContain("Nodes —");
+  });
+
+  test("the hub lists every instance page", () => {
+    const html = instanceHubPage({ id: "validators", title: "Validators" }, [
+      { name: "a", path: "validators/", absPath: "/x/a/validators", instanceRoot: "/x/a" },
+      { name: "b", path: "validators/", absPath: "/x/b/validators", instanceRoot: "/x/b" },
+    ]);
+    expect(html).toContain('<a href="a/">a</a>');
+    expect(html).toContain('<a href="b/">b</a>');
+    expect(html).toContain(GENERATED_BY);
   });
 });
