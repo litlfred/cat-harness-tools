@@ -36,6 +36,7 @@ import {
   codeSubjectPage,
   listCodeFiles,
   pinnedBlobBase,
+  drawsInstanceHub,
 } from "../state-visualizer.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -1015,5 +1016,19 @@ describe("per-instance code pages (bean folio-assistant-svgx)", () => {
     expect(html).toContain('href="https://github.com/o/core/blob/abc1234/scripts/%7B%7B%20x%20%7D%7D.ts"');
     expect(html).toContain("<strong>unknown</strong>, not none");
     expect(html).toContain('<a href="../other/">other</a>');
+  });
+});
+
+describe("drawsInstanceHub: a per-instance visualiser no dashboard draws gets its own route", () => {
+  test("`code` gets a hub (en/cat-harness/code/, 2026-10-15)", () => {
+    expect(drawsInstanceHub(["code"], false, 3)).toBe(true);
+  });
+  test("a registry kind gets a hub", () => {
+    expect(drawsInstanceHub([[...REGISTRY_KINDS][0]!], false, 1)).toBe(true);
+  });
+  test("not when a dashboard already draws the route, nor with no instance pages, nor for a state kind", () => {
+    expect(drawsInstanceHub(["code"], true, 3)).toBe(false);
+    expect(drawsInstanceHub(["code"], false, 0)).toBe(false);
+    expect(drawsInstanceHub(["beans"], false, 2)).toBe(false);
   });
 });
