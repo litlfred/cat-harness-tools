@@ -218,8 +218,11 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {
   it("adversarialCoverageByGraph reports reviewed for kinds with reviewed sidecars", () => {
     const advMap = adversarialCoverageByGraph(REPO, ROOT);
+    // `schemas` is not asserted: its one adversarially reviewed sidecar,
+    // `schemas/kg-qa`, was removed as dead with the owner's authorisation
+    // (cat-harness 4f72623f), so no schemas review is left to restore
+    // (cat-harness d37c20c4). The two that were restored are asserted.
     expect(advMap.get("tools")).toBe("reviewed");
-    expect(advMap.get("schemas")).toBe("reviewed");
     expect(advMap.get("skills")).toBe("reviewed");
   });
 
@@ -235,8 +238,7 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     const toolsRow = rows.find((r) => r.kind === "tools");
     expect(toolsRow?.adversarial).toBe("reviewed");
 
-    const schemasRow = rows.find((r) => r.kind === "schemas");
-    expect(schemasRow?.adversarial).toBe("reviewed");
+    // `schemas`: see the test above — no reviewed schemas sidecar is left.
 
     const skillsRow = rows.find((r) => r.kind === "skills");
     expect(skillsRow?.adversarial).toBe("reviewed");

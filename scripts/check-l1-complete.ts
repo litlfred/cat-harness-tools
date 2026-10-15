@@ -78,7 +78,7 @@ import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -1343,8 +1343,11 @@ export function checkAll(root: string): EntryReport[] | undefined {
   const presence = splitDeclared(libs);
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
+    const others = nonEntryDirs(lib);
     for (const d of readdirSync(lib).sort()) {
       if (!statSync(join(lib, d)).isDirectory()) continue;
+      // Another kind's directory kept in the library is not an entry.
+      if (others.has(join(lib, d))) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(

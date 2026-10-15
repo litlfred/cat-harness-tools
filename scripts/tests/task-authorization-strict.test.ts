@@ -22,7 +22,18 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 const ROOT = HARNESS_ROOT;
 const CTX = loadAccessContext(ROOT);
 
-async function everyStep() {
+/**
+ * Every step of every harness diagram, parsed ONCE for the file. Parsing the
+ * whole process corpus takes seconds on a CI runner, and the second test below
+ * re-parsed all of it to take the first step — which is how it ran past bun's
+ * 5 s limit. Memoised, the corpus is read by the first test that asks.
+ */
+let stepsOnce: Promise<{ process: string; task: string; role?: string }[]> | undefined;
+function everyStep() {
+  return (stepsOnce ??= collectSteps());
+}
+
+async function collectSteps() {
   const out: { process: string; task: string; role?: string }[] = [];
   for (const f of workflowFiles(ROOT).filter((f) => f.endsWith(".bpmn")).map((p) => basename(p))) {
     const m = await loadProcessModel(workflowFile(ROOT, f));
@@ -51,7 +62,9 @@ describe("strict: who may perform which task", () => {
     expect(refusedFor("collaborator")).toBe(0);
     expect(refusedFor("viewer")).toBe(steps.length);
     expect(refusedFor(null)).toBe(steps.length);
-  });
+    // The whole process corpus is parsed here (see `everyStep`): a real-corpus
+    // read, so it is given room beyond bun's 5 s default.
+  }, 60_000);
 
   test("a typed actor is refused in strict mode, even one policy would permit", async () => {
     const [step] = await everyStep();

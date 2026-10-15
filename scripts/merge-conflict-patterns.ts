@@ -69,6 +69,7 @@ export interface ConflictPattern {
 const CHECKOUT_ROOT = resolve(import.meta.dir, "..", "..");
 
 /** The harness site's directory, repo-relative, as every glob below spells it. */
+// declared-path-literal: the prefix of the merge-conflict path patterns below, matched against the paths git reports as conflicted in the index checkout, so it is repo-relative by definition; resolving it through a declaration would change what git is asked about.
 const SITE = "cat-harness/docs";
 
 /** The Tool that draws a glossary page; the routes of the visualisers it renders are the glossary pages. */

@@ -239,7 +239,12 @@ describe("smart-trust, against the platform's real harness data", () => {
       navbar: { hrefs: Record<string, string>; whose?: Record<string, string> };
       foreignSite: { absent: Record<string, string> };
     };
-    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}/fsh-guts/`);
+    // Re-based onto the platform: the platform's OWN root-relative href for its
+    // fsh-guts page (since 2026-10-09 under its declared `<locale>/<harness>/`
+    // route), read from the platform's data rather than restated here.
+    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"]!;
+    expect(platformHref.startsWith("/")).toBe(true);
+    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
     expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.fshGuts).toBe("smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.translationQa).toBe("smart-trust publishes no translation QA sweep on this site");

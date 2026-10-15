@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,6 +45,20 @@ describe("a name that claims an anchor must land on it", () => {
     ['const OUT_DIR = resolve(import.meta.dir, "..", "build");', "a name claiming no anchor at all"],
   ])("%s is clean — %s", (src) => {
     expect(checkAnchorNames(fixture(src + "\n")).findings).toEqual([]);
+  });
+});
+
+describe("a symbolic link is not walked", () => {
+  test("a file reached through a link is judged at its real path only", () => {
+    // `cat-harness/scripts/tests/a.ts` is correct where it lives. Read through
+    // `cat-harness/content/scripts -> ../scripts`, its `../..` would count
+    // from the link and land one level off (bean rnfl's transitional link).
+    const root = fixture('const INSTANCE_ROOT = resolve(import.meta.dir, "..", "..");\n');
+    mkdirSync(join(root, "cat-harness", "content"));
+    symlinkSync("../scripts", join(root, "cat-harness", "content", "scripts"));
+    const r = checkAnchorNames(root);
+    expect(r.filesRead).toBe(1);
+    expect(r.findings).toEqual([]);
   });
 });
 

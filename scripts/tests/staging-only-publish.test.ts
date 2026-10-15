@@ -60,10 +60,19 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 // Where it cannot be built (no mount; a standalone layer with no root script),
 // the tests that need the page fail on their own, by name, rather than this
 // hook failing the whole file.
+//
+// The hook gets an explicit budget, as its sibling in
+// `test/coordinator/staging-only-publish-repo-root.test.ts` does. It spawns a
+// whole build: since B1 (owner, 2026-10-14) `derive:publish` also runs every
+// declared `builtAtPublish` writer, which measured 112 s on the run's own
+// publish-pages job (folio-assistant run 38696377785), so bun's 5 s default
+// killed it mid-write (SIGTERM) and failed the file with no assertion run.
+// 300 s bounds a hang without racing an honest build on a shared runner.
+const BUILD_BUDGET_MS = 300_000;
 beforeAll(() => {
   const r = spawnSync("bun", ["run", "cat", "derive:publish"], { cwd: REPO, encoding: "utf8" });
   if (r.status !== 0) console.warn(`derive:publish did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
-});
+}, BUILD_BUDGET_MS);
 
 function composeTo(opts: { staging?: boolean }): { dir: string; report: ReturnType<typeof compose> } {
   const dir = mkdtempSync(join(tmpdir(), "compose-"));

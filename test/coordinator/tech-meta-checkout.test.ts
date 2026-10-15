@@ -22,16 +22,24 @@ afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+/** The module under test, in this layer's `scripts/`. */
+const TECH_META_PY = join(import.meta.dir, "..", "..", "scripts", "_tech_meta.py");
+
 function techMeta(file: string): Record<string, unknown> {
   const py =
     "import sys, json, importlib.util as u\n" +
     // Absolute, from this file's location. It was `'scripts/_tech_meta.py'`,
     // relative to the CWD — a path inside a python string inside a test, which
     // no scan here reaches. Fifth instance of this exact shape on this branch.
-    `spec = u.spec_from_file_location('t', ${JSON.stringify(join(ORIGIN_DIR, "..", "_tech_meta.py"))})\n` +
+    // The module moved with the rest of cat-harness's code into this layer
+    // (bean `70lx`): `cat-harness/scripts/` no longer exists, so it is read
+    // from `cat-harness-tools/scripts/`, this file's own layer.
+    `spec = u.spec_from_file_location('t', ${JSON.stringify(TECH_META_PY)})\n` +
     "m = u.module_from_spec(spec); spec.loader.exec_module(m)\n" +
     "print(json.dumps(m.tech_meta(sys.argv[1])))\n";
   const r = Bun.spawnSync(["python3", "-c", py, file], { cwd: ROOT });
+  // A failed run says why, rather than surfacing as a JSON parse error of empty stdout.
+  if (r.exitCode !== 0) throw new Error(`_tech_meta.py exited ${r.exitCode}: ${new TextDecoder().decode(r.stderr)}`);
   return JSON.parse(new TextDecoder().decode(r.stdout)) as Record<string, unknown>;
 }
 

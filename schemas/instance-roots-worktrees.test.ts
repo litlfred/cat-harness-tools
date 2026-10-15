@@ -7,9 +7,11 @@
  *
  * 1. **Nested** — scanning the checkout and descending into `.claude/`. The
  *    dot-prefix guard already stops this; pinned here so it stays stopped.
- * 2. **Escaped** — `repoRootFor` is `dirname`, so for the ROOT instance of a
- *    worktree it lands on `.claude/worktrees/`, whose every child is a sibling
- *    worktree. Measured 2026-10-03: ten siblings returned as instances.
+ * 2. **Escaped** — `repoRootFor` was `dirname`, so for the ROOT instance of a
+ *    worktree it landed on `.claude/worktrees/`, whose every child is a sibling
+ *    worktree. Measured 2026-10-03: ten siblings returned as instances. Since
+ *    cat-harness 91aee02 (folio-assistant-lvlv) it steps over
+ *    `.claude/worktrees/` to the enclosing checkout instead.
  *
  * Built from a real `git worktree add` in a temp repository rather than a
  * hand-made `.git` file, so the fixture is the shape git actually produces.
@@ -87,9 +89,12 @@ describe("instanceRootsIn with git worktrees present", () => {
   });
 
   test("the escape: scanning `repoRootFor(<worktree root>)` lists no sibling worktree", () => {
-    // `.claude/worktrees/` — every child is a separate checkout.
-    expect(repoRootFor(wtA)).toBe(join(checkout, ".claude", "worktrees"));
-    expect(instanceRootsIn(repoRootFor(wtA))).toEqual([]);
+    // `repoRootFor` steps over `.claude/worktrees/` (every child of which is a
+    // separate checkout) to the main checkout, which sees no worktree.
+    expect(repoRootFor(wtA)).toBe(checkout);
+    const found = instanceRootsIn(repoRootFor(wtA));
+    expect(found).toEqual([checkout, join(checkout, "core")]);
+    expect(found.some((p) => inside(p, join(checkout, ".claude", "worktrees")))).toBe(false);
   });
 
   test("siblingScopeFor keeps the root instance inside its own checkout", () => {
@@ -118,6 +123,11 @@ describe("sibling clones in a plain directory — the separated layout (ho66)", 
     // clone side by side in a temp directory, which is also what separated
     // repositories look like on disk. g43f's foreign-checkout filter dropped
     // every one of them, so `needs` resolved to nothing (2026-10-05).
+    //
+    // A clone's OWN sibling scope is itself: the owner ruled on 2026-10-11
+    // (bean `68k7`, cat-harness 7d4a633) that an instance which is its own
+    // checkout never looks outside it, so the directory holding the clones
+    // is scanned by naming it, as the first assertion does.
     const plain = mkdtempSync(join(tmpdir(), "ho66-siblings-"));
     try {
       for (const name of ["lower", "upper"]) {
@@ -126,7 +136,7 @@ describe("sibling clones in a plain directory — the separated layout (ho66)", 
         git(join(plain, name), "init", "-q");
       }
       expect(instanceRootsIn(plain)).toEqual([join(plain, "lower"), join(plain, "upper")]);
-      expect(instanceRootsIn(siblingScopeFor(join(plain, "upper")))).toContain(join(plain, "lower"));
+      expect(siblingScopeFor(join(plain, "upper"))).toBe(join(plain, "upper"));
     } finally {
       rmSync(plain, { recursive: true, force: true });
     }

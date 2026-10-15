@@ -87,6 +87,16 @@ describe("the page", () => {
     expect(viewerHtml("x.json")).not.toContain("`");
   });
 
+  test("the emitted script PARSES — an escape lost in the generator's template literal broke it once", () => {
+    // 2026-10-15: the list view wrote `\"muted\"` inside the generator's
+    // template literal, which emits a bare `"`, so the page's only script was
+    // a SyntaxError and nothing on it ran (e2e folio-three-states, themed-viewers).
+    const html = viewerHtml("../../assets/folio/index.json");
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const s of scripts) expect(() => new Function(s)).not.toThrow();
+  });
+
   test("both tables carry a caption, an aria-label, and a preceding h2 heading (finding 5)", () => {
     const html = viewerHtml("../../assets/folio/index.json");
     expect(html).toContain('<h2 id="fo-dirs-head">Declared folio directories</h2>');

@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildVocabulary,
   conceptSchemeIriFor,
+  findPlatformRoot,
   instancesPublishingNs,
   namespaceForPrefixOrLayer,
 } from "../ns-export.ts";
@@ -176,25 +177,15 @@ describe("ns:check fails on a folioType whose owner does not publish an ns defin
   });
 
   test("flags block kind whose owner does not publish an ns definition", async () => {
-    const { mock } = await import("bun:test");
-    const origKindsModule = await import("@litlfred/cat-harness/schemas/block-kinds.js");
-    const origKinds = origKindsModule.discoverBlockKinds();
-    mock.module("@litlfred/cat-harness/schemas/block-kinds.js", () => ({
-      ...origKindsModule,
-      discoverBlockKinds: () => [
-        ...origKinds,
-        {
-          kind: "weird",
-          folioType: "unpublishing-owner:WeirdKind",
-          adapter: "paper",
-          labelPrefix: "wrd",
-        },
-      ],
-    }));
-
-    // Re-import to use mocked module
-    const { buildVocabulary: buildWithMock } = await import("../ns-export.ts");
-    const { report } = buildWithMock();
+    // The kinds are passed in rather than mocked: `mock.module` on block-kinds.js
+    // is never undone by bun, and it leaked `weird` into every later test file
+    // that discovers block kinds (block-kind-nodes.test.ts among them).
+    const { discoverBlockKinds } = await import("@litlfred/cat-harness/schemas/block-kinds.js");
+    const kinds = [
+      ...discoverBlockKinds(findPlatformRoot()),
+      { kind: "weird", folioType: "unpublishing-owner:WeirdKind", adapter: "paper", labelPrefix: "wrd" },
+    ] as ReturnType<typeof discoverBlockKinds>;
+    const { report } = buildVocabulary(undefined, undefined, false, kinds);
     expect(report.undefinedTerms).toContain("unpublishing-owner:WeirdKind");
   });
 });

@@ -943,7 +943,17 @@ async function main(): Promise<number> {
   if (!flags.json) console.log(`\nVerifying — each check run on its own, never through \`gates\`:\n`);
   const red: string[] = [];
   const verdicts: StepVerdict[] = [];
-  const codes = await Promise.all(STEPS.map((s) => verifyQuietly(s.verify)));
+  // A check that WRITES is not safe beside the others. Since B1 (owner,
+  // 2026-10-14) several of these are `publish-check.ts <writer>`: each runs its
+  // writer and then compares, and run concurrently they overwrite one another's
+  // pages mid-comparison, so every such check read red here while each passed
+  // alone (folio-assistant#2529). The read-only ones still share the cores; the
+  // writing ones run after them, one at a time, in STEPS order.
+  const table = scriptsOf(resolve(INSTANCE_ROOT, ".."));
+  const writes = (s: Step): boolean => /publish-check\.ts/.test(table[s.verify[0]!] ?? "");
+  const codes: number[] = new Array(STEPS.length);
+  await Promise.all(STEPS.map(async (s, i) => (writes(s) ? undefined : (codes[i] = await verifyQuietly(s.verify)))));
+  for (const [i, s] of STEPS.entries()) if (writes(s)) codes[i] = await verifyQuietly(s.verify);
   for (const [i, s] of STEPS.entries()) {
     const rc = codes[i]!;
     verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: true, current: rc === 0 });
