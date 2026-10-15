@@ -167,7 +167,7 @@ import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
-const VIEWER_TOOL = "state-viewer";
+export const VIEWER_TOOL = "state-viewer";
 
 const ROOT = HARNESS_ROOT;
 const SITE = siteTarget(join(ROOT, siteDirFor(ROOT)));
@@ -1259,6 +1259,47 @@ export function instanceSubjectsOf(
 }
 
 /**
+ * What a per-instance visualiser (`subgraphs: "instance"`) draws in the
+ * checkout at `root`: its kinds, the kinds it has no reader for, and the
+ * instances that get a page. One home for the selection, because the page
+ * writer and the orphan keep-set both depend on it — the keep-set test held a
+ * hand-written list and missed the seven hubs #294 added.
+ *
+ * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are drawn
+ * on the store's own page, so the subjects are the stores (bean
+ * `folio-assistant-750a`). A directory the visualiser ALSO names by id
+ * (`covers`) is drawn on its full view, and `viewersOf` opens that view for
+ * it: no subject page — except a bean store, whose board draws its beans
+ * only, so its notes and workflow instances need a page of their own. A
+ * directory the checkout ROOT declares (`(root)`, the index's own `test/`)
+ * belongs to no instance and has no route segment: it is `unrouted`.
+ */
+export function perInstanceSubjects(
+  v: { coversKinds?: readonly string[]; covers?: readonly string[] },
+  root: string,
+  harness: string,
+): {
+  kinds: readonly string[];
+  beans: boolean;
+  code: boolean;
+  unread: string[];
+  candidates: ReturnType<typeof checkoutDirectories>;
+  subjects: InstanceSubject[];
+  unrouted: InstanceSubject[];
+} {
+  const kinds = v.coversKinds ?? [];
+  const beans = kinds.includes("beans") && kinds.every((k) => BEAN_STORE_KINDS.has(k));
+  const code = kinds.length > 0 && kinds.every((k) => k === "code");
+  const unread = beans || code ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  if (kinds.length === 0 || unread.length > 0) return { kinds, beans, code, unread, candidates: [], subjects: [], unrouted: [] };
+  const byId = new Set(beans ? [] : (v.covers ?? []));
+  const candidates = checkoutDirectories(root).filter((d) => !(d.declaredBy === harness && byId.has(d.id)));
+  const all = instanceSubjectsOf(candidates, beans ? ["beans"] : kinds);
+  const routed = (s: InstanceSubject) => /^[a-z0-9][a-z0-9-]*$/.test(s.name);
+  return { kinds, beans, code, unread, candidates, subjects: all.filter(routed), unrouted: all.filter((s) => !routed(s)) };
+}
+
+/**
  * One instance's directory of `kinds`, projected with the same family reader
  * the whole-graph QA projection uses (`projectQaGraph`, bean `tfqf` C9), and
  * the same availability rule: absent is UNKNOWN, never zero.
@@ -1668,13 +1709,7 @@ for (const g of graphs) {
 const subjectOrphans: string[] = [];
 const hubs: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
-  const kinds = v.coversKinds ?? [];
-  // A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are
-  // drawn on the store's own page, so the subjects are the stores (bean
-  // `folio-assistant-750a`).
-  const beans = kinds.includes("beans") && kinds.every((k) => BEAN_STORE_KINDS.has(k));
-  const code = kinds.length > 0 && kinds.every((k) => k === "code");
-  const unread = beans || code ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  const { kinds, beans, code, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
@@ -1682,22 +1717,9 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     );
     continue;
   }
-  // A directory this visualiser ALSO names by id (`covers`) is drawn on its
-  // full view, and `viewersOf` opens that view for it: no subject page.
-  //
-  // Except a bean store: the repository store's board draws its beans only,
-  // through the client, so its notes and workflow instances need a page of
-  // their own, and that page is the one its parts' rows open (bean
-  // `folio-assistant-750a`). The store's own row still opens the board.
-  const byId = new Set(beans ? [] : (v.covers ?? []));
-  const candidates = checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id)));
-  // A directory the checkout ROOT declares (`(root)`, the index's own
-  // `test/`) belongs to no instance and has no route segment: it gets no page.
-  const subjects = instanceSubjectsOf(candidates, beans ? ["beans"] : kinds).filter((s) => {
-    if (/^[a-z0-9][a-z0-9-]*$/.test(s.name)) return true;
+  for (const s of unrouted) {
     console.error(`  ! visualiser \`${v.id}\`: \`${s.path}\` is declared by ${s.name}, which is not an instance with a route — no page`);
-    return false;
-  });
+  }
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
     const html = beans

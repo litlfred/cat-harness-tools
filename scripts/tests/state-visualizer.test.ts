@@ -37,8 +37,10 @@ import {
   listCodeFiles,
   pinnedBlobBase,
   drawsInstanceHub,
+  perInstanceSubjects,
+  VIEWER_TOOL,
 } from "../state-visualizer.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import {
   existingPageDir,
@@ -575,7 +577,19 @@ describe("orphan dashboards — a page that answers to no declaration", () => {
     // The strongest statement available: ask for the worst case — nothing is
     // wanted — and assert the answer is exactly this generator's own pages,
     // never one of the site's other directories.
-    const ours = ["beans", "todos", "qa", "attestations", "health", "issue-marks", "uploads", "swimlane-glossary"].map(visOf);
+    const dashboards = ["beans", "todos", "qa", "attestations", "health", "issue-marks", "uploads", "swimlane-glossary"].map(visOf);
+    // And the hub at a per-instance visualiser's own route (#294: code and the
+    // registry kinds), read from the declaration through the writer's own
+    // selection rather than listed, so a new hub is ours without an edit here.
+    const hubs = (readDeclaration(ROOT)?.visualisers ?? [])
+      .filter((v) => v.renderedBy === VIEWER_TOOL && v.subgraphs === "instance")
+      .filter((v) => {
+        const p = perInstanceSubjects(v, ROOT, readDeclaration(ROOT)?.name ?? "cat-harness");
+        return p.unread.length === 0 && drawsInstanceHub(p.kinds, dashboards.includes(v.id), p.subjects.length);
+      })
+      .map((v) => v.id);
+    expect(hubs.length, "the declaration draws no hub, so this half tests nothing").toBeGreaterThan(0);
+    const ours = [...dashboards, ...hubs];
     const selected = prunableDashboards(dashboardsDir(), []);
     expect(selected.sort()).toEqual(ours.map((g) => join(g, "index.html")).sort());
     // And the site root holds none: every dashboard moved to its route.
