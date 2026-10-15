@@ -574,18 +574,21 @@ describe("the document index — `documentIndexOf`", () => {
     expect(g?.items[1]!.fold).toBeUndefined();
   });
 
-  it("FOLDS sub-sections under their section, closed, as a disclosure BELOW the link — owner, 2026-10-05", () => {
+  it("FOLDS sub-sections under their section, closed, toggled FROM THE SECTION'S ROW — owners 2026-10-05 and 2026-10-15", () => {
     // "on this page should have sub-sections collapsible" (bean `r2ld`).
     const g = documentIndexOf(
       page(`<h2 id="a">Alpha</h2><h3 id="b">Beta</h3><h3 id="b2">Beta 2</h3><h2 id="c">Gamma</h2>`),
     )!;
     expect(g.items[0]!.fold).toBe("2 sub-sections");
     const html = navbarHtml({ instance: "x", graphs: { label: "Graphs", items: [] }, documentIndex: g });
-    // The section stays a plain link; the fold follows it, closed.
-    expect(html).toMatch(/<a href="#a"[^>]*>[\s\S]*?<\/a><details class="fa-nav-fold"><summary>/);
-    expect(html).not.toMatch(/<details class="fa-nav-fold" open/);
-    // No link INSIDE any one summary.
-    expect(html).not.toMatch(/<summary>(?:(?!<\/summary>)[^])*<a /);
+    // The section stays a plain link; its toggle sits BESIDE it on the same
+    // row, closed, and no bare "2 sub-sections" row is drawn ("what is 26?
+    // why unlabeled?", owner 2026-10-15).
+    expect(html).toMatch(
+      /<a href="#a"[^>]*>[\s\S]*?<\/a><button type="button" class="fa-nav-twisty" aria-expanded="false" aria-controls="(fa-nav-fold-\d+)" aria-label="Show Alpha's 2 sub-sections"[^>]*>[\s\S]*?<\/button><div class="fa-nav-kids" id="\1" hidden>/,
+    );
+    expect(html).not.toContain("fa-nav-fold\"");
+    expect(html).not.toMatch(/<summary>[^<]*<span class="fa-nav-label">\d+ sub-sections?</);
     expect(html).toContain('href="#b2"');
   });
 
@@ -1259,5 +1262,37 @@ describe("a page's declared section label", () => {
   it("is absent when undeclared, and the section is \"On this page\" (the theme sidebar's name, 2026-10-15)", () => {
     expect(visualiserLabelOf(page(""))).toBeUndefined();
     expect(injectRail(page(""), { instance: "x", toRoot: "..", links: [] })!).toContain("On this page");
+  });
+});
+
+describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26? why unlabeled?\"", () => {
+  const items = [
+    { href: "/s/", label: "Skill schema reference", children: [{ href: "/s/a", label: "A" }, { href: "/s/b", label: "B" }], fold: "2 pages" },
+    { href: "/g/", label: "Guides", children: [{ label: "Here", current: true }], fold: "1 page" },
+  ];
+  const html = navbarHtml({ instance: "x", pages: { label: "Pages", items, collapsible: true } });
+  it("every fold is a button on the parent's row with a name that says whose and how many", () => {
+    const buttons = [...html.matchAll(/<button type="button" class="fa-nav-twisty"[^>]*>/g)].map((m) => m[0]);
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toContain(`aria-label="Show Skill schema reference's 2 pages"`);
+    expect(buttons[0]).toContain(`aria-expanded="false"`);
+    expect(buttons[0]).toContain("data-fa-tip=");
+  });
+  it("ids are unique and each toggle controls its own list", () => {
+    const ids = [...html.matchAll(/aria-controls="([^"]+)"/g)].map((m) => m[1]!);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(html).toContain(`<div class="fa-nav-kids" id="${id}"`);
+  });
+  it("a fold holding the reader's page arrives OPEN, named 'Hide'", () => {
+    expect(html).toContain(`aria-expanded="true" aria-controls="fa-nav-fold-2" aria-label="Hide Guides's 1 page"`);
+    expect(html).toMatch(/<div class="fa-nav-kids" id="fa-nav-fold-2">/);
+  });
+  it("no row in any rail is a bare count", () => {
+    expect(html).not.toMatch(/<span class="fa-nav-label">\d+ (?:pages?|sub-sections?)<\/span>/);
+  });
+  it("a rail rendered INTO a page carries the toggle's script; one with no fold does not", () => {
+    const page = "<!doctype html><html><head></head><body><p>x</p></body></html>";
+    expect(injectNavbar(page, { instance: "x", pages: { label: "Pages", items, collapsible: true } })!).toContain("<script data-fa-nav-folds>");
+    expect(injectNavbar(page, { instance: "x" })!).not.toContain("data-fa-nav-folds");
   });
 });

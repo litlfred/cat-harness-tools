@@ -140,6 +140,8 @@ export function pagesNav(
     const here = o.here !== undefined && o.here === p.url;
     return {
       label: p.title,
+      // Indented one step per level, as the theme's nested lists are.
+      ...(depth > 0 ? { depth } : {}),
       ...(here ? { current: true } : { href: `${prefix}${p.url}` }),
       ...(kids.length ? { children: kids, fold: childPages(kids.length) } : {}),
     };
