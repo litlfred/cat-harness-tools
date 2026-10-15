@@ -465,9 +465,20 @@ function capture(cmd: string, cwd: string): string {
   return r.stdout.trim();
 }
 
-/** The jekyll executable preview-site.sh uses: the gem's own exe (`bundle exec jekyll` is not on PATH everywhere). */
-function jekyllExe(): string {
-  const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | head -1 || true", "/");
+/**
+ * The jekyll executable the Gemfile in `gemDir` resolves to: the gem's own exe
+ * (`bundle exec jekyll` is not on PATH everywhere). It is asked of Bundler, not
+ * globbed: a machine with Jekyll 3.10 and 4.4 installed globbed 3.10 first, and
+ * 3.10 run under a Jekyll-4 bundle dies on `Sass.load_paths` (sass-embedded).
+ */
+function jekyllExe(gemDir: string): string {
+  const gemfile = JSON.stringify(join(gemDir, "Gemfile"));
+  const bundled = capture(
+    `BUNDLE_GEMFILE=${gemfile} bundle exec ruby -e 'print Gem.bin_path("jekyll", "jekyll")' 2>/dev/null || true`,
+    gemDir,
+  );
+  if (bundled) return `ruby ${bundled}`;
+  const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | sort -V | tail -1 || true", "/");
   if (found) return `ruby ${found}`;
   return "jekyll";
 }
@@ -661,7 +672,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("bundle install", "bundle install >/dev/null", gemDir);
     run(
       "jekyll",
-      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe()} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
+      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe(gemDir)} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
       gemDir,
     );
 
