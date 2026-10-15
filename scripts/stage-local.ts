@@ -300,7 +300,7 @@ export function slugOf(branch: string): string | undefined {
 }
 
 /** Files a preview's data steps write that are not a site on their own (the workflow's list). */
-const DATA_ONLY = /^(changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
+const DATA_ONLY = /^(changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
 
 /** True when the build wrote at least one file that is a page, not only data (bean `oisv`). */
 export function builtSomething(siteDir: string): boolean {
@@ -798,7 +798,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
     // declared-path-literal: a path INSIDE another platform instance, resolved
     // by inPlatform against each instance's root, never against this one.
     const changeset = inPlatform(platform, "schemas/changeset.ts");
-    if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json")]);
+    if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
     else log("· this platform has no ChangeSet tool: no review data on this preview");
     const impact = inPlatform(platform, "scripts/document-rendered-impact.ts");
     if (changeset && impact) {
@@ -966,7 +966,7 @@ export function previewData(
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
   else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no ChangeSet on this preview`);
-  else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json")]);
+  else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
   // The PR's tagged review comments, as the workflow's `stage` job ingests them:
   // `blocks.json` from the head's manifests and `review-comments.json`, with the
   // statuses committed to the folio's todos graph winning (bean 423d).
