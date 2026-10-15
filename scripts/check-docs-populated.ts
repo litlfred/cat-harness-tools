@@ -113,12 +113,13 @@
  * did for two months.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { builtAtPublishDirs } from "./check-declared-dirs.ts";
 
 /**
  * Words of prose a page needs to count.
@@ -607,14 +608,27 @@ export function assess(repoRoot: string, instance: string, dirs: string[], insta
   };
 }
 
-/** Every instance that declares a `docs` graph, with the directories it names. */
+/**
+ * Every instance that declares a `docs` graph, with the directories it names.
+ *
+ * A `docs` directory the instance declares it BUILDS AT PUBLISH
+ * (`builtAtPublish`, `schemas/built-at-publish.ts`; owner, 2026-10-14 and
+ * 2026-10-15, "B1") is left out. Every page in it is written by the declared
+ * writer, so none can be the AUTHORED documentation this check asks for, and
+ * before publish it is correctly absent, which the `dh4f` verdict below would
+ * otherwise read as "cannot be determined". Whether the writer built it is
+ * `derive:publish`'s question. An instance whose only `docs` directory is built
+ * at publish therefore drops out of the sweep, as one declaring none does.
+ */
 export function harnessesWithDocs(repoRoot: string): { instance: string; root: string; dirs: string[] }[] {
   const out: { instance: string; root: string; dirs: string[] }[] = [];
   for (const inst of instanceRootsIn(repoRoot)) {
     const decl = readDeclaration(inst);
     if (!decl) continue;
+    const publishTime = builtAtPublishDirs(inst);
     const dirs = (decl.directories ?? [])
       .filter((d) => (d.graphTypologies ?? []).includes("docs"))
+      .filter((d) => !publishTime.has(resolve(inst, d.path) + sep))
       .map((d) => relative(repoRoot, join(inst, d.path)).split("\\").join("/"));
     // `root` is carried rather than re-derived from `instance`: the name is a
     // declared identifier and nothing resolves a path from it, so a consumer

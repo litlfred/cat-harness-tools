@@ -12,7 +12,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { assess, assessSubject, looksGenerated, proseWords, subjectsOf } from "../check-docs-populated.ts";
+import { assess, assessSubject, harnessesWithDocs, looksGenerated, proseWords, subjectsOf } from "../check-docs-populated.ts";
 
 // The planted directory is called `pages`, NOT `docs`, and that is the point
 // twice over. `site-dir-single-answer` refuses a hardcoded site root in any
@@ -365,5 +365,39 @@ describe("subject — the processes/roles/tasks half", () => {
     ]);
     expect(v.verdict).toBe("populated");
     expect(v.page).toBe("docs/real.md");
+  });
+});
+
+describe("harnessesWithDocs — a docs directory built at publish is not authored documentation", () => {
+  // Owner, 2026-10-15 (B1): smart-trust's `docs/` is written by `smart-trust:pages`
+  // at publish. Before publish it is correctly absent, and after it every page
+  // is the writer's, so neither state is a question about authored docs.
+  function plant(repo: string, name: string, builtAtPublish: boolean): void {
+    mkdirSync(join(repo, name), { recursive: true });
+    writeFileSync(
+      join(repo, name, `${name}.json`),
+      JSON.stringify({
+        name,
+        repository: `o/${name}`,
+        version: "0.1.0",
+        directories: [{ id: `${name}-pages`, path: "pages/", graphTypologies: ["docs"] }],
+        ...(builtAtPublish
+          ? { builtAtPublish: [{ path: "pages/", writer: [`${name}:pages`], because: "checkout", directory: `${name}-pages`, reason: "r" }] }
+          : {}),
+      }),
+    );
+  }
+
+  test("an instance whose only docs directory is built at publish drops out; one with an authored docs directory stays", () => {
+    const repo = mkdtempSync(join(tmpdir(), "docs-pop-bap-"));
+    try {
+      plant(repo, "built", true);
+      plant(repo, "authored", false);
+      const names = harnessesWithDocs(repo).map((h) => h.instance);
+      expect(names).toContain("authored");
+      expect(names).not.toContain("built");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
