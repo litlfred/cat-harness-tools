@@ -129,6 +129,17 @@ export function subjectInstances(
 }
 
 /**
+ * The sub-graph segment of one instance's page: `<under>/<instance>` when a
+ * directory of it is nested by the visualiser's `subgraphUnder` (the glossary's
+ * `instance/`, owner 2026-10-15 "3a"), else `<instance>` — as `viewersOf`
+ * composes the tile and the glossary writer writes the page.
+ */
+export function instanceSubgraph(instance: string, dirs: readonly { instance: string; under?: string }[]): string {
+  const under = dirs.find((d) => d.instance === instance && d.under)?.under;
+  return under ? `${under}/${instance}` : instance;
+}
+
+/**
  * Every page the declarations of the checkout at `root` say a built site must
  * carry. A visualiser declared `publish: "staging-only"` (fsh-guts, the
  * trashcan kept but not published) is expected in a preview and never on a
@@ -149,8 +160,7 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     if (v.subgraphs !== "instance") continue;
     const instances = subjectInstances(v, root, dirs);
     for (const instance of instances) {
-      const under = dirs.find((d) => d.instance === instance && d.under)?.under;
-      const sub = { ...parts, subgraph: under ? `${under}/${instance}` : instance };
+      const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
     }

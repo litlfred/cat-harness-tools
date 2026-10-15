@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expectedPages, legacyOnlyPages, missingPages, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
+import { expectedPages, legacyOnlyPages, instanceSubgraph, missingPages, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
@@ -100,5 +100,14 @@ describe("expectedPages over this checkout: tools", () => {
     }
     const expected = expectedPages(root).filter((p) => p.visualiser === "tools" && p.instance !== undefined).map((p) => p.instance!).sort();
     expect(expected).toEqual(drawn);
+  });
+});
+
+describe("instanceSubgraph: subgraphUnder nests the per-instance page, as the tiles and the writer do", () => {
+  test("the glossary's per-instance page is at instance/<instance>/", () => {
+    expect(instanceSubgraph("folio-assistant-core", [{ instance: "folio-assistant-core", under: "instance" }])).toBe("instance/folio-assistant-core");
+  });
+  test("a visualiser with no subgraphUnder keeps <instance>/", () => {
+    expect(instanceSubgraph("smart-base", [{ instance: "smart-base" }, { instance: "who-iris", under: "instance" }])).toBe("smart-base");
   });
 });
