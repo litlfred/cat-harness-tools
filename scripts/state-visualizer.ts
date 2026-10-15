@@ -1696,8 +1696,10 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
-  // state), so its hub is drawn here, listing the instance pages.
-  if (!graphs.some((g) => g.vis === v.id) && subjects.length > 0 && kinds.every((k) => REGISTRY_KINDS.has(k))) {
+  // state, and neither is `code`), so its hub is drawn here, listing the
+  // instance pages. Without it `code/` had a page per instance and none at
+  // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
+  if (!graphs.some((g) => g.vis === v.id) && subjects.length > 0 && (code || kinds.every((k) => REGISTRY_KINDS.has(k)))) {
     hubs.push(v.id);
     emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }

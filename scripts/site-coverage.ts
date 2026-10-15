@@ -70,12 +70,18 @@ function children(dir: string): { files: number; dirs: number } {
 }
 
 /** The covered directories of one visualiser, with the instance each belongs to. */
-function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string }[] {
+function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string; under?: string }[] {
   return checkoutDirectories(v.harnessRoot, { stackedOn: v.harnessRoot })
     .filter((d) =>
       (v.coversKinds ?? []).some((k) => (d.graphTypologies as readonly string[]).includes(k)) ||
       ((v.covers ?? []) as readonly string[]).includes(d.id) && (d.member ?? d.declaredBy) === v.harness)
-    .map((d) => ({ instance: d.member ?? d.declaredBy, absPath: d.absPath }));
+    .map((d) => {
+      // `subgraphUnder` nests a kind's sub-graph pages one segment down, as the
+      // tiles read it (`viewer-declarations.ts`): the glossary's per-instance
+      // pages are at `glossary/instance/<instance>/` (owner, 2026-10-15, "3a").
+      const under = (d.graphTypologies as readonly string[]).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
+      return { instance: d.member ?? d.declaredBy, absPath: d.absPath, ...(under ? { under } : {}) };
+    });
 }
 
 /**
@@ -97,9 +103,11 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     const legacy = visualiserRoute(forwardingParts(parts));
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
-    const instances = [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
+    const withEntries = dirs.filter((d) => children(d.absPath).dirs > 0);
+    const instances = [...new Set(withEntries.map((d) => d.instance))].sort();
     for (const instance of instances) {
-      const sub = { ...parts, subgraph: instance };
+      const under = withEntries.find((d) => d.instance === instance && d.under)?.under;
+      const sub = { ...parts, subgraph: under ? `${under}/${instance}` : instance };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
     }
