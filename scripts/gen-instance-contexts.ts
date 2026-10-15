@@ -54,7 +54,8 @@
  *
  * ## What `--check` fails on
  *
- * drift (the committed context differs from the generated one), a prefix used
+ * drift (a context on disk differs from the generated one — an ABSENT one is
+ * not drift, since the contexts are built at publish and never committed), a prefix used
  * in an IRI position that neither the flattened table nor the document's own
  * inline context binds, a prefix two instances in a flattened table bind
  * differently, a term two contexts define differently (or that a bound prefix
@@ -365,11 +366,16 @@ export function findings(result: GenerateResult): { drift: string[]; problems: s
   const out: string[] = [];
   for (const r of result.reports) {
     if (r.prefixError !== undefined) out.push(`${r.instance}: malformed ${r.prefixError}`);
-    if (r.current !== r.expected) {
+    // A context that is ABSENT is not drift: it is built at publish
+    // (`builtAtPublish`, writer `jsonld:contexts`) and never committed, so a
+    // fresh checkout has none, and `publish-check jsonld:contexts` runs this
+    // check after the writer has built it. Only a file that IS on disk and
+    // differs from what would be written is drift.
+    if (r.current !== undefined && r.current !== r.expected) {
       drift.push(
         r.expected === undefined
           ? `${r.path}: present, but ${r.instance} has no .jsonld documents — remove it`
-          : `${r.path}: ${r.current === undefined ? "missing" : "stale"} — run gen-instance-contexts`,
+          : `${r.path}: stale — run gen-instance-contexts`,
       );
     }
     for (const u of r.unresolved) {

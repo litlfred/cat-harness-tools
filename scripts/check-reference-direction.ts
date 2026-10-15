@@ -427,6 +427,55 @@ export const DATED_PROPOSAL_RECORD: ReferenceExemption = {
 };
 
 /**
+ * 3a — a WORKFLOW `uses:` ADDRESS (owner, 2026-10-15, ruling "3a" of the
+ * folio-assistant#2529 reference-direction review).
+ *
+ * A layer's pull-request CI calls ONE reusable workflow that a higher layer
+ * keeps — `uses: <owner>/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main`
+ * in `cat-harness`, `bootstrap` and `bootstrap-tools`. The owner ruled that
+ * line names a REPOSITORY ADDRESS — where GitHub fetches the workflow from —
+ * not a dependency of the calling layer on the layer that shares the
+ * repository's name. Nothing in the caller's tree loads, imports or runs a
+ * file of that layer; the hosting service resolves the address.
+ *
+ * Why an exemption and not `names-repository`: that verdict is what
+ * {@link analyse}'s `collisionOf` returns for the ROOT instance's name, the one
+ * that collides with the checkout's own repository, and it is consulted for no
+ * other target. Widening the resolver to every instance would change what it
+ * answers (and what its tests hold) for a carve the owner ruled on one shape
+ * of; an exemption carries the ruling as its reason and is counted on its own
+ * line, as X3/X4/X5 are.
+ *
+ * Narrow on three axes, and each edge is held by a test:
+ *
+ *  - **file** — a GitHub Actions workflow: a `.yml`/`.yaml` file directly in
+ *    a `.github/workflows/` directory (of any instance, or of the repository
+ *    root). Not a composite action's `action.yml`, not a workflow template
+ *    under `templates/`, and not Markdown that QUOTES a `uses:` line.
+ *  - **key** — the line is the `uses:` key of a job or of a step (`uses:` or
+ *    `- uses:`), and nothing else: `run:`, `with:`, `repository:`, `path:` and
+ *    comments are read as before, including a `run:` that executes the higher
+ *    layer's scripts and a checkout `path:` that names it.
+ *  - **value** — the WHOLE value is a remote address,
+ *    `<owner>/<repo>[/<path>]@<ref>`, optionally quoted, optionally followed by
+ *    a version comment (`# v4.1.1`) and nothing else. A local action
+ *    (`./<path>`) is a path in the checkout, and a `docker://` image is not a
+ *    repository; both stay read.
+ */
+// declared-path-literal: the shape of a GitHub Actions workflow file, repo-root-relative because that is how an occurrence's file is reported
+const WORKFLOW_FILE = /^(?:[A-Za-z0-9_.-]+\/)*\.github\/workflows\/[^/]+\.ya?ml$/;
+/** `<owner>/<repo>[/<path>]@<ref>` — GitHub's address of a reusable workflow or an action. */
+const REMOTE_USES_ADDRESS = String.raw`[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[A-Za-z0-9_.\/-]+`;
+export const WORKFLOW_USES_ADDRESS: ReferenceExemption = {
+  file: WORKFLOW_FILE,
+  pattern: new RegExp(
+    String.raw`^(?:-\s+)?uses:\s+(["']?)${REMOTE_USES_ADDRESS}\1(?:\s+#\s*v?\d[A-Za-z0-9_.+-]*)?\s*$`,
+  ),
+  reason:
+    "3a, a WORKFLOW `uses:` ADDRESS (owner, 2026-10-15, ruling \"3a\"): a GitHub Actions `uses: <owner>/<repo>[/<path>]@<ref>` names the REPOSITORY a reusable workflow or action is fetched from, not a dependency on the layer sharing that repository's name. Only the `uses:` key of a job or step in a `.github/workflows/` file, and only when the whole value is such an address; `run:`, checkout paths and every other key are read",
+};
+
+/**
  * X4 — a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z,
  * session_01UC1NuEuSy1MBNpEhnDuiGj: "2 y", ruling (ii) — *"rule that a harness
  * skill may name a cat-harness-tools script"*).
@@ -601,6 +650,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
   DEFINITION_POINTS_TO_IMPLEMENTATION_TS,
   DEFINITION_POINTS_TO_IMPLEMENTATION_JSON,
   DATED_PROPOSAL_RECORD,
+  WORKFLOW_USES_ADDRESS,
 ];
 
 /**

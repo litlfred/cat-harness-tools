@@ -22,8 +22,9 @@ const put = (root: string, rel: string, text = "x") => {
   mkdirSync(join(root, rel, ".."), { recursive: true });
   writeFileSync(join(root, rel), text);
 };
-const page = (body: string) => `<!doctype html><html><head><title>t</title></head><body>${body}</body></html>`;
-const THEMED = page(`<div class="side-bar"><nav id="site-nav"></nav><input id="search-input"></div><script type="application/json" id="fa-navbar-row">{}</script>`);
+const page = (body: string, head = "") => `<!doctype html><html><head><title>t</title>${head}</head><body>${body}</body></html>`;
+const META = '<script type="application/json" id="fa-translation-meta">{"lang":"en"}</script>';
+const THEMED = page(`<div class="side-bar"><nav id="site-nav"></nav><input id="search-input"></div><script type="application/json" id="fa-navbar-row">{}</script>`, META);
 const RAILED = page(`<nav class="fa-nav"></nav><script type="application/json" id="fa-navbar-row">{}</script>`);
 
 /** The root folio-site.yml built: two themed pages, served directories, a stamp, and previews under branches/. */
@@ -43,8 +44,8 @@ describe("siteFeatures — measured on the pages", () => {
   test("counts each feature, lists top-level directories without the kept ones, reads the stamp", () => {
     const f = siteFeatures(folioSiteRoot(), ["branches"]);
     expect(f.pages).toBe(3);
-    expect(f.counts).toEqual({ siteNav: 2, search: 2, navbarRow: 3, rail: 3 });
-    expect(f.index).toEqual(["siteNav", "search", "navbarRow", "rail"]);
+    expect(f.counts).toEqual({ siteNav: 2, search: 2, navbarRow: 3, rail: 3, translationMeta: 2 });
+    expect(f.index).toEqual(["siteNav", "search", "navbarRow", "rail", "translationMeta"]);
     expect(f.dirs).toEqual(["artifact", "ast-data", "fhir-artifact-index", "openapi"]);
     expect(f.stamp).toMatchObject({ instance: "r" });
   });
@@ -62,19 +63,19 @@ describe("parityShortfall — what the candidate would lose", () => {
     put(bare, "index.html", page("<h1>IG home</h1>"));
     put(bare, "openapi/index.html", page("swagger"));
     const short = parityShortfall(current, siteFeatures(bare));
-    expect(short).toHaveLength(6);
+    expect(short).toHaveLength(7);
     expect(short.join("\n")).toMatch(/side bar \(#site-nav\): on 2 of the current root's 3 page\(s\), on none of the candidate's 2/);
     expect(short.join("\n")).toMatch(/artifact\/, ast-data\/, fhir-artifact-index\//);
     expect(short.join("\n")).toMatch(/folio-build\.json/);
   });
 
-  test("a railed preview keeps the icon row and the rail, and loses the theme's side bar and search", () => {
+  test("a railed preview keeps the icon row and the rail, and loses the theme's side bar, search and the language picker", () => {
     const railed = tmp("parity-railed-");
     put(railed, "index.html", RAILED);
     for (const d of ["artifact", "ast-data", "fhir-artifact-index", "openapi"]) put(railed, `${d}/x.html`, RAILED);
     put(railed, "folio-build.json", "{}");
     const short = parityShortfall(current, siteFeatures(railed));
-    expect(short.map((s) => s.split(":")[0])).toEqual(["the theme's side bar (#site-nav)", "the theme's search box (#search-input)"]);
+    expect(short.map((s) => s.split(":")[0])).toEqual(["the theme's side bar (#site-nav)", "the search box (#search-input)", "the language picker's block (#fa-translation-meta)"]);
   });
 
   test("a feature on some pages but missing from the candidate's index.html is named too", () => {
@@ -82,7 +83,8 @@ describe("parityShortfall — what the candidate would lose", () => {
     const cand = { ...c, index: ["navbarRow" as const, "rail" as const] };
     expect(parityShortfall(c, cand)).toEqual([
       "the theme's side bar (#site-nav): on the current root's index.html, not on the candidate's",
-      "the theme's search box (#search-input): on the current root's index.html, not on the candidate's",
+      "the search box (#search-input): on the current root's index.html, not on the candidate's",
+      "the language picker's block (#fa-translation-meta): on the current root's index.html, not on the candidate's",
     ]);
   });
 
@@ -162,7 +164,7 @@ describe("directories dropped by the owner's ruling", () => {
   test("a dropped directory is not a shortfall, and is said with its ruling", () => {
     const current = siteFeatures(withComparison(), ["branches"]);
     const cand = siteFeatures(withoutOpenapi(), ["branches"]);
-    expect(droppedByRuling(current, cand, [ruling])).toEqual([{ dir: "comparison-v1.0.0", ruling: ruling.ruling }]);
+    expect(droppedByRuling(current, cand, [ruling])).toEqual([{ dir: "comparison-v1.0.0", words: "comparison-v1.0.0/", ruling: ruling.ruling }]);
     const short = parityShortfall(current, cand, [ruling]);
     expect(short.join("\n")).not.toContain("comparison-v1.0.0");
     // It excuses nothing else: openapi/ is still a shortfall.
@@ -172,5 +174,58 @@ describe("directories dropped by the owner's ruling", () => {
   test("without the declaration the same drop is a shortfall", () => {
     const current = siteFeatures(withComparison(), ["branches"]);
     expect(parityShortfall(current, siteFeatures(folioSiteRoot(), ["branches"])).join("\n")).toContain("comparison-v1.0.0/");
+  });
+});
+
+describe("page features dropped by the owner's ruling (layout \"C\", 2026-10-15)", () => {
+  const sideNav = { feature: "siteNav" as const, ruling: "owner, 2026-10-15, layout \"C\": the folio rail stands in for the theme's side menu" };
+  /** An IG-route build: railed pages with the IG's own search box and the language block, no theme side bar. */
+  const igRoute = (o: { search?: boolean; meta?: boolean } = {}) => {
+    const d = tmp("parity-ig-route-");
+    const body = `<nav class="fa-nav"></nav><script type="application/json" id="fa-navbar-row">{}</script>` +
+      `<div class="ig-topbar">${o.search === false ? "" : '<form class="ig-search"><input id="search-input"></form>'}</div>`;
+    const html = page(body, o.meta === false ? "" : META);
+    put(d, "index.html", html);
+    for (const x of ["artifact", "ast-data", "fhir-artifact-index", "openapi"]) put(d, `${x}/x.html`, html);
+    put(d, "folio-build.json", "{}");
+    return d;
+  };
+  const current = siteFeatures(folioSiteRoot(), ["branches"]);
+
+  test("the dropped feature is reported with its ruling, not a shortfall", () => {
+    const cand = siteFeatures(igRoute());
+    expect(parityShortfall(current, cand, [sideNav])).toEqual([]);
+    expect(droppedByRuling(current, cand, [sideNav])).toEqual([{ feature: "siteNav", words: "the theme's side bar (#site-nav)", ruling: sideNav.ruling }]);
+  });
+
+  test("without the ruling the guard still refuses the same build", () => {
+    expect(parityShortfall(current, siteFeatures(igRoute())).map((s) => s.split(":")[0])).toEqual(["the theme's side bar (#site-nav)"]);
+  });
+
+  test("search stays required: the side-bar ruling does not excuse a missing search box", () => {
+    const short = parityShortfall(current, siteFeatures(igRoute({ search: false })), [sideNav]);
+    expect(short.map((s) => s.split(":")[0])).toEqual(["the search box (#search-input)"]);
+  });
+
+  test("the language picker is required: a build that drops fa-translation-meta is refused", () => {
+    const short = parityShortfall(current, siteFeatures(igRoute({ meta: false })), [sideNav]);
+    expect(short.map((s) => s.split(":")[0])).toEqual(["the language picker's block (#fa-translation-meta)"]);
+  });
+
+  test("a feature entry excuses no directory, and a directory entry no feature", () => {
+    const noOpenapi = igRoute();
+    rmSync(join(noOpenapi, "openapi"), { recursive: true, force: true });
+    expect(parityShortfall(current, siteFeatures(noOpenapi), [sideNav]).join("\n")).toContain("openapi/");
+    expect(matchesDropped("openapi", { feature: "siteNav", ruling: "r" })).toBe(false);
+    expect(parityShortfall(current, siteFeatures(igRoute()), [{ dir: "site-nav", ruling: "r" }]).join("\n")).toContain("#site-nav");
+  });
+
+  test("an entry naming both a directory and a feature excuses neither", () => {
+    const both = { dir: "openapi", feature: "siteNav" as const, ruling: "r" };
+    const noOpenapi = igRoute();
+    rmSync(join(noOpenapi, "openapi"), { recursive: true, force: true });
+    const short = parityShortfall(current, siteFeatures(noOpenapi), [both]).join("\n");
+    expect(short).toContain("openapi/");
+    expect(short).toContain("#site-nav");
   });
 });

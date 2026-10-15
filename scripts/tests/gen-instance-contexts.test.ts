@@ -65,8 +65,11 @@ describe("gen-instance-contexts over a fixture tree", () => {
     expect(by("empty").expected).toBeUndefined();
   });
 
-  test("--check reports missing files as drift, then passes once written", () => {
-    expect(findings(result).drift.length).toBe(2);
+  test("--check does not count an absent (built-at-publish) context as drift, but does count a stale one", () => {
+    expect(findings(result).drift).toEqual([]);
+    const top = result.reports.find((r) => r.instance === "top")!;
+    put(top.path, { "@context": { stale: "http://example.org/stale/" } });
+    expect(findings(generateInstanceContexts(root, opts)).drift).toEqual([`${top.path}: stale — run gen-instance-contexts`]);
     for (const r of result.reports) if (r.expected !== undefined) put(r.path, r.expected);
     const again = generateInstanceContexts(root, opts);
     expect(findings(again)).toEqual({ drift: [], problems: [] });
