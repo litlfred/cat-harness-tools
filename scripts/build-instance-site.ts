@@ -799,7 +799,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   // `en/cat-harness/library/`, and nothing noticed). The parity guard below
   // only compares with the root being replaced, so it cannot miss a page that
   // was never published.
-  const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging) });
+  const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging), ownInstance: o.instance });
   if (uncovered.length > 0) {
     for (const m of uncovered) console.error(`  ✗ coverage: ${m.route} (${m.harness} declares \`${m.visualiser}\`${m.instance ? `; ${m.instance} has entries` : ""})`);
     if (o.coverage !== "report") throw new Error(`the built site lacks ${uncovered.length} declared visualiser page(s): the site is not published`);

@@ -28,6 +28,12 @@ describe("missingPages", () => {
   test("a page at neither address is missing", () => {
     expect(missingPages(expected, has).map((p) => p.route)).toEqual(["en/h/x/"]);
   });
+  test("on the instance's own site, its page at the site's own root is present (who-iris catalogue, 2026-10-15)", () => {
+    const own: ExpectedPage = { ...page("en/h/x/", "h/x/"), ownSiteRoute: "x/" };
+    expect(missingPages([own], (p) => p === "x/index.html")).toEqual([]);
+    // ...and only there: another harness's page at the root does not count.
+    expect(missingPages([page("en/h/x/", "h/x/")], (p) => p === "x/index.html")).toHaveLength(1);
+  });
 });
 
 describe("expectedPages over this checkout", () => {
