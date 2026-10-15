@@ -44,6 +44,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { checkoutDirectories, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 
 import { discoverTools } from "../tools/discover.ts";
@@ -162,12 +163,51 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
   ];
 }
 
-/** The writers of the expected pages in `pages`: each writer once, with only the visualisers it owes. */
-export function writersFor(writers: readonly VisualiserWriter[], pages: readonly ExpectedPage[]): VisualiserWriter[] {
+/**
+ * The writers of the expected pages in `pages`: each writer once, with only the
+ * visualisers it owes.
+ *
+ * A writer run for one instance at a time (an `instance` input) is keyed on the
+ * harness that DECLARES the visualiser, so by itself it draws that harness's
+ * pages only. A visualiser with `subgraphs: "instance"` also owes a page to
+ * every OTHER instance with entries of the kinds it covers: smart-base's
+ * `artifact-index` owes `en/smart-base/artifact-index/smart-trust/` on
+ * smart-trust's site (2026-10-15), and `ig-pages --instance <smart-base>`
+ * never drew it. So for each such owed page whose instance `rootOf` can place,
+ * the writer runs once more, pointed at that instance.
+ */
+export function writersFor(
+  writers: readonly VisualiserWriter[],
+  pages: readonly ExpectedPage[],
+  rootOf: (instance: string) => string | undefined = () => undefined,
+): VisualiserWriter[] {
   const owed = new Set(pages.map((p) => `${p.harness}/${p.visualiser}`));
-  return writers
-    .map((w) => ({ ...w, visualisers: w.visualisers.filter((v) => owed.has(`${v.harness}/${v.visualiser}`)) }))
-    .filter((w) => w.visualisers.length > 0);
+  const out: VisualiserWriter[] = [];
+  for (const w of writers) {
+    const visualisers = w.visualisers.filter((v) => owed.has(`${v.harness}/${v.visualiser}`));
+    if (visualisers.length === 0) continue;
+    out.push({ ...w, visualisers });
+    if (w.instance === undefined) continue;
+    const runFor = new Set([resolve(w.instance.root)]);
+    for (const p of pages) {
+      if (p.instance === undefined || !visualisers.some((v) => v.harness === p.harness && v.visualiser === p.visualiser)) continue;
+      const at = rootOf(p.instance);
+      if (at === undefined || runFor.has(resolve(at))) continue;
+      runFor.add(resolve(at));
+      out.push({ ...w, visualisers: visualisers.filter((v) => v.harness === p.harness && v.visualiser === p.visualiser), instance: { ...w.instance, root: resolve(at) } });
+    }
+  }
+  return out;
+}
+
+/** The root of each instance in the checkout at `root`, by name: where a writer run for that instance is pointed. */
+export function instanceRoots(root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const d of checkoutDirectories(root)) {
+    const at = instanceConfigFor(d.absPath);
+    if (at !== undefined && !out.has(at.name)) out.set(at.name, at.root);
+  }
+  return out;
 }
 
 /** What one writer did. */
@@ -217,7 +257,8 @@ export function runVisualiserWriters(
 export function writeMissingVisualisers(root: string, site: string, opts: { staging?: boolean } = {}, runOne?: (argv: readonly string[], cwd: string) => WriterOutcome): WriterRun[] {
   const missing = missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
   if (missing.length === 0) return [];
-  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing), site, runOne);
+  const roots = instanceRoots(root);
+  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing, (name) => roots.get(name)), site, runOne);
 }
 
 if (import.meta.main) {
