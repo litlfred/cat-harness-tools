@@ -602,7 +602,12 @@ export function viewersOf(
             ? [at(d.id)]
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
-    const subRef = subs.map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!)).find((r) => existsSync(join(repoRoot, r)));
+    // A sub-graph page counts when it is on disk OR when the declaring harness
+    // builds it at publish (`builtAtPublish`): a page that is deliberately not
+    // committed is not missing, and its writer is named on the tile instead.
+    const subRef = subs
+      .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
+      .find((r) => existsSync(join(repoRoot, r)) || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this instance is not its viewer.
