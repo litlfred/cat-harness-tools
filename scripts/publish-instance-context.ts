@@ -128,8 +128,9 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * Owner, 2026-10-15 ("2 Serve vocab at own iriBase"): a term IRI is
  * `<iriBase><version>/ns#Term` (`cat-harness/schemas/namespaces.ts`), so the
  * document `<iriBase><version>/ns` has to exist on the instance's own Pages or
- * every term it mints answers 404 — which was the state of cat-harness and
- * folio-assistant-core when this was written (no `0.1.0/` on either gh-pages).
+ * every term it mints answers 404 — which was the state of two instances,
+ * cat-harness one of them, when this was written (no `0.1.0/` on either
+ * gh-pages).
  *
  * The path is read off the vocabulary's own `@id`, never composed here: the
  * document says where it lives, and a second spelling of that address is the
