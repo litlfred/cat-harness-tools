@@ -944,7 +944,8 @@ export const RULES: Rule[] = [
       // declaration's `jsonldPrefixes` field through its schema, so a core
       // placement — which the `schemas/` prefix rule gave it — was a
       // wrong-direction edge the moment the module landed.
-      "schemas/jsonld-prefixes.ts",
+      "schemas/jsonld-prefixes.ts", // declared-path-literal: a partition plan names modules by path.
+
       // bootstrap's own Zod (graph, discussion, requirement, and since
       // 2026-09-30 the graph document's) lives in `bootstrap-tools/` (bean
       // `xsqm`), outside this partition.
