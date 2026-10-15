@@ -59,7 +59,9 @@ put(site, "index.html", themePage("Home", "."));
 put(site, "guide/index.html", themePage("Guide", ".."));
 put(site, "guide/install.html", themePage("Install", ".."));
 put(site, "guide/use.html", themePage("Use", ".."));
-put(site, "replica/page.html", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Replica</title></head>
+// A replica's own layout makes its BODY the centred column (who-iris's pages do).
+put(site, "replica/page.html", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Replica</title>
+<style>body { max-width: 50rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }</style></head>
 <body><main><h1>A replica page</h1><h2 id="x">One</h2><p>a</p><h2 id="y">Two</h2><p>b</p></main></body></html>
 `);
 // The theme's search scripts, as a just-the-docs site publishes them: stubs here.

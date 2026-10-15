@@ -105,3 +105,15 @@ test.describe("one top bar on every page — \"Top bar, like IG sites\"", () => 
     });
   }
 });
+
+test.describe("the top bar is FULL WIDTH on every page (owner, 2026-10-15)", () => {
+  test("on a page whose body is a centred column, the bar still spans from the rail to the window, flush with the top", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await open(page, "/replica/page.html");
+    await expect.poll(async () => page.locator("#main-header.fa-page-bar").evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const rail = document.querySelector("nav.fa-nav")!.getBoundingClientRect().right;
+      return Math.round(r.left - rail) === 0 && Math.round(document.documentElement.clientWidth - r.right) === 0 && Math.round(r.top) === 0;
+    })).toBe(true);
+  });
+});
