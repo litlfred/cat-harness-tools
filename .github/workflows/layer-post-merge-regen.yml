@@ -1,0 +1,191 @@
+# Post-merge regeneration check and repair for a harnessed LAYER, as ONE
+# reusable workflow (bean folio-assistant-ey1c; owner, 2026-10-15: "a").
+#
+# `post-merge:regen` (scripts/post-merge-regen.ts) runs in a composed index:
+# it is a cat-harness-tools script, so a layer's own checkout has no `cat`
+# command to run it with. cat-harness's copy of the old workflow ran
+# `bun run cat post-merge:regen` in cat-harness alone after the split (bean
+# 70lx), where `cat` is /usr/bin/cat, and it failed on every push.
+#
+# A caller is one `uses:` line, on push to main:
+#
+#   on: { push: { branches: [main] }, workflow_dispatch: { inputs: { dry_run: { type: boolean, default: false } } } }
+#   permissions: { contents: write, pull-requests: write }
+#   jobs:
+#     regen:
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-post-merge-regen.yml@main
+#       with: { dry-run: ${{ inputs.dry_run == true }} }
+#
+# What it does, in the layout `layer-publish-context.yml` uses:
+#   1. Check out the folio-assistant index at `index-ref` and mount every
+#      instance from its lock.
+#   2. Put THE CALLER, at the pushed commit and WITHOUT its `.git`, in place of
+#      its locked mount; keep its git checkout aside in `src`.
+#   3. Take its dependency harness and cat-harness-tools at main.
+#   4. Run `post-merge:regen` there. Its writers repair files in the composed
+#      tree. The script's own PR step is NOT used: the mounts are gitignored in
+#      the index, so it sees no changed file, and the repair belongs in the
+#      CALLER's repository, not folio-assistant.
+#   5. Copy the caller's directory back over `src`, and open the repair PR in
+#      the caller's repository with its GITHUB_TOKEN when, and only when, a
+#      file the caller tracks changed (the negative control). Another layer's
+#      changes are that layer's to repair.
+#   6. Exit with the script's own code: an unrepaired or writer-less check is
+#      a red run (principle 4), even when a repair PR was opened.
+
+name: Layer post-merge regen
+
+on:
+  workflow_call:
+    inputs:
+      instance:
+        description: "The instance's directory in the folio-assistant index (its mount path); empty means the calling repository's name."
+        required: false
+        type: string
+        default: ""
+      path-in-repo:
+        description: "Where the instance sits in the calling repository; '.' for the repository root."
+        required: false
+        type: string
+        default: "."
+      index-ref:
+        description: "The folio-assistant ref to check out."
+        required: false
+        type: string
+        default: "main"
+      dry-run:
+        description: "Report only: run the audit, open no PR."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: layer-post-merge-regen-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  INSTANCE: ${{ inputs.instance != '' && inputs.instance || github.event.repository.name }}
+
+jobs:
+  regen:
+    name: Check post-merge derived artefacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out the folio-assistant index
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/folio-assistant
+          ref: ${{ inputs.index-ref }}
+          path: fa
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Mount every instance from the index's lock
+        run: bash fa/.github/mount-from-lock.sh --root fa
+      - name: Check out the caller
+        uses: actions/checkout@v4
+        with:
+          path: src
+      - name: Put a copy of the caller in place of its locked mount
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -euo pipefail
+          rm -rf "fa/$INSTANCE"
+          mkdir -p "fa/$INSTANCE"
+          rsync -a --exclude .git "src/${SUBDIR}/" "fa/$INSTANCE/"
+          test -f "fa/$INSTANCE/$INSTANCE.json" || { echo "::error::fa/$INSTANCE/$INSTANCE.json is missing: is path-in-repo right?"; exit 2; }
+      - name: Take the dependency harness and cat-harness-tools at main
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/litlfred/cat-harness-tools ci
+          git -C ci sparse-checkout set .github/scripts/layer-publish-context
+          bun ci/.github/scripts/layer-publish-context/needs-at-main.ts fa "$INSTANCE" --always cat-harness-tools
+      - name: Install
+        working-directory: fa
+        run: bun install
+      - name: Mount the subgraphs kept on branches
+        # Through `mountState` directly, as layer-pr-checks.yml does:
+        # `state:mount` also re-lays the remote mounts against the lock, which
+        # refuses the swapped-in caller and the layers taken at main ("no
+        # longer hash to the lock"). A graph that will not mount is a warning:
+        # the regen then judges the gates that read it as they stand.
+        working-directory: fa
+        run: |
+          set -euo pipefail
+          bun -e '
+            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+            const r = mountState({});
+            console.log(report(r));
+            if (r.state === "failed" || r.state === "partial")
+              console.log("::warning::state mount " + r.state + ": see the report above");
+          '
+      - name: Run post-merge regen in the composed index
+        id: regen
+        working-directory: fa
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -uo pipefail
+          args=(--json)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          bun run cat post-merge:regen "${args[@]}" > "$RUNNER_TEMP/regen.json"
+          code=$?
+          cat "$RUNNER_TEMP/regen.json"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Open the repair PR in the caller's repository
+        if: inputs.dry-run == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUBDIR: ${{ inputs.path-in-repo }}
+          SHA: ${{ github.sha }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          rsync -a --delete --exclude .git --exclude node_modules "fa/$INSTANCE/" "src/${SUBDIR}/"
+          cd src
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Negative control: no file $INSTANCE tracks changed; no repair PR."
+            exit 0
+          fi
+          branch="automation/post-merge-regen-${SHA:0:10}"
+          if [ -n "$(gh pr list --head "$branch" --base "$BASE" --json number --jq '.[].number')" ]; then
+            echo "A repair PR for $branch is already open."
+            exit 0
+          fi
+          checks="$(bun -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf-8")); console.log([...(r.repairedChecks ?? []), ...(r.staleChecks ?? [])].filter((v, i, a) => a.indexOf(v) === i).join(", ") || "derived artefacts")' "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "derived artefacts")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -B "$branch"
+          git add -A
+          git commit -q -m "fix(derived): regenerate post-merge derived artefacts ($checks)"
+          git push -q -u origin "$branch"
+          {
+            echo "Automated post-merge repair for \`${SHA:0:10}\`, regenerated in the composed folio-assistant index (\`layer-post-merge-regen.yml\`)."
+            echo
+            echo "Checks: $checks"
+            echo
+            echo "Files:"
+            git diff --name-only "HEAD~1" | sed 's/^/- `/; s/$/`/'
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base "$BASE" --head "$branch" --title "fix(derived): regenerate post-merge derived artefacts" --body-file "$RUNNER_TEMP/body.md"
+      - name: Report the regen verdict
+        if: always()
+        env:
+          CODE: ${{ steps.regen.outputs.code }}
+        run: |
+          {
+            echo "### post-merge regen: $INSTANCE"
+            echo '```json'
+            cat "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "(no report)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "${CODE:-1}"
