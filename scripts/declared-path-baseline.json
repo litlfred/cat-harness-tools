@@ -138,13 +138,13 @@
     "scripts/tests/uml-overview-orphans.test.ts::uml/overview/cat-harness.mmd",
     "scripts/tests/voices-viz.test.ts::skills/authoring/authoring-core/technical-documentation.md",
     "src/upstream/pins.test.ts::docs/_config.yml",
-    "tools/index.ts::schemas/avatars.ts",
-    "tools/index.ts::schemas/cat-harness.ts",
-    "tools/index.ts::schemas/jsonld.ts",
-    "tools/index.ts::schemas/themes.ts",
-    "tools/index.ts::schemas/tool-types.ts",
-    "tools/index.ts::schemas/tool.ts",
-    "tools/index.ts::schemas/vocabulary.ts",
-    "tools/vocab-map.ts::schemas/vocab-mapping.ts"
+    "tools/avatars-css/avatars-css.ts::schemas/avatars.ts",
+    "tools/cat-harness-schema/cat-harness-schema.ts::schemas/cat-harness.ts",
+    "tools/content-context/content-context.ts::schemas/jsonld.ts",
+    "tools/ns-vocabulary/ns-vocabulary.ts::schemas/vocabulary.ts",
+    "tools/themes-css/themes-css.ts::schemas/themes.ts",
+    "tools/tool-schema/tool-schema.ts::schemas/tool.ts",
+    "tools/tool-types-schema/tool-types-schema.ts::schemas/tool-types.ts",
+    "tools/vocab-map/vocab-map.ts::schemas/vocab-mapping.ts"
   ]
 }
