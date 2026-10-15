@@ -23,6 +23,7 @@
  * distinct states (`clean`, `would-have-blocked`, `unknown`, `stale`, `skipped`) in output.
  * Under `--strict` or `--mode hard`, blocking findings and unknown/stale states exit 1.
  *
+ * @covers qa, attestations — the merge-review verdict it looks for in the declared `qa` tree and `attestations` store
  * @module scripts/check-adversarial-review
  * @graphNode tool
  */
