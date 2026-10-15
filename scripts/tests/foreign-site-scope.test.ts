@@ -54,12 +54,46 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const BASE = "https://litlfred.github.io/folio-assistant";
 const CAT_HARNESS = join(REPO, "cat-harness");
 /** The platform's own harness data, at its declared site directory (`siteDirFor`), never a literal. */
 const PLATFORM_DATA = join(CAT_HARNESS, siteDirFor(CAT_HARNESS), "_data", "harness.json");
+const SMART_TRUST = join(REPO, "smart-trust");
+
+// The platform's harness data is BUILT AT PUBLISH (cat-harness's
+// `builtAtPublish`, B1), and so is smart-trust's own site, which it reads:
+// `docs:harness` gives smart-trust a rail scope only when that site exists.
+// Neither is committed. Until 2026-10-15 this file read whatever an earlier
+// `derive:publish` had left in the tree — CI's step before `bun test`, or
+// another file's hook (`staging-only-publish` ran the whole of it until
+// a1794c8) — so in a checkout with no such run, or alone, the describes below
+// threw ENOENT at collection, and over a build in the wrong order they read a
+// harness.json with no smart-trust rail scope.
+//
+// So this file builds what it reads, and only that: the writers the
+// declarations name for those two artefacts, in `derive:publish`'s own order
+// (`declaredPlan`, consumers first — smart-trust:pages before docs:pages and
+// docs:harness), run the way it runs them (`runWriter`). About 10 s, against
+// the whole `derive:publish`'s 300 s and more. At module scope, not in a
+// hook, because the describes compute their fixtures at collection time.
+// The writers resolve their paths from the checkout they belong to, so they
+// write into this tree's ignored, publish-time paths, as a site build does.
+const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
+const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
+if (READ_PLAN.length !== READS.size) {
+  throw new Error(
+    `foreign-site-scope: expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
+  );
+}
+for (const w of writersOf(READ_PLAN)) {
+  const o = runWriter(["bun", "run", "cat", w], REPO);
+  if (o.kind !== "ran") {
+    throw new Error(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
+  }
+}
 
 /** A scope over a made-up declaration set, so the rule matrix is stated rather than inherited. */
 function fakeScope(over: Partial<ForeignScope> = {}): ForeignScope {
