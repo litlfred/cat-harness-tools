@@ -2,15 +2,14 @@
 #
 # Owner, 2026-10-14 ("1"): a layer is judged on its own pull requests by one
 # workflow the harness owns, called from each layer, rather than a copy per
-# layer. Until then only cat-harness-tools, folio-assistant-core, who-iris and
-# bootstrap-tools had pull-request CI. The rest (smart-base, smart-trust,
-# smart-immunizations, fhir-harness, folio-assistant-sci, bootstrap,
-# cat-harness) were judged by nothing until folio-assistant re-pinned them:
+# layer. Until then only four of the eleven layers had pull-request CI. The
+# other seven, this layer's own harness among them, were judged by nothing
+# until folio-assistant re-pinned them:
 # the 2026-10-06 "defined, not run on events" ruling for the WHO forks
 # switched their harness gates off with their IG builds, and the
 # initialization process never installed any pull-request checks.
 #
-# Generalised from folio-assistant-core's `pr-checks.yml` (14ed7ad), whose
+# Generalised from the content core's `pr-checks.yml` (14ed7ad), whose
 # layout is this repository's `pr-tests.yml`: check out the folio-assistant
 # index, mount every instance from its `index.lock.json`, take the lower
 # layers at main, and put THE CALLER (at the ref under test) in place of its
@@ -26,10 +25,10 @@
 #     on a gate the PR newly breaks (`run-gates.py`).
 #
 # Two modes, because a harnessed repository is one of two shapes:
-#   - `layer`: a layer the folio-assistant index mounts (cat-harness,
-#     smart-base, ...). The index is checked out and the caller swapped in.
-#   - `index`: a repository that is its own index (an IG repository over
-#     smart-base, smart-ra, a folio): the caller IS the root, mounted from its
+#   - `layer`: a layer the folio-assistant index mounts (cat-harness, a base
+#     harness, ...). The index is checked out and the caller swapped in.
+#   - `index`: a repository that is its own index (an IG repository over a
+#     base harness, smart-ra, a folio): the caller IS the root, mounted from its
 #     own `index.lock.json`, and its own instance is the one it declares at
 #     its root, or, when it declares none, every instance it mounts.
 # A gate or test already red on main is listed in the step summary, never
@@ -48,8 +47,8 @@
 # is the calling repository's name, the folio-assistant ref is `index-ref`'s
 # default, the judging scripts are at main, and one run per PR is kept
 # (`concurrency`, below). A caller passes an input only when it genuinely
-# differs from that: smart-base's `path-in-repo: smart-base` (its instance is
-# a sub-directory), a `layers-at-main` the dependencies do not imply, or
+# differs from that: a base harness's `path-in-repo: <instance>` (its
+# instance is a sub-directory), a `layers-at-main` the dependencies do not imply, or
 # `with: { mode: index }` for a repository that is its own index.
 
 name: Layer PR checks
@@ -125,7 +124,8 @@ jobs:
   # `index-ref` names a branch, and a branch moves. Each job used to check it
   # out when it started, so whenever the index was re-pinned while a run was
   # queued, base and head mounted DIFFERENT layer pins and the compare job
-  # charged the difference to the PR. fhir-harness#86, run 38695852469: head
+  # charged the difference to the PR.
+  # https://github.com/litlfred/fhir-harness/pull/86, run 38695852469: head
   # checked out claude/nifty-johnson-w3mspn at 07:01:56Z (a3fa2e5), the branch
   # moved to 725d8f8 at 07:04:45Z, base checked out at 07:08Z, and
   # `render:bpmn:check`, red at the first pins and green at the second, was
@@ -182,12 +182,14 @@ jobs:
           # steps to its first parent (below). Never `pull_request.base.sha`:
           # it is the base as of the PR's last push, older than the main the
           # merge commit holds whenever main moved since, so head-vs-base would
-          # charge main's own changes to the PR (seen on smart-base#57, where
-          # smart-base#53 landed between).
+          # charge main's own changes to the PR (seen on
+          # https://github.com/litlfred/smart-base/pull/57, where
+          # https://github.com/litlfred/smart-base/pull/53 landed between).
           # `github.ref`, never `''`: an expression's `a && '' || b` is `b`,
           # because `''` is falsy, so index mode checked out the caller's
           # `index-ref` default, `main`, and judged main against its own
-          # first parent instead of the PR (smart-immunizations#35, run
+          # first parent instead of the PR
+          # (https://github.com/litlfred/smart-immunizations/pull/35, run
           # 38633852296: `-B main refs/remotes/origin/main`).
           # Layer mode: the one commit the `pin` job resolved `index-ref` to,
           # never the ref itself, so base and head mount the same pins.
@@ -205,7 +207,7 @@ jobs:
         # replayer is `mount-from-lock.ts` at the commit the root's lock pins
         # (cat-harness-tools, or cat-harness before the code moved, bean
         # 70lx); it imports only node:*, so that one file is enough, as
-        # who-iris's checks.yml does.
+        # the IRIS instance's checks.yml does.
         name: Mount every instance from the root's lock
         run: |
           set -euo pipefail
@@ -365,7 +367,8 @@ jobs:
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
         # browser build is the one that Playwright expects: a bare `npx
-        # playwright` may fetch another (smart-base#57: "Executable doesn't
+        # playwright` may fetch another
+        # (https://github.com/litlfred/smart-base/pull/57: "Executable doesn't
         # exist at .../chromium_headless_shell-1243").
         working-directory: fa
         run: |

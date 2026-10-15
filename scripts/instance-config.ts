@@ -12,7 +12,8 @@
  * entry, and a `<name>.config.json` is imported only as a migration step and
  * then retired. `build-instance-site.ts`'s `recipeFromConfig` read
  * `${instance}.config.json` directly, so the publish path REQUIRED the legacy
- * file — smart-trust#33 created one on 2026-10-14 for exactly that reason.
+ * file — https://github.com/litlfred/smart-trust/pull/33 created one on
+ * 2026-10-14 for exactly that reason.
  *
  * `readHarnessConfig` / `readEffectiveConfig` in cat-harness answer the same
  * question from a DIRECTORY (they find the instance that owns it); the
