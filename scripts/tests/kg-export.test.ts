@@ -34,7 +34,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { buildExport, exportIdentity, publishedDocument, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
@@ -43,6 +43,9 @@ import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, re
 import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { toolsOf } from "../../tools/discover.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { dirname } from "node:path";
 
 /**
@@ -729,6 +732,16 @@ describe("every self-URL the export publishes resolves to something published", 
     // into the site's `assets/`, which Jekyll serves as they sit. Read from the
     // DIRECTORY, not from the nodes — a depiction naming a file that is not
     // there must fail here, not confirm itself.
+    // One document per Tool beside the host's (bean `tdir`), which the
+    // deploy's `kg-export --out ./_site/<stub>.jsonld` writes. Read from the
+    // FOLDERS on disk, not from the nodes, for the depiction's reason below:
+    // a Tool IRI naming a file the deploy does not write must fail here.
+    // One JSON Schema per shared I/O type (bean `tdir`), which the deploy's
+    // `harness-schema-export --out-dir ./_site` writes beside
+    // `tool-types.schema.json`. A port's `schema` names one of these.
+    for (const n of Object.keys(TOOL_TYPES)) out.add(`tool-types/${n}.schema.json`);
+    const toolDir = join(HARNESS_ROOT, "tools");
+    for (const f of readdirSync(toolDir, { withFileTypes: true })) if (f.isDirectory()) out.add(`tools/${f.name}.jsonld`);
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
     return out;
@@ -1106,8 +1119,9 @@ describe("exporting ANOTHER instance's graph", () => {
     // branch was open and the hardcoded literal took two tests down with it —
     // the same failure this file's package-witness comment warns about, made
     // in the act of fixing it.
+    // A Tool is its own document beside the instance's (bean `tdir`).
     const tool = (e["@graph"] as Array<Record<string, unknown>>).find(
-      (n) => n["@id"] === `${e["@id"]}#tool/discuss`,
+      (n) => n["@id"] === toolIri(String(e["@id"]), "discuss"),
     )!;
     expect(tool.satisfies).toEqual([`${ALT_BASE}/bootstrap/bootstrap.jsonld#skill/discussion`]);
   });
@@ -1130,6 +1144,101 @@ describe("exporting ANOTHER instance's graph", () => {
         if (s.startsWith(`${own}#`)) continue;
         expect({ s, home: homes.some((h) => s.startsWith(`${h}#`)) }).toEqual({ s, home: true });
       }
+    }
+  });
+});
+
+/**
+ * Bean `tdir`. An instance's OWN Tools are in its own document.
+ *
+ * Measured 2026-10-15 before the fix: `kg-export --instance ./smart-base`
+ * emitted 0 Tool nodes against 11 declared, `--instance ./fhir-harness` 0
+ * against 32, because `collectInstanceNodes` never called `collectTools`.
+ * Compared with DISCOVERY's count rather than a pinned number, so a Tool
+ * added there is a Tool expected here; the `> 0` is the vacuity guard.
+ */
+describe("an instance export carries that instance's Tools", () => {
+  const withTools = ["smart-base", "fhir-harness"]
+    .map((n) => join(REPO, n))
+    .filter((r) => instanceRootsIn(REPO).some((i) => resolve(i) === resolve(r)));
+
+  test.skipIf(!inAggregate() || withTools.length === 0)("every Tool discovery finds, and with harness-base port types", async () => {
+    for (const root of withTools) {
+      const e = await buildExport({ baseUrl: ALT_BASE, instanceRoot: root });
+      const graph = e["@graph"] as Array<Record<string, unknown>>;
+      const nodes = graph.filter((n) => String(n["@type"]).endsWith("Tool"));
+      const declared = toolsOf(root).length;
+      expect(declared).toBeGreaterThan(0);
+      expect({ root: basename(root), tools: nodes.length }).toEqual({ root: basename(root), tools: declared });
+      // The port types are the HARNESS's vocabulary, minted against the
+      // deploy's base, never against the instance's own canonical.
+      for (const t of nodes) {
+        const io = t.io as { inputs?: Array<{ schema: string }>; outputs?: Array<{ schema: string }> };
+        for (const p of [...(io.inputs ?? []), ...(io.outputs ?? [])]) {
+          expect(p.schema.startsWith(`${ALT_BASE}/`)).toBe(true);
+        }
+      }
+      expect(e.omitted ?? []).not.toContain("tools");
+    }
+  });
+
+  test.skipIf(!inAggregate() || withTools.length === 0)("with no --base-url, port types are the HARNESS's canonical, not the instance's", async () => {
+    // What the deploy does for smart-base, which declares its own canonical
+    // (`http://smart.who.int/base`): no `--base-url`. The first version of
+    // this fix minted its types there, through a default parameter that fires
+    // on an explicit `undefined` — and the test above, which always passes a
+    // base, could not see it.
+    for (const root of withTools) {
+      const e = await buildExport({ instanceRoot: root });
+      for (const t of (e["@graph"] as Array<Record<string, unknown>>).filter((n) => String(n["@type"]).endsWith("Tool"))) {
+        const io = t.io as { inputs?: Array<{ schema: string }>; outputs?: Array<{ schema: string }> };
+        for (const p of [...(io.inputs ?? []), ...(io.outputs ?? [])]) {
+          expect({ root: basename(root), schema: p.schema.startsWith(`${BASE}/`) }).toEqual({ root: basename(root), schema: true });
+        }
+      }
+    }
+  });
+});
+
+/**
+ * Bean `tdir`, owner 2026-10-15: "a seperate jsonld for each Tool w/ its own
+ * IRI". The IRI is minted beside the document and the file is written beside
+ * `--out`; this holds the two to the same relation, so a Tool IRI resolves to
+ * the bytes the export wrote.
+ */
+describe("each Tool is its own document, at the path its IRI names", () => {
+  test("one file per Tool node, its @id is the node's, and nothing else is in it", () => {
+    const pub = publishedDocument(EXPORT_ALT) as unknown as Record<string, unknown>;
+    const docIri = String(pub["@id"]);
+    const tools = (pub["@graph"] as Array<Record<string, unknown>>).filter((n) => n["@type"] === termIri("Tool"));
+    expect(tools.length).toBeGreaterThan(0);
+    const dir = mkdtempSync(join(tmpdir(), "kgx-tooldocs-"));
+    try {
+      const out = join(dir, basename(new URL(docIri).pathname));
+      const written = writeToolDocuments(pub, out);
+      expect(written.length).toBe(tools.length);
+      const docDir = docIri.slice(0, docIri.lastIndexOf("/") + 1);
+      for (const t of tools) {
+        // The IRI, made relative to the document's directory, IS the file
+        // path relative to `--out`'s directory.
+        const rel = String(t["@id"]).slice(docDir.length);
+        expect(rel).toBe(`tools/${t.name}.jsonld`);
+        const doc = JSON.parse(readFileSync(join(dir, rel), "utf-8")) as Record<string, unknown>;
+        expect(doc["@id"]).toBe(t["@id"]);
+        expect(doc["@context"]).toEqual(pub["@context"]);
+        expect(doc.partOf).toBe(docIri);
+        expect(doc["@graph"]).toEqual([t]);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("no Tool is a fragment of the instance document any more", () => {
+    const own = String(EXPORT_ALT["@id"]);
+    for (const n of EXPORT_ALT["@graph"] as Array<Record<string, unknown>>) {
+      if (n["@type"] !== termIri("Tool")) continue;
+      expect(String(n["@id"]).startsWith(`${own}#`)).toBe(false);
     }
   });
 });
@@ -1434,13 +1543,13 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
       const e = OWNER_DOCS.get(root)!;
       const index = publishedInstanceSchemas(root, deployBase(root)).indexIri;
       expect({ stub: p.stub, conformsTo: e.conformsTo }).toEqual({ stub: p.stub, conformsTo: index });
-      expect({ stub: p.stub, omitted: [...(e.omitted ?? [])].sort() }).toEqual({ stub: p.stub, omitted: ["packages", "registry", "tools"] });
+      expect({ stub: p.stub, omitted: [...(e.omitted ?? [])].sort() }).toEqual({ stub: p.stub, omitted: ["packages", "registry"] });
     }
   });
 
   test("an exempt instance publishes no schema/ here, so it still says `schemas` was not looked for", () => {
     expect(EXPORT_ALT_BOOT.conformsTo).toBeUndefined();
-    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas", "tools"]);
+    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas"]);
   });
 
   test.skipIf(!inAggregate())("a planned instance's skills link the contract $id its publisher writes", () => {

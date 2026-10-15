@@ -33,12 +33,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
-import { TOOL_TYPES, isInjectionSafe } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "@litlfred/cat-harness/schemas/tool.js";
 import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
 import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
-import { instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { inlineToolDeclarations } from "@litlfred/cat-harness/schemas/tool-folders.js";
 import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -415,6 +416,53 @@ export function danglingStorageTools(repoRoot: string = REPO): Array<{ instance:
   return out;
 }
 
+/**
+ * Every declared `tools` directory in the repository, with its instance.
+ *
+ * Read from the declarations, as discovery reads them (`tools/discover.ts`),
+ * so a directory this reports on is exactly one whose Tools are loaded. An
+ * instance whose declaration cannot be resolved is skipped here: discovery
+ * already reports it as a failure, and `check:tools` fails on that.
+ */
+export function declaredToolsDirs(repoRoot: string = REPO): Array<{ instance: string; dir: string }> {
+  const out: Array<{ instance: string; dir: string }> = [];
+  for (const root of instanceRootsIn(repoRoot)) {
+    let dir: string | undefined;
+    try {
+      dir = instanceDirectoryForGraph(root, "tools");
+    } catch {
+      continue;
+    }
+    if (dir !== undefined) out.push({ instance: relative(repoRoot, root) || ".", dir });
+  }
+  return out;
+}
+
+/**
+ * Files in a declared `tools` directory that declare a Tool INLINE — a
+ * `defineTool(` outside `<id>/<id>.ts` — bean `tdir`.
+ *
+ * The owner, 2026-10-15, called one folder per Tool "strongly recommended": a
+ * Tool declared in a barrel has no folder of its own for its scripts, tests
+ * and QA, and its `id` is not the name of anything on disk. So this is a
+ * FINDING, printed by the CLI and NOT failing the gate yet. It becomes a gate
+ * once every litlfred instance is migrated (the seven on
+ * `claude/tool-folders-tdir` are; an instance outside that set may not be),
+ * at which point the CLI's section below sets `bad`.
+ *
+ * `inlineToolDeclarations` (`schemas/tool-folders.ts`) is the one test of
+ * "inline"; this only asks it of every declared directory.
+ */
+export function inlineToolFindings(
+  dirs: ReadonlyArray<{ instance: string; dir: string }> = declaredToolsDirs(),
+  repoRoot: string = REPO,
+): Array<{ instance: string; file: string }> {
+  const read = (f: string) => readFileSync(f, "utf-8");
+  return dirs.flatMap(({ instance, dir }) =>
+    inlineToolDeclarations(dir, read).map((f) => ({ instance, file: relative(repoRoot, f) || f })),
+  );
+}
+
 export function checkTools(instance?: string): ToolCheck {
   // Coverage is asked of THE AUDITED instance's skills; resolution is asked of
   // every declared one. Two questions, two sets — see `satisfiableSkills`.
@@ -477,7 +525,7 @@ export function checkTools(instance?: string): ToolCheck {
         const want = contract.types.get(i.name);
         // A repeated port takes several values: on the contract's side that is
         // an array, whatever the type of each value.
-        const have = i.repeated ? "array" : jsonTypeOf(i.schema.split("#/$defs/")[1] ?? "");
+        const have = i.repeated ? "array" : jsonTypeOf(toolTypeNameOf(i.schema) ?? "");
         // An integer IS a number; the reverse does not hold.
         const compatible = want === have || (want === "number" && have === "integer");
         if (want !== undefined && have !== undefined && !compatible) {
@@ -486,7 +534,7 @@ export function checkTools(instance?: string): ToolCheck {
       }
     }
     for (const p of [...t.io.inputs, ...t.io.outputs]) {
-      const name = p.schema.split("#/$defs/")[1];
+      const name = toolTypeNameOf(p.schema);
       if (name === undefined || !typeNames.has(name)) {
         unknownTypes.push({ tool: t.id, port: p.name, ref: p.schema });
       }
@@ -496,7 +544,7 @@ export function checkTools(instance?: string): ToolCheck {
     // goes on stdin, where it is data instead of program text.
     for (const i of t.io.inputs) {
       if (i.arg === undefined || "stdin" in i.arg) continue;
-      const name = i.schema.split("#/$defs/")[1] ?? "";
+      const name = toolTypeNameOf(i.schema) ?? "";
       if (!isInjectionSafe(name)) unsafeArgs.push({ tool: t.id, port: i.name, type: name });
     }
   }
@@ -622,6 +670,13 @@ if (import.meta.main) {
       "\n    A node naming a command that does not run is unreachable through its own\n" +
         "    declaration, which is the one thing a Tool node is for.",
     );
+  }
+  // A FINDING, not a failure (bean `tdir`): see `inlineToolFindings`. When
+  // every litlfred instance declares its Tools in folders, this sets `bad`.
+  const inline = inlineToolFindings();
+  if (inline.length > 0) {
+    console.warn(`\n! Inline Tool declarations — move each to tools/<id>/<id>.ts, bean tdir (${inline.length}, not yet a gate):`);
+    for (const d of inline) console.warn(`    ${d.instance}: ${d.file}`);
   }
   if (bad) process.exit(1);
   console.log(
