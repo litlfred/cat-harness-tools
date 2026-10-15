@@ -29,8 +29,9 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * ## What this holds
  *
  * - the scheme is decided by an inline snippet in `<head>` BEFORE the bundle
- *   runs — stored choice, else the OS, else DARK — and `html` is painted dark
- *   by the very first CSS;
+ *   runs — stored choice, else the OS, else LIGHT (owner, 2026-10-15:
+ *   *"follow os else light"*) — and `html` is painted in that scheme by the
+ *   very first CSS;
  * - a stored choice that the loaded stylesheet already shows is never swapped;
  * - a light reader still ends up light.
  *
@@ -131,7 +132,7 @@ const isDark = (c: string) => luminance(c) < 0.1;
 const isLight = (c: string) => luminance(c) > 0.6;
 const bundleRan = (page: Page) => page.evaluate(() => !!document.querySelector(".fa-glass-handle"));
 
-test.describe("the first paint is dark — \"it should deafult dark mode then turn to light mode\"", () => {
+test.describe("the first paint follows the reader, else the OS, else light — no flash either way", () => {
   test("head_custom carries the snippet FIRST — before every stylesheet it emits — and it is plain HTML", () => {
     expect(SNIPPET, "head_custom.html has the fa-first-paint block").not.toBe("");
     expect(SNIPPET).not.toMatch(/\{\{|\{%/);
@@ -199,6 +200,23 @@ test.describe("the first paint is dark — \"it should deafult dark mode then tu
     await expect.poll(async () => isLight(await ground(page))).toBe(true);
     expect(isLight(await htmlBg(page))).toBe(true);
     await expect(page.locator(".fa-scheme-mini")).toHaveAttribute("aria-pressed", "false");
+    await ctx.close();
+  });
+
+  test("nothing stored, the OS says nothing: LIGHT before the bundle runs, and after", async ({ browser }) => {
+    // Chromium cannot emulate "no preference" (see above), so the OS is made
+    // silent the way an old or locked-down browser is: no matchMedia at all.
+    const ctx = await browser.newContext({ colorScheme: "dark" });
+    await ctx.addInitScript(() => { try { delete (window as { matchMedia?: unknown }).matchMedia; (window as { matchMedia?: unknown }).matchMedia = undefined; } catch { /* */ } });
+    const page = await ctx.newPage();
+    const hold = await serve(page, { holdBundle: true });
+    await page.goto("http://replica.test/page.html", { waitUntil: "commit" });
+    await page.waitForSelector("#t", { state: "attached" });
+    expect(await bundleRan(page)).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-scheme"))).toBe("light");
+    hold.release();
+    await page.waitForSelector(".fa-glass-handle", { state: "attached" });
+    await expect.poll(async () => isLight(await ground(page))).toBe(true);
     await ctx.close();
   });
 
