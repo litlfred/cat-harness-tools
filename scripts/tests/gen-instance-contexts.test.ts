@@ -21,6 +21,7 @@ const put = (rel: string, value: unknown): void => {
 put("base/base.json", { name: "base", needs: [], jsonldPrefixes: { dcterms: "http://purl.org/dc/terms/", skos: "http://www.w3.org/2004/02/skos/core#" } });
 put("top/top.json", { name: "top", needs: ["base"], jsonldPrefixes: { bibo: "http://purl.org/ontology/bibo/", fabio: "http://purl.org/spar/fabio/" } });
 put("empty/empty.json", { name: "empty", needs: ["base"] });
+put("declared/declared.json", { name: "declared", needs: ["base"], builtAtPublish: [{ path: "ns/context/v1.jsonld", writer: ["jsonld:contexts"], because: "checkout", reason: "test" }] });
 
 // base: speaks skos (inside an array) and dcterms only inside its own context file, which must not count.
 put("base/nodes/a.jsonld", { "@id": "a", "@type": ["skos:Concept"] });
@@ -63,6 +64,12 @@ describe("gen-instance-contexts over a fixture tree", () => {
   test("an instance with no documents gets no context", () => {
     expect(by("empty").documents).toBe(0);
     expect(by("empty").expected).toBeUndefined();
+  });
+
+  test("an instance that declares its context built at publish gets one even with no documents mounted", () => {
+    expect(by("declared").documents).toBe(0);
+    expect(by("declared").expected).toBeDefined();
+    expect(JSON.parse(by("declared").expected!)["@context"]).toBeDefined();
   });
 
   test("--check does not count an absent (built-at-publish) context as drift, but does count a stale one", () => {
