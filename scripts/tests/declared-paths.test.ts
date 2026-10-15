@@ -113,6 +113,7 @@ describe("declared-path literals", () => {
 
   test("a witness naming a declared publish-time artefact is held by the declaration", () => {
     // cat-harness declares uml/overview/ builtAtPublish (owner, 2026-10-14, B1).
+    // declared-path-literal: test vectors for the builtAtPublish rule — paths the declaration names, asserted as such; whether they are on disk is what the rule is about.
     expect(underBuiltAtPublish(root, "uml/overview/cat-harness.mmd")).toBe(true);
     expect(underBuiltAtPublish(root, "docs/uml/overview/cat-harness.md")).toBe(true);
     expect(underBuiltAtPublish(root, "schemas/no-such-module.ts")).toBe(false);
