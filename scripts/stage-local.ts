@@ -978,11 +978,25 @@ export function previewData(
   else {
     // declared-path-literal: the folio's todos graph root, as `review-comment-move.ts` reads it (`todos/todos.json`).
     const todos = join(repo, "todos");
+    const hasTodos = existsSync(join(todos, "todos.json"));
     run(repo, "bun", [
       "run", comments, "--repo", `${f.owner}/${f.name}`, "--pr", String(f.pr), "--commit", f.sha,
       "--folio", folio, "--blocks-out", join(site, "blocks.json"), "--out", join(site, "review-comments.json"),
-      ...(existsSync(join(todos, "todos.json")) ? ["--todos", todos] : []),
+      ...(hasTodos ? ["--todos", todos, "--write-decided"] : []),
     ]);
+    // A `resolve:` decision applied above is RECORDED, not only published
+    // (owner, 2026-10-15): the Tool wrote each decided comment into the todos
+    // graph's feedback directory, and a graph kept on its own state branch is
+    // spliced there by `state:push` (a no-op when nothing changed, and when the
+    // graph is not branch-kept). A todos graph in the feature branch's tree is
+    // left for the editor to commit. A push that fails costs the record, which
+    // the next build writes again, not the preview.
+    const push = hasTodos ? inPlatform(repo, "scripts/state-push.ts") : undefined;
+    if (push) {
+      const r = spawnSync("bun", ["run", push, "--id", "todos", "-m", `review decisions from PR #${f.pr}`], { cwd: repo, encoding: "utf-8" });
+      const said = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n").slice(-2).join(" ");
+      log(r.status === 0 ? `· todos: ${said || "pushed"}` : `⚠ todos not pushed (${said}): the next build records the decisions again`);
+    }
   }
   const banner = inPlatform(repo, "scripts/staging-banner.ts");
   if (!banner) { log("· this platform has no staging banner: no staging.json on this preview"); return; }
