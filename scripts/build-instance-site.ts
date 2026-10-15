@@ -86,6 +86,7 @@ import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
+import { checkInlineScripts } from "./check-inline-scripts.ts";
 import { chromeLayers } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
@@ -821,6 +822,19 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     for (const m of links.misses.slice(0, 50)) console.error(`  ✗ ${m}`);
     if (o.links !== "report") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
     console.error(`  (links: report — the recipe says so; published with ${links.misses.length} unresolved link(s))`);
+  }
+
+  // Every inline script still parses, and no theme markup pass reached into
+  // one (owner's report 2026-10-15: the heading-anchor and table-wrapper
+  // passes broke every page that builds HTML in a script). The content's own
+  // pages are reported, as their links are: the content's to fix.
+  const inline = checkInlineScripts(site);
+  const [ownScripts, upstreamScripts] = [inline.problems.filter((p) => !upstream.has(p.page)), inline.problems.filter((p) => upstream.has(p.page))];
+  console.log(`inline scripts: ${inline.scripts} on ${inline.pages} html pages, ${inline.problems.length} unsound`);
+  for (const p of upstreamScripts.slice(0, 20)) console.log(`  · ${p.page}:${p.line} ${p.reason} (a page the content supplies: reported, not gated)`);
+  if (ownScripts.length > 0) {
+    for (const p of ownScripts.slice(0, 50)) console.error(`  ✗ ${p.page}:${p.line} ${p.reason}`);
+    throw new Error(`${ownScripts.length} inline script(s) do not survive the build: the site is not published`);
   }
 
   o.beforePublish?.(site);
