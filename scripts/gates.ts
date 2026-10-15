@@ -997,6 +997,21 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "builds a release tarball; only a release run, dispatched by hand, has anything to pack",
   },
   {
+    match: "bun run cat processes:viz",
+    kind: "covered-by",
+    reason:
+      "the site builds write the processes pages (docs-site.yml, feature-staging.yml, after the drawings they embed); " +
+      "`processes:viz:check` is in the gate set, and `processes-viz.test.ts` covers the generator in `bun test`",
+  },
+  {
+    match: "scripts/staging-changes.ts",
+    kind: "ci-only",
+    reason:
+      "writes a preview's `STAGING/<slug>/changes/` page at deploy time: its inputs are the PR's file list, the base " +
+      "commit's lock, the built `_site` and the published `gh-pages` root, which exist only in the staging job. " +
+      "Its expansion, prediction and comparison are covered by `staging-changes.test.ts` in `bun test`",
+  },
+  {
     match: "run cat render:bpmn",
     kind: "covered-by",
     reason: "`render:bpmn:check` is in the gate set; the site build runs the writer",
