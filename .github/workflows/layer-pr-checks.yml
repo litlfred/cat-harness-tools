@@ -407,14 +407,30 @@ jobs:
           bun run cat derive:publish 2>&1 | tee "$log"
           code=${PIPESTATUS[0]}
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
-          if [ "$code" -ne 0 ]; then
-            echo "::error::derive:publish exited $code on the ${{ matrix.side }} side; the gates still run, and the compare job judges it as the gate publish:derive:publish"
-          fi
-          python3 - "$rec" "$code" "$log" <<'PY'
+          # A root that is not the folio-assistant index (no
+          # code-quality-gates.yml: a folio, an IG repository) mounts fewer
+          # instances than cat-harness's builtAtPublish list assumes (smart-ra#66:
+          # smart:pages, beans, glossaries of unmounted instances), so a failed
+          # build there is recorded as SKIPPED with its tail, not judged: the
+          # pages it did build still serve the gates that read them. In the index
+          # it stays a gate, so the index's own build is held to every writer.
+          if [ "$code" -ne 0 ] && [ ! -f .github/workflows/code-quality-gates.yml ]; then
+            echo "::warning::derive:publish exited $code on the ${{ matrix.side }} side of a root that is not the index; recorded as skipped, not judged"
+            python3 - "$rec" "$code" "$log" <<'PY'
+          import json, sys
+          tail = open(sys.argv[3], errors="replace").read().strip()[-600:].replace("\n", " / ")
+          json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "skipped": f"exited {sys.argv[2]} in a root that is not the index: {tail}"}}, open(sys.argv[1], "w"), indent=1)
+          PY
+          else
+            if [ "$code" -ne 0 ]; then
+              echo "::error::derive:publish exited $code on the ${{ matrix.side }} side; the gates still run, and the compare job judges it as the gate publish:derive:publish"
+            fi
+            python3 - "$rec" "$code" "$log" <<'PY'
           import json, sys
           tail = open(sys.argv[3], errors="replace").read().strip()[-1500:]
           json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
           PY
+          fi
       - name: bun test
         working-directory: fa
         # Judged by the compare job, not by this exit code.
