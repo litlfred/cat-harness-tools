@@ -5,9 +5,11 @@
  * @graphNode none — a test
  */
 import { describe, expect, test } from "bun:test";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { join } from "node:path";
-
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import {
   bootstrapVocabularyPath,
   buildVocabulary,
@@ -195,22 +197,29 @@ describe("ns:check fails on a folioType whose owner does not publish an ns defin
 });
 
 describe("bootstrapVocabularyPath resolves from both the index root and the cat-harness root (bean 63q4)", () => {
-  test("bootstrapVocabularyPath returns <platformRoot>/bootstrap/ns.jsonld for both roots", () => {
-    const platform = findPlatformRoot();
-    const expected = join(platform, "bootstrap", "ns.jsonld");
+  test("bootstrapVocabularyPath returns <workspace>/bootstrap/ns.jsonld for both roots", () => {
+    const workspace = resolve(HARNESS_ROOT, "..");
+    const expected = join(workspace, "bootstrap", "ns.jsonld");
     expect(bootstrapVocabularyPath()).toBe(expected);
-    expect(bootstrapVocabularyPath(join(platform, "cat-harness"))).toBe(expected);
-    expect(bootstrapVocabularyPath(platform)).toBe(expected);
+    expect(bootstrapVocabularyPath(resolve(HARNESS_ROOT))).toBe(expected);
+    expect(bootstrapVocabularyPath(workspace)).toBe(expected);
   });
 
   test("buildVocabularyOne builds bootstrap's vocabulary when given the index root", () => {
-    const platform = findPlatformRoot();
-    const out = buildVocabularyOne(platform, "bootstrap");
-    expect(out.kind).toBe("built");
-    if (out.kind !== "built") return;
-    expect(out.url).toBe("https://litlfred.github.io/bootstrap/0.1.0/ns");
-    expect(out.paths).toEqual(["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"]);
-    expect(out.terms).toBeGreaterThan(0);
+    const workspace = resolve(HARNESS_ROOT, "..");
+    const tmp = mkdtempSync(join(tmpdir(), "bootstrap-vocab-index-"));
+    try {
+      // Mirrors layer-publish-context.yml: the caller is mounted at <index>/bootstrap without .git.
+      cpSync(join(workspace, "bootstrap", "bootstrap.json"), join(tmp, "bootstrap", "bootstrap.json"), { recursive: true });
+      cpSync(join(workspace, "bootstrap", "ns.jsonld"), join(tmp, "bootstrap", "ns.jsonld"), { recursive: true });
+      const out = buildVocabularyOne(tmp, "bootstrap");
+      expect(out.kind).toBe("built");
+      if (out.kind !== "built") return;
+      expect(out.url).toBe("https://litlfred.github.io/bootstrap/0.1.0/ns");
+      expect(out.paths).toEqual(["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"]);
+      expect(out.terms).toBeGreaterThan(0);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
-
