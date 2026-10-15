@@ -145,6 +145,7 @@ import {
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
@@ -1295,7 +1296,7 @@ export function perInstanceSubjects(
   const byId = new Set(beans ? [] : (v.covers ?? []));
   const candidates = checkoutDirectories(root).filter((d) => !(d.declaredBy === harness && byId.has(d.id)));
   const all = instanceSubjectsOf(candidates, beans ? ["beans"] : kinds);
-  const routed = (s: InstanceSubject) => /^[a-z0-9][a-z0-9-]*$/.test(s.name);
+  const routed = (s: InstanceSubject) => ROUTE_SEGMENT.test(s.name);
   return { kinds, beans, code, unread, candidates, subjects: all.filter(routed), unrouted: all.filter((s) => !routed(s)) };
 }
 
