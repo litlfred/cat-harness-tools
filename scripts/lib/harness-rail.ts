@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -83,6 +83,15 @@ export interface RailOptions {
    * counted, the platform's work plan (issue #46, gap 2). Default `assetRoot`.
    */
   rowRoot?: string;
+  /**
+   * Where the rail's own CODE and STYLE are loaded from — `navbar.js`,
+   * `navbar.css`, `navbar-row.js`, `navbar-row.css` — when that is not
+   * {@link assetRoot}. Owner, 2026-10-15, "pinned copy per site": a folio's or
+   * an IG's site ships these files itself, at its pinned platform version,
+   * rather than linking the platform's live site, while the rail's LINKS still
+   * point at the platform's pages. Default `assetRoot`.
+   */
+  chromeRoot?: string;
   /**
    * The row's script and stylesheet, to be INLINED rather than linked — for a
    * standalone viewer page that fetches nothing (`withViewerNav`), as its
@@ -150,7 +159,7 @@ export interface RailOptions {
   shareNavbarRow?: boolean;
   /**
    * What the page's own section is CALLED — the visualiser's name, `todos` on
-   * `/todos/`. Absent on a mounted document, whose section is its "Contents".
+   * `/todos/`. Absent on a mounted document, whose section is "On this page".
    */
   visualiserLabel?: string;
   /**
@@ -172,7 +181,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
       ? undefined
-      : { label: "Harnesses", icon: "\u25A6", items: o.harnesses, collapsible: true };
+      : { label: RAIL_SECTION_LABELS.harnesses, icon: "\u25A6", items: o.harnesses, collapsible: true };
   return {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -190,7 +199,9 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // "Graphs" section start closed on LHS navbar"*. It was open whenever the
     // page had no section of its own. `navbarRegionsHtml` still opens it when
     // one of its rows is the current page, so the reader's place stays visible.
-    graphs: { label: "Graphs", icon: "\u25A4", items: o.links, collapsible: true, open: false },
+    // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
+    // for the same rows, so the section reads the same on every site.
+    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     home: { href: `${o.toRoot}/`, label: o.homeLabel ?? "folio-assistant", icon: "\u2302" },
   };
@@ -243,16 +254,17 @@ export function wantsLinkedRail(html: string): boolean {
  * answer than the headings — a declared index in the graph, say.
  */
 export function injectRail(html: string, o: RailOptions): string | undefined {
-  const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? "Contents";
+  const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? RAIL_SECTION_LABELS.onThisPage;
   const documentIndex = o.documentIndex ?? visualiserNavOf(html, label) ?? documentIndexOf(html, label);
   const root = o.assetRoot ?? o.toRoot;
+  const chrome = o.chromeRoot ?? root;
   if (o.emitRailData) {
     const railed = withSharedRail(html, o, root, documentIndex);
     return railed === undefined
       ? undefined
       : withNavbarRow(railed, o.navbarRow, {
-          root,
-          ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}),
+          root: chrome,
+          dataRoot: o.rowRoot ?? root,
           ...(o.shareNavbarRow ? { shared: { emit: o.emitRailData, toRoot: o.toRoot } } : {}),
         });
   }
@@ -262,13 +274,13 @@ export function injectRail(html: string, o: RailOptions): string | undefined {
   const railed = injectNavbar(
     html,
     railModel({ ...o, ...(documentIndex ? { documentIndex } : {}) }),
-    linked ? { cssHref: `${root}/${NAVBAR_CSS}` } : {},
+    linked ? { cssHref: `${chrome}/${NAVBAR_CSS}` } : {},
   );
   return railed === undefined
     ? undefined
     : withNavbarRow(railed, o.navbarRow, {
-        root,
-        ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}),
+        root: chrome,
+        dataRoot: o.rowRoot ?? root,
         ...(o.inlineRowAssets && !linked ? { inline: o.inlineRowAssets } : {}),
       });
 }
@@ -512,12 +524,15 @@ function withSharedRail(html: string, o: RailOptions, root: string, documentInde
     `<a href="${esc(o.toRoot)}/">${esc(o.homeLabel ?? "folio-assistant")}</a></nav>`;
   const at = body.index + body[0].length;
   let out = html.slice(0, at) + block + nav + html.slice(at);
+  // The drawing and its style are the platform's code, loaded from
+  // `chromeRoot` — the site's own pinned copy on a foreign site.
+  const chrome = o.chromeRoot ?? root;
   const tags =
-    `<link rel="stylesheet" href="${root}/${NAVBAR_CSS}">` +
+    `<link rel="stylesheet" href="${chrome}/${NAVBAR_CSS}">` +
     // The DATA is written into the site being railed, so it is fetched from
-    // this page's own root; the drawing and its style are the platform's.
+    // this page's own root.
     `<script src="${o.toRoot}/${asset.file}" defer></script>` +
-    `<script src="${root}/${NAVBAR_JS}" defer></script>`;
+    `<script src="${chrome}/${NAVBAR_JS}" defer></script>`;
   const head = /<\/head\s*>/i.exec(out);
   out = head ? out.slice(0, head.index) + tags + out.slice(head.index) : out.slice(0, at) + tags + out.slice(at);
   return out;

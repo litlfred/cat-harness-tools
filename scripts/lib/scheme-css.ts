@@ -61,37 +61,61 @@ export function darkRules(rules: string): string {
 }
 
 /**
- * The reader's saved colour scheme, applied to a standalone viewer — bean `dc64`.
+ * The reader's colour scheme, decided before first paint on a page that writes
+ * its own `<head>` — bean `dc64`, and the owner's rule of 2026-10-15, *"follow
+ * os else light"*: the reader's stored choice (`fa-color-scheme`), then the
+ * OS's `prefers-color-scheme`, then LIGHT.
  *
- * The dashboards (beans, todos, translation status) style both schemes through
- * `:root[data-fa-scheme="light"]`, and default to dark because the site's
- * configured `color_scheme` is dark. On a themed page `docs-ui.js` sets that
- * attribute from the reader's stored choice. These pages do not load it, so a
- * reader who picked LIGHT anywhere on the site still got dark here.
+ * The dashboards (beans, todos, translation status) and a folio's railed pages
+ * style both schemes through `data-fa-scheme` on `<html>`. On a themed page
+ * the first-paint snippet in `head_custom.html` sets it; these pages do not
+ * include that file, so this puts the SAME snippet in their head.
  *
- * A few bytes in the HEAD, run before first paint so the page does not flash
- * dark and then flip. It reads ONLY a stored choice: with none, the page keeps
- * its CSS default, which is the configured scheme, the same fallback
- * `docs-ui.js` uses.
- *
- * The storage key is read out of `docs-ui.js` at generation time, not written
- * down again here. Two copies of a key are two answers free to disagree, and a
- * rename in one would silently disconnect every dashboard.
+ * ONE SOURCE. The script is LIFTED from between `head_custom.html`'s
+ * `fa-first-paint` markers ({@link firstPaintSchemeScript}), not written again
+ * here: it was a second copy until 2026-10-15, with its own fallback (no
+ * attribute at all, so the page's CSS default — dark — decided), and two
+ * copies of a rule are two answers free to disagree. On a page with no
+ * just-the-docs its theme-sheet swap finds no `jtd` and does nothing.
  */
 export function withSavedScheme(html: string): string {
   if (html.includes(SCHEME_MARK)) return html;
   const head = /<head\b[^>]*>/i.exec(html);
   if (!head) return html;
-  const key = JSON.stringify(schemeKey());
-  const script =
-    `<script ${SCHEME_MARK}>try{var s=localStorage.getItem(${key});` +
-    `if(s!=="light"&&s!=="dark"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches)s="light";` +
-    `if(s==="light"||s==="dark")document.documentElement.setAttribute("data-fa-scheme",s)}catch(e){}</script>\n`;
+  const script = firstPaintSchemeScript().replace(/^<script\b/i, `<script ${SCHEME_MARK}`) + "\n";
   const at = head.index + head[0].length;
   return html.slice(0, at) + "\n" + script + html.slice(at);
 }
 
 const SCHEME_MARK = `data-folio-saved-scheme`;
+
+/** The markers `head_custom.html` wraps its first-paint block in. */
+export const FIRST_PAINT_BEGIN = "<!-- fa-first-paint:begin -->";
+export const FIRST_PAINT_END = "<!-- fa-first-paint:end -->";
+
+let firstPaintCache: string | undefined;
+/**
+ * The first-paint `<script>…</script>` exactly as `head_custom.html` ships it —
+ * the one place the scheme rule is written. Throws if it cannot be found: a
+ * silent default would put a different rule on these pages than on the rest
+ * of the site.
+ */
+export function firstPaintSchemeScript(): string {
+  if (firstPaintCache) return firstPaintCache;
+  // declared-path-literal: a platform asset of the harness, not a folio
+  // directory. It is the one place the rule is defined.
+  const head = readFileSync(pathToFileURL(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "_includes/head_custom.html"))), "utf-8");
+  const a = head.indexOf(FIRST_PAINT_BEGIN);
+  const b = head.indexOf(FIRST_PAINT_END);
+  const block = a >= 0 && b > a ? head.slice(a + FIRST_PAINT_BEGIN.length, b) : "";
+  const m = /<script>[\s\S]*?<\/script>/.exec(block);
+  if (!m) throw new Error("scheme-css: head_custom.html no longer carries a fa-first-paint <script> — standalone pages cannot follow the reader's scheme");
+  if (!m[0].includes(JSON.stringify(schemeKey()))) {
+    throw new Error(`scheme-css: the first-paint snippet does not read docs-ui.js's SCHEME_KEY (${schemeKey()}) — the two would disagree`);
+  }
+  firstPaintCache = m[0];
+  return firstPaintCache;
+}
 
 let schemeKeyCache: string | undefined;
 /** The key `docs-ui.js` stores the reader's scheme under. Throws if it cannot be found: a silent default would disconnect every page. */

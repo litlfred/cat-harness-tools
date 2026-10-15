@@ -113,6 +113,14 @@ export interface BuildOptions {
    */
   finalSteps?: string[];
   staging?: string;
+  /**
+   * Run on the finished site after the link check and before the publish
+   * (and when nothing is published). A preview's data steps go here: the
+   * ChangeSet and the staging banner the review page reads, which only the
+   * workflow-described path wrote until dth-hrh's review walkthrough
+   * (bean xp72, 2026-10-15) found its previews carried none.
+   */
+  beforePublish?: (site: string) => void;
   mount: boolean;
   /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
   fresh: boolean;
@@ -799,6 +807,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (o.links !== "report") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
     console.error(`  (links: report — the recipe says so; published with ${links.misses.length} unresolved link(s))`);
   }
+
+  o.beforePublish?.(site);
 
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");
