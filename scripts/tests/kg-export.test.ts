@@ -34,7 +34,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { buildExport, exportIdentity, publishedDocument, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
@@ -44,6 +44,7 @@ import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.j
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
 import { dirname } from "node:path";
 
 /**
@@ -730,6 +731,12 @@ describe("every self-URL the export publishes resolves to something published", 
     // into the site's `assets/`, which Jekyll serves as they sit. Read from the
     // DIRECTORY, not from the nodes — a depiction naming a file that is not
     // there must fail here, not confirm itself.
+    // One document per Tool beside the host's (bean `tdir`), which the
+    // deploy's `kg-export --out ./_site/<stub>.jsonld` writes. Read from the
+    // FOLDERS on disk, not from the nodes, for the depiction's reason below:
+    // a Tool IRI naming a file the deploy does not write must fail here.
+    const toolDir = join(HARNESS_ROOT, "tools");
+    for (const f of readdirSync(toolDir, { withFileTypes: true })) if (f.isDirectory()) out.add(`tools/${f.name}.jsonld`);
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
     return out;
@@ -1107,8 +1114,9 @@ describe("exporting ANOTHER instance's graph", () => {
     // branch was open and the hardcoded literal took two tests down with it —
     // the same failure this file's package-witness comment warns about, made
     // in the act of fixing it.
+    // A Tool is its own document beside the instance's (bean `tdir`).
     const tool = (e["@graph"] as Array<Record<string, unknown>>).find(
-      (n) => n["@id"] === `${e["@id"]}#tool/discuss`,
+      (n) => n["@id"] === toolIri(String(e["@id"]), "discuss"),
     )!;
     expect(tool.satisfies).toEqual([`${ALT_BASE}/bootstrap/bootstrap.jsonld#skill/discussion`]);
   });
@@ -1166,6 +1174,49 @@ describe("an instance export carries that instance's Tools", () => {
         }
       }
       expect(e.omitted ?? []).not.toContain("tools");
+    }
+  });
+});
+
+/**
+ * Bean `tdir`, owner 2026-10-15: "a seperate jsonld for each Tool w/ its own
+ * IRI". The IRI is minted beside the document and the file is written beside
+ * `--out`; this holds the two to the same relation, so a Tool IRI resolves to
+ * the bytes the export wrote.
+ */
+describe("each Tool is its own document, at the path its IRI names", () => {
+  test("one file per Tool node, its @id is the node's, and nothing else is in it", () => {
+    const pub = publishedDocument(EXPORT_ALT) as unknown as Record<string, unknown>;
+    const docIri = String(pub["@id"]);
+    const tools = (pub["@graph"] as Array<Record<string, unknown>>).filter((n) => n["@type"] === termIri("Tool"));
+    expect(tools.length).toBeGreaterThan(0);
+    const dir = mkdtempSync(join(tmpdir(), "kgx-tooldocs-"));
+    try {
+      const out = join(dir, basename(new URL(docIri).pathname));
+      const written = writeToolDocuments(pub, out);
+      expect(written.length).toBe(tools.length);
+      const docDir = docIri.slice(0, docIri.lastIndexOf("/") + 1);
+      for (const t of tools) {
+        // The IRI, made relative to the document's directory, IS the file
+        // path relative to `--out`'s directory.
+        const rel = String(t["@id"]).slice(docDir.length);
+        expect(rel).toBe(`tools/${t.name}.jsonld`);
+        const doc = JSON.parse(readFileSync(join(dir, rel), "utf-8")) as Record<string, unknown>;
+        expect(doc["@id"]).toBe(t["@id"]);
+        expect(doc["@context"]).toEqual(pub["@context"]);
+        expect(doc.partOf).toBe(docIri);
+        expect(doc["@graph"]).toEqual([t]);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("no Tool is a fragment of the instance document any more", () => {
+    const own = String(EXPORT_ALT["@id"]);
+    for (const n of EXPORT_ALT["@graph"] as Array<Record<string, unknown>>) {
+      if (n["@type"] !== termIri("Tool")) continue;
+      expect(String(n["@id"]).startsWith(`${own}#`)).toBe(false);
     }
   });
 });
