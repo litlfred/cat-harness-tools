@@ -36,7 +36,7 @@
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
  *
- * `--pre`, `--source-step` and `--site-step` take package SCRIPT NAMES, never commands: the
+ * `--pre`, `--source-step`, `--site-step` and `--final-step` take package SCRIPT NAMES, never commands: the
  * Tool contract admits no input that can carry a shell payload (check:tools),
  * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
@@ -47,7 +47,9 @@
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
  *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
  *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
- *     rail-standalone-pages, `.nojekyll`
+ *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
+ *     that must see every page of the finished site, the platform's own too (an IG's one bar on
+ *     the identifier lookup page; owner, 2026-10-15); then `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
  *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
@@ -94,6 +96,12 @@ export interface BuildOptions {
   sourceSteps: string[];
   /** Package scripts run as `bun run <name> <built site>` after Jekyll: generators that write finished pages. */
   siteSteps?: string[];
+  /**
+   * Package scripts run as `bun run <name> <built site>` LAST: after the platform's own writers
+   * (instance docs, identifier lookup, the rail on standalone pages), before the parity guard and
+   * the link check. For a step that must see every page of the finished site, the platform's too.
+   */
+  finalSteps?: string[];
   staging?: string;
   mount: boolean;
   /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
@@ -222,6 +230,8 @@ export interface SiteRecipe {
   pre: string[];
   sourceSteps: string[];
   siteSteps: string[];
+  /** Run after the platform's own writers ({@link BuildOptions.finalSteps}). */
+  finalSteps?: string[];
   /** Root entries a root publish keeps, besides `STAGING/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
   keep?: string[];
   /**
@@ -305,6 +315,7 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       pre: list("pre"),
       sourceSteps: list("sourceSteps"),
       siteSteps: list("siteSteps"),
+      ...(list("finalSteps").length ? { finalSteps: list("finalSteps") } : {}),
       ...(keep.length ? { keep: keep as string[] } : {}),
       ...(profile !== "folio" ? { profile } : {}),
       ...(links !== "refuse" ? { links } : {}),
@@ -577,7 +588,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const gh = ownerRepo(remote);
   if (!gh) throw new Error(`origin ${remote} is not a GitHub repository: the base path cannot be read`);
   const title = decl.title ?? decl.name;
-  for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+  for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? []), ...(o.finalSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
   if (o.keep?.some((k) => k === "" || k.includes("/") || k === "." || k === "..")) throw new Error(`keep names root entries, not paths: ${JSON.stringify(o.keep)}`);
   const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
@@ -661,6 +672,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
+    for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
   } finally {
     restoreHarnessData();
   }
@@ -735,15 +747,15 @@ if (import.meta.main) {
   if (!instance) {
     console.error(
       "usage: build-instance-site.ts --root <checkout> --instance <name> [--link-root <url>] [--out <dir>] [--home <md>]\n" +
-        "         [--pre <script>]... [--source-step <script>]... [--site-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]\n" +
+        "         [--pre <script>]... [--source-step <script>]... [--site-step <script>]... [--final-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]\n" +
         "         [--keep <root entry>]... [--parity refuse|report|off] [--parity-against <published root dir>]",
     );
     process.exit(2);
   }
   // Explicit step flags win. With none, the instance's own `site.build`.
-  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "keep" | "profile" | "links"> => {
-    const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step") };
-    if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length > 0) return { ...flags, keep: many("--keep") };
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links"> => {
+    const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
+    if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };
     const { recipe: r, read } = recipeRead(root, instance);
     if (r === undefined) return flags;
     console.log(`steps: from ${read.from} site.build`);
