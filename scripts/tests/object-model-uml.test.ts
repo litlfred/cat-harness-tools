@@ -41,9 +41,9 @@ describe("every class links to its glossary definition", () => {
     expect(md.match(/\]\(/g)?.length).toBe(classes.length);
   });
 
-  test("a term's page is its owning instance's authored glossary page", () => {
-    expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/authored\/cat-harness\/$/);
-    expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/authored\/bootstrap\/$/);
+  test("a term's page is its owning instance's glossary page", () => {
+    expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/instance\/cat-harness\/$/);
+    expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/instance\/bootstrap\/$/);
   });
 
   test("a class whose term the page lacks is reported, and no page is could-not-determine", () => {

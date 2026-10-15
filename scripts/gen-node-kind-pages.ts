@@ -36,6 +36,16 @@
  * does not exist. The segment is in the URL from the start so adding a locale
  * moves no page.
  *
+ * ## Built at publish, where cat-harness declares it
+ *
+ * A page under a route cat-harness declares `builtAtPublish` — the instance
+ * declaration pages, and the `node-kind-index` pages, whose one node is the
+ * publish-time table `docs/_data/node-kinds.json` — has no committed bytes to
+ * compare. Under `--check` it is skipped (the `tools:viz` / `folio:viz`
+ * rule): not compared, not required to resolve, and not an orphan; a write
+ * run still writes and prunes it. `publish:check node-kind:pages` is what
+ * runs the writer first and then this check.
+ *
  * Usage:
  *   bun run cat node-kind:pages          # write
  *   bun run cat node-kind:pages:check    # fail if a page is stale or orphaned
@@ -43,6 +53,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
+import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import { kindDirectories, nodesOfKind, type KindNode } from "@litlfred/cat-harness/schemas/node-kind-nodes.ts";
@@ -471,6 +482,18 @@ export interface BuildOptions {
    * A themed page carries no rail: the theme's sidebar is its navigation.
    */
   shape?: PageShape;
+  /**
+   * The routes the site's instance builds at publish, as `builtAtPublish`
+   * declares them (instance-relative), with `siteDir` the site's path in that
+   * instance. Under `check`, a page under one is skipped. Absent: nothing is.
+   */
+  builtAtPublish?: { list: readonly Pick<BuiltAtPublish, "path">[]; siteDir: string };
+}
+
+/** Whether a site-relative page (no `index.html`) sits under a declared publish-time route. */
+export function pageBuiltAtPublish(rel: string, decl: BuildOptions["builtAtPublish"]): boolean {
+  if (decl === undefined) return false;
+  return isBuiltAtPublish(decl.list, `${decl.siteDir}/${rel}/index.html`.split(sep).join("/"));
 }
 
 /**
@@ -510,6 +533,8 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
     const file = join(o.site, rel, "index.html");
     written.add(file);
     pages.push(rel);
+    // Built at publish: nothing committed to compare it with.
+    if (o.check && pageBuiltAtPublish(rel, o.builtAtPublish)) return;
     // Themed: the plain emit, no rail. Standalone: the rail, with the page's own section (#1757).
     makeEmit({ check: o.check, onStale: () => { stale++; }, ...(shape === "standalone" ? { nav: { ...nav, section } } : {}), quiet: true })(file, html);
   };
@@ -552,6 +577,7 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
     for (const locale of LOCALES) {
       for (const file of ownPages(join(o.site, locale))) {
         if (written.has(file)) continue;
+        if (o.check && pageBuiltAtPublish(relative(o.site, join(file, "..")), o.builtAtPublish)) continue;
         if (o.check) {
           console.error(`  ✗ ${relative(o.siteRepo, file)} is an orphan — its node or kind is gone`);
           stale++;
@@ -614,17 +640,20 @@ if (import.meta.main) {
     console.log("  · this instance declares no name — nothing to publish under");
     process.exit(0);
   }
-  const { pages, stale } = await buildNodeKindPages({ instanceRoot: INSTANCE_ROOT, siteRepo, site, built, check, prune: !folio, shape: folio ? "standalone" : "themed" });
+  // The platform's own docs only: a folio's `_site` is built at deploy, whole.
+  const declared = folio ? undefined : { list: readDeclaration(INSTANCE_ROOT)?.builtAtPublish ?? [], siteDir: siteDirFor(INSTANCE_ROOT) };
+  const { pages, stale } = await buildNodeKindPages({ instanceRoot: INSTANCE_ROOT, siteRepo, site, built, check, prune: !folio, shape: folio ? "standalone" : "themed", ...(declared ? { builtAtPublish: declared } : {}) });
   if (!check) console.log(`  ${pages.length} node-kind page(s) under ${LOCALES.join(", ")} in ${relative(process.cwd(), site) || "."}`);
   if (stale > 0) {
     console.error(`\n${stale} page(s) stale — run \`bun run cat node-kind:pages\``);
     process.exit(1);
   }
   // Every planned page must resolve, written or checked: the QA half of PR 3.
-  const missing = unresolvedPages(site, pages);
+  const missing = unresolvedPages(site, check ? pages.filter((p) => !pageBuiltAtPublish(p, declared)) : pages);
   if (missing.length) {
     for (const m of missing) console.error(`  ✗ ${m}/ does not resolve`);
     process.exit(1);
   }
-  if (check) console.log(`✓ ${pages.length} node-kind page(s) current, and every one resolves`);
+  const atPublish = check ? pages.filter((p) => pageBuiltAtPublish(p, declared)).length : 0;
+  if (check) console.log(`✓ ${pages.length - atPublish} node-kind page(s) current, and every one resolves${atPublish ? `; ${atPublish} built at publish, not compared` : ""}`);
 }

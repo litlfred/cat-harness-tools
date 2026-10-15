@@ -66,7 +66,8 @@ import {
   type MethodologyNode,
 } from "./check-methodology-evidence.js";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
@@ -468,7 +469,18 @@ if (import.meta.main) {
   const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const out = join(docsBase, PAGE);
 
-  if (check) {
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page joins
+  // every methodology node the checkout's composition declares to every
+  // declared library (`libraryResolver` reads the library projection and each
+  // instance's READMEs), so it moved with the index's pins. The instance
+  // declares the route `builtAtPublish` with this script as its writer, and
+  // `derive:publish` runs it; under `--check` a declared page has no committed
+  // bytes to compare, so it is skipped there (the `folio:viz` rule).
+  const builtHere = isBuiltAtPublish(readDeclaration(INSTANCE_ROOT)?.builtAtPublish ?? [], posix.join(siteDirFor(INSTANCE_ROOT), PAGE));
+
+  if (check && builtHere) {
+    console.log(`✓ methodologies viewer: ${PAGE} is built at publish (builtAtPublish), not committed — nothing to compare; \`bun run cat methodologies:viz\` writes it`);
+  } else if (check) {
     const current = existsSync(out) ? readFileSync(out, "utf-8") : "";
     if (current !== rendered) {
       console.error(`::error::gen-methodologies-viz: ${PAGE} is stale — run \`bun run cat methodologies:viz\``);

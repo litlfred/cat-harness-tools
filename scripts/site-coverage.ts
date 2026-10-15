@@ -25,7 +25,10 @@
  *     anything;
  *   - with `subgraphs: "instance"`, also `…/<instance>/` for each instance
  *     whose covered directory holds an ENTRY (a sub-directory): a library
- *     whose only file is its `library.json` has no entries to show.
+ *     whose only file is its `library.json` has no entries to show. Where the
+ *     writer reads its instances with a reader of its own
+ *     ({@link SUBJECT_READERS}), that reader decides instead, so the guard and
+ *     the writer cannot disagree about which instances have a page.
  * A page is there when the route holds `index.html` (the built site) or
  * `index.md` (a Jekyll source).
  *
@@ -37,6 +40,7 @@ import { join, resolve } from "node:path";
 
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { toolSubjects } from "./gen-tools-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
 /** One page the declarations say the site must carry. */
@@ -49,6 +53,13 @@ export interface ExpectedPage {
   instance?: string;
   /** The same view at its address before the locale segment (`forwardingParts`). */
   legacyRoute: string;
+  /**
+   * On the site OF the instance that declares it, the same view at that site's
+   * own root: a folio's site reads `/<instance>/…` as `/…` (`ownHref` in
+   * `lib/foreign-site-scope.ts`), so who-iris's catalogue tile,
+   * `/who-iris/catalogue/`, lands on `catalogue/`. Set only for that instance.
+   */
+  ownSiteRoute?: string;
 }
 
 const visible = (name: string): boolean => !name.startsWith(".") && !name.startsWith("_");
@@ -63,12 +74,69 @@ function children(dir: string): { files: number; dirs: number } {
 }
 
 /** The covered directories of one visualiser, with the instance each belongs to. */
-function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string }[] {
+function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string; under?: string }[] {
   return checkoutDirectories(v.harnessRoot, { stackedOn: v.harnessRoot })
     .filter((d) =>
       (v.coversKinds ?? []).some((k) => (d.graphTypologies as readonly string[]).includes(k)) ||
       ((v.covers ?? []) as readonly string[]).includes(d.id) && (d.member ?? d.declaredBy) === v.harness)
-    .map((d) => ({ instance: d.member ?? d.declaredBy, absPath: d.absPath }));
+    .map((d) => {
+      // `subgraphUnder` nests a kind's sub-graph pages one segment down, as the
+      // tiles read it (`viewer-declarations.ts`): the glossary's per-instance
+      // pages are at `glossary/instance/<instance>/` (owner, 2026-10-15, "3a").
+      const under = (d.graphTypologies as readonly string[]).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
+      return { instance: d.member ?? d.declaredBy, absPath: d.absPath, ...(under ? { under } : {}) };
+    });
+}
+
+/**
+ * The instances a writer draws a sub-graph page for, read by the WRITER's own
+ * reader, keyed by the Tool the visualiser is `renderedBy`.
+ *
+ * "A sub-directory is an entry" is the right test for a library, an uploads
+ * queue or a bean store, and the wrong one for a `tools` graph: a Tool is a
+ * node the writer loads (`toolSubjects`), not a folder. smart-immunizations
+ * (2026-10-15) inherits smart-base's `tools` declaration as a member, and its
+ * repository root holds the IG's own `tools/` folder of FHIR scripts: the guard
+ * expected `en/cat-harness/tools/smart-immunizations/`, the writer rightly drew
+ * nothing (no Tool node there), and the build failed on a page nobody owed.
+ * Owner ruling B1: a declaration names only what an index mounting the
+ * instance has — a folder that merely matches a declared path is not a graph.
+ *
+ * A writer with no entry here keeps the sub-directory test. A reader that
+ * throws (a declared graph that does not load) falls back to it too, so the
+ * guard still reports rather than goes quiet.
+ */
+export const SUBJECT_READERS: Readonly<Record<string, (root: string) => readonly string[]>> = {
+  "tools-viewer": (root) => toolSubjects(root).subjects.map((s) => s.name),
+};
+
+/** The instances `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
+export function subjectInstances(
+  v: Pick<DeclaredVisualiser, "renderedBy">,
+  root: string,
+  dirs: readonly { instance: string; absPath: string }[],
+  readers: Readonly<Record<string, (root: string) => readonly string[]>> = SUBJECT_READERS,
+): string[] {
+  const read = readers[v.renderedBy];
+  if (read !== undefined) {
+    try {
+      return [...new Set(read(root))].sort();
+    } catch {
+      // fall through: the generic test still names what is expected
+    }
+  }
+  return [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
+}
+
+/**
+ * The sub-graph segment of one instance's page: `<under>/<instance>` when a
+ * directory of it is nested by the visualiser's `subgraphUnder` (the glossary's
+ * `instance/`, owner 2026-10-15 "3a"), else `<instance>` — as `viewersOf`
+ * composes the tile and the glossary writer writes the page.
+ */
+export function instanceSubgraph(instance: string, dirs: readonly { instance: string; under?: string }[]): string {
+  const under = dirs.find((d) => d.instance === instance && d.under)?.under;
+  return under ? `${under}/${instance}` : instance;
 }
 
 /**
@@ -77,20 +145,24 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
  * trashcan kept but not published) is expected in a preview and never on a
  * root publish.
  */
-export function expectedPages(root: string, opts: { staging?: boolean } = {}): ExpectedPage[] {
+export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
   const out: ExpectedPage[] = [];
+  const own = (harness: string, legacy: string): { ownSiteRoute?: string } =>
+    opts.ownInstance !== undefined && harness === opts.ownInstance && legacy.startsWith(`${harness}/`) ? { ownSiteRoute: legacy.slice(harness.length + 1) } : {};
   for (const v of declaredVisualisers(root)) {
     if (!opts.staging && v.publish === "staging-only") continue;
     const dirs = coveredDirectories(v).filter((d) => existsSync(d.absPath));
     const withAnything = dirs.filter((d) => { const c = children(d.absPath); return c.files + c.dirs > 0; });
     if (withAnything.length === 0) continue;
     const parts = pageParts({ harness: v.harness, visualiser: v.id });
-    out.push({ route: visualiserRoute(parts), legacyRoute: visualiserRoute(forwardingParts(parts)), harness: v.harness, visualiser: v.id });
+    const legacy = visualiserRoute(forwardingParts(parts));
+    out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
-    const instances = [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
+    const instances = subjectInstances(v, root, dirs);
     for (const instance of instances) {
-      const sub = { ...parts, subgraph: instance };
-      out.push({ route: visualiserRoute(sub), legacyRoute: visualiserRoute(forwardingParts(sub)), harness: v.harness, visualiser: v.id, instance });
+      const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
+      const subLegacy = visualiserRoute(forwardingParts(sub));
+      out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
     }
   }
   return out;
@@ -100,7 +172,7 @@ const holds = (has: (path: string) => boolean, route: string): boolean => has(`$
 
 /** The expected pages `has` finds at neither address. `has` answers for a site-relative file path. */
 export function missingPages(expected: readonly ExpectedPage[], has: (path: string) => boolean): ExpectedPage[] {
-  return expected.filter((p) => !holds(has, p.route) && !holds(has, p.legacyRoute));
+  return expected.filter((p) => !holds(has, p.route) && !holds(has, p.legacyRoute) && !(p.ownSiteRoute !== undefined && holds(has, p.ownSiteRoute)));
 }
 
 /**
@@ -113,7 +185,7 @@ export function legacyOnlyPages(expected: readonly ExpectedPage[], has: (path: s
 }
 
 /** The guard as `build-instance-site.ts` calls it: the missing pages of a built site directory. */
-export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean } = {}): ExpectedPage[] {
+export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
   return missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
 }
 

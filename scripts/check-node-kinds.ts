@@ -1,44 +1,76 @@
 #!/usr/bin/env bun
 /**
- * The node-kind index, written or checked — issue #2195, PR 1.
+ * The node-kind index, written or checked — issue #2195, PR 1; per-layer
+ * baselines since the owner's ruling of 2026-10-15.
  *
  * @module scripts/check-node-kinds
- * @covers cat-harness, typologies — it resolves every declared family's validator and records which are node kinds
+ * @covers cat-harness, typologies — it resolves every declared family's validator, records which are node kinds, and holds each instance's unkinded families to that instance's own baseline
  *
- *   bun run cat node-kinds                       write cat-harness/docs/_data/node-kinds.json
- *   bun run cat node-kinds:check                 fail on a stale index, a NEW unkinded family, or an id collision
- *   bun run cat node-kinds --accept-unkinded     write, admitting new unkinded families to the baseline
+ *   bun run cat node-kinds                       write every instance's baseline, and cat-harness/docs/_data/node-kinds.json
+ *   bun run cat node-kinds:check                 fail on a NEW unkinded family, a stale or foreign baseline entry, or an id collision
+ *   bun run cat node-kinds --accept-unkinded     write, admitting new unkinded families to their owners' baselines
  *
- * ## The index is derived; the baseline is not
+ * ## The index is derived; the baselines are not
  *
- * `kinds` is recomputed from the typologies every run (`nodeKindIndex`), so a
- * stale copy is only ever a regenerate. `unkinded` is different: it is the
- * list of families that predate node kinds, and the owner asked for a *"QA
- * check on new kinds"*. So a family that is unkinded NOW but was not in the
- * committed list is refused by BOTH modes — the writer will not quietly add it
- * to the baseline, which would make regenerating the fix for the very finding
- * the gate exists to raise. `--accept-unkinded` is the deliberate override, and
- * a reviewer sees it as a growing list in the diff.
+ * `kinds` is recomputed from the typologies every run (`nodeKindIndex`), so the
+ * table is only ever a regenerate. The baseline is different: it is the list
+ * of families that predate node kinds, and the owner asked for a *"QA check on
+ * new kinds"*. So a family that is unkinded NOW but is not in its owner's
+ * baseline is refused by BOTH modes — the writer will not quietly add it,
+ * which would make regenerating the fix for the very finding the gate exists
+ * to raise. `--accept-unkinded` is the deliberate override, and a reviewer sees
+ * it as a growing list in the diff.
  *
- * The baseline only shrinks on its own: a family that becomes a node kind
- * leaves the list at the next write, and `--check` fails until it is written,
- * so the improvement is recorded rather than lost.
+ * A baseline only shrinks on its own: a family that becomes a node kind leaves
+ * at the next write, and `--check` fails until it is written, so the
+ * improvement is recorded rather than lost.
+ *
+ * ## One baseline per layer; the table at publish (owner, 2026-10-15)
+ *
+ * The baseline was the `unkinded` half of the committed table, one cat-harness
+ * file naming every layer's families, which went stale at every re-pin. Now a
+ * family belongs to the instance that declares its typology (`typologyOwner`),
+ * each instance keeps its own in a declared asset of role `unkinded-baseline`
+ * (none declared: an empty baseline), and the gate judges each against its own
+ * (`ratchet`), so a layer's PR adding a family is judged by that layer's
+ * commit. The table `docs/_data/node-kinds.json` is still written, for the
+ * node-kind pages, but cat-harness declares it `builtAtPublish`: under
+ * `--check` there are no committed bytes to compare, so it is not compared
+ * (the `tools:viz` / `folio:viz` rule).
+ *
+ * A cat-harness that does not yet declare the table built at publish is read
+ * the old way — the committed table IS the baseline, and `--check` compares
+ * its bytes — so these tools can land before the declaration flips.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { defaultGraphTypologies, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { NodeKindIndexFileKind, newUnkinded, nodeKindIndex, unkindedKey, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.js";
+import { defaultGraphTypologies, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import {
+  baselinePath,
+  NodeKindIndexFileKind,
+  newUnkinded,
+  nodeKindIndex,
+  ratchet,
+  renderBaseline,
+  typologyOwner,
+  UnkindedBaselineKind,
+  unkindedKey,
+  type NodeKindIndex,
+  type Unkinded,
+} from "@litlfred/cat-harness/schemas/node-kind-index.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
 const repoRoot = REPO_ROOT ?? join(HARNESS_ROOT, "..");
-export const INDEX_PATH = join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "node-kinds.json");
+const INDEX_REL = join(siteDirFor(HARNESS_ROOT), "_data", "node-kinds.json");
+export const INDEX_PATH = join(HARNESS_ROOT, INDEX_REL);
 
 /**
- * What is committed: the index, under a schema tag a reader can check. The
- * tag is the kind's own, read from `NodeKindIndexFileKind`, so a version bump
- * there (1.1.0 added `foundBy`, bean `ujiv`) cannot leave this writer stamping
- * the old one.
+ * The table, under a schema tag a reader can check. The tag is the kind's own,
+ * read from `NodeKindIndexFileKind`, so a version bump there (1.1.0 added
+ * `foundBy`, bean `ujiv`) cannot leave this writer stamping the old one.
  */
 export interface NodeKindIndexFile extends NodeKindIndex {
   $schema: string;
@@ -47,6 +79,11 @@ export interface NodeKindIndexFile extends NodeKindIndex {
 export function render(index: NodeKindIndex): string {
   const file: NodeKindIndexFile = { $schema: NodeKindIndexFileKind.tag!, ...index };
   return JSON.stringify(file, null, 2) + "\n";
+}
+
+/** Whether cat-harness declares the table built at publish — the per-layer mode. */
+export function tableBuiltAtPublish(harnessRoot = HARNESS_ROOT): boolean {
+  return isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], INDEX_REL.split("\\").join("/"));
 }
 
 function committed(): NodeKindIndexFile | undefined {
@@ -58,25 +95,140 @@ function committed(): NodeKindIndexFile | undefined {
   }
 }
 
-async function main(): Promise<number> {
-  const check = process.argv.includes("--check");
-  const accept = process.argv.includes("--accept-unkinded");
-  const index = await nodeKindIndex(defaultGraphTypologies, HARNESS_ROOT, repoRoot);
-  const prior = committed();
-  const at = relative(repoRoot, INDEX_PATH);
-  let failed = false;
+/** One instance's declared baseline: where, and what it admits; `error` when declared and unreadable. */
+interface DeclaredBaseline {
+  instance: string;
+  path?: string;
+  entries?: Pick<Unkinded, "typology" | "family">[];
+  text?: string;
+  error?: string;
+}
 
+/** Every instance in the checkout, with its declared baseline read. */
+export function readBaselines(root = repoRoot): DeclaredBaseline[] {
+  const out: DeclaredBaseline[] = [];
+  for (const r of instanceRootsIn(root)) {
+    const instance = readDeclaration(r)?.name;
+    if (!instance) continue;
+    const path = baselinePath(r);
+    if (path === undefined) {
+      out.push({ instance });
+      continue;
+    }
+    if (!existsSync(path)) {
+      out.push({ instance, path, error: "is declared and missing" });
+      continue;
+    }
+    const text = readFileSync(path, "utf-8");
+    try {
+      const parsed = UnkindedBaselineKind.schema.safeParse(JSON.parse(text));
+      if (!parsed.success) out.push({ instance, path, text, error: `is not ${UnkindedBaselineKind.tag}: ${parsed.error.message}` });
+      else out.push({ instance, path, text, entries: (parsed.data as { unkinded: Pick<Unkinded, "typology" | "family">[] }).unkinded });
+    } catch (e) {
+      out.push({ instance, path, text, error: `does not parse: ${(e as Error).message}` });
+    }
+  }
+  return out;
+}
+
+function printKinds(index: NodeKindIndex): void {
   console.log(`${index.kinds.length} node kind(s) found through the typologies; ${index.unkinded.length} famil(ies) not yet a node kind`);
   for (const k of index.kinds) {
     const tree = [k.parents.length ? `extends ${k.parents.join(", ")}` : "", k.subclasses.length ? `subclasses ${k.subclasses.join(", ")}` : ""].filter(Boolean).join("; ");
     console.log(`  ✓ ${k.id}${k.declaredBy ? ` (${k.declaredBy})` : " (ancestor only)"}${tree ? ` — ${tree}` : ""}`);
   }
+}
 
+function writeTable(index: NodeKindIndex): void {
+  mkdirSync(dirname(INDEX_PATH), { recursive: true });
+  writeFileSync(INDEX_PATH, render(index));
+  console.log(`wrote ${relative(repoRoot, INDEX_PATH)}`);
+}
+
+/** The per-layer gate and writer. */
+function perLayer(index: NodeKindIndex, check: boolean, accept: boolean): number {
+  let failed = index.collisions.length > 0;
+  const declared = readBaselines();
+  const byInstance = new Map(declared.map((d) => [d.instance, d] as const));
+  for (const d of declared) {
+    if (d.error) {
+      console.log(`  ✗ ${d.instance}: its unkinded baseline ${relative(repoRoot, d.path!)} ${d.error}`);
+      failed = true;
+    }
+  }
+  const { layers, unattributed } = ratchet(
+    index,
+    (t) => typologyOwner(defaultGraphTypologies, t),
+    new Map(declared.map((d) => [d.instance, d.entries ?? (d.path ? [] : undefined)] as const)),
+    accept,
+  );
+  for (const u of unattributed) {
+    console.log(`  ✗ ${unkindedKey(u)} has no node kind, and no instance can be named as its owner — declare its typology in a typologies/ graph`);
+    failed = true;
+  }
+  const writes: Array<{ path: string; text: string }> = [];
+  for (const l of layers) {
+    const d = byInstance.get(l.instance);
+    const at = d?.path ? relative(repoRoot, d.path) : `${l.instance} (no unkinded-baseline asset declared)`;
+    if (l.fresh.length > 0 && !accept) {
+      console.log(`\n✗ ${l.instance}: ${l.fresh.length} NEW famil(ies) with no node kind — declare a nodeKind() and point the family's validator node at it:`);
+      for (const k of l.fresh) console.log(`    ${k}`);
+      console.log(`  (or, deliberately, \`bun run cat node-kinds --accept-unkinded\` to baseline it in ${at})`);
+      failed = true;
+    }
+    for (const k of l.foreign) {
+      console.log(`  ✗ ${at} lists ${k}, which another instance owns — a baseline names only its own instance's families`);
+      if (check) failed = true;
+    }
+    if (check && l.gone.length > 0) {
+      console.log(`\n✗ ${at} is stale — ${l.gone.length} baselined famil(ies) became node kinds or are gone: ${l.gone.join(", ")}. Run \`bun run cat node-kinds\` and commit.`);
+      failed = true;
+    }
+    const want = renderBaseline(l.keep);
+    if (d?.path === undefined) {
+      if (l.keep.length > 0) {
+        console.log(`  ✗ ${l.instance} owns ${l.keep.length} unkinded famil(ies) to baseline and declares no asset of role \`unkinded-baseline\` to hold them`);
+        failed = true;
+      }
+      continue;
+    }
+    if (d.text !== want) {
+      if (check) {
+        if (l.gone.length === 0 && l.foreign.length === 0) console.log(`\n✗ ${at} is not in its written form. Run \`bun run cat node-kinds\` and commit.`);
+        failed = true;
+      } else writes.push({ path: d.path, text: want });
+    }
+  }
+  for (const id of index.collisions) console.log(`  ✗ two different node kinds are both named \`${id}\``);
+
+  if (check) {
+    if (!failed) {
+      const n = layers.filter((l) => l.keep.length > 0).length;
+      console.log(`\n✓ every instance's unkinded families are in its own baseline (${index.unkinded.length} across ${n} instance(s)), and no id collides. ${relative(repoRoot, INDEX_PATH)} is built at publish — nothing committed to compare.`);
+    }
+    return failed ? 1 : 0;
+  }
+  // The table is derived whatever the ratchet says, and `derive:publish` runs
+  // this writer: a refused family must not also cost the site its node-kind
+  // pages. The baselines are what a refusal holds back.
+  writeTable(index);
+  if (failed) return 1;
+  for (const w of writes) {
+    writeFileSync(w.path, w.text);
+    console.log(`wrote ${relative(repoRoot, w.path)}`);
+  }
+  return 0;
+}
+
+/** The old gate: the committed table is the one baseline, and `--check` compares its bytes. */
+function legacy(index: NodeKindIndex, check: boolean, accept: boolean): number {
+  const prior = committed();
+  const at = relative(repoRoot, INDEX_PATH);
+  let failed = false;
   for (const id of index.collisions) {
     console.log(`  ✗ two different node kinds are both named \`${id}\``);
     failed = true;
   }
-
   // Without a committed file there is no baseline to compare against: the
   // first write establishes it, which is the one time accepting is implied.
   const fresh = prior === undefined ? [] : newUnkinded(index, prior);
@@ -86,7 +238,6 @@ async function main(): Promise<number> {
     console.log(`  (or, deliberately, \`bun run cat node-kinds --accept-unkinded\` to baseline it)`);
     failed = true;
   }
-
   const want = render(index);
   if (check) {
     if (prior === undefined || readFileSync(INDEX_PATH, "utf-8") !== want) {
@@ -97,12 +248,17 @@ async function main(): Promise<number> {
     if (!failed) console.log(`\n✓ ${at} is current, no new family is unkinded, and no id collides.`);
     return failed ? 1 : 0;
   }
-
   if (failed) return 1;
-  mkdirSync(dirname(INDEX_PATH), { recursive: true });
-  writeFileSync(INDEX_PATH, want);
-  console.log(`\nwrote ${at}`);
+  writeTable(index);
   return 0;
+}
+
+async function main(): Promise<number> {
+  const check = process.argv.includes("--check");
+  const accept = process.argv.includes("--accept-unkinded");
+  const index = await nodeKindIndex(defaultGraphTypologies, HARNESS_ROOT, repoRoot);
+  printKinds(index);
+  return tableBuiltAtPublish() ? perLayer(index, check, accept) : legacy(index, check, accept);
 }
 
 if (import.meta.main) process.exit(await main());

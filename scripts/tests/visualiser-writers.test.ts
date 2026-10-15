@@ -133,6 +133,15 @@ describe("writersFor and runVisualiserWriters", () => {
     expect(owed[0]!.visualisers.map((v) => v.visualiser)).toEqual(["qa"]);
   });
 
+  test("a per-instance writer runs again for each other instance owed a sub-graph page", () => {
+    const ig: VisualiserWriter = { tool: "ig", visualisers: [ref("sb", "artifact-index")], invoke: ["bun", "run", "ig.ts"], siteFlag: "--site", instance: { flag: "--instance", root: "/r/sb" } };
+    const sub = (instance: string): ExpectedPage => ({ ...page("sb", "artifact-index"), route: `en/sb/artifact-index/${instance}/`, instance });
+    const roots: Record<string, string> = { sb: "/r/sb", trust: "/r/trust" };
+    const owed = writersFor([ig], [page("sb", "artifact-index"), sub("sb"), sub("trust"), sub("unplaced")], (n) => roots[n]);
+    expect(owed.map((w) => w.instance?.root)).toEqual(["/r/sb", "/r/trust"]);
+    expect(writerArgv("/r", owed[1]!, "/s")).toEqual(["bun", "run", "ig.ts", "--instance", "/r/trust", "--site", "/s"]);
+  });
+
   test("a failure, a decline and an unrunnable writer are returned for the caller to judge", () => {
     const seen: string[][] = [];
     const runs = runVisualiserWriters("/r", writers, "/s", (argv) => {
