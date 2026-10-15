@@ -594,9 +594,12 @@ export function viewersOf(
     // declaring harness does not hold a directory of that id itself: a bare
     // `skills` is cat-harness's own, `core-skills` can only be core's.
     const harnessIds = new Set((readRaw(v.harnessRoot)?.directories ?? []).map((x) => x.id));
+    // `subgraphUnder` nests either kind of sub-graph: the glossary's
+    // per-instance pages sit at `glossary/instance/<instance>/` (owner,
+    // 2026-10-15, "3a") so an instance name cannot meet an asset-type page.
     const subs =
       v.subgraphs === "instance"
-        ? [owner]
+        ? [at(owner)]
         : v.subgraphs === "directory"
           ? owner === v.harness
             ? [at(d.id)]
