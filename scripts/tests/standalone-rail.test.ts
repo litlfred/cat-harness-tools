@@ -148,11 +148,16 @@ describe("what it must NOT touch — each failure renders fine and is therefore 
     expect(r.alreadyNavigated).toBeGreaterThan(0);
   });
 
-  test("a page ALREADY carrying the harness rail is left alone", () => {
+  test("a page ALREADY carrying the harness rail keeps it, and gains only the first-paint snippet", () => {
     const root = site();
     const before = readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8");
     run(root);
-    expect(readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8")).toBe(before);
+    const after = readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8");
+    expect(after.replace(/\n<script data-folio-saved-scheme>[\s\S]*?<\/script>\n/, "")).toBe(before);
+    expect(after.match(/<nav class="fa-nav"/g)).toHaveLength(1);
+    expect(after).toContain("data-folio-saved-scheme");
+    run(root);
+    expect(readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8")).toBe(after); // idempotent
   });
 
   test("a page that DECLINES the rail in its own markup keeps that decision (#1881)", () => {
