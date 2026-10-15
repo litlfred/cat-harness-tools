@@ -81,18 +81,29 @@ const SMART_TRUST = join(REPO, "smart-trust");
 // hook, because the describes compute their fixtures at collection time.
 // The writers resolve their paths from the checkout they belong to, so they
 // write into this tree's ignored, publish-time paths, as a site build does.
-const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
-const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
-if (READ_PLAN.length !== READS.size) {
-  throw new Error(
-    `foreign-site-scope: expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
-  );
-}
-for (const w of writersOf(READ_PLAN)) {
-  const o = runWriter(["bun", "run", "cat", w], REPO);
-  if (o.kind !== "ran") {
-    throw new Error(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
+//
+// Where they cannot be built — a layer standing alone without smart-trust
+// (the standalone ratchet), or no state mounted — this says why and builds
+// nothing, and the tests that read the data fail on their own, by name, as
+// they do without it; it does not turn the whole file into one load error.
+try {
+  const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
+  const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
+  if (READ_PLAN.length !== READS.size) {
+    console.warn(
+      `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
+    );
+  } else {
+    for (const w of writersOf(READ_PLAN)) {
+      const o = runWriter(["bun", "run", "cat", w], REPO);
+      if (o.kind !== "ran") {
+        console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
+        break;
+      }
+    }
   }
+} catch (e) {
+  console.warn(`foreign-site-scope: built nothing — could not read the publish plan: ${(e as Error).message}`);
 }
 
 /** A scope over a made-up declaration set, so the rule matrix is stated rather than inherited. */
