@@ -87,6 +87,7 @@ import { checkInlineScripts } from "./check-inline-scripts.ts";
 import { chromeLayers } from "./compose-docs.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
+import { siteCoverageShortfall } from "./site-coverage.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -108,6 +109,14 @@ export interface BuildOptions {
    */
   finalSteps?: string[];
   staging?: string;
+  /**
+   * Run on the finished site after the link check and before the publish
+   * (and when nothing is published). A preview's data steps go here: the
+   * ChangeSet and the staging banner the review page reads, which only the
+   * workflow-described path wrote until dth-hrh's review walkthrough
+   * (bean xp72, 2026-10-15) found its previews carried none.
+   */
+  beforePublish?: (site: string) => void;
   mount: boolean;
   /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
   fresh: boolean;
@@ -140,6 +149,8 @@ export interface BuildOptions {
   profile?: SiteProfile;
   /** `report`: unresolved links are said, and do not stop the publish. */
   links?: "refuse" | "report";
+  /** `report`: a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish. */
+  coverage?: "refuse" | "report";
   /** Root files the built site must hold before it is published (a step's promise, checked). */
   require?: string[];
 }
@@ -258,6 +269,8 @@ export interface SiteRecipe {
   profile?: SiteProfile;
   /** An unresolved link refuses the publish (`refuse`, the default) or is only said (`report`). */
   links?: "refuse" | "report";
+  /** A declared visualiser page missing from the built site refuses the publish (`refuse`, the default) or is only said (`report`). */
+  coverage?: "refuse" | "report";
 }
 
 export type SiteProfile = "folio" | "ig-repo-site";
@@ -323,6 +336,8 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
   if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${where}: site.build.profile must be folio or ig-repo-site`);
   const links = b.links ?? "refuse";
   if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
+  const coverage = b.coverage ?? "refuse";
+  if (coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
   const keep = b.keep ?? [];
   if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${where}: site.build.keep must be a list of root entry names`);
   return {
@@ -335,6 +350,7 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       ...(keep.length ? { keep: keep as string[] } : {}),
       ...(profile !== "folio" ? { profile } : {}),
       ...(links !== "refuse" ? { links } : {}),
+      ...(coverage !== "refuse" ? { coverage } : {}),
     },
     read,
   };
@@ -759,6 +775,18 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const lacking = missingRequired(site, o.require ?? []);
   if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
 
+  // Every page the declarations say this site serves — the root's and every
+  // instance it needs (owner, 2026-10-15: smart-ra was published without
+  // `en/cat-harness/library/`, and nothing noticed). The parity guard below
+  // only compares with the root being replaced, so it cannot miss a page that
+  // was never published.
+  const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging) });
+  if (uncovered.length > 0) {
+    for (const m of uncovered) console.error(`  ✗ coverage: ${m.route} (${m.harness} declares \`${m.visualiser}\`${m.instance ? `; ${m.instance} has entries` : ""})`);
+    if (o.coverage !== "report") throw new Error(`the built site lacks ${uncovered.length} declared visualiser page(s): the site is not published`);
+    console.error(`  (coverage: report — the recipe says so; published without ${uncovered.length} declared page(s))`);
+  } else console.log("coverage: ✓ every declared visualiser page is in the site");
+
   // The root's guard: the built site carries everything the root it replaces carries.
   const keep = [...new Set(["STAGING", "_render-log", ...(o.keep ?? [])])];
   if (!staging && (o.parity ?? "refuse") !== "off") {
@@ -802,6 +830,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     for (const p of ownScripts.slice(0, 50)) console.error(`  ✗ ${p.page}:${p.line} ${p.reason}`);
     throw new Error(`${ownScripts.length} inline script(s) do not survive the build: the site is not published`);
   }
+
+  o.beforePublish?.(site);
 
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");
