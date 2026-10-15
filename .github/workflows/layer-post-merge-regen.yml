@@ -113,8 +113,21 @@ jobs:
         working-directory: fa
         run: bun install
       - name: Mount the subgraphs kept on branches
+        # Through `mountState` directly, as layer-pr-checks.yml does:
+        # `state:mount` also re-lays the remote mounts against the lock, which
+        # refuses the swapped-in caller and the layers taken at main ("no
+        # longer hash to the lock"). A graph that will not mount is a warning:
+        # the regen then judges the gates that read it as they stand.
         working-directory: fa
-        run: bun run cat state:mount
+        run: |
+          set -euo pipefail
+          bun -e '
+            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+            const r = mountState({});
+            console.log(report(r));
+            if (r.state === "failed" || r.state === "partial")
+              console.log("::warning::state mount " + r.state + ": see the report above");
+          '
       - name: Run post-merge regen in the composed index
         id: regen
         working-directory: fa
