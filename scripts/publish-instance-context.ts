@@ -1,7 +1,11 @@
 #!/usr/bin/env bun
 /**
  * Build ONE instance's JSON-LD `@context` and publish it to that instance's
- * own GitHub Pages, at `<iriBase>ns/context/v1.jsonld`.
+ * own GitHub Pages, at `<iriBase>ns/context/v1.jsonld` — or, for an instance
+ * whose `ns` is a document (bootstrap's `ns.jsonld`), BESIDE it at
+ * `<iriBase>ns.context.v1.jsonld` (owner, 2026-10-15, "D1";
+ * `contextPathFor` in `gen-instance-contexts.ts`). The path is the build's
+ * `path`, and `publish --path` takes it, so the workflow never spells it.
  *
  * Bean `folio-assistant-63q4`, owner 2026-10-15: each instance's context is
  * published by its own repository, through one reusable workflow
@@ -48,7 +52,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
-import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
+import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";
 import { buildVocabulary, instancesPublishingNs } from "./ns-export.ts";
 
@@ -71,9 +75,9 @@ function iriBaseOf(root: string): string | undefined {
   }
 }
 
-/** `<iriBase>ns/context/v1.jsonld`, with exactly one slash between. */
-export function contextUrl(iriBase: string): string {
-  return `${iriBase.replace(/\/+$/, "")}/${INSTANCE_CONTEXT_PATH}`;
+/** `<iriBase><path>` (by default `ns/context/v1.jsonld`), with exactly one slash between. */
+export function contextUrl(iriBase: string, path: string = INSTANCE_CONTEXT_PATH): string {
+  return `${iriBase.replace(/\/+$/, "")}/${path}`;
 }
 
 /**
@@ -108,8 +112,8 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
     kind: "built",
     instance,
     iriBase,
-    url: contextUrl(iriBase),
-    path: INSTANCE_CONTEXT_PATH,
+    url: contextUrl(iriBase, decl.contextPath),
+    path: decl.contextPath,
     documents: report.documents,
     bound: report.bound.map((b) => b.prefix),
     context: report.expected,
@@ -130,9 +134,11 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * The path is read off the vocabulary's own `@id`, never composed here: the
  * document says where it lives, and a second spelling of that address is the
  * drift this repository keeps paying for. It must sit under the instance's
- * `iriBase`, and must not be `ns` itself — that address is the DIRECTORY
- * holding `ns/context/v1.jsonld`, and a static host cannot serve both
- * (folio-assistant#2560 is the same clash on the aggregate site).
+ * `iriBase`, and must not be a directory the context sits in, nor the
+ * context itself: with the default context path `ns` is the DIRECTORY holding
+ * `ns/context/v1.jsonld`, and a static host cannot serve both
+ * (folio-assistant#2560 is the same clash on the aggregate site). An instance
+ * whose `ns` is a document has its context beside it (D1), so `ns` is free.
  *
  * Published three times, as `ns-export --out-dir` does: extensionless because
  * the IRI is, `.jsonld` for the canonical extension, `.json` because Pages
@@ -164,7 +170,7 @@ export function buildVocabularyOne(repoRoot: string, instance: string): Vocabula
   ];
   if (problems.length > 0) return { kind: "failed", instance, problems };
   const id = (doc as { "@id"?: unknown })["@id"];
-  const where = vocabularyPaths(id, iriBase);
+  const where = vocabularyPaths(id, iriBase, decl.contextPath);
   if ("problem" in where) return { kind: "failed", instance, problems: [`${instance}: ${where.problem}`] };
   return {
     kind: "built",
@@ -177,17 +183,29 @@ export function buildVocabularyOne(repoRoot: string, instance: string): Vocabula
   };
 }
 
-/** Where a vocabulary whose `@id` is `id` is served on the Pages at `iriBase`: the three paths, or why it cannot be. */
-export function vocabularyPaths(id: unknown, iriBase: string): { paths: string[] } | { problem: string } {
+/**
+ * Where a vocabulary whose `@id` is `id` is served on the Pages at `iriBase`:
+ * the three paths, or why it cannot be. `contextPath` is where the instance's
+ * context is published (instance-relative): a vocabulary path in the
+ * directory it sits in, or at its own path, collides with it.
+ */
+export function vocabularyPaths(id: unknown, iriBase: string, contextPath: string = INSTANCE_CONTEXT_PATH): { paths: string[] } | { problem: string } {
   const base = `${iriBase.replace(/\/+$/, "")}/`;
   if (typeof id !== "string" || !id.startsWith(base)) {
     return { problem: `the vocabulary's @id ${String(id)} is not under the iriBase ${base}, so that Pages site cannot serve it` };
   }
   const rel = id.slice(base.length).replace(/[#/]+$/, "");
-  if (rel === "" || rel === "ns" || rel.startsWith("ns/")) {
-    return { problem: `the vocabulary's @id ${id} would be served at \`${rel || "/"}\`, which collides with the context directory ns/` };
+  // The directory the context sits in (`ns/` by default), or none when it sits
+  // at the root beside a namespace document (D1).
+  const top = contextPath.includes("/") ? contextPath.split("/")[0]! : undefined;
+  if (rel === "" || (top !== undefined && (rel === top || rel.startsWith(`${top}/`)))) {
+    return { problem: `the vocabulary's @id ${id} would be served at \`${rel || "/"}\`, which collides with the context directory ${top ?? ""}/` };
   }
-  return { paths: [rel, `${rel}.jsonld`, `${rel}.json`] };
+  const paths = [rel, `${rel}.jsonld`, `${rel}.json`];
+  if (paths.includes(contextPath)) {
+    return { problem: `the vocabulary's @id ${id} would be served at \`${contextPath}\`, which is where the context is published` };
+  }
+  return { paths };
 }
 
 // ── publish ──────────────────────────────────────────────────────
@@ -374,7 +392,7 @@ async function main(argv: readonly string[]): Promise<number> {
     const file = arg(argv, "--file");
     const token = process.env.GITHUB_TOKEN;
     if (!repo || !file || !token) {
-      console.error("usage: GITHUB_TOKEN=… publish-instance-context.ts publish --repo <owner/name> --file <context> [--sha <commit>] [--path ns/context/v1.jsonld]");
+      console.error(`usage: GITHUB_TOKEN=… publish-instance-context.ts publish --repo <owner/name> --file <context> [--sha <commit>] [--path ${INSTANCE_CONTEXT_PATH}|${NS_DOCUMENT_CONTEXT_PATH}]`);
       return 2;
     }
     if (!existsSync(file)) {

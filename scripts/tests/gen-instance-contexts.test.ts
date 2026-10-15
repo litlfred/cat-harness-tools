@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { contentDocuments as checkCorpus } from "../check-context-emission.ts";
-import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, render } from "../gen-instance-contexts.ts";
+import { contextPathFor, findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, render } from "../gen-instance-contexts.ts";
 import { contentDocuments } from "../lib/jsonld-corpus.ts";
 
 const root = mkdtempSync(join(tmpdir(), "gen-instance-contexts-"));
@@ -96,6 +96,53 @@ describe("gen-instance-contexts over a fixture tree", () => {
 
   test(`the path is instance-relative: ${INSTANCE_CONTEXT_PATH}`, () => {
     expect(by("top").path).toBe(`top/${INSTANCE_CONTEXT_PATH}`);
+  });
+});
+
+describe("an instance whose `ns` is a document gets its context BESIDE it (D1)", () => {
+  // Owner, 2026-10-15: bootstrap holds its vocabulary as `ns.jsonld`, staged
+  // at the extensionless `ns` (and `<version>/ns`), so `ns/context/v1.jsonld`
+  // would need `ns` to be a directory as well: ENOTDIR in
+  // check:bootstrap-standalone, and the same clash on its gh-pages.
+  const droot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-nsdoc-"));
+  afterAll(() => rmSync(droot, { recursive: true, force: true }));
+  const dput = (rel: string, value: unknown): void => {
+    const p = join(droot, rel);
+    mkdirSync(join(p, ".."), { recursive: true });
+    writeFileSync(p, JSON.stringify(value));
+  };
+  dput("low/low.json", {
+    name: "low",
+    needs: [],
+    jsonldPrefixes: { skos: "http://www.w3.org/2004/02/skos/core#" },
+    builtAtPublish: [{ path: NS_DOCUMENT_CONTEXT_PATH, writer: ["jsonld:contexts"], because: "checkout", reason: "test" }],
+  });
+  dput("low/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.org/low/0.1.0/ns", "@type": "skos:ConceptScheme" });
+  dput("high/high.json", { name: "high", needs: ["low"] });
+  dput("high/nodes/h.jsonld", { "@type": "skos:Concept" });
+
+  test("the path follows what the instance holds, not its name", () => {
+    expect(NS_DOCUMENT_CONTEXT_PATH).toBe("ns.context.v1.jsonld");
+    expect(contextPathFor(join(droot, "low"))).toBe(NS_DOCUMENT_CONTEXT_PATH);
+    expect(contextPathFor(join(droot, "high"))).toBe(INSTANCE_CONTEXT_PATH);
+  });
+
+  test("the report, and so the writer, puts it beside the vocabulary; the other instance keeps ns/context/", () => {
+    const r = generateInstanceContexts(droot, opts);
+    const low = r.reports.find((x) => x.instance === "low")!;
+    expect(low.path).toBe(`low/${NS_DOCUMENT_CONTEXT_PATH}`);
+    expect(low.expected).toBeDefined();
+    expect(r.reports.find((x) => x.instance === "high")!.path).toBe(`high/${INSTANCE_CONTEXT_PATH}`);
+  });
+
+  test("declaring the beside path is declaring the context; the written file is not read back as a document", () => {
+    const first = generateInstanceContexts(droot, opts).reports.find((x) => x.instance === "low")!;
+    const documents = first.documents;
+    writeFileSync(join(droot, first.path), first.expected!);
+    const again = generateInstanceContexts(droot, opts);
+    const low = again.reports.find((x) => x.instance === "low")!;
+    expect(low.documents).toBe(documents);
+    expect(findings(again).drift).toEqual([]);
   });
 });
 

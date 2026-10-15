@@ -23,6 +23,18 @@
  * `@protected`, so a change that rebinds one is a NEW context (`v2`) published
  * beside the old one, never an edit under a URL consumers have cached.
  *
+ * ## Except where the instance's `ns` is a DOCUMENT: `<instance>/ns.context.v1.jsonld`
+ *
+ * Owner, 2026-10-15 ("D1"). An instance that holds its vocabulary as
+ * `ns.jsonld` at its root (bootstrap) has it staged at the extensionless `ns`
+ * and `<version>/ns`: `ns` is a FILE there, so `ns/context/v1.jsonld` cannot
+ * sit under it, and a static host cannot serve both. Staging both was the
+ * `ENOTDIR` `check:bootstrap-standalone` met after `derive:publish`, and the
+ * collision bootstrap's `gh-pages` would meet. Such an instance's context goes
+ * BESIDE the vocabulary, at {@link NS_DOCUMENT_CONTEXT_PATH}, same `v1`
+ * rule. Decided by what the instance holds ({@link contextPathFor}), never by
+ * its name, so the next layer whose namespace is a document gets the same.
+ *
  * ## What it reads, and what it refuses to read
  *
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
@@ -105,6 +117,21 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 /** Instance-relative, and why it is this path: see the module note. */
 export const INSTANCE_CONTEXT_PATH = "ns/context/v1.jsonld";
 
+/** The namespace DOCUMENT an instance may hold at its root, staged at the extensionless `ns`. */
+export const NS_DOCUMENT = "ns.jsonld";
+
+/** Where the context of an instance whose `ns` is a document goes: beside it (D1, see the module note). */
+export const NS_DOCUMENT_CONTEXT_PATH = "ns.context.v1.jsonld";
+
+/**
+ * The instance-relative path of the context of the instance at `root`:
+ * {@link NS_DOCUMENT_CONTEXT_PATH} when it holds its namespace as a document
+ * ({@link NS_DOCUMENT}), else {@link INSTANCE_CONTEXT_PATH}.
+ */
+export function contextPathFor(root: string): string {
+  return existsSync(join(root, NS_DOCUMENT)) ? NS_DOCUMENT_CONTEXT_PATH : INSTANCE_CONTEXT_PATH;
+}
+
 const DEFAULT_ROOT = resolve(dirname(HARNESS_ROOT));
 
 /** One instance, read from its declaration as data. */
@@ -115,10 +142,12 @@ export interface InstanceDecl {
   needs: string[] | undefined;
   /** The declared table, or the error that made it unreadable. */
   prefixes: JsonldPrefixTable;
+  /** Instance-relative path of its context ({@link contextPathFor}). */
+  contextPath: string;
   prefixError?: string;
   /**
    * The instance declares its context as built at publish (a `builtAtPublish`
-   * entry for {@link INSTANCE_CONTEXT_PATH}). The declaration promises the
+   * entry for its {@link contextPathFor} path). The declaration promises the
    * file, so it is written even when no document of the instance is mounted
    * here — an index that mounts none of an instance's directories otherwise
    * fails `derive:publish` with "declared built at publish, and built nothing".
@@ -137,6 +166,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
       return []; // `check:declaration-filename`'s finding, not this one's.
     }
     if (typeof raw.name !== "string") return [];
+    const contextPath = contextPathFor(root);
     const parsed = raw.jsonldPrefixes === undefined ? undefined : JsonldPrefixTableSchema.safeParse(raw.jsonldPrefixes);
     return [
       {
@@ -145,9 +175,10 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
         stub: typeof raw.stub === "string" ? raw.stub : raw.name,
         needs: Array.isArray(raw.needs) ? raw.needs.filter((n): n is string => typeof n === "string") : undefined,
         prefixes: parsed?.success ? parsed.data : {},
+        contextPath,
         declaresContext:
           Array.isArray(raw.builtAtPublish) &&
-          raw.builtAtPublish.some((e) => typeof e === "object" && e !== null && (e as { path?: unknown }).path === INSTANCE_CONTEXT_PATH),
+          raw.builtAtPublish.some((e) => typeof e === "object" && e !== null && (e as { path?: unknown }).path === contextPath),
         ...(parsed && !parsed.success
           ? { prefixError: `${relative(repoRoot, join(root, file))}: jsonldPrefixes — ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` }
           : {}),
@@ -249,7 +280,7 @@ function ownerOf(abs: string, decls: readonly InstanceDecl[]): InstanceDecl | un
 /** Excluded from the corpus: the generated contexts, and any context document under `ns/`. */
 function isExcluded(abs: string, owner: InstanceDecl, doc: unknown): boolean {
   const rel = relative(owner.root, abs).split(sep).join("/");
-  if (rel === INSTANCE_CONTEXT_PATH) return true;
+  if (rel === owner.contextPath) return true;
   return rel.startsWith("ns/") && isContextDocument(doc);
 }
 
@@ -329,7 +360,7 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
     const slot = perInstance.get(name)!;
     const tables = tablesFor(d);
     const built = buildInstanceContext({ instance: name, tables, documents: slot.docs, termSources });
-    const out = join(d.root, INSTANCE_CONTEXT_PATH);
+    const out = join(d.root, d.contextPath);
     return {
       instance: name,
       ...built,
