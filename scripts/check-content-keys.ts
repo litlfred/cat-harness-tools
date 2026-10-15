@@ -224,35 +224,6 @@ function reportKeys(k: KeyDeclarationReport): boolean {
   return false;
 }
 
-/** Print the path-under-`@id` half; return whether it failed. */
-function reportPaths(p: KeyDeclarationReport): boolean {
-  if (p.undeclared.length === 0) {
-    console.log("✓ no file path sits under an `@id`-coerced term");
-    return false;
-  }
-  console.error(`\n${p.undeclared.length} \`@id\` term(s) carry FILE PATHS — a processor resolves them against @base, to the wrong place:`);
-  for (const u of p.undeclared) console.error(`  ✗ ${u.prefix}  ×${u.count}  e.g. ${u.example}`);
-  console.error("\nDeclare the term a literal, or mint an absolute IRI for a file that is actually served (bean `589f`).");
-  return true;
-}
-
-/** Print the undeclared-key half; return whether it failed. */
-function reportKeys(k: KeyDeclarationReport): boolean {
-  console.log(`\nKey declaration — ${k.documents} content-context document(s) read`);
-  if (k.documents === 0) {
-    console.error("::error::key declaration: no content-context document read — a clean run over nothing is not clean");
-    return true;
-  }
-  if (k.undeclared.length > 0) {
-    console.error(`\n${k.undeclared.length} key(s) are not declared terms — a JSON-LD processor DROPS them:`);
-    for (const u of k.undeclared) console.error(`  ✗ ${u.prefix}  ×${u.count}  e.g. ${u.example}`);
-    console.error("\nDeclare each in CONTENT_CONTEXT (schemas/jsonld.ts), or nest it under an `@json` term if it is data rather than a property.");
-    return true;
-  }
-  console.log("✓ every key in every content-context document is a declared term");
-  return false;
-}
-
 if (import.meta.main) {
   const k = checkDeclaredKeys();
   const p = checkPathsAreNotLinks();
