@@ -2118,7 +2118,10 @@ function collectTools(
   problems: string[],
   scope: CorpusScope = corpusScopeFor(ROOT),
   root: string = ROOT,
-  typeBase: string | undefined = base || undefined,
+  // No default: a default parameter fires on an explicit `undefined`, which
+  // is exactly what an instance export passes to mean "the harness's base",
+  // and it then minted smart-base's types under `http://smart.who.int/base/`.
+  typeBase: string | undefined,
 ): Node[] {
   let defs;
   try {
@@ -3369,7 +3372,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectRegistryNodes(docIri, problems),
           ...collectPackages(docIri, problems, scope),
           ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope)),
-          ...collectTools(docIri, base, problems, scope),
+          ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
           ...collectExternalSchemas(docIri),
           ...collectGraphTypologies(),

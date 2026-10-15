@@ -1181,6 +1181,23 @@ describe("an instance export carries that instance's Tools", () => {
       expect(e.omitted ?? []).not.toContain("tools");
     }
   });
+
+  test.skipIf(!inAggregate() || withTools.length === 0)("with no --base-url, port types are the HARNESS's canonical, not the instance's", async () => {
+    // What the deploy does for smart-base, which declares its own canonical
+    // (`http://smart.who.int/base`): no `--base-url`. The first version of
+    // this fix minted its types there, through a default parameter that fires
+    // on an explicit `undefined` — and the test above, which always passes a
+    // base, could not see it.
+    for (const root of withTools) {
+      const e = await buildExport({ instanceRoot: root });
+      for (const t of (e["@graph"] as Array<Record<string, unknown>>).filter((n) => String(n["@type"]).endsWith("Tool"))) {
+        const io = t.io as { inputs?: Array<{ schema: string }>; outputs?: Array<{ schema: string }> };
+        for (const p of [...(io.inputs ?? []), ...(io.outputs ?? [])]) {
+          expect({ root: basename(root), schema: p.schema.startsWith(`${BASE}/`) }).toEqual({ root: basename(root), schema: true });
+        }
+      }
+    }
+  });
 });
 
 /**
