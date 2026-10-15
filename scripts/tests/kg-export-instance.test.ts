@@ -28,6 +28,19 @@ const ROOT = resolve(HARNESS_ROOT);
 const BASE = "https://example.org";
 const DOC = "https://example.org/x.jsonld";
 
+/**
+ * The ROOT instance's collection, made once for this file — see the same
+ * pair in `instance-graph-isolation.test.ts` for the measurement (7.1 s cold
+ * before bean `tdir` made Tools generic, 9.2 s after, 5.3 s warm: each call
+ * alone was past bun's 5 s default). Both readers only read the nodes.
+ */
+let rootNodes: ReturnType<typeof collectInstanceNodes> | undefined;
+const rootCollection = (): ReturnType<typeof collectInstanceNodes> =>
+  (rootNodes ??= collectInstanceNodes(ROOT, DOC, BASE, []));
+
+/** ~6x the cold collection; on both readers, since test order is not guaranteed. */
+const CORPUS_TIMEOUT = 60_000;
+
 const typesOf = (nodes: Array<Record<string, unknown>>): Map<string, number> => {
   const m = new Map<string, number>();
   for (const n of nodes) {
@@ -51,7 +64,7 @@ describe("a minimal instance exports through the same code path", () => {
     const { nodes } = await collectInstanceNodes(join(repoRootFor(ROOT), "bootstrap"), DOC, BASE, problems);
     const dirs = typesOf(nodes).get("Subgraph") ?? 0;
     const rootDirs = typesOf(
-      (await collectInstanceNodes(ROOT, DOC, BASE, [])).nodes,
+      (await rootCollection()).nodes,
     ).get("Subgraph")!;
     // Strictly fewer than the root's, and NOT a pinned number.
     //
@@ -63,19 +76,19 @@ describe("a minimal instance exports through the same code path", () => {
     // mistake this repository has paid for with coverage counts more than once.
     expect(dirs).toBeGreaterThan(0);
     expect(rootDirs).toBeGreaterThan(dirs);
-  });
+  }, CORPUS_TIMEOUT);
 
   test("the root instance still exports everything it did", async () => {
     // The refactor's own guard. `bun run cat kg:export` output was verified
     // byte-identical apart from `generatedAt`; this keeps the shape pinned
     // without pinning a COUNT, which would make "it still works" and
     // "somebody deleted a diagram" indistinguishable.
-    const { nodes } = await collectInstanceNodes(ROOT, DOC, BASE, []);
+    const { nodes } = await rootCollection();
     const t = typesOf(nodes);
     for (const kind of ["Skill", "Process", "SequenceFlow", "Role", "ProcessNode"]) {
       expect({ kind, present: (t.get(kind) ?? 0) > 0 }).toEqual({ kind, present: true });
     }
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("what was not looked for is not reported as clean", () => {
