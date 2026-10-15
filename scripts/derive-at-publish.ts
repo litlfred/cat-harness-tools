@@ -64,15 +64,15 @@
  * A `checkout` artefact is, by the B1 rule, computed over the instances ABOVE
  * the one that serves it — the ones that `need` it. When one of those builds
  * part of its own tree at publish, the artefact below reads that output, so
- * its writer must run after it. Measured 2026-10-15: smart-trust's `docs/`
- * (`smart-trust:pages`) is built at publish, and cat-harness's
- * `docs/_data/harness.json` (`docs:harness`) gives smart-trust a folio link
- * and a rail scope only when that directory exists. In index order
- * cat-harness ran first, so one clean `derive:publish` published the platform
- * site with smart-trust as a landing-page section and no rail scope, and
+ * its writer must run after it. Measured 2026-10-15: an IG instance's `docs/`
+ * (its `<ig>:pages` writer) is built at publish, and cat-harness's
+ * `docs/_data/harness.json` (`docs:harness`) gives that IG a folio link and a
+ * rail scope only when that directory exists. In index order cat-harness ran
+ * first, so one clean `derive:publish` published the platform site with the
+ * IG as a landing-page section and no rail scope, and
  * `foreign-site-scope.test.ts` went red or green with whichever concurrent
- * build had reached `smart-trust:pages` first (cat-harness-tools PR #298, run
- * 38734014626). The other direction does not arise: an instance above reads a
+ * build had reached the IG's pages writer first (cat-harness-tools PR #298,
+ * run 38734014626). The other direction does not arise: an instance above reads a
  * lower layer at the checkout's pins, which is committed, never built here.
  *
  * ```

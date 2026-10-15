@@ -37,6 +37,7 @@ beforeAll(() => {
   // `a-platform` sorts first and is the one the others stand on, as cat-harness
   // is listed first in the index and stands below smart-trust.
   instance("a-platform", [], [
+    // declared-path-literal: a fixture declaration in a temp dir, standing in for cat-harness's own
     { path: "docs/_data/harness.json", writer: ["platform:pages", "platform:harness"], because: "checkout" },
     { path: "docs/other/", writer: ["platform:other"], because: "checkout" },
   ]);
