@@ -82,7 +82,7 @@ describe("the AUTHORED two are reported against the kind", () => {
     expect(gaps.every((g) => g.owes === "kind-table-row")).toBe(true);
     // The whole point: the finding carries the KIND.
     expect(gaps[0]!.kind).toBeTruthy();
-    expect(gaps[0]!.detail).toContain("directory-conventions.md");
+    expect(gaps[0]!.detail).toContain(KIND_TABLE_DOC);
   });
 });
 

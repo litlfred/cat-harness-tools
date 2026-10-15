@@ -43,6 +43,7 @@ import {
   readAttestationFile,
   type SectionTitleVerdict,
 } from "@litlfred/cat-harness/schemas/qa-attestations.js";
+import { conventionalFolioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 /** chapter directory → section key → decided verdict. */
 export type VerdictMap = Record<string, Record<string, SectionTitleVerdict>>;
@@ -60,8 +61,11 @@ export function derivedCopyPath(contentRoot: string, paper: string): string {
 
 /** The committed sidecar this replaces. Read once, to move its verdicts; never written. */
 export function legacySidecarPath(contentRoot: string, paper: string): string {
-  // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-  return resolve(contentRoot, "folio", paper, "section-title-audit.qa.json");
+  // The CONVENTION, not the declared folio: the legacy sidecar was only ever
+  // written at `<root>/folio/<paper>/`, before a folio could declare another
+  // root, so the convention is where it is (and `folioDir` would answer a
+  // different question, failing where the `folio` kind is unregistered, `ot9a`).
+  return resolve(conventionalFolioDir(contentRoot), paper, "section-title-audit.qa.json");
 }
 
 export type LoadedVerdicts =

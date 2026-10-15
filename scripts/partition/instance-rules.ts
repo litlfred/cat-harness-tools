@@ -401,6 +401,7 @@ export const RULES: Rule[] = [
       "schemas/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
       "schemas/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
       "schemas/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
+      "schemas/built-at-publish.ts",         // what an instance serves and never commits — read by the declaration schema itself (B1)
 
       "schemas/property-skills.ts",          // declaration key → its edit skills (issue #1146)
       "schemas/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)
@@ -937,6 +938,14 @@ export const RULES: Rule[] = [
       // edge `namespaces.ts` was extracted to remove. Measured on first run:
       // the prefix rule claimed it for core and the edge appeared immediately.
       "schemas/vocabulary.ts",
+      // The external vocabularies an instance's JSON-LD speaks, as DECLARED
+      // data (bean folio-assistant-63q4, owner 2026-10-14). Harness by the
+      // same argument as `namespaces.ts`: `cat-harness.ts` reads the
+      // declaration's `jsonldPrefixes` field through its schema, so a core
+      // placement — which the `schemas/` prefix rule gave it — was a
+      // wrong-direction edge the moment the module landed.
+      "schemas/jsonld-prefixes.ts", // declared-path-literal: a partition plan names modules by path.
+
       // bootstrap's own Zod (graph, discussion, requirement, and since
       // 2026-09-30 the graph document's) lives in `bootstrap-tools/` (bean
       // `xsqm`), outside this partition.
@@ -1261,21 +1270,10 @@ export const RULES: Rule[] = [
   {
     repo: "base",
     exact: [
-      // Measures whether an IG's SOURCE graph carries dependency edges for its
-      // logic layer — Library, PlanDefinition, Measure (bean `f4gj`). Its name
-      // carries none of the keyword rule's tokens, so it fell through every
-      // rule when it arrived.
-      //
-      // BASE rather than core, although its subject is content and
-      // `check-artifact-index.ts` was core on exactly that reasoning — it has since
-      // MOVED to `folio-assistant-core/scripts/` under bean `yj6r`, so no rule in
-      // this file adjudicates it any more; see the note where its entry stood. The
-      // difference is the import: this one reads `pipeline/fsh-cone.ts`
-      // to compare against what that tool extracts, and `fsh-cone` is base by
-      // the keyword rule underneath. Calling this core would buy the one thing
-      // the partition exists to prevent — a `folio-assist-core -> smart-base`
-      // wrong-direction edge — to gain nothing, since FHIR Shorthand and a
-      // cpg/cqfmeasures profile URL are as WHO-specific as a subject gets.
+      // `measure-logic-layer-edges.ts` (bean `f4gj`) stood here. It left this
+      // layer with the FSH cone it measures, on the owner's ruling of 2026-10-14
+      // (Q3: FHIR Shorthand belongs to the FHIR IG layer), so no rule in this
+      // file adjudicates either any more.
     ],
   },
   {

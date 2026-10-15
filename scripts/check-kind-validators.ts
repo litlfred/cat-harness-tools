@@ -227,6 +227,35 @@ function jsonFiles(dir: string): string[] {
  */
 export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   const out: FamilySweep[] = [];
+  // Every directory the checkout declares, with the kinds it carries. A node
+  // under a MORE SPECIFIC declared directory belongs to that directory's
+  // kinds, not to an enclosing one's: smart-base declares
+  // `library/<entry>/l1-extraction/` as `l1-extraction` inside its `library/`,
+  // and the library map must not call that kind's run contexts and work lists
+  // "unmapped" (folio-assistant#2529).
+  const declaredDirs: { abs: string; kinds: readonly string[] }[] = [];
+  for (const inst of instanceRootsIn(join(root, ".."))) {
+    for (const e of readDeclaration(inst)?.directories ?? []) {
+      declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
+    }
+  }
+  const innermostKinds = (file: string): readonly string[] | undefined => {
+    let best: { abs: string; kinds: readonly string[] } | undefined;
+    for (const d of declaredDirs) {
+      if (file.startsWith(`${d.abs}/`) && (best === undefined || d.abs.length > best.abs.length)) best = d;
+    }
+    return best?.kinds;
+  };
+  // A NESTED kind: it names its `$schema` families and no instance declares a
+  // directory of it, so its nodes sit inside a parent kind's directory (the
+  // IG artefact JSON-LD that gen-ig-pages writes under an `ig-pages` docs
+  // root). Its families route from the parent's sweep and count as its own.
+  const nested = new Map<string, { kind: string; fam: Awaited<ReturnType<typeof resolveNodeSchemas>>[number] }>();
+  for (const kind of defaultGraphTypologies.names()) {
+    if (!defaultGraphTypologies.get(kind)!.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
+    for (const fam of await resolveNodeSchemas(kind, root)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+  }
+  const routed = new Map<string, Pick<FamilySweep, "counts" | "invalid">>();
   for (const kind of defaultGraphTypologies.names()) {
     const def = defaultGraphTypologies.get(kind)!;
     if (!def.nodeSchemas) continue;
@@ -308,19 +337,25 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         }
         const tag = (node as { $schema?: unknown } | null)?.$schema;
         if (typeof tag !== "string") continue;
-        const fam = byTag.get(tag);
+        // Under a more specific declared directory of other kinds: theirs.
+        const inner = innermostKinds(file);
+        if (inner !== undefined && !inner.includes(kind)) continue;
+        const own = byTag.get(tag);
+        const via = own === undefined ? nested.get(tag) : undefined;
+        const fam = own ?? via?.fam;
         const rel = relative(join(root, ".."), file);
         if (!fam) {
           if (!s.unmapped.some((u) => u.tag === tag)) s.unmapped.push({ tag, example: rel });
           continue;
         }
-        const c = (s.counts[tag] ??= { nodes: 0, checked: 0, parsed: 0, state: fam.state });
+        const into = via === undefined ? s : (routed.get(via.kind) ?? routed.set(via.kind, { counts: {}, invalid: [] }).get(via.kind)!);
+        const c = (into.counts[tag] ??= { nodes: 0, checked: 0, parsed: 0, state: fam.state });
         c.nodes++;
         if (fam.state !== "resolved") continue;
         c.checked++;
         const r = fam.schema.safeParse(stripAnnotations(node));
         if (r.success) c.parsed++;
-        else s.invalid.push({ file: rel, issue: `${r.error.issues[0]?.path.join(".")}: ${r.error.issues[0]?.message}` });
+        else into.invalid.push({ file: rel, issue: `${r.error.issues[0]?.path.join(".")}: ${r.error.issues[0]?.message}` });
       }
     }
     // A live store that was READ and holds nothing: recorded here so the
@@ -329,6 +364,18 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
       s.emptyLiveStore = [...liveStores].map(([id, at]) => ({ id, at: relative(repoRoot, at) || "." }));
     }
     out.push(s);
+  }
+  // A nested kind's nodes, met in its parents' directories, are reported as its own.
+  for (const s of out) {
+    const r = routed.get(s.kind);
+    if (r === undefined) continue;
+    for (const [tag, c] of Object.entries(r.counts)) {
+      const t = (s.counts[tag] ??= { nodes: 0, checked: 0, parsed: 0, state: c.state });
+      t.nodes += c.nodes;
+      t.checked += c.checked;
+      t.parsed += c.parsed;
+    }
+    s.invalid.push(...r.invalid);
   }
   return out;
 }
@@ -351,6 +398,8 @@ async function main(): Promise<number> {
     }
     if (f.onFamily && Object.keys(f.counts).length === 0) {
       console.log(`  · ${f.onFamily} director(ies) on a branch family or a route-keyed branch by declaration — the nodes are on those branches, not in this checkout, so not examined here`);
+    } else if (f.noDirectory && nodes > 0) {
+      console.log(`  · no instance declares a ${f.kind} directory — its nodes above were met in a parent kind's directory`);
     } else if (f.noDirectory) {
       console.log(`  · no instance declares a ${f.kind} directory — nothing to route (a nested kind is reached through its parent)`);
     } else if (f.unreachable && nodes === 0) {

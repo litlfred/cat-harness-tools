@@ -18,7 +18,6 @@ import {
   initFolio,
   type InitFolioOptions,
 } from "../../scripts/init-folio.ts";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -32,8 +31,17 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
  * declaration too.
  */
 const SLUG = "cold-chain-guidance";
-const SCAFFOLD_CONFIG = instanceConfigFilename(SLUG);
-const scaffoldConfigIn = (dir: string): string => join(dir, SCAFFOLD_CONFIG);
+/**
+ * The scaffold's config: INLINE in its `index.config.json` entry (bean `ymvt`
+ * — `folio_init` writes no `<slug>.config.json`), minus the index's own keys.
+ */
+function scaffoldConfig(dir: string): Record<string, unknown> {
+  const idx = JSON.parse(readFileSync(join(dir, "index.config.json"), "utf-8")) as { instances: Array<Record<string, unknown>> };
+  const entry = idx.instances.find((e) => e.name === SLUG);
+  if (entry === undefined) throw new Error(`index.config.json lists no ${SLUG}`);
+  const { name: _n, source: _s, import: _i, _comment: _c, ...config } = entry;
+  return config;
+}
 
 /**
  * The platform as a folio links it: the REPOSITORY root, which contains
@@ -104,7 +112,7 @@ describe("what gets written", () => {
     // A change that re-composes both from one template breaks this line.
     const doc = tmp();
     initFolio(opts(doc));
-    const docCfg = JSON.parse(readFileSync(scaffoldConfigIn(doc), "utf-8"));
+    const docCfg = scaffoldConfig(doc);
     expect(docCfg.contentType).toBe("document");
     expect(docCfg.adapterModule).toBe("./folio-assistant/folio-assistant-core/adapters/document/index.ts");
     // The document entry's `module` now starts `../` too, exactly as paper's
@@ -113,7 +121,7 @@ describe("what gets written", () => {
 
     const pap = tmp();
     initFolio(opts(pap, { contentType: "paper" }));
-    const papCfg = JSON.parse(readFileSync(scaffoldConfigIn(pap), "utf-8"));
+    const papCfg = scaffoldConfig(pap);
     expect(papCfg.contentType).toBe("paper");
     expect(papCfg.adapterModule).toBe("./folio-assistant/folio-assistant-sci/adapters/paper/index.ts");
   });
@@ -127,7 +135,7 @@ describe("what gets written", () => {
     // tidying it by hand.
     const d = tmp();
     initFolio(opts(d, { contentType: "paper", assistantPath: "vendor/fa" }));
-    const cfg = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const cfg = scaffoldConfig(d);
     expect(cfg.adapterModule).toBe("./vendor/fa/folio-assistant-sci/adapters/paper/index.ts");
     expect(cfg.adapterModule).not.toContain("..");
   });
@@ -140,7 +148,7 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   test("a document folio stands on its adapter's instance, folio-assistant-core", () => {
     const d = tmp();
     initFolio(opts(d));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d);
     expect(config.dependencies).toEqual({
       folioAssistant: [{ name: "folio-assistant-core", path: "folio-assistant/folio-assistant-core" }],
     });
@@ -154,7 +162,7 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   test("a paper folio stands on folio-assistant-sci; a sibling link path is honoured", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper", link: "sibling", assistantPath: "../platform" }));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d);
     expect(config.dependencies).toEqual({
       folioAssistant: [{ name: "folio-assistant-sci", path: "../platform/folio-assistant-sci" }],
     });

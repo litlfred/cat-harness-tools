@@ -94,6 +94,14 @@ describe("the schema", () => {
     expect(IndexConfigSchema.safeParse(index([{ name: "a" }, { name: "a" }])).success).toBe(false);
   });
 
+  test("`site.agentRun` is a boolean the repository declares beside `landing` (owner, 2026-10-14, Q7)", () => {
+    expect(IndexConfigSchema.safeParse(index([{ name: "a" }], { agentRun: true })).success).toBe(true);
+    expect(IndexConfigSchema.safeParse(index([{ name: "a" }], { landing: "a", agentRun: false })).success).toBe(true);
+    expect(IndexConfigSchema.safeParse(index([{ name: "a" }], { agentRun: "yes" })).success).toBe(false);
+    // Still strict: a misspelt flag is refused rather than silently ignored.
+    expect(IndexConfigSchema.safeParse(index([{ name: "a" }], { agentrun: true })).success).toBe(false);
+  });
+
   test("a landing that names an instance the index does not list is refused", () => {
     const p = IndexConfigSchema.safeParse(index([{ name: "a" }, { name: "b" }], { landing: "c" }));
     expect(p.success).toBe(false);

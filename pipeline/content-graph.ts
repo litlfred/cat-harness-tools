@@ -151,8 +151,8 @@ export interface ContentNode {
  *   misses `simp`/instance/unfolding dependencies and can over-report a
  *   coincidental name match. Good enough for advisory signals; not good
  *   enough to drive staleness invalidation.
- * - `elaborated` — folio-assistant-sci's formal-edge extractor
- *   (`folio-assistant-sci/pipeline/formal-edges.ts`): the same
+ * - `elaborated` — records from a contributed formal-edge extractor
+ *   (a pipeline slot the science layer fills): the same
  *   elaborated type/value split as `atlas`, computed with LeanArchitect's
  *   dependency rule over the folio's `lean.ref` targets. As trustworthy as
  *   `atlas`; see `isElaborated`.
@@ -613,7 +613,7 @@ if (import.meta.main) {
     if (!g.hasFormal) {
       console.log(
         `\n  No ${ATLAS_CACHE_REL}. Union degrades to the editorial graph.\n` +
-          `  Populate it with: bun run pipeline/lean-atlas-ingest.ts --ingest <jsonl>`,
+          `  Populate it with: bun run cat-harness-tools/pipeline/lean-atlas-ingest.ts --ingest <jsonl>`,
       );
     }
   }

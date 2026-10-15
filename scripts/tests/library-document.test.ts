@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractOf, plainHeading, readEntryDocument } from "../lib/library-document.ts";
+import { extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../lib/library-document.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));
@@ -144,5 +144,37 @@ describe("plainHeading — a text heading as a reader sees it (litlfred/dth-hrh)
     expect(plainHeading("Rating \\*\\*\\* stars")).toBe("Rating *** stars");
     expect(plainHeading("HWF_Registry_DTH_Outline.md")).toBe("HWF_Registry_DTH_Outline.md");
     expect(plainHeading("Plain heading")).toBe("Plain heading");
+  });
+});
+
+describe("a Markdown section's extract (litlfred/dth-hrh, twg-outline)", () => {
+  const text = (unit: "heading" | "file") => ({
+    _schema: "text-structure/v1", doc_id: "t", metadata: { title: "T" }, toc_source: "headings", structure_note: "verbatim",
+    source: { file: "t.md", sha256: "0".repeat(64), digest: "file", bytes: 1, mtime: null, mimetype_sniffed: "text/plain", mimetype_source: "content", upstream: null,
+      files: [{ path: "t.md", sha256: "0".repeat(64), bytes: 1, lines: 9, format: "markdown" }] },
+    sections: [{ id: "s001-part-4", number: null, title: "**Part 4\\. Examples**", level: 1, file: "t.md", line_start: 1, line_end: 9, unit, n_chars: 1, n_words: 1 }],
+  });
+  const md = "---\nsection_id: s001-part-4\n---\n# **Part 4\\. Examples**\n\n**Purpose:** worked [use cases](u.md).\n\n* Maturity *levels*  \n* Step 2\\. done\n";
+
+  test("drops its own heading and reads as plain text", () => {
+    const dir = entry(text("heading"));
+    writeFileSync(join(dir, "sections", "s001-part-4.md"), md);
+    const s = readEntryDocument(dir, "t")!.sections[0]!;
+    expect(s.title).toBe("Part 4. Examples");
+    expect(s.extract).toBe("Purpose: worked use cases. Maturity levels Step 2. done");
+  });
+
+  test("a whole verbatim file is left as it is", () => {
+    const dir = entry(text("file"));
+    writeFileSync(join(dir, "sections", "s001-part-4.md"), md);
+    expect(readEntryDocument(dir, "t")!.sections[0]!.extract).toStartWith("# **Part 4\\. Examples**");
+  });
+});
+
+describe("a Markdown table in an extract (litlfred/dth-hrh, 'Handbook at a glance')", () => {
+  test("drops the delimiter row and reads each row as its cells", () => {
+    const md = "## At a glance\n\n| Part | Chapter | Sections |\n| :---- | :---- | :---- |\n| Part 0 | 1. Why **registries** | A; B |\n| | 2. Scope | `a\\|b` |\n";
+    // As sectionText reads it: whitespace collapsed and trimmed.
+    expect(plainMarkdown(md).replace(/\s+/g, " ").trim()).toBe("Part; Chapter; Sections Part 0; 1. Why registries; A; B 2. Scope; a|b");
   });
 });

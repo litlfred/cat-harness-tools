@@ -56,7 +56,12 @@ describe("the page a reader gets — over the REAL corpus", () => {
     // caught it.
     const committed = readFileSync(join(INSTANCE, siteDirFor(INSTANCE), pageRelPath(REPO)!), "utf-8");
     for (const text of [rendered, committed]) {
-      const targets = new Set([...text.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]));
+      // A detail section's anchor is the heading's kramdown id (`### Title {#name}`),
+      // or an explicit `<a id>` before it; either is a target on this page.
+      const targets = new Set([
+        ...[...text.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]),
+        ...[...text.matchAll(/^#{1,6} .*\{#([^}\s]+)\}\s*$/gm)].map((m) => m[1]),
+      ]);
       const links = [...text.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
       expect(links.length).toBe(rows.length);
       expect(links.filter((l) => !targets.has(l))).toEqual([]);
@@ -110,8 +115,9 @@ describe("the page a reader gets — over the REAL corpus", () => {
     expect(cut.endsWith("…")).toBe(true);
     const bold = "y".repeat(130) + " **a bold phrase that runs past the limit** tail";
     expect((short(bold, 140).match(/\*\*/g) ?? []).length % 2).toBe(0);
-    // ...and a cut that lands OUTSIDE any span is left exactly where it was.
-    expect(short("z".repeat(200), 150)).toBe("z".repeat(149) + "…");
+    // ...and a cut that lands OUTSIDE any span, with no word boundary to back
+    // off to, is left exactly where it was: the first `n` characters.
+    expect(short("z".repeat(200), 150)).toBe("z".repeat(150) + "…");
   });
 
   it("the page is DECLARED, not composed — and under the docs tree", () => {

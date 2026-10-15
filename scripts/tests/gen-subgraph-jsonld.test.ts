@@ -16,12 +16,16 @@ import {
   generateSubgraphs,
   planPayloads,
   planSubgraphs,
+  prefixesInScope,
   renderPayloadFiles,
+  subgraphContext,
   type PayloadPlan,
   type SubgraphPlan,
 } from "../gen-subgraph-jsonld.js";
-import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import jsonld from "jsonld";
 import { exportIdentity } from "../kg-export.js";
+import { expandFindings, type localLoader } from "../publish-verify.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import {
   PAYLOAD_MEDIA_TYPES,
@@ -153,6 +157,30 @@ describe("gen-subgraph-jsonld", () => {
     expect(ctx.id).toBeUndefined(); // no keyword alias, so files say `@id`
   });
 
+  test("every file expands under its context with no warning — publish-verify's `jsonld-expand`", async () => {
+    // folio-assistant#2545: a top-level `_generated` the context did not map
+    // was an `invalid property` on all 372 subgraph files, and the staging
+    // build failed after the site was built. The same expansion, here.
+    const ctxDoc = JSON.parse(files.get(SUBGRAPH_CONTEXT_PATH)!);
+    const loader = (async (url: string) => {
+      if (url !== plan.contextUrl) throw new Error(`refused to fetch ${url}`);
+      return { contextUrl: null, documentUrl: url, document: ctxDoc };
+    }) as unknown as ReturnType<typeof localLoader>;
+    const findings: string[] = [];
+    let checked = 0;
+    for (const [p, t] of files) {
+      if (p === SUBGRAPH_CONTEXT_PATH) continue;
+      const doc = JSON.parse(t) as Record<string, unknown>;
+      if (checked === 0) expect(doc._generated).toBeDefined();
+      checked += 1;
+      for (const f of await expandFindings(doc, loader)) findings.push(`${p}: ${f}`);
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(findings).toEqual([]);
+    // …because the note is a declared term, not because it went away.
+    expect(ctxDoc["@context"]._generated).toEqual({ "@id": expect.any(String), "@type": "@json" });
+  }, 120_000);
+
   test("subgraph membership and structural containment stay two properties (bean 3f5f)", () => {
     const ctx = JSON.parse(files.get(SUBGRAPH_CONTEXT_PATH)!)["@context"];
     expect(ctx.inSubgraph["@id"]).not.toBe(ctx.partOf["@id"]);
@@ -235,6 +263,59 @@ describe("gen-subgraph-jsonld", () => {
     );
     expect(p.problems.some((s) => s.includes("#skill/ghost"))).toBe(true);
     expect(p.problems.some((s) => s.includes("#node/orphan"))).toBe(true);
+  });
+});
+
+/**
+ * Bean `folio-assistant-63q4`: a subgraph file belongs to the instance whose
+ * `docs/` it is written under, and `jsonld:contexts` resolves its prefixes
+ * through THAT instance's flattened table (its own plus what it `needs`). An
+ * own-namespace prefix of an instance above it must not be compacted to.
+ */
+describe("own-namespace prefixes stay inside the writing instance's reach", () => {
+  const ALL = Object.keys(NS_PREFIXES);
+
+  test("an out-of-scope prefix is not bound, and no term is defined through it", () => {
+    const [kept, ...rest] = ALL;
+    const ctx = subgraphContext(new Set([kept]));
+    expect(ctx[kept]).toBe((NS_PREFIXES as Record<string, string>)[kept]);
+    const text = JSON.stringify(ctx);
+    for (const p of rest) {
+      expect(ctx[p]).toBeUndefined();
+      expect(text.includes(`"${p}:`)).toBe(false);
+    }
+    // No narrowing without a scope: every own prefix is bound, as before.
+    const full = subgraphContext();
+    for (const p of ALL) expect(full[p]).toBe((NS_PREFIXES as Record<string, string>)[p]);
+  });
+
+  test("a foreign IRI is spelt in full, and the triples are the ones the CURIE gave", async () => {
+    const foreign = ALL[ALL.length - 1];
+    const ns = (NS_PREFIXES as Record<string, string>)[foreign];
+    const narrow = subgraphContext(new Set(ALL.filter((p) => p !== foreign)));
+    const full = subgraphContext();
+    const node = { "@id": "https://x.test/subgraph/h/", "@type": termIri("Subgraph"), holdsGraph: [`${ns}graphTypology/library`] };
+    const compact = async (ctx: Record<string, unknown>) =>
+      (await jsonld.compact({ "@context": full, ...node } as never, ctx as never)) as Record<string, unknown>;
+    const a = await compact(full);
+    const b = await compact(narrow);
+    expect(JSON.stringify(a)).toContain(`"${foreign}:graphTypology/library"`);
+    expect(JSON.stringify(b)).not.toContain(`"${foreign}:`);
+    expect(JSON.stringify(b)).toContain(`"${ns}graphTypology/library"`);
+    const nq = async (d: Record<string, unknown>) => jsonld.toRDF(d as never, { format: "application/n-quads" } as never);
+    expect(await nq(b)).toBe(await nq(a));
+  });
+
+  test("this instance's reach includes itself, and every generated file keeps to it", () => {
+    const scope = prefixesInScope(ROOT);
+    expect(scope).toBeDefined();
+    expect(plan.prefixesInScope).toEqual(scope);
+    const outOfScope = ALL.filter((p) => !scope!.has(p));
+    const offenders: string[] = [];
+    for (const [p, t] of files) {
+      for (const pre of outOfScope) if (t.includes(`"${pre}:`)) offenders.push(`${p}: ${pre}:`);
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

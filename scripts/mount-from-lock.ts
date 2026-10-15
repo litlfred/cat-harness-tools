@@ -215,8 +215,8 @@ export function digestOf(dir: string, skip: readonly string[] = []): { treeDiges
 //   `--check`s, through this one function. At any depth because bun's isolated
 //   linker also writes into the SIBLING mounts a manifest's `workspaces` names
 //   (`../cat-harnes[s]`). Nothing upstream tracks a `node_modules/` (measured
-//   2026-10-12 over cat-harness, cat-harness-tools, bootstrap, bootstrap-tools,
-//   folio-assistant-core, smart-base: 0 paths), and `remote-mount.ts` refuses
+//   2026-10-12 over cat-harness, cat-harness-tools, bootstrap, bootstrap-tools
+//   and two content instances: 0 paths), and `remote-mount.ts` refuses
 //   to lay down a tree that does, so the exclusion can never hide a pinned byte.
 // - The lockfile is NOT excluded: it is a pinned byte. The install runs with
 //   `--no-save`, so bun writes no lockfile and edits no manifest, and the

@@ -87,6 +87,7 @@ import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
+import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -1497,6 +1498,8 @@ function auditRoles(
   skills: Set<string>,
   stories: UserStoryGraph | undefined,
   storiesPath: string,
+  /** The roles to emit a subject for; the rest of `graph` is read for resolution only. */
+  subjects: ReadonlySet<string>,
 ): KgQaReport[] {
   // Both files: `role-has-story` reads the stories, which point at the role
   // (#1168), so a story added or removed changes a role's verdict without
@@ -1516,7 +1519,7 @@ function auditRoles(
   const declared = new Set(graph.roles.map((r) => r.id));
   const anyActorDeclaresRoles = actors.some((a) => (a.roles ?? []).length > 0);
 
-  return graph.roles.map((r) => {
+  return graph.roles.filter((r) => subjects.has(r.id)).map((r) => {
     const badSkills = r.skills
       .filter((s) => !resolvableSkills.has(s))
       .map((s) => ({
@@ -2693,6 +2696,19 @@ let graphError: string | undefined;
  * worse than no path at all.
  */
 let roleGraphPath = "";
+/**
+ * The ids of the roles THIS instance's own role graph declares.
+ *
+ * The checkout overlay above also brings in the roles a higher instance owns
+ * outright (smart-base's `l1-extraction-reviewer`, owner ruling 3b,
+ * 2026-10-12). Those resolve here, but they are that instance's subjects:
+ * its own `--instance` run audits them. Emitting them again from the
+ * platform's run is the duplicated subject `instance-graph-isolation.test.ts`
+ * forbids, and what `resolution-across-needs.test.ts` ("the audit's role
+ * SUBJECTS are the instance's own") pins: resolution widens, subjecthood
+ * does not.
+ */
+const ownRoleIds = new Set<string>();
 try {
   // declared-path-literal: the convention fallback, at the call site. The
   // role graph moved out of the skills tree on 2026-09-21 and is a declared
@@ -2704,6 +2720,9 @@ try {
     graph = readRoleGraph(KG_ROOT);
     if (graph) roleGraphPath = join(KG_ROOT, "roles", "roles.json");
   }
+  // The roles this instance declares itself, before any overlay: the role
+  // SUBJECTS of this run (see `ownRoleIds` below).
+  for (const r of graph?.roles ?? []) ownRoleIds.add(r.id);
   // Dependents' extensions, by id, on the platform's own run (placement PR0b).
   // Identical to the graph above while no dependent extends a role.
   if (graph && corpusScopeFor(root) === "checkout") graph = checkoutRoleGraph(root, graph)?.graph ?? graph;
@@ -2809,7 +2828,7 @@ try {
   process.exit(2);
 }
 if (graph) {
-  reports.push(...auditRoles(graph, roleGraphPath, processes, actors, skills, stories, storiesPath));
+  reports.push(...auditRoles(graph, roleGraphPath, processes, actors, skills, stories, storiesPath, ownRoleIds));
 }
 const requirements = readRequirements();
 const satisfiers = readSatisfiers();
@@ -3096,7 +3115,7 @@ for (const r of reports) {
   written.add(resolve(p));
   // Never overwrite a sidecar whose judgements could not be moved.
   if (attUnknown.has(r)) continue;
-  const text = serialise(r);
+  const text = serialise(withPriorAdversarialReviews(r, p));
   if (check) {
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
     if (current !== text) stale.push(relative(root, p));
@@ -3200,11 +3219,34 @@ if (orphans.length > 0) {
   console.error("  It fails `kg:audit:check`; removing a dead sidecar is still yours to authorise.");
 }
 
+/**
+ * Write all of `text` to `fd`, synchronously.
+ *
+ * One `writeSync` is not enough on a pipe: it returns after filling the pipe's
+ * buffer (64 KiB on Linux) and the rest is dropped, so a parent reading
+ * `kg-audit --json` got exactly 65536 bytes of a larger report and could not
+ * parse it (resolution-across-needs.test.ts, CI run 38696377785). So: loop on
+ * the count written, and wait out EAGAIN while the reader drains the pipe.
+ */
+function writeFullySync(fd: number, text: string): void {
+  const buf = Buffer.from(text, "utf-8");
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  let off = 0;
+  while (off < buf.length) {
+    try {
+      off += writeSync(fd, buf, off, buf.length - off);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EAGAIN") throw e;
+      Atomics.wait(pause, 0, 0, 5);
+    }
+  }
+}
+
 if (asJson) {
   // Written synchronously: the judge below ends in `process.exit`, and a
   // multi-megabyte `console.log` to a PIPE is not flushed by then — the
   // callers that parse this saw a truncated array (bean `oqe3`).
-  writeSync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
+  writeFullySync(1, JSON.stringify({ reports, stale }, null, 2) + "\n");
 } else {
   const rank: Record<KgSeverity, number> = { minor: 1, major: 2, critical: 3 };
   const counts: Record<KgResult, number> = { pass: 0, fail: 0, "n/a": 0, unknown: 0 };

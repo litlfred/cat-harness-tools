@@ -6,7 +6,8 @@
  *
  * One syntax for every target: Liquid. Each harness instance declares the
  * prefix its values are addressed by (`liquid.prefix`, default its `name`).
- * fhir-harness declares `site.data` as PASS-THROUGH, so Jekyll and the IG
+ * An instance that declares a prefix `passThrough: true` (the FHIR IG layer
+ * does, for `site.data`) leaves it to the renderer, so Jekyll and the IG
  * Publisher keep resolving `{{ site.data.fhir.… }}` exactly as they do today.
  * Every other declared prefix is resolved HERE, before the text reaches
  * Jekyll, the IG Publisher or LaTeX, which is what makes the PDF, the

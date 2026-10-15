@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative, resolve, sep } from "node:path";
 
 import {
   ADVERSARIAL_CHECKLISTS,
@@ -182,16 +183,30 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     const beanFilesBefore = existsSync(beansDir) ? readdirSync(beansDir) : [];
 
     const candidates = gatherCandidateNodes(ROOT);
-    const ranked = rankCandidateNodes(candidates, ROOT);
-    const report = executeBackfillBatch(ranked, { repoRoot: ROOT, limit: 2 });
+    // The batch WRITES. Its sidecars go to a scratch tree, never the real
+    // cat-harness results tree: written there, `merge-base` (a gate-path node
+    // that is no cat-harness Tool) became a verdict about another instance's
+    // subject, and `kg-audit-foreign-subjects` failed whenever the two test
+    // files shared a shard. The nodes are still READ from the real checkout.
+    const scratch = mkdtempSync(join(tmpdir(), "adv-backfill-"));
+    try {
+      const ranked = rankCandidateNodes(candidates, ROOT).map((n) => ({
+        ...n,
+        sidecarPath: join(scratch, relative(ROOT, n.sidecarPath)),
+      }));
+      const report = executeBackfillBatch(ranked, { repoRoot: ROOT, limit: 2 });
 
-    expect(report.nodesReviewed).toBe(2);
-    expect(report.totalEstimatedTokens).toBeGreaterThan(0);
-    expect(report.measurements).toHaveLength(2);
+      expect(report.nodesReviewed).toBe(2);
+      expect(report.totalEstimatedTokens).toBeGreaterThan(0);
+      expect(report.measurements).toHaveLength(2);
 
-    // Verify sidecars were written or exist
-    for (const m of report.measurements) {
-      expect(existsSync(m.sidecarPath)).toBe(true);
+      // Verify sidecars were written, and only into the scratch tree
+      for (const m of report.measurements) {
+        expect(m.sidecarPath.startsWith(scratch + sep)).toBe(true);
+        expect(existsSync(m.sidecarPath)).toBe(true);
+      }
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
     }
 
     // Verify NO new beans were created in beans/defs/
@@ -203,8 +218,11 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {
   it("adversarialCoverageByGraph reports reviewed for kinds with reviewed sidecars", () => {
     const advMap = adversarialCoverageByGraph(REPO, ROOT);
+    // `schemas` is not asserted: its one adversarially reviewed sidecar,
+    // `schemas/kg-qa`, was removed as dead with the owner's authorisation
+    // (cat-harness 4f72623f), so no schemas review is left to restore
+    // (cat-harness d37c20c4). The two that were restored are asserted.
     expect(advMap.get("tools")).toBe("reviewed");
-    expect(advMap.get("schemas")).toBe("reviewed");
     expect(advMap.get("skills")).toBe("reviewed");
   });
 
@@ -220,8 +238,7 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     const toolsRow = rows.find((r) => r.kind === "tools");
     expect(toolsRow?.adversarial).toBe("reviewed");
 
-    const schemasRow = rows.find((r) => r.kind === "schemas");
-    expect(schemasRow?.adversarial).toBe("reviewed");
+    // `schemas`: see the test above — no reviewed schemas sidecar is left.
 
     const skillsRow = rows.find((r) => r.kind === "skills");
     expect(skillsRow?.adversarial).toBe("reviewed");
@@ -235,8 +252,12 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     const toolsRow = rows.find((r) => r.kind === "tools");
     expect(toolsRow).toBeDefined();
 
+    // What the name says: the record carries the row's state, whichever it is.
+    // It asserted "reviewed", which held only while the backfill test above
+    // wrote a reviewed sidecar into the REAL cat-harness tree before it ran.
     const record = asRecord(toolsRow!);
-    expect(record.adversarial).toBe("reviewed");
+    expect(["reviewed", "stale", "never"]).toContain(toolsRow!.adversarial);
+    expect(record.adversarial).toBe(toolsRow!.adversarial);
     expect(record).not.toHaveProperty("files");
     expect(record).not.toHaveProperty("sidecars");
     expect(record.hasFiles).toBe(true);

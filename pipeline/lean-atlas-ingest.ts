@@ -333,8 +333,8 @@ if (import.meta.main) {
   );
   const root = positional ? join(repoRoot, positional) : folioDir(repoRoot);
 
-  // `--source elaborated` marks records from folio-assistant-sci's formal-edge
-  // extractor; the default stays `atlas` so existing callers are unchanged.
+  // `--source elaborated` marks records from a contributed formal-edge
+  // extractor (a pipeline slot); the default stays `atlas` so existing callers are unchanged.
   const si = args.indexOf("--source");
   const src = si >= 0 ? args[si + 1] : "atlas";
   if (src !== "atlas" && src !== "elaborated") {
@@ -351,7 +351,7 @@ if (import.meta.main) {
   --list [root]        List blocks with a resolvable .lean
   --ingest <jsonl> [--source atlas|elaborated]
                        Ingest elaborated output (authoritative): Lean Atlas
-                       (default) or folio-assistant-sci's formal-edge
+                       (default) or a contributed formal-edge
                        extractor (--source elaborated).
                        One decl per line:
                          {"decl":"...","type_deps":[],"value_deps":[],"lean_path":"..."}

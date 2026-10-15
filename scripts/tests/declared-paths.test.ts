@@ -26,7 +26,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { absentResultDirs, isTestFile, newWitnesses, scanDeclaredPaths, underAbsentResults, witnessesOf } from "../check-declared-paths.js";
+import { absentResultDirs, isTestFile, newWitnesses, scanDeclaredPaths, underAbsentResults, underBuiltAtPublish, witnessesOf } from "../check-declared-paths.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -104,9 +104,19 @@ describe("declared-path literals", () => {
     const lost = recorded.filter((w) => {
       if (held.has(w)) return false;
       const at = w.indexOf("::");
-      return !unverifiable(w.slice(0, at), w.slice(at + 2));
+      // A publish-time artefact this checkout has not built is held by its
+      // declaration, as in the gate (`underBuiltAtPublish`).
+      return !unverifiable(w.slice(0, at), w.slice(at + 2)) && !underBuiltAtPublish(root, w.slice(at + 2));
     });
     expect(lost, "an artefact moved and the code naming it was not updated").toEqual([]);
+  });
+
+  test("a witness naming a declared publish-time artefact is held by the declaration", () => {
+    // cat-harness declares uml/overview/ builtAtPublish (owner, 2026-10-14, B1).
+    // declared-path-literal: test vectors for the builtAtPublish rule — paths the declaration names, asserted as such; whether they are on disk is what the rule is about.
+    expect(underBuiltAtPublish(root, "uml/overview/cat-harness.mmd")).toBe(true);
+    expect(underBuiltAtPublish(root, "docs/uml/overview/cat-harness.md")).toBe(true);
+    expect(underBuiltAtPublish(root, "schemas/no-such-module.ts")).toBe(false);
   });
 
   /**

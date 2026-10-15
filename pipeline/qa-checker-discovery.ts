@@ -8,7 +8,7 @@
  * ```
  *
  * — the generic sweep naming one adapter's checker table. That is a
- * wrong-direction dependency (core → smart-base) and it does not generalise:
+ * wrong-direction dependency (core → an IG adapter) and it does not generalise:
  * a third adapter is a third `??`, and a folio bringing its own criteria has
  * nowhere to put them.
  *

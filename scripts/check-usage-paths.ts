@@ -68,7 +68,7 @@
  * ## A self-reference needs no audience guess, which is the whole point
  *
  * A path in prose has an AUDIENCE and prose cannot declare one, which is why
- * the conservatism above is right. `bun run pipeline/build.ts` after
+ * the conservatism above is right. Running `pipeline/build.ts` after
  * `cd content` is a folio reader's command, written against a root the
  * convention has since retired in favour of `folio/` (owner, 2026-09-20) — so
  * prefixing `cat-harness/` would cement a retired convention AND resolve to a

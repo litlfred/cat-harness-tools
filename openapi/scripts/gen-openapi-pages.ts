@@ -110,7 +110,18 @@ export function pagesFor(instanceRoot: string): Written[] {
     );
   }
   // The graph's path under /<instance>/ — `openapi` — which every IRI here extends.
-  const graphPath = localDirOf(instanceRoot, dir).replace(/\/$/, "");
+  return pagesForGraph({ instance, config, dir, graphPath: localDirOf(instanceRoot, dir).replace(/\/$/, "") });
+}
+
+/**
+ * The same files for a graph named directly rather than through a
+ * declaration: `instance` is the name every IRI extends, `dir` holds the
+ * documents and their provenance, `graphPath` is where the graph is served
+ * under the instance. An IG repository's own site uses it (`ig-site-openapi.ts`),
+ * since such a repository has no declaration (owner, 2026-10-14).
+ */
+export function pagesForGraph(o: { instance: string; config: ReturnType<typeof readConfig>; dir: string; graphPath: string }): Written[] {
+  const { instance, config, dir, graphPath } = o;
   const out: Written[] = [];
   // For the graph's own index page (below): every document, and which
   // document each operation id belongs to.

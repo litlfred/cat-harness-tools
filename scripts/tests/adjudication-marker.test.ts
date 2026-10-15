@@ -238,7 +238,10 @@ describe("absence stays absence", () => {
     const files = workflowFiles(join(HARNESS_ROOT)).filter((f) => f.endsWith(".bpmn")).map((x) => basename(x));
     expect(files.length, "no diagrams found — this assertion would be vacuous").toBeGreaterThan(5);
     for (const f of files) await load(diagram(f));
-  });
+    // Loads every diagram of the real corpus, which took 5.1 s on a CI runner
+    // (run 38696377785, shard 1) against bun's 5 s default: the corpus grows,
+    // so the limit is stated rather than inherited.
+  }, 30_000);
 });
 
 /**

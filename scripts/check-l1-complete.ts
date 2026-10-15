@@ -44,6 +44,7 @@
  * @covers library
  */
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -74,9 +75,12 @@ import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
+import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
 
@@ -225,7 +229,66 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // Authored, not produced by an arm: an editor's title, read by
   // gen-library-jsonld over the extracted one (bean `v8wg`).
   TITLE_CORRECTION_FILE,
+  // The two review-anchor arms of the document adapter (`docx-structure.py`,
+  // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
+  // written beside `structure.json` so a public comment citing "page 12, line
+  // 340" of a circulated draft still resolves after the folio is edited. Each
+  // names the source it was read from by sha256, like every sidecar here.
+  "docx-structure.json",
+  "pdf-line-map.json",
 ];
+
+/**
+ * The children of an entry that ARE the source it was derived from — held in
+ * the entry, byte for byte.
+ *
+ * An entry normally holds what the arms derived and keeps its source in
+ * `uploads/`. Some sources must stay with their derivation: a draft circulated
+ * for public comment is FROZEN, every comment cites a page and line of those
+ * exact bytes, and moving them is the edit the freeze forbids. The closed set
+ * above cannot name such a file, because its name is the document's.
+ *
+ * So the rule is a fact the entry already records, not a name: a child is a
+ * held source when a sidecar of this entry names it as its `source` (`file`,
+ * or a `files[]` member's `path`) AND its bytes hash to the sha256 that
+ * sidecar recorded. A misfiled arm output, a stray upload or a later edit of
+ * the source fails the hash and stays a stray — the `3psh` reasoning holds,
+ * because nothing is admitted by its spelling.
+ */
+export function heldSources(dir: string, sidecars: Iterable<string>): Set<string> {
+  const claims = new Map<string, Set<string>>();
+  const claim = (file: unknown, sha: unknown) => {
+    if (typeof file !== "string" || typeof sha !== "string" || !file || file.includes("/") || file.includes("\\")) return;
+    if (!claims.has(file)) claims.set(file, new Set());
+    claims.get(file)!.add(sha.toLowerCase());
+  };
+  for (const name of sidecars) {
+    if (!name.endsWith(".json") && !name.endsWith(".jsonld")) continue;
+    const f = join(dir, name);
+    if (!existsSync(f)) continue;
+    let src: unknown;
+    try {
+      src = (JSON.parse(readFileSync(f, "utf-8")) as Record<string, unknown>)?.source;
+    } catch {
+      continue; // the owning requirement reports an unparseable sidecar
+    }
+    if (!src || typeof src !== "object") continue;
+    const s = src as Record<string, unknown>;
+    claim(s.file, s.sha256);
+    if (Array.isArray(s.files)) for (const m of s.files) if (m && typeof m === "object") claim((m as Record<string, unknown>).path, (m as Record<string, unknown>).sha256);
+  }
+  const held = new Set<string>();
+  for (const [file, shas] of claims) {
+    const p = join(dir, file);
+    try {
+      if (!statSync(p).isFile()) continue;
+      if (shas.has(createHash("sha256").update(readFileSync(p)).digest("hex"))) held.add(file);
+    } catch {
+      continue; // absent: the source is held elsewhere, which is the normal case
+    }
+  }
+  return held;
+}
 
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
@@ -527,7 +590,7 @@ export function sourceBlockOf(dir: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
-function derivableRequirements(dir: string): Requirement[] {
+function derivableRequirements(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Requirement[] {
   const out: Requirement[] = [];
   const has = (p: string) => existsSync(join(dir, p));
 
@@ -571,7 +634,19 @@ function derivableRequirements(dir: string): Requirement[] {
         return false;
       }
     };
-    const stray = children.filter((c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c));
+    // A DECLARED library sub-graph inside the entry (bean `8pzh` item 1, owner
+    // 2026-10-12: L1 extraction output lives beside its entry and is published
+    // with it). The instance declares the directory with a kind that is
+    // `within: "library"`, so it is the entry's own KG content, not an arm's
+    // misfiled output — the same lookup the library publisher follows. An
+    // UNDECLARED directory there is still a stray.
+    const declaredSubgraphs = new Set(
+      entrySubgraphDirs(dir, registry).map((d) => relative(resolve(dir), d.abs).split(/[\\/]/)[0]),
+    );
+    const held = heldSources(dir, [...allowed].filter((c) => children.includes(c)));
+    const stray = children.filter(
+      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c) && !held.has(c),
+    );
     if (stray.length > 0) {
       out.push({
         name: "contents",
@@ -583,7 +658,13 @@ function derivableRequirements(dir: string): Requirement[] {
           `Reported, not removed.`,
       });
     } else if (children.length > 0) {
-      out.push({ name: "contents", state: "met", detail: `${children.length} child(ren), all declared` });
+      out.push({
+        name: "contents",
+        state: "met",
+        detail:
+          `${children.length} child(ren), all declared` +
+          (held.size ? `; ${held.size} held source(s) matching their recorded sha256: ${[...held].sort().join(", ")}` : ""),
+      });
     }
   }
 
@@ -1260,11 +1341,11 @@ export function expiredExceptions(
   return out;
 }
 
-export function checkEntry(dir: string): EntryReport {
+export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryReport {
   return {
     slug: dir.split("/").filter(Boolean).pop() ?? dir,
     requirements: [
-      ...derivableRequirements(dir),
+      ...derivableRequirements(dir, registry),
       ...NOT_DERIVABLE.map((nd) => ({
         name: nd.name,
         state: "not-derivable" as const,
@@ -1329,8 +1410,11 @@ export function checkAll(root: string): EntryReport[] | undefined {
   const presence = splitDeclared(libs);
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
+    const others = nonEntryDirs(lib);
     for (const d of readdirSync(lib).sort()) {
       if (!statSync(join(lib, d)).isDirectory()) continue;
+      // Another kind's directory kept in the library is not an entry.
+      if (others.has(join(lib, d))) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(
@@ -1416,8 +1500,15 @@ export function sidecarFor(root: string, report: EntryReport): string {
  * while the libraries sat in `who-iris/` and the others (measured 2026-10-09).
  * An entry no declared library holds stays at `root`, as before.
  */
-export function sidecarRootFor(root: string, slug: string): string {
-  for (const lib of corpusDirectoriesForGraph(root, "library")) {
+export function sidecarRootFor(
+  root: string,
+  slug: string,
+  // The libraries, when the caller already has them: {@link sidecarStates}
+  // asks once per entry, and resolving every declaration again for each of 87
+  // entries was most of its cost.
+  libs: readonly string[] = corpusDirectoriesForGraph(root, "library"),
+): string {
+  for (const lib of libs) {
     const entry = join(lib, slug);
     if (existsSync(entry)) return instanceConfigFor(entry)?.root ?? root;
   }
@@ -1442,9 +1533,19 @@ export function sidecarStates(
   reports: EntryReport[],
   against?: string,
 ): { slug: string; state: QaResultState }[] {
+  // Resolved once for every entry, not once per entry: the libraries here, the
+  // qa location as in qa-results' storedOn. Unresolvable means what it means
+  // there: no directory is stored.
+  const libs = corpusDirectoriesForGraph(root, "library");
+  let location: QaLocation | undefined;
+  try {
+    location = resolveQaLocation();
+  } catch {
+    location = undefined;
+  }
   return reports.map((r) => ({
     slug: r.slug,
-    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug), join("library-qa", r.slug)), sidecarDocument(r), { against }),
+    state: qaResultState(qaResultPath(sidecarRootFor(root, r.slug, libs), join("library-qa", r.slug)), sidecarDocument(r), { against, location }),
   }));
 }
 

@@ -47,11 +47,13 @@
  *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title (w6fu)
  *   bun run cat ingest uploads/FILE.pdf --library who-iris
  *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
+ *   bun run cat ingest uploads/FILE.md --text   # Markdown/MDX/XML: text has no magic bytes, so the caller says so
  *
  * `--title` passes a KNOWN title through to the PDF rungs (bean `turh`). Absent
  * it, the catalogue's Dublin Core `dc.title` is passed when the instance has a
  * catalogue node for this entry — the first authority of the 2026-10-01 title
  * ruling, so a scan no longer carries its OCR's misreading as `doc_title`.
+ *   bun run cat ingest ../qou/uploads/FILE.pdf --instance ../qou   # a content folio's library
  *
  * `--library` is required only when the repository declares more than one, and
  * then it is REQUIRED rather than defaulted: since bean `frs5` there are two,
@@ -76,6 +78,7 @@ import { IntakeSchema } from "@litlfred/cat-harness/schemas/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -92,8 +95,43 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * Derived from the module's location rather than from the caller's, because
  * this script BELONGS to this instance. A caller who means a different one
  * passes `root`, which is what the parameter is for.
+ *
+ * ## `--instance <dir>`: ingest into a CONTENT instance's library
+ *
+ * Without it this is cat-harness, and that is still the default. With it, the
+ * staging tree and the destination library are resolved against `<dir>`, which
+ * must hold an instance declaration (`<name>.json`). This is the case of a
+ * content folio such as `litlfred/qou`, checked out beside the harness: before
+ * the flag the only route was to re-implement this module's steps against the
+ * folio's paths (qou's `scripts/library-ingest.ts` did exactly that, importing
+ * `planFor` / `withDerivedArms` / `checkEntry` / `buildEntryNodes`), which is
+ * the second implementation of "how a document is ingested" this module exists
+ * to prevent. `--harness` cannot serve: it accepts only a directory whose
+ * declaration names `cat-harness`.
+ *
+ * Refused, never guessed, when `<dir>` declares nothing: filing into a
+ * directory no declaration names is filing where nothing scans it.
  */
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
+
+/** `--instance <dir>` or `--instance=<dir>`, else the harness. Exported for tests. */
+export function resolveInstanceRoot(argv: readonly string[], fallback: string = HARNESS_ROOT): string {
+  let chosen: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--instance" && i + 1 < argv.length) chosen = argv[++i];
+    else if (a.startsWith("--instance=")) chosen = a.slice("--instance=".length);
+  }
+  if (chosen === undefined || chosen === "") return resolve(fallback);
+  const root = resolve(chosen);
+  if (readDeclaration(root) === undefined) {
+    throw new Error(
+      `--instance names ${root}, which holds no instance declaration (<name>.json) — ` +
+        "ingesting there would file the document where nothing scans it",
+    );
+  }
+  return root;
+}
 
 /**
  * A python helper beside this module, as an ABSOLUTE path.
@@ -218,7 +256,7 @@ export function libraryChoice(argv: string[]): string | undefined {
 
 /** Which rung a document needs, and the evidence that chose it. */
 export interface Plan {
-  rung: "archive" | "tabular" | "notebook" | "slides" | "referenced" | "pdf-structure" | "pdf-pages" | "pdf-ocr+pdf-pages" | "undetermined";
+  rung: "archive" | "tabular" | "notebook" | "slides" | "referenced" | "text" | "pdf-structure" | "pdf-pages" | "pdf-ocr+pdf-pages" | "undetermined";
   why: string;
   /** Commands to run, in order, each as argv. */
   steps: string[][];
@@ -338,7 +376,7 @@ export function withDerivedArms(
   // A notebook gets the ONE arm that reads what a rung wrote rather than the
   // source: `l1-blocks.ts` builds blocks from `sections/`. The image arms read
   // a PDF and do not apply; the notebook rung writes its own `images.json`.
-  if (plan.rung === "notebook") {
+  if (plan.rung === "notebook" || plan.rung === "text") {
     return { ...plan, steps: [...plan.steps, ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging]] };
   }
   const PDF_RUNGS = ["pdf-structure", "pdf-pages", "pdf-ocr+pdf-pages"];
@@ -698,6 +736,8 @@ export function planFor(
   p: Probe | undefined = undefined,
   lib: string = libraryRoot(),
   mimetype: string | null | undefined = undefined,
+  /** `--text`: the caller says the source is text (Markdown, MDX, XML). */
+  text = false,
 ): Plan {
   // CONTENT decides the rung, before anything opens the file as a PDF.
   //
@@ -711,6 +751,24 @@ export function planFor(
   // claim by whoever made the file. A `.pdf` that is really a zip belongs on
   // the archive rung, and this is the only thing that can tell.
   const mime = mimetype === undefined ? sniffMimetype(pdf) : mimetype;
+
+  // Text — Markdown, MDX, XML — has no magic bytes, so it is routed only when
+  // the CALLER says so (`--text`), never from the extension: the decision the
+  // l1-document-ingestion skill left open ("Routing a dropped `.md` is a
+  // separate decision"), taken 2026-10-14 after a Markdown source reached
+  // `library/` through `text-structure.ts` alone and never got its KG nodes
+  // (litlfred/dth-hrh). Through here it takes the same derived arm a notebook
+  // does and `--promote` writes its nodes, as for every other rung.
+  if (text) {
+    if (mime !== null && !/^(text\/|application\/(xml|json))/.test(mime)) {
+      return { rung: "undetermined", why: `--text given, but the file sniffs as ${mime}: not text`, steps: [] };
+    }
+    return {
+      rung: "text",
+      why: "--text given: read by its own headings (a Markdown file at its ATX headings, any other text as one verbatim section)",
+      steps: [["bun", "run", tsHelper("text-structure.ts"), "-o", lib, "--doc-id", bibSlug(pdf), "--base", dirname(resolve(pdf)), pdf]],
+    };
+  }
 
   // A spreadsheet before an archive, because an .xlsx IS a zip and would
   // otherwise be listed as a bag of XML parts rather than read as a workbook.
@@ -882,7 +940,7 @@ export function knownTitle(
 }
 
 /** The rungs that take `--title`: both write `structure.json` and the sections' `doc_title`. */
-const TITLE_RUNGS = new Set(["pdf-structure.py", "pdf-pages.py"]);
+const TITLE_RUNGS = new Set(["pdf-structure.py", "pdf-pages.py", "text-structure.ts"]);
 
 /** `plan` with `--title` handed to each rung that takes one. Pure. */
 export function withKnownTitle(plan: Plan, title: string | undefined): Plan {
@@ -890,7 +948,8 @@ export function withKnownTitle(plan: Plan, title: string | undefined): Plan {
   return {
     ...plan,
     steps: plan.steps.map((s) =>
-      TITLE_RUNGS.has(basename(s[1] ?? "")) && !s.includes("--title") ? [...s, "--title", title] : s,
+      // A Python rung is `python3 <script>`; a TypeScript one is `bun run <script>`.
+      (TITLE_RUNGS.has(basename(s[1] ?? "")) || TITLE_RUNGS.has(basename(s[2] ?? ""))) && !s.includes("--title") ? [...s, "--title", title] : s,
     ),
   };
 }
@@ -1027,7 +1086,7 @@ if (import.meta.main) {
   // was boolean; `--library who-iris` breaks it, because `who-iris` does not
   // start with `--` and would be ingested as a filename — producing "who-iris:
   // not there" while the real argument sat untouched two places along.
-  const takesValue = new Set(["--library", "--reference", "--title"]);
+  const takesValue = new Set(["--library", "--reference", "--title", "--instance"]);
   let pdf: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -1111,7 +1170,7 @@ if (import.meta.main) {
           why: "--reference given — recorded with its outline and sha256, text withheld",
           steps: [["python3", pyHelper("referenced-source.py"), "-o", stagingRoot, pdf, "--identity", reference]],
         }
-      : withKnownTitle(planFor(pdf, undefined, stagingRoot), known?.title),
+      : withKnownTitle(planFor(pdf, undefined, stagingRoot, undefined, argv.includes("--text")), known?.title),
     pdf,
     stagingRoot,
     staging,

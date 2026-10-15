@@ -254,6 +254,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "harness:dirs:check": TREE_READER,
   "id-lookup:check": READ_ONLY,
   "iri:sync:check": TREE_READER,
+  "jsonld:contexts:check": TREE_READER, // `--check` returns before the write loop; reads the corpus git lists
   "kg:detangle:direction": TREE_READER,
   "kg:schema:check": READ_ONLY,
   "kg:subscribe:check": READ_ONLY,

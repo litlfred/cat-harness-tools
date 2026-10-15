@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
-import { indexSummary, orphanPages, unpublishedTwins } from "../gen-skill-docs.ts";
+import { indexSummary, orphanPages, twinsInCheckout, unpublishedTwins } from "../gen-skill-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
@@ -224,5 +224,36 @@ describe("unpublishedTwins", () => {
     // The vacuity control, and the reason both halves are asserted above: a
     // function returning `[]` unconditionally satisfies the first test.
     expect(unpublishedTwins(ok, []).length).toBe(2);
+  });
+});
+
+/**
+ * A twin whose publishing group's DIRECTORY this checkout does not hold is out
+ * of scope here, not the `bsay` defect (smart-ra#66: a document folio has no
+ * `.claude/skills/local/`, and `skills:docs` failed `derive:publish` on it).
+ * The guard must still fire wherever the group is present.
+ */
+describe("twinsInCheckout", () => {
+  const table = { "a": [{ published: "a" }, { published: "local-a" }] };
+  const groups = [{ dir: "/skills" }, { dir: "/local", publishPrefix: "local-" }];
+
+  test("the partner's group directory absent: the entry is dropped and named, so no banner and no failure", () => {
+    const r = twinsInCheckout(table, groups, (d) => d !== "/local");
+    expect(r.table).toEqual({});
+    expect(r.absent).toEqual(["a -> local-a"]);
+    expect(unpublishedTwins(r.table, ["a"])).toEqual([]);
+  });
+
+  test("the group present (the folio-assistant index): the entry is kept, and a missing stub still fails", () => {
+    const r = twinsInCheckout(table, groups, () => true);
+    expect(r.table).toEqual(table);
+    expect(r.absent).toEqual([]);
+    expect(unpublishedTwins(r.table, ["a"])).toEqual(["a -> local-a"]);
+  });
+
+  test("a twin no declared group would publish is kept, so the table contradicting the groups still fails", () => {
+    const r = twinsInCheckout({ "a": [{ published: "a" }, { published: "other-a" }] }, groups, (d) => d !== "/local");
+    expect(Object.keys(r.table)).toEqual(["a"]);
+    expect(unpublishedTwins(r.table, ["a"])).toEqual(["a -> other-a"]);
   });
 });

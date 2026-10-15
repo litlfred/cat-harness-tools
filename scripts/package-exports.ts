@@ -3,6 +3,7 @@
  * A package's `exports` are DERIVED from the `code` subgraphs it declares and
  * ships — bean `mo75` (exports item), the prerequisite of `7pvn`.
  *
+ * @covers cat-harness, code — it derives a package's `exports` from the `code` directories its declaration names, and judges `package.json` against them
  * @module scripts/package-exports
  *
  * ## Why

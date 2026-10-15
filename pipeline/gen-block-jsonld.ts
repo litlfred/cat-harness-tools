@@ -200,7 +200,8 @@ export function blockToJsonLd(
   return doc;
 }
 
-function serialise(doc: Record<string, unknown>): string {
+/** The node as written to disk: what `--check` compares byte for byte. */
+export function serialise(doc: Record<string, unknown>): string {
   return `${JSON.stringify(doc, null, 2)}\n`;
 }
 

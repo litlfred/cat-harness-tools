@@ -394,6 +394,88 @@ const LAYERING_SPECIFICATIONS = [
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
+ * X5 — a DATED DECISION RECORD (owner, 2026-10-14, Q1 of the #2529
+ * reference-direction review: "Exempt as records").
+ *
+ * A proposal under an instance's `docs/proposals/` whose file name ends in the
+ * date it was written (`<topic>-YYYY-MM-DD.md`, or the `.json` measurement it
+ * carries) is a RECORD: it states the options, the measurements and the
+ * layering as they stood on that day, and the owner answered it as written.
+ * Rewording it afterwards so that it no longer names a higher layer would
+ * falsify what was asked and what was decided — the same reason X3 leaves the
+ * layering specifications naming the layers they define.
+ *
+ * Deliberately narrow, and each half is held by a test:
+ *
+ *  - **dated** — the file name must END in `-YYYY-MM-DD`. The undated pages
+ *    beside them (`index.md`, `README.md`, a proposal still being argued
+ *    without a date) are living documents, edited as the answer changes, and
+ *    stay `wrong-direction`.
+ *  - **a proposal** — directly under `docs/proposals/` of an instance root,
+ *    not in a sub-directory and not in any other `docs/` section.
+ *
+ * A pattern rather than a named list, unlike X3, because the owner ruled on
+ * the CLASS ("dated decision records"), not on three files: every dated record
+ * written later is the same kind of thing for the same reason.
+ */
+// declared-path-literal: the shape of a dated proposal record, repo-root-relative because that is how an occurrence's file is reported
+const DATED_PROPOSAL_RECORD_FILE = /^[a-z0-9][a-z0-9-]*\/docs\/proposals\/[a-z0-9][a-z0-9-]*-\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\.(?:md|json)$/;
+export const DATED_PROPOSAL_RECORD: ReferenceExemption = {
+  file: DATED_PROPOSAL_RECORD_FILE,
+  reason:
+    "X5, a DATED DECISION RECORD (owner, 2026-10-14, Q1: \"Exempt as records\"): a proposal whose file name carries the date it was written records the layering, the options and the measurements as they stood that day, and the owner answered it as written. Rewording it to stop naming a higher layer would falsify the record. Dated files directly under an instance's `docs/proposals/` only; the undated index and living pages beside them are read",
+};
+
+/**
+ * 3a — a WORKFLOW `uses:` ADDRESS (owner, 2026-10-15, ruling "3a" of the
+ * folio-assistant#2529 reference-direction review).
+ *
+ * A layer's pull-request CI calls ONE reusable workflow that a higher layer
+ * keeps — `uses: <owner>/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main`
+ * in `cat-harness`, `bootstrap` and `bootstrap-tools`. The owner ruled that
+ * line names a REPOSITORY ADDRESS — where GitHub fetches the workflow from —
+ * not a dependency of the calling layer on the layer that shares the
+ * repository's name. Nothing in the caller's tree loads, imports or runs a
+ * file of that layer; the hosting service resolves the address.
+ *
+ * Why an exemption and not `names-repository`: that verdict is what
+ * {@link analyse}'s `collisionOf` returns for the ROOT instance's name, the one
+ * that collides with the checkout's own repository, and it is consulted for no
+ * other target. Widening the resolver to every instance would change what it
+ * answers (and what its tests hold) for a carve the owner ruled on one shape
+ * of; an exemption carries the ruling as its reason and is counted on its own
+ * line, as X3/X4/X5 are.
+ *
+ * Narrow on three axes, and each edge is held by a test:
+ *
+ *  - **file** — a GitHub Actions workflow: a `.yml`/`.yaml` file directly in
+ *    a `.github/workflows/` directory (of any instance, or of the repository
+ *    root). Not a composite action's `action.yml`, not a workflow template
+ *    under `templates/`, and not Markdown that QUOTES a `uses:` line.
+ *  - **key** — the line is the `uses:` key of a job or of a step (`uses:` or
+ *    `- uses:`), and nothing else: `run:`, `with:`, `repository:`, `path:` and
+ *    comments are read as before, including a `run:` that executes the higher
+ *    layer's scripts and a checkout `path:` that names it.
+ *  - **value** — the WHOLE value is a remote address,
+ *    `<owner>/<repo>[/<path>]@<ref>`, optionally quoted, optionally followed by
+ *    a version comment (`# v4.1.1`) and nothing else. A local action
+ *    (`./<path>`) is a path in the checkout, and a `docker://` image is not a
+ *    repository; both stay read.
+ */
+// declared-path-literal: the shape of a GitHub Actions workflow file, repo-root-relative because that is how an occurrence's file is reported
+const WORKFLOW_FILE = /^(?:[A-Za-z0-9_.-]+\/)*\.github\/workflows\/[^/]+\.ya?ml$/;
+/** `<owner>/<repo>[/<path>]@<ref>` — GitHub's address of a reusable workflow or an action. */
+const REMOTE_USES_ADDRESS = String.raw`[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[A-Za-z0-9_.\/-]+`;
+export const WORKFLOW_USES_ADDRESS: ReferenceExemption = {
+  file: WORKFLOW_FILE,
+  pattern: new RegExp(
+    String.raw`^(?:-\s+)?uses:\s+(["']?)${REMOTE_USES_ADDRESS}\1(?:\s+#\s*v?\d[A-Za-z0-9_.+-]*)?\s*$`,
+  ),
+  reason:
+    "3a, a WORKFLOW `uses:` ADDRESS (owner, 2026-10-15, ruling \"3a\"): a GitHub Actions `uses: <owner>/<repo>[/<path>]@<ref>` names the REPOSITORY a reusable workflow or action is fetched from, not a dependency on the layer sharing that repository's name. Only the `uses:` key of a job or step in a `.github/workflows/` file, and only when the whole value is such an address; `run:`, checkout paths and every other key are read",
+};
+
+/**
  * X4 — a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z,
  * session_01UC1NuEuSy1MBNpEhnDuiGj: "2 y", ruling (ii) — *"rule that a harness
  * skill may name a cat-harness-tools script"*).
@@ -437,6 +519,101 @@ export const DEFINITION_NAMES_IMPLEMENTATION: ReferenceExemption = {
     "X4, a DEFINITION NAMING ITS IMPLEMENTATION (owner, 2026-10-11T05:58:12Z, ruling (ii): \"a harness skill may name a cat-harness-tools script\"): Markdown in the harness telling an agent which tools script to run — \"definitions there, implementations here\" (cat-harness-tools/AGENTS.md). Markdown only, the tools layer only, and only when every mention on the line is a script or command path",
 };
 
+/**
+ * X4, WIDENED — a definition POINTING AT its implementation, which nothing
+ * runs (owner, 2026-10-14, Q6 of the folio-assistant#2529
+ * reference-direction review: "(a)", widen X4).
+ *
+ * Ruling (ii) above excused one shape of the split: a harness Markdown line
+ * naming the tools SCRIPT an agent should run. The same split also shows up
+ * as a pointer that is not a script and not in Markdown — a skill naming the
+ * `src/` module that implements what it defines, a schema's comment naming the
+ * tools file that writes the shape it declares, a requirement or an actor's
+ * `description` naming the code it describes. The owner ruled those the same
+ * kind of thing: the definition is complete without them, and the line tells
+ * a reader where the implementation lives. Nothing loads, imports or executes
+ * it, which is the whole difference between a pointer and a dependency.
+ *
+ * Narrow on the same axes as X4, and each edge is held by a test:
+ *
+ *  - **from / to** — a file under `cat-harness/` naming `cat-harness-tools`,
+ *    and no other pair. The "definitions there, implementations here" split
+ *    is between exactly these two layers.
+ *  - **what counts as a pointer** — a path INTO the tools layer's code
+ *    (`cat-harness-tools/<dir>/…`, at least one directory deep, never its
+ *    `test/` material and never a root file such as its `package.json`); the
+ *    layer named beside a code file (`cat-harness-tools \`x.ts\``, or
+ *    `\`x.ts\` (cat-harness-tools)`); and, in Markdown only, a parenthetical
+ *    that wraps onto the next line straight after the layer's name. The layer
+ *    named AS SUCH — in a list of repositories, as a subject doing something —
+ *    is not a pointer and stays read.
+ *  - **never executed** — the mention may not be the argument of a command
+ *    (`run`, `test`, `python3`, `bash`, `node`, …) or of an import (`from "…"`,
+ *    `import("…")`, `require("…")`), and may not be glued to a longer path
+ *    (`/abs/…/cat-harness-tools/…`, `../cat-harness-tools/…`), which is what a
+ *    command line or a loader resolves. Per file type, the line must be one
+ *    nothing runs: in TypeScript a COMMENT line (and not a `/// <reference>`
+ *    or an `import()` type); in JSON a PROSE field (`description`,
+ *    `requirement`, `rationale`, a `_comment`, …) or a bare array element that
+ *    is a sentence; Markdown is prose throughout, with the command and import
+ *    refusals above.
+ *  - **line** — EVERY mention on the line must be one of these, as in X4: a
+ *    pointer does not excuse a real reference beside it.
+ *
+ * Three entries, one per file type, because a line rule cannot see the file
+ * type and each type has a different answer to "which lines does nothing
+ * run". Each is counted under its own reason, so how much each carve does is
+ * visible in the summary.
+ */
+/** Characters a path segment may hold in a pointer: X4's, plus the `*` of a glob. */
+const POINTER_PATH_CHARS = "[A-Za-z0-9_.*-]";
+/** A mention that is the argument of a command or an import is executed or loaded, never a pointer. */
+const NOT_EXECUTED = `(?<!\\b(?:run|test|exec|python3?|bash|sh|node|bunx|npx|deno|source|from|import)\\s+["'\`]?)(?<!\\b(?:require|import)\\(\\s*["'\`]?)`;
+/** The name, not glued to a longer path on its left (`/abs/…/<name>`, `../<name>`). */
+const POINTER_NAME = `${NOT_EXECUTED}(?<![A-Za-z0-9_./-])${escapeRe(TOOLS_NAME)}(?![A-Za-z0-9_-])`;
+/** A code file, optionally in a code span. A test file is not where a definition is implemented. */
+const IMPLEMENTATION_FILE = `\`?(?!(?:test|tests|__tests__)/)(?:${PATH_CHARS}+/)*(?!${PATH_CHARS}*\\.(?:test|spec)\\.)${PATH_CHARS}+\\.(?:ts|tsx|js|mjs|py|sh)(?![A-Za-z0-9_])\`?`;
+/** `cat-harness-tools/<dir>/…` — at least one directory deep, never into its test material. */
+const TOOLS_IMPLEMENTATION_PATH = `${POINTER_NAME}/(?!(?:test|tests|__tests__)/)${PATH_CHARS}+/(?:${POINTER_PATH_CHARS}+(?:/${POINTER_PATH_CHARS}+)*/?)?`;
+/** `cat-harness-tools \`x.ts\`` and `(cat-harness-tools src/x.ts)`. */
+const LAYER_BESIDE_FILE = `${POINTER_NAME}[ \\t]+${IMPLEMENTATION_FILE}`;
+/** `\`x.ts\` (cat-harness-tools)`. */
+const FILE_BESIDE_LAYER = `${IMPLEMENTATION_FILE}[ \\t]+\\(${POINTER_NAME}\\)`;
+const POINTERS = `${TOOLS_IMPLEMENTATION_PATH}|${LAYER_BESIDE_FILE}|${FILE_BESIDE_LAYER}`;
+/** The rest of the line, with every mention on it a pointer (or one of `extra`). */
+const ONLY_POINTERS = (extra = ""): string => `(?:${extra}${POINTERS}|(?!${NAME_BOUND})[\\s\\S])*$`;
+const POINTS_REASON = (where: string): string =>
+  `X4 WIDENED, a DEFINITION POINTING AT ITS IMPLEMENTATION (owner, 2026-10-14, Q6: "(a)", widen X4): ${where} in the harness naming where in cat-harness-tools the thing it defines is implemented — a pointer nothing imports, loads or runs. Only when every mention on the line is such a pointer: a path into the tools layer's code (not its tests), or the layer named beside a code file; never the argument of a command or an import`;
+
+export const DEFINITION_POINTS_TO_IMPLEMENTATION_MD: ReferenceExemption = {
+  file: /^cat-harness\/.+\.md$/,
+  to: TOOLS_NAME,
+  // X4's script and command paths stay excused on the same line, and a
+  // Markdown parenthetical may wrap straight after the layer's name.
+  pattern: new RegExp(`^${ONLY_POINTERS(`${TOOLS_SCRIPT_PATH}|${TOOLS_COMMAND_PATH}|\\(${POINTER_NAME}$|`)}`),
+  reason: POINTS_REASON("Markdown"),
+};
+
+export const DEFINITION_POINTS_TO_IMPLEMENTATION_TS: ReferenceExemption = {
+  file: /^cat-harness\/.+\.tsx?$/,
+  to: TOOLS_NAME,
+  // A comment line, trimmed as `analyse` reports it; never a triple-slash
+  // directive or an `import()` / `require()` type, which a compiler resolves.
+  pattern: new RegExp(`^(?:\\/\\/(?!\\/)|\\/\\*|\\*)(?![\\s\\S]*(?:\\bimport\\s*\\(|\\brequire\\s*\\(|<reference\\b))${ONLY_POINTERS()}`),
+  reason: POINTS_REASON("a TypeScript comment"),
+};
+
+/** JSON keys whose value is prose for a reader — never a command, a path a tool reads, or an identifier. */
+const PROSE_KEY = `"(?:description|requirement|rationale|reason|note|notes|summary|statement|gloss|\\$comment|_?[A-Za-z]*_?comment)"\\s*:\\s*"`;
+/** A bare array element that is a sentence: it ends in a full stop, which no command or path does. */
+const SENTENCE_ELEMENT = `"(?=(?:[^"\\\\]|\\\\.)*[.!?]"\\s*,?$)`;
+export const DEFINITION_POINTS_TO_IMPLEMENTATION_JSON: ReferenceExemption = {
+  file: /^cat-harness\/.+\.json$/,
+  to: TOOLS_NAME,
+  pattern: new RegExp(`^(?:${PROSE_KEY}|${SENTENCE_ELEMENT})${ONLY_POINTERS()}`),
+  reason: POINTS_REASON("a JSON prose field"),
+};
+
 // ── This instance's exemptions ──────────────────────────────────
 //
 // Same contract as `iwtn`'s `ALLOW`: each entry states WHY the text is not a
@@ -469,6 +646,11 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
     reason:
       "X3, a LAYERING SPECIFICATION (owner, Q-B 2026-10-01): the file's subject IS the instance graph — it defines the layers, so it names them. Moved to any one layer it could no longer describe the others. A named list of three, ruled by the owner, never a pattern",
   },  DEFINITION_NAMES_IMPLEMENTATION,
+  DEFINITION_POINTS_TO_IMPLEMENTATION_MD,
+  DEFINITION_POINTS_TO_IMPLEMENTATION_TS,
+  DEFINITION_POINTS_TO_IMPLEMENTATION_JSON,
+  DATED_PROPOSAL_RECORD,
+  WORKFLOW_USES_ADDRESS,
 ];
 
 /**
@@ -520,14 +702,16 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * entries were DELETED rather than left, because an entry recording a choice
  * nobody has to make any more is a question the owner would be asked twice.
  * Neither file was edited to earn that — the generator was.
+ *
+ * The second time: `cat-harness/docs/en/cat-harness/processes/index.md`,
+ * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
+ * that generator began writing `generated:` into every page it draws
+ * (folio-assistant#2529, PR 3 of the reference-direction batch).
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/docs/cat-harness/published-graphs.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/cat-harness.json", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/smart-base-tools.md", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/ig-artifact-ingestion.md", names: 2 },
-  { file: "folio-assistant-core/scripts/ingest-ig-artifacts.ts", names: 3 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
@@ -536,17 +720,13 @@ const PENDING: readonly { file: string; names: number }[] = [
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "folio-assistant-core/schemas/fhir-artifact-index.ts", names: 2 },
   { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "fhir-harness/AGENTS.md", names: 4 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-preprocessing.md", names: 3 },
   { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
   { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
-  { file: "smart-base/schemas/dak.ts", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
   { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
@@ -556,17 +736,12 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
   { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
   { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
-  { file: "smart-ig/README.md", names: 2 },
-  { file: "smart-ig/AGENTS.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },
   { file: "smart-base/README.md", names: 2 },
   { file: "smart-base/AGENTS.md", names: 2 },
-  { file: "smart-base/tools/index.ts", names: 2 },
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
   { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
   { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
-  { file: "cat-harness/docs/en/cat-harness/processes/index.md", names: 4 }, // moved by t4xb from docs/processes/ (ruling (i), 2026-10-11)
-  { file: "smart-ig/smart-ig.json", names: 2 },
 ];
 
 /**
@@ -1225,6 +1400,22 @@ const GATE = "check:reference-direction";
 // entry predated seven multi-destination files already on `main`.
 export const CHECK_FAIL_ON_NEW = ["wrong-direction", "pending-stale", "instances-undeclared"] as const;
 
+/**
+ * How many exempt occurrences each exemption excused, keyed by its reason and
+ * in declaration order (X1, appended per file, last). Exported so a test can
+ * hold that every exemption is counted under its own line.
+ */
+export function exemptionCounts(exempt: readonly { verdict: ReferenceVerdict }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const e of [...EXEMPTIONS, TRANSLATION_MIRROR]) counts.set(e.reason, 0);
+  for (const c of exempt) {
+    if (c.verdict.verdict !== "exempt") continue;
+    const { reason } = c.verdict.exemption;
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return counts;
+}
+
 function main(): number {
   const args = process.argv.slice(2);
   // `--check` reads and compares; it never writes. Bean `ymsu` — a gate that
@@ -1254,6 +1445,12 @@ function main(): number {
   console.log(`Reference direction — ${report.instances} instances, ${report.classified.length} name occurrences pointing up the dependency arrow\n`);
   console.log(`  wrong-direction   ${String(wrong.length).padStart(5)}   in ${new Set(wrong.map((c) => c.occurrence.file)).size} files`);
   console.log(`  exempt            ${String(exempt.length).padStart(5)}   ${EXEMPTIONS_DECLARED} exemptions, each with a stated reason`);
+  // Per exemption, so a carve doing more work than anyone intended shows
+  // which one it is. PRINTED, not recorded: like the total, it moves with the
+  // corpus rather than with a ruling.
+  for (const [reason, count] of exemptionCounts(exempt)) {
+    console.log(`    ${String(count).padStart(5)}  ${reason.length > 96 ? `${reason.slice(0, 95)}…` : reason}`);
+  }
   // Its OWN line, never folded into `allowed` and never into the two skipped
   // counts below. It is a different statement from all three: the occurrence
   // was read, it was judged, and what it names owes no direction.

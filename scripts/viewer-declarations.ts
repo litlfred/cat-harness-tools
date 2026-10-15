@@ -48,7 +48,7 @@
  *
  * @module scripts/viewer-declarations
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 
 import {
@@ -206,6 +206,67 @@ export function declaredVisualisers(repoRoot: string): DeclaredVisualiser[] {
   }
   declaredCache.set(key, out);
   return out;
+}
+
+/**
+ * A `<harness>/<visualiser>/` route a SITE holds a generated page at, and the
+ * Tool its page says drew it.
+ */
+export interface RecordedRoute {
+  harness: string;
+  visualiser: string;
+  /** `rendered-by`, or the basename (no extension) of the script `generated:` names. */
+  renderedBy: string;
+}
+
+/**
+ * The routes a built site records, read from the generated pages in it — for a
+ * checkout where the instance that DECLARES a visualiser is not mounted.
+ *
+ * A layer standing alone (`check-standalone`) still carries the harness site,
+ * and that site still holds pages a higher layer's generator wrote there; only
+ * the declaration that placed them is absent. {@link declaredVisualisers}
+ * stays the authority whenever it can be read. This answers the narrower
+ * question "which pages here say which Tool drew them", from the page's own
+ * front matter (`rendered-by:`, or `generated: <path>/<tool>.ts`) at
+ * `<site>/<harness>/<visualiser>/index.{md,html}` — the same self-declaration
+ * `check:reference-direction` trusts when it skips generator output. It
+ * resolves no directory, so the module rule above is untouched.
+ */
+export function routesRecordedInSite(site: string): RecordedRoute[] {
+  const out: RecordedRoute[] = [];
+  const dirs = (p: string): string[] => {
+    try {
+      return readdirSync(p, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith(".") && !d.name.startsWith("_"))
+        .map((d) => d.name)
+        .sort();
+    } catch {
+      return [];
+    }
+  };
+  for (const harness of dirs(site)) {
+    for (const visualiser of dirs(join(site, harness))) {
+      for (const file of ["index.md", "index.html"]) {
+        const p = join(site, harness, visualiser, file);
+        if (!existsSync(p)) continue;
+        const by = recordedRenderer(readFileSync(p, "utf-8"));
+        if (by !== undefined) out.push({ harness, visualiser, renderedBy: by });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** The Tool a page's front matter says drew it, or `undefined` when it says none. */
+function recordedRenderer(text: string): string | undefined {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1];
+  if (fm === undefined) return undefined;
+  const rendered = /^rendered-by:\s*["']?([A-Za-z0-9._-]+)/m.exec(fm)?.[1];
+  if (rendered !== undefined) return rendered;
+  const generated = /^generated:\s*["']?(\S+?)\.(?:ts|js|py)\b/m.exec(fm)?.[1];
+  return generated === undefined ? undefined : generated.split("/").pop();
 }
 
 /** Forget what {@link declaredVisualisers} read — for a test that rewrites a declaration mid-process. */

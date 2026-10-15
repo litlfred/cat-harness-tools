@@ -636,7 +636,7 @@ export interface BlockPaths {
 // The constant is the BUILT-IN builders. A caller holding contributed builders
 // (`ContributionRegistry.contributedBuilders()`) passes them, and gets a regex
 // over both from {@link builderRegexFor} — the `dak` builders were baked in
-// here until bean `1335` moved the adapter to smart-base.
+// here until bean `1335` moved the adapter to the IG layer.
 const BLOCK_BUILDER_RE = new RegExp(
   `export\\s+default\\s+(${ALL_BLOCK_BUILDER_ALT})\\s*\\(`,
 );
@@ -754,7 +754,7 @@ export interface WalkBlocksOptions {
    *
    * Absent means the built-in vocabulary only, which is what every caller got
    * before bean `1335` minus the `dak` builders that core used to bake in.
-   * Those are smart-base's now; a caller that has loaded contributions (the
+   * Those are the IG layer's now; a caller that has loaded contributions (the
    * sweep does) passes them here, and a contributed manifest is then found,
    * read and verified exactly as a built-in one is.
    */
@@ -1126,7 +1126,7 @@ function makeFailureReporter(opts: WalkBlocksOptions): FailureReporter {
           `      source-text identity, so nothing is skipped — but none of them was\n` +
           `      verified. If this is the whole corpus, the cause is usually a folio\n` +
           `      checked out without its platform symlink (<folio>/folio-assistant).\n` +
-          `      Run: bun run pipeline/verify-block-walk.ts <content-root>`,
+          `      Run: bun run cat-harness-tools/pipeline/verify-block-walk.ts <content-root>`,
       );
     }
   };
@@ -1536,7 +1536,7 @@ export const SCRIPT_SIDECAR_DIR = "test/results/script-sidecars";
 /**
  * Resolve a criterion's script-sidecar path. `repoRoot` should be
  * the absolute path to the repo root; the sidecar lives under
- * `<repoRoot>/pipeline/script-sidecars/<id>.script.json`.
+ * `<repoRoot>/test/results/script-sidecars/<id>.script.json` ({@link SCRIPT_SIDECAR_DIR}).
  *
  * The id is {@link portableSegment}-encoded, because a criterion id is an
  * identifier rather than a filename and nothing constrains it to be one. Every

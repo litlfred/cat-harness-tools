@@ -112,6 +112,23 @@ describe("instantiate: writes the config and the state directories", () => {
     expect(r.ok && r.written.length).toBe(3);
   });
 
+  test("with an index.config.json, the config goes INLINE in a new entry and no <name>.config.json is written (ymvt)", async () => {
+    const c = checkout();
+    await subscribed(c);
+    writeFileSync(join(c.repo, "index.config.json"), JSON.stringify({ $schema: "folio-index-config/v1", instances: [{ name: "host", source: { local: { at: "host" } } }] }, null, 2));
+    const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(r.ok && r.state).toBe("instantiated");
+    expect(existsSync(join(c.repo, "ihris-kb.config.json"))).toBe(false);
+    const idx = JSON.parse(readFileSync(join(c.repo, "index.config.json"), "utf8"));
+    const entry = idx.instances.find((e: { name: string }) => e.name === "ihris-kb");
+    expect(entry._subscription).toEqual({ subscriber: "host", id: "ihris-kb", repository: "litlfred/ihris-kb", ref: SHA });
+    // Re-running reports the entry, and leaves it as it is.
+    const again = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(again.ok && again.state).toBe("already-instantiated");
+    // Subscriptions read instantiation index-first.
+    expect(subscriptionCards(c.repo).flatMap((x) => x.instantiated ?? [])).toContain("ihris-kb");
+  });
+
   test("a dry run writes nothing and says what it would", async () => {
     const c = checkout();
     await subscribed(c);

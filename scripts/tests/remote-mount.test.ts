@@ -410,6 +410,25 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
   });
 
+  test("19c. a re-mount keeps the instance's node_modules — an install artefact is never the mount's to delete", () => {
+    // folio-assistant#2529: `state:mount` re-lays the mounts, and the re-lay
+    // removed each instance's directory whole — its `node_modules/` with it.
+    // A workspace member's dependencies come from the root's `bun install`,
+    // which the mount does not repeat, so folio-assistant-sci lost its pinned
+    // katex 0.18 and resolved the root's 0.16.
+    const root = downstream({ overrides: { boot: { whole: true } } });
+    mountRemote({ instanceRoot: root, urlFor });
+    const pkg = join(root, "boot/node_modules/katex");
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, "package.json"), '{"name":"katex","version":"0.18.10"}\n');
+    const again = mountRemote({ instanceRoot: root, urlFor });
+    expect(Object.fromEntries(again.plan.outcomes.map((o) => [o.instance, o.state])).boot).toBe("mounted");
+    expect(readFileSync(join(pkg, "package.json"), "utf-8")).toContain("0.18.10");
+    expect(existsSync(join(root, "boot/schemas/floor.ts"))).toBe(true);
+    // node_modules/ is outside the digest, so the check stays clean with it there.
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
   // From EITHER name (owner, 2026-10-07): `index.lock.json`, and the legacy
   // `<name>.mount-lock.json` a downstream folio or an old branch still carries.
   test.each(["index.lock.json", "down.mount-lock.json"])("20. a committed lock (%s) replays on a fresh clone with no declaration reader, and verifies digests", (lockName) => {

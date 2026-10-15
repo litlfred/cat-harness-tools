@@ -164,13 +164,56 @@ function readJson<T>(path: string): T | undefined {
   }
 }
 
-/** A section file's body, front matter removed. */
-function sectionText(path: string): string | null {
+/**
+ * A section file's body, front matter removed. When the section is Markdown
+ * (a text or notebook source divided at its headings), the body is read as a
+ * reader sees it: see `plainMarkdown`.
+ */
+function sectionText(path: string, markdown = false): string | null {
   if (!existsSync(path)) return null;
   const raw = readFileSync(path, "utf8");
   const body = raw.startsWith("---") ? raw.replace(/^---\n[\s\S]*?\n---\n?/, "") : raw;
-  const t = body.replace(/\s+/g, " ").trim();
+  const t = (markdown ? plainMarkdown(body) : body).replace(/\s+/g, " ").trim();
   return t || null;
+}
+
+/**
+ * A Markdown section body as one line of plain text, for an extract: the
+ * section's own opening heading dropped (the view already shows it as the
+ * title), heading, quote and bullet markers and fence lines removed, links
+ * and images reduced to their text, a table's delimiter row dropped and each
+ * row read as its non-empty cells joined by "; " (the twg-outline's "Handbook
+ * at a glance" showed its pipes), and each line's emphasis and escapes removed
+ * by `plainHeading`. Display only; sections/*.md stays verbatim.
+ */
+export function plainMarkdown(md: string): string {
+  const lines = md.replace(/\r\n?/g, "\n").split("\n");
+  let i = 0;
+  while (i < lines.length && !lines[i]!.trim()) i++;
+  if (/^ {0,3}#{1,6}(\s|$)/.test(lines[i] ?? "")) i++;
+  return lines
+    .slice(i)
+    .filter((l) => !/^\s*(```|~~~)/.test(l) && !/^\s*([-*_]\s*){3,}$/.test(l) && !TABLE_DELIMITER.test(l))
+    .map((l) => (/^\s*\|/.test(l) ? tableRow(l) : l))
+    .map((l) =>
+      plainHeading(
+        l.replace(/^ {0,3}#{1,6}\s+/, "")
+          .replace(/\s+#+\s*$/, "")
+          .replace(/^\s*>\s?/, "")
+          .replace(/^\s*[-*+]\s+(\[[ xX]\]\s+)?/, "")
+          .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+          .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"),
+      ))
+    .join(" ");
+}
+
+/** A GFM table's delimiter row: `| :--- | ---: |`, with or without the outer pipes. */
+const TABLE_DELIMITER = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+/** A table row as its non-empty cells, joined by "; ". `\|` inside a cell is a literal pipe. */
+function tableRow(l: string): string {
+  return l.trim().replace(/^\|/, "").replace(/(?<!\\)\|\s*$/, "")
+    .split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim()).filter(Boolean).join("; ");
 }
 
 /** Cut at a word boundary, and say whether anything was cut. */
@@ -225,6 +268,11 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
         })),
       };
   const withheld = !!opts.withheld;
+  // A text section divided at a heading, and a notebook's cells, are Markdown;
+  // a PDF page's text and a whole verbatim file (XML, say) are not.
+  const markdownIds = new Set(read.variant === "pdf" ? [] : read.sections
+    .filter((x, k) => (read.raw as { sections?: { unit?: string }[] }).sections?.[k]?.unit !== "file")
+    .map((x) => x.id));
 
   const summaries = new Map<string, { text: string; status: string }>();
   const sj = readJson<RawSummaries>(join(dir, "summaries.json"));
@@ -241,7 +289,7 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
   const kj = readJson<RawKeywords>(join(dir, "keywords.json"));
 
   const sections: DocSection[] = (s.sections ?? []).map((x) => {
-    const text = withheld ? null : sectionText(join(dir, "sections", `${x.id}.md`));
+    const text = withheld ? null : sectionText(join(dir, "sections", `${x.id}.md`), markdownIds.has(x.id));
     const { extract, cut } = extractOf(text);
     return {
       id: x.id,

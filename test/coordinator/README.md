@@ -131,4 +131,5 @@ Part of [Folio Assistant](../README.md) 0.1.0, declared as `folio-assistant-test
 | [`workflow-gate-checkout.test.ts`](workflow-gate-checkout.test.ts) | a file |  |
 | [`workflow-paths-resolve.test.ts`](workflow-paths-resolve.test.ts) | a file |  |
 | [`workflow-skill-refs-checkout.test.ts`](workflow-skill-refs-checkout.test.ts) | a file |  |
+
 <!-- kg:subgraph:end -->
