@@ -172,7 +172,7 @@ jobs:
       # continue-on-error: without it there is no blueprint to build.
       - name: Generate the blueprint layout
         run: |
-          bun run "{{assistant}}/folio-assistant-sci/content/pipeline/blueprint-layout.ts" \
+          bun run "{{assistant}}/folio-assistant-sci/pipeline/blueprint-layout.ts" \
             --paper "{{folio}}/$PAPER/$PAPER.ts" \
             --out "{{folio}}/$PAPER/lean/blueprint/src"
 

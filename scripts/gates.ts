@@ -1382,6 +1382,15 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "jsonld:contexts:check",
+    kind: "report",
+    reason:
+      "RED WHERE IT LANDED (891c678): smart-base, smart-trust and smart-immunizations publish no `ns/context/v1.jsonld` " +
+      "yet, and `cat-harness/docs/subgraph/cat-harness/index.jsonld` uses an unbound `folio-assistant-core` prefix. " +
+      "Wiring it into CI now would red every PR on pre-existing gaps; it becomes a gate once those contexts are generated " +
+      "(folio-assistant#2529 triage, 2026-10-15)",
+  },
+  {
     script: "software:check",
     kind: "report",
     reason:
