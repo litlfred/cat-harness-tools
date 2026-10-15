@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
 import type { DeclaredArtefact } from "../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -22,7 +22,14 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
 
   test("the build config drops the remote theme it cannot fetch, and nothing else", () => {
     const c = "title: X\nremote_theme: just-the-docs/just-the-docs\nplugins:\n  - jekyll-remote-theme\n  - jekyll-feed\n";
-    expect(buildConfig(c)).toBe("title: X\nplugins:\n  - jekyll-seo-tag\n  - jekyll-feed\n");
+    expect(buildConfig(c)).toBe(`title: X\nplugins:\n  - jekyll-seo-tag\n  - jekyll-feed\n\ndefaults:\n${DEFAULT_LAYOUT.join("\n")}\n`);
+  });
+
+  test("a page with no layout gets the theme's default, as GitHub Pages gives it; the config's own defaults stay", () => {
+    const c = "title: X\ndefaults:\n  - scope:\n      path: start\n    values:\n      parent: Start here\n";
+    const out = buildConfig(c);
+    expect(out).toBe(`title: X\ndefaults:\n${DEFAULT_LAYOUT.join("\n")}\n  - scope:\n      path: start\n    values:\n      parent: Start here\n`);
+    expect(out.match(/^defaults:/gm)).toHaveLength(1);
   });
 
   test("the override says what the declaration and the remote say, first description line only", () => {
