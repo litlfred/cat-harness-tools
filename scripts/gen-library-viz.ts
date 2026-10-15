@@ -68,6 +68,7 @@ import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-mani
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
@@ -1717,6 +1718,13 @@ if (import.meta.main) {
     ),
   );
   const wantedJsonld = new Set<string>();
+  // An artefact this harness declares it builds at publish (`builtAtPublish`
+  // in its declaration), by its path in the harness's own site. Under
+  // `--site` the same site-relative path is asked, so the answer does not
+  // depend on where the site is being written.
+  const builtAtPublish = readDeclaration(ROOT)?.builtAtPublish ?? [];
+  const builtHere = (dest: string): boolean =>
+    isBuiltAtPublish(builtAtPublish, relative(ROOT, join(ROOT, siteDirFor(ROOT), relative(site, dest))).split(sep).join("/"));
   for (const subject of subjects) {
     const sub = viewerPlacement(site, `${route}/${subject}`, seg);
     const manifests = g.entries
@@ -1771,12 +1779,19 @@ if (import.meta.main) {
       // to the entry, under the manifest's own directory — copied as-is, like
       // the manifest. A withheld entry publishes none. Its JSON-LD documents
       // are linked from the page (here, and through the projection's `links`).
+      //
+      // The copies are NOT committed (owner, 2026-10-15, "H1"): their bytes
+      // come from the entry's instance at whatever pin the checkout mounts, so
+      // this harness declares them `builtAtPublish` and `derive:publish` runs
+      // this writer to lay them down. A declared copy has no committed bytes
+      // for `--check` to compare, so it is skipped there (the `folio:viz`
+      // rule) and written otherwise; the page that links it is still checked.
       const graphs: { label: string; href: string }[] = [];
       const files = e.withheld ? [] : entryGraphFiles(join(repoRoot, e.dir));
       for (const f of files) {
         const dest = join(site, entryGraphSitePath(subject, e.id, f.rel));
         wantedJsonld.add(dest);
-        emitBytes(dest, readFileSync(f.abs));
+        if (!(check && builtHere(dest))) emitBytes(dest, readFileSync(f.abs));
         if (f.jsonld) graphs.push({ label: f.rel, href: relative(shellDir, dest).split(sep).join("/") });
       }
       emit(

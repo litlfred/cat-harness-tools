@@ -30,6 +30,10 @@ import {
   REGISTRY_KINDS,
   registryRowsOf,
   instanceHubPage,
+  codeDirectoriesOf,
+  codeSubjectPage,
+  listCodeFiles,
+  pinnedBlobBase,
 } from "../state-visualizer.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -889,5 +893,72 @@ describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
     expect(html).toContain('<a href="a/">a</a>');
     expect(html).toContain('<a href="b/">b</a>');
     expect(html).toContain(GENERATED_BY);
+  });
+});
+
+describe("per-instance code pages (bean folio-assistant-svgx)", () => {
+  const dir = (o: { id: string; path: string; absPath: string; declaredBy: string; member?: string; kinds: string[]; description?: string }) => ({
+    ...o,
+    graphTypologies: o.kinds,
+  });
+  const dirs = [
+    dir({ id: "scripts", path: "scripts/", absPath: "/x/core/scripts", declaredBy: "core", kinds: ["code"] }),
+    dir({ id: "pipeline", path: "pipeline/", absPath: "/x/core/pipeline", declaredBy: "core", kinds: ["cat-harness", "code"], description: "the pipeline" }),
+    dir({ id: "docs", path: "docs/", absPath: "/x/core/docs", declaredBy: "core", kinds: ["docs"] }),
+    dir({ id: "scripts", path: "scripts/", absPath: "/x/other/scripts", declaredBy: "other", kinds: ["code"] }),
+  ];
+
+  test("an instance's code page lists EVERY code directory it declares, not just the first", () => {
+    const got = codeDirectoriesOf(dirs, "core", ["code"]);
+    expect(got.map((d) => d.id)).toEqual(["scripts", "pipeline"]);
+    expect(got[1]!.description).toBe("the pipeline");
+    expect(instanceSubjectsOf(dirs, ["code"]).map((s) => s.name)).toEqual(["core", "other"]);
+  });
+
+  test("files are listed relative to the directory, sorted, skipping node_modules and dot directories; absent is null", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "code-list-"));
+    try {
+      for (const f of ["b.ts", "a/x.ts", "node_modules/m/i.js", ".git/HEAD"]) {
+        mkdirSync(dirname(join(tmp, f)), { recursive: true });
+        writeFileSync(join(tmp, f), "");
+      }
+      expect(listCodeFiles(tmp)).toEqual({ files: ["a/x.ts", "b.ts"], total: 2 });
+      expect(listCodeFiles(tmp, 1)).toEqual({ files: ["a/x.ts"], total: 2 });
+      expect(listCodeFiles(join(tmp, "absent"))).toBeNull();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test("links go to GitHub at the pinned commit from index.lock.json, and nowhere when not locked", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "code-lock-"));
+    try {
+      writeFileSync(
+        join(tmp, "index.lock.json"),
+        JSON.stringify({ mounts: [{ harness: "core", repository: "o/core", ref: "0123456789abcdef0123456789abcdef01234567" }] }),
+      );
+      expect(pinnedBlobBase(tmp, "core")).toBe("https://github.com/o/core/blob/0123456789abcdef0123456789abcdef01234567/");
+      expect(pinnedBlobBase(tmp, "other")).toBeUndefined();
+      expect(pinnedBlobBase(join(tmp, "absent"), "core")).toBeUndefined();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test("the page links each file, says unknown for an absent directory, and turns Liquid off", () => {
+    const subjects = instanceSubjectsOf(dirs, ["code"]);
+    const core = subjects.find((s) => s.name === "core")!;
+    const html = codeSubjectPage(
+      { id: "code", title: "Code" },
+      core,
+      subjects,
+      codeDirectoriesOf(dirs, "core", ["code"]),
+      "https://github.com/o/core/blob/abc1234/",
+      (p) => (p.endsWith("scripts") ? { files: ["{{ x }}.ts"], total: 1 } : null),
+    );
+    expect(html).toContain("render_with_liquid: false");
+    expect(html).toContain('href="https://github.com/o/core/blob/abc1234/scripts/%7B%7B%20x%20%7D%7D.ts"');
+    expect(html).toContain("<strong>unknown</strong>, not none");
+    expect(html).toContain('<a href="../other/">other</a>');
   });
 });
