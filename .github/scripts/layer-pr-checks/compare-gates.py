@@ -8,7 +8,9 @@ when head has a gate base did not run and it fails. A gate red on both is
 listed, not counted: it is main's to fix, and failing every PR on it would
 teach `|| true`. Exit 2 from a gate is "could not determine" in this
 harness's convention; it is reported, and it counts as a failure only when
-base determined (0 or 1) and head did not. Writes a Markdown summary to
+base determined (0 or 1) and head did not. A gate run-gates.py skipped
+(a `skipped` reason, no `exit`) is listed as skipped and never counted; on
+base it reads as not run. Writes a Markdown summary to
 $GITHUB_STEP_SUMMARY when set.
 """
 import json
@@ -21,6 +23,12 @@ def main():
     head = json.load(open(sys.argv[2]))
     rows, new = [], []
     for name in sorted(head):
+        if "skipped" in head[name]:
+            # Not run on head: it could determine nothing here (run-gates.py).
+            # Listed so it is not silently absent; never a verdict either way.
+            b = base.get(name, {}).get("exit")
+            rows.append(f"| `{name}` | {b if b is not None else '—'} | — | skipped ({head[name]['skipped']}) |")
+            continue
         h = head[name]["exit"]
         b = base.get(name, {}).get("exit")
         if h == 0:
