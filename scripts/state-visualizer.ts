@@ -145,7 +145,7 @@ import {
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
+import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
@@ -566,14 +566,16 @@ function emit(path: string, content: string): void {
  * caller, relative to where that page sits, so the depth is expressed once at
  * the only place that knows it.
  */
-function page(opts: { title: string; body: string; liquid?: boolean }): string {
-  // `liquid: false` for a page that shows AUTHORED text (file names, a
-  // declaration's descriptions): Jekyll would otherwise run Liquid over it,
-  // and one `{{` or `{%` in a name breaks the site build.
+function page(opts: { title: string; body: string; noLiquid?: boolean; liquid?: boolean }): string {
+  // A page that quotes AUTHORED text (a registry node's title or summary, file
+  // names, a declaration's descriptions) must not be run through Liquid, or a
+  // `{{ … }}` or `{%` in that text is evaluated and the site build fails on it.
+  // `noLiquid: true` and `liquid: false` say the same thing.
+  const noLiquid = opts.noLiquid === true || opts.liquid === false;
   return `---
 layout: default
 title: ${JSON.stringify(opts.title)}
-nav_exclude: true${opts.liquid === false ? "\nrender_with_liquid: false" : ""}
+nav_exclude: true${noLiquid ? "\nrender_with_liquid: false" : ""}
 ---
 <!--
   ${GENERATED_BY}: the next run
@@ -1006,7 +1008,111 @@ export function qaPanelsOf(
  * `attestations` (`qa-attestations/v1`) are that shape; a kind outside this
  * set is refused loudly rather than drawn as a census of nothing.
  */
-export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set(["qa", "health", "attestations"]);
+export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
+  "qa",
+  "health",
+  "attestations",
+  // The harness's own registries (bean `folio-assistant-k7ro`): one
+  // `folio-*/v1` JSON node per file, so the family reader counts them as it
+  // counts QA, and `registryRowsOf` lists each node.
+  "typologies",
+  "validators",
+  "qa-checkers",
+  "block-kinds",
+  "content-adapters",
+  "code-list",
+]);
+
+/**
+ * The registry kinds among {@link PER_INSTANCE_KINDS} (bean
+ * `folio-assistant-k7ro`): directories of `folio-graph-typology/v1`,
+ * `folio-validator/v1`, `folio-qa-checker/v1`, `folio-block-kind/v1`,
+ * `folio-content-adapter/v1` and `folio-code-list/v1` nodes. A census of
+ * them says little on its own — every file is one family — so their page also
+ * lists each node.
+ */
+export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
+  "typologies",
+  "validators",
+  "qa-checkers",
+  "block-kinds",
+  "content-adapters",
+  "code-list",
+]);
+
+/** One registry node, as an instance page lists it. */
+export interface RegistryRow {
+  /** Path under the declared directory. */
+  file: string;
+  schema?: string;
+  /** The node's `id`, `name` or `kind`, else the file stem. */
+  id: string;
+  /** Its `title`, `label`, `summary` or `description`, clipped. */
+  text?: string;
+  /** Why the file is not listed with its fields. */
+  note?: string;
+}
+
+/** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
+export function registryRowsOf(absPath: string): RegistryRow[] {
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
+  return jsonFilesIn(absPath)
+    .map((p) => relative(absPath, p).split(sep).join("/"))
+    .sort()
+    .map((file): RegistryRow => {
+      const stem = basename(file, ".json");
+      let doc: unknown;
+      try {
+        doc = JSON.parse(readFileSync(join(absPath, file), "utf-8"));
+      } catch {
+        return { file, id: stem, note: "does not parse as JSON" };
+      }
+      if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return { file, id: stem, note: "not a JSON object" };
+      const r = doc as Record<string, unknown>;
+      const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]);
+      return {
+        file,
+        ...(str(r["$schema"]) ? { schema: str(r["$schema"]) } : {}),
+        id: str(r["id"]) ?? str(r["name"]) ?? str(r["kind"]) ?? stem,
+        ...(text ? { text: text.length > 160 ? `${text.slice(0, 159)}\u2026` : text } : {}),
+      };
+    });
+}
+
+/** The node table of a registry page. */
+export function registryTable(rows: readonly RegistryRow[]): string {
+  if (rows.length === 0) return "";
+  const tr = rows
+    .map(
+      (r) =>
+        `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.note ?? r.text ?? "")}</td>` +
+        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td></tr>`,
+    )
+    .join("");
+  return (
+    `<h2 class="sv-h2">Nodes — ${rows.length}</h2>` +
+    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th></tr></thead>` +
+    `<tbody>${tr}</tbody></table></div>`
+  );
+}
+
+/**
+ * `<base>/<harness>/<vis>/` for a per-instance visualiser that no state graph
+ * draws (the registry kinds are not state): the list of instances, so the
+ * "every instance's …" link from each instance page has somewhere to go.
+ */
+export function instanceHubPage(vis: { id: string; title?: string }, subjects: readonly InstanceSubject[]): string {
+  const title = vis.title ?? vis.id;
+  const items = subjects.map((s) => `<li><a href="${esc(s.name)}/">${esc(s.name)}</a> · <code>${esc(s.path)}</code></li>`).join("");
+  return page({
+    title,
+    noLiquid: true,
+    body:
+      `<h1 id="${esc(vis.id)}">${esc(title)}</h1>` +
+      `<p class="sv-sub">One page per instance in this checkout holding a directory of this kind.</p>` +
+      `<ul class="sv-list">${items}</ul>`,
+  });
+}
 
 /**
  * One instance's graph of a kind: the sub-graph a `subgraphs: "instance"`
@@ -1096,12 +1202,15 @@ export function instanceSubjectPage(
     )
     .join("");
   const qaFamilies = (vis.coversKinds ?? []).includes("qa");
+  const registry = (vis.coversKinds ?? []).length > 0 && (vis.coversKinds ?? []).every((k) => REGISTRY_KINDS.has(k));
   return page({
     title: `${s.name} — ${title}`,
+    ...(registry ? { noLiquid: true } : {}),
     body:
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
       qaPanelsOf(ix, undefined, { qaFamilies }) +
+      (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
   });
@@ -1405,9 +1514,10 @@ const all = [
   ...stateGraphsOf({ ...decl, directories: checkoutDirs }, visOf, ownRefs),
 ].sort((a, b) => a.id.localeCompare(b.id));
 for (const v of mine) {
-  // A per-instance visualiser over a kind that is not state (`code`) draws its
-  // pages below, not a dashboard here, so covering no state graph is expected.
-  if (!all.some((g) => g.vis === v.id) && !(v.subgraphs === "instance" && (v.coversKinds ?? []).every((k) => k === "code"))) {
+  // A per-instance visualiser over a kind that is not state (`code`, a
+  // registry) draws its pages below, not a dashboard here, so covering no
+  // state graph is expected.
+  if (!all.some((g) => g.vis === v.id) && v.subgraphs !== "instance") {
     console.error(`  ! visualiser \`${v.id}\` covers no declared state graph (${(v.covers ?? []).join(", ") || "no covers"}) — nothing drawn`);
   }
 }
@@ -1456,6 +1566,7 @@ for (const g of graphs) {
 // per-instance reader here, and is refused loudly rather than drawn as an
 // empty page.
 const subjectOrphans: string[] = [];
+const hubs: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const kinds = v.coversKinds ?? [];
   const beans = kinds.length > 0 && kinds.every((k) => k === "beans");
@@ -1488,6 +1599,12 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
         : instanceSubjectPage(v, s, subjects);
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
+  // No state graph draws this visualiser's own page (a registry kind is not
+  // state), so its hub is drawn here, listing the instance pages.
+  if (!graphs.some((g) => g.vis === v.id) && subjects.length > 0 && kinds.every((k) => REGISTRY_KINDS.has(k))) {
+    hubs.push(v.id);
+    emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
+  }
   const parent = pageDirOf(v.id);
   const { owned, foreign } = orphanSubjectPages(parent, subjects.map((s) => s.name), carriesMarker(GENERATED_BY));
   for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
@@ -1513,7 +1630,7 @@ const harnessSegment = harnessName ?? basename(ROOT);
 // read off the route of any one of them (the segment name is immaterial).
 const localisedSegment = dirname(relative(SITE, pageDirOf("dashboard")));
 const orphans = [
-  ...prunableDashboards(join(SITE, localisedSegment), graphs.map((g) => g.vis)).map((o) => join(localisedSegment, o)),
+  ...prunableDashboards(join(SITE, localisedSegment), [...graphs.map((g) => g.vis), ...hubs]).map((o) => join(localisedSegment, o)),
   ...(localisedSegment === harnessSegment
     ? []
     : prunableDashboards(join(SITE, harnessSegment), []).map((o) => join(harnessSegment, o))),
