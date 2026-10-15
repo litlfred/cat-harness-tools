@@ -82,13 +82,12 @@ describe("the rail's sections are named alike on both paths (bean 9rq1)", () => 
   });
 
   /**
-   * THE GAP STILL OPEN, stated rather than hidden: Path B has no "Pages"
-   * section yet. A just-the-docs site's page tree is built in the browser by
-   * `docs-ui.js` (`mountNavPagesHeading`); the rail gains it when the theme
-   * sidebar is replaced by the rail (owner, 2026-10-15: one rail on every
-   * site). When it lands this expectation flips and the list above gains it.
+   * "Pages" on Path B: the server-built page tree (`lib/jekyll-pages-nav.ts`),
+   * given when the site has one. Drawn between the page's own section and
+   * Folders — the order the theme sidebar uses.
    */
-  test("Pages: on Path A only, for now", () => {
-    expect(summaries(injectRail(PAGE, OPTS)!)).not.toContain(RAIL_SECTION_LABELS.pages);
+  test("Pages: Path B draws it when the site has a page tree, in Path A's order", () => {
+    const html = injectRail(PAGE, { ...OPTS, pages: [{ href: "../guide/", label: "Guide" }] })!;
+    expect(summaries(html)).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.pages, RAIL_SECTION_LABELS.folders, RAIL_SECTION_LABELS.harnesses]);
   });
 });

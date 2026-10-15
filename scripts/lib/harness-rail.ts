@@ -69,6 +69,11 @@ export interface RailOptions {
    */
   harnesses?: readonly NavItem[];
   /**
+   * The site's own page tree, for the "Pages" section — rows from
+   * `pagesNav` (`lib/jekyll-pages-nav.ts`). Absent, no Pages section.
+   */
+  pages?: readonly NavItem[];
+  /**
    * Where the PLATFORM's site root is from this page, when it is not `toRoot`
    * — a folio's own Pages site, whose platform links and row files live on the
    * platform's site (`platformBase`). Default `toRoot`. Bean `lhvt`.
@@ -201,6 +206,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // one of its rows is the current page, so the reader's place stays visible.
     // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
     // for the same rows, so the section reads the same on every site.
+    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: o.pages, collapsible: true, open: false } } : {}),
     graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     home: { href: `${o.toRoot}/`, label: o.homeLabel ?? "folio-assistant", icon: "\u2302" },
@@ -428,6 +434,7 @@ export interface RailShared {
   mark?: NavbarModel["mark"];
   root?: NavItem;
   links: readonly NavItem[];
+  pages?: readonly NavItem[];
   harnesses?: readonly NavItem[];
   homeLabel?: string;
 }
@@ -465,6 +472,7 @@ export function railSharedJson(o: RailOptions, root: string): string {
     ...(o.mark ? { mark: o.mark } : {}),
     ...(o.root ? { root: o.root } : {}),
     links: o.links,
+    ...(o.pages && o.pages.length > 0 ? { pages: o.pages } : {}),
     ...(o.harnesses ? { harnesses: o.harnesses } : {}),
     ...(o.homeLabel ? { homeLabel: o.homeLabel } : {}),
   };
@@ -493,10 +501,19 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
           const { href: _here, ...rest } = item;
           return { ...rest, current: true };
         });
+  // The same for the page tree, at any depth.
+  const markHere = (items: readonly NavItem[]): NavItem[] =>
+    items.map((item) => {
+      const kids = item.children ? { children: markHere(item.children) } : {};
+      if (page.here === undefined || item.href !== `${page.root}${page.here}`) return { ...item, ...kids };
+      const { href: _here, ...rest } = item;
+      return { ...rest, ...kids, current: true };
+    });
   return navbarRegionsHtml(
     railModel({
       ...shared,
       links,
+      ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
       ...(page.documentIndex ? { documentIndex: page.documentIndex } : {}),
     }),
