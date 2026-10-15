@@ -1185,7 +1185,9 @@ describe("the row's glyphs are docs-ui.js's glyphs (bean lhvt)", () => {
   // `navbar-row.js` carries copies of the six drawings; `docs-ui.js` still
   // draws them on its tiles. Evaluated, not grepped: the constants are string
   // concatenations, so the comparison is of the SVG each produces.
-  const js = join(HARNESS_ROOT, "docs", "assets", "js");
+  // Both live in the harness's site CHROME, `site-chrome/` (its own subgraph
+  // since cat-harness 19e5d6ba), not in `docs/`.
+  const js = join(HARNESS_ROOT, "site-chrome", "assets", "js");
   const glyphs = (file: string): Record<string, string> => {
     const src = readFileSync(join(js, file), "utf-8");
     const out: Record<string, string> = {};
