@@ -146,6 +146,7 @@ import {
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
+import { isOpen, readBeans, type BeanNode } from "./beans.ts";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
@@ -1063,6 +1064,93 @@ export function qaSubjectPage(
   });
 }
 
+/**
+ * What a per-instance beans page is given: the store's beans, or why it could
+ * not be read. `null` beans is "no store at the declared path", which is
+ * not the same as a store holding none.
+ */
+export type BeanStoreRead = { beans: BeanNode[] | null } | { unreachable: string };
+
+/** Read one instance's bean store, keeping "could not read" apart from "empty". */
+export function readSubjectBeans(instanceRoot: string): BeanStoreRead {
+  try {
+    return { beans: readBeans(instanceRoot) };
+  } catch (e) {
+    return { unreachable: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Priority order for the open-bean table; an unknown priority sorts last. */
+const PRIORITY_ORDER = ["critical", "high", "normal", "low", "deferred"];
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's work plan (bean
+ * `folio-assistant-1nu0`, owner 2026-10-15: "per-instance pages").
+ *
+ * Each instance's `beans/` is its OWN store (`cat-tools-…`,
+ * `folio-assistant-…` ids), not the repository store the full board draws,
+ * so the page reads that store and lists its open beans. Rendered
+ * SERVER-SIDE: the board's client (`work-plan.js`) reads the one bean index
+ * the layout names, so it cannot be pointed at a second store from a page.
+ */
+export function beansSubjectPage(
+  vis: { id: string; title?: string },
+  s: QaSubject,
+  subjects: readonly QaSubject[],
+  read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
+): string {
+  const title = vis.title ?? "Beans";
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  let body: string;
+  if ("unreachable" in read) {
+    body =
+      `<h2 class="sv-h2">Not available in this build</h2>` +
+      `<p class="sv-sub">${esc(read.unreachable)}. This is <strong>unknown</strong>, not zero.</p>`;
+  } else if (read.beans === null) {
+    body =
+      `<h2 class="sv-h2">No bean store</h2>` +
+      `<p class="sv-sub">${esc(s.path)} holds no <code>bean-defs</code> node, so there is no work plan to list. ` +
+      `That is no store, not an empty one.</p>`;
+  } else {
+    const all = read.beans;
+    const open = all
+      .filter(isOpen)
+      .sort((a, b) => {
+        const pa = PRIORITY_ORDER.indexOf(a.priority);
+        const pb = PRIORITY_ORDER.indexOf(b.priority);
+        return (pa < 0 ? PRIORITY_ORDER.length : pa) - (pb < 0 ? PRIORITY_ORDER.length : pb) || a.id.localeCompare(b.id);
+      });
+    const rows = open
+      .map(
+        (b) =>
+          `<tr><td><code>${esc(b.id)}</code></td><td>${esc(b.title)}</td><td>${esc(b.status)}</td>` +
+          `<td>${esc(b.type)}</td><td>${esc(b.priority)}</td></tr>`,
+      )
+      .join("");
+    body =
+      `<h2 class="sv-h2">Open — ${open.length} of ${all.length} bean(s)</h2>` +
+      (open.length === 0
+        ? `<p class="sv-sub">Every bean in this store is completed or scrapped.</p>`
+        : `<table><thead><tr><th>id</th><th>title</th><th>status</th><th>type</th><th>priority</th></tr></thead>` +
+          `<tbody>${rows}</tbody></table>`);
+  }
+  return page({
+    title: `${s.name} — ${title}`,
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">the repository work plan</a></p>` +
+      body +
+      `<h2 class="sv-h2">Instances holding a work plan of their own</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
+}
+
 if (import.meta.main) main();
 
 /**
@@ -1164,20 +1252,27 @@ for (const g of graphs) {
 // "per-instance pages"). A visualiser declaring `subgraphs: "instance"` gets
 // one page per instance in the checkout holding a directory of a kind it
 // covers, at `<locale>/<harness>/<vis>/<instance>/` — the sub-graph route
-// `viewersOf` resolves a tile to. Only the QA renderer draws per instance;
-// a state graph of another projection has no per-instance reader here, and
-// is refused loudly rather than drawn as an empty page.
+// `viewersOf` resolves a tile to. `qa` and `beans` have per-instance readers;
+// a state graph of another projection has none here, and is refused loudly
+// rather than drawn as an empty page.
 const subjectOrphans: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const kinds = v.coversKinds ?? [];
-  if (!kinds.includes("qa")) {
-    console.error(`  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; only \`qa\` has a per-instance renderer — none drawn`);
+  const render = kinds.includes("qa") ? qaSubjectPage : kinds.includes("beans") ? beansSubjectPage : undefined;
+  if (render === undefined) {
+    console.error(`  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; only \`qa\` and \`beans\` have a per-instance renderer — none drawn`);
     continue;
   }
-  const subjects = qaSubjectsOf(checkoutDirectories(ROOT), kinds);
+  // A directory this visualiser ALSO names by id (\`covers\`) is drawn on its
+  // full view, and \`viewersOf\` opens that view for it: no subject page.
+  const byId = new Set(v.covers ?? []);
+  const subjects = qaSubjectsOf(
+    checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id))),
+    kinds,
+  );
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
-    emit(join(dir, "index.html"), withRenderedByFrontMatter(qaSubjectPage(v, s, subjects), VIEWER_TOOL));
+    emit(join(dir, "index.html"), withRenderedByFrontMatter(render(v, s, subjects), VIEWER_TOOL));
   }
   const parent = pageDirOf(v.id);
   const { owned, foreign } = orphanSubjectPages(parent, subjects.map((s) => s.name), carriesMarker(GENERATED_BY));

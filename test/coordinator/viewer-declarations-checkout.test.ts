@@ -41,6 +41,24 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     expect(dirs.filter(({ raw }) => raw.coverage?.visualiser !== undefined).map(({ instance, dir }) => `${instance}/${dir.id}`)).toEqual([]);
   });
 
+  test("beans and folio: one page per instance, the declarer's by-id directory keeps its full view (bean 1nu0)", () => {
+    const resolveFor = (instance: string, id: string): string | undefined => {
+      const row = dirs.find((d) => d.instance === instance && d.dir.id === id);
+      return row ? viewersOf(row.dir, row.root, REPO)[0]?.ref : undefined;
+    };
+    const page = (route: string) => new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?${route.replace(/\./g, "\\.")}$`);
+    // Each instance's `beans/` is its own store, not the repository one.
+    if (dirs.some((d) => d.instance === "cat-harness-tools" && d.dir.id === "beans")) {
+      expect(resolveFor("cat-harness-tools", "beans")).toMatch(page("cat-harness/beans/cat-harness-tools/index.html"));
+    }
+    if (dirs.some((d) => d.instance === "who-iris" && d.dir.id === "folio")) {
+      expect(resolveFor("who-iris", "folio")).toMatch(page("cat-harness/folio/who-iris/index.html"));
+    }
+    // cat-harness names both by id: its rows open the full views it had.
+    expect(resolveFor("cat-harness", "beans")).toMatch(page("cat-harness/beans/index.html"));
+    expect(resolveFor("cat-harness", "folio")).toMatch(page("cat-harness/folio/index.html"));
+  });
+
   test("known directories resolve to their declared route", () => {
     const resolveFor = (instance: string, id: string): string | undefined => {
       const row = dirs.find((d) => d.instance === instance && d.dir.id === id)!;
