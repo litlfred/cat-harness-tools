@@ -6,7 +6,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 444,
+      "failed": 441,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -90,12 +90,9 @@
         "scripts/tests/declared-assets.test.ts > this repository's own declarations > every relative link out of the rendered root files resolves",
         "scripts/tests/declared-assets.test.ts > this repository's own declarations > the provenance sits on the file bootstrap actually copies — and that file is RENDERED",
         "scripts/tests/escaped-markup-source.test.ts > scope > excludes the generated trees, because those must never be hand-edited",
-        "scripts/tests/foreign-site-scope.test.ts > smart-trust, against the platform's real harness data > (d) the platform's fsh-guts is a labelled link, and the chrome is told it is not this site's",
-        "scripts/tests/foreign-site-scope.test.ts > the IG site's shell (compose-docs --shell), end to end > (c) every data file the shell still carries is chrome — a new projection must be named",
         "scripts/tests/fsh-guts-export.test.ts > the site build publishes it, with the media-type alias > and the .json alias, since Pages serves .jsonld as octet-stream",
         "scripts/tests/fsh-guts-export.test.ts > the site build publishes it, with the media-type alias > the document is written into the site",
         "scripts/tests/gen-skill-commands.test.ts > over this repository > every user_invocable skill has a command and every command has a declared skill",
-        "scripts/tests/gen-slice-sqlite.test.ts > gen-slice-sqlite — kg > the whole-repo KG slices green, its pointers resolve to the COMMITTED payloads, and it stays under the budget",
         "scripts/tests/harness-dirs.test.ts > the fallback can work the plan, not just read it > it reads this repo's real store, which the CLI also reads",
         "scripts/tests/harness-dirs.test.ts > the two stores are visible and agreed upon > beansYmlPath reads the key, and reports absence rather than guessing",
         "scripts/tests/harness-dirs.test.ts > the two stores are visible and agreed upon > the work plan is where it says it is, and is not empty",

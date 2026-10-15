@@ -22,6 +22,7 @@ import {
 } from "../gen-subgraph-jsonld.js";
 import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { exportIdentity } from "../kg-export.js";
+import { expandFindings, type localLoader } from "../publish-verify.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import {
   PAYLOAD_MEDIA_TYPES,
@@ -152,6 +153,30 @@ describe("gen-subgraph-jsonld", () => {
     expect(ctx.hasMember).toBeDefined();
     expect(ctx.id).toBeUndefined(); // no keyword alias, so files say `@id`
   });
+
+  test("every file expands under its context with no warning — publish-verify's `jsonld-expand`", async () => {
+    // folio-assistant#2545: a top-level `_generated` the context did not map
+    // was an `invalid property` on all 372 subgraph files, and the staging
+    // build failed after the site was built. The same expansion, here.
+    const ctxDoc = JSON.parse(files.get(SUBGRAPH_CONTEXT_PATH)!);
+    const loader = (async (url: string) => {
+      if (url !== plan.contextUrl) throw new Error(`refused to fetch ${url}`);
+      return { contextUrl: null, documentUrl: url, document: ctxDoc };
+    }) as unknown as ReturnType<typeof localLoader>;
+    const findings: string[] = [];
+    let checked = 0;
+    for (const [p, t] of files) {
+      if (p === SUBGRAPH_CONTEXT_PATH) continue;
+      const doc = JSON.parse(t) as Record<string, unknown>;
+      if (checked === 0) expect(doc._generated).toBeDefined();
+      checked += 1;
+      for (const f of await expandFindings(doc, loader)) findings.push(`${p}: ${f}`);
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(findings).toEqual([]);
+    // …because the note is a declared term, not because it went away.
+    expect(ctxDoc["@context"]._generated).toEqual({ "@id": expect.any(String), "@type": "@json" });
+  }, 120_000);
 
   test("subgraph membership and structural containment stay two properties (bean 3f5f)", () => {
     const ctx = JSON.parse(files.get(SUBGRAPH_CONTEXT_PATH)!)["@context"];
