@@ -116,4 +116,23 @@ test.describe("the top bar is FULL WIDTH on every page (owner, 2026-10-15)", () 
       return Math.round(r.left - rail) === 0 && Math.round(document.documentElement.clientWidth - r.right) === 0 && Math.round(r.top) === 0;
     })).toBe(true);
   });
+
+  test("the bar follows the rail as it opens and closes, so it is never left under the open rail", async ({ page }) => {
+    // Opened (pointed at), the rail widens body's padding-left from 56px to
+    // 264px; a body whose max-width fixes its content box does not resize
+    // when only its padding does. Measured before the fix in a headless
+    // shell, whose pointer rests at the window's corner over the rail: the
+    // bar stayed at 264..1488 in a 1280px window, its start under the rail.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await open(page, "/replica/page.html");
+    const spans = () => page.locator("#main-header.fa-page-bar").evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const rail = document.querySelector("nav.fa-nav")!.getBoundingClientRect().right;
+      return { start: Math.round(r.left - rail), end: Math.round(document.documentElement.clientWidth - r.right), top: Math.round(r.top), rail: Math.round(rail) };
+    });
+    await page.mouse.move(20, 400);
+    await expect.poll(async () => { const s = await spans(); return s.rail > 56 ? { ...s, rail: "open" } : s; }).toEqual({ start: 0, end: 0, top: 0, rail: "open" });
+    await page.mouse.move(900, 400);
+    await expect.poll(spans).toEqual({ start: 0, end: 0, top: 0, rail: 56 });
+  });
 });

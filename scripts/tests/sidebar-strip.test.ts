@@ -70,6 +70,15 @@ const block = css
   .slice(css.indexOf("The sidebar rests as an icon strip"), css.indexOf("Edit-the-source affordance"))
   .replace(/\/\*[\s\S]*?\*\//g, "");
 
+/** The whole stylesheet, comments stripped, for the regions outside `block`. */
+const whole = css.replace(/\/\*[\s\S]*?\*\//g, "");
+/** One rule's text in `whole`, found by a declaration only that rule carries. */
+const ruleInWhole = (needle: string): string => {
+  const at = whole.indexOf(needle);
+  expect({ needle, found: at > -1 }).toEqual({ needle, found: true });
+  return whole.slice(whole.slice(0, at).lastIndexOf("}") + 1, whole.indexOf("}", at) + 1);
+};
+
 /** One rule's text, found by a declaration only that rule carries. */
 const ruleWith = (needle: string): string => {
   const at = block.indexOf(needle);
@@ -127,25 +136,33 @@ describe("at rest it is a strip, not an absence", () => {
     expect(ruleWith("flex: 0 0 auto")).toContain(".side-bar > *");
   });
 
-  it("the two capped regions YIELD to that floor", () => {
-    // `0 1 auto`, not `0 0 auto`: each scrolls inside its own cap, so giving
+  it("the capped bottom region YIELDS to that floor", () => {
+    // `0 1 auto`, not `0 0 auto`: it scrolls inside its own cap, so giving
     // space back costs no reachability — while refusing to took the middle to
     // 93px in a 900px column, measured with the document index open.
     //
-    // Against the WHOLE stylesheet rather than `block`: the fixed bottom and
-    // the document index are their own sections, outside the strip slice this
-    // file otherwise reads. Comments stripped for the reason `block` strips
-    // them — a stylesheet that documents the declaration it avoids fails any
-    // test that greps for the declaration.
-    const whole = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    const ruleIn = (needle: string): string => {
-      const at = whole.indexOf(needle);
-      expect({ needle, found: at > -1 }).toEqual({ needle, found: true });
-      return whole.slice(whole.slice(0, at).lastIndexOf("}") + 1, whole.indexOf("}", at) + 1);
-    };
-    for (const cap of ["max-height: 50%", "max-height: 25%"]) {
-      expect(ruleIn(cap)).toContain("flex: 0 1 auto");
-    }
+    // ONE capped region, not two. The second was the theme sidebar's
+    // document index (`.fa-doc-index`, `max-height: 25%`), which `docs-ui.js`
+    // built in the browser. Owner, 2026-10-15, "folio rail everywhere"
+    // (option A): the folio rail replaces the theme's side bar after the
+    // Jekyll build and carries "On this page" as a server-built section, so
+    // cat-harness #285 retired `mountDocumentIndex` and the rules only it used.
+    // Asserting that cap now would defend a region the ruling removed; the
+    // test below asserts it stays removed instead.
+    //
+    // Against the WHOLE stylesheet rather than `block`: the fixed bottom is
+    // its own section, outside the strip slice this file otherwise reads.
+    // Comments stripped for the reason `block` strips them — a stylesheet
+    // that documents the declaration it avoids fails any test that greps for
+    // the declaration.
+    expect(ruleInWhole("max-height: 50%")).toContain("flex: 0 1 auto");
+  });
+
+  it("the browser-built document index is gone, rules and script alike (owner, 2026-10-15)", () => {
+    // If it came back it would come back uncapped: the 25% cap went with it.
+    expect(whole).not.toContain(".fa-doc-index");
+    // The function, not the name: docs-ui.js's comments still say why it went.
+    expect(read("cat-harness/site-chrome/assets/js/docs-ui.js")).not.toMatch(/function\s+mountDocumentIndex\b/);
   });
 
   it("is scoped above the theme's breakpoint, never applied to the phone", () => {
