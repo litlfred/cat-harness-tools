@@ -70,7 +70,6 @@ import {
   findDeclarationFile,
   findInstanceRoot,
   readDeclaration,
-  repoRootFor,
   rootForScope,
   declarationPathIn,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -400,7 +399,14 @@ export function contributingRoots(root: string): string[] {
   //
   // `.git` is the honest marker of "this directory is a checkout". A real
   // repository has one; a temp directory does not.
-  const repoRoot = repoRootFor(own);
+  //
+  // `checkoutRootFor`, not `repoRootFor` (2026-10-15): for the CHECKOUT-ROOT
+  // instance — a folio whose landing is the repository itself — `dirname` is
+  // the directory holding the clone, and the `.git` guard does not stop it
+  // when that directory is a checkout too: a Claude Code worktree's parent
+  // resolves to the MAIN checkout, so every instance in another session's tree
+  // joined this board. The checkout root answers itself and the scan is skipped.
+  const repoRoot = checkoutRootFor(own);
   if (repoRoot !== own && existsSync(join(repoRoot, ".git"))) {
     // THE CHECKOUT ROOT ITSELF, by the same rule: it is an instance the moment
     // it declares itself. It used to be reached only by accident — cat-harness
@@ -661,7 +667,8 @@ export function ensureLandingSticky(
   const absDir = join(root, folioDir);
 
   const own = resolve(root);
-  const repoRoot = repoRootFor(own);
+  // The checkout, never the directory holding it — see `contributingRoots`.
+  const repoRoot = checkoutRootFor(own);
   const mountedRoots = new Set([
     ...mountedInstanceRoots(own).values(),
     ...(repoRoot !== own ? mountedInstanceRoots(repoRoot).values() : []),
