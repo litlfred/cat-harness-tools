@@ -57,14 +57,26 @@
  * Tool gets no page and stays reported, never an empty page claiming to
  * show it.
  *
+ * ## Built at publish, not committed (owner, 2026-10-14, "B1")
+ *
+ * Every page here is a function of the checkout, not of cat-harness's commit:
+ * the Tools of every instance the index mounts, the skills each `satisfies`
+ * resolves against, and whether that skill's published page is on disk (a
+ * `skills:docs` output, itself built at publish). So the committed pages went
+ * stale at every re-pin. cat-harness declares the route `builtAtPublish` with
+ * this script as its writer, and `derive:publish` runs it; under `--check` a
+ * declared page has no committed bytes to compare, so it is skipped there (the
+ * `folio:viz` rule) and written otherwise.
+ *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-tools-viz.ts
  *   bun run cat-harness-tools/scripts/gen-tools-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { discoverTools, toolsOf } from "../tools/discover.ts";
@@ -552,9 +564,21 @@ if (import.meta.main) {
         })
     : [];
 
+  // A page cat-harness declares it builds at publish (`builtAtPublish`), by its
+  // path in cat-harness's own site: the same site-relative path is asked under
+  // `--site`, so the answer does not depend on where the site is written.
+  const harnessRoot = join(REPO, "cat-harness");
+  const declaredBuilt = readDeclaration(harnessRoot)?.builtAtPublish ?? [];
+  const builtHere = (rel: string): boolean => isBuiltAtPublish(declaredBuilt, join(siteDirFor(harnessRoot), rel).split(sep).join("/"));
+
   if (check) {
     let stale = 0;
+    let skipped = 0;
     for (const [rel, rendered] of pages) {
+      if (builtHere(rel)) {
+        skipped++;
+        continue;
+      }
       const out = join(site, rel);
       const current = existsSync(out) ? readFileSync(out, "utf-8") : "";
       if (current !== rendered) {
@@ -562,12 +586,19 @@ if (import.meta.main) {
         stale++;
       }
     }
+    // Under a built-at-publish route a stale local page is not a committed
+    // orphan, so `--check` does not report it; a write run still prunes it.
     for (const d of orphans) {
+      if (builtHere(relative(site, join(d, "index.md")))) continue;
       console.error(`::error::gen-tools-viz: ${d} is an orphan — its instance declares no Tools now`);
       stale++;
     }
     if (stale > 0) process.exit(1);
-    console.log(`✓ tools viewer is current — ${rows.length} tool(s), ${subjects.length} instance page(s)`);
+    console.log(
+      skipped === pages.size
+        ? `✓ tools viewer: ${pages.size} page(s) built at publish (builtAtPublish), not committed — nothing to compare; \`bun run cat tools:viz\` writes them`
+        : `✓ tools viewer is current — ${rows.length} tool(s), ${subjects.length} instance page(s)${skipped ? `, ${skipped} built at publish` : ""}`,
+    );
   } else {
     for (const [rel, rendered] of pages) {
       const out = join(site, rel);
