@@ -31,6 +31,20 @@ Each gate's exit code, the tail of its output, and its command are written to
 <out.json>. This script exits 0 whatever the gates did: the compare step
 judges head against base, so a gate already red on main does not fail a PR
 that did not break it. `GATE_JOBS` (default 1) runs that many at once.
+Each gate's wall time is recorded as `seconds`.
+
+`GATE_SHARD=i/N` (bean `lpcs`, step 3) runs only shard `i` of `N`: the gates
+whose position in the SORTED derived set is `i-1` modulo `N`. The slice is a
+function of the gate names alone, so the N shards of one side are disjoint and
+their union is the whole set; unset, or `1/1`, is the whole set, as before.
+The workflow gives each shard its own machine and checkout, so gates that
+write never race (the reason `GATE_JOBS` stays 1). The skipped gates and the
+`--record`ed results go in shard 1 only, so a merged side holds each once.
+Beside <out.json> the run writes `gates-shard.json` -- the shard, `N`, the size
+of the whole set, and the names it ran -- from which the compare job proves
+every shard is present and that together they cover the set
+(`merge-shards.py`). A malformed `GATE_SHARD` exits 2: guessing a slice could
+silently drop gates. `--list` honours it too, and adds a `shard` field.
 
 `--record <file.json>` merges results a workflow step already produced, in the
 same shape (`{name: {command, exit, tail}}`, or `{name: {command, skipped}}`),
@@ -53,9 +67,11 @@ that holds no such input.
 """
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 # Scoped to the instance where the check takes a scope (kg-audit, kg-export,
@@ -291,14 +307,37 @@ def declared_gates(root, name, path, runner, env=None):
     return run, skipped
 
 
+def parse_shard(value):
+    """(i, n) from a `GATE_SHARD` of the form `i/N`, 1 <= i <= N; (1, 1) when unset or empty.
+    Raises ValueError on anything else."""
+    v = (value or "").strip()
+    if not v:
+        return 1, 1
+    m = re.fullmatch(r"([0-9]+)/([0-9]+)", v)
+    if not m:
+        raise ValueError(f"GATE_SHARD={v!r} is not of the form i/N")
+    i, n = int(m.group(1)), int(m.group(2))
+    if n < 1 or not 1 <= i <= n:
+        raise ValueError(f"GATE_SHARD={v!r}: need 1 <= i <= N")
+    return i, n
+
+
+def shard_names(names, i, n):
+    """The names shard i of n runs: those whose index in sorted(names) is i-1 mod n.
+    Returned in the order `names` gives them, so n == 1 runs exactly today's order."""
+    mine = {x for k, x in enumerate(sorted(names)) if k % n == i - 1}
+    return [x for x in names if x in mine]
+
+
 def run(root, name, command):
+    start = time.monotonic()
     try:
         p = subprocess.run(shlex.split(command), cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S)
         code, text = p.returncode, (p.stdout + p.stderr).strip()
     except subprocess.TimeoutExpired:
         # Harness convention: exit 2 is "could not determine", never a pass.
         code, text = 2, f"timed out after {TIMEOUT_S} s"
-    return name, command, code, text
+    return name, command, code, text, round(time.monotonic() - start, 1)
 
 
 def derive(root, given, tmp, env=None):
@@ -354,12 +393,22 @@ def main():
     args = sys.argv[1:]
     given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
     tmp = os.environ.get("RUNNER_TEMP", "/tmp")
+    try:
+        shard, shards = parse_shard(os.environ.get("GATE_SHARD"))
+    except ValueError as e:
+        print(f"::error::{e}; a guessed slice could drop gates, so nothing is run", file=sys.stderr)
+        sys.exit(2)
     if len(args) >= 2 and args[1] == "--list":
         # `run-gates.py <root> --list [--instance <name>]...`: the derived set
         # as JSON on stdout, nothing run. Exit 2 when there is no own instance:
         # no gate set is "could not determine", never an empty pass.
         own, harness, runner, gates, skipped = derive(args[0], given, tmp)
-        json.dump({"own": own, "harness": harness, "runner": runner, "gates": gates, "skipped": skipped}, sys.stdout, indent=1)
+        listed = {"own": own, "harness": harness, "runner": runner, "gates": gates, "skipped": skipped}
+        if os.environ.get("GATE_SHARD", "").strip():
+            listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards)}
+            listed["skipped"] = skipped if shard == 1 else {}
+            listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
+        json.dump(listed, sys.stdout, indent=1)
         sys.exit(0 if own else 2)
     root, out_path = args[0], args[1]
     records = [args[i + 1] for i, a in enumerate(args) if a == "--record" and i + 1 < len(args)]
@@ -370,15 +419,21 @@ def main():
     print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
     print(f"script runner: {runner}", flush=True)
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
+    total = len(gates)
+    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards)}
+    if shard != 1:
+        skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once
+    print(f"shard {shard}/{shards}: {len(gates)} of {total} gate(s)", flush=True)
 
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        for name, command, code, text in pool.map(lambda kv: run(root, kv[0], kv[1]), gates.items()):
-            print(f"::group::{name}: exit {code} — {command}", flush=True)
+        for name, command, code, text, seconds in pool.map(lambda kv: run(root, kv[0], kv[1]), gates.items()):
+            print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
             print(text[-4000:], flush=True)
             print("::endgroup::", flush=True)
-            results[name] = {"command": command, "exit": code, "tail": text[-1500:]}
+            results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
+    ran = list(results)
     for name, entry in skipped.items():
         print(f"{name}: skipped ({entry['skipped']}) — {entry['command']}", flush=True)
     for path in records:
@@ -392,6 +447,8 @@ def main():
     results.update(skipped)  # no `exit`: compare-gates.py reports these as skipped, never as a verdict
     with open(out_path, "w") as f:
         json.dump(results, f, indent=1)
+    with open(os.path.join(os.path.dirname(os.path.abspath(out_path)), "gates-shard.json"), "w") as f:
+        json.dump({"shard": shard, "of": shards, "total": total, "ran": ran}, f, indent=1)
     print(f"{len(results) - len(skipped)} gate(s) run: {green} green; {len(skipped)} skipped", flush=True)
 
 
