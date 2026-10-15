@@ -272,8 +272,9 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
       "beans-cli ~ beans-manual",
       "ingest-extended ~ ingest-stdlib",
       "package-release-manual ~ release-please",
-      // A real alternative (cat-harness `tools/index.ts`): the same renderings
-      // served from a Python runtime where Bun is absent, with its `selection`.
+      // Two runtimes for one server (bean `0hi8`: "at least two tools satisfy
+      // it"): same ports, same skill, and a `selection` on each that says Bun
+      // or Python. Substitutable by design, so it belongs in this list.
       "serve-rendering ~ serve-rendering-py",
       "transcribe-faster-whisper ~ transcribe-vosk",
       "transcribe-faster-whisper ~ transcribe-whisper-cpp",

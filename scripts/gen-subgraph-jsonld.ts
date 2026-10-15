@@ -88,6 +88,16 @@
  * Output is deterministic — no timestamps, no commit, keys and members
  * sorted — so `--check` can compare bytes.
  *
+ * Every file it writes says so itself, in a top-level `_generated` key
+ * ({@link SUBGRAPH_GENERATED}): the convention `sync-docs-harness.ts` and
+ * `glossary-page.ts` use (bean `ws99`), which `check:reference-direction`
+ * reads as "a generator wrote this". A subgraph file names every instance
+ * whose nodes it frames, so without the key each one read as authored
+ * prose in the instance that commits it naming the layers above it. The
+ * subgraph context declares `_generated` as a `@json` term
+ * ({@link subgraphContext}), so the files stay valid JSON-LD: an unmapped key
+ * is an `invalid property` to a processor, not something it silently drops.
+ *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts            # write
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts --check    # verify
@@ -111,7 +121,7 @@ import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceRootsIn
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { NS_PREFIXES, propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 import {
   HEAVY_POINTERS,
   PAYLOAD_MEDIA_TYPES,
@@ -128,6 +138,7 @@ import {
   SubgraphIndexSchema,
 } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { readInstanceDecls } from "./gen-instance-contexts.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -303,15 +314,83 @@ export const HEAVY_LITERAL_BYTES = 16 * 1024;
 
 type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
 
-/** The context every subgraph file names by URL. */
-export function subgraphContext(): Record<string, unknown> {
+/**
+ * The own-namespace prefixes (`NS_PREFIXES` keys — each an instance's stub) a
+ * subgraph file written under `root` may use as CURIEs: the stubs of `root`'s
+ * instance and of every instance it `needs`, transitively. `undefined` when
+ * `root`'s declaration is not among the checkout's instances — nothing is
+ * known about its reach, so nothing is narrowed.
+ *
+ * ## Why (bean `folio-assistant-63q4`)
+ *
+ * Every subgraph file is written under `root`'s `docs/`, so the file BELONGS
+ * to `root`'s instance, and `check:jsonld-contexts` (`gen-instance-contexts`)
+ * resolves the prefixes it uses through that instance's flattened table —
+ * its own, plus those of what it `needs`. The framing context used to bind
+ * every one of `NS_PREFIXES`, so an IRI in the namespace of an instance ABOVE
+ * `root` compacted to a CURIE: cat-harness's root frames core's graph kinds
+ * (`folio-assistant-core:graphTypology/library`, …), and the overlaid
+ * `folio-assistant-core/` tree names its own. cat-harness does not need core
+ * — core is above it — so the CURIE was unbound in the one table that governs
+ * the file, and `jsonld:contexts` failed `derive:publish`.
+ *
+ * Leaving the prefix out compacts such an IRI to its full absolute form,
+ * which expands to the identical triple: the N-Quads do not move, only the
+ * spelling does. The reach is computed the way the gate computes it
+ * (`readInstanceDecls`, `needs`), so the two cannot disagree.
+ */
+export function prefixesInScope(root: string = ROOT): Set<string> | undefined {
+  const own = resolve(root);
+  let decls: ReturnType<typeof readInstanceDecls>;
+  try {
+    decls = readInstanceDecls(checkoutRootFor(own));
+  } catch {
+    return undefined;
+  }
+  const byName = new Map(decls.map((d) => [d.name, d]));
+  const start = decls.find((d) => resolve(d.root) === own);
+  if (start === undefined) return undefined;
+  const reached = new Set<string>();
+  const stack = [start.name];
+  while (stack.length > 0) {
+    const n = stack.pop()!;
+    if (reached.has(n)) continue;
+    reached.add(n);
+    for (const m of byName.get(n)?.needs ?? []) if (byName.has(m)) stack.push(m);
+  }
+  return new Set([...reached].map((n) => byName.get(n)!.stub));
+}
+
+/**
+ * The context every subgraph file names by URL. With `inScope`, an own-namespace
+ * prefix outside it is not bound (see {@link prefixesInScope}); a term defined
+ * through such a prefix is written with its full IRI instead, so no term is lost.
+ */
+export function subgraphContext(inScope?: ReadonlySet<string>): Record<string, unknown> {
   const base = buildContext();
+  const dropped = new Map<string, string>(
+    inScope === undefined
+      ? []
+      : Object.entries(NS_PREFIXES as Readonly<Record<string, string>>).filter(([k]) => !inScope.has(k)),
+  );
+  const expandDropped = (v: unknown): unknown => {
+    if (typeof v === "string") {
+      const i = v.indexOf(":");
+      const ns = i > 0 ? dropped.get(v.slice(0, i)) : undefined;
+      return ns !== undefined && !v.slice(i + 1).startsWith("//") ? ns + v.slice(i + 1) : v;
+    }
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+      return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, expandDropped(x)]));
+    }
+    return v;
+  };
   const ctx: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(base)) {
     // Keyword aliases (`id` → `@id`) are dropped: compaction would otherwise
     // write `"id"` where the contract says the root `@id` is the directory IRI.
     if (typeof v === "string" && v.startsWith("@") && !k.startsWith("@")) continue;
-    ctx[k] = v;
+    if (dropped.has(k)) continue;
+    ctx[k] = expandDropped(v);
   }
   // A set, so a subgraph of one kind still carries an array — the shape a
   // consumer reads should not depend on how many kinds a directory holds.
@@ -326,6 +405,12 @@ export function subgraphContext(): Record<string, unknown> {
   ctx.payload = { "@id": propertyIri("payload") };
   ctx.sha256 = { "@id": propertyIri("sha256") };
   ctx.bytes = { "@id": propertyIri("bytes") };
+  // The top-level `_generated` note ({@link SUBGRAPH_GENERATED}) is a TERM, not
+  // a bare key: a key the context does not map is an `invalid property` to a
+  // JSON-LD processor, and `publish-verify`'s `jsonld-expand` fails on every
+  // subgraph file that carries one (folio-assistant#2545). `@json` keeps the
+  // note verbatim; it says who wrote the file, not anything about the graph.
+  ctx._generated = { "@id": propertyIri("generatedNote"), "@type": "@json" };
   return ctx;
 }
 
@@ -385,6 +470,11 @@ export interface SubgraphPlan {
    */
   seeAlso: string[];
   contextUrl: string;
+  /**
+   * The own-namespace prefixes the files may compact to — `root`'s instance
+   * and what it needs ({@link prefixesInScope}). `undefined`: all of them.
+   */
+  prefixesInScope?: ReadonlySet<string>;
   subgraphs: Map<string, SubgraphEntry>;
   nodes: Map<string, Node>;
   problems: string[];
@@ -633,6 +723,7 @@ export function planSubgraphs(
     harnessRoots: roots,
     seeAlso: unframedRepoIndexes(repoRoot, new Set(harnessRoots.keys())),
     contextUrl: `${base}/${SUBGRAPH_CONTEXT_PATH}`,
+    prefixesInScope: prefixesInScope(opts.root),
     subgraphs,
     nodes,
     problems,
@@ -682,6 +773,9 @@ function depth(plan: SubgraphPlan, e: SubgraphEntry): number {
 }
 
 /** Keys sorted at every level, except inside `@json` literals' own arrays. */
+/** The top-level `_generated` every subgraph file carries — bean `ws99`'s self-declaration. */
+export const SUBGRAPH_GENERATED = "gen-subgraph-jsonld.ts — do not hand-edit; run `bun run cat subgraph:jsonld`";
+
 function canonical(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(canonical);
   if (v !== null && typeof v === "object") {
@@ -702,7 +796,7 @@ export async function renderSubgraphFiles(
   _harness: string,
   outDir: string,
 ): Promise<Map<string, string>> {
-  const ctx = subgraphContext();
+  const ctx = subgraphContext(plan.prefixesInScope);
   const links = linkTerms(ctx);
   const never = Object.fromEntries(links.map((t) => [t, { "@embed": "@never", "@omitDefault": true }]));
   // A payload link is embedded whole wherever its node appears — `@id`,
@@ -724,7 +818,7 @@ export async function renderSubgraphFiles(
   const out = new Map<string, string>();
   const finish = (framed: Record<string, unknown>): string => {
     const { "@context": _inline, ...body } = framed;
-    return `${JSON.stringify(canonical({ "@context": plan.contextUrl, ...body }), null, 2)}\n`;
+    return `${JSON.stringify(canonical({ "@context": plan.contextUrl, _generated: SUBGRAPH_GENERATED, ...body }), null, 2)}\n`;
   };
 
   for (const e of [...plan.subgraphs.values()].sort((a, b) => a.iri.localeCompare(b.iri))) {

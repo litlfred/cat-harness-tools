@@ -12,8 +12,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { initFolio } from "../init-folio";
-import { HARNESS_ROOT } from "../lib/roots.ts";
 import { SCRIPT_SIDECAR_DIR } from "../../pipeline/qa-utils.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
@@ -66,10 +66,6 @@ describe("a new folio is QA'd from its first commit", () => {
     // would also be satisfied by a flag that silently disabled the write, or
     // by a sweep that found no automated criteria at all — and this test would
     // pass over exactly the emptiness it is supposed to rule out.
-    // Where the sweep writes them is asked, not spelled: `SCRIPT_SIDECAR_DIR`
-    // moved from `pipeline/script-sidecars` to the qa graph's
-    // `test/results/script-sidecars` when the code left cat-harness (bean
-    // `70lx`), and a spelled path read an empty directory that was never made.
     const wrote = readdirSync(join(sidecars, SCRIPT_SIDECAR_DIR));
     expect(wrote.length).toBeGreaterThan(0);
     expect(wrote.every((f) => f.endsWith(".script.json"))).toBe(true);

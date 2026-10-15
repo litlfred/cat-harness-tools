@@ -16,7 +16,7 @@ import { droppedInMerge, droppedLine, droppedPaths, ownedTreeAction, plan, refus
 import { pathClass } from "../merge-pipeline-paths.ts";
 import { parseLog } from "../merge-main-comment.js";
 import { plan as qaPlan } from "../qa-resolve-conflicts.ts";
-import { classify, PATTERNS, resolveGeneratedRegions } from "../merge-conflict-patterns.js";
+import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, PATTERNS, resolveGeneratedRegions } from "../merge-conflict-patterns.js";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -72,6 +72,70 @@ function generatedDocsPages(): string[] {
   walk(join(INSTANCE, siteDirFor(INSTANCE)));
   return out.sort();
 }
+
+describe("generated-page globs come from the declared visualisers, not instance names", () => {
+  // The glossary and catalogue globs used to spell out the instance that
+  // declares each page, which made this lower layer name instances above it
+  // (check:reference-direction). They are now read off `visualisers[]`.
+  function fixture(visualisers: object[]): string {
+    const repo = mkdtempSync(join(tmpdir(), "conflict-routes-"));
+    mkdirSync(join(repo, "acme"));
+    writeFileSync(join(repo, "acme", "acme.json"), JSON.stringify({ name: "acme", visualisers }));
+    return repo;
+  }
+
+  test("a glossary visualiser yields its route, English and per locale", () => {
+    const repo = fixture([{ id: "terms", renderedBy: GLOSSARY_RENDERER }, { id: "other", renderedBy: "x" }]);
+    try {
+      const glossary = (v: { renderedBy: string }) => v.renderedBy === GLOSSARY_RENDERER;
+      expect(declaredRouteGlobs(repo, glossary, "**")).toEqual(["cat-harness/docs/acme/terms/**"]);
+      expect(declaredRouteGlobs(repo, glossary, "index.md", "{ar,es}")).toEqual(["cat-harness/docs/{ar,es}/acme/terms/index.md"]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("a catalogue visualiser yields its route; a checkout declaring none yields no glob", () => {
+    const repo = fixture([{ id: CATALOGUE_VISUALISER, renderedBy: "x" }]);
+    const empty = fixture([]);
+    try {
+      const catalogue = (v: { id: string }) => v.id === CATALOGUE_VISUALISER;
+      expect(declaredRouteGlobs(repo, catalogue, "**")).toEqual(["cat-harness/docs/acme/catalogue/**"]);
+      expect(declaredRouteGlobs(empty, catalogue, "**")).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  test("standing alone, the routes come from the generated pages the harness site holds", () => {
+    // check-standalone lays out this layer and its `needs` only: the instance
+    // that DECLARES the glossary or catalogue visualiser is absent, but the
+    // harness site still holds the pages its generator wrote.
+    const repo = mkdtempSync(join(tmpdir(), "conflict-routes-site-"));
+    try {
+      const page = (rel: string, fm: string) => {
+        mkdirSync(join(repo, "cat-harness/docs", rel, ".."), { recursive: true });
+        writeFileSync(join(repo, "cat-harness/docs", rel), `---\n${fm}\n---\nbody\n`);
+      };
+      page("acme/terms/index.md", "generated: acme/scripts/glossary-page.ts — do not hand-edit");
+      page("acme/catalogue/index.html", "rendered-by: acme-pages");
+      page("acme/notes/index.md", "title: authored, says nothing about a generator");
+      const glossary = (v: { renderedBy: string }) => v.renderedBy === GLOSSARY_RENDERER;
+      const catalogue = (v: { id: string }) => v.id === CATALOGUE_VISUALISER;
+      expect(declaredRouteGlobs(repo, glossary, "**")).toEqual(["cat-harness/docs/acme/terms/**"]);
+      expect(declaredRouteGlobs(repo, catalogue, "**")).toEqual(["cat-harness/docs/acme/catalogue/**"]);
+      expect(declaredRouteGlobs(repo, (v) => v.id === "notes", "**")).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("a translated glossary page other than the generated index stays refused", () => {
+    const translated = PATTERNS.find((p) => p.id === "translated-glossary")!;
+    for (const g of translated.globs) expect(g.endsWith("/index.md")).toBe(true);
+  });
+});
 
 describe("classify", () => {
   test("measured generated families resolve by their declared strategy", () => {

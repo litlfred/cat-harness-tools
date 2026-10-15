@@ -34,9 +34,8 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { INDEX_CONFIG_FILENAME, INDEX_CONFIG_SCHEMA, formatIndexConfig, withIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
@@ -50,6 +49,13 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { git, remoteState } from "./lib/empty-remote.ts";
+import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
+import { parseRemote } from "./pages-bootstrap.ts";
+import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
+
+/** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
+export const INITIAL_VERSION = "0.1.0";
 
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";
@@ -102,6 +108,14 @@ export interface InitInstanceOptions {
   dryRun?: boolean;
   /** Skip `git submodule add` / `git init`. */
   skipVcs?: boolean;
+  /**
+   * The address the instance's IRIs are minted under, and where its JSON-LD
+   * context is published (`<iriBase>ns/context/v1.jsonld`). `initInstance`
+   * derives `https://<owner>.github.io/<repo>/` from a GitHub `origin` when
+   * this is absent and the instance is its repository's root; otherwise none
+   * is declared, and the publish workflow skips with a notice until one is.
+   */
+  iriBase?: string;
 }
 
 /** An instance that holds a folio: the instance, plus what its adapter scaffolds. */
@@ -448,6 +462,14 @@ function instanceDeclaration(o: MaybeFolio): string {
       $schema: CAT_HARNESS_DECLARATION_SCHEMA_TAG,
       name: o.slug,
       title: o.title,
+      // Where its IRIs are minted and its context is published (bean
+      // folio-assistant-63q4). Only when known: an invented address is worse
+      // than none. With a `version` beside it, always: `releaseIris` mints
+      // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
+      // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
+      // which is how the restored smart-trust and smart-immunizations
+      // declarations broke their IG publish on 2026-10-15.
+      ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
       // A contentless instance declares no `folio` directory: declaring one it
       // does not hold would be the `dh4f` defect (a consumer scans nothing and
       // reports a clean run). Bean `mer2`.
@@ -470,7 +492,10 @@ function instanceDeclaration(o: MaybeFolio): string {
 }
 
 /**
- * The scaffolded instance's CONFIG — `<slug>.config.json`, beside its declaration.
+ * The scaffolded instance's CONFIG — written INLINE in its `index.config.json`
+ * entry, never as a `<slug>.config.json` (bean `ymvt`, owner 2026-10-14: *"i
+ * thought ONLY index.config.json"*; the per-instance file is a legacy import,
+ * retired by `index-config:migrate --inline`).
  *
  * NO `site.landing` FLAG, on purpose (issue #1904). A scaffolded folio is the
  * one harness instantiated at its root, and the owner's ruling makes that the
@@ -481,9 +506,8 @@ function instanceDeclaration(o: MaybeFolio): string {
  * and `check:landing-instance` fails until one does. Writing it now would be
  * a decision nobody has made yet. Rule: the `harness-tiles` skill.
  */
-function instanceConfig(o: MaybeFolio, assistant: string): string {
-  return JSON.stringify(
-    {
+function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknown> {
+  return {
       // Omitted, not defaulted, for a contentless instance (bean `mer2`):
       // naming an adapter here would be inventing a content type for a layer
       // that has none.
@@ -502,19 +526,16 @@ function instanceConfig(o: MaybeFolio, assistant: string): string {
       // full of unreachable github.io URLs is not something the author finds
       // out about, because it renders fine for them.
       readme: { linkStyle: "blob", publishRef: "gh-pages" },
-    },
-    null,
-    2,
-  ) + "\n";
+  };
 }
 
 /**
  * The `index.config.json` a new folio starts with: one instance, the one
- * scaffolded, declared at the root and importing its own `<slug>.config.json`.
- * Exported for the test that holds `init-folio` to the schema.
+ * scaffolded, declared at the root, its config INLINE in the entry (bean
+ * `ymvt`). Exported for the test that holds `init-folio` to the schema.
  */
-export function newFolioIndex(slug: string): IndexConfig {
-  return { $schema: INDEX_CONFIG_SCHEMA, instances: [{ name: slug, source: { local: { at: "." } } }] };
+export function newFolioIndex(slug: string, config: Record<string, unknown> = {}): IndexConfig {
+  return { $schema: INDEX_CONFIG_SCHEMA, instances: [{ name: slug, source: { local: { at: "." } }, ...config }] };
 }
 
 /**
@@ -617,6 +638,20 @@ export default prose({
 `;
 }
 
+/**
+ * The starter block's `.jsonld`, made by the generator itself from the same
+ * fields as {@link starterBlockManifest}, so the two cannot disagree; a test
+ * runs `gen-block-jsonld.ts --check` on a scaffold to hold that.
+ */
+function starterBlockNode(root: string, slug: string): string {
+  const block = { kind: "prose", label: "prose:overview", title: "Overview", uses: [] as string[] };
+  // The starter block's own manifest path, written above in initFolio at the
+  // convention, which is also the `folio/` its declaration names: a scaffold
+  // reads no declaration, because it is the one writing it.
+  const file = join(conventionalFolioDir(root), slug, "introduction", "overview.ts");
+  return serialiseBlockNode(blockToJsonLd({ kind: block.kind, label: block.label, uses: [], file, block }, slug, []));
+}
+
 function starterBlockBody(o: InitFolioOptions): string {
   const kinds =
     o.contentType === "document"
@@ -692,6 +727,7 @@ folio/${o.slug}/          the document
   <chapter>/<chapter>.ts   a chapter manifest — sections, in reading order
   <chapter>/<root>.ts      a block manifest
   <chapter>/<root>.md      that block's prose
+  <chapter>/<root>.jsonld  that block's knowledge-graph node (generated; committed)
 folio/schema/            re-export shim for the platform's builders
 test/results/block-qa/     QA verdicts, one per block, mirroring folio/ (machine-written working copy — published to qa-reports)
 test/attestations/        reviewer judgements and baseline attestations (committed on main)
@@ -708,7 +744,12 @@ todos/                    people's outstanding items (mounted likewise)
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
 bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
+
+Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
+and the document site publishes it. Re-run the generator after adding, moving
+or editing a block; the site build fails while a node is missing or stale.
 
 ## QA — every block is checked from the first commit
 
@@ -1387,12 +1428,12 @@ function writeInstanceFiles(s: Scaffold): void {
   // filename a meaning. See `instanceConfig` above — ONE file now, its
   // declaration and its config, since `harness.json` was excised.
   write(instanceDeclarationFilename(o.slug), instanceDeclaration(o));
-  write(instanceConfigFilename(o.slug), instanceConfig(o, assistant));
   // The root INDEX (owner, 2026-10-07): which harnesses this checkout
-  // instantiates — today the one being scaffolded, at the root — importing its
-  // `<slug>.config.json`. No `site.landing`: a sole instance is the landing
+  // instantiates — today the one being scaffolded, at the root — with its
+  // config INLINE in the entry (bean `ymvt`: no `<slug>.config.json` is
+  // written; the index is the one config). No `site.landing`: a sole instance is the landing
   // with no flag, and naming one now would be a decision nobody has made.
-  const index = newFolioIndex(o.slug);
+  const index = newFolioIndex(o.slug, instanceConfig(o, assistant));
   write(INDEX_CONFIG_FILENAME, formatIndexConfig(index));
   write(".mcp.json", mcpJson(assistant));
   write(".claude/settings.json", claudeSettings(assistant));
@@ -1442,7 +1483,18 @@ function finishScaffold(s: Scaffold): void {
   const platformPresent = existsSync(join(root, assistant));
   if (!o.skipVcs && !o.dryRun) {
     linkPlatform(root, assistant, o, result);
-  } else if (o.link === "submodule" && !platformPresent) {
+  } else if (!o.dryRun && !enclosingRepoRoot(root)) {
+    // `--skip-vcs` skips linking the platform, and with it `seedMainIfEmpty`,
+    // which lives in that step. dth-hrh was scaffolded so, into a cloud
+    // checkout of an EMPTY repository on a feature branch; nothing put `main`
+    // on the remote, the branch was pushed first, and GitHub made it the
+    // default (owner, 2026-10-14). The remote still gets `main` here, without
+    // a branch switch: the caller chose the branch it is on.
+    const seed = seedRemoteMainIfEmpty(root);
+    const note = formatRemoteSeed(seed).split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2)).join(" ");
+    if (note) result.notes.push(note);
+  }
+  if ((o.skipVcs || o.dryRun) && o.link === "submodule" && !platformPresent) {
     // Only when it is actually absent. Emitting this unconditionally told a
     // caller who had already added the submodule (and passed --skip-vcs
     // precisely because of that) to add it again.
@@ -1489,12 +1541,92 @@ export function initInstance(options: InitInstanceOptions): InitFolioResult {
   const o: MaybeFolio = { ...options, contentType: undefined };
   checkSlug(o.slug);
   const s = startScaffold(o);
+  // Checked before anything is written, as for a folio (bean `zdfa`): GitHub
+  // reads workflows only at the repository root.
+  const enclosing = enclosingRepoRoot(s.root);
+  if (o.iriBase === undefined && !enclosing) o.iriBase = githubPagesBase(s.root);
   if (!o.dryRun) mkdirSync(s.root, { recursive: true });
   writeInstanceFiles(s);
   s.write("README.md", instanceReadme(o));
   s.write("AGENTS.md", instanceAgentsMd(o, s.assistant));
+  writePublishContext(s, enclosing);
   finishScaffold(s);
   return s.result;
+}
+
+/**
+ * `https://<owner>.github.io/<repo>/` from a GitHub `origin`, the address
+ * GitHub Pages serves a project repository at; `undefined` when there is no
+ * such remote (a fresh `git init`), because a guessed address would be
+ * minted into every IRI the instance writes.
+ */
+export function githubPagesBase(root: string): string | undefined {
+  let probe = resolve(root);
+  while (!existsSync(probe)) {
+    const up = dirname(probe);
+    if (up === probe) return undefined;
+    probe = up;
+  }
+  const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd: probe, stdio: "pipe" });
+  if (r.status !== 0) return undefined;
+  const url = r.stdout.toString().trim();
+  // github.com only: `parseRemote` takes owner/repo from any host, and a
+  // proxied or mirrored remote would otherwise mint an address nobody serves.
+  if (!/^(?:git@github\.com:|(?:https?|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)/.test(url)) return undefined;
+  const parsed = parseRemote(url);
+  if (!parsed) return undefined;
+  const owner = parsed.owner.toLowerCase();
+  // A `<owner>.github.io` repository is served at the root, not under its name.
+  return parsed.repo.toLowerCase() === `${owner}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${parsed.repo}/`;
+}
+
+/** The caller of cat-harness-tools' `layer-publish-context.yml` (bean folio-assistant-63q4). */
+export function publishContextWorkflow(slug: string): string {
+  return `# Publish this instance's JSON-LD context to gh-pages, at
+# <iriBase>ns/context/v1.jsonld, on every push to main. Everything is decided in
+# the reusable workflow; it creates gh-pages on its first run if it is absent.
+# GitHub Pages is switched on once, by hand, after that first run:
+# Settings -> Pages -> "Deploy from a branch: gh-pages, / (root)".
+name: Publish JSON-LD context
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    uses: litlfred/cat-harness-tools/.github/workflows/layer-publish-context.yml@main
+    with:
+      instance: ${slug}
+`;
+}
+
+/**
+ * Turn on the context's publishing (bean folio-assistant-63q4, owner
+ * 2026-10-15: *"this should be a part of cat-harness initiation process"*).
+ * Only at a repository's root, where GitHub reads workflows.
+ */
+function writePublishContext(s: Scaffold, enclosing: string | null): void {
+  const { o, write, result } = s;
+  if (enclosing) {
+    result.notes.push(
+      `Inside the repository at '${enclosing}', so no publish-context workflow was written: GitHub reads workflows only at that ` +
+        `repository's root. Its own publish-context workflow (cat-harness-tools' layer-publish-context.yml) publishes ` +
+        `<iriBase>ns/context/v1.jsonld for an instance it holds, with path-in-repo naming the instance's directory.`,
+    );
+    return;
+  }
+  write(".github/workflows/publish-context.yml", publishContextWorkflow(o.slug));
+  result.notes.push(
+    o.iriBase === undefined
+      ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
+          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          `${instanceDeclarationFilename(o.slug)}.`
+      : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
+          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
+  );
 }
 
 /** Scaffold a folio: `initInstance`'s writes, plus the adapter's folio scaffold. */
@@ -1573,6 +1705,10 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
   write(`folio/${o.slug}/introduction/overview.ts`, starterBlockManifest());
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
   write(`folio/${o.slug}/introduction/overview.md`, starterBlockBody(o));
+  // Its knowledge-graph node: every block is one from the first commit, and a
+  // document site fails without it (`gen-block-jsonld.ts --check` keeps it current).
+  // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
+  write(`folio/${o.slug}/introduction/overview.jsonld`, starterBlockNode(root, o.slug));
 
   // 4. The two source-material directories.
   //
@@ -1690,11 +1826,6 @@ export type SeedOutcome =
   | { kind: "no-main"; current: string }
   | { kind: "stopped"; reason: string };
 
-function git(root: string, args: string[], timeout = 60_000) {
-  const r = spawnSync("git", args, { cwd: root, stdio: "pipe", timeout });
-  return { ok: r.status === 0, out: r.stdout?.toString().trim() ?? "", err: r.stderr?.toString().trim() ?? "" };
-}
-
 /**
  * On an EMPTY repository, make `main` real before bootstrapping onto it.
  *
@@ -1724,12 +1855,10 @@ export function seedMainIfEmpty(root: string, slug: string): SeedOutcome {
     return { kind: "no-main", current };
   }
 
-  const hasOrigin = git(root, ["remote"]).out.split(/\s+/).includes("origin");
-  if (hasOrigin) {
-    const heads = git(root, ["ls-remote", "--heads", "origin"]);
-    if (!heads.ok) return { kind: "stopped", reason: `could not ask the remote whether it is empty (${heads.err.slice(0, 200) || "no output"}) — not seeding over history nobody checked` };
-    if (heads.out !== "") return { kind: "stopped", reason: "the remote already has branches — this checkout is empty only because nothing was fetched; fetch and check out its default branch instead of seeding" };
-  }
+  const remote = remoteState(root);
+  const hasOrigin = remote.kind !== "no-origin";
+  if (remote.kind === "unknown") return { kind: "stopped", reason: `could not ask the remote whether it is empty (${remote.reason}) — not seeding over history nobody checked` };
+  if (remote.kind === "has-branches") return { kind: "stopped", reason: "the remote already has branches — this checkout is empty only because nothing was fetched; fetch and check out its default branch instead of seeding" };
 
   if (!git(root, ["symbolic-ref", "HEAD", "refs/heads/main"]).ok) return { kind: "stopped", reason: "could not point HEAD at main" };
   const seed = git(root, ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "--quiet", "-m", "Seed main"]);
@@ -1935,6 +2064,9 @@ Options:
   --force             Overwrite files that already exist
   --dry-run           Report what would be written
   --skip-vcs          Do not run git init / git submodule add
+  --iri-base <url>    With --instance: where its IRIs are minted and its
+                      JSON-LD context is published (default: derived from a
+                      GitHub origin, https://<owner>.github.io/<repo>/)
   --staged <path>     A sub-KG staged INSIDE the host repo at --dir: writes
                       only <path>/<slug>.json and <path>/platform.ts
                       (bean 3tza). Needs --repository and --needs; the slug
@@ -1969,6 +2101,7 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
   let force = false;
   let dryRun = false;
   let skipVcs = false;
+  let iriBase: string | undefined;
   let instance = false;
   let typeGiven = false;
   let staged: string | undefined;
@@ -2007,6 +2140,7 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
       case "--force": force = true; break;
       case "--dry-run": dryRun = true; break;
       case "--skip-vcs": skipVcs = true; break;
+      case "--iri-base": iriBase = next(); break;
       case "--staged": staged = next(); break;
       case "--repository": repository = next(); break;
       case "--host-repository": hostRepository = next(); break;
@@ -2037,8 +2171,10 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
     // Refused rather than ignored: a content type passed to a contentless
     // init is a caller who wanted a folio and would silently not get one.
     if (typeGiven) throw new Error("--instance takes no --type: an instance with a content type is a folio");
-    return { kind: "instance", options: common };
+    if (iriBase !== undefined && !/^https?:\/\/.+\/$/.test(iriBase)) throw new Error(`--iri-base must be a URL ending in '/', got '${iriBase}'`);
+    return { kind: "instance", options: { ...common, ...(iriBase !== undefined ? { iriBase } : {}) } };
   }
+  if (iriBase !== undefined) throw new Error("--iri-base goes with --instance");
   if (authors.length === 0) throw new Error("--author is required (repeat for several)");
 
   return { kind: "folio", options: { ...common, contentType, authors } };

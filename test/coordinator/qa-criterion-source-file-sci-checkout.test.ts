@@ -36,15 +36,8 @@ import {
  */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
-const REPO = resolve(ORIGIN_DIR, "../../..");
-/**
- * The instance that owns the QA registry and core's own checkers — this one,
- * cat-harness-tools, since the tools split (bean `w2gr`). It was
- * `cat-harness` when the test was written there, and after the move every
- * core checker was labelled `cat-harness-tools/pipeline/…` against a resolver
- * that answers the bare `pipeline/…` for its own root: 70 false mismatches.
- */
-const ROOT = resolve(import.meta.dir, "../..");
+const ROOT = resolve(ORIGIN_DIR, "../..");
+const REPO = resolve(ROOT, "..");
 const CHECKER_DIR = "pipeline";
 
 /**
@@ -76,31 +69,25 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
  * repo-relative for core's own, `<contributor>/<path>` for a contributed one.
  */
 function checkerFiles(): Array<{ label: string; abs: string }> {
-  const out = new Map<string, string>();
+  const out: Array<{ label: string; abs: string }> = [];
   for (const instance of instanceRootsIn(REPO)) {
     const dir = resolve(instance, CHECKER_DIR);
     if (!existsSync(dir)) continue;
     const name = instance.split("/").pop() ?? "";
     for (const f of readdirSync(dir).filter((x) => /^qa-checkers-.*\.ts$/.test(x))) {
       const rel = `${CHECKER_DIR}/${f}`;
-      out.set(resolve(instance, rel) === resolve(ROOT, rel) ? rel : `${name}/${rel}`, resolve(dir, f));
+      out.push({
+        label: instance === ROOT ? rel : `${name}/${rel}`,
+        abs: resolve(dir, f),
+      });
     }
   }
-  // A CONTRIBUTED checker lives where its contributor's `qa-checkers/` node
-  // says — `content/pipeline/` in sci and smart-base, and wherever the next
-  // contributor puts it — so its file comes from the registry that loads it,
-  // labelled as the resolver labels it, rather than from a second guess at
-  // the directory name.
-  for (const c of registry.contributedQaCheckers()) {
-    const e = registry.qaCheckerEntry(c.criterion);
-    const abs = e && resolve(e.root, e.sourceFile);
-    if (e && abs && existsSync(abs)) out.set(e.label, abs);
-  }
-  return [...out].map(([label, abs]) => ({ label, abs })).sort((a, b) => a.label.localeCompare(b.label));
+  return out.sort((a, b) => a.label.localeCompare(b.label));
 }
 
+const checkerFileList = checkerFiles();
 const sources = new Map<string, string>(
-  checkerFiles().map((f) => [f.label, readFileSync(f.abs, "utf-8")]),
+  checkerFileList.map((f) => [f.label, readFileSync(f.abs, "utf-8")]),
 );
 
 // The name convention is `qa-checker-discovery`'s, not this test's: discovery
@@ -114,9 +101,15 @@ const checkerFnName = checkerFunctionName;
  * agreement.
  */
 function hostFiles(id: string): string[] {
+  return hostEntries(id).map((h) => h.label);
+}
+
+/** As {@link hostFiles}, with each host's absolute path. */
+function hostEntries(id: string): Array<{ label: string; abs: string }> {
   const fn = checkerFnName(id);
-  const out: string[] = [];
-  for (const [f, s] of sources) {
+  const out: Array<{ label: string; abs: string }> = [];
+  for (const f of checkerFileList) {
+    const s = sources.get(f.label) ?? "";
     if (s.includes(`"${id}":`) || s.includes(`export function ${fn}(`)) out.push(f);
   }
   return out;
@@ -142,11 +135,17 @@ describe("getCriterionSourceFile — declared source must host the checker", () 
         mismatched.push(`${def.id}: ${located.reason}`);
         continue;
       }
+      // Compared by the file the resolver READS — its `root` joined to its
+      // `sourceFile` — not by label: a core criterion's label stays the path
+      // as declared while its bytes are read from the implementing instance
+      // (owner ruling T7, bean `70lx`), so a label match would need this test
+      // to know which layer implements core's checkers.
       const declared = located.label;
-      const hosts = hostFiles(def.id);
+      const declaredAbs = resolve(located.root, located.sourceFile);
+      const hosts = hostEntries(def.id);
       if (hosts.length === 0) continue; // reported separately below
-      if (!hosts.includes(declared)) {
-        mismatched.push(`${def.id}: declared ${declared}, found in ${hosts.join(", ")}`);
+      if (!hosts.some((h) => h.abs === declaredAbs)) {
+        mismatched.push(`${def.id}: declared ${declared}, found in ${hosts.map((h) => h.label).join(", ")}`);
       }
     }
     // Named in the failure so a fix does not need a re-run to find them.

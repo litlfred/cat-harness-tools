@@ -11,7 +11,9 @@ Part of [C@T Harness](../../README.md) 0.1.0, declared as `openapi-scripts`, hol
 | file | what it is | used by |
 |---|---|---|
 | [`gen-openapi-pages.ts`](gen-openapi-pages.ts) | a file |  |
+| [`ig-site-openapi.ts`](ig-site-openapi.ts) | a file |  |
 | [`ingest-openapi.ts`](ingest-openapi.ts) | a file |  |
 | [`openapi.test.ts`](openapi.test.ts) | a file |  |
 | [`templates/`](templates/) | _nothing declares what this holds_ | |
+
 <!-- kg:subgraph:end -->

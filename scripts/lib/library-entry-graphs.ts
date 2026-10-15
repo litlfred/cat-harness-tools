@@ -37,7 +37,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
@@ -62,6 +62,43 @@ function declaringInstanceRoot(dir: string): string | undefined {
   }
 }
 
+type DeclaredDirectories = ReturnType<typeof instanceDirectories>;
+
+/**
+ * One instance's declared directories, read once per declaration text.
+ *
+ * `check:l1-complete` asks {@link entrySubgraphDirs} once per library entry,
+ * and every entry of a library has the same declaring instance. Re-reading and
+ * re-resolving that declaration for each one made `checkAll` over the corpus
+ * slow enough to time a test out (`ingest-and-l1`, 5.8 s against bun's 5 s).
+ * The key is the declaration's TEXT as well as its root, and the registry's
+ * size (kinds are registered at runtime), the same key `readDeclaration` uses:
+ * an edited declaration, such as a test fixture rewritten in place, is read
+ * again rather than answered from a stale copy. `undefined` is an unreadable declaration, cached
+ * the same way: it is `check:harness-dirs`'s finding, not this one's.
+ */
+const declaredDirectoriesCache = new Map<string, { text: string; registry: GraphTypologyRegistry; kinds: number; dirs: DeclaredDirectories | undefined }>();
+
+function declaredDirectoriesOf(instRoot: string, registry: GraphTypologyRegistry): DeclaredDirectories | undefined {
+  let text = "";
+  try {
+    const file = findDeclarationFile(instRoot);
+    text = file === undefined ? "" : readFileSync(join(instRoot, file), "utf-8");
+  } catch {
+    text = "";
+  }
+  const hit = declaredDirectoriesCache.get(instRoot);
+  if (hit !== undefined && hit.text === text && hit.registry === registry && hit.kinds === registry.names().length) return hit.dirs;
+  let dirs: DeclaredDirectories | undefined;
+  try {
+    dirs = instanceDirectories(instRoot, readDeclaration(instRoot, registry), registry);
+  } catch {
+    dirs = undefined;
+  }
+  declaredDirectoriesCache.set(instRoot, { text, registry, kinds: registry.names().length, dirs });
+  return dirs;
+}
+
 function filesUnder(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort()) {
@@ -83,35 +120,56 @@ function isJsonLd(abs: string): boolean {
   }
 }
 
+/** One directory DECLARED inside a library entry with a kind that is a sub-graph of `library`. */
+export interface EntrySubgraphDir {
+  /** The typology that makes it a library sub-graph (e.g. `l1-extraction`). */
+  kind: string;
+  /** The directory on disk. */
+  abs: string;
+  /** Whether that kind is published (`published !== false`). */
+  published: boolean;
+}
+
 /**
- * Every file of every directory DECLARED inside `entryDir` whose typology is a
- * sub-graph of `library` (`within: "library"`) and is published. Sorted by
- * `rel`. Empty when the entry holds none, or its instance cannot be read —
- * an unreadable declaration is `check:harness-dirs`'s finding, not this one's.
+ * Every directory DECLARED inside `entryDir` whose typology is a sub-graph of
+ * `library` (`within: "library"`) and exists on disk — published or not. The
+ * one declaration lookup {@link entryGraphFiles} publishes from and
+ * `check:l1-complete` accepts as entry contents, so the two cannot disagree.
+ * Empty when the entry holds none, or its instance cannot be read — an
+ * unreadable declaration is `check:harness-dirs`'s finding, not this one's.
  */
-export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
+export function entrySubgraphDirs(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntrySubgraphDir[] {
   const entry = resolve(entryDir);
   const instRoot = declaringInstanceRoot(dirname(entry));
   if (instRoot === undefined) return [];
-  let dirs: ReturnType<typeof instanceDirectories>;
-  try {
-    dirs = instanceDirectories(instRoot, readDeclaration(instRoot, registry), registry);
-  } catch {
-    return [];
-  }
-  const byRel = new Map<string, EntryGraphFile>();
+  const dirs = declaredDirectoriesOf(instRoot, registry);
+  if (dirs === undefined) return [];
+  const out: EntrySubgraphDir[] = [];
   for (const d of dirs) {
     if (d.scope === "repository") continue;
     const abs = resolve(instRoot, d.path);
     if (!abs.startsWith(entry + sep) || !existsSync(abs) || !statSync(abs).isDirectory()) continue;
-    const kind = (d.graphTypologies ?? []).find((k) => {
-      const def = registry.get(k);
-      return def?.within === "library" && def.published !== false;
-    });
-    if (kind === undefined) continue;
-    for (const f of filesUnder(abs)) {
+    const kinds = (d.graphTypologies ?? []).filter((k) => registry.get(k)?.within === "library");
+    if (kinds.length === 0) continue;
+    const pub = kinds.find((k) => registry.get(k)?.published !== false);
+    out.push({ kind: pub ?? kinds[0], abs, published: pub !== undefined });
+  }
+  return out;
+}
+
+/**
+ * Every file of every directory DECLARED inside `entryDir` whose typology is a
+ * sub-graph of `library` (`within: "library"`) and is published. Sorted by
+ * `rel`. Empty when the entry holds none, or its instance cannot be read.
+ */
+export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
+  const entry = resolve(entryDir);
+  const byRel = new Map<string, EntryGraphFile>();
+  for (const d of entrySubgraphDirs(entry, registry)) {
+    if (!d.published) continue;
+    for (const f of filesUnder(d.abs)) {
       const rel = relative(entry, f).split(sep).join("/");
-      if (!byRel.has(rel)) byRel.set(rel, { kind, abs: f, rel, jsonld: isJsonLd(f) });
+      if (!byRel.has(rel)) byRel.set(rel, { kind: d.kind, abs: f, rel, jsonld: isJsonLd(f) });
     }
   }
   return [...byRel.values()].sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
@@ -121,4 +179,33 @@ export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistr
 export function entryGraphSitePath(instance: string, docId: string, rel: string): string {
   const base = dirname(libraryAssetSitePath(instance, docId));
   return `${base}/${rel.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * The directories directly inside the library `lib` that its instance
+ * declares with kinds that do not include `library` — absolute, without a
+ * trailing separator. They are other graphs kept in the library, not entries:
+ * smart-immunizations keeps its L1 scenario worked example at
+ * `library/l1-recommendation-scenarios/` as `l1-extraction`, and a reader that
+ * walked it as an entry graded it for a manifest and sections it never had.
+ */
+export function nonEntryDirs(lib: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Set<string> {
+  const out = new Set<string>();
+  const inst = findInstanceRoot(lib);
+  if (inst === undefined) return out;
+  // The RESOLVED directories, not the declaration file alone: a library names
+  // a directory of another kind FROM WITHIN (`library/library.json`'s
+  // `directories`, the #980 shape `check:layout-norms` sanctions), and a
+  // reader of the root file alone graded that directory as an entry missing
+  // its manifest, sections and blocks (cat-harness-tools#281). The raw
+  // declaration stays the fallback for a declaration the resolver refuses.
+  const resolved = declaredDirectoriesOf(inst, registry);
+  const entries: { path: string; graphTypologies?: readonly string[]; scope?: string }[] =
+    resolved ?? readDeclaration(inst)?.directories ?? [];
+  for (const e of entries) {
+    if (e.scope === "repository") continue;
+    const abs = join(inst, e.path).replace(/[/\\]+$/, "");
+    if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies ?? []).includes("library")) out.add(abs);
+  }
+  return out;
 }

@@ -3,7 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
+import type { DeclaredArtefact } from "../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -94,5 +95,126 @@ describe("keepPinned — a build leaves a mounted layer as the lock pins it (lit
     writeFileSync(f, "new");
     restore();
     expect(readFileSync(f, "utf-8")).toBe("new");
+  });
+});
+
+describe("build-instance-site — a checkout that only mounts layers (an IG repository)", () => {
+  test("a step runs from the checkout's own package.json, or through run-script.ts where it has none", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-step-"));
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { "build:site": "echo" } }));
+    expect(stepCommand(d, "build:site")).toBe("bun run build:site");
+    // A package.json for the IG's own tooling, naming none of the site's steps
+    // (smart-immunizations: fsh-sushi only): the step still resolves.
+    writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { "fsh-sushi": "^3" } }));
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
+    expect(() => stepCommand(d, "x; rm -rf /")).toThrow();
+  });
+
+  test("a chrome writer runs through the checkout's `cat` runner, or run-script.ts where it has none (dth-hrh)", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-writer-"));
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { "site:document": "echo" } }));
+    const [bun, run, script, writer] = writerCommand(d, "avatars:css");
+    expect([bun, run, writer]).toEqual(["bun", "run", "avatars:css"]);
+    expect(script).toMatch(/run-script\.ts$/);
+    writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { cat: "bun cat-harness-tools/scripts/run-script.ts" } }));
+    expect(writerCommand(d, "avatars:css")).toEqual(["bun", "run", "cat", "avatars:css"]);
+  });
+
+  test("the pages a step lists as the content's own: one per line, comments and blanks ignored", () => {
+    const d = mkdtempSync(join(tmpdir(), "bis-up-"));
+    expect(readUpstreamPages(join(d, "absent.txt")).size).toBe(0);
+    writeFileSync(join(d, "u.txt"), "# composed\na.html\n\nsub/b.html\n");
+    expect([...readUpstreamPages(join(d, "u.txt"))]).toEqual(["a.html", "sub/b.html"]);
+  });
+
+  test("a required root file a step did not write is named, so the site is not published", () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-req-"));
+    writeFileSync(join(site, "index.html"), "x");
+    expect(missingRequired(site, ["folio-build.json", "index.html"])).toEqual(["folio-build.json"]);
+    writeFileSync(join(site, "folio-build.json"), "{}");
+    expect(missingRequired(site, ["folio-build.json"])).toEqual([]);
+  });
+
+  test("a dead link on a content page is reported apart; one on any other page still refuses", async () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-links-"));
+    mkdirSync(join(site, "sub"));
+    writeFileSync(join(site, "index.html"), '<a href="sub/b.html">ok</a><a href="gone.html">dead</a>');
+    writeFileSync(join(site, "sub", "b.html"), '<a href="../StructureDefinition-x.html">dead</a>');
+    const r = await checkLinks(site, "/repo/", new Set(["sub/b.html"]));
+    expect(r.misses).toEqual(["index.html: gone.html"]);
+    expect(r.upstreamMisses).toEqual(["sub/b.html: ../StructureDefinition-x.html"]);
+  });
+});
+
+describe("build-instance-site — whose chrome the shell carries (smart-trust, 2026-10-14)", () => {
+  test("an IG repository's shell is the platform's chrome only; a folio's carries its own as well", () => {
+    // folio-site.yml composed an IG's shell in a folio-assistant checkout, which declares no
+    // root docs layer; run from the IG's checkout, the shell must not pick the IG's docs/ up,
+    // because stage-ig-sites builds that directory into the IG site and refuses a second copy.
+    expect(shellFlags("ig-repo-site")).toBe("--shell --platform-only");
+    expect(shellFlags("folio")).toBe("--shell");
+    expect(shellFlags()).toBe("--shell");
+  });
+});
+
+describe("pinGeneratedData — the build's data never stays in a mount (litlfred/smart-hiv, 2026-10-14)", () => {
+  test("the landing's stickies.json in a smart-base mount is put back, and one the build created is removed", () => {
+    const root = mkdtempSync(join(tmpdir(), "pin-data-"));
+    // A mounted landing with a declaration naming its site directory.
+    mkdirSync(join(root, "smart-base/docs/_data"), { recursive: true });
+    writeFileSync(join(root, "smart-base/smart-base.json"), JSON.stringify({ name: "smart-base" }));
+    writeFileSync(join(root, "smart-base/docs/_data/stickies.json"), "pinned");
+    // A mount with no declaration: nothing to keep, and no throw.
+    mkdirSync(join(root, "bootstrap"), { recursive: true });
+    const restore = pinGeneratedData(root, ["smart-base", "bootstrap"]);
+    writeFileSync(join(root, "smart-base/docs/_data/stickies.json"), "rewritten by gen-landing-data");
+    writeFileSync(join(root, "smart-base/docs/_data/harness.json"), "created by sync-docs-harness");
+    restore();
+    expect(readFileSync(join(root, "smart-base/docs/_data/stickies.json"), "utf-8")).toBe("pinned");
+    expect(existsSync(join(root, "smart-base/docs/_data/harness.json"))).toBe(false);
+  });
+});
+
+
+describe("the chrome's publish-time writers run before the chrome is composed (smart-ra avatars.css)", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "bis-chrome-"));
+  const chrome = join(tmp, "cat-harness/site-chrome");
+  const docs = join(tmp, "cat-harness/docs");
+  const entry = (path: string, writer: string, under = chrome): DeclaredArtefact => ({ instance: "cat-harness", abs: join(under, path), path, writer: [writer], because: "checkout" });
+  const css = entry("assets/css/avatars.css", "avatars:css");
+  const page = entry("_data/harness.json", "docs:pages", docs);
+
+  test("an entry inside a chrome layer is the chrome's; one in the site directory is not", () => {
+    expect(chromeArtefacts(tmp, [css, page], [chrome])).toEqual([css]);
+  });
+
+  test("a writer that built its artefact passes, and runs once however many artefacts name it", () => {
+    const calls: string[] = [];
+    const twin = entry("assets/css/other.css", "avatars:css");
+    const r = buildChrome(tmp, [css, twin], (w) => {
+      calls.push(w);
+      mkdirSync(join(chrome, "assets/css"), { recursive: true });
+      writeFileSync(css.abs, ".a{}");
+      writeFileSync(twin.abs, ".b{}");
+      return { kind: "ran" };
+    });
+    expect(calls).toEqual(["avatars:css"]);
+    expect(r.ran).toEqual(["avatars:css"]);
+  });
+
+  test("a writer that fails refuses the build", () => {
+    expect(() => buildChrome(tmp, [css], () => ({ kind: "failed", exit: 1 }))).toThrow(/avatars:css failed/);
+  });
+
+  test("a writer that ran and built nothing refuses the build: the chrome links it", () => {
+    const gone = entry("assets/js/never.js", "never:js");
+    expect(() => buildChrome(tmp, [gone], () => ({ kind: "ran" }))).toThrow(/missing or empty/);
+  });
+
+  test("a writer that does not apply to this root (exit 78) is reported, and its artefacts excused", () => {
+    const na = entry("assets/js/na.js", "na:js");
+    const r = buildChrome(tmp, [na], () => ({ kind: "skipped", why: "no frobnicator here" }));
+    expect(r.skipped.get("na:js")).toBe("no frobnicator here");
   });
 });

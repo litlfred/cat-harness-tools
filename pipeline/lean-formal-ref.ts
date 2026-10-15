@@ -213,7 +213,12 @@ function fileDeclaresAnything(file: string): boolean {
     .test(body);
 }
 
-function fileDeclaresName(file: string, name: string): boolean {
+/**
+ * Does `file` textually declare a top-level `name`? Exported for
+ * `scripts/check-lake-targets.ts`, which carried a copy of this function, and
+ * with it a sixth declaration pattern (`lean-decl-starts-are-shared.test.ts`).
+ */
+export function fileDeclaresName(file: string, name: string): boolean {
   let body: string;
   try {
     body = readFileSync(file, "utf-8");

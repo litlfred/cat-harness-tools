@@ -57,12 +57,11 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
   "md-exists": {
     kinds: [
       "definition", "theorem", "lemma", "proposition", "corollary",
-      "conjecture", "example", "remark", "simulator", "prose",
-      // A recommendation is a prose carrier, so it owes its .md as prose does
-      // (core's `recommendation` kind, bean `55ao`; typed by cat-harness#109).
-      "recommendation",
+      "conjecture", "example", "remark", "simulator", "prose", "recommendation",
     ],
     because:
+      // `recommendation` joined when cat-harness admitted the normative
+      // statement kind: its body is prose, so it carries a companion .md.
       "whether equation/diagram/table/proof/algorithm blocks must have a " +
       "companion .md is an editorial policy question, not drift — left as " +
       "found, deliberately. Its description says 'every block', which is " +

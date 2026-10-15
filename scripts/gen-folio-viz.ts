@@ -308,7 +308,7 @@ fetch(DATA_HREF).then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.
       return '<table aria-label="Files in ' + esc(d.dir) + '" aria-labelledby="fo-files-head">' +
         "<caption>Files in <code>" + esc(d.dir) + "</code></caption>" +
         "<thead><tr><th>file</th><th>size</th></tr></thead><tbody>" +
-        files.map(function(f){ return "<tr><td><code>" + esc(f.path) + "</code></td><td class=\"muted\">" + esc(f.size) + "</td></tr>"; }).join("") +
+        files.map(function(f){ return "<tr><td><code>" + esc(f.path) + '</code></td><td class="muted">' + esc(f.size) + "</td></tr>"; }).join("") +
         "</tbody></table>";
     }).join("");
 

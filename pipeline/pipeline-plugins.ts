@@ -4,13 +4,12 @@
  * ## Why (bean `squu`, owner ruling 2026-10-01 ~18:15)
  *
  * The sci-bound pipeline files — the Lean lexer, the LaTeX preflight, Lean
- * coverage, one folio's chapter profiles — go straight to
- * `folio-assistant-sci`, the top layer. A generic module that imports one of
- * them would, after that move, be a lower → higher import, which
- * `check:import-direction` rejects. So the generic caller asks for a KIND here
- * and the science layer fills it through its `contributes` module
- * (`folio-assistant-sci/contributions.ts`). Neither side names the other's
- * files: the edge is inverted, not hidden.
+ * coverage, one folio's chapter profiles — go straight to the science layer,
+ * the top layer. A generic module that imports one of them would, after that
+ * move, be a lower → higher import, which `check:import-direction` rejects.
+ * So the generic caller asks for a KIND here and the science layer fills it
+ * through the `pipeline-plugins` graph it declares (one node per slot).
+ * Neither side names the other's files: the edge is inverted, not hidden.
  *
  * ## The shape is the one the repository already uses
  *
@@ -47,8 +46,13 @@
  * @module pipeline/pipeline-plugins
  */
 
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
 // ── The slots, and what fills each ─────────────────────────────────
@@ -140,6 +144,8 @@ export class UnregisteredPipelinePluginError extends Error {
     readonly kind: string,
     readonly root: string | undefined,
     readonly filled: string[],
+    /** Instances in the checkout that DECLARE a node for this slot — read from their declarations. */
+    readonly declaredBy: string[] = [],
   ) {
     super(
       `No dependency contributes the pipeline plugin "${kind}". ` +
@@ -150,8 +156,10 @@ export class UnregisteredPipelinePluginError extends Error {
           ? `Slots that ARE filled: ${filled.join(", ")}. `
           : "No slot is filled at all. ") +
         `"${kind}" is generic pipeline code reaching a higher layer's code ` +
-        `(normally folio-assistant-sci): declare that instance as a dependency, ` +
-        `or have its contributes module list a pipelinePlugins entry of this kind.`,
+        (declaredBy.length
+          ? `(declared in this checkout by ${declaredBy.join(", ")}): declare that instance as a dependency.`
+          : "(no instance in this checkout declares it): declare a dependency whose `pipeline-plugins` " +
+            "graph holds a node for this slot."),
     );
     this.name = "UnregisteredPipelinePluginError";
   }
@@ -198,9 +206,47 @@ export function pipelinePlugin<K extends PipelinePluginKind>(kind: K): PipelineP
       kind,
       loadedFrom,
       reg.contributedPipelinePlugins().map((p) => `${p.kind} (${p.contributor})`),
+      slotDeclaredBy(loadedFrom ?? resolve(import.meta.dir, "..", ".."), kind),
     );
   }
   return impl as PipelinePlugins[K];
+}
+
+/**
+ * The instances in the checkout at `repoRoot` whose declared
+ * `pipeline-plugins` graph holds a node for `slot` — what the error offers as
+ * the dependency to declare, read from the declarations rather than written
+ * down, so this generic module names no layer above it
+ * (check:reference-direction). Only the DECLARATION is read: nothing is
+ * loaded, so a broken contributor cannot hide behind the error it would fix.
+ * Empty when none does, or when the checkout cannot be read.
+ */
+export function slotDeclaredBy(repoRoot: string, slot: string): string[] {
+  const out: string[] = [];
+  let roots: string[];
+  try {
+    roots = checkoutInstanceRoots(repoRoot);
+  } catch {
+    return out;
+  }
+  for (const root of roots) {
+    try {
+      const name = readDeclaration(root)?.name;
+      if (name === undefined) continue;
+      const fills = directoriesForGraph(root, "pipeline-plugins").some(
+        (dir) =>
+          existsSync(dir) &&
+          readdirSync(dir)
+            .filter((f) => f.endsWith(".json"))
+            .some((f) => (JSON.parse(readFileSync(join(dir, f), "utf-8")) as { slot?: unknown }).slot === slot),
+      );
+      if (fills && !out.includes(name)) out.push(name);
+    } catch {
+      // An unreadable declaration or node is another gate's finding; the
+      // error this feeds must still be raised.
+    }
+  }
+  return out.sort();
 }
 
 /**

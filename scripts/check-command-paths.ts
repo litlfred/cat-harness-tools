@@ -81,7 +81,7 @@ const SHELL_INFO = /^(sh|bash|shell|zsh|console|terminal|sh\b.*)$/i;
  * a person deciding whether to keep it.
  */
 export function skipCommand(cmd: string): string | undefined {
-  // `cd content && bun run pipeline/bib-qa.ts` — the base is not this root, and
+  // `cd content`, then `pipeline/bib-qa.ts` run from there — the base is not this root, and
   // guessing it is how a check starts reporting a folio's layout as a defect.
   if (/(^|[;&|]\s*)cd\s/.test(cmd)) return "changes directory — the base is not the repository root";
   // `git show origin/main:beans/defs/x.md` — a ref is path-shaped and is not a path.
@@ -160,8 +160,8 @@ export interface CommandPathReport {
  * case: `scripts/install-beans.sh` names a directory this repository does not
  * have, and it is a defect precisely because the document is about this tree.
  *
- * **A skill may be about a FOLIO.** `bun run pipeline/content-graph.ts`
- * is correct in a folio and unresolvable in the platform, which carries no
+ * **A skill may be about a FOLIO.** Running `pipeline/content-graph.ts` is
+ * correct in a folio and unresolvable in the platform, which carries no
  * folio — `AGENTS.md` says so in its first banner. Failing on those would make
  * the check unrunnable, and exempting the whole corpus would give up the `z9eb`
  * case, where `session-intent` named `STATUS.md` and `docs/coordination/` and

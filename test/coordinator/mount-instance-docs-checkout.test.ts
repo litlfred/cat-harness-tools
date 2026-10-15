@@ -14,13 +14,12 @@ import { servedDirectories } from "../../scripts/mount-instance-docs.js";
 
 describe("a served directory's bytes publish at /<instance>/<path> — bean 680p", () => {
 
-  it("the real declarations serve smart-trust's, smart-base's and smart-immunizations' artefact indexes and smart-trust's OpenAPI graph, and nothing else", () => {
+  it("the real declarations serve smart-trust's and smart-base's artefact indexes and smart-trust's OpenAPI graph, and nothing else", () => {
     const routes = servedDirectories().map((s) => s.route).sort();
     // `smart-trust/openapi` added 2026-10-03 (bean `s4ta`): the OpenAPI
     // graph (cat-harness's `openapi` subgraph renders it), whose thin pages fetch the document beside them.
-    // `smart-immunizations/fhir-artifact-index` joined when that IG was
-    // harnessed as its own instance and declared its artefact index exactly as
-    // smart-trust does (its pages fetch the index beside them).
+    // `smart-immunizations/fhir-artifact-index` since smart-immunizations joined
+    // the index (bean `mftp`): it serves its artefact index as smart-base does.
     expect(routes).toEqual(["smart-base/fhir-artifact-index", "smart-immunizations/fhir-artifact-index", "smart-trust/fhir-artifact-index", "smart-trust/openapi"]);
   });
 });

@@ -43,11 +43,13 @@ import {
   promoteCommand,
   usableOutlineEntries,
   withDerivedArms,
+  withKnownTitle,
 } from "../ingest-document.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -429,7 +431,10 @@ describe("the verdict as a committed sidecar", () => {
       return;
     }
     expect(staleSidecars(root, all ?? [])).toEqual([]);
-  });
+    // A real-corpus walk: ~5.2 s on the CI runner, over bun's 5 s default, so
+    // it timed out there as a "new failure" on unrelated PRs. A timeout, not a
+    // skip — the same budget the other real-corpus tests carry.
+  }, 30_000);
 });
 
 
@@ -718,7 +723,8 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // live pipeline, because the milnorlink checks passed over it (the
     // incomplete case refuses either way, and the complete case was staged by
     // hand straight into the entry directory).
-    expect(src).toContain("planFor(pdf, undefined, stagingRoot)");
+    // The third argument is what matters; `--text` adds two after it (2026-10-14).
+    expect(src).toContain("planFor(pdf, undefined, stagingRoot,");
     expect(src).not.toContain("const plan = planFor(pdf);");
 
     // AND THE SAME FOR THE SENTENCE IT PRINTS, which this test did not cover
@@ -1198,6 +1204,61 @@ describe("an entry's contents are a CLOSED set — `3psh`", () => {
   });
 });
 
+/**
+ * A DECLARED library sub-graph inside an entry is the entry's own KG content,
+ * not a stray — bean `8pzh` item 1 (owner, 2026-10-12: L1 extraction output
+ * lives beside its library entry and is published with it). The kind comes
+ * from the registry (`within: "library"`), never a directory name here.
+ */
+describe("an entry's declared library sub-graph is not a stray — `8pzh`", () => {
+  const PAGED = {
+    "structure.json": '{"$schema":"pdf-structure/v1","doc_id":"d","sections":[]}',
+    "manifest.jsonld": "{}",
+  };
+  const registry = (): GraphTypologyRegistry => {
+    const reg = new GraphTypologyRegistry();
+    reg.register("probe-extraction", { renderable: false, holds: "derived", summary: "x", within: "library" });
+    reg.register("probe-loose", { renderable: false, holds: "derived", summary: "x" });
+    return reg;
+  };
+  /** An instance whose `library/e1/` holds `out/`, declared with `kinds` (or not at all). */
+  const instance = (kinds: string[] | undefined): string => {
+    const root = mkdtempSync(join(tmpdir(), "l1-subgraph-"));
+    made.push(root);
+    const e1 = join(root, "library", "e1");
+    mkdirSync(join(e1, "out"), { recursive: true });
+    for (const [n, b] of Object.entries(PAGED)) writeFileSync(join(e1, n), b);
+    writeFileSync(join(e1, "out", "graph.json"), "{}");
+    writeFileSync(
+      join(root, "fixture.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "fixture",
+        directories: [
+          { id: "library", path: "library/", graphTypologies: ["library"] },
+          ...(kinds === undefined ? [] : [{ id: "e1-out", path: "library/e1/out/", graphTypologies: kinds }]),
+        ],
+      }),
+    );
+    return e1;
+  };
+  const contents = (dir: string) => checkEntry(dir, registry()).requirements.find((r) => r.name === "contents");
+
+  test("a directory declared with a within-library kind is MET", () => {
+    expect(contents(instance(["probe-extraction"]))?.state).toBe("met");
+  });
+
+  test("the same directory UNDECLARED is still a stray", () => {
+    const r = contents(instance(undefined));
+    expect(r?.state).toBe("unmet");
+    expect(r?.detail).toContain("out");
+  });
+
+  test("declared with a kind that is NOT within library is still a stray", () => {
+    expect(contents(instance(["probe-loose"]))?.state).toBe("unmet");
+  });
+});
+
 describe("libraryRootFor (bean 12ws)", () => {
   test("returns cwd when it declares a library graph", () => {
     // A fixture, not a sibling instance: `who-iris/` exists only in the
@@ -1225,3 +1286,36 @@ describe("libraryRootFor (bean 12ws)", () => {
   });
 });
 
+
+// ── The text rung, through the one entry point (owner, 2026-10-14) ─────────
+//
+// A Markdown source reached `library/` through `text-structure.ts` alone and
+// never got its KG nodes (litlfred/dth-hrh): the skill named two more steps
+// and nothing ran them. Through `cat ingest --text` it takes the notebook's
+// derived arm, and `--promote` writes its nodes as for every rung.
+describe("--text: a text source through cat ingest", () => {
+  test("is routed to text-structure only when the caller says so, never by extension", () => {
+    const p = planFor("/tmp/HWF_Outline.md", undefined, LIB, null, true);
+    expect(p.rung).toBe("text");
+    expect(p.steps).toHaveLength(1);
+    const step = p.steps[0]!;
+    expect(step.join(" ")).toContain("text-structure.ts");
+    expect(step).toContain("--doc-id");
+    expect(step[step.length - 1]).toBe("/tmp/HWF_Outline.md");
+    // Without the flag the same file is not read as text: the extension decides nothing.
+    expect(planFor("/tmp/HWF_Outline.md", { outline: 0, chars: 50_000 }, LIB, null, false).rung).not.toBe("text");
+  });
+
+  test("a binary file is refused as text, not read", () => {
+    expect(planFor("/tmp/x.md", undefined, LIB, "application/pdf", true).rung).toBe("undetermined");
+    expect(planFor("/tmp/x.xml", undefined, LIB, "application/xml", true).rung).toBe("text");
+  });
+
+  test("it takes the l1-blocks arm, and a known title reaches the rung", () => {
+    const p = planFor("/tmp/HWF_Outline.md", undefined, LIB, null, true);
+    const armed = withDerivedArms(p, "/tmp/HWF_Outline.md", "/stage", "/stage/slug", "/lib");
+    expect(armed.steps).toHaveLength(2);
+    expect(armed.steps[1]!.join(" ")).toContain("l1-blocks.ts -o /stage/slug");
+    expect(withKnownTitle(p, "The Outline").steps[0]).toContain("--title");
+  });
+});

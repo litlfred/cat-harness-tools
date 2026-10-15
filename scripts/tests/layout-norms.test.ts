@@ -16,13 +16,15 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+
 import { checkLayoutNorms, pairKey, readBaseline } from "../check-layout-norms.ts";
 
 const INSTANCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
 
 /** A throwaway repository with one instance declaring `dirs`. */
-function fixture(dirs: Array<{ id: string; path: string }>): string {
+function fixture(dirs: Array<{ id: string; path: string; graphTypologies?: string[] }>): string {
   const repo = mkdtempSync(join(tmpdir(), "layout-norms-"));
   const inst = join(repo, "thing");
   for (const d of dirs) mkdirSync(join(inst, d.path), { recursive: true });
@@ -32,14 +34,55 @@ function fixture(dirs: Array<{ id: string; path: string }>): string {
       name: "thing",
       description: "fixture",
       directories: dirs.map((d) => ({
-        ...d,
         graphTypologies: ["cat-harness"],
+        ...d,
         description: "fixture",
       })),
     }),
   );
   return repo;
 }
+
+/**
+ * A sub-graph KIND nested inside its parent's — bean `8pzh` item 1 (owner,
+ * 2026-10-12: L1 extraction output lives beside its library entry). The kind is
+ * the registry's, `within` the parent directory's kind, so the nesting is the
+ * declared shape, not a root declaration reaching down.
+ */
+describe("a typology declared `within` its parent's kind is sanctioned — `8pzh`", () => {
+  const registry = (): GraphTypologyRegistry => {
+    const reg = new GraphTypologyRegistry();
+    reg.register("probe-extraction", { renderable: false, holds: "derived", summary: "x", within: "library" });
+    reg.register("probe-elsewhere", { renderable: false, holds: "derived", summary: "x", within: "methodology" });
+    return reg;
+  };
+  const nested = (kind: string): string =>
+    fixture([
+      { id: "library", path: "library/", graphTypologies: ["library"] },
+      { id: "e1-out", path: "library/e1/out/", graphTypologies: [kind] },
+    ]);
+
+  it("is NOT reported when the child's kind is `within` the parent's", () => {
+    const repo = nested("probe-extraction");
+    try {
+      const r = checkLayoutNorms(repo, join(repo, "none.json"), registry());
+      expect(r.undetermined).toBe(false);
+      expect(r.found).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("IS reported when the child's kind is `within` some OTHER kind", () => {
+    const repo = nested("probe-elsewhere");
+    try {
+      const r = checkLayoutNorms(repo, join(repo, "none.json"), registry());
+      expect(r.unexpected).toEqual([pairKey("thing", "library/", "library/e1/out/")]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("the ratchet bites — the test that matters", () => {
   it("REPORTS and FAILS a nested declaration that is not baselined", () => {

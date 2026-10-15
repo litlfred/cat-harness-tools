@@ -62,6 +62,8 @@
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --check
  *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --doc <doc-id>
+ *   bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --entry <entry-dir>
+ *   (any other argument is refused, and nothing is written)
  *
  * @module pipeline/gen-library-jsonld
  * @covers library, uploads
@@ -344,7 +346,7 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
  *
  * The declared name, never the folder's (bean `j3ls`, as `t5dm` for
  * `instanceOf`): a separated instance's repository is wherever it was cloned,
- * and who-iris cloned into `wim/` rewrote every manifest IRI to
+ * and a separated instance cloned into `wim/` rewrote every manifest IRI to
  * `.../jsonld/wim/<id>/`, so all 813 nodes read as stale.
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
@@ -424,7 +426,7 @@ export function buildDocumentNodes(
   // Section ranges OVERLAP -- a section's `page_end` is the start page of the
   // next one, inclusive -- so without this a figure is emitted once per
   // containing section, every emission writing the SAME path with a different
-  // `derivedFrom`. Measured 2026-09-22 on `smart-base/library/9789240093362-eng/`
+  // `derivedFrom`. Measured 2026-09-22 on an IG library entry (`9789240093362-eng`)
   // (bean `imen`): page 71 falls inside FOUR sections, page 68 inside three,
   // page 30 inside two. Last write won, and `--check` then reported the losers
   // stale forever, because re-running reproduced the same race.
@@ -589,7 +591,8 @@ let contentPrefixes: Map<string, string> | undefined;
  * instance the CONTENT repository declares as a dependency.
  *
  * `defaultInstancePrefixes` reads only the checkout this module sits in, so
- * run from a content repository it could not bind `folio-assistant-sci:` —
+ * run from a content repository it could not bind a dependency's prefix
+ * (e.g. the science layer's) —
  * the prefix of the `Theorem` and `Definition` types that theorem candidates
  * carry — and every entry with a candidate threw. Measured on qou 2026-10-11:
  * 18 entries had no section nodes for that reason. `instancePrefixes` already
@@ -949,8 +952,33 @@ export function buildEntryNodes(docId: string, dir: string, locatedAt: string = 
   return { state: "no-input" };
 }
 
+/** The flags `run` reads, and those that take a value. */
+const FLAGS = new Set(["--check", "--prune", "--entry", "--doc"]);
+const VALUED = new Set(["--entry", "--doc"]);
+
+/**
+ * An argument `run` would not read, or undefined. A flag it does not know
+ * used to be ignored, so `--help` ran a full WRITE over every library
+ * (2026-10-14, litlfred/dth-hrh): an unknown flag is now refused before
+ * anything is written.
+ */
+export function unknownArgument(argv: readonly string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (!FLAGS.has(a)) return a;
+    if (VALUED.has(a)) i++;
+  }
+  return undefined;
+}
+
 async function run(): Promise<number> {
   const argv = process.argv.slice(2);
+  const unknown = unknownArgument(argv);
+  if (unknown !== undefined) {
+    console.error(`gen-library-jsonld: unknown argument ${JSON.stringify(unknown)}; nothing written.`);
+    console.error("usage: gen-library-jsonld.ts [--check] [--prune] [--doc <doc-id>] | --entry <dir>");
+    return 2;
+  }
   // ONE entry directory, wherever it is — a STAGED entry, before promotion.
   // `ingest-document.ts` runs this as the `referenced` rung's manifest arm
   // (bean `scfh`), so the manifest has one writer whether the entry is staged

@@ -62,18 +62,20 @@ import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarat
 import { sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { declaredDirectory, localSiteDir } from "./lib/local-site-dir.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "external-schemas-viewer";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+// The checkout holding the harness and this layer (`REPO_ROOT`), not a guess
+// three levels up: `../../../cat-harness` matched ANY directory of that name
+// above the checkout (a sibling clone in a scratch directory), and the page
+// then counted the uses of a different tree — 0 of 281 here.
 const REPO = existsSync(join(INSTANCE_ROOT, "cat-harness"))
   ? INSTANCE_ROOT
-  : existsSync(join(INSTANCE_ROOT, "../../../cat-harness"))
-  ? resolve(INSTANCE_ROOT, "../../..")
-  : resolve(INSTANCE_ROOT, "..");
+  : REPO_ROOT ?? resolve(INSTANCE_ROOT, "..");
 
 /** The graph typology this renders. A KIND, never a path. */
 const KIND = "external-schema";
@@ -218,6 +220,7 @@ export function page(
     "---",
     'title: "External schemas"',
     'description: "The specifications this repository depends on — the edition of each, what would move if one bumped, and the terms it actually branches on."',
+    "generated: gen-external-schemas-viz.ts — do not hand-edit; run `bun run cat external-schemas:viz`",
     "---",
     `<style>${CSS}</style>`,
     "",

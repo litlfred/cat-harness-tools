@@ -34,6 +34,7 @@
  * Exit codes follow the bean gates: 0 every declaration tagged, 1 a defect
  * (untagged under `--check`, or a foreign tag), 2 could not check.
  *
+ * @covers cat-harness — every harness declaration `<instance>/<instance>.json`, for its `$schema` tag
  * @module scripts/declarations-retag
  */
 

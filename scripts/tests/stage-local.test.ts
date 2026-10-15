@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ARTIFACT_MAX_FILES, artifactBundle, builtSomething, inPlatform, ownerRepoOf, platformAssetRefs, readStagingInputs, slugOf } from "../stage-local.ts";
+import { agentRunLine, agentRunOf, ARTIFACT_MAX_FILES, artifactBundle, builtSomething, inPlatform, ownerRepoOf, platformAssetRefs, readStagingInputs, slugOf } from "../stage-local.ts";
 
 describe("stage-local", () => {
   test("reads the staging workflow's inputs from the folio's own file, with the workflow's defaults", () => {
@@ -86,5 +86,34 @@ describe("stage-local", () => {
 <a href="https://o.github.io/p/tools/">Tools</a><script src="https://cdn.example/x.js"></script>`;
     expect(platformAssetRefs(new Map([["index.html", page]]))).toEqual({ roots: ["https://o.github.io/p"], assets: ["css/navbar.css", "js/navbar.js"] });
     expect(platformAssetRefs(new Map([["a.html", "<p>no rail</p>"]]))).toEqual({ roots: [], assets: [] });
+  });
+});
+
+describe("stage-local: agent-run is what the repository declares (owner, 2026-10-14, Q7)", () => {
+  const repoWith = (index?: unknown): string => {
+    const d = mkdtempSync(join(tmpdir(), "stage-local-agentrun-"));
+    if (index !== undefined) writeFileSync(join(d, "index.config.json"), typeof index === "string" ? index : JSON.stringify(index));
+    return d;
+  };
+  const idx = (site?: object) => ({ $schema: "folio-index-config/v1", instances: [{ name: "a" }], ...(site ? { site } : {}) });
+
+  test("declared: site.agentRun true in the repository's own index.config.json", () => {
+    const a = agentRunOf(repoWith(idx({ agentRun: true })));
+    expect(a.agentRun).toBe(true);
+    expect(agentRunLine(a)).toContain("yes, declared in index.config.json");
+    expect(agentRunLine(a)).toContain("never dispatch");
+  });
+
+  test("not declared: no index, no flag, or false, each said as what it is", () => {
+    expect(agentRunOf(repoWith())).toMatchObject({ agentRun: false, why: "absent" });
+    expect(agentRunOf(repoWith(idx()))).toMatchObject({ agentRun: false, why: "not-declared" });
+    expect(agentRunOf(repoWith(idx({ agentRun: false })))).toMatchObject({ agentRun: false, why: "declared-false" });
+    expect(agentRunLine(agentRunOf(repoWith()))).toContain("no index.config.json");
+  });
+
+  test("an index that cannot be read is UNKNOWN, never 'not agent-run'", () => {
+    const a = agentRunOf(repoWith("{ not json"));
+    expect(a.agentRun).toBe("unreadable");
+    expect(agentRunLine(a)).toContain("unknown");
   });
 });

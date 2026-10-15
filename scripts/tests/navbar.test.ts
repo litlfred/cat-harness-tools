@@ -43,7 +43,7 @@ import {
   withGeometry,
 } from "../gen-navbar-geometry-css.js";
 import { publishedUrlOf, solveCrop } from "../harness-tiles.js";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declaredGraphs, toRootFor, visualiserHref } from "../mount-instance-docs.js";
 import { kindTitle } from "../lib/nav-label.js";
 import { graphTypologyRowDecor } from "../lib/graph-typology-nav.js";
@@ -1185,10 +1185,11 @@ describe("the row's glyphs are docs-ui.js's glyphs (bean lhvt)", () => {
   // `navbar-row.js` carries copies of the six drawings; `docs-ui.js` still
   // draws them on its tiles. Evaluated, not grepped: the constants are string
   // concatenations, so the comparison is of the SVG each produces.
-  // Asked, never spelled: both scripts are the site CHROME's since cat-harness
-  // moved it into its own `site-chrome/` layer (semantic subgraphs, slice 1).
+  // Both live in the harness's site CHROME, `site-chrome/` (its own subgraph
+  // since cat-harness 19e5d6ba), not in `docs/`.
+  const js = join(HARNESS_ROOT, "site-chrome", "assets", "js");
   const glyphs = (file: string): Record<string, string> => {
-    const src = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, `assets/js/${file}`)), "utf-8");
+    const src = readFileSync(join(js, file), "utf-8");
     const out: Record<string, string> = {};
     for (const name of ["STICKY_GLYPH", "BEANS_GLYPH", "PROCESS_GLYPH", "NET_GLYPH", "TILES_GLYPH", "FISH_GLYPH", "QR_GLYPH"]) {
       const m = new RegExp(`var ${name} =([\\s\\S]*?);\\n`).exec(src);

@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { seedMainIfEmpty } from "../init-folio.ts";
+import { initFolio, seedMainIfEmpty } from "../init-folio.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -102,5 +102,38 @@ describe("history is never seeded over", () => {
     const r = seedMainIfEmpty(repo, "demo");
     expect(r.kind).toBe("stopped");
     expect(r.kind === "stopped" && r.reason).toContain("could not ask the remote");
+  });
+});
+
+describe("--skip-vcs still puts main on an empty remote (dth-hrh, 2026-10-14)", () => {
+  test("a cloud checkout on an unborn feature branch: main reaches the remote, the branch is kept", () => {
+    const remote = tmp();
+    git(remote, "init", "--quiet", "--bare");
+    const repo = tmp();
+    git(repo, "init", "--quiet", "-b", "claude/feature");
+    git(repo, "config", "user.name", "t");
+    git(repo, "config", "user.email", "t@example.org");
+    git(repo, "remote", "add", "origin", remote);
+
+    initFolio({ targetDir: repo, contentType: "document", slug: "doc", title: "Doc", authors: ["A"], link: "sibling", assistantPath: "../platform", skipVcs: true });
+
+    expect(git(remote, "branch", "--list", "main")).toContain("main");
+    expect(git(repo, "symbolic-ref", "--short", "HEAD")).toBe("claude/feature");
+    // The branch starts from main, so its first commit and its PR sit on top of it.
+    expect(git(repo, "rev-parse", "claude/feature")).toBe(git(remote, "rev-parse", "main"));
+  });
+
+  test("a remote with branches is not touched", () => {
+    const remote = tmp();
+    git(remote, "init", "--quiet", "--bare");
+    const seeder = freshRepo();
+    git(seeder, "commit", "--quiet", "--allow-empty", "-m", "x");
+    git(seeder, "push", "--quiet", remote, "HEAD:refs/heads/trunk");
+    const repo = freshRepo();
+    git(repo, "remote", "add", "origin", remote);
+
+    initFolio({ targetDir: repo, contentType: "document", slug: "doc", title: "Doc", authors: ["A"], link: "sibling", assistantPath: "../platform", skipVcs: true });
+
+    expect(git(remote, "branch", "--list", "main")).toBe("");
   });
 });

@@ -120,6 +120,7 @@ import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visua
 import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
+import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -185,7 +186,50 @@ export function baseDocsDir(repo = REPO): string {
   return base.dir;
 }
 
-export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[] } {
+/**
+ * The harness's CHROME layers: its instance-scoped `docs` layers other than
+ * its site directory — `site-chrome/` since slice 1 of the semantic subgraphs,
+ * the theme every shell carries — the same reading {@link baseDocsDir} makes
+ * from the other side. A layer that is declared built at publish and not yet
+ * built (`pending`) is still a chrome layer: it is exactly what a build must
+ * write before it composes.
+ *
+ * The site build reads this to run the publish-time writers whose output
+ * lands in the chrome (`avatars.css`): a folio's site composes the chrome
+ * without ever running `derive:publish`, so a stylesheet the head links was
+ * missing and the link check refused the publish (smart-ra, 2026-10-15).
+ */
+export function chromeLayers(repo = REPO): DocsLayer[] {
+  const harness = join(repo, "cat-harness");
+  const site = existsSync(harness) ? resolve(harness, siteDirFor(harness)) : undefined;
+  const { layers, pending } = docsLayers(repo);
+  return [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site);
+}
+
+/**
+ * The directories an instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
+ * cat-harness `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
+ * absolute paths ending in the separator. Read as `check-declared-dirs.ts`
+ * `builtAtPublishDirs` reads them.
+ */
+function builtAtPublishIn(instanceRoot: string): Set<string> {
+  const p = declarationPathIn(instanceRoot);
+  if (p === undefined || !existsSync(p)) return new Set();
+  const decl = JSON.parse(readFileSync(p, "utf-8")) as { builtAtPublish?: Array<{ path?: string }> };
+  return new Set((decl.builtAtPublish ?? []).flatMap((e) => (typeof e.path === "string" && e.path.endsWith("/") ? [resolve(instanceRoot, e.path) + sep] : [])));
+}
+
+/**
+ * The declared docs layers, split three ways: on disk (`layers`); absent
+ * (`missing`, a finding: the `dh4f` shape); and absent but declared BUILT AT
+ * PUBLISH by the instance that declares them (`pending`). A `pending` layer is
+ * correctly absent from a checkout whose build has not run the step that
+ * writes it. That is `derive:publish`'s question, which refuses an entry that
+ * came out empty. It is said and left out, never refused: an IG's own site
+ * build, which makes its pages from the AST, never runs that step
+ * (smart-trust, 2026-10-15).
+ */
+export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[]; pending: DocsLayer[] } {
   const decl = JSON.parse(readFileSync(declarationPathIn(join(repo, "cat-harness"))!, "utf-8")) as {
     directories?: DeclEntry[];
   };
@@ -224,9 +268,13 @@ export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLay
   }
   // Base (instance-scoped) before overlay (repository-scoped): later wins.
   found.sort((a, b) => Number(a.repositoryScoped) - Number(b.repositoryScoped));
+  const atPublish = new Set([...builtAtPublishIn(repo), ...builtAtPublishIn(join(repo, "cat-harness"))]);
+  const absent = found.filter((l) => !existsSync(l.dir));
+  const pending = absent.filter((l) => atPublish.has(resolve(l.dir) + sep));
   return {
     layers: found.filter((l) => existsSync(l.dir)),
-    missing: found.filter((l) => !existsSync(l.dir)),
+    missing: absent.filter((l) => !pending.includes(l)),
+    pending,
   };
 }
 
@@ -646,6 +694,9 @@ function filesUnder(dir: string, prefix = ""): string[] {
   return out;
 }
 
+/** What a shell writes for the platform's per-page todo listing: no page lists a note. */
+export const EMPTY_TODO_LISTING: { pages: Record<string, string> } = { pages: {} };
+
 export interface ComposeReport {
   /**
    * A shell's scoping to the folio whose site it is (#2263): which instance,
@@ -657,6 +708,8 @@ export interface ComposeReport {
   readonly layers: DocsLayer[];
   /** Declared layers whose directory does not exist. */
   readonly missing: DocsLayer[];
+  /** Declared layers absent because they are built at publish ({@link docsLayers}). */
+  readonly pending?: DocsLayer[];
   /** `<relative path>` → the layer id that supplied the file finally present. */
   readonly suppliedBy: Record<string, string>;
   /** Paths a later layer shadowed, with both layer ids. */
@@ -707,6 +760,8 @@ export interface ComposeReport {
    * the site carries still stands there (a site not yet regenerated).
    */
   readonly forwards: { written: string[]; superseded: string[] };
+  /** The repository-scoped layers a platform-only shell left out (`platformOnly`), never silently. */
+  readonly leftOut?: DocsLayer[];
 }
 
 /**
@@ -807,6 +862,22 @@ export interface ComposeOptions {
    * tile re-based — never the platform's numbers on someone else's page.
    */
   readonly foreign?: { instance?: string; platformBase?: string; title?: string };
+  /**
+   * A shell of the PLATFORM's chrome only: the repository-scoped layers — the
+   * docs directories the checkout root's own declaration names — are left out
+   * and reported in `leftOut`. Only with `shell`.
+   *
+   * An IG repository's own site (`ig-repo-site`) asks for this. Its shell was
+   * always composed in a folio-assistant checkout (fhir-harness's
+   * `templates/ig-repo-site/folio-site.yml`), whose root declares no docs
+   * layer, so it carried the platform's chrome and nothing of the IG's. Run
+   * from the IG's own checkout, the root's `docs` entry (smart-trust's
+   * `docs/`, the IG's artefact pages and their `assets/`) became an overlay,
+   * and its assets arrived twice: once here, once from `stage-ig-sites`, which
+   * builds that directory into the IG site (`igSite`) and refuses a path the
+   * host already has. That step owns the directory; the shell does not.
+   */
+  readonly platformOnly?: boolean;
 }
 
 /** Is `rel` part of the site's chrome — Jekyll machinery or a static asset — rather than a page? */
@@ -816,7 +887,12 @@ export const isChrome = (rel: string): boolean => {
 };
 
 export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): ComposeReport {
-  const { layers, missing } = docsLayers(repo);
+  if (opts.platformOnly && !opts.shell) throw new Error("compose-docs: platformOnly is a shell's option (--platform-only needs --shell)");
+  const declared = docsLayers(repo);
+  const missing = declared.missing;
+  const pending = declared.pending;
+  const leftOut = opts.platformOnly ? declared.layers.filter((l) => l.repositoryScoped) : [];
+  const layers = opts.platformOnly ? declared.layers.filter((l) => !l.repositoryScoped) : declared.layers;
   const withheld = opts.staging === true ? [] : withheldFromCanonical(repo);
   const withheldFiles: string[] = [];
 
@@ -957,6 +1033,13 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       writeFileSync(data, `${JSON.stringify(next, null, 2)}\n`);
       scoped = { instance: scope.instance, platformBase: scope.platformBase, hostProjections: [...new Set(hostProjections)].sort() };
     }
+    // THE PLATFORM'S PER-PAGE TODO LISTING (bean `lwjc`) is a projection of
+    // ITS notes on ITS pages. The footer falls back to the whole listing when
+    // the index is ABSENT, so leaving it out would put every platform note on
+    // the folio's site. Written EMPTY instead (owner, 2026-10-14): no page of
+    // the folio's site lists a platform note, and the footer includes nothing.
+    const todoListing = join(out, "_data", "todo_listing.json");
+    if (existsSync(todoListing)) writeFileSync(todoListing, `${JSON.stringify(EMPTY_TODO_LISTING, null, 2)}\n`);
     // The landing stickies' platform links, re-based the same way (who-iris's
     // own site, 2026-10-09: they resolved under the folio's baseurl and 404'd).
     const stickiesData = join(out, "_data", "stickies.json");
@@ -986,6 +1069,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   // ever writes over the other or over a page.
   const forwards = opts.shell ? { written: [], superseded: [] } : writeForwardingPages(out, repo, withheld);
 
+
   // DEDUPED. A path present in two layers is withheld once per layer, and a
   // report listing it twice made `withheld.length` stop meaning "files this
   // tree does not carry" — which is the only thing a reader would use it for.
@@ -993,6 +1077,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   return {
     layers,
     missing,
+    pending,
     suppliedBy,
     overrides,
     added,
@@ -1003,7 +1088,30 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     aliases,
     forwards,
     ...(scoped ? { scoped } : {}),
+    ...(opts.platformOnly ? { leftOut } : {}),
   };
+}
+
+/**
+ * THE GLOB SCOPES, EXPANDED — the stage the CLI runs straight after
+ * `compose()`, over the finished tree (owner, 2026-10-14: "Explicit scopes").
+ *
+ * Jekyll re-runs a glob scope's `Dir.glob` on every `to_liquid` of every page,
+ * which was most of the docs build's CPU; one exact-path scope per match is
+ * the same set of pages in Jekyll 3.10 and 4 at a fraction of the cost
+ * (`lib/default-scope-globs.ts`). Generated here, never written by hand, so a
+ * page added to a globbed folder is covered by the next compose.
+ *
+ * A stage of its own rather than part of `compose()`: composition is ruled
+ * parse-equal to the merge of the layers' configs (D1), and the tests that
+ * hold it to that stay true of `compose()`. This stage then rewrites ONLY the
+ * `defaults` block, splicing it into the composed file's text, so every other
+ * key keeps its bytes; with no glob scope the file is not touched at all.
+ */
+export function expandComposedScopes(out: string): ExpandedScope[] {
+  const configPath = join(out, "_config.yml");
+  if (!existsSync(configPath)) return [];
+  return expandGlobScopesInFile(configPath, out);
 }
 
 /** Every file beneath a directory with its bytes — for the identity check. */
@@ -1022,7 +1130,7 @@ if (import.meta.main) {
   const out = i >= 0 ? argv[i + 1] : undefined;
   if (!out) {
     console.error(
-      "usage: compose-docs.ts --out <dir> [--check] [--staging] [--changed-files <file>] [--shell [--instance <name>] [--title <label>] [--link-root <platform site>]]",
+      "usage: compose-docs.ts --out <dir> [--check] [--staging] [--changed-files <file>] [--shell [--platform-only] [--instance <name>] [--title <label>] [--link-root <platform site>]]",
     );
     process.exit(2);
   }
@@ -1056,6 +1164,11 @@ if (import.meta.main) {
   // not symmetric.
   const staging = argv.includes("--staging");
   const shell = argv.includes("--shell");
+  const platformOnly = argv.includes("--platform-only");
+  if (platformOnly && !shell) {
+    console.error("compose-docs: --platform-only needs --shell");
+    process.exit(2);
+  }
   // `--instance <name> [--title <label>] [--link-root <platform site>]`: whose
   // site the shell is for (#2263). Only meaningful with --shell.
   const opt = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
@@ -1066,8 +1179,15 @@ if (import.meta.main) {
         ...(opt("--link-root") ? { platformBase: opt("--link-root")! } : {}),
       }
     : undefined;
-  const r = compose(resolve(out), REPO, { staging, changedFiles, shell, ...(foreign ? { foreign } : {}) });
+  const r = compose(resolve(out), REPO, { staging, changedFiles, shell, platformOnly, ...(foreign ? { foreign } : {}) });
+  // The glob front-matter scopes, expanded over the tree just composed.
+  // Not on a shell: its pages are composed into it by later steps, so its
+  // tree is not finished here, and a glob expanded now would miss them.
+  const scopes = shell ? [] : expandComposedScopes(resolve(out));
   if (shell) console.log("  --shell: the chrome only — Jekyll machinery and assets, no page, no composed instance");
+  for (const l of r.leftOut ?? []) {
+    console.log(`  --platform-only: left out ${l.id} (repository) — ${relative(REPO, l.dir)}; the site's own steps compose it`);
+  }
   if (r.scoped) {
     console.log(
       `  --shell: harness data scoped to ${r.scoped.instance ?? "an UNNAMED folio (pass --instance: nothing is then its own)"}; ` +
@@ -1076,6 +1196,9 @@ if (import.meta.main) {
     for (const h of r.scoped.hostProjections) console.log(`  HOST PROJECTION left out: ${h}`);
   }
 
+  for (const m of r.pending ?? []) {
+    console.log(`  built at publish, not built in this build — left out: ${m.id} (${relative(REPO, m.dir)})`);
+  }
   for (const m of r.missing) {
     // A declared layer with no directory is a FINDING, not a skip. It is the
     // `dh4f` shape exactly: the declaration says to look, and there is nothing
@@ -1113,6 +1236,9 @@ if (import.meta.main) {
     console.log(`  ${d.carry ? "CARRIED " : "STUBBED "} ${d.instance.under} — ${d.why}`);
   }
 
+  // Each glob scope with what it became, so a reader can see a folder's pages
+  // were covered rather than trust a count.
+  for (const x of scopes) console.log(`  SCOPE    ${x.glob} -> ${x.paths.length} exact path(s): ${x.paths.join(", ")}`);
   console.log(`  ${r.aliases.written.length} alias redirect(s) written`);
   console.log(
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +

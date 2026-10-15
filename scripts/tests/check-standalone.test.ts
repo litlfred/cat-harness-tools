@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { judge, STANDALONE_EXIT } from "../check-standalone.ts";
+import { judge, layerRelativeKey, refreshCommand, STANDALONE_EXIT } from "../check-standalone.ts";
 import { probeStandalone, type LayerDecl } from "../seed-ready.ts";
 
 describe("judge", () => {
@@ -139,4 +139,22 @@ describe("the falsifiers, through the real probe", () => {
       rmSync(root, { recursive: true, force: true });
     }
   }, 60_000);
+});
+
+describe("check-standalone: keys and hints are the layer's, not the machine's", () => {
+  const measured = (findings: string[], count = findings.length) =>
+    ({ state: "measured", count, findings }) as const;
+
+  test("a failure keyed by an absolute path matches its baseline entry wherever it ran", () => {
+    const ci = "/home/runner/work/x/fa/cat-harness-tools/pipeline/p.test.ts > d > t";
+    expect(layerRelativeKey(ci, "cat-harness-tools")).toBe("pipeline/p.test.ts > d > t");
+    expect(layerRelativeKey("scripts/a.test.ts > t", "cat-harness-tools")).toBe("scripts/a.test.ts > t");
+    const j = judge(measured([ci]), { failing: ["/home/user/fa/cat-harness-tools/pipeline/p.test.ts > d > t"], failed: 1 }, "cat-harness-tools");
+    expect(j.exit).toBe(STANDALONE_EXIT.held);
+  });
+
+  test("the hint names the command that rewrites THIS layer's entry", () => {
+    const j = judge(measured([]), { failing: ["a > b"], failed: 1 }, "cat-harness-tools");
+    expect(j.lines.join("\n")).toContain(refreshCommand("cat-harness-tools"));
+  });
 });

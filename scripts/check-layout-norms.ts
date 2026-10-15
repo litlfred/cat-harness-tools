@@ -27,6 +27,24 @@
  * owner chose. Written down here rather than left to be rediscovered as a
  * false finding.
  *
+ * ## A sub-graph KIND that lives inside its parent's (bean `8pzh`)
+ *
+ * The from-within rule above sanctions a nesting by WHO declared it. A second
+ * shape is sanctioned by WHAT the inner directory is: a graph typology whose
+ * registry definition says `within: "<kind>"` is, by definition, a sub-graph
+ * held inside a directory of that kind. Owner, 2026-10-12, bean `8pzh` item 1:
+ * L1 extraction output lives beside its library entry and is published with
+ * it, so an instance declares `library/<entry>/l1-extraction/` with a typology
+ * that is `within: "library"`, nested inside its `library/` entry.
+ *
+ * So a pair is not a finding when one of the child's typologies declares
+ * `within` equal to one of the parent directory's typologies. The rule reads
+ * the registry, never a kind name — the kinds are a content layer's, loaded
+ * from its `typologies/` graph — and it is the same reading
+ * `lib/library-entry-graphs.ts` makes to PUBLISH that directory, so the
+ * check and the publisher cannot disagree about which nesting is intended.
+ * A child whose typology names some other parent kind is still reported.
+ *
  * ## Why the check is "nested inside another DECLARED directory"
  *
  * Depth is the wrong test and would produce false findings immediately.
@@ -87,6 +105,7 @@ import {
   resolveDirectories,
   subgraphTree,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -150,7 +169,11 @@ export function readBaseline(file = BASELINE): string[] {
   return raw.pairs ?? [];
 }
 
-export function checkLayoutNorms(repoRoot = REPO_ROOT, baselineFile = BASELINE): LayoutReport {
+export function checkLayoutNorms(
+  repoRoot = REPO_ROOT,
+  baselineFile = BASELINE,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): LayoutReport {
   const roots = instanceRootsIn(repoRoot);
   const r: LayoutReport = {
     undetermined: roots.length === 0,
@@ -162,12 +185,29 @@ export function checkLayoutNorms(repoRoot = REPO_ROOT, baselineFile = BASELINE):
   if (r.undetermined) return r;
 
   for (const root of roots) {
-    const decl = readDeclaration(root);
+    const decl = readDeclaration(root, registry);
     if (decl === undefined) continue;
     r.instances += 1;
     const name = decl.name ?? basename(root);
-    const dirs = resolveDirectories([{ name, root, own: true }]);
+    const dirs = resolveDirectories([{ name, root, own: true }], registry);
     const pathOf = new Map(dirs.map((d) => [d.id, d.path]));
+    // The typologies at each PATH, unioned over every id naming it (see
+    // `pairKey`): a parent's kind may arrive by its declared entry or a default.
+    const kindsAt = new Map<string, Set<string>>();
+    for (const d of dirs) {
+      const s = kindsAt.get(d.path) ?? new Set<string>();
+      for (const k of d.graphTypologies ?? []) s.add(k);
+      kindsAt.set(d.path, s);
+    }
+    // A sub-graph KIND held inside its parent's (bean 8pzh; module doc): one of
+    // the child's typologies is, in the registry, `within` one of the parent's.
+    const kindWithin = (childPath: string, parentPath: string): boolean => {
+      const parentKinds = kindsAt.get(parentPath) ?? new Set<string>();
+      return [...(kindsAt.get(childPath) ?? [])].some((k) => {
+        const w = registry.get(k)?.within;
+        return w !== undefined && parentKinds.has(w);
+      });
+    };
     // Nesting declared FROM WITHIN (the owner's #980 ruling; bean cmsl): the
     // inner directory is named by a declaration file inside the outer one, so
     // the pair is the sanctioned shape and never a finding.
@@ -199,6 +239,7 @@ export function checkLayoutNorms(repoRoot = REPO_ROOT, baselineFile = BASELINE):
         // directory as `<path>/archive` from `.beans.yml`, so the third-party
         // CLI would recreate it (bean `wekz` recorded the same dependency).
         if (within !== undefined && within === withinOf.get(rel.parent)) continue;
+        if (kindWithin(childPath, parentPath)) continue;
         r.found.push(pairKey(name, parentPath, childPath));
       }
     }

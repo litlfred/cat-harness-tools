@@ -53,17 +53,6 @@ function railedCount(): number {
 const FIXTURE = "cat-harness/railed-fixture/index.html";
 
 /**
- * The Methodologies tile's destination, READ from the data rather than
- * spelled. It was `/methodologies/` when this was written; since the
- * visualisers moved to their declared routes it is the localised
- * `/en/cat-harness/methodologies/`, and a rail row naming the old address
- * named a destination nothing else names, so a planted label never collided.
- */
-const METHODOLOGIES = (
-  JSON.parse(readFileSync(join(SITE, "_data", "harness.json"), "utf-8")) as { tiles: { title: string; href?: string }[] }
-).tiles.find((t) => t.title === "Methodologies")!.href!;
-
-/**
  * A copy of the parts of the site the check reads: the data, the include and
  * the landing templates, plus ONE railed page. A plant goes into the copy, so
  * the live tree is never edited (the restore-by-copy discipline in
@@ -85,13 +74,28 @@ function siteCopy(): { root: string; site: string; files: string[] } {
   return { root, site, files: [`site/${FIXTURE}`] };
 }
 
-/** A minimal railed viewer page whose one row names {@link METHODOLOGIES} as `label`. */
+/**
+ * The site path the data's "Methodologies" tile links to, read from the data
+ * rather than written here: it moved under the locale route
+ * (`/methodologies/` became `/en/cat-harness/methodologies/`), and a plant
+ * aimed at a path the data no longer names conflicts with nothing.
+ */
+function methodologiesHref(site: string): string {
+  const d = JSON.parse(readFileSync(join(site, "_data", "harness.json"), "utf-8")) as { tiles: { title: string; href?: string }[] };
+  const href = d.tiles.find((t) => t.title === "Methodologies")?.href;
+  if (href === undefined || !href.startsWith("/")) throw new Error(`harness.json has no site-absolute "Methodologies" tile (found ${href})`);
+  return href;
+}
+
+/** A minimal railed viewer page whose one row names the Methodologies destination as `label`. */
 function writeRail(site: string, label: string): void {
   const page = join(site, FIXTURE);
   mkdirSync(join(page, ".."), { recursive: true });
+  // FIXTURE is two directories deep, so `../../` is the site root.
+  const href = `../..${methodologiesHref(site)}`;
   writeFileSync(
     page,
-    `<!doctype html><html><body><nav class="fa-nav"><a href="../..${METHODOLOGIES}"><span class="fa-nav-label">${label}</span></a></nav></body></html>\n`,
+    `<!doctype html><html><body><nav class="fa-nav"><a href="${href}"><span class="fa-nav-label">${label}</span></a></nav></body></html>\n`,
   );
 }
 
@@ -146,11 +150,12 @@ describe("a planted second name fails", () => {
   test("on the RAIL: one row's label changed in a viewer page", () => {
     const c = siteCopy();
     // Unplanted, the synthetic rail agrees with the data.
-    expect(checkNavNames(c.root, c.site, c.files).conflicts.find((x) => x.href === METHODOLOGIES)).toBeUndefined();
+    const dest = methodologiesHref(c.site);
+    expect(checkNavNames(c.root, c.site, c.files).conflicts.find((x) => x.href === dest)).toBeUndefined();
     writeRail(c.site, "methodology");
     const r = checkNavNames(c.root, c.site, c.files);
     expect(r.read.railPages).toBe(1);
-    const hit = r.conflicts.find((x) => x.href === METHODOLOGIES);
+    const hit = r.conflicts.find((x) => x.href === dest);
     expect(hit).toBeDefined();
     expect(hit!.names.map((n) => n.label).sort()).toEqual(["Methodologies", "methodology"]);
   });

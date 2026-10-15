@@ -7,12 +7,12 @@
  * @module scripts/tests/bpmn-checklist.test
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
-import { checklistFor, renderAll } from "../bpmn-checklist.ts";
+import { checklistFor, defaultOutDir, orphanChecklists, placementOf, renderAll } from "../bpmn-checklist.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -119,5 +119,69 @@ describe("the checklist projection", () => {
     expect(before.name).toBe("review.checklist.md");
     expect(after.text).not.toBe(before.text);
     expect(after.text).toContain("Review the draft twice");
+  });
+});
+
+describe("where a checklist is committed (owner, 2026-10-14: commit them, in the layer that owns it)", () => {
+  /**
+   * Three instances: `b` below the harness, `h` the harness, `u` above it.
+   * Declarations as instances write them — `<name>/<name>.json` — so the
+   * placement is read the way the real checkout is, not from a stub.
+   */
+  function checkout(): { root: string; harness: string; below: string; above: string; nested: string } {
+    const root = mkdtempSync(join(tmpdir(), "bpmn-checklist-place-"));
+    dirs.push(root);
+    const inst = (name: string, needs: string[]) => {
+      mkdirSync(join(root, name, "processes", "content"), { recursive: true });
+      writeFileSync(join(root, name, `${name}.json`), JSON.stringify({ name, needs }));
+    };
+    inst("b", []);
+    inst("h", ["b"]);
+    inst("u", ["h"]);
+    const below = join(root, "b", "processes", "x.bpmn");
+    const above = join(root, "u", "processes", "content", "y.bpmn");
+    const nested = join(root, "h", "processes", "z.bpmn");
+    for (const f of [below, above, nested]) writeFileSync(f, XML());
+    return { root, harness: join(root, "h"), below, above, nested };
+  }
+
+  test("beside the diagram, in the instance that owns it — above the harness and in it", () => {
+    const c = checkout();
+    const p = placementOf([c.above, c.nested], c.root, c.harness);
+    expect(p.get(c.above)).toEqual({ out: join(c.root, "u", "processes", "content", "y.checklist.md"), label: "u/processes/content/y.bpmn" });
+    expect(p.get(c.nested)).toEqual({ out: join(c.root, "h", "processes", "z.checklist.md"), label: "h/processes/z.bpmn" });
+  });
+
+  test("below the harness, the harness holds it: an instance it needs must not refer to it", () => {
+    const c = checkout();
+    const p = placementOf([c.below], c.root, c.harness);
+    expect(p.get(c.below)).toEqual({ out: join(defaultOutDir(c.harness), "x.checklist.md"), label: "b/processes/x.bpmn" });
+    // And never inside `b` itself.
+    expect(p.get(c.below)!.out.startsWith(join(c.root, "b") + "/")).toBe(false);
+  });
+
+  test("the cited source names the instance, so the text is the same wherever the instance is checked out", async () => {
+    const c = checkout();
+    const { files } = await renderAll([c.above], c.root, { harnessRoot: c.harness });
+    expect(files[0]!.text.split("\n")[0]).toContain("GENERATED from u/processes/content/y.bpmn");
+  });
+
+  test("a checklist with no diagram is an orphan; one with a diagram is not", () => {
+    const c = checkout();
+    const kept = join(c.root, "u", "processes", "content", "y.checklist.md");
+    const stray = join(c.root, "u", "processes", "content", "gone.checklist.md");
+    writeFileSync(kept, "x");
+    writeFileSync(stray, "x");
+    expect(orphanChecklists([join(c.root, "u", "processes")], new Set([kept]))).toEqual([stray]);
+  });
+
+  test("--out puts every checklist in one directory, and a stem two diagrams share is refused, not overwritten", async () => {
+    const c = checkout();
+    const twin = join(c.root, "u", "processes", "x.bpmn");
+    writeFileSync(twin, XML());
+    const into = join(c.root, "out");
+    const r = await renderAll([c.below, twin], c.root, { into, harnessRoot: c.harness });
+    expect(r.files.map((f) => f.out)).toEqual([join(into, "x.checklist.md")]);
+    expect(r.failed.length).toBe(1);
   });
 });

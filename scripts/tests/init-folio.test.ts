@@ -39,6 +39,7 @@ import {
 } from "../init-folio";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
@@ -56,6 +57,18 @@ import { dirname } from "node:path";
 const SLUG = "cold-chain-guidance";
 const SCAFFOLD_CONFIG = instanceConfigFilename(SLUG);
 const scaffoldConfigIn = (dir: string): string => join(dir, SCAFFOLD_CONFIG);
+/**
+ * The scaffold's config as written: INLINE in its `index.config.json` entry
+ * (bean `ymvt` — the index is the one config, and no `<slug>.config.json` is
+ * written), minus the index's own keys.
+ */
+function scaffoldConfig(dir: string): Record<string, unknown> {
+  const idx = JSON.parse(readFileSync(join(dir, "index.config.json"), "utf-8")) as { instances: Array<Record<string, unknown>> };
+  const entry = idx.instances.find((e) => e.name === SLUG);
+  if (entry === undefined) throw new Error(`index.config.json lists no ${SLUG}`);
+  const { name: _n, source: _s, import: _i, _comment: _c, ...config } = entry;
+  return config;
+}
 
 /**
  * The platform as a folio links it: the REPOSITORY root, which contains
@@ -217,8 +230,10 @@ describe("what gets written", () => {
   test("every file the layout needs, and no subject matter", () => {
     const d = tmp();
     const r = initFolio(opts(d));
+    // The config is inline in the index (bean `ymvt`), never a legacy file.
+    expect(existsSync(scaffoldConfigIn(d))).toBe(false);
     for (const f of [
-      SCAFFOLD_CONFIG,
+      "index.config.json",
       ".mcp.json",
       ".beans.yml",
       "folio/schema/builders.ts",
@@ -525,7 +540,7 @@ describe("a contentless instance (mer2)", () => {
   // the scaffolder, so the test fails if initiation stops writing any of them.
   const INSTANCE_LEVEL = [
     instanceDeclarationFilename(SLUG),
-    SCAFFOLD_CONFIG,
+    "index.config.json",
     ".mcp.json",
     ".claude/settings.json",
     ".gitignore",
@@ -534,6 +549,9 @@ describe("a contentless instance (mer2)", () => {
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
+    // Bean folio-assistant-63q4 (owner, 2026-10-15): initiation turns on the
+    // publishing of the instance's JSON-LD context.
+    ".github/workflows/publish-context.yml",
   ];
 
   test("writes every instance-level artefact, and nothing an adapter owns", () => {
@@ -544,16 +562,80 @@ describe("a contentless instance (mer2)", () => {
       expect(existsSync(join(d, f))).toBe(true);
     }
     // declared-path-literal: asserting the scaffold did NOT create the folio layout.
-    for (const absent of ["folio", "uploads", "library", ".github"]) {
+    for (const absent of ["folio", "uploads", "library"]) {
       expect(existsSync(join(d, absent))).toBe(false);
     }
     expect(r.created.some((f) => f.startsWith("folio/"))).toBe(false);
+    // The one workflow is the context publisher: no staging or QA workflow.
+    expect(r.created.filter((f) => f.startsWith(".github/"))).toEqual([".github/workflows/publish-context.yml"]);
+  });
+
+  test("the publish-context workflow calls the harness's reusable workflow for THIS instance, on push to main", () => {
+    const d = tmp();
+    initInstance(instanceOpts(d));
+    const wf = parseYaml(readFileSync(join(d, ".github/workflows/publish-context.yml"), "utf-8")) as {
+      on: { push: { branches: string[] } };
+      permissions: Record<string, string>;
+      jobs: { publish: { uses: string; with: Record<string, string> } };
+    };
+    expect(wf.on.push.branches).toEqual(["main"]);
+    expect(wf.permissions).toEqual({ contents: "write" });
+    expect(wf.jobs.publish.uses).toBe("litlfred/cat-harness-tools/.github/workflows/layer-publish-context.yml@main");
+    expect(wf.jobs.publish.with).toEqual({ instance: SLUG });
+  });
+
+  test("no GitHub origin: no iriBase is invented, and the note says how to add one", () => {
+    const d = tmp();
+    const r = initInstance(instanceOpts(d));
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBeUndefined();
+    expect(decl.version).toBeUndefined();
+    expect(r.notes.join("\n")).toContain("No iriBase was declared");
+  });
+
+  test("a GitHub origin gives iriBase https://<owner>.github.io/<repo>/, and the note says to switch Pages on", () => {
+    const d = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: d });
+    spawnSync("git", ["remote", "add", "origin", "https://github.com/LitlFred/new-layer.git"], { cwd: d });
+    const r = initInstance(instanceOpts(d));
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBe("https://litlfred.github.io/new-layer/");
+    // An iriBase without a version breaks releaseIris, and with it the IG publish.
+    expect(decl.version).toBe("0.1.0");
+    expect(releaseIris(decl)?.agent).toBe("https://litlfred.github.io/new-layer/0.1.0/");
+    expect(r.notes.join("\n")).toContain("Deploy from a branch: gh-pages, / (root)");
+  });
+
+  test("an origin that is not github.com derives no iriBase", () => {
+    const d = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: d });
+    spawnSync("git", ["remote", "add", "origin", "http://proxy@127.0.0.1:1234/git/litlfred/new-layer"], { cwd: d });
+    initInstance(instanceOpts(d));
+    expect((readDeclaration(d) as { iriBase?: string }).iriBase).toBeUndefined();
+  });
+
+  test("--iri-base is declared as given", () => {
+    const d = tmp();
+    initInstance({ ...instanceOpts(d), iriBase: "https://example.org/x/" });
+    const decl = readDeclaration(d) as { iriBase?: string; version?: string };
+    expect(decl.iriBase).toBe("https://example.org/x/");
+    expect(decl.version).toBe("0.1.0");
+    expect(() => releaseIris(decl)).not.toThrow();
+  });
+
+  test("inside another repository no workflow is written (GitHub would never read it), and the note says why", () => {
+    const outer = tmp();
+    spawnSync("git", ["init", "-q"], { cwd: outer });
+    const d = join(outer, "inner");
+    const r = initInstance(instanceOpts(d));
+    expect(existsSync(join(d, ".github"))).toBe(false);
+    expect(r.notes.join("\n")).toContain("no publish-context workflow was written");
   });
 
   test("the config names no adapter and the declaration no folio directory", () => {
     const d = tmp();
     initInstance(instanceOpts(d));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d);
     expect(config.contentType).toBeUndefined();
     expect(config.adapter).toBeUndefined();
     expect(config.adapterModule).toBeUndefined();
@@ -569,7 +651,9 @@ describe("a contentless instance (mer2)", () => {
     const folio = tmp();
     initInstance(instanceOpts(bare));
     const r = initFolio(opts(folio));
-    for (const f of INSTANCE_LEVEL) expect(r.created).toContain(f);
+    // Except the context publisher: a folio's gh-pages is its staging site's,
+    // which the folio's own publish workflow writes.
+    for (const f of INSTANCE_LEVEL.filter((x) => !x.endsWith("publish-context.yml"))) expect(r.created).toContain(f);
     // The files with no content-type dependence are byte-identical.
     for (const f of [".mcp.json", ".claude/settings.json", ".beans.yml"]) {
       expect(readFileSync(join(folio, f), "utf-8")).toBe(readFileSync(join(bare, f), "utf-8"));
@@ -600,7 +684,7 @@ describe("a contentless instance (mer2)", () => {
   test("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper" }));
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d);
     expect(config.contentType).toBe("paper");
     expect(config.adapter).toBe("paper");
   });
@@ -645,7 +729,7 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   test("a contentless instance stands on cat-harness, and reaches its skills through the stack", () => {
     const d = tmp();
     initInstance({ targetDir: d, slug: SLUG, title: "Cold Chain Guidance", link: "submodule", skipVcs: true });
-    const config = JSON.parse(readFileSync(scaffoldConfigIn(d), "utf-8"));
+    const config = scaffoldConfig(d);
     expect(config.dependencies).toEqual({ folioAssistant: [{ name: "cat-harness", path: "folio-assistant/cat-harness" }] });
     symlinkSync(REPO_ROOT, join(d, "folio-assistant"));
     const chain = chainNames(d);

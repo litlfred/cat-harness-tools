@@ -18,19 +18,23 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 import {
   KNOWN_DRIFT,
+  GLOSSARY_RENDERER,
   UNCATALOGED,
   comparableSource,
   driftFor,
   headingsOf,
   shapeOf,
   sameStructure,
+  uncatalogedFor,
+  uncatalogedGlossaries,
 } from "./translation-drift.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -146,15 +150,72 @@ describe("the backlogs are reviewable, not a policy", () => {
   });
 
   test("every uncatalogued entry states a reason and a date", () => {
-    for (const u of UNCATALOGED) {
+    for (const u of uncatalogedFor(repoRootFor(ROOT))) {
       expect(u.reason.trim().length).toBeGreaterThan(20);
       expect(u.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 
   test("no page is recorded TWICE — once would be enough to hide it", () => {
-    const all = [...KNOWN_DRIFT.map((k) => k.translation), ...UNCATALOGED.map((u) => u.translation)];
+    const all = [...KNOWN_DRIFT.map((k) => k.translation), ...uncatalogedFor(repoRootFor(ROOT)).map((u) => u.translation)];
     expect(all.length).toBe(new Set(all).size);
+  });
+});
+
+describe("the glossary pages are recorded at their DECLARED routes", () => {
+  // They used to be written down with the declaring instance's name spelled
+  // out, which made this lower layer name an instance above it
+  // (check:reference-direction). The route is now read from whichever
+  // instance declares a visualiser the glossary renderer draws.
+  test("a declared glossary visualiser yields one entry per locale at its route", () => {
+    const repo = mkdtempSync(join(tmpdir(), "drift-glossary-"));
+    try {
+      mkdirSync(join(repo, "acme"));
+      writeFileSync(
+        join(repo, "acme", "acme.json"),
+        JSON.stringify({ name: "acme", visualisers: [{ id: "terms", renderedBy: GLOSSARY_RENDERER }] }),
+      );
+      expect(uncatalogedGlossaries(repo).map((u) => u.translation)).toEqual(
+        ["ar", "es", "fr", "ru", "zh"].map((l) => `${l}/acme/terms`),
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("a checkout declaring no glossary visualiser records none", () => {
+    const repo = mkdtempSync(join(tmpdir(), "drift-glossary-"));
+    try {
+      mkdirSync(join(repo, "acme"));
+      writeFileSync(join(repo, "acme", "acme.json"), JSON.stringify({ name: "acme", visualisers: [] }));
+      expect(uncatalogedGlossaries(repo)).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("standing alone, a glossary page the site holds is recorded at its route", () => {
+    // check-standalone lays out this layer and its `needs` only, so the
+    // instance declaring the glossary visualiser may be absent while the site
+    // still holds the page its generator wrote.
+    const repo = mkdtempSync(join(tmpdir(), "drift-glossary-site-"));
+    try {
+      const site = join(repo, "site");
+      mkdirSync(join(site, "acme", "terms"), { recursive: true });
+      writeFileSync(join(site, "acme", "terms", "index.md"), "---\ngenerated: acme/scripts/glossary-page.ts — do not hand-edit\n---\n# Terms\n");
+      mkdirSync(join(site, "acme", "notes"), { recursive: true });
+      writeFileSync(join(site, "acme", "notes", "index.md"), "---\ntitle: Notes\n---\n# Notes\n");
+      expect(uncatalogedGlossaries(repo, site).map((u) => u.translation)).toEqual(
+        ["ar", "es", "fr", "ru", "zh"].map((l) => `${l}/acme/terms`),
+      );
+      expect(uncatalogedGlossaries(repo).map((u) => u.translation)).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("the written-down backlog holds no glossary route", () => {
+    expect(UNCATALOGED.filter((u) => /\/glossary$/.test(u.translation))).toEqual([]);
   });
 });
 

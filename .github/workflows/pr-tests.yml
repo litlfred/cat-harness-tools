@@ -9,6 +9,14 @@
 # `.git` directories are removed so they are discovered as instances, the
 # same as a lock mount.
 #
+# bootstrap-tools and bootstrap are put at main beside cat-harness main, for
+# the same reason one level down: cat-harness main's generated files are
+# produced with bootstrap-tools main. The index lock pinned an older
+# bootstrap-tools, whose `subgraph-readmes` splice predates the blank line
+# before the end marker (bootstrap-tools e9fb7d1d). Every library README that
+# cat-harness main committed then read as stale, and `library-readmes` failed
+# on main and on every PR for a reason no PR here could fix.
+#
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
 # PR newly breaks. The step summary lists every failure, old and new.
@@ -16,11 +24,13 @@
 # NO E2E JOB, and why (bean cat-tools-g9m3, Done-when 3). The Playwright suite
 # (`bun run cat test:e2e`, 83 `*.e2e.ts` specs under `test/` on 2026-10-12) cannot be run
 # meaningfully against this mount yet: with the paths fixed (#65), collection
-# still stops at a spec that throws "no instance named who-iris declares a
-# visualiser catalogue", because the who-iris pinned in folio-assistant's
-# `index.lock.json` predates that visualiser. A job here would report 0 specs,
+# still stops at a spec that throws "no instance named <catalogue instance>
+# declares a visualiser catalogue", because the instance that declares the
+# visualiser catalogue the spec needs is pinned, in folio-assistant's
+# `index.lock.json`, at a commit that predates that visualiser. A job here would report 0 specs,
 # which reads as a pass and is the 1xhc shape this repository keeps paying for.
-# The job belongs here once who-iris is re-pinned (lane A, bean kpci): then add
+# The job belongs here once that instance is re-pinned (lane A, bean kpci) --
+# or in the index's CI, which mounts every layer: then add
 # a job that fails when `playwright test --list` collects fewer than the specs
 # on disk, and runs them.
 
@@ -38,8 +48,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pin:
+    # Every job stands on the SAME cat-harness and index commits, read once
+    # here. Cloned per job, `main` moved between the base and head jobs (minutes
+    # apart), and the comparison charged that move to the PR: ingest-and-l1's
+    # verdicts flipped "new failure" / "fixed by this PR" with the corpus's
+    # timing (cat-harness-tools#217, #223).
+    name: Pin cat-harness and the index
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cat-harness: ${{ steps.pin.outputs.cat-harness }}
+      bootstrap-tools: ${{ steps.pin.outputs.bootstrap-tools }}
+      bootstrap: ${{ steps.pin.outputs.bootstrap }}
+      index: ${{ steps.pin.outputs.index }}
+    steps:
+      - id: pin
+        run: |
+          set -euo pipefail
+          echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "bootstrap-tools=$(git ls-remote https://github.com/litlfred/bootstrap-tools refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "bootstrap=$(git ls-remote https://github.com/litlfred/bootstrap refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   typecheck:
     name: Typecheck
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -48,6 +83,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: litlfred/folio-assistant
+          ref: ${{ needs.pin.outputs.index }}
           path: fa
       - &setup-bun
         uses: oven-sh/setup-bun@v2
@@ -57,11 +93,24 @@ jobs:
         name: Mount every instance from the index lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
-        name: Use cat-harness main
+        # cat-harness and the closure its main is generated with: all three at
+        # the commits the pin job read (see the header).
+        name: Use cat-harness, bootstrap-tools and bootstrap main, at the pinned commits
+        env:
+          CAT_HARNESS: ${{ needs.pin.outputs.cat-harness }}
+          BOOTSTRAP_TOOLS: ${{ needs.pin.outputs.bootstrap-tools }}
+          BOOTSTRAP: ${{ needs.pin.outputs.bootstrap }}
         run: |
-          rm -rf fa/cat-harness
-          git clone -q --depth 1 https://github.com/litlfred/cat-harness fa/cat-harness
-          rm -rf fa/cat-harness/.git
+          set -euo pipefail
+          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP"; do
+            name="${pair%%:*}" sha="${pair#*:}"
+            test -n "$sha" || { echo "::error::no pinned commit for $name"; exit 1; }
+            rm -rf "fa/$name"
+            git init -q "fa/$name"
+            git -C "fa/$name" fetch -q --depth 1 "https://github.com/litlfred/$name" "$sha"
+            git -C "fa/$name" checkout -q --detach FETCH_HEAD
+            rm -rf "fa/$name/.git"
+          done
       - name: Put the PR in place of the locked cat-harness-tools
         run: rm -rf fa/cat-harness-tools
       - uses: actions/checkout@v4
@@ -85,6 +134,7 @@ jobs:
 
   run-tests:
     name: bun test (${{ matrix.side }})
+    needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -101,7 +151,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: fa/cat-harness-tools
-          ref: ${{ matrix.side == 'base' && (github.event.pull_request.base.sha || 'main') || '' }}
+          fetch-depth: 2
+      - &base-side
+        # Both sides check out the PR's merge commit; the base side steps to its
+        # first parent, the main it merges into. Never `pull_request.base.sha`:
+        # that is main as of the PR's last push, older than the main the merge
+        # commit holds whenever main moved since. workflow_dispatch: main's tip.
+        name: Base side, the merge commit's first parent
+        if: matrix.side == 'base'
+        working-directory: fa/cat-harness-tools
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin main
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
       - *unnest
       - *install
       - name: Mount the graphs kept on branches
@@ -134,6 +201,85 @@ jobs:
         with:
           name: junit-${{ matrix.side }}
           path: ${{ runner.temp }}/junit.xml
+
+  standalone-run:
+    # The standalone ratchet (bean `ho66`; owner, 2026-10-14). The tracked
+    # files of this layer and of its declared closure (`needs`: cat-harness,
+    # bootstrap-tools) are laid out as sibling git repositories with no index
+    # around them, and `bun test` is run in this layer. A test that fails there
+    # reads something only the monorepo has. Measured on BOTH main and the PR,
+    # like run-tests: both stand on cat-harness main, which moves, so a test
+    # that starts failing on main because cat-harness changed is not this PR's.
+    # The `standalone` job below judges the pair against the committed
+    # `scripts/standalone-baseline.json`. The baseline is measured in THIS
+    # layout (the index mounts, cat-harness main, bun 1.3.14) with no state
+    # graphs mounted: a mount is the monorepo's, and the rehearsal copies only
+    # the closure anyway.
+    name: standalone (${{ matrix.side }})
+    needs: pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
+    steps:
+      - *checkout-index
+      - *setup-bun
+      - *mount
+      - *cat-harness-main
+      - name: Put cat-harness-tools in place of the locked mount
+        run: rm -rf fa/cat-harness-tools
+      - uses: actions/checkout@v4
+        with:
+          path: fa/cat-harness-tools
+          fetch-depth: 2
+      - *base-side
+      - name: Measure with the PR's checker on both sides
+        # So a main that predates --measured-out is still measured. Only the
+        # checker file is taken from the PR; the tree it measures is main's.
+        if: matrix.side == 'base'
+        uses: actions/checkout@v4
+        with:
+          path: pr-checker
+          sparse-checkout: scripts/check-standalone.ts
+          sparse-checkout-cone-mode: false
+      - if: matrix.side == 'base'
+        run: cp pr-checker/scripts/check-standalone.ts fa/cat-harness-tools/scripts/check-standalone.ts && rm -rf pr-checker
+      - *unnest
+      - *install
+      - name: Measure cat-harness-tools standalone
+        working-directory: fa
+        # Called directly, not through `bun run cat`: folio-assistant's root
+        # `cat` alias points at cat-harness/scripts/run-script.ts, which has
+        # moved to this repository. The result is judged by the standalone job,
+        # not by this exit code; a side that could not be measured is judged
+        # as such (head) or leaves the baseline alone to judge (base).
+        run: |
+          bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
+          test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.side }}
+          path: ${{ runner.temp }}/standalone.json
+
+  standalone:
+    name: Standalone (no new failures)
+    needs: standalone-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/scripts
+            scripts/standalone-baseline.json
+      - uses: actions/download-artifact@v4
+        with:
+          path: standalone
+      - name: Judge the PR against main and the baseline
+        run: >-
+          python3 .github/scripts/compare-standalone.py scripts/standalone-baseline.json cat-harness-tools
+          standalone/standalone-base/standalone.json standalone/standalone-head/standalone.json
 
   tests:
     name: Tests (no new failures)

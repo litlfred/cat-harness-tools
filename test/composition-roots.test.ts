@@ -77,7 +77,7 @@ describe("MCP tool groups", () => {
     // `lean_formal_edges` was a `contributes` tool group until its Tool node
     // replaced it (bean riit).
     const sci = sets.find((s) => s.instance === "folio-assistant-sci");
-    expect(sci?.groups.map((g) => g.module)).toEqual(["content/pipeline/formal-edges-mcp.ts"]);
+    expect(sci?.groups.map((g) => g.module)).toEqual(["pipeline/formal-edges-mcp.ts"]);
   });
 
   test("a folio that declares nothing still gets the harness's tools", () => {

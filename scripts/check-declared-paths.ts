@@ -157,7 +157,8 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -249,6 +250,20 @@ export function absentResultDirs(root: string): string[] {
 export function underAbsentResults(root: string, literal: string, absent: readonly string[]): boolean {
   const abs = join(root, literal);
   return absent.some((d) => abs === d.replace(/\/+$/, "") || abs.startsWith(d.replace(/\/+$/, "") + "/"));
+}
+
+/**
+ * Is `literal` (relative to `root`) an artefact `root` declares it BUILDS AT
+ * PUBLISH (`builtAtPublish`, `schemas/built-at-publish.ts`; owner,
+ * 2026-10-14, "B1")? Such a file is never committed and is on disk only after
+ * `derive:publish`, so a recorded witness naming it is held by the
+ * declaration when this checkout has not built it: absent is its correct
+ * state here, not a lost artefact (the `check-declared-dirs.ts`
+ * `builtAtPublishDirs` rule, for a file).
+ */
+export function underBuiltAtPublish(root: string, literal: string): boolean {
+  const decl = readDeclaration(root) as { builtAtPublish?: Array<{ path: string }> } | undefined;
+  return isBuiltAtPublish(decl?.builtAtPublish ?? [], literal.replace(/^\.\//, ""));
 }
 
 /**
@@ -622,7 +637,13 @@ if (import.meta.main) {
 
   const witnesses = witnessesOf({ prefixes, artefacts, marked, refused });
   const held = new Set(witnesses);
-  const lost = (prior.resolves ?? []).filter((w) => !held.has(w) && !unverifiableKeys.has(w));
+  // A recorded witness naming a publish-time artefact this checkout has not
+  // built is held by the declaration, not lost (see `underBuiltAtPublish`).
+  const atPublish = (prior.resolves ?? []).filter(
+    (w) => !held.has(w) && !unverifiableKeys.has(w) && underBuiltAtPublish(root, w.slice(w.indexOf("::") + 2)),
+  );
+  const atPublishKeys = new Set(atPublish);
+  const lost = (prior.resolves ?? []).filter((w) => !held.has(w) && !unverifiableKeys.has(w) && !atPublishKeys.has(w));
   const added = newWitnesses(prior.resolves ?? [], witnesses);
 
   const over: Array<{ file: string; was: number; now: number }> = [];
@@ -648,6 +669,9 @@ if (import.meta.main) {
       `name a file that exists — ${witnesses.length} witnessed, ${lost.length} lost, ${added.length} new` +
       (unverifiable.length ? `, ${unverifiable.length} could not be checked` : ""),
   );
+  if (atPublish.length) {
+    console.log(`  · ${String(atPublish.length).padStart(3)}  witnessed, built at publish — declared \`builtAtPublish\`, not built in this checkout`);
+  }
   console.log(`  · ${String(marked.length).padStart(3)}  declared base cases, each with a reason`);
   console.log(
     `  ${over.length ? "✗" : "·"} ${String(refused.length).padStart(3)}  ` +
@@ -771,7 +795,9 @@ if (import.meta.main) {
         "raising a count or dropping a witness is a diff somebody reviews. See " +
         "the module header of scripts/check-declared-paths.ts.",
       files: Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b))),
-      resolves: witnesses,
+      // A publish-time witness this checkout did not build is KEPT: dropping it
+      // here would lose it over an artefact nobody looked for.
+      resolves: [...new Set([...witnesses, ...atPublish])].sort(),
     };
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`);
     const counted = Object.values(current).reduce((a, b) => a + b, 0);

@@ -28,6 +28,7 @@ import { isSubjectShell } from "../gen-library-viz.ts";
 import { orphanSubjectPages, viewerHtml } from "../gen-schema-viz.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { declaredPageRoute } from "../viewer-declarations.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
 /**
@@ -41,6 +42,12 @@ const INSTANCE = resolve(HARNESS_ROOT);
  */
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
 const HANDLER = readDeclaration(INSTANCE)?.name;
+/**
+ * Each kind's pages sit at its viewer's DECLARED route, `<locale>/<harness>/<id>`
+ * (owner, 2026-10-09) — the route its generator writes under, asked rather
+ * than composed from the handler and the kind.
+ */
+const VIEWER_OF: Record<string, string> = { schemas: "schemas-viewer", library: "library-viewer" };
 
 /** A directory holding one subject page that declares itself for `scope`. */
 function subjectPage(parent: string, dir: string, scope: string): void {
@@ -121,7 +128,9 @@ describe("the committed tree carries no orphan", () => {
 
   for (const kind of ["schemas", "library"]) {
     it(`${kind} subject pages all declare themselves`, () => {
-      const dir = join(SITE, HANDLER!, kind);
+      const route = declaredPageRoute(INSTANCE, VIEWER_OF[kind]!);
+      expect(route, `${kind}: no declared viewer route`).toBeDefined();
+      const dir = join(SITE, route!);
       const subs = readdirSync(dir, { withFileTypes: true })
         .filter((e) => e.isDirectory())
         .map((e) => e.name);

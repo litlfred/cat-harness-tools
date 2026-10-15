@@ -226,31 +226,23 @@ describe("declared and defaulted are different facts", () => {
       expect(element(r.file), `${r.file} is marked declared`).toBe(true);
     }
 
-    // Proper subset: an element can carry no value. This was measured on the
-    // corpus — "at least one file whose policy declares no enforcement" — and
-    // the corpus drained it: since every such file also declares a value on
-    // another element (`relaxable="false"` sits beside `enforcement=` in each),
-    // the two FILE-level oracles now agree on the corpus while still meaning
-    // different things. So the distinction is held on a witness rather than on
-    // whichever files happen to exist: a real file's own namespace binding,
-    // around one policy element that carries `relaxable` and no enforcement.
-    const withElement = rows.find((r) => element(r.file));
-    expect(withElement, "no process file carries a policy element — vacuous").toBeDefined();
-    const binding = /\bxmlns:[A-Za-z_][\w.-]*\s*=\s*"[^"]*"/g;
-    const own = [...readFileSync(join(REPO, withElement!.file), "utf-8").matchAll(binding)]
-      .map((m) => m[0])
-      .find((b) => ownElementPattern(`<x ${b}>`, "policy", "", "").source !== "(?!)");
-    expect(own, `${withElement!.file} binds none of our namespaces`).toBeDefined();
-    const prefix = /xmlns:([^=\s]+)/.exec(own!)![1];
-    const witness = `<bpmn:definitions ${own}><bpmn:process id="p"><${prefix}:policy relaxable="false"/></bpmn:process></bpmn:definitions>`;
-    expect(ownElementPattern(witness, "policy", "", "").test(witness), "the witness carries a policy element").toBe(true);
-    expect(ownElementPattern(witness, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(witness), "…and declares no enforcement").toBe(false);
-    // And the corpus still holds such ELEMENTS, even where no whole file does.
-    const valueless = rows.some((r) => {
-      const xml = readFileSync(join(REPO, r.file), "utf-8");
-      return [...xml.matchAll(ownElementPattern(xml, "policy", "[^>]*>", "g"))].some((m) => !/\benforcement\s*=/.test(m[0]));
-    });
-    expect(valueless, "policy elements carrying no enforcement").toBe(true);
+    // Proper subset. The corpus held a witness — a policy element carrying no
+    // enforcement value — until bean `30hn` (2026-10-09, "declare explicit
+    // policy enforcement on BPMN processes") gave every process an explicit
+    // value, as it set out to. So the corpus can no longer show the two
+    // oracles disagree, and a corpus-only assertion would now pass however
+    // the oracles were merged. The witness is planted instead, from a real
+    // declared file with its enforcement values struck out: still a policy
+    // element to one oracle, undeclared to the other.
+    const declared = rows.find((x) => x.enforcementDeclared);
+    expect(declared, "a process declaring an enforcement value").toBeDefined();
+    const planted = readFileSync(join(REPO, declared!.file), "utf-8").replace(/\s\benforcement\s*=\s*"[^"]*"/g, "");
+    expect(element(declared!.file)).toBe(true);
+    expect(ownElementPattern(planted, "policy", "", "").test(planted), "the planted policy is an element").toBe(true);
+    expect(
+      ownElementPattern(planted, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(planted),
+      "and it declares no enforcement",
+    ).toBe(false);
   });
 });
 

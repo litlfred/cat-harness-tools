@@ -98,7 +98,8 @@ import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
-import { entryGraphFiles, entryGraphSitePath } from "./lib/library-entry-graphs.ts";
+import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -791,11 +792,20 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   /** `source_file` → the slug naming it, and the sha it claims. */
   const named = new Map<string, { slug: string; sha: string }>();
 
-  for (const libDir of [...libDirs].sort()) {
+  // Declared-but-absent is REPORTED, not read (bean `95ir`; the owner's ruling
+  // of 2026-09-23: fail in CI for the declaration, `check:declared-dirs`, and
+  // never in a scanner). Reading one threw ENOENT and took the whole graph
+  // with it (smart-immunizations declares library/ and is mounted without it).
+  const presence = splitDeclared([...libDirs]);
+  noteAbsent(presence.absent, "a library");
+  for (const libDir of presence.present.sort()) {
     const instance = instanceOf(libDir, repoRoot);
+    const notEntries = nonEntryDirs(libDir);
     for (const slug of readdirSync(libDir).sort()) {
       const dir = join(libDir, slug);
       if (!statSync(dir).isDirectory()) continue;
+      // Another kind's directory kept in the library is not an entry.
+      if (notEntries.has(dir.replace(/[/\\]+$/, ""))) continue;
       const has = (f: string): boolean => existsSync(join(dir, f));
       const manifest = readJson<{
         title?: string;

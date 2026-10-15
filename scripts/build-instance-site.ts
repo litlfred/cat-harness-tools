@@ -13,7 +13,8 @@
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> --instance <name>
  *
- * reads the steps from `<name>.config.json` `site.build` ({@link recipeFromConfig}).
+ * reads the steps from the instance's `index.config.json` entry `site.build` ({@link recipeFromConfig};
+ * a legacy `<name>.config.json` only as a reported fallback, bean `ymvt`).
  * Any step flag below replaces it whole (no merging of flags and recipe):
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
@@ -31,11 +32,13 @@
  *  2. `bun install --no-save` in the checkout and in every mounted instance
  *     with a package.json, so a mount still hashes to its lock and the next mount can verify it
  *  3. each `--pre` package script (`bun run <name>`), in the checkout: the instance's own gates
- *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, compose-docs --shell,
+ *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, the publish-time
+ *     writers whose `builtAtPublish` output lies in the chrome ({@link chromeArtefacts}:
+ *     `avatars:css`), compose-docs --shell,
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
  *
- * `--pre`, `--source-step` and `--site-step` take package SCRIPT NAMES, never commands: the
+ * `--pre`, `--source-step`, `--site-step` and `--final-step` take package SCRIPT NAMES, never commands: the
  * Tool contract admits no input that can carry a shell payload (check:tools),
  * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
@@ -45,12 +48,26 @@
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
  *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
- *     mount-instance-docs, pdf-viewer, set-html-lang, publish-id-lookup,
- *     rail-standalone-pages, `.nojekyll`
+ *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
+ *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
+ *     that must see every page of the finished site, the platform's own too (an IG's one bar on
+ *     the identifier lookup page; owner, 2026-10-15); then `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
- *  8. with `--publish`: the root replaces the branch but keeps `STAGING/` and `_render-log/`;
- *     a preview replaces only `STAGING/<branch>/`
+ *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
+ *     would replace, read from the remote's publish branch (or `--parity-against <dir>`), on
+ *     the pages — the theme's side bar and search, the icon row, the rail, the top-level
+ *     directories, the `folio-build.json` stamp. With `--publish` a shortfall refuses; without,
+ *     it is said. Owner, 2026-10-14: an IG's main site published by this path loses nothing
+ *     `folio-site.yml` gave it.
+ *  9. with `--publish`: the root replaces the branch but keeps `STAGING/`, `_render-log/` and
+ *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `STAGING/<branch>/`
+ *
+ * Every step runs with the build's own values in its environment ({@link siteStepEnv}:
+ * `SITE_INSTANCE`, `SITE_TITLE`, `SITE_BASEURL`, `SITE_URL`, `SITE_LINK_ROOT`,
+ * `SITE_WORK`, `SITE_SOURCE`, `SITE_DIR`, `SITE_REPOSITORY`, `SITE_COMMIT`, `SITE_REF`), so an IG declares `folio-site.yml`'s
+ * steps as its own package scripts — the platform scripts that workflow runs,
+ * with the arguments it passes — and no step is written here for one kind of site.
  *
  * What it does NOT do: decide whether to publish. `--publish` is the caller's
  * explicit act; without it the run builds and checks, and says where the site is.
@@ -58,12 +75,18 @@
  * @covers none — a build step: it composes existing generators and judges no graph
  */
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+
+import { chromeLayers } from "./compose-docs.ts";
+import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
+import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
+import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -77,6 +100,12 @@ export interface BuildOptions {
   sourceSteps: string[];
   /** Package scripts run as `bun run <name> <built site>` after Jekyll: generators that write finished pages. */
   siteSteps?: string[];
+  /**
+   * Package scripts run as `bun run <name> <built site>` LAST: after the platform's own writers
+   * (instance docs, identifier lookup, the rail on standalone pages), before the parity guard and
+   * the link check. For a step that must see every page of the finished site, the platform's too.
+   */
+  finalSteps?: string[];
   staging?: string;
   mount: boolean;
   /** Remove the lock's mount paths first, so a build that wrote into them cannot block the next mount. */
@@ -84,6 +113,95 @@ export interface BuildOptions {
   publish: boolean;
   remote?: string;
   message?: string;
+  /**
+   * The site's title and description when the checkout declares no instance:
+   * a repository that only mounts layers (`index.config.json`), such as an IG
+   * repository on its base harness. `instance` is then the chrome's SCOPE, an
+   * instance the checkout mounts, and the title is the site's own.
+   */
+  identity?: { title: string; description?: string };
+  /** Root entries a root publish keeps besides `STAGING/` and `_render-log/` (an IG's `branches/` previews). */
+  keep?: string[];
+  /**
+   * The root publish's guard ({@link parityShortfall}): the built site is measured against
+   * the root it replaces — read from `parityAgainst`, else from `remote`'s publish branch —
+   * and a shortfall refuses the publish (`refuse`, the default) or is only said (`report`).
+   */
+  parity?: "refuse" | "report" | "off";
+  parityAgainst?: string;
+  /**
+   * Top-level directories the current root serves that this build drops by the
+   * owner's ruling ({@link DroppedByRuling}): not a shortfall, and said with the
+   * ruling. Matches directory names only; it excuses nothing else.
+   */
+  parityDropped?: DroppedByRuling[];
+  /** The platform steps around the declared ones ({@link PROFILE_STEPS}); `folio` when absent. */
+  profile?: SiteProfile;
+  /** `report`: unresolved links are said, and do not stop the publish. */
+  links?: "refuse" | "report";
+  /** Root files the built site must hold before it is published (a step's promise, checked). */
+  require?: string[];
+}
+
+/** The `require`d root files a built site does not hold. */
+export function missingRequired(site: string, required: readonly string[]): string[] {
+  return required.filter((f) => !existsSync(join(site, f)));
+}
+
+/**
+ * The environment every step runs with, so a step needs no flag for what the
+ * build already knows: the site's base path, and the file in which a step
+ * lists the pages whose links are the CONTENT's own (see {@link checkLinks}).
+ */
+export const STEP_ENV = { baseurl: "FOLIO_SITE_BASEURL", upstreamPages: "FOLIO_SITE_UPSTREAM_PAGES" } as const;
+
+/**
+ * How a step runs: `bun run <name>` from the checkout's own `package.json`, or,
+ * in a checkout with none (it only mounts layers), through `run-script.ts`,
+ * which finds the name among the mounted layers' checkout scripts. Either way
+ * a step is a script NAME, never a command.
+ */
+export function stepCommand(root: string, name: string): string {
+  if (!SCRIPT_NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a package script name`);
+  return ownsScript(root, name) ? `bun run ${name}` : `bun run ${JSON.stringify(join(import.meta.dir, "run-script.ts"))} ${name}`;
+}
+
+/**
+ * How a chrome writer runs: `bun run cat <writer>` where the checkout's own
+ * package.json has the `cat` runner, else `run-script.ts` from here, as
+ * {@link stepCommand} does for a step. dth-hrh had no root `cat` script, so
+ * `bun run cat avatars:css` ran /usr/bin/cat and refused the build (owner's
+ * repin window, 2026-10-15); `init-folio` writes none either.
+ */
+export function writerCommand(root: string, writer: string): string[] {
+  return ownsScript(root, "cat") ? ["bun", "run", "cat", writer] : ["bun", "run", join(import.meta.dir, "run-script.ts"), writer];
+}
+
+/**
+ * Whether the checkout's own package.json defines the script. An IG repository
+ * may carry a package.json for its own tooling (smart-immunizations' holds
+ * only fsh-sushi) that names none of the site's steps: `bun run <step>` there
+ * fails "Script not found", so the step goes through the mounted layers'
+ * script table instead, as it does where there is no package.json at all.
+ */
+function ownsScript(root: string, name: string): boolean {
+  const file = join(root, "package.json");
+  if (!existsSync(file)) return false;
+  try {
+    const scripts = (JSON.parse(readFileSync(file, "utf-8")) as { scripts?: Record<string, unknown> }).scripts;
+    return typeof scripts?.[name] === "string";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The site-relative pages a step listed as carrying the content's own links:
+ * one path per line, `#` comments and blank lines ignored.
+ */
+export function readUpstreamPages(file: string): Set<string> {
+  if (!existsSync(file)) return new Set();
+  return new Set(readFileSync(file, "utf-8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#")));
 }
 
 /** A branch name safe to use as one path segment under STAGING/. */
@@ -127,32 +245,106 @@ export interface SiteRecipe {
   pre: string[];
   sourceSteps: string[];
   siteSteps: string[];
+  /** Run after the platform's own writers ({@link BuildOptions.finalSteps}). */
+  finalSteps?: string[];
+  /** Root entries a root publish keeps, besides `STAGING/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
+  keep?: string[];
+  /**
+   * Which platform steps run around the declared ones ({@link PROFILE_STEPS}): `folio` (the
+   * default) runs every one; `ig-repo-site` runs exactly the platform steps fhir-harness's
+   * `templates/ig-repo-site/folio-site.yml` runs — the shell, its navbar, Jekyll, the rail.
+   */
+  profile?: SiteProfile;
+  /** An unresolved link refuses the publish (`refuse`, the default) or is only said (`report`). */
+  links?: "refuse" | "report";
 }
 
+export type SiteProfile = "folio" | "ig-repo-site";
+
 /**
- * The recipe `<instance>.config.json` declares under `site.build`, or
- * undefined when it declares none. Owner, 2026-10-10: "i want one
- * consolidated worfklow". The recipe lived only as prose in a folio's
- * AGENTS.md, so `stage-local.ts` could not find it and every runner re-typed
- * it. The cat-harness schema is `HarnessSiteBuildSchema`. It is read here
+ * The platform steps each profile runs besides the shell, its navbar, Jekyll and the rail.
+ * An IG repository's own site (`folio-site.yml`) never ran the folio's landing data, instance
+ * mounts, PDF viewer, `lang` pass or identifier lookup: run there, `mount-instance-docs` laid
+ * seven other instances' directories at an IG's root (smart-trust, measured 2026-10-14).
+ *
+ * `own-chrome`: the shell carries the chrome of the checkout root's OWN docs layers as well as
+ * the platform's. `folio-site.yml` composed the shell in a folio-assistant checkout, which
+ * declares no root docs layer, so an IG's shell never carried its own; run from the IG's
+ * checkout it did, and the IG's `docs/assets/` arrived twice — once in the shell, once from
+ * `stage-ig-sites`, which builds `docs/` into the IG site and refuses a path the host already
+ * holds (smart-trust, 2026-10-14). `stage-ig-sites` owns that directory.
+ */
+export const PROFILE_STEPS: Record<SiteProfile, ReadonlySet<string>> = {
+  folio: new Set(["sync", "landing", "mount", "pdf", "suggest", "lang", "lookup", "own-chrome"]),
+  "ig-repo-site": new Set(),
+};
+
+/** The chrome step's `compose-docs` flags for a profile: always a shell, platform-only unless the profile carries its own chrome. */
+export function shellFlags(profile: SiteProfile = "folio"): string {
+  return PROFILE_STEPS[profile].has("own-chrome") ? "--shell" : "--shell --platform-only";
+}
+
+/** A root entry a recipe may keep: one plain path segment. */
+export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+
+/**
+ * The recipe instance `instance` declares under `site.build`, or undefined
+ * when it declares none. Owner, 2026-10-10: "i want one consolidated
+ * worfklow". The recipe lived only as prose in a folio's AGENTS.md, so
+ * `stage-local.ts` could not find it and every runner re-typed it. The
+ * cat-harness schema is `HarnessSiteBuildSchema`. It is read here
  * structurally, so this compiles against a cat-harness pin from before that
  * schema, and every step is held to {@link SCRIPT_NAME} exactly as the flags are.
+ *
+ * READ INDEX FIRST (bean `ymvt`, owner 2026-10-14: *"i thought ONLY
+ * index.config.json"*): the instance's `index.config.json` entry, inline; a
+ * root `<instance>.config.json` only as a fallback that {@link recipeRead}
+ * reports as legacy. Until 2026-10-14 this read the file directly, so a
+ * repository had to keep one to publish (smart-trust#33).
  */
-export function recipeFromConfig(root: string, instance: string): SiteRecipe | undefined {
-  const file = join(resolve(root), `${instance}.config.json`);
-  if (!existsSync(file)) return undefined;
-  const build = (JSON.parse(readFileSync(file, "utf-8")) as { site?: { build?: Record<string, unknown> } }).site?.build;
-  if (build === undefined) return undefined;
+export function recipeRead(root: string, instance: string): { recipe?: SiteRecipe; read: InstanceConfigRead } {
+  const read = readInstanceConfig(root, instance);
+  const site = read.config?.site;
+  const build = site !== null && typeof site === "object" ? (site as { build?: unknown }).build : undefined;
+  if (build === undefined || build === null || typeof build !== "object") return { read };
+  const b = build as Record<string, unknown>;
   const list = (k: string): string[] => {
-    const v = build[k] ?? [];
+    const v = b[k] ?? [];
     if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && SCRIPT_NAME.test(x))) {
-      throw new Error(`${file}: site.build.${k} must be a list of package script names`);
+      throw new Error(`${read.from}: site.build.${k} must be a list of package script names`);
     }
     return v as string[];
   };
-  const home = build.home;
-  if (home !== undefined && typeof home !== "string") throw new Error(`${file}: site.build.home must be a path`);
-  return { ...(home !== undefined ? { home } : {}), pre: list("pre"), sourceSteps: list("sourceSteps"), siteSteps: list("siteSteps") };
+  const home = b.home;
+  const where = read.from;
+  if (home !== undefined && typeof home !== "string") throw new Error(`${where}: site.build.home must be a path`);
+  const profile = b.profile ?? "folio";
+  if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${where}: site.build.profile must be folio or ig-repo-site`);
+  const links = b.links ?? "refuse";
+  if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
+  const keep = b.keep ?? [];
+  if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${where}: site.build.keep must be a list of root entry names`);
+  return {
+    recipe: {
+      ...(home !== undefined ? { home } : {}),
+      pre: list("pre"),
+      sourceSteps: list("sourceSteps"),
+      siteSteps: list("siteSteps"),
+      ...(list("finalSteps").length ? { finalSteps: list("finalSteps") } : {}),
+      ...(keep.length ? { keep: keep as string[] } : {}),
+      ...(profile !== "folio" ? { profile } : {}),
+      ...(links !== "refuse" ? { links } : {}),
+    },
+    read,
+  };
+}
+
+/** {@link recipeRead}'s recipe, saying on stderr when it came from a legacy `<instance>.config.json`. */
+export function recipeFromConfig(root: string, instance: string): SiteRecipe | undefined {
+  const { recipe, read } = recipeRead(root, instance);
+  const notice = legacyNotice(read);
+  if (recipe !== undefined && notice !== undefined) console.warn(notice);
+  return recipe;
 }
 
 /** owner and repository name from a GitHub remote URL (https or ssh). */
@@ -245,15 +437,23 @@ function served(site: string, rel: string): boolean {
   return existsSync(`${p}.html`);
 }
 
-export async function checkLinks(site: string, base: string): Promise<{ pages: number; files: number; misses: string[] }> {
+/**
+ * Every unresolved link of the built site. A link on a page in `upstream` is
+ * returned apart, in `upstreamMisses`: that page carries the CONTENT's own
+ * links (an IG's source pages, the IG Publisher's output), whose dead links
+ * are the content's to fix and are reported, while a dead link on any other
+ * page is the build's and refuses the publish.
+ */
+export async function checkLinks(site: string, base: string, upstream: ReadonlySet<string> = new Set()): Promise<{ pages: number; files: number; misses: string[]; upstreamMisses: string[] }> {
   const misses: string[] = [];
+  const upstreamMisses: string[] = [];
   const pages = htmlFiles(site);
   for (const page of pages) {
     const rel = relative(site, page).split(sep).join("/");
     for (const url of await pageUrls(readFileSync(page, "utf-8"))) {
       const t = targetOf(url, rel, base);
       if (t === undefined) continue;
-      if (t === "outside-base" || !served(site, t)) misses.push(`${rel}: ${url}`);
+      if (t === "outside-base" || !served(site, t)) (upstream.has(rel) ? upstreamMisses : misses).push(`${rel}: ${url}`);
     }
   }
   let files = 0;
@@ -265,12 +465,61 @@ export async function checkLinks(site: string, base: string): Promise<{ pages: n
     }
   };
   count(site);
-  return { pages: pages.length, files, misses };
+  return { pages: pages.length, files, misses, upstreamMisses };
 }
 
-function run(label: string, cmd: string, cwd: string): void {
+/**
+ * The publish-time artefacts the site CHROME holds: every `builtAtPublish`
+ * entry of any instance in the checkout whose path lies inside one of the
+ * harness's chrome layers ({@link chromeLayers}). Derived from the
+ * declarations, so the next stylesheet or script a chrome writer adds is run
+ * without a change here.
+ *
+ * Why the build runs them itself: a folio's site build composes the chrome
+ * and never runs `derive:publish`, whose job is the platform's own site. So
+ * `site-chrome/assets/css/avatars.css` (writer `avatars:css`), linked from
+ * every page's head, was never written, and smart-ra's link check refused the
+ * publish over `/smart-ra/assets/css/avatars.css` (2026-10-15).
+ */
+export function chromeArtefacts(root: string, plan: readonly DeclaredArtefact[] = declaredPlan(root), layers: readonly string[] = chromeLayers(root).map((l) => l.dir)): DeclaredArtefact[] {
+  const dirs = layers.map((d) => resolve(d) + sep);
+  return plan.filter((a) => dirs.some((d) => resolve(a.abs).startsWith(d)));
+}
+
+/**
+ * Run the chrome's publish-time writers ({@link chromeArtefacts}) as
+ * `derive:publish` runs them, and judge them the same way: a writer that fails
+ * refuses the build; one that says it does not apply to this root (exit 78,
+ * `lib/not-applicable.ts`) is reported and its artefacts excused; any other
+ * artefact that came out missing or empty refuses the build, since the chrome
+ * links it.
+ */
+export function buildChrome(
+  root: string,
+  artefacts: readonly DeclaredArtefact[] = chromeArtefacts(root),
+  runOne: (writer: string) => WriterOutcome = (w) => runWriter(writerCommand(root, w), root),
+): { ran: string[]; skipped: Map<string, string> } {
+  const ran: string[] = [];
+  const skipped = new Map<string, string>();
+  for (const w of writersOf(artefacts)) {
+    console.log(`▶ chrome artefact writer: ${w}`);
+    const o = runOne(w);
+    if (o.kind === "failed") throw new Error(`chrome artefact writer ${w} failed (exit ${o.exit ?? "on a signal"})`);
+    if (o.kind === "skipped") {
+      skipped.set(w, o.why);
+      console.log(`  skipped ${w} — it does not apply to this root: ${o.why}`);
+    } else ran.push(w);
+  }
+  const empty = artefacts.filter((a) => !a.writer.some((w) => skipped.has(w)) && !built(a));
+  if (empty.length > 0) {
+    throw new Error(`the site chrome's publish-time artefact(s) ${empty.map((a) => `${a.instance}/${a.path}`).join(", ")} came out missing or empty after ${writersOf(empty).join(", ")}`);
+  }
+  return { ran, skipped };
+}
+
+function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
   console.log(`▶ ${label}`);
-  const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit" });
+  const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit", env: { ...process.env, ...env } });
   if (r.status !== 0) throw new Error(`${label} failed (exit ${r.status}): ${cmd}`);
 }
 
@@ -280,9 +529,20 @@ function capture(cmd: string, cwd: string): string {
   return r.stdout.trim();
 }
 
-/** The jekyll executable preview-site.sh uses: the gem's own exe (`bundle exec jekyll` is not on PATH everywhere). */
-function jekyllExe(): string {
-  const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | head -1 || true", "/");
+/**
+ * The jekyll executable the Gemfile in `gemDir` resolves to: the gem's own exe
+ * (`bundle exec jekyll` is not on PATH everywhere). It is asked of Bundler, not
+ * globbed: a machine with Jekyll 3.10 and 4.4 installed globbed 3.10 first, and
+ * 3.10 run under a Jekyll-4 bundle dies on `Sass.load_paths` (sass-embedded).
+ */
+function jekyllExe(gemDir: string): string {
+  const gemfile = JSON.stringify(join(gemDir, "Gemfile"));
+  const bundled = capture(
+    `BUNDLE_GEMFILE=${gemfile} bundle exec ruby -e 'print Gem.bin_path("jekyll", "jekyll")' 2>/dev/null || true`,
+    gemDir,
+  );
+  if (bundled) return `ruby ${bundled}`;
+  const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | sort -V | tail -1 || true", "/");
   if (found) return `ruby ${found}`;
   return "jekyll";
 }
@@ -310,17 +570,101 @@ export function keepPinned(path: string, mountDirs: readonly string[], root: str
   };
 }
 
+/** The files the build's own steps generate into a site's `_data/`: `sync-docs-harness` and `gen-landing-data`. */
+export const GENERATED_DATA = ["_data/harness.json", "_data/stickies.json"] as const;
+
+/**
+ * {@link keepPinned} for every {@link GENERATED_DATA} file in every mount's site
+ * directory. Not only cat-harness: `gen-landing-data` writes the LANDING's
+ * `stickies.json`, which for an IG landing on smart-base is in the smart-base
+ * mount (litlfred/smart-hiv, 2026-10-14). A mount with no declaration has no site
+ * directory and nothing to keep.
+ */
+export function pinGeneratedData(root: string, mountDirs: readonly string[]): () => void {
+  const restores = mountDirs.flatMap((m) => {
+    const dir = join(root, m);
+    const sites = new Set<string>();
+    for (const f of GENERATED_DATA) {
+      try {
+        sites.add(siteFileFor(dir, f));
+      } catch {
+        // no declaration: no site directory
+      }
+      try {
+        sites.add(join(siteDirFor(dir), f));
+      } catch {
+        // no declaration: no site directory
+      }
+    }
+    return [...sites].map((rel) => keepPinned(join(dir, rel), mountDirs, root));
+  });
+  return () => {
+    for (const r of restores) r();
+  };
+}
+
+/** The mount paths `index.lock.json` names in `root`; empty when there is no lock. */
+export function lockedMountPaths(root: string): string[] {
+  const lockFile = join(root, "index.lock.json");
+  return existsSync(lockFile)
+    ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
+    : [];
+}
+
+/**
+ * What every recipe step is told, in its environment, so a declared step can
+ * pass the build's own values to a platform script without a shell payload in
+ * the declaration: folio-site.yml's `$INSTANCE`, `$LABEL`, `$BASE`,
+ * `$MAIN_SITE` and `$RUNNER_TEMP`, under names of their own.
+ */
+export function siteStepEnv(v: { instance: string; title: string; baseurl: string; url: string; linkRoot: string; work: string; source: string; site: string; repository?: string; commit?: string; ref?: string }): Record<string, string> {
+  return {
+    ...(v.repository ? { SITE_REPOSITORY: v.repository } : {}),
+    ...(v.commit ? { SITE_COMMIT: v.commit } : {}),
+    ...(v.ref ? { SITE_REF: v.ref } : {}),
+    SITE_INSTANCE: v.instance,
+    SITE_TITLE: v.title,
+    SITE_BASEURL: v.baseurl,
+    SITE_URL: v.url,
+    SITE_LINK_ROOT: v.linkRoot,
+    SITE_WORK: v.work,
+    SITE_SOURCE: v.source,
+    SITE_DIR: v.site,
+  };
+}
+
+/**
+ * The publish branch's current root, laid out in a temporary directory, the
+ * `exclude`d root entries left out; undefined when the branch does not exist
+ * yet. Read with `git fetch --depth 1` + `git archive`: nothing is cloned
+ * into the checkout and nothing is written to the remote.
+ */
+export function publishedRoot(remote: string, branch: string, exclude: readonly string[]): string | undefined {
+  const dir = mkdtempSync(join(tmpdir(), "published-root-"));
+  const git = join(dir, "git");
+  const tree = join(dir, "root");
+  mkdirSync(tree);
+  if (spawnSync("git", ["init", "-q", "--bare", git]).status !== 0) return undefined;
+  if (spawnSync("git", ["-C", git, "fetch", "-q", "--depth", "1", remote, branch], { stdio: ["ignore", "ignore", "ignore"] }).status !== 0) return undefined;
+  const ex = exclude.map((e) => JSON.stringify(`:(exclude)${e}`)).join(" ");
+  run(`read the published root of ${branch}`, `git -C ${JSON.stringify(git)} archive FETCH_HEAD -- . ${ex} | tar -x -C ${JSON.stringify(tree)}`, dir);
+  return tree;
+}
+
 export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string; base: string }> {
   const root = resolve(o.root);
   const declFile = findDeclarationFile(root);
-  const decl = declFile === undefined ? undefined : siteFields(readFileSync(join(root, declFile), "utf-8"), join(root, declFile));
-  if (!decl) throw new Error(`${root} holds no instance declaration`);
-  if (decl.name !== o.instance) throw new Error(`${root} declares ${decl.name}, not ${o.instance}`);
+  const declared = declFile === undefined ? undefined : siteFields(readFileSync(join(root, declFile), "utf-8"), join(root, declFile));
+  if (!declared && !o.identity) throw new Error(`${root} holds no instance declaration`);
+  if (declared && !o.identity && declared.name !== o.instance) throw new Error(`${root} declares ${declared.name}, not ${o.instance}`);
+  // With an identity the site is the checkout's own and `instance` only scopes the chrome.
+  const decl = o.identity ? { name: o.instance, title: o.identity.title, description: o.identity.description } : declared!;
   const remote = capture("git remote get-url origin", root);
   const gh = ownerRepo(remote);
   if (!gh) throw new Error(`origin ${remote} is not a GitHub repository: the base path cannot be read`);
   const title = decl.title ?? decl.name;
-  for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+  for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? []), ...(o.finalSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+  if (o.keep?.some((k) => k === "" || k.includes("/") || k === "." || k === "..")) throw new Error(`keep names root entries, not paths: ${JSON.stringify(o.keep)}`);
   const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
   const out = resolve(o.out);
@@ -340,28 +684,42 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
   }
   if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
-  const lockFile = join(root, "index.lock.json");
-  const mounted: string[] = existsSync(lockFile)
-    ? (JSON.parse(readFileSync(lockFile, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
-    : [];
-  run("install", ["bun install --no-save >/dev/null", ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
-  for (const p of o.pre) run(`pre: ${p}`, `bun run ${p}`, root);
+  const mounted = lockedMountPaths(root);
+  const ownPackage = existsSync(join(root, "package.json"));
+  run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
 
+  // The work directory exists before the first step: a pre step may leave its output there
+  // (an IG's artefact index, read by a later step), as folio-site.yml's steps use $RUNNER_TEMP.
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  // The harness data the build rewrites lives in the cat-harness mount: put the pinned
-  // bytes back afterwards, failed build or not, so the mount stays as the lock pins it.
-  const harnessDir = join(root, "cat-harness");
-  const restoreHarnessData = keepPinned(join(harnessDir, siteFileFor(harnessDir, "_data/harness.json")), mounted, root);
+  const upstreamFile = join(out, "upstream-pages.txt");
+  writeFileSync(upstreamFile, "");
+  const env = {
+    ...siteStepEnv({
+      instance: o.instance, title, baseurl, url: `https://${gh.owner}.github.io`, linkRoot: o.linkRoot, work: out, source: docs, site,
+      repository: `${gh.owner}/${gh.repo}`, commit: capture("git rev-parse HEAD", root), ref: capture("git rev-parse --abbrev-ref HEAD", root),
+    }),
+    [STEP_ENV.baseurl]: baseurl,
+    [STEP_ENV.upstreamPages]: upstreamFile,
+  };
+  for (const p of o.pre) run(`pre: ${p}`, stepCommand(root, p), root, env);
+  // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
+  // whichever mount holds the harness or the landing — cat-harness, or smart-base for an
+  // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
+  // every mount stays as the lock pins it.
+  const restoreHarnessData = pinGeneratedData(root, mounted);
   const s = JSON.stringify(site);
   try {
-    run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
-    run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
+    const has = PROFILE_STEPS[o.profile ?? "folio"];
+    if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
+    if (has.has("landing")) run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
     const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
-    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} --shell ${scope}`, root);
+    // Before the chrome is composed: what it links that only a publish-time writer builds.
+    buildChrome(root);
+    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} ${shellFlags(o.profile)} ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-    for (const s of o.sourceSteps) run(`source: ${s}`, `bun run ${s} ${JSON.stringify(docs)}`, root);
+    for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${JSON.stringify(docs)}`, root, env);
 
     // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
     const harness = join(root, "cat-harness");
@@ -380,26 +738,55 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("bundle install", "bundle install >/dev/null", gemDir);
     run(
       "jekyll",
-      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe()} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
+      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe(gemDir)} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
       gemDir,
     );
 
-    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `bun run ${st} ${s}`, root);
-    run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
-    run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
-    run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
-    run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
-    run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}`, root);
+    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
+    if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
+    if (has.has("suggest")) run("suggest editor", `bun run ${TOOLS}/suggest-editor.ts --site ${s}`, root);
+    if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
+    if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
+    run("rail on standalone pages", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
+    for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
   } finally {
     restoreHarnessData();
   }
   writeFileSync(join(site, ".nojekyll"), "");
 
-  const links = await checkLinks(site, `${baseurl}/`);
+  const lacking = missingRequired(site, o.require ?? []);
+  if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
+
+  // The root's guard: the built site carries everything the root it replaces carries.
+  const keep = [...new Set(["STAGING", "_render-log", ...(o.keep ?? [])])];
+  if (!staging && (o.parity ?? "refuse") !== "off") {
+    const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
+    if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
+    else {
+      const cur = siteFeatures(against, keep);
+      const cand = siteFeatures(site, keep);
+      console.log(`parity: ${describeFeatures("current root", cur)}`);
+      console.log(`parity: ${describeFeatures("this build  ", cand)}`);
+      for (const d of droppedByRuling(cur, cand, o.parityDropped ?? [])) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
+      const short = parityShortfall(cur, cand, o.parityDropped ?? []);
+      for (const m of short) console.error(`  ✗ ${m}`);
+      if (short.length && o.publish && o.parity !== "report") throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
+      if (!short.length) console.log("parity: ✓ this build carries everything the published root does");
+    }
+  }
+
+  const upstream = readUpstreamPages(upstreamFile);
+  const links = await checkLinks(site, `${baseurl}/`, upstream);
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);
+  if (links.upstreamMisses.length > 0) {
+    console.log(`links: ${links.upstreamMisses.length} unresolved on ${upstream.size} page(s) the content supplies (reported, not gated: the content's own to fix):`);
+    for (const m of links.upstreamMisses.slice(0, 20)) console.log(`  · ${m}`);
+  }
   if (links.misses.length > 0) {
     for (const m of links.misses.slice(0, 50)) console.error(`  ✗ ${m}`);
-    throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
+    if (o.links !== "report") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
+    console.error(`  (links: report — the recipe says so; published with ${links.misses.length} unresolved link(s))`);
   }
 
   if (o.publish) {
@@ -415,7 +802,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     }
     const opts: Parameters<typeof publishSite>[0] & { into?: string; keep?: string[] } = staging
       ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
-      : { site, remote: o.remote, keep: ["STAGING", "_render-log"], message, name: "Claude", email: "noreply@anthropic.com" };
+      : { site, remote: o.remote, keep, message, name: "Claude", email: "noreply@anthropic.com" };
     const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);
     console.log(r.state === "published" ? `published ${r.commit} (attempt ${r.attempt})` : "branch already current");
@@ -437,17 +824,20 @@ if (import.meta.main) {
   if (!instance) {
     console.error(
       "usage: build-instance-site.ts --root <checkout> --instance <name> [--link-root <url>] [--out <dir>] [--home <md>]\n" +
-        "         [--pre <script>]... [--source-step <script>]... [--site-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]",
+        "         [--pre <script>]... [--source-step <script>]... [--site-step <script>]... [--final-step <script>]... [--staging <branch>] [--no-mount | --fresh] [--publish --remote <git url>] [--message <m>]\n" +
+        "         [--keep <root entry>]... [--parity refuse|report|off] [--parity-against <published root dir>]",
     );
     process.exit(2);
   }
   // Explicit step flags win. With none, the instance's own `site.build`.
-  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps"> => {
-    const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step") };
-    if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length > 0) return flags;
-    const r = recipeFromConfig(root, instance);
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links"> => {
+    const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
+    if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };
+    const { recipe: r, read } = recipeRead(root, instance);
     if (r === undefined) return flags;
-    console.log(`steps: from ${instance}.config.json site.build`);
+    console.log(`steps: from ${read.from} site.build`);
+    const notice = legacyNotice(read);
+    if (notice !== undefined) console.warn(notice);
     return r;
   };
   try {
@@ -463,6 +853,9 @@ if (import.meta.main) {
       publish: a.includes("--publish"),
       remote: one("--remote"),
       message: one("--message"),
+      ...(many("--keep").length ? { keep: many("--keep") } : {}),
+      ...(one("--parity") ? { parity: one("--parity") as BuildOptions["parity"] } : {}),
+      ...(one("--parity-against") ? { parityAgainst: one("--parity-against")! } : {}),
     });
   } catch (e) {
     console.error(`✗ ${(e as Error).message}`);

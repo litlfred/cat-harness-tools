@@ -51,14 +51,10 @@ import {
   SOURCE_LEDGER_SCHEMA,
   writeSourceLedger,
 } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
-import { directoryForGraph, folioDir, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { entryUrl, referenceEntries } from "./reference-entries.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();
-const REFERENCES_PATH = deferResolution(() => join(folioDir(REPO_ROOT),  "schema", "references.ts"), {
-  moduleUrl: import.meta.url,
-  what: "REFERENCES_PATH",
-  under: REPO_ROOT,
-});
 // declared-path-literal: the convention fallback, at the call site so the choice is visible.
 const UPLOADS_DIR = deferResolution(() => directoryForGraph(REPO_ROOT, "uploads") ?? join(REPO_ROOT, "uploads"), {
   moduleUrl: import.meta.url,
@@ -71,12 +67,12 @@ const SCHEMA_ID = SOURCE_LEDGER_SCHEMA;
 /** Documents we index.  Anything else in `uploads/` is scaffolding. */
 const SOURCE_EXTENSIONS = [".pdf", ".txt", ".tex", ".djvu", ".epub"];
 
-// ── references.ts probing ────────────────────────────────────────────────
+// ── reference probing ────────────────────────────────────────────────────
 //
-// `references.ts` is TypeScript, not data, so it is not imported here — a
-// regex read keeps the indexer free of a bun/tsc round-trip and of any
-// chance of executing paper source.  Only two facts are read: which ids
-// exist, and which arXiv ids they mention.
+// Read through `reference-entries.ts`: the per-entry files a folio keeps
+// (`<folio>/references/<key>.json`) and any `ref({…})` left in
+// `references.ts`. Nothing is imported or executed. Only two facts are read:
+// which ids exist, and which arXiv ids they mention.
 
 interface RefIndex {
   /** Every `ref()` id. */
@@ -87,32 +83,22 @@ interface RefIndex {
   urls: Map<string, string>;
 }
 
-function readReferences(): RefIndex {
-  const src = readFileSync(REFERENCES_PATH(), "utf-8");
+export function readReferences(repoRoot: string = REPO_ROOT): RefIndex {
   const ids = new Set<string>();
   const byArxiv = new Map<string, string>();
   const urls = new Map<string, string>();
 
-  // Each entry is a `ref({ … })` call; split on the builder so an arXiv id
-  // is attributed to the entry it actually appears in.
-  for (const m of src.matchAll(/ref\(\{(.*?)\n\s*\}\)/gs)) {
-    const body = m[1];
-    const idM = body.match(/\bid:\s*"([^"]+)"/);
-    if (!idM) continue;
-    const id = idM[1];
-    ids.add(id);
-
-    const urlM = body.match(/\bURL:\s*"([^"]+)"/);
-    if (urlM) urls.set(id, urlM[1]);
-    else {
-      const doiM = body.match(/\bDOI:\s*"([^"]+)"/);
-      if (doiM) urls.set(id, `https://doi.org/${doiM[1]}`);
-    }
-
-    for (const a of body.matchAll(
+  // Every entry, from the per-entry files and the module alike
+  // (`reference-entries.ts`). An arXiv id is attributed to the entry it
+  // actually appears in: the entry's own file, or its own `ref({…})` body.
+  for (const e of referenceEntries(repoRoot)) {
+    ids.add(e.id);
+    const url = entryUrl(e);
+    if (url) urls.set(e.id, url);
+    for (const a of e.text.matchAll(
       /(?:arxiv\.org\/abs\/|arXiv:\s*)([a-z-]+\/\d{7}|\d{4}\.\d{4,5})/gi,
     )) {
-      byArxiv.set(a[1].toLowerCase(), id);
+      byArxiv.set(a[1].toLowerCase(), e.id);
     }
   }
   return { ids, byArxiv, urls };
@@ -299,4 +285,5 @@ function main(): void {
   }
 }
 
-main();
+// Run only as a script, so a test can import `readReferences`.
+if (import.meta.main) main();

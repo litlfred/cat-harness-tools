@@ -49,10 +49,10 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -63,7 +63,7 @@ import {
   type Judgement,
   type QaResult,
 } from "./qa-results.ts";
-import { declaredVisualisers as harnessVisualisers } from "./viewer-declarations.js";
+import { checkoutInstanceRoots, declaredVisualisers as harnessVisualisers } from "./viewer-declarations.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
@@ -74,7 +74,11 @@ export const VIEWPORTS = ["web", "mobile"] as const;
 
 type Index = { wireframes: Record<string, { covers: string[] }> };
 type ReportEntry = { viewport: string; criterion: string; result: string; notes?: string };
-type Report = { candidates: { file: string; entries: ReportEntry[] }[] };
+/**
+ * `use`, `topic` and `surface` are the skill's input, recorded by `wireframe:check`
+ * since 2026-10-14; a report written before then has none of them.
+ */
+type Report = { topic?: string; use?: string; surface?: string; candidates: { file: string; entries: ReportEntry[] }[] };
 
 export interface WireframeReport {
   declared: string[];
@@ -96,7 +100,42 @@ export function coveredKey(entry: string, declared: readonly string[]): string |
   return declared.find((k) => entry === k || entry.startsWith(`${k}/`));
 }
 
-export function checkWireframes(repoRoot: string = REPO_ROOT, dir: string = WIREFRAMES): WireframeReport {
+/**
+ * Where the wireframes are: this harness's own `<site>/wireframes/`, and the
+ * same directory in every OTHER instance of the checkout that has one.
+ *
+ * A wireframe belongs with the page it draws. While every wireframe sat here,
+ * the harness's index named pages of layers ABOVE it — a catalogue page of a
+ * content instance — and in any checkout that did not mount that layer the
+ * ref read as undeclared (measured in a content repository that mounts only
+ * the platform, cat-harness-tools#281). A content layer's own visualiser had
+ * nowhere to put its wireframe at all. So each instance's index is read where it sits, and
+ * names only refs it can see. This harness's wireframes keep their bare
+ * names; another instance's are named `<instance>/<topic>`, since two layers
+ * may each have a `catalogue`.
+ */
+export function wireframeSources(repoRoot: string = REPO_ROOT): { dir: string; prefix: string }[] {
+  const own = resolve(WIREFRAMES);
+  const out = [{ dir: own, prefix: "" }];
+  for (const root of checkoutInstanceRoots(repoRoot)) {
+    let dir: string;
+    try {
+      dir = resolve(root, siteDirFor(root), "wireframes");
+    } catch {
+      continue; // no readable declaration: `check:harness-dirs`' finding, not this one's
+    }
+    if (dir === own || !existsSync(join(dir, "index.json"))) continue;
+    const name = readDeclaration(root)?.name ?? basename(root);
+    out.push({ dir, prefix: `${name}/` });
+  }
+  return out;
+}
+
+export function checkWireframes(
+  repoRoot: string = REPO_ROOT,
+  dirs: string | { dir: string; prefix: string }[] = wireframeSources(repoRoot),
+): WireframeReport {
+  const sources = typeof dirs === "string" ? [{ dir: dirs, prefix: "" }] : dirs;
   const r: WireframeReport = {
     declared: declaredVisualisers(repoRoot),
     covered: [],
@@ -106,39 +145,46 @@ export function checkWireframes(repoRoot: string = REPO_ROOT, dir: string = WIRE
     missingViewport: [],
     failing: [],
   };
-  const indexFile = join(dir, "index.json");
-  const index: Index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf-8")) : { wireframes: {} };
   const coverer = new Map<string, string>();
-  for (const [name, w] of Object.entries(index.wireframes)) {
-    for (const ref of w.covers) {
-      const key = coveredKey(ref, r.declared);
-      if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
-      else if (!coverer.has(key)) coverer.set(key, name);
-    }
-    const wdir = join(dir, name);
-    if (!existsSync(join(wdir, "intent.md"))) r.incomplete.push({ wireframe: name, problem: "no intent.md" });
-    const candidates = existsSync(wdir) ? readdirSync(wdir).filter((f) => f.endsWith(".html")).sort() : [];
-    if (candidates.length === 0) {
-      r.incomplete.push({ wireframe: name, problem: "no candidate .html" });
-      continue;
-    }
-    const reportFile = join(wdir, "checks", "report.json");
-    if (!existsSync(reportFile)) {
-      r.incomplete.push({ wireframe: name, problem: "no checks/report.json: run `bun run cat wireframe:check`" });
-      continue;
-    }
-    const report: Report = JSON.parse(readFileSync(reportFile, "utf-8"));
-    for (const c of candidates) {
-      const entries = report.candidates.find((x) => basename(x.file) === c)?.entries;
-      if (entries === undefined) {
-        r.incomplete.push({ wireframe: name, problem: `${c} is not in checks/report.json` });
+  for (const { dir, prefix } of sources) {
+    const indexFile = join(dir, "index.json");
+    const index: Index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf-8")) : { wireframes: {} };
+    for (const [topic, w] of Object.entries(index.wireframes)) {
+      const name = `${prefix}${topic}`;
+      for (const ref of w.covers) {
+        const key = coveredKey(ref, r.declared);
+        if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
+        else if (!coverer.has(key)) coverer.set(key, name);
+      }
+      const wdir = join(dir, topic);
+      if (!existsSync(join(wdir, "intent.md"))) r.incomplete.push({ wireframe: name, problem: "no intent.md" });
+      const candidates = existsSync(wdir) ? readdirSync(wdir).filter((f) => f.endsWith(".html")).sort() : [];
+      if (candidates.length === 0) {
+        r.incomplete.push({ wireframe: name, problem: "no candidate .html" });
         continue;
       }
-      for (const vp of VIEWPORTS) {
-        const at = entries.filter((e) => e.viewport === vp);
-        if (at.length === 0) r.missingViewport.push({ wireframe: name, candidate: c, viewport: vp });
-        for (const e of at.filter((x) => x.result !== "pass"))
-          r.failing.push({ wireframe: name, candidate: c, viewport: vp, criterion: e.criterion, ...(e.notes ? { notes: e.notes } : {}) });
+      const reportFile = join(wdir, "checks", "report.json");
+      if (!existsSync(reportFile)) {
+        r.incomplete.push({ wireframe: name, problem: `no checks/report.json: run \`bun run cat wireframe:check --use as-is --topic ${topic} --surface <ref>\`` });
+        continue;
+      }
+      const report: Report = JSON.parse(readFileSync(reportFile, "utf-8"));
+      if (report.topic !== undefined && report.topic !== topic) {
+        r.incomplete.push({ wireframe: name, problem: `checks/report.json was written for topic "${report.topic}"` });
+        continue;
+      }
+      for (const c of candidates) {
+        const entries = report.candidates.find((x) => basename(x.file) === c)?.entries;
+        if (entries === undefined) {
+          r.incomplete.push({ wireframe: name, problem: `${c} is not in checks/report.json` });
+          continue;
+        }
+        for (const vp of VIEWPORTS) {
+          const at = entries.filter((e) => e.viewport === vp);
+          if (at.length === 0) r.missingViewport.push({ wireframe: name, candidate: c, viewport: vp });
+          for (const e of at.filter((x) => x.result !== "pass"))
+            r.failing.push({ wireframe: name, candidate: c, viewport: vp, criterion: e.criterion, ...(e.notes ? { notes: e.notes } : {}) });
+        }
       }
     }
   }

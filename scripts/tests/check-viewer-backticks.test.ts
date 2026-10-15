@@ -105,9 +105,7 @@ describe("the file set is derived, not listed", () => {
   test("it finds the generators, including the one outside cat-harness", () => {
     // `who-iris/scripts/gen-iris-pages.ts` was added to the old array by hand
     // on 2026-09-21, after the trap caught it for the third time in a session.
-    // Nothing names it now; the walk finds it. The platform's own generators
-    // live in cat-harness-tools since the tools split (definitions in
-    // cat-harness, implementations in cat-harness-tools; bean `w2gr`).
+    // Nothing names it now; the walk finds it.
     expect(sources).toContain("who-iris/scripts/gen-iris-pages.ts");
     expect(sources).toContain("cat-harness-tools/scripts/kg-viewer.ts");
     // A generator whose pages moved onto the theme's layout (2026-10-07) no

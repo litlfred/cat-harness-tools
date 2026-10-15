@@ -91,13 +91,18 @@
  * @covers qa
  */
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
+import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
+import { stateMountedDirs } from "./mount-from-lock.ts";
 
 export { REFRESH_SCHEMA, refreshReportComplete };
 export const REFRESH_EXIT = { complete: 0, incomplete: 1, unknown: 2 } as const;
@@ -128,6 +133,12 @@ export interface QaWriter {
   okExits?: readonly number[];
   /** Why it is here, or what it depends on. */
   because: string;
+  /**
+   * It reads graphs kept on their STATE branches (todos, beans, issue marks …).
+   * In a content root with no state branch mounted it is not applicable,
+   * reported with that reason rather than as failed (cat-harness-tools#281).
+   */
+  readsState?: true;
 }
 
 // declared-path-literal: the HARNESS's qa tree, as the repo-relative key every writer below is keyed by. This script moved up to cat-harness-tools in 70lx B2 and drives its implementer's writers (downward); it was an own-instance path until the move.
@@ -209,6 +220,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     writes: [`${R}/witnesses/**`],
     // declared-path-literal: the docs projections it regenerates beside the witnesses (bean `72a8`), measured from the 2026-10-07 restore log.
     rewrites: ["cat-harness/docs/assets/beans/*.json", "cat-harness/docs/assets/qa/*.json"],
+    // Measured in smart-ra 2026-10-15: `skills:docs` reads the todo graph and exits 1 when it is unmounted.
+    readsState: true,
     because: "the published witness projections of the block and translation verdicts above",
   },
   { id: "viewer:nav:audit", run: ["viewer:nav:audit"], writes: [`${R}/viewer-nav/**`], because: "viewer navbar census" },
@@ -255,6 +268,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
           rewrites: ["cat-harness/docs/assets/qa/*.json"],
         }
       : {}),
+    // Measured in smart-ra 2026-10-15 (cat-harness-tools#281): skill:register
+    // runs `skills:docs`, which reads the todo graph, and check:harness-state
+    // judges the issue-marks, merge-queue, session-survey, todo-feedback and
+    // board-positions graphs; all of them live on state branches.
+    ...(script === "skill:register" || script === "check:harness-state" ? { readsState: true as const } : {}),
     because: "a whole-artefact review; its writer form writes the sidecar",
   })),
   {
@@ -305,6 +323,54 @@ export function claimants(path: string, writers: readonly QaWriter[] = QA_WRITER
 
 export type RefreshMode = "tracked" | "computed" | "mixed";
 
+/** A writer that cannot build anything in this root, and why: neither run nor failed. */
+export interface NotApplicable {
+  id: string;
+  why: string;
+}
+
+/** What {@link notApplicableWriters} needs to know about the root. */
+export interface RootFacts {
+  profile: RootProfile;
+  /** Whether an npm script of this name is declared by any instance on disk. */
+  declares: (script: string) => boolean;
+  /** Whether any state branch is mounted in this worktree. */
+  stateMounted: boolean;
+}
+
+/**
+ * The writers that do not apply to this root, each with its reason. Pure, so
+ * the rule is tested on fixtures.
+ *
+ * Only a CONTENT root has any (owner, cat-harness-tools#281: "hold smart-ra to
+ * its own gate set"). In the harness every writer is its own CI recipe, and a
+ * writer that names no script there is a broken declaration (bean `72a8`), so
+ * it stays a failure. In a content root two things are true that are not
+ * failures of the root:
+ *
+ * - the writer's script is declared by no instance mounted there (`p2:refusals`
+ *   is declared by the IG layers smart-ra does not mount);
+ * - it reads state graphs and no state branch is mounted (`readsState`).
+ *
+ * Anything else a content root's writer does stays judged: a real content gap
+ * (an L1 entry with no manifest, a surface with no wireframe) is a failure.
+ */
+export function notApplicableWriters(writers: readonly QaWriter[], facts: RootFacts): NotApplicable[] {
+  if (facts.profile !== "content") return [];
+  const out: NotApplicable[] = [];
+  for (const w of writers) {
+    if (w.run === "external") continue;
+    const name = w.run[0]!;
+    const isScriptName = !name.includes("/") && !/\.[cm]?[jt]s$/.test(name);
+    if (isScriptName && !facts.declares(name)) {
+      out.push({ id: w.id, why: `\`${name}\` is declared by no instance mounted in this root, so there is nothing to run` });
+    } else if (w.readsState && !facts.stateMounted) {
+      out.push({ id: w.id, why: "it reads graphs kept on state branches, and none is mounted in this root (`bun run cat state:mount`)" });
+    }
+  }
+  return out;
+}
+
 export interface WriterRun {
   id: string;
   exit: number | null;
@@ -327,6 +393,8 @@ export interface QaRefreshReport {
   empty: string[];
   /** Writers that exited outside their `okExits`. */
   failed: string[];
+  /** Writers not run because they do not apply to this root, with why. Neither passed nor failed. */
+  notApplicable: NotApplicable[];
   complete: boolean;
   /** Why it is not complete, one line each. Empty when complete. */
   reasons: string[];
@@ -350,8 +418,11 @@ export function assess(args: {
   commit?: string;
   /** `mixed` mode: the paths version control still tracks, whose provenance is the commit. */
   tracked?: readonly string[];
+  /** Writers that do not apply to this root ({@link notApplicableWriters}): not judged empty or failed. */
+  notApplicable?: readonly NotApplicable[];
 }): QaRefreshReport {
   const writers = args.writers ?? QA_WRITERS;
+  const na = new Set((args.notApplicable ?? []).map((n) => n.id));
   const paths = args.inventory.directories.flatMap((d) => d.files.map((f) => f.path));
   const families: Record<string, number> = {};
   const unclaimed: string[] = [];
@@ -368,9 +439,10 @@ export function assess(args: {
       if (by.length === 0 && !trackedSet.has(p)) unclaimed.push(p);
       for (const id of by) families[id]!++;
     }
-    for (const w of writers) if (families[w.id] === 0) empty.push(w.id);
+    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id)) empty.push(w.id);
     for (const r of args.runs) {
       const w = writers.find((x) => x.id === r.id);
+      if (na.has(r.id)) continue;
       if (r.exit === null || !(w?.okExits ?? [0]).includes(r.exit)) failed.push(r.id);
     }
     if (unclaimed.length) reasons.push(`${unclaimed.length} file(s) no declared writer claims (first: ${unclaimed[0]}) — QA_WRITERS is out of date`);
@@ -389,6 +461,7 @@ export function assess(args: {
     unclaimed,
     empty,
     failed,
+    notApplicable: [...(args.notApplicable ?? [])],
     complete: reasons.length === 0,
     reasons,
   };
@@ -527,13 +600,29 @@ export function partitionWriters(
   return { backed, unbacked };
 }
 
-/** Run one writer from the repository root; its output streams through. */
-function runWriter(repoRoot: string, w: QaWriter): WriterRun {
+/**
+ * Run one writer from the repository root; its output streams through. A
+ * writer that exits {@link NOT_APPLICABLE_EXIT} said it cannot build anything
+ * in this root (`lib/not-applicable.ts`): its reason is collected into
+ * `notApplicable`, and it is judged neither empty nor failed.
+ */
+function runWriter(repoRoot: string, w: QaWriter, notApplicable: NotApplicable[]): WriterRun {
   const t = Date.now();
   if (w.run === "external") return { id: w.id, exit: 0, seconds: 0 };
   console.log(`::group::qa:refresh ${w.id} — bun run cat ${w.run.join(" ")}`);
-  const r = spawnSync("bun", ["run", "cat", ...w.run], { cwd: repoRoot, stdio: "inherit" });
+  const reasonFile = join(tmpdir(), `qa-refresh-na-${process.pid}-${w.id.replace(/[^A-Za-z0-9._-]/g, "_")}.txt`);
+  rmSync(reasonFile, { force: true });
+  const r = spawnSync("bun", ["run", "cat", ...w.run], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: { ...process.env, [NOT_APPLICABLE_REASON_ENV]: reasonFile },
+  });
   console.log("::endgroup::");
+  if (r.status === NOT_APPLICABLE_EXIT) {
+    const why = existsSync(reasonFile) ? readFileSync(reasonFile, "utf-8").trim() : "";
+    notApplicable.push({ id: w.id, why: why || `it exited ${NOT_APPLICABLE_EXIT} (not applicable) and gave no reason` });
+  }
+  rmSync(reasonFile, { force: true });
   return { id: w.id, exit: r.status, seconds: Math.round((Date.now() - t) / 1000) };
 }
 
@@ -568,7 +657,17 @@ function main(argv: string[]): number {
   if (roots.length === 0) throw new QaUsageError("no instance declares a qa directory; there is nothing to refresh");
   const commit = git(repoRoot, ["rev-parse", "HEAD"]).trim();
   const tracked = trackedQaFiles(repoRoot, roots);
-  const { backed, unbacked } = partitionWriters(tracked);
+  const { backed, unbacked: candidates } = partitionWriters(tracked);
+  const table = scriptTable(repoRoot);
+  const notApplicable = notApplicableWriters(candidates, {
+    profile: rootProfile(repoRoot),
+    declares: (name) => table.has(name),
+    stateMounted: stateMountedDirs(repoRoot).length > 0,
+  });
+  const naIds = new Set(notApplicable.map((n) => n.id));
+  const unbacked = candidates.filter((w) => !naIds.has(w.id));
+  for (const n of notApplicable) console.log(`qa:refresh: ${n.id} NOT APPLICABLE in this root — ${n.why}`);
+  const declaredNa = notApplicable.length;
   const mode: RefreshMode = unbacked.length === 0 ? "tracked" : backed.length === 0 ? "computed" : "mixed";
   const runs: WriterRun[] = [];
   if (backed.length) {
@@ -599,7 +698,7 @@ function main(argv: string[]): number {
   const backupRoot = join(repoRoot, "build", "qa-refresh-restored", new Date().toISOString().replace(/[:.]/g, "-"));
   const restored = runRestoring(
     unbacked,
-    (w) => runWriter(repoRoot, w),
+    (w) => runWriter(repoRoot, w, notApplicable),
     () => dirtyTracked(repoRoot),
     (paths) => git(repoRoot, ["checkout", "--", ...paths]),
     {
@@ -624,7 +723,8 @@ function main(argv: string[]): number {
     console.log(`qa:refresh: LEFT ${left.length} changed committed file(s) in place — the writer running does not declare it rewrites them, so they may be somebody's edit:`);
     for (const { p, w } of left) console.log(`  left ${p}  (changed while ${w} ran; add it to that writer's \`rewrites\` if the writer did it)`);
   }
-  const report = assess({ mode, inventory: movedInventory(repoRoot, roots), runs, commit, tracked: [...tracked, ...carried] });
+  for (const n of notApplicable.slice(declaredNa)) console.log(`qa:refresh: ${n.id} NOT APPLICABLE in this root — ${n.why}`);
+  const report = assess({ mode, inventory: movedInventory(repoRoot, roots), runs, commit, tracked: [...tracked, ...carried], notApplicable });
   const out = resolve(one("report") ?? join(repoRoot, "build", "qa-refresh.json"));
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(report, null, 2) + "\n");
@@ -632,6 +732,7 @@ function main(argv: string[]): number {
   console.log(
     `qa:refresh ${report.complete ? "COMPLETE" : "INCOMPLETE"} (${mode}): ${report.files} file(s), ${report.bytes} bytes` +
       (runs.length ? ` from ${runs.length} writer(s)` : "") +
+      (notApplicable.length ? `, ${notApplicable.length} not applicable here` : "") +
       ` — report ${out}`,
   );
   for (const r of report.reasons) console.error(`  ✗ ${r}`);
