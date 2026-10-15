@@ -120,6 +120,7 @@ import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
+import { beforeHeadEnd, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
@@ -754,7 +755,7 @@ export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
  */
 export function withPlatformUi(html: string, chromeRoot: string, platformBase?: string): string {
   if (html.includes(PLATFORM_UI_ATTR)) return html;
-  const head = html.search(/<\/head>/i);
+  const head = headEndTag(html)?.index ?? -1;
   if (head < 0) return html;
   const tags =
     (platformBase ? `<meta name="fa-platform-base" content="${platformBase.replace(/"/g, "&quot;")}" ${PLATFORM_UI_ATTR}>` : "") +
@@ -798,7 +799,7 @@ export const PINNED_DATA_META = "fa-pinned-data";
 /** The page told that the platform DATA it reads is the site's own pinned copy, `toRoot` away. */
 export function withPinnedData(html: string, toRoot: string): string {
   if (html.includes(`name="${PINNED_DATA_META}"`)) return html;
-  return html.replace(/<\/head>/i, `<meta name="${PINNED_DATA_META}" content="${toRoot.replace(/"/g, "&quot;")}"></head>`);
+  return beforeHeadEnd(html, `<meta name="${PINNED_DATA_META}" content="${toRoot.replace(/"/g, "&quot;")}">`);
 }
 
 /**

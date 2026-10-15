@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -362,7 +362,7 @@ export function withNavbarRow(
   let out = html;
   let sharedTag = "";
   if (!out.includes(`id="${NAVBAR_ROW_ID}"`)) {
-    const body = /<body\b[^>]*>/i.exec(out);
+    const body = bodyTag(out);
     if (!body) return html;
     const pos = body.index + body[0].length;
     const json = JSON.stringify(row).replace(/</g, "\\u003c");
@@ -390,7 +390,7 @@ export function withNavbarRow(
     // AHEAD of any reader already linked, else before `</head>`: deferred
     // scripts run in document order, and the readers are deferred too.
     const reader = out.search(/<script\b[^>]*(navbar-row\.js|docs-ui\.js)/i);
-    const head = /<\/head\s*>/i.exec(out);
+    const head = headEndTag(out);
     const at2 = reader >= 0 ? reader : head ? head.index : -1;
     if (at2 >= 0) out = out.slice(0, at2) + sharedTag + out.slice(at2);
   }
@@ -398,9 +398,9 @@ export function withNavbarRow(
   const tags = at.inline
     ? `<style ${NAVBAR_ROW_INLINE}>${at.inline.css}</style><script ${NAVBAR_ROW_INLINE}>${at.inline.js}</script>`
     : `<link rel="stylesheet" href="${at.root}/${NAVBAR_ROW_CSS}">` + `<script src="${at.root}/${NAVBAR_ROW_JS}" defer></script>`;
-  const head = /<\/head\s*>/i.exec(out);
+  const head = headEndTag(out);
   if (head) return out.slice(0, head.index) + tags + out.slice(head.index);
-  const body = /<body\b[^>]*>/i.exec(out);
+  const body = bodyTag(out);
   return body ? out.slice(0, body.index + body[0].length) + tags + out.slice(body.index + body[0].length) : out;
 }
 
@@ -533,7 +533,7 @@ const PENDING = 'data-fa-rail="pending"';
 /** Inject the page block, the placeholder `<nav>` and the three links; emit the shared data. */
 function withSharedRail(html: string, o: RailOptions, root: string, documentIndex: NavGroup | undefined): string | undefined {
   if (html.includes('class="fa-nav"')) return undefined;
-  const body = /<body\b[^>]*>/i.exec(html);
+  const body = bodyTag(html);
   if (!body) return undefined;
   const asset = railDataAsset(railSharedJson(o, root));
   o.emitRailData!(asset.file, asset.body);
@@ -558,7 +558,7 @@ function withSharedRail(html: string, o: RailOptions, root: string, documentInde
     // this page's own root.
     `<script src="${o.toRoot}/${asset.file}" defer></script>` +
     `<script src="${chrome}/${NAVBAR_JS}" defer></script>`;
-  const head = /<\/head\s*>/i.exec(out);
+  const head = headEndTag(out);
   out = head ? out.slice(0, head.index) + tags + out.slice(head.index) : out.slice(0, at) + tags + out.slice(at);
   return out;
 }

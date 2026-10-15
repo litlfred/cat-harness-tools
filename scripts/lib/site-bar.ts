@@ -25,6 +25,7 @@
  * @module scripts/lib/site-bar
  */
 import { PAGE_BAR_CLASS, PAGE_LAYOUT_MARK, pageLayoutTags } from "../page-layout.ts";
+import { beforeHeadEnd, bodyTag } from "./navbar.ts";
 
 /** The class the bar carries beside the page layout's. */
 export const SITE_BAR_CLASS = "fa-site-bar";
@@ -119,7 +120,7 @@ export function withSiteBar(html: string, o: SiteBarOptions): string {
     const open = `<div id="main-header" class="main-header ${SITE_BAR_CLASS} ${PAGE_BAR_CLASS}">`;
     out = out.slice(0, theme.index) + open + home + out.slice(theme.index + theme[0].length, close) + SITE_BAR_LOCALE + out.slice(close);
   } else {
-    const body = /<body\b[^>]*>/i.exec(out);
+    const body = bodyTag(out);
     if (!body) return html;
     const box = o.search && o.search.length ? themeSearchHtml() : "";
     const bar = `<div id="main-header" class="main-header ${SITE_BAR_CLASS} ${PAGE_BAR_CLASS}">${home}${box}${SITE_BAR_LOCALE}</div>`;
@@ -130,10 +131,10 @@ export function withSiteBar(html: string, o: SiteBarOptions): string {
     out = out.slice(0, at) + bar + out.slice(at);
     if (box) {
       const scripts = o.search!.map((s) => `<script src="${esc(o.toRoot)}/${esc(s)}" defer></script>`).join("");
-      out = out.replace(/<\/head>/i, `${scripts}</head>`);
+      out = beforeHeadEnd(out, scripts);
     }
   }
-  if (!out.includes(PAGE_LAYOUT_MARK)) out = out.replace(/<\/head>/i, `${pageLayoutTags(`${o.toRoot}/`)}</head>`);
+  if (!out.includes(PAGE_LAYOUT_MARK)) out = beforeHeadEnd(out, pageLayoutTags(`${o.toRoot}/`));
   return out;
 }
 

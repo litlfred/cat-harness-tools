@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { expandRail, railDataJson } from "../lib/harness-rail.ts";
-import { RAIL_SECTION_LABELS } from "../lib/navbar.ts";
+import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../lib/navbar.ts";
 import { elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../lib/site-bar.ts";
 import { railStandalonePages } from "../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../page-layout.ts";
@@ -133,5 +133,18 @@ describe("the rail pass with --theme-source: one rail on every page (option A)",
     const again = railStandalonePages(site, "cat-harness", "cat-harness", [], undefined, { themeSource: source });
     expect(again.injected).toBe(0);
     expect(readFileSync(join(site, "guide/install.html"), "utf-8")).toBe(before);
+  });
+});
+
+describe("the real <body>, never one a comment or a script names", () => {
+  // Measured 2026-10-15: the theme's head_custom.html says `<body>` in an HTML
+  // comment, and the first textual match put the whole rail inside it.
+  const page = `<html><head><!-- hoists a stray <div> into <body> --><script>var s = "<body>";</script></head><body class="x"><p>hi</p></body></html>`;
+  test("bodyTag skips both", () => {
+    expect(bodyTag(page)?.[0]).toBe('<body class="x">');
+  });
+  test("the rail lands in the body", () => {
+    const out = injectNavbar(page, { instance: "x" })!;
+    expect(out.indexOf('<nav class="fa-nav"')).toBeGreaterThan(out.indexOf('<body class="x">'));
   });
 });
