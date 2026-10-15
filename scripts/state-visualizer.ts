@@ -127,6 +127,7 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   unlinkSync,
@@ -565,11 +566,14 @@ function emit(path: string, content: string): void {
  * caller, relative to where that page sits, so the depth is expressed once at
  * the only place that knows it.
  */
-function page(opts: { title: string; body: string }): string {
+function page(opts: { title: string; body: string; liquid?: boolean }): string {
+  // `liquid: false` for a page that shows AUTHORED text (file names, a
+  // declaration's descriptions): Jekyll would otherwise run Liquid over it,
+  // and one `{{` or `{%` in a name breaks the site build.
   return `---
 layout: default
 title: ${JSON.stringify(opts.title)}
-nav_exclude: true
+nav_exclude: true${opts.liquid === false ? "\nrender_with_liquid: false" : ""}
 ---
 <!--
   ${GENERATED_BY}: the next run
@@ -1190,6 +1194,159 @@ export function beansSubjectPage(
   });
 }
 
+/**
+ * One declared code directory of an instance, for its per-instance code page
+ * (bean `folio-assistant-svgx`).
+ */
+export interface CodeDirectory {
+  id: string;
+  path: string;
+  absPath: string;
+  description?: string;
+}
+
+/**
+ * Every directory of `kinds` that instance `name` holds, in declaration
+ * order. Unlike {@link instanceSubjectsOf}, which keeps ONE directory per
+ * instance, an instance declares code in many places (`scripts/`,
+ * `schemas/`, `pipeline/`, …) and its code page lists them all.
+ */
+export function codeDirectoriesOf(
+  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[]; description?: string }>,
+  name: string,
+  kinds: readonly string[],
+): CodeDirectory[] {
+  const out: CodeDirectory[] = [];
+  const seen = new Set<string>();
+  for (const d of dirs) {
+    if ((d.member ?? d.declaredBy) !== name) continue;
+    if (!d.graphTypologies.some((k) => kinds.includes(k))) continue;
+    if (seen.has(d.absPath)) continue;
+    seen.add(d.absPath);
+    out.push({ id: d.id, path: d.path, absPath: d.absPath, ...(d.description ? { description: d.description } : {}) });
+  }
+  return out;
+}
+
+/** Directory names a source listing never descends into. */
+const CODE_SKIP = new Set(["node_modules", ".git", ".lake", "__pycache__", "dist", "build"]);
+
+/** At most this many files are listed per directory; the total is always given. */
+export const CODE_FILE_LIMIT = 300;
+
+/**
+ * The files under a code directory, `/`-separated and relative to it, sorted.
+ * `null` when the directory is not on disk — not in this build, which is
+ * unknown, not empty.
+ */
+export function listCodeFiles(absPath: string, limit: number = CODE_FILE_LIMIT): { files: string[]; total: number } | null {
+  if (!existsSync(absPath)) return null;
+  const all: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (CODE_SKIP.has(e.name) || e.name.startsWith(".")) continue;
+        walk(join(dir, e.name), r);
+      } else if (e.isFile()) {
+        all.push(r);
+      }
+    }
+  };
+  walk(absPath, "");
+  all.sort();
+  return { files: all.slice(0, limit), total: all.length };
+}
+
+/**
+ * `https://github.com/<repo>/blob/<ref>/` for an instance mounted from a
+ * pinned commit — read from the checkout's `index.lock.json` — so a file links
+ * to the source the site was built from. `undefined` when the instance is not
+ * a locked mount (a layer repository's own checkout): the page then lists
+ * names without links rather than guess a ref.
+ */
+export function pinnedBlobBase(repoRoot: string, instance: string): string | undefined {
+  try {
+    const lock = JSON.parse(readFileSync(join(repoRoot, "index.lock.json"), "utf-8")) as {
+      mounts?: Array<{ harness?: string; repository?: string; ref?: string }>;
+    };
+    const m = (lock.mounts ?? []).find((x) => x.harness === instance);
+    if (!m?.repository || !m.ref || !/^[\w.-]+\/[\w.-]+$/.test(m.repository) || !/^[0-9a-f]{7,40}$/.test(m.ref)) return undefined;
+    return `https://github.com/${m.repository}/blob/${m.ref}/`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's code: each declared
+ * code directory with its files, linked to GitHub at the pinned commit
+ * (bean `folio-assistant-svgx`, child of `46ob`). A source LISTING, not a
+ * rendered source browser: the file opens on GitHub, which already renders
+ * it.
+ */
+export function codeSubjectPage(
+  vis: { id: string; title?: string },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  dirs: readonly CodeDirectory[],
+  blobBase: string | undefined,
+  list: (absPath: string) => { files: string[]; total: number } | null = (p) => listCodeFiles(p),
+): string {
+  const title = vis.title ?? "Code";
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  const href = (p: string): string => (blobBase ? `${blobBase}${p.split("/").map(encodeURIComponent).join("/")}` : "");
+  const sections = dirs
+    .map((d) => {
+      const read = list(d.absPath);
+      const base = d.path.replace(/^\.\//, "").replace(/\/+$/, "");
+      const heading = `<h3><code>${esc(base || ".")}/</code> <span class="sv-tag">${esc(d.id)}</span></h3>`;
+      const desc = d.description ? `<p class="sv-sub">${esc(d.description)}</p>` : "";
+      if (read === null) {
+        return `<section class="sv-item">${heading}${desc}<p class="sv-sub">Not in this build, so its files are <strong>unknown</strong>, not none.</p></section>`;
+      }
+      const items = read.files
+        .map((f) => {
+          const p = base ? `${base}/${f}` : f;
+          const u = href(p);
+          return u ? `<li><a href="${esc(u)}"><code>${esc(f)}</code></a></li>` : `<li><code>${esc(f)}</code></li>`;
+        })
+        .join("");
+      const more = read.total > read.files.length ? `<p class="sv-sub">First ${read.files.length} of ${read.total} files listed.</p>` : "";
+      return (
+        `<section class="sv-item">${heading}${desc}` +
+        `<p class="sv-sub">${read.total} file${read.total === 1 ? "" : "s"}</p>` +
+        `<ul>${items}</ul>${more}</section>`
+      );
+    })
+    .join("\n");
+  const where = blobBase
+    ? `Files open on GitHub at the commit this site was built from.`
+    : `This instance is not a pinned mount here, so files are listed without links.`;
+  return page({
+    title: `${s.name} — ${title}`,
+    liquid: false,
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${dirs.length} declared code director${dirs.length === 1 ? "y" : "ies"} · ${esc(where)}</p>` +
+      sections +
+      `<h2 class="sv-h2">Instances holding code</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
+}
+
 if (import.meta.main) main();
 
 /**
@@ -1248,7 +1405,9 @@ const all = [
   ...stateGraphsOf({ ...decl, directories: checkoutDirs }, visOf, ownRefs),
 ].sort((a, b) => a.id.localeCompare(b.id));
 for (const v of mine) {
-  if (!all.some((g) => g.vis === v.id)) {
+  // A per-instance visualiser over a kind that is not state (`code`) draws its
+  // pages below, not a dashboard here, so covering no state graph is expected.
+  if (!all.some((g) => g.vis === v.id) && !(v.subgraphs === "instance" && (v.coversKinds ?? []).every((k) => k === "code"))) {
     console.error(`  ! visualiser \`${v.id}\` covers no declared state graph (${(v.covers ?? []).join(", ") || "no covers"}) — nothing drawn`);
   }
 }
@@ -1300,24 +1459,33 @@ const subjectOrphans: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const kinds = v.coversKinds ?? [];
   const beans = kinds.length > 0 && kinds.every((k) => k === "beans");
-  const unread = beans ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  const code = kinds.length > 0 && kinds.every((k) => k === "code");
+  const unread = beans || code ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
-        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, "beans"].join(", ")}) — none drawn`,
+        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, "beans", "code"].join(", ")}) — none drawn`,
     );
     continue;
   }
   // A directory this visualiser ALSO names by id (`covers`) is drawn on its
   // full view, and `viewersOf` opens that view for it: no subject page.
   const byId = new Set(v.covers ?? []);
-  const subjects = instanceSubjectsOf(
-    checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id))),
-    kinds,
-  );
+  const candidates = checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id)));
+  // A directory the checkout ROOT declares (`(root)`, the index's own
+  // `test/`) belongs to no instance and has no route segment: it gets no page.
+  const subjects = instanceSubjectsOf(candidates, kinds).filter((s) => {
+    if (/^[a-z0-9][a-z0-9-]*$/.test(s.name)) return true;
+    console.error(`  ! visualiser \`${v.id}\`: \`${s.path}\` is declared by ${s.name}, which is not an instance with a route — no page`);
+    return false;
+  });
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
-    const html = beans ? beansSubjectPage(v, s, subjects) : instanceSubjectPage(v, s, subjects);
+    const html = beans
+      ? beansSubjectPage(v, s, subjects)
+      : code
+        ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
+        : instanceSubjectPage(v, s, subjects);
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   const parent = pageDirOf(v.id);
