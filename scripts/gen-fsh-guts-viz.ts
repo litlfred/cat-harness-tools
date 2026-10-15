@@ -60,6 +60,7 @@ import { publishPlan } from "./derive-at-publish.js";
 import { visualiserSitePath } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), which cat-harness declares its `fsh-guts` visualiser `renderedBy`. */
 const VIEWER_TOOL = "staging-graph-viewer";
@@ -373,14 +374,16 @@ if (import.meta.main) {
   }
   const INSTANCE_ROOT = HARNESS_ROOT;
   const docsRoot = localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO);
-  const out = join(docsRoot, PAGE);
+  const ownOut = join(docsRoot, PAGE);
+  // `--site <dir>`: a site being built gets the page at the same route (`visualiser-writers.ts`).
+  const out = join(siteTarget(docsRoot), PAGE);
 
   let isPublishArtefact = false;
   try {
-    isPublishArtefact = publishPlan(REPO).some((a) => join(REPO, a.artefact) === out);
+    isPublishArtefact = publishPlan(REPO).some((a) => join(REPO, a.artefact) === ownOut);
   } catch {
     try {
-      isPublishArtefact = publishPlan(INSTANCE_ROOT).some((a) => join(INSTANCE_ROOT, a.artefact) === out);
+      isPublishArtefact = publishPlan(INSTANCE_ROOT).some((a) => join(INSTANCE_ROOT, a.artefact) === ownOut);
     } catch {
       isPublishArtefact = false;
     }

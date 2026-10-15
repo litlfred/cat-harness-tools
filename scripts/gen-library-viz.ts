@@ -49,7 +49,6 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parseArgs } from "node:util";
 
 import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEntry,
   readEntryBlocks, instanceOf,
@@ -76,6 +75,7 @@ import { escHtml, thinPageConfigOf } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, withViewers } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "library-viewer";
@@ -83,13 +83,6 @@ const VIEWER_TOOL = "library-viewer";
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
 const check = process.argv.includes("--check");
-/**
- * `--site <dir>`: write into that site instead of this harness's own docs. A
- * per-repository site (`build-instance-site.ts`, `compose-docs --shell`)
- * carries no cat-harness docs, so it is written straight into its own; the
- * URL pattern under it is the same declared route.
- */
-const SITE_ARG = parseArgs({ args: process.argv.slice(2), options: { site: { type: "string" } }, strict: false }).values.site;
 /** The GitHub repository the entries' source and feedback links point into. */
 const LINK_REPO = (() => {
   const d = readDeclaration(ROOT) as { livesAt?: { repository?: string }; repository?: string } | undefined;
@@ -1431,7 +1424,7 @@ if (import.meta.main) {
   g.entries = g.entries.filter((e) => inComposition(scope, repoRoot, e.dir));
   g.queues = g.queues.filter((q) => inComposition(scope, repoRoot, q.dir));
   g.uploads = g.uploads.filter((u) => inComposition(scope, repoRoot, u.path));
-  const site = typeof SITE_ARG === "string" ? resolve(SITE_ARG) : join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //
   // The sources are DERIVED: every instance's own declaration, every

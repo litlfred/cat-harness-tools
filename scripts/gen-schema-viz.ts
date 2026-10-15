@@ -374,6 +374,7 @@ import { orphanSubjectPages } from "./orphan-pages.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -1356,7 +1357,7 @@ if (import.meta.main) {
     console.log("  · no schemas directory — nothing to publish");
     process.exit(0);
   }
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   /**
    * The published segment is the DECLARED directory's own name, read rather
    * than written down.
