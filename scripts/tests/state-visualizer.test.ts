@@ -22,6 +22,8 @@ import {
   GENERATED_BY,
   ownVisualiserRefs,
   prunableDashboards,
+  qaSubjectPage,
+  qaSubjectsOf,
 } from "../state-visualizer.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -659,5 +661,74 @@ describe("the e2e spec's copy of the marker agrees with the generator's — bean
   test("and the marker is really in the pages, so neither copy is hypothetical", () => {
     // Guards the case where both copies agree and both are wrong.
     expect(read("qa")).toContain(GENERATED_BY);
+  });
+});
+
+describe("per-instance QA pages (bean folio-assistant-1nu0)", () => {
+  const dir = (o: { id?: string; path?: string; absPath: string; declaredBy: string; member?: string; kinds?: string[] }) => ({
+    id: o.id ?? "qa",
+    path: o.path ?? "test/results/",
+    absPath: o.absPath,
+    declaredBy: o.declaredBy,
+    ...(o.member ? { member: o.member } : {}),
+    graphTypologies: o.kinds ?? ["qa"],
+  });
+
+  test("one subject per instance holding the kind, named by its member, sorted", () => {
+    const subjects = qaSubjectsOf(
+      [
+        dir({ absPath: "/x/who-iris/test/results", declaredBy: "who-iris" }),
+        dir({ absPath: "/x/cat-harness-tools/test/results", declaredBy: "cat-harness", member: "cat-harness-tools" }),
+        dir({ absPath: "/x/cat-harness/test/results", declaredBy: "cat-harness" }),
+        dir({ id: "beans", path: "beans/", absPath: "/x/cat-harness/beans", declaredBy: "cat-harness", kinds: ["beans"] }),
+      ],
+      ["qa"],
+    );
+    expect(subjects.map((s) => s.name)).toEqual(["cat-harness", "cat-harness-tools", "who-iris"]);
+  });
+
+  test("the instance root is recovered from the declared path, not composed", () => {
+    const [s] = qaSubjectsOf([dir({ absPath: "/x/who-iris/test/results", declaredBy: "who-iris" })], ["qa"]);
+    expect(s!.instanceRoot).toBe("/x/who-iris");
+  });
+
+  test("a declared directory that is not on disk still gets a subject, so its tile has a page", () => {
+    // Derived QA lives on qa-reports: an absent tree is the normal case.
+    const absent = join(tmpdir(), "sv-qa-absent-xyz", "test", "results");
+    expect(existsSync(absent)).toBe(false);
+    expect(qaSubjectsOf([dir({ absPath: absent, declaredBy: "smart-base" })], ["qa"]).map((s) => s.name)).toEqual(["smart-base"]);
+  });
+
+  test("an instance page with no corpus says UNKNOWN, links back and to its siblings", () => {
+    const subjects = qaSubjectsOf(
+      [
+        dir({ absPath: "/x/a/test/results", declaredBy: "a" }),
+        dir({ absPath: "/x/b/test/results", declaredBy: "b" }),
+      ],
+      ["qa"],
+    );
+    const html = qaSubjectPage({ id: "qa", title: "QA results" }, subjects[0]!, subjects, {
+      $schema: "folio-qa-graph/v1",
+      availability: "unknown",
+      reason: "not fetched",
+    });
+    expect(html).toContain("<strong>unknown</strong>, not zero");
+    expect(html).toContain('href="../"');
+    expect(html).toContain('href="../b/"');
+    expect(html).not.toContain('href="../a/"');
+    expect(html).toContain(GENERATED_BY);
+  });
+
+  test("an instance page with a corpus renders its families", () => {
+    const [s] = qaSubjectsOf([dir({ absPath: "/x/a/test/results", declaredBy: "a" })], ["qa"]);
+    const html = qaSubjectPage({ id: "qa" }, s!, [s!], {
+      $schema: "folio-qa-graph/v1",
+      files: 2,
+      families: [{ schema: "kg-qa/v1", files: 2, rollUpField: "totals", buckets: { pass: 3 } }],
+      unclassified: 0,
+      unreadable: 0,
+    } as never);
+    expect(html).toContain("<code>kg-qa/v1</code>");
+    expect(html).toContain("over 2 document(s)");
   });
 });
