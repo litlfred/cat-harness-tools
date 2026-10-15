@@ -105,9 +105,9 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
-import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
-import { type ForeignScope, foreignScopeFor, scopeNavbarRow } from "./lib/foreign-site-scope.ts";
+import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
@@ -118,6 +118,10 @@ import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.t
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+
+/** The platform's published site, no trailing slash: where a folio's own site links the platform's pages. */
+const PLATFORM_BASE = DOCS_SITE_BASE.replace(/\/$/, "");
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -707,20 +711,71 @@ export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
  * Load the platform's `docs-ui` stylesheet and script into a FOLIO's page.
  *
  * The rail itself is static, but its icon row is drawn by `docs-ui.js` from
- * `#fa-navbar-row`, and a folio's site carries neither file. Both are loaded
- * from the platform's published site, once, before `</head>`.
+ * `#fa-navbar-row`. Both files are loaded once, before `</head>`, from
+ * `chromeRoot` — the site's OWN pinned copy ({@link pinPlatformChrome}; owner,
+ * 2026-10-15, "pinned copy per site"), never the platform's live site. Given
+ * `platformBase`, the page also names the platform's base in
+ * `<meta name="fa-platform-base">`: the platform DATA `docs-ui.js` reads
+ * (themes, tiles, the site index) is still the platform's, and the script's
+ * own address no longer says where that is.
  */
-export function withPlatformUi(html: string, platformBase: string): string {
+export function withPlatformUi(html: string, chromeRoot: string, platformBase?: string): string {
   if (html.includes(PLATFORM_UI_ATTR)) return html;
   const head = html.search(/<\/head>/i);
   if (head < 0) return html;
   const tags =
-    `<link rel="stylesheet" href="${platformBase}/assets/css/docs-ui.css" ${PLATFORM_UI_ATTR}>` +
-    `<script src="${platformBase}/assets/js/docs-ui.js" defer ${PLATFORM_UI_ATTR}></script>`;
+    (platformBase ? `<meta name="fa-platform-base" content="${platformBase.replace(/"/g, "&quot;")}" ${PLATFORM_UI_ATTR}>` : "") +
+    `<link rel="stylesheet" href="${chromeRoot}/assets/css/docs-ui.css" ${PLATFORM_UI_ATTR}>` +
+    `<script src="${chromeRoot}/assets/js/docs-ui.js" defer ${PLATFORM_UI_ATTR}></script>`;
   // And the reader's saved scheme, before first paint: the light bulb sets it
   // on any page of the site, and without this a folio's page painted in the
   // OS scheme and flipped once `docs-ui.js` arrived (issue #2208).
   return withSavedScheme(html.slice(0, head) + tags + html.slice(head));
+}
+
+/**
+ * The platform's chrome CODE a foreign site ships as its own pinned copy —
+ * owner, 2026-10-15, "pinned copy per site": every site carries the shared
+ * rail and theme files at its pinned platform version, and no page links
+ * the platform's live `assets/`. Paths are site-relative, the same on the
+ * platform's site and on the copy, so a page links `<toRoot>/<path>`.
+ *
+ * The rail's shared DATA (`assets/navbar/rail-*.js`, `row-*.js`) is already
+ * written into the site, and the scheme snippet is inlined
+ * (`withSavedScheme`), so these six files are the rest of it.
+ */
+export const PINNED_CHROME_FILES: readonly string[] = [
+  "assets/js/navbar.js",
+  "assets/css/navbar.css",
+  "assets/js/navbar-row.js",
+  "assets/css/navbar-row.css",
+  "assets/js/docs-ui.js",
+  "assets/css/docs-ui.css",
+];
+
+/**
+ * Copy {@link PINNED_CHROME_FILES} from the mounted (pinned) harness into
+ * `siteAbs`. A file the site already holds with the SAME bytes is left; one
+ * it holds with DIFFERENT bytes is also left, and reported — the site's own
+ * build wrote it, and its other pages use it. A file the harness does not
+ * have throws: a rail that links a file nobody shipped is a dead rail.
+ */
+export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS_ROOT): { copied: string[]; same: string[]; differing: string[] } {
+  const out = { copied: [] as string[], same: [] as string[], differing: [] as string[] };
+  for (const rel of PINNED_CHROME_FILES) {
+    const from = join(harnessRoot, siteFileFor(harnessRoot, rel));
+    if (!existsSync(from)) throw new Error(`pinPlatformChrome: the harness has no ${rel} (looked at ${from}) — the rail would link a file nobody shipped`);
+    const bytes = readFileSync(from);
+    const to = join(siteAbs, rel);
+    if (existsSync(to)) {
+      (readFileSync(to).equals(bytes) ? out.same : out.differing).push(rel);
+      continue;
+    }
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, bytes);
+    out.copied.push(rel);
+  }
+  return out;
 }
 
 /**
@@ -887,9 +942,21 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       }
 
       const named = railNames(built, m.name);
-      const links: NavItem[] = declaredGraphs(m.name, linked, publishedGraphs(built, m.name, toRoot), named.harness);
+      // THE FOLIO'S OWN SITE (owner, 2026-10-15, on who-iris: the rail's Graphs
+      // group was empty, then linked pages the site does not hold). In the
+      // checkout that declares this instance, the site being built is the
+      // instance's own, not the platform's: `harness.json`'s paths name the
+      // platform's handler viewers, so composed against this site most of them
+      // are 404s. The standalone pass already answers this with
+      // `ownSiteGraphs` and `instanceHarnesses` (bean `mftp`); the mount pass
+      // now asks the same functions, so one site's rail says one thing.
+      const ownSite = ownsCheckout(m.name);
+      const site = ownSite ? ownSiteGraphs(siteAbs, built, m.name, toRoot) : publishedGraphs(built, m.name, toRoot);
+      const links: NavItem[] = declaredGraphs(m.name, linked, site, named.harness);
 
-      const harnesses = instantiatedHarnesses(built, toRoot);
+      const harnesses = ownSite
+        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot)
+        : instantiatedHarnesses(built, toRoot);
       const before = readFileSync(file, "utf-8");
       const mark = instanceMark(built, m.name, toRoot);
       const after = injectRail(before, {
@@ -900,7 +967,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         ...(root[0] ? { root: root[0] } : {}),
         links,
         ...(harnesses ? { harnesses } : {}),
-        navbarRow: navbarRowData(built),
+        ...(ownSite ? { rowRoot: toRoot } : {}),
+        navbarRow: ownSite ? rebaseNavbarRow(navbarRowData(built), PLATFORM_BASE, m.name) : navbarRowData(built),
         emitRailData: railDataWriter(siteAbs),
       });
       if (after === undefined) {
@@ -1151,7 +1219,12 @@ export function ownSiteGraphs(
   const out = new Map<string, GraphFallback>();
   for (const [kind, f] of publishedGraphs(built, instance, "")) {
     const { href, note: _note, ...named } = f;
-    const at = (href !== undefined ? held(href) : undefined) ?? declared.get(kind);
+    // `harness.json` names the platform's routes: the folio's own pages are under
+    // `/<instance>/` there and at this site's root here (`/who-iris/catalogue/` is
+    // who-iris's `/catalogue/`). Scoped the way compose-docs scopes the shell's
+    // copy of the same file (`siteHref`), so the rail and the sidebar agree.
+    const scopedHref = href !== undefined ? siteHref(href, { instance, platformBase: PLATFORM_BASE }) : undefined;
+    const at = (href !== undefined ? (held(href) ?? (scopedHref !== href ? held(scopedHref!) : undefined)) : undefined) ?? declared.get(kind);
     if (at !== undefined) out.set(kind, { href: `${toRoot}/${at}`, ...named });
     else out.set(kind, { note: f.note ?? "not published on this site", ...named });
   }
@@ -1182,7 +1255,7 @@ export function railStandalonePages(
   instanceName: string,
   mountRoutes: readonly string[],
   foreign?: ForeignSiteRail,
-): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[] } {
+): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; pinned?: ReturnType<typeof pinPlatformChrome> } {
   const skipped: string[] = [];
   let injected = 0;
   let alreadyNavigated = 0;
@@ -1264,7 +1337,9 @@ export function railStandalonePages(
         // The row's files are the PLATFORM's (bean `lhvt`). On a folio's site its
         // remaining site-root hrefs and counts are the FOLIO's (issue #46, gap 2).
         assetRoot: linkRoot,
-        ...(foreign ? { rowRoot: toRoot } : {}),
+        // The rail's code and style: the site's own pinned copy on a foreign
+        // site (owner, 2026-10-15), never the platform's live `assets/`.
+        ...(foreign ? { rowRoot: toRoot, chromeRoot: toRoot } : {}),
         ...(mark ? { mark } : {}),
         links,
         ...(harnesses ? { harnesses } : {}),
@@ -1279,12 +1354,14 @@ export function railStandalonePages(
         skipped.push(rel);
         continue;
       }
-      writeFileSync(abs, foreign ? withPlatformUi(after, foreign.platformBase) : after);
+      writeFileSync(abs, foreign ? withPlatformUi(after, toRoot, foreign.platformBase) : after);
       injected++;
     }
   };
   if (existsSync(siteAbs)) walk(siteAbs);
-  return { injected, alreadyNavigated, redirects, declined, skipped };
+  // The files those pages now link, shipped with them — only when a page was railed.
+  const pinned = foreign && injected > 0 ? pinPlatformChrome(siteAbs) : undefined;
+  return { injected, alreadyNavigated, redirects, declined, skipped, ...(pinned ? { pinned } : {}) };
 }
 
 /**

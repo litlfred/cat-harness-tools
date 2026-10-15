@@ -84,6 +84,13 @@ function main(): number {
       `${r.declined} declined in their own markup (folio-navbar: none), ` +
       `${routes.length} mount route(s) left to the mount pass`,
   );
+  if (r.pinned) {
+    // Owner, 2026-10-15, "pinned copy per site": what the railed pages link is shipped beside them.
+    console.log(
+      `  pinned chrome: ${r.pinned.copied.length} copied, ${r.pinned.same.length} already identical` +
+        (r.pinned.differing.length ? `, ${r.pinned.differing.length} left as the site built them (${r.pinned.differing.join(", ")})` : ""),
+    );
+  }
   if (r.skipped.length) {
     console.log(`  ${r.skipped.length} file(s) took no rail (no <body>):`);
     for (const f of r.skipped.slice(0, 5)) console.log(`      ${f}`);

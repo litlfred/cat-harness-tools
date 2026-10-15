@@ -908,7 +908,8 @@ export async function stageDeclared(
     ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
-    ...(target === "preview" ? { staging: branch } : {}),
+    ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}) }, site, log) } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -916,6 +917,40 @@ export async function stageDeclared(
     remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
+}
+
+/**
+ * A declared-recipe preview's review data, as the workflow-described path
+ * writes it: the ChangeSet (`changeset.json`, `changeset-text.json`) from the
+ * platform's content layer when it carries one, and the staging banner with
+ * its `staging.json`. Without them the review page of a `site.build` folio
+ * (dth-hrh) said there was nothing to compare against (bean xp72). The folio
+ * is `folio/<instance>`, the conventional root; a checkout without one gets
+ * the banner and no ChangeSet, and says so.
+ */
+export function previewData(
+  repo: string,
+  f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string },
+  site: string,
+  log: (s: string) => void,
+): void {
+  git(repo, ["fetch", "-q", "origin", f.base]);
+  const folio = join("folio", f.instance);
+  const changeset = inPlatform(repo, "schemas/changeset.ts");
+  if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
+  else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no ChangeSet on this preview`);
+  else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json")]);
+  const banner = inPlatform(repo, "scripts/staging-banner.ts");
+  if (!banner) { log("· this platform has no staging banner: no staging.json on this preview"); return; }
+  const gh = `https://github.com/${f.owner}/${f.name}`;
+  run(repo, "bun", [
+    "run", banner,
+    "--site", site, "--branch", f.branch, "--sha", f.sha.slice(0, 7),
+    "--built", `${new Date().toISOString().replace(/\.\d+Z$/, "Z")} (built locally by an agent)`,
+    "--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`,
+    "--branch-url", `${gh}/tree/${f.branch}`, "--issues-url", `${gh}/issues`,
+    "--run-url", f.runUrl ?? `${gh}/commit/${f.sha}`, "--main-site", `https://${f.owner}.github.io/${f.name}/`, "--before-ref", f.base,
+  ]);
 }
 
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]

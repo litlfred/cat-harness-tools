@@ -48,22 +48,28 @@
  *   bun run cat library:viz:check    # fail if either artefact is stale
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { parseArgs } from "node:util";
 
-import { readLibraryGraph, type LibraryGraph, type LibraryBlock,
-  readEntryBlocks,
+import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEntry,
+  readEntryBlocks, instanceOf,
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
-import { EDIT_LINKS_RUNTIME } from "../src/core/edit-links.ts";
+import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
+import { detectRepoUrl } from "../src/core/git-refs.ts";
+import { VIEWER_PATH } from "./pdf-viewer.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import { entryGraphFiles, entryGraphSitePath } from "./lib/library-entry-graphs.ts";
+import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
+import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
+import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
@@ -71,7 +77,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, withViewers } from "./viewer-declarations.js";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -80,7 +86,19 @@ const VIEWER_TOOL = "library-viewer";
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
 const check = process.argv.includes("--check");
-/** The GitHub repository the entries' source and feedback links point into. */
+/**
+ * `--site <dir>`: write into that site instead of this harness's own docs. A
+ * per-repository site (`build-instance-site.ts`, `compose-docs --shell`)
+ * carries no cat-harness docs, so it is written straight into its own; the
+ * URL pattern under it is the same declared route.
+ */
+const SITE_ARG = parseArgs({ args: process.argv.slice(2), options: { site: { type: "string" } }, strict: false }).values.site;
+/**
+ * This harness's own repository. NOT where an entry's links point: an entry
+ * is held by its own instance, in that instance's repository, which
+ * `forgeAt` reads from the mount lock (`lib/library-source.ts`). This is the
+ * fallback for a path no mount covers when the checkout's origin is unknown.
+ */
 const LINK_REPO = (() => {
   const d = readDeclaration(ROOT) as { livesAt?: { repository?: string }; repository?: string } | undefined;
   return d?.livesAt?.repository ?? d?.repository;
@@ -893,6 +911,199 @@ export interface ShellEntry {
   jsonld?: string;
   /** The JSON-LD graphs of the entry's declared sub-graphs (e.g. its L1 extraction), relative to the page — bean 8pzh. */
   graphs?: { label: string; href: string }[];
+  /** Every published file the page renders — {@link entrySources}. */
+  sources?: SourceLink[];
+}
+
+// ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
+//
+//   > graphs and subgrpahs (e.g. library) should also link to their source
+//   > jslon(ld)'s as well as assets like in the library
+//
+// The manifest was a `<link rel="alternate">` and a `<noscript>` line, which a
+// reader never sees. So each page lists, visibly, the published files it is a
+// rendering of. Every href is computed from the SAME path function the writer
+// below publishes to, and a file not on the site is not listed: the entry's
+// source PDF, `structure.json`, `sections/` and `blocks/` JSON-LD are not
+// published, and a link to them would be a 404 dressed as a source.
+
+/** One published file a library page renders, href relative to the page. */
+export interface SourceLink {
+  label: string;
+  href: string;
+  /** What the file is, in a reader's words — e.g. `JSON-LD`, `projection (JSON)`. */
+  what: string;
+}
+
+/** One instance's library, as the whole-library page lists it. */
+export interface LibrarySubgraphLink {
+  instance: string;
+  entries: number;
+  /** The instance's library page, when this handler renders one. */
+  page?: string;
+  /** The instance's published subgraph JSON-LD, which holds its `library` directory as a member. */
+  jsonld?: string;
+}
+
+/** `abs` as an href from the page in `fromDir`. */
+const hrefFrom = (fromDir: string, abs: string): string => relative(fromDir, abs).split(sep).join("/");
+
+/** Where an entry's two projections are published — one function for the writer and the links. */
+export function entryDataFiles(dataDir: string, id: string): { blocks: string; doc: string } {
+  return { blocks: join(dataDir, "entries", `${id}.json`), doc: join(dataDir, "entries", `${id}.doc.json`) };
+}
+
+/**
+ * An instance's subgraph JSON-LD on disk under this harness's site, or
+ * `undefined` when none is published. There is no document for the library
+ * alone: `gen-subgraph-jsonld.ts` frames subgraphs under the KG directories
+ * only, and the library is a member (`#directory/library`) of the instance's
+ * root, so the root is the graph the library page links.
+ */
+export function instanceSubgraphFile(harnessRoot: string, site: string, instance?: string): string | undefined {
+  let dir: string;
+  try {
+    // Relative to the site root, so the same place is asked of a `--site` build.
+    dir = relative(siteDirFor(harnessRoot), subgraphOutDir(harnessRoot));
+  } catch {
+    return undefined; // no `docs` directory, so nothing is framed here
+  }
+  const abs = instance === undefined ? join(site, dir, SUBGRAPH_INDEX_FILE) : join(site, dir, instance, SUBGRAPH_INDEX_FILE);
+  return existsSync(abs) ? abs : undefined;
+}
+
+/**
+ * The instance roots a site COMPOSES — owner, 2026-10-15: *"a harness should
+ * combine it libray/ (or whatever) sites of it and all its depndencies"*.
+ * When the checkout's root declares an instance (a per-repository site such
+ * as a folio), that instance and its transitive `needs` (`declarationChain`);
+ * when it declares none (a hub index), `undefined`: every instance listed.
+ */
+export function composedInstanceRoots(repoRoot: string): Set<string> | undefined {
+  let name: string | undefined;
+  try {
+    name = readDeclaration(repoRoot)?.name;
+  } catch {
+    name = undefined; // unreadable: check:declaration-filename's finding; compose everything
+  }
+  if (name === undefined) return undefined;
+  return new Set(declarationChain(repoRoot).map((c) => resolve(c.root)));
+}
+
+/** Whether `repoRel` (a path in the checkout) belongs to an instance the site composes. */
+export function inComposition(scope: ReadonlySet<string> | undefined, repoRoot: string, repoRel: string): boolean {
+  if (scope === undefined) return true;
+  const inst = findInstanceRoot(join(repoRoot, repoRel));
+  return inst !== undefined && scope.has(resolve(inst));
+}
+
+/**
+ * The files an entry page renders: its manifest, the files of its declared
+ * sub-graphs, its two projections and its avatar — each at the path the
+ * writer publishes it to (`libraryAssetSitePath`, `entryGraphSitePath`,
+ * {@link entryDataFiles}, `avatarCopies`).
+ */
+export function entrySources(
+  o: {
+    site: string;
+    dataDir: string;
+    /** The entry page's directory — every href is relative to it. */
+    shellDir: string;
+    instance: string;
+    entry: Pick<LibraryEntry, "id" | "avatar">;
+    /** Whether the manifest is published — it is copied only when the source has one. */
+    manifest: boolean;
+    /** The sub-graph files published for it (`entryGraphFiles`; none for a withheld entry). */
+    files: readonly EntryGraphFile[];
+    /** The source file and the KG files in the repository that holds the entry (`entryRepoLinks`). */
+    repo?: readonly RepoLink[];
+  },
+): SourceLink[] {
+  const { site, shellDir, instance, entry: e } = o;
+  const at = (sitePath: string): string => hrefFrom(shellDir, join(site, sitePath));
+  const data = entryDataFiles(o.dataDir, e.id);
+  return [
+    ...(o.manifest ? [{ label: "manifest.jsonld", href: at(libraryAssetSitePath(instance, e.id)), what: "the entry's JSON-LD" }] : []),
+    ...o.files.map((f) => ({
+      label: f.rel,
+      href: at(entryGraphSitePath(instance, e.id, f.rel)),
+      what: f.jsonld ? `${f.kind} sub-graph (JSON-LD)` : `${f.kind} sub-graph file`,
+    })),
+    ...(o.repo ?? []),
+    { label: basename(data.doc), href: hrefFrom(shellDir, data.doc), what: "document projection (JSON)" },
+    { label: basename(data.blocks), href: hrefFrom(shellDir, data.blocks), what: "block projection (JSON)" },
+    ...(e.avatar ? [{ label: basename(e.avatar.href), href: at(e.avatar.href.slice(1)), what: `avatar (${e.avatar.source})` }] : []),
+  ];
+}
+
+/** The files an instance's page renders: the projection, its subgraph JSON-LD, and each entry's manifest. */
+export function instanceSources(
+  o: { pageDir: string; dataFile: string; subgraph?: string; manifests: readonly { id: string; abs: string }[] },
+): SourceLink[] {
+  return [
+    { label: basename(o.dataFile), href: hrefFrom(o.pageDir, o.dataFile), what: "library projection (JSON)" },
+    ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(o.pageDir, o.subgraph), what: "the instance's subgraph (JSON-LD)" }] : []),
+    ...o.manifests.map((m) => ({ label: `${m.id}/manifest.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
+  ];
+}
+
+/**
+ * Every instance in the CHECKOUT that declares a library, with its page and
+ * its subgraph JSON-LD. Owner, 2026-10-15: the whole-library page *"should
+ * also link to the library sub-graphs from the other harnesses"*, and *"a
+ * harness should combine it libray/ (or whatever) sites of it and all its
+ * depndencies"*. So the set is read from the checkout's declarations
+ * (`checkoutDirectoriesForGraph`), never listed: on folio-assistant it is every
+ * instance, on one repository's site its own and its mounted `needs`. An
+ * instance with no page here (no entries, no queue) is still listed.
+ */
+export function librarySubgraphs(
+  o: {
+    harnessRoot: string;
+    repoRoot: string;
+    site: string;
+    pageDir: string;
+    pages: ReadonlySet<string>;
+    entries: readonly { instance: string }[];
+    /** {@link composedInstanceRoots}; `undefined` lists every instance. */
+    scope?: ReadonlySet<string>;
+  },
+): LibrarySubgraphLink[] {
+  const names = new Set(o.pages);
+  for (const d of checkoutDirectoriesForGraph("library", o.repoRoot)) {
+    if (inComposition(o.scope, o.repoRoot, relative(o.repoRoot, d))) names.add(instanceOf(d, o.repoRoot));
+  }
+  return [...names].sort().map((instance) => {
+    const subgraph = instanceSubgraphFile(o.harnessRoot, o.site, instance);
+    return {
+      instance,
+      entries: o.entries.filter((e) => e.instance === instance).length,
+      ...(o.pages.has(instance) ? { page: `${encodeURIComponent(instance)}/` } : {}),
+      ...(subgraph ? { jsonld: hrefFrom(o.pageDir, subgraph) } : {}),
+    };
+  });
+}
+
+/** The visible list of {@link SourceLink}s, and on the whole-library page the table of every instance's library. */
+export function sourcesHtml(links: readonly SourceLink[], libraries: readonly LibrarySubgraphLink[] = []): string {
+  if (links.length === 0 && libraries.length === 0) return "";
+  const a = (href: string, text: string): string => `<a href="${escHtml(href)}">${escHtml(text)}</a>`;
+  const table = libraries.length === 0 ? "" : `<h3 id="lib-subgraphs">Library subgraphs in this checkout</h3>
+<table class="lib-subgraphs"><thead><tr><th>Instance</th><th>Entries</th><th>Library page</th><th>Subgraph JSON-LD</th></tr></thead><tbody>
+${libraries
+  .map((l) => `<tr><td>${escHtml(l.instance)}</td><td>${l.entries}</td><td>${l.page ? a(l.page, l.instance) : "—"}</td><td>${
+    l.jsonld ? a(l.jsonld, SUBGRAPH_INDEX_FILE) : "not published"
+  }</td></tr>`)
+  .join("\n")}
+</tbody></table>`;
+  const list = links.length === 0 ? "" : `<ul>
+${links.map((l) => `<li>${a(l.href, l.label)} <span class="note">${escHtml(l.what)}</span></li>`).join("\n")}
+</ul>`;
+  return `<section class="lib-sources" id="lib-sources">
+<h2>Source JSON-LD and assets</h2>
+<p class="note">The published files this page is a rendering of.</p>
+${list}${table}
+</section>`;
 }
 
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
@@ -943,6 +1154,8 @@ interface LibraryPage {
   alternate?: string;
   /** Keep the page out of the site search — set on the per-entry pages. */
   searchExclude?: boolean;
+  /** The visible source list, as HTML — {@link sourcesHtml}. */
+  sources?: string;
 }
 
 /**
@@ -982,6 +1195,7 @@ function libraryPageHtml(p: LibraryPage): string {
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="lib-page" data-fa-no-filter>
 ${VIEWER_BODY}
+${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
 <script type="application/json" id="${LIBRARY_CONFIG_ID}">${config}</script>
@@ -1003,8 +1217,14 @@ ${VIEWER_BODY}
  *
  * @param libRoot  the library root relative to this page: `./` or `../`
  */
-export function viewerHtml(dataHref: string, scope = "", libRoot?: string): string {
+export function viewerHtml(
+  dataHref: string,
+  scope = "",
+  libRoot?: string,
+  sources: { links?: readonly SourceLink[]; libraries?: readonly LibrarySubgraphLink[] } = {},
+): string {
   return libraryPageHtml({
+    sources: sourcesHtml(sources.links ?? [], sources.libraries ?? []),
     title: scope ? `${scope} — library` : "Library — the L1 corpus",
     dataHref,
     config: { data: dataHref, scope, libRoot: libRoot ?? (scope ? "../" : "./") },
@@ -1038,6 +1258,7 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
         : ""
     }`,
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
+    sources: sourcesHtml(entry.sources ?? []),
     searchExclude: true,
   });
 }
@@ -1215,6 +1436,13 @@ if (import.meta.main) {
     console.log("  · no library or uploads directory is declared — nothing to publish");
     process.exit(0);
   }
+  // A per-repository site composes its own instance and its `needs`, not
+  // every instance its checkout happens to mount (`composedInstanceRoots`).
+  const scope = composedInstanceRoots(repoRoot);
+  g.entries = g.entries.filter((e) => inComposition(scope, repoRoot, e.dir));
+  g.queues = g.queues.filter((q) => inComposition(scope, repoRoot, q.dir));
+  g.uploads = g.uploads.filter((u) => inComposition(scope, repoRoot, u.path));
+  const site = typeof SITE_ARG === "string" ? resolve(SITE_ARG) : join(ROOT, siteDirFor(ROOT));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //
   // The sources are DERIVED: every instance's own declaration, every
@@ -1236,6 +1464,7 @@ if (import.meta.main) {
       for (const d of decl.directories ?? []) {
         const dir = join(inst, d.path);
         if (dir === siteDir || dir.startsWith(siteDir + "/")) continue;
+        if (dir === site || dir.startsWith(site + "/")) continue; // a `--site` target holds published copies too
         for (const kind of d.graphTypologies ?? []) sources.push({ kind, instance: decl.name ?? basename(inst), dir });
       }
     }
@@ -1257,7 +1486,6 @@ if (import.meta.main) {
     );
   }
 
-  const site = join(ROOT, siteDirFor(ROOT));
   // The published segment is the DECLARED directory's own name — the same
   // rule `gen-schema-viz.ts` follows, and for the same reason: writing
   // "library" here would be a second answer to a question `harness.json`
@@ -1384,6 +1612,8 @@ if (import.meta.main) {
   // index, and never into the asset ("asset doesnt know about its
   // renderings"). See `entryView` for the rule.
   const roots = instanceRootRoutes(repoRoot);
+  // The checkout's own repository, for a path no mount covers.
+  const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || LINK_REPO;
   for (const e of g.entries) {
     e.view = entryView(e, roots, relative(site, join(pageDir, e.instance, e.id)).split(sep).join("/"));
   }
@@ -1415,15 +1645,18 @@ if (import.meta.main) {
   for (const e of g.entries) {
     // [source] and [feedback] on the document and each section (bean zcak).
     // No [edit]: an entry is frozen, and this instance materialises none.
+    // In the repository that HOLDS the entry, at its path there — never this
+    // harness's repository plus the checkout path (owner, 2026-10-15: a 404).
+    const at = forgeAt(repoRoot, e.dir, checkoutRepo);
     const doc = readEntryDocument(join(repoRoot, e.dir), e.id, {
       withheld: !!e.withheld,
-      ...(LINK_REPO ? { links: { repo: LINK_REPO, dir: e.dir } } : {}),
+      ...(at ? { links: { repo: at.repo, dir: at.path } } : {}),
     });
     // The entry's resolved title, not the page-1 guess in structure.json
     // (issue #1794: the guess is never a library entry's title).
     if (doc && e.title) doc.title = e.title;
     emit(
-      join(dataDir, "entries", `${e.id}.doc.json`),
+      entryDataFiles(dataDir, e.id).doc,
       JSON.stringify(doc ?? { $schema: "folio-library-document/v1", id: e.id, absent: true }, null, 2) + "\n",
     );
   }
@@ -1434,7 +1667,7 @@ if (import.meta.main) {
     // viewer has to tell apart from a network failure, and "this entry has no
     // blocks" is a determined answer that deserves to be served as one.
     emit(
-      join(dataDir, "entries", `${e.id}.json`),
+      entryDataFiles(dataDir, e.id).blocks,
       JSON.stringify({ $schema: "folio-library-entry/v1", id: e.id, blocks }, null, 2) + "\n",
     );
   }
@@ -1473,13 +1706,37 @@ if (import.meta.main) {
   emit(join(dataDir, "viewer.css"), VIEWER_CSS);
   emit(join(dataDir, "viewer.js"), VIEWER_JS);
 
-  emit(join(pageDir, "index.html"), withRenderedByFrontMatter(viewerHtml(dataHref, "", "./"), VIEWER_TOOL));
+  // The whole-library page links the projection, the repository's subgraph
+  // index, and every instance's library in the checkout (`librarySubgraphs`).
+  const dataFile = join(dataDir, "index.json");
+  const repoIndex = instanceSubgraphFile(ROOT, site);
+  emit(
+    join(pageDir, "index.html"),
+    withRenderedByFrontMatter(
+      viewerHtml(dataHref, "", "./", {
+        links: [
+          { label: basename(dataFile), href: hrefFrom(pageDir, dataFile), what: "library projection (JSON)" },
+          ...(repoIndex ? [{ label: `subgraph/${SUBGRAPH_INDEX_FILE}`, href: hrefFrom(pageDir, repoIndex), what: "the repository's subgraph index (JSON-LD)" }] : []),
+        ],
+        libraries: librarySubgraphs({ harnessRoot: ROOT, repoRoot, site, pageDir, pages: new Set(subjects), entries: g.entries, ...(scope ? { scope } : {}) }),
+      }),
+      VIEWER_TOOL,
+    ),
+  );
   const wantedJsonld = new Set<string>();
   for (const subject of subjects) {
     const sub = viewerPlacement(site, `${route}/${subject}`, seg);
+    const manifests = g.entries
+      .filter((e) => e.instance === subject && existsSync(join(repoRoot, e.dir, "manifest.jsonld")))
+      .map((e) => ({ id: e.id, abs: join(site, libraryAssetSitePath(subject, e.id)) }));
     emit(
       join(sub.pageDir, "index.html"),
-      withRenderedByFrontMatter(viewerHtml(sub.dataHref, subject, "../"), VIEWER_TOOL),
+      withRenderedByFrontMatter(
+        viewerHtml(sub.dataHref, subject, "../", {
+          links: instanceSources({ pageDir: sub.pageDir, dataFile, subgraph: instanceSubgraphFile(ROOT, site, subject), manifests }),
+        }),
+        VIEWER_TOOL,
+      ),
     );
 
     // ── EVERY ENTRY'S OWN IRI, MATERIALIZED (owner, 2026-10-02, #1881) ──
@@ -1522,7 +1779,8 @@ if (import.meta.main) {
       // the manifest. A withheld entry publishes none. Its JSON-LD documents
       // are linked from the page (here, and through the projection's `links`).
       const graphs: { label: string; href: string }[] = [];
-      for (const f of e.withheld ? [] : entryGraphFiles(join(repoRoot, e.dir))) {
+      const files = e.withheld ? [] : entryGraphFiles(join(repoRoot, e.dir));
+      for (const f of files) {
         const dest = join(site, entryGraphSitePath(subject, e.id, f.rel));
         wantedJsonld.add(dest);
         emitBytes(dest, readFileSync(f.abs));
@@ -1534,6 +1792,17 @@ if (import.meta.main) {
           id: e.id,
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
+          sources: entrySources({
+            site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
+            repo: entryRepoLinks({
+              repoRoot,
+              dir: e.dir,
+              source: sourceFileOf(repoRoot, e, g.uploads),
+              checkoutRepo,
+              viewerHref: hrefFrom(shellDir, join(site, VIEWER_PATH)),
+              withheld: !!e.withheld,
+            }),
+          }),
         }),
       );
     }
