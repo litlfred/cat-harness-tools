@@ -34,6 +34,9 @@
 #      GITHUB_TOKEN (contents API, one path, skipped when unchanged, nothing
 #      else on the branch touched). No `gh-pages` yet: an orphan one is created
 #      holding `.nojekyll`, the context and a placeholder `index.html`.
+#   6. Build the instance's own vocabulary (`publish-instance-context.ts vocab`)
+#      and put it where its term IRIs point, `<iriBase><version>/ns` plus
+#      `.jsonld` and `.json`, the same way. No terms of its own: a skip.
 #
 # GitHub Pages itself is switched on by the owner once, after the first run:
 # Settings → Pages → "Deploy from a branch: gh-pages, / (root)". A workflow
@@ -152,6 +155,34 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
         run: bun run cat-harness-tools/scripts/publish-instance-context.ts publish --repo "$REPO" --file "$RUNNER_TEMP/context.jsonld" --sha "$SHA"
+      # The instance's own VOCABULARY, at the address its term IRIs name
+      # (`<iriBase><version>/ns#Term`), read off the vocabulary's `@id` by the
+      # script rather than written here (owner, 2026-10-15, "Serve vocab at own
+      # iriBase"). Before this, cat-harness and folio-assistant-core had no
+      # `0.1.0/` on gh-pages and every term IRI they mint answered 404. An
+      # instance that mints no terms is a skip with a notice.
+      - name: Build the vocabulary
+        id: vocab
+        working-directory: fa
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/vocab"
+          bun run cat-harness-tools/scripts/publish-instance-context.ts vocab --root . --instance "$INSTANCE" --out-dir "$dir"
+          if [ -s "$dir/.paths" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; else echo "built=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Publish the vocabulary to gh-pages
+        if: steps.vocab.outputs.built == 'true'
+        working-directory: fa
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/vocab"
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            bun run cat-harness-tools/scripts/publish-instance-context.ts publish --repo "$REPO" --file "$dir/$p" --path "$p" --sha "$SHA"
+          done < "$dir/.paths"
       - name: Summary
         if: always()
         run: |
