@@ -41,9 +41,22 @@
  *
  * ## Refusals, not silence
  *
- * A writer that exits non-zero fails the step, naming it. A writer reads a
+ * A writer that exits non-zero fails the step, naming it — after every other
+ * declared writer has run, so one run names every failure. A writer reads a
  * mounted graph and refuses an unmounted one (exit 2), so a build that forgot
  * `state:mount` fails here rather than publishing an empty page.
+ *
+ * ## Except a writer that says it does not apply to this root
+ *
+ * A writer that exits `NOT_APPLICABLE_EXIT` (78, `lib/not-applicable.ts`) has
+ * said, with a reason, that THIS root cannot build its artefact: `uml:overview`
+ * reads the QA working copy, which needs the gates workflow, and a document
+ * folio (smart-ra) has none (smart-ra#66, run 38714163952). It is reported
+ * SKIPPED with its reason, every other writer still runs, the artefacts that
+ * name it are excused from the built-or-refused check (and listed), and the
+ * step does not fail on it. Only the writer can say so — no list of writers or
+ * roots lives here — so a root that has the prerequisite (the folio-assistant
+ * index) runs it exactly as before, and any other non-zero exit still fails.
  *
  * ```
  * bun run cat derive:publish            # run every writer
@@ -51,13 +64,15 @@
  * ```
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { dirname } from "node:path";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
@@ -112,6 +127,40 @@ export function built(a: Pick<DeclaredArtefact, "abs" | "path">): boolean {
   return statSync(a.abs).isDirectory() && walk(a.abs);
 }
 
+/** What one writer did: ran, failed with an exit, or declined this root with a reason. */
+export type WriterOutcome = { kind: "ran" } | { kind: "failed"; exit: number | null } | { kind: "skipped"; why: string };
+
+/** Read a writer's exit, and its handed-over reason when it declined (`lib/not-applicable.ts`). */
+export function outcomeOf(status: number | null, reason: string | undefined): WriterOutcome {
+  if (status === 0) return { kind: "ran" };
+  if (status === NOT_APPLICABLE_EXIT) return { kind: "skipped", why: reason?.trim() || "the writer gave no reason" };
+  return { kind: "failed", exit: status };
+}
+
+/** Run one writer, handing it a file for its not-applicable reason. */
+export function runWriter(argv: readonly string[], cwd: string): WriterOutcome {
+  // input-site: inert #d24ef100 — a temp dir for the writer's reason, removed before this returns
+  const dir = mkdtempSync(join(tmpdir(), "derive-publish-"));
+  const file = join(dir, "not-applicable.txt");
+  try {
+    // input-site: inert #9142594c — hands the environment on to a writer, plus the path it writes its reason to
+    const r = spawnSync(argv[0]!, argv.slice(1), { cwd, stdio: "inherit", env: { ...process.env, [NOT_APPLICABLE_REASON_ENV]: file } });
+    return outcomeOf(r.status, existsSync(file) ? readFileSync(file, "utf-8") : undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The declared artefacts excused because a writer of theirs declined this root,
+ * and the ones that must be built: an entry naming a skipped writer cannot be
+ * complete, so it is reported rather than refused.
+ */
+export function excused(plan: readonly DeclaredArtefact[], skipped: ReadonlyMap<string, string>): { excused: DeclaredArtefact[]; judged: DeclaredArtefact[] } {
+  const ex = plan.filter((a) => a.writer.some((w) => skipped.has(w)));
+  return { excused: ex, judged: plan.filter((a) => !ex.includes(a)) };
+}
+
 if (import.meta.main) {
   const plan = publishPlan();
   const listOnly = process.argv.includes("--list");
@@ -121,14 +170,15 @@ if (import.meta.main) {
     // The writer list holds scripts and, for a directory, template directories
     // it READS (ending in `/`); only the scripts are run.
     for (const w of a.writer.filter((p) => !p.endsWith("/"))) {
-      const r = spawnSync("bun", ["run", w], { cwd: REPO_ROOT, stdio: "inherit" });
-      if (r.status !== 0) {
-        console.log(`::error::derive:publish: writer ${w} for ${a.artefact} exited ${r.status ?? "on a signal"}`);
+      const o = runWriter(["bun", "run", w], REPO_ROOT);
+      if (o.kind === "failed") {
+        console.log(`::error::derive:publish: writer ${w} for ${a.artefact} exited ${o.exit ?? "on a signal"}`);
         process.exit(1);
       }
+      if (o.kind === "skipped") console.log(`  skipped: writer ${w} for ${a.artefact} does not apply to this root — ${o.why}`);
     }
   }
-  console.log(`  ✓ ${plan.length} artefact(s) built`);
+  console.log(`  ✓ ${plan.length} artefact(s) handled`);
 
   const at = process.argv.indexOf("--cause");
   const cause = at === -1 ? undefined : (process.argv[at + 1] as "checkout" | "state");
@@ -141,17 +191,36 @@ if (import.meta.main) {
   console.log(`derive:publish — ${declared.length} declared artefact(s) (builtAtPublish${cause ? `, ${cause} only` : ""}), ${writers.length} writer(s)`);
   for (const a of declared) console.log(`  ${a.instance}/${a.path}  (${a.because}; writer: ${a.writer.join(", ")})`);
   if (listOnly) process.exit(0);
+  // Every writer runs, whatever an earlier one did, so one run names every
+  // failure rather than the first (smart-ra#66 hid three behind uml:overview).
+  // A failure still fails the step, after the rest have run.
+  const skipped = new Map<string, string>();
+  const failed = new Map<string, number | null>();
   for (const w of writers) {
-    const r = spawnSync("bun", ["run", "cat", w], { cwd: REPO_ROOT, stdio: "inherit" });
-    if (r.status !== 0) {
-      console.log(`::error::derive:publish: declared writer \`${w}\` exited ${r.status ?? "on a signal"}`);
-      process.exit(1);
+    const o = runWriter(["bun", "run", "cat", w], REPO_ROOT);
+    if (o.kind === "failed") {
+      failed.set(w, o.exit);
+      console.log(`::error::derive:publish: declared writer \`${w}\` exited ${o.exit ?? "on a signal"}`);
+    }
+    if (o.kind === "skipped") {
+      skipped.set(w, o.why);
+      console.log(`derive:publish: declared writer \`${w}\` skipped — it does not apply to this root: ${o.why}`);
     }
   }
-  const empty = declared.filter((a) => !built(a));
-  if (empty.length > 0) {
-    for (const a of empty) console.log(`::error::derive:publish: ${a.instance}/${a.path} is declared built at publish, and ${a.writer.join(", ")} built nothing there`);
+  const { excused: notHere, judged } = excused(declared, skipped);
+  // An artefact of a failed writer is already named by its writer's failure.
+  const empty = judged.filter((a) => !a.writer.some((w) => failed.has(w)) && !built(a));
+  for (const a of empty) console.log(`::error::derive:publish: ${a.instance}/${a.path} is declared built at publish, and ${a.writer.join(", ")} built nothing there`);
+  // Last, so the record's tail (layer-pr-checks.yml keeps the final 1500 characters) carries it.
+  for (const [w, why] of skipped) {
+    const of = notHere.filter((a) => a.writer.includes(w)).map((a) => `${a.instance}/${a.path}`);
+    console.log(`  skipped ${w} (not applicable here: ${why}); not built: ${of.join(", ")}`);
+  }
+  if (failed.size > 0 || empty.length > 0) {
+    const parts = [...failed].map(([w, x]) => `${w} exited ${x ?? "on a signal"}`);
+    if (empty.length > 0) parts.push(`${empty.length} declared artefact(s) built empty`);
+    console.log(`::error::derive:publish: ${parts.join("; ")}`);
     process.exit(1);
   }
-  console.log(`  ✓ ${declared.length} declared artefact(s) built`);
+  console.log(`  ✓ ${judged.length} declared artefact(s) built${notHere.length ? `, ${notHere.length} skipped (their writer does not apply to this root)` : ""}`);
 }

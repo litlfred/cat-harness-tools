@@ -267,8 +267,44 @@ export function unpublishedTwins(
  * unwrite it. The count is zero once `kg-navigation` is out, so the ratchet is
  * free — this repository's rule for every promotion.
  */
+/**
+ * The twin entries that apply to THIS checkout: an entry is dropped when one of
+ * its twins is published by a group whose directory this checkout does not
+ * hold, so neither page carries a banner naming a page that cannot exist here,
+ * and the guard below does not fail on it.
+ *
+ * Measured on smart-ra#66 (run 38714163952): `derive:publish` failed on
+ * `skills:docs` because the `local-` twins come from `.claude/skills/local/`,
+ * which the folio-assistant index has and a document folio does not. That is
+ * not the `bsay` defect: no group stopped publishing; the group is not here.
+ *
+ * What it keeps fatal, so the `bsay` guard still holds wherever it can say
+ * anything: a twin whose group directory IS present and that produced no page
+ * (the stub was removed), and a twin no declared group would publish at all
+ * (the table contradicts the group list). Both stay in the table, and
+ * {@link unpublishedTwins} refuses them.
+ */
+export function twinsInCheckout<T extends { published: string }>(
+  table: Readonly<Record<string, ReadonlyArray<T>>>,
+  groups: ReadonlyArray<{ dir: string; publishPrefix?: string }>,
+  exists: (dir: string) => boolean,
+): { table: Record<string, ReadonlyArray<T>>; absent: string[] } {
+  const out: Record<string, ReadonlyArray<T>> = {};
+  const absent: string[] = [];
+  for (const [name, twins] of Object.entries(table)) {
+    const missing = twins.filter((t) => {
+      const publishers = groups.filter((g) => `${g.publishPrefix ?? ""}${name}` === t.published);
+      return publishers.length > 0 && !publishers.some((g) => exists(g.dir));
+    });
+    if (missing.length === 0) out[name] = twins;
+    else absent.push(`${name} -> ${missing.map((t) => t.published).join(", ")}`);
+  }
+  return { table: out, absent: absent.sort() };
+}
+
 function reportUnpublishedTwins(produced: Iterable<string>): void {
-  const bad = unpublishedTwins(SAME_BASENAME_DIFFERENT_DOCUMENT, produced);
+  for (const a of TWINS.absent) console.log(`  twin not in this checkout (its group's directory is absent; no banner either side): ${a}`);
+  const bad = unpublishedTwins(TWINS.table, produced);
   if (bad.length === 0) return;
   console.error(
     `\n✗ ${bad.length} SAME_BASENAME_DIFFERENT_DOCUMENT entr(y/ies) name a page this run did not produce.\n` +
@@ -732,6 +768,9 @@ const GROUPS: Group[] = [
   },
 ];
 
+/** {@link SAME_BASENAME_DIFFERENT_DOCUMENT}, less the entries this checkout cannot publish both halves of. */
+const TWINS = twinsInCheckout(SAME_BASENAME_DIFFERENT_DOCUMENT, GROUPS, existsSync);
+
 /**
  * Inline a split skill's parts into its published page.
  *
@@ -1066,7 +1105,7 @@ async function main(): Promise<void> {
       // and reading both is the opposite of the advice. A generator that
       // publishes a stale claim about which document governs is worse than one
       // that publishes no banner, because a reader acts on it.
-      const twin = SAME_BASENAME_DIFFERENT_DOCUMENT[name];
+      const twin = TWINS.table[name];
       const raw = readFileSync(join(group.dir, file), "utf-8");
       // The body first, based at the skill's own package; then the parts, each
       // based one level deeper. Two different bases, so two calls.
