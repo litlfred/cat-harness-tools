@@ -44,6 +44,7 @@
  * @covers library
  */
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -228,7 +229,66 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // Authored, not produced by an arm: an editor's title, read by
   // gen-library-jsonld over the extracted one (bean `v8wg`).
   TITLE_CORRECTION_FILE,
+  // The two review-anchor arms of the document adapter (`docx-structure.py`,
+  // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
+  // written beside `structure.json` so a public comment citing "page 12, line
+  // 340" of a circulated draft still resolves after the folio is edited. Each
+  // names the source it was read from by sha256, like every sidecar here.
+  "docx-structure.json",
+  "pdf-line-map.json",
 ];
+
+/**
+ * The children of an entry that ARE the source it was derived from — held in
+ * the entry, byte for byte.
+ *
+ * An entry normally holds what the arms derived and keeps its source in
+ * `uploads/`. Some sources must stay with their derivation: a draft circulated
+ * for public comment is FROZEN, every comment cites a page and line of those
+ * exact bytes, and moving them is the edit the freeze forbids. The closed set
+ * above cannot name such a file, because its name is the document's.
+ *
+ * So the rule is a fact the entry already records, not a name: a child is a
+ * held source when a sidecar of this entry names it as its `source` (`file`,
+ * or a `files[]` member's `path`) AND its bytes hash to the sha256 that
+ * sidecar recorded. A misfiled arm output, a stray upload or a later edit of
+ * the source fails the hash and stays a stray — the `3psh` reasoning holds,
+ * because nothing is admitted by its spelling.
+ */
+export function heldSources(dir: string, sidecars: Iterable<string>): Set<string> {
+  const claims = new Map<string, Set<string>>();
+  const claim = (file: unknown, sha: unknown) => {
+    if (typeof file !== "string" || typeof sha !== "string" || !file || file.includes("/") || file.includes("\\")) return;
+    if (!claims.has(file)) claims.set(file, new Set());
+    claims.get(file)!.add(sha.toLowerCase());
+  };
+  for (const name of sidecars) {
+    if (!name.endsWith(".json") && !name.endsWith(".jsonld")) continue;
+    const f = join(dir, name);
+    if (!existsSync(f)) continue;
+    let src: unknown;
+    try {
+      src = (JSON.parse(readFileSync(f, "utf-8")) as Record<string, unknown>)?.source;
+    } catch {
+      continue; // the owning requirement reports an unparseable sidecar
+    }
+    if (!src || typeof src !== "object") continue;
+    const s = src as Record<string, unknown>;
+    claim(s.file, s.sha256);
+    if (Array.isArray(s.files)) for (const m of s.files) if (m && typeof m === "object") claim((m as Record<string, unknown>).path, (m as Record<string, unknown>).sha256);
+  }
+  const held = new Set<string>();
+  for (const [file, shas] of claims) {
+    const p = join(dir, file);
+    try {
+      if (!statSync(p).isFile()) continue;
+      if (shas.has(createHash("sha256").update(readFileSync(p)).digest("hex"))) held.add(file);
+    } catch {
+      continue; // absent: the source is held elsewhere, which is the normal case
+    }
+  }
+  return held;
+}
 
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
@@ -583,8 +643,9 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     const declaredSubgraphs = new Set(
       entrySubgraphDirs(dir, registry).map((d) => relative(resolve(dir), d.abs).split(/[\\/]/)[0]),
     );
+    const held = heldSources(dir, [...allowed].filter((c) => children.includes(c)));
     const stray = children.filter(
-      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c),
+      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c) && !held.has(c),
     );
     if (stray.length > 0) {
       out.push({
@@ -597,7 +658,13 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           `Reported, not removed.`,
       });
     } else if (children.length > 0) {
-      out.push({ name: "contents", state: "met", detail: `${children.length} child(ren), all declared` });
+      out.push({
+        name: "contents",
+        state: "met",
+        detail:
+          `${children.length} child(ren), all declared` +
+          (held.size ? `; ${held.size} held source(s) matching their recorded sha256: ${[...held].sort().join(", ")}` : ""),
+      });
     }
   }
 

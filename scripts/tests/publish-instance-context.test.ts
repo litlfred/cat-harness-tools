@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildOne, contextUrl, publishFile, type ApiRequest } from "../publish-instance-context.ts";
+import { buildOne, contextUrl, publishFile, vocabularyPaths, type ApiRequest } from "../publish-instance-context.ts";
 import { PLACEHOLDER_HTML } from "../pages-bootstrap.ts";
 
 const root = mkdtempSync(join(tmpdir(), "publish-instance-context-"));
@@ -61,6 +61,30 @@ describe("build", () => {
   test("contextUrl puts exactly one slash after the base", () => {
     expect(contextUrl("https://x.github.io/y")).toBe("https://x.github.io/y/ns/context/v1.jsonld");
     expect(contextUrl("https://x.github.io/y/")).toBe("https://x.github.io/y/ns/context/v1.jsonld");
+  });
+});
+
+describe("vocabulary paths", () => {
+  test("served where its @id points, under the iriBase, in three spellings", () => {
+    expect(vocabularyPaths("https://x.github.io/y/0.1.0/ns", "https://x.github.io/y/")).toEqual({
+      paths: ["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"],
+    });
+    // A trailing `#` on the @id, and no trailing slash on the base, change nothing.
+    expect(vocabularyPaths("https://x.github.io/y/0.1.0/ns#", "https://x.github.io/y")).toEqual({
+      paths: ["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"],
+    });
+  });
+
+  test("an @id outside the iriBase is refused: that Pages site cannot serve it", () => {
+    const r = vocabularyPaths("https://litlfred.github.io/folio-assistant/y/ns", "https://x.github.io/y/");
+    expect("problem" in r && r.problem).toContain("not under the iriBase");
+  });
+
+  test("`ns` itself is refused: it is the directory holding ns/context/v1.jsonld", () => {
+    for (const id of ["https://x.github.io/y/ns", "https://x.github.io/y/ns/vocab"]) {
+      const r = vocabularyPaths(id, "https://x.github.io/y/");
+      expect("problem" in r && r.problem).toContain("collides with the context directory");
+    }
   });
 });
 
