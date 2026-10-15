@@ -195,7 +195,8 @@ test.describe("kg viewer", () => {
     await page.locator("#q").fill("beans-cli");
     await page.locator("#list li button").first().click();
     await expect(page.locator(".detail h3")).toContainText("beans CLI");
-    await expect(page.locator(".detail .iri")).toContainText("#tool/beans-cli");
+    // A Tool's IRI is its own document beside the graph's (bean `tdir`).
+    await expect(page.locator(".detail .iri")).toContainText("/tools/beans-cli.jsonld");
     await expect(page.locator(".detail th", { hasText: /^satisfies$/ })).toHaveCount(1);
   });
 
@@ -266,7 +267,7 @@ test.describe("kg viewer", () => {
         undeclaredTerms: [{ term: "undeclaredProbe", onTypes: ["Tool"], occurrences: 1 }],
         problems: [],
         danglingLinks: [],
-        "@graph": [{ "@id": "https://example.invalid/fixture.jsonld#tool/probe", "@type": `${NS}Tool`, name: "probe", undeclaredProbe: "dropped on expansion" }],
+        "@graph": [{ "@id": "https://example.invalid/tools/probe.jsonld", "@type": `${NS}Tool`, name: "probe", undeclaredProbe: "dropped on expansion" }],
       }),
     );
 

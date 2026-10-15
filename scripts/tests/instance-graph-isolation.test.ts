@@ -25,11 +25,34 @@ const DOC = "https://example.org/x.jsonld";
 
 const ids = (nodes: Array<Record<string, unknown>>): string[] => nodes.map((n) => String(n["@id"]));
 
+/**
+ * The ROOT instance's collection, made once for this file.
+ *
+ * It is a whole-corpus walk, and since `collectInstanceNodes` collects Tools
+ * (bean `tdir`) it also re-homes every Tool's `satisfies` skill across every
+ * instance. Measured 2026-10-15 in the CI layout: 7.1 s cold before `tdir`,
+ * 9.2 s cold after, 5.3 s warm on both — so each of two calls was past bun's
+ * 5 s default on its own, and which side of it the cold call landed on was
+ * the runner's mood (it flipped "new failure" on PRs that did not touch it).
+ * Both readers only read the nodes, so they share one promise.
+ */
+let rootNodes: ReturnType<typeof collectInstanceNodes> | undefined;
+const rootCollection = (): ReturnType<typeof collectInstanceNodes> =>
+  (rootNodes ??= collectInstanceNodes(ROOT, DOC, "", []));
+
+/**
+ * The budget for whichever test populates {@link rootCollection} first, on
+ * both because test order is not guaranteed. BASIS: the 9.2 s cold collection
+ * above; 60 s is ~6x it, room for a loaded runner and a growing corpus, and
+ * still fails fast on a regression into something quadratic.
+ */
+const CORPUS_TIMEOUT = 60_000;
+
 describe("a second instance in the tree stays out of the first's graph", () => {
   test("the root instance's nodes include none of bootstrap's process", async () => {
-    const { nodes } = await collectInstanceNodes(ROOT, DOC, "", []);
+    const { nodes } = await rootCollection();
     expect(ids(nodes).filter((i) => i.includes("Process_InitializeHarness"))).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 
   test("and bootstrap's own graph DOES carry it", async () => {
     // Isolation that achieved itself by losing the node would be worse than
@@ -41,10 +64,10 @@ describe("a second instance in the tree stays out of the first's graph", () => {
   test("the root instance keeps every process it declares", async () => {
     // Presence, not a count: a pinned number makes "still works" and
     // "somebody deleted a diagram" indistinguishable.
-    const { nodes } = await collectInstanceNodes(ROOT, DOC, "", []);
+    const { nodes } = await rootCollection();
     const procs = nodes.filter((n) => String(n["@type"]).endsWith("Process"));
     expect(procs.length).toBeGreaterThan(10);
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("discovery reads the declaration rather than the tree", () => {

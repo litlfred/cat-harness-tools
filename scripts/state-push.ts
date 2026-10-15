@@ -181,7 +181,7 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
     try {
       if (opts.dryRun) {
         const changes = pendingMountChanges(loc, { repoRoot: root });
-        const emptying = changes === undefined ? undefined : mountEmptyingReason(loc, { repoRoot: root });
+        const emptying = changes === undefined || opts.allowEmpty ? undefined : mountEmptyingReason(loc, { repoRoot: root });
         if (changes === undefined) {
           graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
         } else if (emptying) {
@@ -198,7 +198,10 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         continue;
       }
       const message = opts.message ?? `state: ${loc.id} from its mount`;
-      const w = pushMount(loc, message, { repoRoot: root, store: opts.store });
+      // `--allow-empty` is the one explicit request to delete a whole graph, so it
+      // reaches pushMount's own emptying refusal too: refusing it there made
+      // the flag a no-op (two guards of the same deletion, bean sp0e).
+      const w = pushMount(loc, message, { repoRoot: root, store: opts.store, allowEmpty: opts.allowEmpty });
       if (w.state === "refused") graphs.push({ ...base, state: "refused", reason: w.reason });
       else graphs.push({ ...base, state: w.state, reason: w.reason, write: w, changes });
     } catch (e) {

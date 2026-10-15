@@ -16,11 +16,11 @@ import { join, resolve } from "node:path";
 
 import { tools } from "../../tools/discover.js";
 import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../check-tools.js";
 import { knownSkills as canonicalKnownSkills } from "../known-skills.js";
 import { buildExport } from "../kg-export.js";
-import { buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../harness-schema-export.js";
+import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../harness-schema-export.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -141,7 +141,8 @@ describe("tools", () => {
     for (const t of tools()) {
       for (const p of [...t.io.inputs, ...t.io.outputs]) {
         expect(p.schema.startsWith("https://")).toBe(true);
-        expect(defs.has(p.schema.split("#/$defs/")[1] ?? "")).toBe(true);
+        // Its own document, `<base>/tool-types/<Name>.schema.json` (bean `tdir`).
+        expect(defs.has(toolTypeNameOf(p.schema) ?? "")).toBe(true);
       }
     }
   });
@@ -184,6 +185,25 @@ describe("tools", () => {
   test("the generated schemas carry an absolute $id", () => {
     expect(buildToolSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/tool.schema.json`);
     expect(buildToolTypes({ baseUrl: BASE }).$id).toBe(`${BASE}/tool-types.schema.json`);
+  });
+
+  test("each type is its own document, whose $id is the IRI a port names (bean tdir)", () => {
+    const files = buildToolTypeFiles({ baseUrl: BASE });
+    expect(files.map(([p]) => p).sort()).toEqual(Object.keys(TOOL_TYPES).map((n) => `tool-types/${n}.schema.json`).sort());
+    const combined = buildToolTypes({ baseUrl: BASE }).$defs as Record<string, Record<string, unknown>>;
+    for (const [path, doc] of files) {
+      const name = toolTypeNameOf(path)!;
+      expect(doc.$id).toBe(toolTypeDocumentIri(BASE, name));
+      expect(doc.$id).toBe(`${BASE}/${path}`);
+      // The same Zod, printed twice: the body is the combined document's.
+      const { $schema: _a, $id: _b, title: _c, ...body } = doc;
+      const { $schema: _d, ...inline } = combined[name];
+      expect(body).toEqual(inline);
+    }
+    // And every port in the repository names one of them.
+    for (const t of tools()) {
+      for (const p of [...t.io.inputs, ...t.io.outputs]) expect(toolTypeNameOf(p.schema)).toBeDefined();
+    }
   });
 
   test("skill discovery is the ONE definition, not a second scan", () => {
@@ -241,7 +261,10 @@ describe("tools", () => {
     for (const t of toolNodes) {
       const io = t.io as { inputs: Array<{ schema: string }>; outputs: Array<{ schema: string }> };
       for (const port of [...io.inputs, ...io.outputs]) {
-        expect(port.schema.startsWith(`${STAGING}/tool-types.schema.json#/$defs/`)).toBe(true);
+        // Minted by toolTypeIri against the staging base, whichever form it
+        // has in this phase (fragment now, per-type document next; bean tdir).
+        expect(port.schema.startsWith(`${STAGING}/tool-types`)).toBe(true);
+        expect(port.schema).toBe(toolTypeIri(STAGING, toolTypeNameOf(port.schema)!));
       }
     }
   });
@@ -250,7 +273,7 @@ describe("tools", () => {
     const B = "https://example.invalid/other";
     for (const t of tools(B)) {
       for (const p of [...t.io.inputs, ...t.io.outputs]) {
-        expect(p.schema.startsWith(`${B}/tool-types.schema.json`)).toBe(true);
+        expect(p.schema.startsWith(`${B}/tool-types`)).toBe(true);
       }
     }
   });

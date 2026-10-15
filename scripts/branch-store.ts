@@ -1616,7 +1616,17 @@ export function exitUnlessMounted(id: string, tool: string, repoRoot: string = g
  * `conflict` and nothing is pushed. On `pushed`, the marker moves to the new
  * tip, so the next push compares against what landed.
  */
-export function pushMount(id: string | TipLocation, message: string, opts: MountOptions = {}): PushResult {
+export interface PushMountOptions extends MountOptions {
+  /**
+   * Send a change set that deletes EVERY file of the mount ({@link emptyingReason}).
+   * Off by default, and never inferred: only an explicit request to delete the
+   * whole graph sets it (`state:push --allow-empty`, bean `sp0e`). Without it,
+   * an emptied or gone mount is refused, as above.
+   */
+  allowEmpty?: boolean;
+}
+
+export function pushMount(id: string | TipLocation, message: string, opts: PushMountOptions = {}): PushResult {
   const repoRoot = opts.repoRoot ?? gitTopLevel();
   const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
   const name = typeof id === "string" ? id : locationKey(id);
@@ -1625,7 +1635,7 @@ export function pushMount(id: string | TipLocation, message: string, opts: Mount
   // pushes back to the repository it was read from.
   const changes = localChanges(m, repoRoot);
   if (!changes.length) return { state: "unchanged", reason: `no local edits under ${m.into}`, branch: m.branch, attempts: 0 };
-  const emptying = emptyingReason(m, changes);
+  const emptying = opts.allowEmpty ? undefined : emptyingReason(m, changes);
   if (emptying) return { state: "refused", reason: emptying };
   const store = BranchStore.open(m.branch, { repoRoot, ...storeOptionsFor(m, repoRoot, opts.store) });
   const w = store.write(changes, message);
