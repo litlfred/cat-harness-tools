@@ -28,6 +28,12 @@ Each gate's exit code, the tail of its output, and its command are written to
 <out.json>. This script exits 0 whatever the gates did: the compare step
 judges head against base, so a gate already red on main does not fail a PR
 that did not break it. `GATE_JOBS` (default 1) runs that many at once.
+
+A declared gate that cannot determine anything here is not run, and is
+written with a `skipped` reason in place of `exit` (owner, 2026-10-15, "b1"):
+one that judges the remote's live state (`LIVE_STATE_SCRIPTS`), one that needs
+an argument or artefact this runner never supplies (`NEEDS_INPUT_SCRIPTS`),
+and one whose prerequisite file is absent at the root (`PREREQUISITE_FILES`).
 """
 import json
 import os
@@ -58,6 +64,47 @@ TIMEOUT_S = 1200
 # would charge that to the PR; these are reported by the session-start sweep
 # and their own workflows instead.
 LIVE_STATE_SCRIPTS = {"check:ci-health", "check:head-has-run", "check:dependency-advisories"}
+# Gates that judge an INPUT this runner never supplies: run bare, each prints
+# its usage and exits 2 ("could not determine") on base and head alike, so it
+# judges nothing about the PR -- and where base exits 1 for another reason,
+# compare-gates.py rightly counts 1 -> 2 as NEW (smart-immunizations#35). Each
+# entry was confirmed by reading the script and running it with no argument;
+# the workflow that does supply the input runs it there.
+NEEDS_INPUT_SCRIPTS = {
+    "check:corpus-gate": "needs --staged or --since <ref>; bare, it prints its usage and exits 2",
+    "check:test-budgets": "needs a junit report path; bare, 'no junit report given' and exit 2",
+    "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
+    "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
+    "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
+}
+# Gates that read something only a root with a given file can build: skipped
+# where that file is absent, run wherever it is present, so the rule follows
+# the root rather than naming any repository. The QA working copy that
+# uml:overview and readme:subgraphs read is built by `qa:refresh`, whose
+# writers are this harness's own CI recipe and read the gates workflow
+# (`gates.ts` GATES_WORKFLOW, via audit:coverage); in an IG index root or a
+# layer repository there is no such workflow, the build fails, and the gate
+# exits 2 on both sides (smart-immunizations#35).
+GATES_WORKFLOW = ".github/workflows/code-quality-gates.yml"
+QA_WORKING_COPY = "reads the QA working copy, which qa:refresh cannot build without it"
+PREREQUISITE_FILES = {
+    "uml:overview:check": (GATES_WORKFLOW, QA_WORKING_COPY),
+    "readme:subgraphs:check": (GATES_WORKFLOW, QA_WORKING_COPY),
+}
+
+
+def skip_reason(root, script):
+    """Why a declared gate cannot determine anything in this run, or None to run it."""
+    if script in LIVE_STATE_SCRIPTS:
+        return "judges the remote's live state, not the checkout"
+    if script in NEEDS_INPUT_SCRIPTS:
+        return NEEDS_INPUT_SCRIPTS[script]
+    if script in PREREQUISITE_FILES:
+        path, why = PREREQUISITE_FILES[script]
+        if not os.path.exists(os.path.join(root, path)):
+            return f"{path} is absent at the root; it {why}"
+    return None
 
 
 def read_json(path):
@@ -128,15 +175,21 @@ def script_runner(root):
 
 
 def declared_gates(root, name, path, runner):
+    """(gate name -> command, gate name -> (command, skip reason))."""
     pkg = read_json(os.path.join(root, path, "package.json")) or {}
     scripts = {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}
     # Through the index's own runner, as the index's CI runs them: it resolves
     # a name against every instance's declared scripts.
-    return {
-        f"{name}:{s}": f"{runner} {s}"
-        for s in sorted(scripts)
-        if (s.startswith("check:") or s.endswith(":check")) and s not in LIVE_STATE_SCRIPTS
-    }
+    run, skipped = {}, {}
+    for s in sorted(scripts):
+        if not (s.startswith("check:") or s.endswith(":check")):
+            continue
+        command, why = f"{runner} {s}", skip_reason(root, s)
+        if why:
+            skipped[f"{name}:{s}"] = (command, why)
+        else:
+            run[f"{name}:{s}"] = command
+    return run, skipped
 
 
 def run(root, name, command):
@@ -171,12 +224,19 @@ def main():
     seen_scripts = set()
     runner = script_runner(root)
     print(f"script runner: {runner}", flush=True)
+    skipped = {}
     for n in harness:
-        for gname, command in declared_gates(root, n, known[n], runner).items():
+        run_these, skip_these = declared_gates(root, n, known[n], runner)
+        for gname, command in run_these.items():
             if command in seen_scripts:
                 continue  # one script, run once, named by the first instance that declares it
             seen_scripts.add(command)
             gates[gname] = command
+        for gname, (command, why) in skip_these.items():
+            if command in seen_scripts:
+                continue
+            seen_scripts.add(command)
+            skipped[gname] = {"command": command, "skipped": why}
 
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
@@ -186,9 +246,13 @@ def main():
             print(text[-4000:], flush=True)
             print("::endgroup::", flush=True)
             results[name] = {"command": command, "exit": code, "tail": text[-1500:]}
+    for name, entry in skipped.items():
+        print(f"{name}: skipped ({entry['skipped']}) — {entry['command']}", flush=True)
+    green = sum(1 for r in results.values() if r["exit"] == 0)
+    results.update(skipped)  # no `exit`: compare-gates.py reports these as skipped, never as a verdict
     with open(out_path, "w") as f:
         json.dump(results, f, indent=1)
-    print(f"{len(results)} gate(s): {sum(1 for r in results.values() if r['exit'] == 0)} green", flush=True)
+    print(f"{len(results) - len(skipped)} gate(s) run: {green} green; {len(skipped)} skipped", flush=True)
 
 
 if __name__ == "__main__":
