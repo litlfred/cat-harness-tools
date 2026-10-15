@@ -78,6 +78,7 @@ import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { entrySubgraphDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
@@ -1320,6 +1321,22 @@ export function libraryRootFor(cwd: string): string | undefined {
  * "no declaration was found", which is not the same and must never be
  * rendered as a clean run.
  */
+/**
+ * The directories directly inside `lib` that the declaring instance declares
+ * with kinds that do not include `library` — absolute, without a trailing
+ * separator. They are other graphs nested in the library, not entries.
+ */
+export function otherKindDirs(lib: string): Set<string> {
+  const out = new Set<string>();
+  const inst = findInstanceRoot(lib);
+  if (inst === undefined) return out;
+  for (const e of readDeclaration(inst)?.directories ?? []) {
+    const abs = join(inst, e.path).replace(/\/+$/, "");
+    if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies as readonly string[]).includes("library")) out.add(abs);
+  }
+  return out;
+}
+
 export function checkAll(root: string): EntryReport[] | undefined {
   // Declared, not composed — see `libraryRoot` in `ingest-document.ts` for why.
   //
@@ -1343,8 +1360,14 @@ export function checkAll(root: string): EntryReport[] | undefined {
   const presence = splitDeclared(libs);
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
+    const others = otherKindDirs(lib);
     for (const d of readdirSync(lib).sort()) {
       if (!statSync(join(lib, d)).isDirectory()) continue;
+      // A child the instance declares as a directory of ANOTHER kind is not an
+      // entry: smart-immunizations keeps its L1 scenario worked example at
+      // `library/l1-recommendation-scenarios/` as `l1-extraction`, and grading
+      // it for sections and a manifest is a finding about a file it never was.
+      if (others.has(join(lib, d))) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(
