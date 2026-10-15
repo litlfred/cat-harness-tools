@@ -127,6 +127,7 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   unlinkSync,
@@ -162,6 +163,7 @@ import {
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -1005,6 +1007,84 @@ export function qaPanelsOf(
 export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set(["qa", "health", "attestations"]);
 
 /**
+ * The kinds that make up ONE bean store: the store (`beans`) and the parts its
+ * `beans.json` declares from within — work items, PR addenda and running BPMN
+ * instances (bean `folio-assistant-750a`). A visualiser covering any of them
+ * draws the store's page, which lists all three; see {@link beanStorePartsSection}.
+ */
+export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set(["beans", "bean-defs", "bean-notes", "workflow-state"]);
+
+/** One bean-store part's directories, read from the store's own `beans.json`. */
+function storePartDirs(storeAbs: string, kind: string): string[] {
+  let decl: { directories?: Array<{ path?: string; graphTypologies?: string[] }> };
+  try {
+    decl = JSON.parse(readFileSync(join(storeAbs, "beans.json"), "utf-8"));
+  } catch {
+    return [];
+  }
+  return (decl.directories ?? [])
+    .filter((d) => typeof d.path === "string" && (d.graphTypologies ?? []).includes(kind))
+    .map((d) => join(storeAbs, d.path!));
+}
+
+/** The files of `ext` in `dirs`, sorted; a missing directory contributes none. */
+function filesIn(dirs: readonly string[], ext: string): string[] {
+  const out: string[] = [];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) if (f.endsWith(ext) && f !== "README.md") out.push(join(dir, f));
+  }
+  return out.sort((a, b) => basename(a).localeCompare(basename(b)));
+}
+
+/**
+ * The bean store's two other parts, server-side: its PR addenda (`bean-notes`,
+ * `<bean>--<date>--<branch>.md`) and its running BPMN instances
+ * (`workflow-state`, `folio-workflow-instance/v1`). Bean
+ * `folio-assistant-750a`: both are declared inside `beans/beans.json`, so the
+ * store's page is their viewer, and it must SHOW them rather than only be
+ * linked from their rows. Where an instance is is read from its own `tokens`;
+ * this page keeps no second idea of position.
+ */
+export function beanStorePartsSection(storeAbs: string): string {
+  const notes = filesIn(storePartDirs(storeAbs, "bean-notes"), ".md");
+  const noteRows = notes
+    .map((f) => {
+      const [bean = "", date = "", ...branch] = basename(f, ".md").split("--");
+      return `<tr><td><code>${esc(bean)}</code></td><td>${esc(date)}</td><td>${esc(branch.join("--"))}</td></tr>`;
+    })
+    .join("");
+  const flows = filesIn(storePartDirs(storeAbs, "workflow-state"), ".json");
+  const flowRows = flows
+    .map((f) => {
+      let w: { id?: string; processId?: string; status?: string; tokens?: unknown; bean?: string } = {};
+      try {
+        w = JSON.parse(readFileSync(f, "utf-8"));
+      } catch {
+        return `<tr><td><code>${esc(basename(f))}</code></td><td colspan="4">not readable JSON</td></tr>`;
+      }
+      const at = Array.isArray(w.tokens) ? w.tokens.map(String).join(", ") : "";
+      return (
+        `<tr><td><code>${esc(w.id ?? basename(f, ".json"))}</code></td><td>${esc(w.processId ?? "")}</td>` +
+        `<td>${esc(w.status ?? "")}</td><td>${esc(at)}</td><td>${esc(w.bean ?? "")}</td></tr>`
+      );
+    })
+    .join("");
+  // In a raw block: the page is Liquid-rendered, and branch names, ids and
+  // token names are data nobody screened for `{{`.
+  return wrapRaw(
+    `<h2 class="sv-h2" id="bean-notes">Bean notes — ${notes.length}</h2>` +
+    (notes.length === 0
+      ? `<p class="sv-sub">No pull-request addenda in this store.</p>`
+      : `<table><thead><tr><th>bean</th><th>date</th><th>branch</th></tr></thead><tbody>${noteRows}</tbody></table>`) +
+    `<h2 class="sv-h2" id="workflow-state">Workflow instances — ${flows.length}</h2>` +
+    (flows.length === 0
+      ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
+      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`),
+  ).join("\n");
+}
+
+/**
  * One instance's graph of a kind: the sub-graph a `subgraphs: "instance"`
  * visualiser draws a page for (bean `folio-assistant-1nu0`, owner 2026-10-15:
  * "per-instance pages"; "each viewer draws one page per instance").
@@ -1177,7 +1257,10 @@ export function beansSubjectPage(
       (open.length === 0
         ? `<p class="sv-sub">Every bean in this store is completed or scrapped.</p>`
         : `<table><thead><tr><th>id</th><th>title</th><th>status</th><th>type</th><th>priority</th></tr></thead>` +
-          `<tbody>${rows}</tbody></table>`);
+          `<tbody>${rows}</tbody></table>`) +
+      // Only beside a store that was read: an unreadable one is unknown, and
+      // its parts would read as zero (bean `folio-assistant-750a`).
+      beanStorePartsSection(s.absPath);
   }
   return page({
     title: `${s.name} — ${title}`,
@@ -1299,21 +1382,29 @@ for (const g of graphs) {
 const subjectOrphans: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const kinds = v.coversKinds ?? [];
-  const beans = kinds.length > 0 && kinds.every((k) => k === "beans");
+  // A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are
+  // drawn on the store's own page, so the subjects are the stores (bean
+  // `folio-assistant-750a`).
+  const beans = kinds.includes("beans") && kinds.every((k) => BEAN_STORE_KINDS.has(k));
   const unread = beans ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
-        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, "beans"].join(", ")}) — none drawn`,
+        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, ...BEAN_STORE_KINDS].join(", ")}) — none drawn`,
     );
     continue;
   }
   // A directory this visualiser ALSO names by id (`covers`) is drawn on its
   // full view, and `viewersOf` opens that view for it: no subject page.
-  const byId = new Set(v.covers ?? []);
+  //
+  // Except a bean store: the repository store's board draws its beans only,
+  // through the client, so its notes and workflow instances need a page of
+  // their own, and that page is the one its parts' rows open (bean
+  // `folio-assistant-750a`). The store's own row still opens the board.
+  const byId = new Set(beans ? [] : (v.covers ?? []));
   const subjects = instanceSubjectsOf(
     checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id))),
-    kinds,
+    beans ? ["beans"] : kinds,
   );
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));

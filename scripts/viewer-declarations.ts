@@ -621,7 +621,13 @@ export function viewersOf(
       (v.harness === owner && (v.covers ?? []).includes(d.id)) ||
       !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
     if (subs.length > 0 && subRef === undefined && !byId) continue;
-    const ref = subRef ?? visualiserPageRef(repoRoot, full, site);
+    // A directory the visualiser NAMES by id keeps its full view even when a
+    // sub-graph page of the same instance exists (bean `folio-assistant-750a`):
+    // `beans` draws the repository store as the board AND as `beans/cat-harness/`,
+    // the page its parts (`defs/`, `notes/`, `workflows/`) open, and the store's
+    // own row must still open the board.
+    const named = v.harness === owner && (v.covers ?? []).includes(d.id);
+    const ref = (named ? undefined : subRef) ?? visualiserPageRef(repoRoot, full, site);
     const { id: _id, renderedBy: _by, covers: _c, coversKinds: _k, subgraphs: _s, subgraphUnder: _u, alias: _a, harness: _h, harnessRoot: _r, ...tile } = v;
     // `writer` is declared relative to the HARNESS (its own scripts), and read
     // repository-relative like `ref`, so a mount path is never written down.
