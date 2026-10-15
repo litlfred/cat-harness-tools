@@ -476,6 +476,92 @@ export function checkInstance(root: string, inst: LockInstance): Outcome {
   return { instance: inst.instance, state: "current", detail: `${inst.directories.length} director${inst.directories.length === 1 ? "y" : "ies"} at ${inst.sha.slice(0, 12)}` };
 }
 
+/**
+ * Optional content-addressed cache directory (`CAT_MOUNT_CACHE_DIR`,bean `cis1`).
+ * Disabled when `CAT_MOUNT_URL_PREFIX` is set (unless `CAT_MOUNT_CACHE_FORCE=1`)
+ * so fixture tests serving local bare repositories never cross-contaminate.
+ * Every cached directory is keyed by its 64-hex `treeDigest` and re-verified by
+ * `digestOf(dst).treeDigest === d.treeDigest` on restore; every declaration or
+ * asset blob is keyed by its `sha256` and re-verified on restore.
+ */
+function mountCacheDir(): string | undefined {
+  const dir = process.env.CAT_MOUNT_CACHE_DIR?.trim();
+  if (!dir) return undefined;
+  if (process.env.CAT_MOUNT_URL_PREFIX && process.env.CAT_MOUNT_CACHE_FORCE !== "1") return undefined;
+  return resolve(dir);
+}
+
+function tryMountFromCache(root: string, inst: LockInstance, absent: readonly string[], cacheDir: string): Outcome | undefined {
+  const declCache = join(cacheDir, "blobs", inst.declaration.sha256);
+  if (!existsSync(declCache) || sha256(readFileSync(declCache)) !== inst.declaration.sha256) return undefined;
+  for (const d of inst.directories) {
+    if (!absent.includes(d.path)) continue;
+    if (!existsSync(join(cacheDir, "trees", d.treeDigest))) return undefined;
+  }
+  for (const a of inst.assets ?? []) {
+    if (!absent.includes(`${inst.path}/${a.src}`)) continue;
+    const blob = join(cacheDir, "blobs", a.sha256);
+    if (!existsSync(blob) || sha256(readFileSync(blob)) !== a.sha256) return undefined;
+  }
+  const written: string[] = [];
+  for (const d of inst.directories) {
+    if (!absent.includes(d.path)) continue;
+    const src = join(cacheDir, "trees", d.treeDigest);
+    const dst = join(root, d.path);
+    mkdirSync(dirname(dst), { recursive: true });
+    cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true });
+    written.push(d.path);
+    if (digestOf(dst).treeDigest !== d.treeDigest) {
+      for (const w of written) rmSync(join(root, w), { recursive: true, force: true });
+      rmSync(src, { recursive: true, force: true });
+      return undefined;
+    }
+  }
+  for (const a of inst.assets ?? []) {
+    if (!absent.includes(`${inst.path}/${a.src}`)) continue;
+    const src = join(cacheDir, "blobs", a.sha256);
+    const dst = join(root, inst.path, a.src);
+    mkdirSync(dirname(dst), { recursive: true });
+    cpSync(src, dst, { force: true });
+    written.push(join(inst.path, a.src));
+  }
+  const declDst = join(root, inst.path, inst.declaration.file);
+  if (!existsSync(declDst)) {
+    mkdirSync(dirname(declDst), { recursive: true });
+    cpSync(declCache, declDst);
+  }
+  ensureIgnored(root, inst.path);
+  for (const d of inst.directories) ensureIgnored(root, d.path);
+  const files = inst.directories.reduce((n, d) => n + d.files, 0) + (inst.assets?.length ?? 0);
+  return { instance: inst.instance, state: "mounted", detail: `${written.length} director${written.length === 1 ? "y" : "ies"}, ${files} file(s) from ${inst.repository}@${inst.sha.slice(0, 12)}` };
+}
+
+function saveToMountCache(cacheDir: string, inst: LockInstance, root: string): void {
+  try {
+    const blobsDir = join(cacheDir, "blobs");
+    const treesDir = join(cacheDir, "trees");
+    mkdirSync(blobsDir, { recursive: true });
+    mkdirSync(treesDir, { recursive: true });
+    const declDst = join(root, inst.path, inst.declaration.file);
+    const declCache = join(blobsDir, inst.declaration.sha256);
+    if (existsSync(declDst) && !existsSync(declCache)) cpSync(declDst, declCache);
+    for (const d of inst.directories) {
+      const dst = join(root, d.path);
+      const treeCache = join(treesDir, d.treeDigest);
+      if (existsSync(dst) && !existsSync(treeCache)) {
+        cpSync(dst, treeCache, { recursive: true, verbatimSymlinks: true, force: true });
+      }
+    }
+    for (const a of inst.assets ?? []) {
+      const dst = join(root, inst.path, a.src);
+      const blobCache = join(blobsDir, a.sha256);
+      if (existsSync(dst) && !existsSync(blobCache)) cpSync(dst, blobCache);
+    }
+  } catch {
+    // Cache population is best-effort and never alters mount outcome.
+  }
+}
+
 export function mountInstance(root: string, inst: LockInstance): Outcome {
   const id = inst.instance;
   const bad = [inst.path, ...inst.directories.map((d) => d.path)].find((p) => !safeRel(p));
@@ -487,6 +573,12 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
   if (absent.length === 0) return checkInstance(root, inst);
   const trackedPath = inst.directories.map((d) => d.path).find((p) => tracked(root, p));
   if (trackedPath) return { instance: id, state: "missing", detail: `\`${trackedPath}/\` holds tracked files — a mount never lands on tracked bytes` };
+
+  const cacheDir = mountCacheDir();
+  if (cacheDir) {
+    const cached = tryMountFromCache(root, inst, absent, cacheDir);
+    if (cached) return cached;
+  }
 
   const upstreamDecl = inst.upstreamRoot ? `${inst.upstreamRoot.replace(/\/+$/, "")}/${inst.declaration.file}` : inst.declaration.file;
   const assetPaths = (inst.assets ?? []).map((a) => {
@@ -546,6 +638,7 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
       mkdirSync(dirname(declDst), { recursive: true });
       cpSync(declSrc, declDst);
     }
+    if (cacheDir) saveToMountCache(cacheDir, inst, root);
     ensureIgnored(root, inst.path);
     for (const d of inst.directories) ensureIgnored(root, d.path);
     const files = inst.directories.reduce((n, d) => n + d.files, 0) + (inst.assets?.length ?? 0);

@@ -74,12 +74,18 @@ function children(dir: string): { files: number; dirs: number } {
 }
 
 /** The covered directories of one visualiser, with the instance each belongs to. */
-function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string }[] {
+function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string; under?: string }[] {
   return checkoutDirectories(v.harnessRoot, { stackedOn: v.harnessRoot })
     .filter((d) =>
       (v.coversKinds ?? []).some((k) => (d.graphTypologies as readonly string[]).includes(k)) ||
       ((v.covers ?? []) as readonly string[]).includes(d.id) && (d.member ?? d.declaredBy) === v.harness)
-    .map((d) => ({ instance: d.member ?? d.declaredBy, absPath: d.absPath }));
+    .map((d) => {
+      // `subgraphUnder` nests a kind's sub-graph pages one segment down, as the
+      // tiles read it (`viewer-declarations.ts`): the glossary's per-instance
+      // pages are at `glossary/instance/<instance>/` (owner, 2026-10-15, "3a").
+      const under = (d.graphTypologies as readonly string[]).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
+      return { instance: d.member ?? d.declaredBy, absPath: d.absPath, ...(under ? { under } : {}) };
+    });
 }
 
 /**
@@ -143,7 +149,8 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     if (v.subgraphs !== "instance") continue;
     const instances = subjectInstances(v, root, dirs);
     for (const instance of instances) {
-      const sub = { ...parts, subgraph: instance };
+      const under = dirs.find((d) => d.instance === instance && d.under)?.under;
+      const sub = { ...parts, subgraph: under ? `${under}/${instance}` : instance };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
     }
