@@ -83,7 +83,9 @@ describe("what was not looked for is not reported as clean", () => {
     // "This instance has no tools" and "tools were never looked for" are
     // different facts. Collapsing them is the `dh4f` defect.
     const { omitted } = await collectInstanceNodes(join(repoRootFor(ROOT), "bootstrap"), DOC, BASE, []);
-    expect([...omitted].sort()).toEqual(["packages", "registry", "schemas", "tools"]);
+    // `tools` left this list with bean `tdir`: discovery reads every
+    // instance's declared `tools` graph, so it IS looked for now.
+    expect([...omitted].sort()).toEqual(["packages", "registry", "schemas"]);
   });
 
   test("a declared directory holding no diagrams is a NOTE, not a crash and not a problem", async () => {
@@ -180,11 +182,13 @@ describe("the scope table says what it means", () => {
     expect(all.length).toBe(new Set(all).size);
   });
 
-  test("`tools` is instance-bound although it never mentions ROOT", () => {
-    // The sharpest of the four: it is IMPORT-bound, not root-hardcoded, so
-    // threading a root through it would reach nothing. Classifying it by
-    // "does it mention ROOT" would have put it on the wrong side.
-    expect(COLLECTOR_SCOPE.instanceBound).toContain("tools");
-    expect(COLLECTOR_SCOPE.generic).not.toContain("tools");
+  test("`tools` is generic: discovery reads each instance's declared graph", () => {
+    // It was instance-bound while it was a compile-time `import` of
+    // `tools/index.ts` (`gn4l`). Discovery (`p0za`) made it a read of a
+    // DECLARED directory, which is the generic collectors' defining property,
+    // and `collectTools` takes the root (bean `tdir`). Left on the bound side,
+    // `--instance ./smart-base` published none of its 11 Tools.
+    expect(COLLECTOR_SCOPE.generic).toContain("tools");
+    expect(COLLECTOR_SCOPE.instanceBound).not.toContain("tools");
   });
 });

@@ -2040,16 +2040,31 @@ export function firstSentence(s: string, max = 260): string {
 /** One answer per skill per build: roles and Tools ask about the same names many times. */
 const skillHomes = new Map<string, string>();
 
-function skillHome(base: string, ownDoc: string, skillId: string, scope: CorpusScope = corpusScopeFor(ROOT)): string {
-  const key = `${base}\0${ownDoc}\0${scope}\0${skillId}`;
+/**
+ * `ownRoot` is the instance whose document `ownDoc` IS. It was always `ROOT`
+ * until instance exports began collecting Tools (bean `tdir`): smart-base's
+ * `extract-dak` satisfies a skill smart-base declares, and asking cat-harness
+ * "do you have it?" first would either keep a cat-harness-only skill in
+ * smart-base's document (a dangling link) or send smart-base's own skill to a
+ * sibling's. So the "this document wins" test asks the instance being
+ * exported, and every OTHER instance, the host included, is a sibling.
+ */
+function skillHome(
+  base: string,
+  ownDoc: string,
+  skillId: string,
+  scope: CorpusScope = corpusScopeFor(ROOT),
+  ownRoot: string = ROOT,
+): string {
+  const key = `${base}\0${ownDoc}\0${scope}\0${resolve(ownRoot)}\0${skillId}`;
   const hit = skillHomes.get(key);
   if (hit !== undefined) return hit;
-  const home = skillHomeUncached(base, ownDoc, skillId, scope);
+  const home = skillHomeUncached(base, ownDoc, skillId, scope, ownRoot);
   skillHomes.set(key, home);
   return home;
 }
 
-function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope: CorpusScope): string {
+function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope: CorpusScope, ownRoot: string): string {
   // THIS DOCUMENT WINS WHENEVER IT HAS THE SKILL, and that check has to come
   // first rather than fall out of iteration order.
   //
@@ -2060,9 +2075,9 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   // because those instances declare ids cat-harness also declares, and the
   // published-paths walk in `kg-export.test.ts` caught it as two documents
   // the deploy does not write.
-  if (knownSkills(ROOT, scope).has(skillId)) return ownDoc;
+  if (knownSkills(ownRoot, scope).has(skillId)) return ownDoc;
   for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
-    if (resolve(instance) === resolve(ROOT)) continue;
+    if (resolve(instance) === resolve(ownRoot)) continue;
     if (!knownSkills(instance).has(skillId)) continue;
     // `publishedIdentity`, not `exportIdentity` with this base: an instance
     // that declares its own `canonicalUrl` is published under it, so passing
@@ -2072,11 +2087,41 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   return ownDoc;
 }
 
-function collectTools(doc: string, base: string, problems: string[], scope: CorpusScope = corpusScopeFor(ROOT)): Node[] {
+/**
+ * The Tool nodes of the instance at `root` — the host's when `root` is `ROOT`,
+ * a sibling's when `collectInstanceNodes` asks.
+ *
+ * ## Why it takes the root (bean `tdir`)
+ *
+ * It read `toolsOf(ROOT)` and nothing called it outside the host's branch of
+ * `buildExport`, so `kg-export --instance ./smart-base` published 0 of
+ * smart-base's 11 Tools and `--instance ./fhir-harness` 0 of its 32 —
+ * measured 2026-10-15, both exports otherwise complete and silent about it.
+ * Discovery (`tools/discover.ts`, bean `p0za`) had already made the Tools of
+ * every instance loadable; the export simply never asked for them.
+ *
+ * ## Two bases, and they are not the same question
+ *
+ * - `base` is where THIS document is published: a Tool's `maintains` and
+ *   `satisfies` resolve against it, as every other node's links do.
+ * - `typeBase` is where the I/O type vocabulary is published, which is the
+ *   HARNESS's base for every instance (`harnessBase` in `discover.ts`).
+ *   Minting smart-base's port types against smart-base's canonical named
+ *   `http://smart.who.int/base/tool-types/...`, a document WHO does not
+ *   publish (bean `p0za`). `undefined` lets discovery use the harness's
+ *   declared base; a preview passes its own `--base-url`.
+ */
+function collectTools(
+  doc: string,
+  base: string,
+  problems: string[],
+  scope: CorpusScope = corpusScopeFor(ROOT),
+  root: string = ROOT,
+  typeBase: string | undefined = base || undefined,
+): Node[] {
   let defs;
   try {
-    // The SAME base the document is published against — see tools/index.ts.
-    defs = toolsOf(ROOT, base);
+    defs = toolsOf(root, typeBase);
   } catch (e) {
     problems.push(`tools/ did not load: ${e instanceof Error ? e.message : String(e)}`);
     return [];
@@ -2095,7 +2140,13 @@ function collectTools(doc: string, base: string, problems: string[], scope: Corp
     // an environment descriptor (`{ runtime: ["go"], network: true }`) whose
     // values are not capability ids. Two relations, two terms.
     requirements: t.requires,
-    satisfies: t.satisfies.map((k) => makeIri(skillHome(base, doc, k, scope), "skill", k)),
+    // A sibling's skill is re-homed against the deploy's own base when this
+    // is an instance export (`typeBase`, the `--base-url`), never against
+    // this instance's canonical: `publishedIdentity` would otherwise mint a
+    // sibling's document under `http://smart.who.int/base/`.
+    satisfies: t.satisfies.map((k) =>
+      makeIri(skillHome(root === ROOT ? base : (typeBase ?? ""), doc, k, scope, root), "skill", k),
+    ),
     // `satisfiesSkillNames` was here. REMOVED as denormalised: every
     // `satisfies` link lands on a Skill node carrying that same name, and none
     // of them dangles — see {@link skillHome} for the ones that land in
@@ -2570,7 +2621,7 @@ const LINK_TERMS = [
  */
 export const COLLECTOR_SCOPE = {
   /** Reads only DECLARED directories, so any instance with a declaration works. */
-  generic: ["skills", "processes", "declaredRoles", "declaration"],
+  generic: ["skills", "processes", "declaredRoles", "declaration", "tools"],
   /** Reads nothing instance-specific at all — the global graph-typology registry. */
   universal: ["graphTypologies"],
   /**
@@ -2579,11 +2630,15 @@ export const COLLECTOR_SCOPE = {
    * - `registry` — `.claude/skills/<group>` as a path literal.
    * - `packages` — `package-manifest.json` plus directories named in code.
    * - `schemas` — `auditSchemaNodes`, which audits this repo's `schemas/`.
-   * - `tools` — **compile-time `import`** of `tools/index.ts`. This one is the
-   *   sharpest: it is not root-hardcoded, it is IMPORT-BOUND, so threading a
-   *   root through it reaches nothing. It would need the tool set passed in.
+   *
+   * `tools` WAS listed here as import-bound: a compile-time `import` of
+   * `tools/index.ts`, which a root could not redirect. Discovery (bean
+   * `p0za`) replaced that import with a read of each instance's declared
+   * `tools` graph, and `collectTools` takes the root (bean `tdir`), so it is
+   * generic now. The stale entry is what let `--instance` exports publish no
+   * Tools while `omitted` said only that they had not been looked for.
    */
-  instanceBound: ["registry", "packages", "schemas", "tools"],
+  instanceBound: ["registry", "packages", "schemas"],
 } as const;
 
 /**
@@ -2631,6 +2686,10 @@ export async function collectInstanceNodes(
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
     ...collectDeclaredAssets(doc, problems, root),
+    // Every declared `tools` graph is read by discovery, so Tools are generic
+    // (bean `tdir`). The type vocabulary is the harness's: `baseUrl`, the
+    // deploy's own `--base-url`, or the harness's declared base when none.
+    ...collectTools(doc, base, problems, corpusScopeFor(root), root, baseUrl),
   ];
   // A LINK TO AN OMITTED COLLECTOR'S NODES MUST NOT BE EMITTED.
   //

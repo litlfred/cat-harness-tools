@@ -43,6 +43,7 @@ import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, re
 import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { toolsOf } from "../../tools/discover.js";
 import { dirname } from "node:path";
 
 /**
@@ -1134,6 +1135,41 @@ describe("exporting ANOTHER instance's graph", () => {
   });
 });
 
+/**
+ * Bean `tdir`. An instance's OWN Tools are in its own document.
+ *
+ * Measured 2026-10-15 before the fix: `kg-export --instance ./smart-base`
+ * emitted 0 Tool nodes against 11 declared, `--instance ./fhir-harness` 0
+ * against 32, because `collectInstanceNodes` never called `collectTools`.
+ * Compared with DISCOVERY's count rather than a pinned number, so a Tool
+ * added there is a Tool expected here; the `> 0` is the vacuity guard.
+ */
+describe("an instance export carries that instance's Tools", () => {
+  const withTools = ["smart-base", "fhir-harness"]
+    .map((n) => join(REPO, n))
+    .filter((r) => instanceRootsIn(REPO).some((i) => resolve(i) === resolve(r)));
+
+  test.skipIf(!inAggregate() || withTools.length === 0)("every Tool discovery finds, and with harness-base port types", async () => {
+    for (const root of withTools) {
+      const e = await buildExport({ baseUrl: ALT_BASE, instanceRoot: root });
+      const graph = e["@graph"] as Array<Record<string, unknown>>;
+      const nodes = graph.filter((n) => String(n["@type"]).endsWith("Tool"));
+      const declared = toolsOf(root).length;
+      expect(declared).toBeGreaterThan(0);
+      expect({ root: basename(root), tools: nodes.length }).toEqual({ root: basename(root), tools: declared });
+      // The port types are the HARNESS's vocabulary, minted against the
+      // deploy's base, never against the instance's own canonical.
+      for (const t of nodes) {
+        const io = t.io as { inputs?: Array<{ schema: string }>; outputs?: Array<{ schema: string }> };
+        for (const p of [...(io.inputs ?? []), ...(io.outputs ?? [])]) {
+          expect(p.schema.startsWith(`${ALT_BASE}/`)).toBe(true);
+        }
+      }
+      expect(e.omitted ?? []).not.toContain("tools");
+    }
+  });
+});
+
 /*
  * THE STANDARDS A GRAPH IS WRITTEN IN, reachable from the graph. Owner,
  * 2026-09-27, on the `processes` GraphTypology: "i would have expected to see
@@ -1434,13 +1470,13 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
       const e = OWNER_DOCS.get(root)!;
       const index = publishedInstanceSchemas(root, deployBase(root)).indexIri;
       expect({ stub: p.stub, conformsTo: e.conformsTo }).toEqual({ stub: p.stub, conformsTo: index });
-      expect({ stub: p.stub, omitted: [...(e.omitted ?? [])].sort() }).toEqual({ stub: p.stub, omitted: ["packages", "registry", "tools"] });
+      expect({ stub: p.stub, omitted: [...(e.omitted ?? [])].sort() }).toEqual({ stub: p.stub, omitted: ["packages", "registry"] });
     }
   });
 
   test("an exempt instance publishes no schema/ here, so it still says `schemas` was not looked for", () => {
     expect(EXPORT_ALT_BOOT.conformsTo).toBeUndefined();
-    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas", "tools"]);
+    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas"]);
   });
 
   test.skipIf(!inAggregate())("a planned instance's skills link the contract $id its publisher writes", () => {
