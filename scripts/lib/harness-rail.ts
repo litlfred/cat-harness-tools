@@ -84,6 +84,15 @@ export interface RailOptions {
    */
   rowRoot?: string;
   /**
+   * Where the rail's own CODE and STYLE are loaded from — `navbar.js`,
+   * `navbar.css`, `navbar-row.js`, `navbar-row.css` — when that is not
+   * {@link assetRoot}. Owner, 2026-10-15, "pinned copy per site": a folio's or
+   * an IG's site ships these files itself, at its pinned platform version,
+   * rather than linking the platform's live site, while the rail's LINKS still
+   * point at the platform's pages. Default `assetRoot`.
+   */
+  chromeRoot?: string;
+  /**
    * The row's script and stylesheet, to be INLINED rather than linked — for a
    * standalone viewer page that fetches nothing (`withViewerNav`), as its
    * narrow-viewport rules already are. Bean `lhvt`.
@@ -248,13 +257,14 @@ export function injectRail(html: string, o: RailOptions): string | undefined {
   const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? RAIL_SECTION_LABELS.onThisPage;
   const documentIndex = o.documentIndex ?? visualiserNavOf(html, label) ?? documentIndexOf(html, label);
   const root = o.assetRoot ?? o.toRoot;
+  const chrome = o.chromeRoot ?? root;
   if (o.emitRailData) {
     const railed = withSharedRail(html, o, root, documentIndex);
     return railed === undefined
       ? undefined
       : withNavbarRow(railed, o.navbarRow, {
-          root,
-          ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}),
+          root: chrome,
+          dataRoot: o.rowRoot ?? root,
           ...(o.shareNavbarRow ? { shared: { emit: o.emitRailData, toRoot: o.toRoot } } : {}),
         });
   }
@@ -264,13 +274,13 @@ export function injectRail(html: string, o: RailOptions): string | undefined {
   const railed = injectNavbar(
     html,
     railModel({ ...o, ...(documentIndex ? { documentIndex } : {}) }),
-    linked ? { cssHref: `${root}/${NAVBAR_CSS}` } : {},
+    linked ? { cssHref: `${chrome}/${NAVBAR_CSS}` } : {},
   );
   return railed === undefined
     ? undefined
     : withNavbarRow(railed, o.navbarRow, {
-        root,
-        ...(o.rowRoot ? { dataRoot: o.rowRoot } : {}),
+        root: chrome,
+        dataRoot: o.rowRoot ?? root,
         ...(o.inlineRowAssets && !linked ? { inline: o.inlineRowAssets } : {}),
       });
 }
@@ -514,12 +524,15 @@ function withSharedRail(html: string, o: RailOptions, root: string, documentInde
     `<a href="${esc(o.toRoot)}/">${esc(o.homeLabel ?? "folio-assistant")}</a></nav>`;
   const at = body.index + body[0].length;
   let out = html.slice(0, at) + block + nav + html.slice(at);
+  // The drawing and its style are the platform's code, loaded from
+  // `chromeRoot` — the site's own pinned copy on a foreign site.
+  const chrome = o.chromeRoot ?? root;
   const tags =
-    `<link rel="stylesheet" href="${root}/${NAVBAR_CSS}">` +
+    `<link rel="stylesheet" href="${chrome}/${NAVBAR_CSS}">` +
     // The DATA is written into the site being railed, so it is fetched from
-    // this page's own root; the drawing and its style are the platform's.
+    // this page's own root.
     `<script src="${o.toRoot}/${asset.file}" defer></script>` +
-    `<script src="${root}/${NAVBAR_JS}" defer></script>`;
+    `<script src="${chrome}/${NAVBAR_JS}" defer></script>`;
   const head = /<\/head\s*>/i.exec(out);
   out = head ? out.slice(0, head.index) + tags + out.slice(head.index) : out.slice(0, at) + tags + out.slice(at);
   return out;
