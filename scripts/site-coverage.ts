@@ -49,6 +49,13 @@ export interface ExpectedPage {
   instance?: string;
   /** The same view at its address before the locale segment (`forwardingParts`). */
   legacyRoute: string;
+  /**
+   * On the site OF the instance that declares it, the same view at that site's
+   * own root: a folio's site reads `/<instance>/…` as `/…` (`ownHref` in
+   * `lib/foreign-site-scope.ts`), so who-iris's catalogue tile,
+   * `/who-iris/catalogue/`, lands on `catalogue/`. Set only for that instance.
+   */
+  ownSiteRoute?: string;
 }
 
 const visible = (name: string): boolean => !name.startsWith(".") && !name.startsWith("_");
@@ -77,20 +84,24 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
  * trashcan kept but not published) is expected in a preview and never on a
  * root publish.
  */
-export function expectedPages(root: string, opts: { staging?: boolean } = {}): ExpectedPage[] {
+export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
   const out: ExpectedPage[] = [];
+  const own = (harness: string, legacy: string): { ownSiteRoute?: string } =>
+    opts.ownInstance !== undefined && harness === opts.ownInstance && legacy.startsWith(`${harness}/`) ? { ownSiteRoute: legacy.slice(harness.length + 1) } : {};
   for (const v of declaredVisualisers(root)) {
     if (!opts.staging && v.publish === "staging-only") continue;
     const dirs = coveredDirectories(v).filter((d) => existsSync(d.absPath));
     const withAnything = dirs.filter((d) => { const c = children(d.absPath); return c.files + c.dirs > 0; });
     if (withAnything.length === 0) continue;
     const parts = pageParts({ harness: v.harness, visualiser: v.id });
-    out.push({ route: visualiserRoute(parts), legacyRoute: visualiserRoute(forwardingParts(parts)), harness: v.harness, visualiser: v.id });
+    const legacy = visualiserRoute(forwardingParts(parts));
+    out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
     const instances = [...new Set(dirs.filter((d) => children(d.absPath).dirs > 0).map((d) => d.instance))].sort();
     for (const instance of instances) {
       const sub = { ...parts, subgraph: instance };
-      out.push({ route: visualiserRoute(sub), legacyRoute: visualiserRoute(forwardingParts(sub)), harness: v.harness, visualiser: v.id, instance });
+      const subLegacy = visualiserRoute(forwardingParts(sub));
+      out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
     }
   }
   return out;
@@ -100,7 +111,7 @@ const holds = (has: (path: string) => boolean, route: string): boolean => has(`$
 
 /** The expected pages `has` finds at neither address. `has` answers for a site-relative file path. */
 export function missingPages(expected: readonly ExpectedPage[], has: (path: string) => boolean): ExpectedPage[] {
-  return expected.filter((p) => !holds(has, p.route) && !holds(has, p.legacyRoute));
+  return expected.filter((p) => !holds(has, p.route) && !holds(has, p.legacyRoute) && !(p.ownSiteRoute !== undefined && holds(has, p.ownSiteRoute)));
 }
 
 /**
@@ -113,7 +124,7 @@ export function legacyOnlyPages(expected: readonly ExpectedPage[], has: (path: s
 }
 
 /** The guard as `build-instance-site.ts` calls it: the missing pages of a built site directory. */
-export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean } = {}): ExpectedPage[] {
+export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
   return missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
 }
 
