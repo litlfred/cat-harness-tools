@@ -45,6 +45,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "document-kinds-viewer";
@@ -243,7 +244,7 @@ if (import.meta.main) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
     process.exit(0);
   }
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   const { pageDir } = viewerPlacement(site, route, GRAPH);
   // No `nav`: these pages are themed, so the theme's sidebar is their
   // navigation and there is no rail to inject.

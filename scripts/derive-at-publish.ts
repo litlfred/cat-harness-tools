@@ -29,8 +29,8 @@
  * no commit of it can hold current — computed over the checkout's other
  * instances (`checkout`), or from a branch-kept graph (`state`) — and names
  * each one's writer as a package script. After the branch-derived artefacts
- * above, this runs every such writer once — instances CONSUMERS FIRST, each
- * instance's entries in its declared order — and then REFUSES an entry that
+ * above, this runs every such writer once — in the order {@link writersOf} works
+ * out from the declarations (see "Writer order" below) — and then REFUSES an entry that
  * came out missing or empty:
  * a declared page nobody built is a broken publish, not an absent one.
  * `--cause state` runs only the state-derived ones (what an e2e job reading the
@@ -59,21 +59,38 @@
  * roots lives here — so a root that has the prerequisite (the folio-assistant
  * index) runs it exactly as before, and any other non-zero exit still fails.
  *
- * ## Why consumers first
+ * ## Writer order: lowest layer first, plus the edges the declarations state
  *
- * A `checkout` artefact is, by the B1 rule, computed over the instances ABOVE
- * the one that serves it — the ones that `need` it. When one of those builds
- * part of its own tree at publish, the artefact below reads that output, so
- * its writer must run after it. Measured 2026-10-15: an IG instance's `docs/`
- * (its `<ig>:pages` writer) is built at publish, and cat-harness's
- * `docs/_data/harness.json` (`docs:harness`) gives that IG a folio link and a
- * rail scope only when that directory exists. In index order cat-harness ran
- * first, so one clean `derive:publish` published the platform site with the
- * IG as a landing-page section and no rail scope, and
- * `foreign-site-scope.test.ts` went red or green with whichever concurrent
- * build had reached the IG's pages writer first (cat-harness-tools PR #298,
- * run 38734014626). The other direction does not arise: an instance above reads a
- * lower layer at the checkout's pins, which is committed, never built here.
+ * Owner, 2026-10-15 ("A1"). The base order is the instances' dependency order
+ * (lowest layer first, a function of the declared `needs` alone, never of the
+ * index's listing order), each instance's entries in their declared order,
+ * and a writer named by several entries runs ONCE. On top of that, two kinds
+ * of edge, both read from the declarations and both hard:
+ *
+ * - an instance's own declared order: each of its writers runs after the one
+ *   it lists before it (`processes:viz` after `render:bpmn`, `navbar:include`
+ *   after the `docs:harness` whose `harness.json` it renders);
+ * - a READ EDGE (`reads` on an entry, `schemas/built-at-publish.ts` in
+ *   cat-harness): the entry's writers run after the writers of every OTHER
+ *   instance's entry that fills (`directory`) a directory of one of those
+ *   kinds.
+ *
+ * The case the second exists for (measured 2026-10-15): cat-harness's
+ * `docs/_data/harness.json` (`docs:harness`) gives an IG instance a folio
+ * link and a rail scope only when that IG's `docs/` exists, and that
+ * directory is the IG's own publish-time artefact (its `<ig>:pages` writer).
+ * Lowest-first wrote the tiles first, so one clean `derive:publish` published
+ * the platform site with the IG as a landing-page section and no rail scope
+ * (`foreign-site-scope.test.ts` (a), `viewer-undiscovered.test.ts`). An
+ * interim fix ran every instance consumers first; the ruling replaced it with
+ * the declared edge, `reads: ["docs"]` on that entry, because which way a read
+ * goes is a fact the reading writer knows, and a global inversion only guesses
+ * it (it also ran the shared `jsonld:contexts` before the cat-harness
+ * documents it reads were written).
+ *
+ * The sort is stable (a writer runs as early as its edges allow, ties broken
+ * by first mention), and a cycle is REFUSED, naming the writers in it: two
+ * writers that each read the other's output have no order that is right.
  *
  * ```
  * bun run cat derive:publish            # run every writer
@@ -113,13 +130,16 @@ export interface DeclaredArtefact {
   path: string;
   writer: readonly string[];
   because: "checkout" | "state";
+  /** The kinds of directory, in other instances, its writers read (`reads`): the declared read edge. */
+  reads?: readonly string[];
+  /** The kinds of the declared directory this entry fills (`directory`), so a reader of those kinds is ordered after it. */
+  fills?: readonly string[];
 }
 
 /**
- * The order instances' publish-time writers run in: every instance before the
- * ones it `needs` (see "Why consumers first" above). It is the reverse of the
- * dependency-first order `flattenDependencies` gives, so it is a function of
- * the declared `needs` alone, never of the index's listing order.
+ * The order instances' publish-time entries are read in: dependency order,
+ * lowest layer first, a function of the declared `needs` alone. The base of
+ * {@link writersOf}; the declared edges reorder writers on top of it.
  */
 export function writingOrder(repoRoot = REPO_ROOT): string[] {
   const all = readInstances(repoRoot);
@@ -128,10 +148,10 @@ export function writingOrder(repoRoot = REPO_ROOT): string[] {
   if (flat.problems.length > 0) {
     throw new Error(`derive:publish: the instance needs graph is broken — ${flat.problems.map((p) => p.detail).join("; ")}`);
   }
-  return flat.order.map((s) => s.id).reverse();
+  return flat.order.map((s) => s.id);
 }
 
-/** Every instance's `builtAtPublish`, instances consumers first ({@link writingOrder}), entries as declared. */
+/** Every instance's `builtAtPublish`, instances lowest layer first ({@link writingOrder}), entries as declared. */
 export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state"): DeclaredArtefact[] {
   const order = writingOrder(repoRoot);
   const roots = new Map(readInstances(repoRoot).map((i) => [i.name, i.root] as const));
@@ -139,18 +159,100 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
   for (const name of order) {
     const root = roots.get(name);
     if (root === undefined) continue;
-    const decl = readDeclaration(root) as { builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state" }> } | undefined;
+    const decl = readDeclaration(root) as
+      | {
+          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string }>;
+          directories?: Array<{ id?: string; graphTypologies?: string[]; kinds?: string[] }>;
+        }
+      | undefined;
+    const kindsOf = new Map((decl?.directories ?? []).map((d) => [d.id, d.graphTypologies ?? d.kinds ?? []] as const));
     for (const e of decl?.builtAtPublish ?? []) {
       if (cause !== undefined && e.because !== cause) continue;
-      out.push({ instance: name, abs: join(root, e.path), path: e.path, writer: e.writer, because: e.because });
+      const fills = e.directory === undefined ? [] : (kindsOf.get(e.directory) ?? []);
+      out.push({
+        instance: name,
+        abs: join(root, e.path),
+        path: e.path,
+        writer: e.writer,
+        because: e.because,
+        ...(e.reads?.length ? { reads: e.reads } : {}),
+        ...(fills.length ? { fills } : {}),
+      });
     }
   }
   return out;
 }
 
-/** The scripts to run, each once, in first-mention order. */
+/** One ordering edge: `before` runs before `after`, and why the declarations say so. */
+export interface WriterEdge {
+  before: string;
+  after: string;
+  why: string;
+}
+
+/**
+ * The ordering edges the plan declares (see "Writer order" above): each
+ * instance's writers in the order it lists them, and every `reads` edge.
+ */
+export function writerEdges(plan: readonly DeclaredArtefact[]): WriterEdge[] {
+  const edges: WriterEdge[] = [];
+  const byInstance = new Map<string, string[]>();
+  for (const a of plan) {
+    const seq = byInstance.get(a.instance) ?? [];
+    for (const w of a.writer) if (!seq.includes(w)) seq.push(w);
+    byInstance.set(a.instance, seq);
+  }
+  for (const [instance, seq] of byInstance) {
+    for (let k = 1; k < seq.length; k++) edges.push({ before: seq[k - 1]!, after: seq[k]!, why: `${instance} lists ${seq[k - 1]} before ${seq[k]}` });
+  }
+  for (const reader of plan) {
+    for (const kind of reader.reads ?? []) {
+      for (const source of plan) {
+        if (source.instance === reader.instance || !(source.fills ?? []).includes(kind)) continue;
+        for (const before of source.writer) {
+          for (const after of reader.writer) {
+            if (before !== after) edges.push({ before, after, why: `${reader.instance}/${reader.path} reads ${kind}, which ${source.instance}/${source.path} fills` });
+          }
+        }
+      }
+    }
+  }
+  return edges;
+}
+
+/**
+ * The scripts to run, each once: first-mention order, reordered by the
+ * declared edges ({@link writerEdges}) with a stable topological sort, so a
+ * writer runs as early as its edges allow. Throws on a cycle, naming it.
+ */
 export function writersOf(plan: readonly DeclaredArtefact[]): string[] {
-  return [...new Set(plan.flatMap((a) => a.writer))];
+  const nodes = [...new Set(plan.flatMap((a) => a.writer))];
+  const rank = new Map(nodes.map((n, k) => [n, k] as const));
+  const edges = writerEdges(plan);
+  const next = new Map<string, Set<string>>(nodes.map((n) => [n, new Set<string>()]));
+  const indegree = new Map<string, number>(nodes.map((n) => [n, 0]));
+  for (const e of edges) {
+    if (next.get(e.before)!.has(e.after)) continue;
+    next.get(e.before)!.add(e.after);
+    indegree.set(e.after, indegree.get(e.after)! + 1);
+  }
+  const out: string[] = [];
+  const ready = nodes.filter((n) => indegree.get(n) === 0);
+  while (ready.length > 0) {
+    ready.sort((a, b) => rank.get(a)! - rank.get(b)!);
+    const n = ready.shift()!;
+    out.push(n);
+    for (const m of next.get(n)!) {
+      indegree.set(m, indegree.get(m)! - 1);
+      if (indegree.get(m) === 0) ready.push(m);
+    }
+  }
+  if (out.length < nodes.length) {
+    const stuck = new Set(nodes.filter((n) => !out.includes(n)));
+    const why = edges.filter((e) => stuck.has(e.before) && stuck.has(e.after)).map((e) => `${e.before} → ${e.after} (${e.why})`);
+    throw new Error(`derive:publish: the publish-time writers' declared order has a cycle among ${[...stuck].join(", ")}: ${why.join("; ")}`);
+  }
+  return out;
 }
 
 /** Built means present and, for a directory, holding at least one file. */
@@ -221,9 +323,16 @@ if (import.meta.main) {
     process.exit(2);
   }
   const declared = declaredPlan(REPO_ROOT, cause);
-  const writers = writersOf(declared);
+  let writers: string[];
+  try {
+    writers = writersOf(declared);
+  } catch (e) {
+    console.log(`::error::${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
   console.log(`derive:publish — ${declared.length} declared artefact(s) (builtAtPublish${cause ? `, ${cause} only` : ""}), ${writers.length} writer(s)`);
-  for (const a of declared) console.log(`  ${a.instance}/${a.path}  (${a.because}; writer: ${a.writer.join(", ")})`);
+  for (const a of declared) console.log(`  ${a.instance}/${a.path}  (${a.because}; writer: ${a.writer.join(", ")}${a.reads ? `; reads: ${a.reads.join(", ")}` : ""})`);
+  console.log(`  writer order: ${writers.join(" → ")}`);
   if (listOnly) process.exit(0);
   // Every writer runs, whatever an earlier one did, so one run names every
   // failure rather than the first (smart-ra#66 hid three behind uml:overview).

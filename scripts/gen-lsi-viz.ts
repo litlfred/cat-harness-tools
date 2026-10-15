@@ -103,6 +103,7 @@ import { readQaTree } from "./qa-store.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteArg } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
@@ -110,7 +111,9 @@ const VIEWER_TOOL = "lsi-viewer";
 const REPO = resolve(dirname(HARNESS_ROOT));
 // declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
-const OUT = join(VIEWER_DIR, "index.md");
+/** `--site <dir>`: the same route under a site being built (`visualiser-writers.ts`). */
+const SITE = siteArg();
+const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(join(REPO, "cat-harness/docs"), VIEWER_DIR), "index.md");
 const DIMS_SHOWN = 8;
 
 function sidecars(dir = RESULTS, out: string[] = []): string[] {

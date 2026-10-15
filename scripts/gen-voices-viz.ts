@@ -65,6 +65,7 @@ import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { SKILL_PAGES_DIR, skillPagesOf } from "./lib/skill-pages.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "voices-viewer";
@@ -435,7 +436,7 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // The published segment is the DECLARED directory's own name, and THIS
   // instance declares no voices — it derives none, which is the whole point of
   // the move that produced this graph. So the segment is read from the

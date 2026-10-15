@@ -16,7 +16,8 @@ import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js"
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
-import { page, publishedPage, pageRelPath, skillIds, toolRows } from "../../scripts/gen-tools-viz.js";
+import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
+import { discoverTools } from "../../tools/discover.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -159,10 +160,29 @@ describe("the page reports the join in both directions", () => {
 
 describe("the generator writes where the declaration says", () => {
 
+  // The full view is the full KG (bean 1nu0): every declared `tools` graph,
+  // read by auto-discovery, with one sub-graph page per instance.
+  const { subjects, empty } = toolSubjects(REPO);
+
   it("and the committed page is current", () => {
     // The gate runs this too; asserting it here means a stale page fails the
     // unit suite rather than only the gate, which is where it is noticed first.
     const rel = pageRelPath(REPO)!;
-    expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(publishedPage(rows, skillIds(REPO)));
+    const all = toolRows(discoverTools(REPO).tools);
+    const scope = { subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
+    expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(publishedPage(all, skillIds(REPO), REPO, scope));
+  });
+
+  it("draws one current page per instance that declares Tools, and none for an empty graph", () => {
+    // Vacuity guard: more than cat-harness's own graph is drawn.
+    expect(subjects.length).toBeGreaterThan(1);
+    for (const x of subjects) {
+      const rel = pageRelPath(REPO, x.name)!;
+      expect(rel).toEndWith(`/tools/${x.name}/index.md`);
+      expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(
+        publishedPage(x.rows, skillIds(REPO), REPO, { instance: x.name, upHref: "../" }),
+      );
+    }
+    for (const n of empty) expect(existsSync(join(DOCS, pageRelPath(REPO, n)!))).toBe(false);
   });
 });
