@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a harnessed repository's gates in a mounted index and record each exit code.
 
-Usage: run-gates.py <index-root> <out.json> [--instance <name>]...
+Usage: run-gates.py <index-root> <out.json> [--instance <name>]... [--record <file.json>]...
 
 Generalised from folio-assistant-core's `.github/scripts/run-gates.py`
 (14ed7ad) for `layer-pr-checks.yml`, the reusable workflow every harnessed
@@ -31,6 +31,13 @@ Each gate's exit code, the tail of its output, and its command are written to
 <out.json>. This script exits 0 whatever the gates did: the compare step
 judges head against base, so a gate already red on main does not fail a PR
 that did not break it. `GATE_JOBS` (default 1) runs that many at once.
+
+`--record <file.json>` merges results a workflow step already produced, in the
+same shape (`{name: {command, exit, tail}}`, or `{name: {command, skipped}}`),
+into <out.json>: the `derive:publish` build that runs before the gates is
+judged by the compare job like one of them, so a build the PR breaks is a NEW
+failure rather than a line in a log. A missing or unreadable file records the
+step as `exit 2` ("could not determine"), never as nothing.
 
 A declared gate that cannot determine anything here is not run, and is
 written with a `skipped` reason in place of `exit` (owner, 2026-10-15, "b1"):
@@ -221,6 +228,7 @@ def main():
     args = sys.argv[1:]
     root, out_path = args[0], args[1]
     given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
+    records = [args[i + 1] for i, a in enumerate(args) if a == "--record" and i + 1 < len(args)]
     tmp = os.environ.get("RUNNER_TEMP", "/tmp")
     known = instances_in(root)
     own = own_instances(root, given, known)
@@ -267,6 +275,13 @@ def main():
             results[name] = {"command": command, "exit": code, "tail": text[-1500:]}
     for name, entry in skipped.items():
         print(f"{name}: skipped ({entry['skipped']}) — {entry['command']}", flush=True)
+    for path in records:
+        got = read_json(path)
+        if not isinstance(got, dict) or not got:
+            got = {f"record:{os.path.basename(path)}": {"command": path, "exit": 2, "tail": f"{path} is missing or unreadable: the step that writes it did not record a result"}}
+        for name, entry in got.items():
+            print(f"{name}: recorded ({entry.get('skipped') or 'exit %s' % entry.get('exit')}) — {entry.get('command')}", flush=True)
+            (skipped if "skipped" in entry else results)[name] = entry
     green = sum(1 for r in results.values() if r["exit"] == 0)
     results.update(skipped)  # no `exit`: compare-gates.py reports these as skipped, never as a verdict
     with open(out_path, "w") as f:

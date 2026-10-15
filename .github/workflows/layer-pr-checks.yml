@@ -343,6 +343,71 @@ jobs:
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi
+      - name: Build the publish-time pages (derive:publish), on this side
+        # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
+        # instance declares `builtAtPublish` are no longer committed, and
+        # `bun run cat derive:publish` builds them over the mounts, as
+        # folio-assistant's `publish-pages` job does before its tests. Gates
+        # and tests read them (docs/_data/harness.json, avatars.css, the UML
+        # overview, the translated glossary), so without this every caller
+        # re-pinned past cb280cd went newly red on head while base, at the
+        # older pins, still had them committed (smart-ra#66, run 38690096973).
+        # It runs on BOTH sides, after state mount (its `state` writers read
+        # the branch-kept graphs) and after the Chromium install (render:bpmn).
+        #
+        # Never fatal: the gates run whatever happened here. The outcome is
+        # recorded as the gate `publish:derive:publish` (run-gates.py
+        # `--record`), so the compare job reports a head failure as NEW and
+        # one red on main too as such, rather than it vanishing in this log.
+        #
+        # A root with no `cat` script (smart-ra) is given one for this step
+        # only: derive:publish and its writers call `bun run cat <writer>`,
+        # which there would run /usr/bin/cat. package.json is restored before
+        # the tests and gates, so they judge the checkout as committed.
+        working-directory: fa
+        run: |
+          set -uo pipefail
+          rec="$RUNNER_TEMP/derive-publish.json"
+          log="$RUNNER_TEMP/derive-publish.log"
+          runner="bun cat-harness-tools/scripts/run-script.ts"
+          if [ ! -f cat-harness-tools/scripts/run-script.ts ]; then
+            why="cat-harness-tools/scripts/run-script.ts is absent at this side's pin"
+          elif ! { $runner --list 2>/dev/null || true; } | cut -f1 | grep -x 'derive:publish' >/dev/null; then
+            why="no instance declares derive:publish at this side's pins (its pages are committed there)"
+          else
+            why=""
+          fi
+          if [ -n "$why" ]; then
+            echo "derive:publish skipped: $why"
+            python3 - "$rec" "$why" <<'PY'
+          import json, sys
+          json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "skipped": sys.argv[2]}}, open(sys.argv[1], "w"), indent=1)
+          PY
+            exit 0
+          fi
+          injected=""
+          if ! python3 -c 'import json,sys; sys.exit(0 if "cat" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
+            cp package.json "$RUNNER_TEMP/package.json.orig"
+            python3 - <<'PY'
+          import json
+          p = json.load(open("package.json"))
+          p.setdefault("scripts", {})["cat"] = "bun cat-harness-tools/scripts/run-script.ts"
+          json.dump(p, open("package.json", "w"), indent=2)
+          PY
+            injected=1
+            echo "root has no \`cat\` script: one is added for derive:publish and removed after it"
+          fi
+          bun run cat derive:publish 2>&1 | tee "$log"
+          code=${PIPESTATUS[0]}
+          if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::derive:publish exited $code on the ${{ matrix.side }} side; the gates still run, and the compare job judges it as the gate publish:derive:publish"
+          fi
+          python3 - "$rec" "$code" "$log" <<'PY'
+          import json, sys
+          tail = open(sys.argv[3], errors="replace").read().strip()[-1500:]
+          json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
+          PY
       - name: bun test
         working-directory: fa
         # Judged by the compare job, not by this exit code.
@@ -370,7 +435,7 @@ jobs:
           GATE_JOBS: ${{ inputs.gate-jobs }}
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
         # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
-        run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN
+        run: python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.side }}
