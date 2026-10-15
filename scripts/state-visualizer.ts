@@ -921,7 +921,12 @@ type QaPanelsInput = {
  * where the same data is published as JSON; a per-instance page has no
  * published projection of its own, so it passes none and says nothing about one.
  */
-export function qaPanelsOf(ix: QaPanelsInput | QaGraphProjection, src?: string): string {
+export function qaPanelsOf(
+  ix: QaPanelsInput | QaGraphProjection,
+  src?: string,
+  opts: { qaFamilies?: boolean } = {},
+): string {
+  const qaFamilies = opts.qaFamilies ?? true;
   const dataLine = src === undefined ? "" : `<p class="sv-sub">The data is <a href="${src}">a plain JSON file</a>.</p>`;
   // The build had no QA corpus to count (bean `tfqf`, C9). Said, with its
   // reason, rather than rendered as "Families — 0, over 0 document(s)", which
@@ -972,11 +977,17 @@ export function qaPanelsOf(ix: QaPanelsInput | QaGraphProjection, src?: string):
 
   return (
     `<h2 class="sv-h2">Families — ${families.length}, over ${counted.files ?? 0} document(s)</h2>` +
-    `<p class="sv-sub">There is deliberately <strong>no total across these families</strong>. ` +
-    `The two largest that roll up disagree on the container (<code>totals</code> against ` +
-    `<code>counts</code>), on the spelling of not-applicable (<code>n/a</code> against ` +
-    `<code>na</code>) and on whether <code>warn</code> exists at all; the third declares no ` +
-    `roll-up. A single number over them would be three silent decisions.</p>` +
+    // The no-total argument is about the QA families specifically (three
+    // roll-up conventions); another kind's page groups by `$schema` the same
+    // way and says only that, rather than repeating a claim about QA.
+    (qaFamilies
+      ? `<p class="sv-sub">There is deliberately <strong>no total across these families</strong>. ` +
+        `The two largest that roll up disagree on the container (<code>totals</code> against ` +
+        `<code>counts</code>), on the spelling of not-applicable (<code>n/a</code> against ` +
+        `<code>na</code>) and on whether <code>warn</code> exists at all; the third declares no ` +
+        `roll-up. A single number over them would be three silent decisions.</p>`
+      : `<p class="sv-sub">Documents are grouped by the <code>$schema</code> each one declares; ` +
+        `there is no total across families.</p>`) +
     panels +
     thirdStates +
     dataLine
@@ -984,9 +995,19 @@ export function qaPanelsOf(ix: QaPanelsInput | QaGraphProjection, src?: string):
 }
 
 /**
- * One instance's QA graph: the sub-graph a `subgraphs: "instance"` visualiser
- * draws a page for (bean `folio-assistant-1nu0`, owner 2026-10-15:
- * "per-instance pages").
+ * The kinds a `subgraphs: "instance"` visualiser can draw one page per
+ * instance for: those whose documents are self-describing JSON (a `$schema`
+ * tag), which the family reader (`readQaGraph`) counts without knowing the
+ * kind. `qa` (`test/results/`), `health` (`health-report/v1`) and
+ * `attestations` (`qa-attestations/v1`) are that shape; a kind outside this
+ * set is refused loudly rather than drawn as a census of nothing.
+ */
+export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set(["qa", "health", "attestations"]);
+
+/**
+ * One instance's graph of a kind: the sub-graph a `subgraphs: "instance"`
+ * visualiser draws a page for (bean `folio-assistant-1nu0`, owner 2026-10-15:
+ * "per-instance pages"; "each viewer draws one page per instance").
  *
  * `name` is the instance the directory BELONGS to — `member` for an inherited
  * subgraph, else the declarer — which is the sub-graph segment `viewersOf`
@@ -994,7 +1015,7 @@ export function qaPanelsOf(ix: QaPanelsInput | QaGraphProjection, src?: string):
  * declared path rather than composed, so the corpus-availability probe asks
  * the instance that holds the directory.
  */
-export interface QaSubject {
+export interface InstanceSubject {
   name: string;
   path: string;
   absPath: string;
@@ -1007,18 +1028,18 @@ export interface QaSubject {
  *
  * Read from the RESOLVED checkout (`checkoutDirectories`), never from a list:
  * an instance is a subject because it declares the kind, so a new instance
- * holding a `qa` directory gets its page with no edit here. A declared
+ * holding such a directory gets its page with no edit here. A declared
  * directory that is NOT on disk still gets one, and that page says the corpus
- * is unknown in this build: derived QA lives on the `qa-reports` branch, so an
- * absent tree is the normal case, not an empty graph — and with no page the
- * instance's tile would have nowhere to go (measured: fhir-harness,
- * folio-assistant-sci and smart-base have no `test/results/` in the index).
+ * is unknown in this build: derived QA lives on the `qa-reports` branch and
+ * health reports are written by a sweep and never committed, so an absent tree
+ * is the normal case, not an empty graph — and with no page the instance's
+ * tile would have nowhere to go.
  */
-export function qaSubjectsOf(
+export function instanceSubjectsOf(
   dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
   kinds: readonly string[],
-): QaSubject[] {
-  const out = new Map<string, QaSubject>();
+): InstanceSubject[] {
+  const out = new Map<string, InstanceSubject>();
   for (const d of dirs) {
     if (!d.graphTypologies.some((k) => kinds.includes(k))) continue;
     const name = d.member ?? d.declaredBy;
@@ -1031,19 +1052,36 @@ export function qaSubjectsOf(
 }
 
 /**
- * `<base>/<harness>/<vis>/<instance>/` — one instance's QA results.
+ * One instance's directory of `kinds`, projected with the same family reader
+ * the whole-graph QA projection uses (`projectQaGraph`, bean `tfqf` C9), and
+ * the same availability rule: absent is UNKNOWN, never zero.
  *
- * Projected HERE, from that instance's own declared directory, with the same
- * reader and the same availability rule (`projectQaGraph`, bean `tfqf` C9) the
- * whole-graph projection uses. An instance whose derived corpus is not in the
- * build says so — unknown, not zero — instead of counting the few files that
- * happen to be committed.
+ * `qa` keeps its own probe (`qaCorpusAvailability`): its corpus is the derived
+ * results trees, which a `test/results/` holding only committed attestations
+ * does not answer for. Every other kind is present exactly when its declared
+ * directory is on disk.
  */
-export function qaSubjectPage(
-  vis: { id: string; title?: string },
-  s: QaSubject,
-  subjects: readonly QaSubject[],
-  ix: QaGraphProjection = projectQaGraph(s.absPath, qaCorpusAvailability(s.instanceRoot).present),
+export function projectInstanceSubject(s: InstanceSubject, kinds: readonly string[]): QaGraphProjection {
+  if (kinds.includes("qa")) return projectQaGraph(s.absPath, qaCorpusAvailability(s.instanceRoot).present);
+  return projectQaGraph(
+    s.absPath,
+    existsSync(s.absPath),
+    `\`${s.path}\` of ${s.name} is not in this build (it is not committed here, or was not fetched), so it was not counted`,
+  );
+}
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's graph of the kinds
+ * the visualiser covers.
+ *
+ * An instance whose corpus is not in the build says so — unknown, not zero —
+ * instead of counting the few files that happen to be committed.
+ */
+export function instanceSubjectPage(
+  vis: { id: string; title?: string; coversKinds?: readonly string[] },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  ix: QaGraphProjection = projectInstanceSubject(s, vis.coversKinds ?? []),
 ): string {
   const title = vis.title ?? vis.id;
   const others = subjects
@@ -1053,13 +1091,14 @@ export function qaSubjectPage(
         : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
     )
     .join("");
+  const qaFamilies = (vis.coversKinds ?? []).includes("qa");
   return page({
     title: `${s.name} — ${title}`,
     body:
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
-      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's QA results</a></p>` +
-      qaPanelsOf(ix) +
-      `<h2 class="sv-h2">Instances holding QA results</h2>` +
+      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
+      qaPanelsOf(ix, undefined, { qaFamilies }) +
+      `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
   });
 }
@@ -1095,8 +1134,8 @@ const PRIORITY_ORDER = ["critical", "high", "normal", "low", "deferred"];
  */
 export function beansSubjectPage(
   vis: { id: string; title?: string },
-  s: QaSubject,
-  subjects: readonly QaSubject[],
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
   read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
 ): string {
   const title = vis.title ?? "Beans";
@@ -1252,27 +1291,34 @@ for (const g of graphs) {
 // "per-instance pages"). A visualiser declaring `subgraphs: "instance"` gets
 // one page per instance in the checkout holding a directory of a kind it
 // covers, at `<locale>/<harness>/<vis>/<instance>/` — the sub-graph route
-// `viewersOf` resolves a tile to. `qa` and `beans` have per-instance readers;
-// a state graph of another projection has none here, and is refused loudly
-// rather than drawn as an empty page.
+// `viewersOf` resolves a tile to. The kinds in `PER_INSTANCE_KINDS`
+// (self-describing JSON the family reader counts) draw on the shared instance
+// page, and `beans` on its own store reader; any other kind has no
+// per-instance reader here, and is refused loudly rather than drawn as an
+// empty page.
 const subjectOrphans: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const kinds = v.coversKinds ?? [];
-  const render = kinds.includes("qa") ? qaSubjectPage : kinds.includes("beans") ? beansSubjectPage : undefined;
-  if (render === undefined) {
-    console.error(`  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; only \`qa\` and \`beans\` have a per-instance renderer — none drawn`);
+  const beans = kinds.length > 0 && kinds.every((k) => k === "beans");
+  const unread = beans ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  if (kinds.length === 0 || unread.length > 0) {
+    console.error(
+      `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
+        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, "beans"].join(", ")}) — none drawn`,
+    );
     continue;
   }
-  // A directory this visualiser ALSO names by id (\`covers\`) is drawn on its
-  // full view, and \`viewersOf\` opens that view for it: no subject page.
+  // A directory this visualiser ALSO names by id (`covers`) is drawn on its
+  // full view, and `viewersOf` opens that view for it: no subject page.
   const byId = new Set(v.covers ?? []);
-  const subjects = qaSubjectsOf(
+  const subjects = instanceSubjectsOf(
     checkoutDirectories(ROOT).filter((d) => !(d.declaredBy === harnessOf() && byId.has(d.id))),
     kinds,
   );
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
-    emit(join(dir, "index.html"), withRenderedByFrontMatter(render(v, s, subjects), VIEWER_TOOL));
+    const html = beans ? beansSubjectPage(v, s, subjects) : instanceSubjectPage(v, s, subjects);
+    emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   const parent = pageDirOf(v.id);
   const { owned, foreign } = orphanSubjectPages(parent, subjects.map((s) => s.name), carriesMarker(GENERATED_BY));
