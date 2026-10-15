@@ -186,7 +186,30 @@ export function baseDocsDir(repo = REPO): string {
   return base.dir;
 }
 
-export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[] } {
+/**
+ * The directories an instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
+ * cat-harness `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
+ * absolute paths ending in the separator. Read as `check-declared-dirs.ts`
+ * `builtAtPublishDirs` reads them.
+ */
+function builtAtPublishIn(instanceRoot: string): Set<string> {
+  const p = declarationPathIn(instanceRoot);
+  if (p === undefined || !existsSync(p)) return new Set();
+  const decl = JSON.parse(readFileSync(p, "utf-8")) as { builtAtPublish?: Array<{ path?: string }> };
+  return new Set((decl.builtAtPublish ?? []).flatMap((e) => (typeof e.path === "string" && e.path.endsWith("/") ? [resolve(instanceRoot, e.path) + sep] : [])));
+}
+
+/**
+ * The declared docs layers, split three ways: on disk (`layers`); absent
+ * (`missing`, a finding: the `dh4f` shape); and absent but declared BUILT AT
+ * PUBLISH by the instance that declares them (`pending`). A `pending` layer is
+ * correctly absent from a checkout whose build has not run the step that
+ * writes it. That is `derive:publish`'s question, which refuses an entry that
+ * came out empty. It is said and left out, never refused: an IG's own site
+ * build, which makes its pages from the AST, never runs that step
+ * (smart-trust, 2026-10-15).
+ */
+export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[]; pending: DocsLayer[] } {
   const decl = JSON.parse(readFileSync(declarationPathIn(join(repo, "cat-harness"))!, "utf-8")) as {
     directories?: DeclEntry[];
   };
@@ -225,9 +248,13 @@ export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLay
   }
   // Base (instance-scoped) before overlay (repository-scoped): later wins.
   found.sort((a, b) => Number(a.repositoryScoped) - Number(b.repositoryScoped));
+  const atPublish = new Set([...builtAtPublishIn(repo), ...builtAtPublishIn(join(repo, "cat-harness"))]);
+  const absent = found.filter((l) => !existsSync(l.dir));
+  const pending = absent.filter((l) => atPublish.has(resolve(l.dir) + sep));
   return {
     layers: found.filter((l) => existsSync(l.dir)),
-    missing: found.filter((l) => !existsSync(l.dir)),
+    missing: absent.filter((l) => !pending.includes(l)),
+    pending,
   };
 }
 
@@ -661,6 +688,8 @@ export interface ComposeReport {
   readonly layers: DocsLayer[];
   /** Declared layers whose directory does not exist. */
   readonly missing: DocsLayer[];
+  /** Declared layers absent because they are built at publish ({@link docsLayers}). */
+  readonly pending?: DocsLayer[];
   /** `<relative path>` → the layer id that supplied the file finally present. */
   readonly suppliedBy: Record<string, string>;
   /** Paths a later layer shadowed, with both layer ids. */
@@ -841,6 +870,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   if (opts.platformOnly && !opts.shell) throw new Error("compose-docs: platformOnly is a shell's option (--platform-only needs --shell)");
   const declared = docsLayers(repo);
   const missing = declared.missing;
+  const pending = declared.pending;
   const leftOut = opts.platformOnly ? declared.layers.filter((l) => l.repositoryScoped) : [];
   const layers = opts.platformOnly ? declared.layers.filter((l) => !l.repositoryScoped) : declared.layers;
   const withheld = opts.staging === true ? [] : withheldFromCanonical(repo);
@@ -1027,6 +1057,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   return {
     layers,
     missing,
+    pending,
     suppliedBy,
     overrides,
     added,
@@ -1145,6 +1176,9 @@ if (import.meta.main) {
     for (const h of r.scoped.hostProjections) console.log(`  HOST PROJECTION left out: ${h}`);
   }
 
+  for (const m of r.pending ?? []) {
+    console.log(`  built at publish, not built in this build — left out: ${m.id} (${relative(REPO, m.dir)})`);
+  }
   for (const m of r.missing) {
     // A declared layer with no directory is a FINDING, not a skip. It is the
     // `dh4f` shape exactly: the declaration says to look, and there is nothing

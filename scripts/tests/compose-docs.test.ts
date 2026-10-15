@@ -118,6 +118,21 @@ describe("compose-docs reads its layers from the declaration", () => {
     expect(missing.map((l) => l.id)).toEqual(["root-docs"]);
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("a declared layer absent because it is BUILT AT PUBLISH is pending, not missing", () => {
+    // smart-trust, 2026-10-15: docs/ declared built at publish by its pages
+    // step; the IG's own site build never runs it, and was refused for it.
+    const root = fixture({ "a.md": "base" }, {});
+    writeDeclaration(root, JSON.stringify({ name: "checkout", directories: [{ id: "built-docs", path: "built/", graphTypologies: ["docs"] }], builtAtPublish: [{ path: "built/" }] }));
+    const { layers, missing, pending } = docsLayers(root);
+    expect(pending.map((l) => l.id)).toEqual(["built-docs"]);
+    expect(missing).toEqual([]);
+    expect(layers.map((l) => l.id)).not.toContain("built-docs");
+    // Once built, it is an ordinary layer.
+    mkdirSync(join(root, "built"), { recursive: true });
+    expect(docsLayers(root).layers.map((l) => l.id)).toContain("built-docs");
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 
 describe("an EMPTY overlay composes byte-identically — the safety property", () => {
