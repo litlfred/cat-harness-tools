@@ -602,11 +602,24 @@ export function viewersOf(
             ? [at(d.id)]
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
-    const subRef = subs.map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!)).find((r) => existsSync(join(repoRoot, r)));
+    // A sub-graph page counts when it is on disk OR when the declaring harness
+    // builds it at publish (`builtAtPublish`): a page that is deliberately not
+    // committed is not missing, and its writer is named on the tile instead.
+    const subRef = subs
+      .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
+      .find((r) => existsSync(join(repoRoot, r)) || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this instance is not its viewer.
-    const byId = !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
+    //
+    // A directory the visualiser ALSO names by id (`covers`) keeps its full
+    // view when no sub-graph page was drawn for it (bean
+    // `folio-assistant-1nu0`): `beans` draws cat-harness's own repository
+    // store as the full board and every other instance's store as a page of
+    // its own, so the declarer's row must not lose the board it already had.
+    const byId =
+      (v.harness === owner && (v.covers ?? []).includes(d.id)) ||
+      !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
     if (subs.length > 0 && subRef === undefined && !byId) continue;
     const ref = subRef ?? visualiserPageRef(repoRoot, full, site);
     const { id: _id, renderedBy: _by, covers: _c, coversKinds: _k, subgraphs: _s, subgraphUnder: _u, alias: _a, harness: _h, harnessRoot: _r, ...tile } = v;

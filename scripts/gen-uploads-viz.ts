@@ -98,6 +98,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "uploads-viewer";
@@ -383,7 +384,7 @@ const emitPage = makeEmit({ check, onStale: () => { stale++; } });
 
 if (import.meta.main) {
   const repoRoot = checkoutRootFor(ROOT);
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   const g = readLibraryGraph(instanceRootsIn(repoRoot), repoRoot);
   if (g === null) {
     console.log("  · no library graph could be read — nothing to publish");

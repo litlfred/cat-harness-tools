@@ -88,6 +88,28 @@ describe("vocabulary paths", () => {
   });
 });
 
+describe("an instance whose `ns` is a document (D1)", () => {
+  test("its context is built for, and served at, the path beside the vocabulary", () => {
+    put("doc/doc.json", { name: "doc", needs: [], iriBase: "https://example.github.io/doc/", jsonldPrefixes: { skos: "http://www.w3.org/2004/02/skos/core#" } });
+    put("doc/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.github.io/doc/0.1.0/ns", "@type": "skos:ConceptScheme" });
+    const doc = buildOne(root, "doc", opts);
+    expect(doc.kind).toBe("built");
+    if (doc.kind !== "built") return;
+    expect(doc.path).toBe("ns.context.v1.jsonld");
+    expect(doc.url).toBe("https://example.github.io/doc/ns.context.v1.jsonld");
+  });
+
+  test("contextUrl takes the path", () => {
+    expect(contextUrl("https://x.github.io/y/", "ns.context.v1.jsonld")).toBe("https://x.github.io/y/ns.context.v1.jsonld");
+  });
+
+  test("with the context beside it, a vocabulary at `ns` collides with nothing; at the context's own path it does", () => {
+    expect(vocabularyPaths("https://x.github.io/y/ns", "https://x.github.io/y/", "ns.context.v1.jsonld")).toEqual({ paths: ["ns", "ns.jsonld", "ns.json"] });
+    const r = vocabularyPaths("https://x.github.io/y/ns.context.v1", "https://x.github.io/y/", "ns.context.v1.jsonld");
+    expect("problem" in r && r.problem).toContain("where the context is published");
+  });
+});
+
 /** A fake API: answers from `routes` in order, and records every call. */
 function fakeApi(routes: Array<[string, { status: number; json?: unknown }]>) {
   const calls: Array<{ method: string; path: string; body?: unknown }> = [];

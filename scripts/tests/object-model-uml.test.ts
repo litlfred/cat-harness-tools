@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { assertTerms, glossaryLinksMd, schemasViewPuml } from "../gen-object-model-uml.js";
+import { assertTerms, glossaryLinksMd, schemasViewPuml, termPageRoute } from "../gen-object-model-uml.js";
 
 const puml = schemasViewPuml("test");
 const edges = puml.split("\n").filter((l) => /^\w+ (-->|\.\.>|\.\.\|>)/.test(l));
@@ -30,12 +30,20 @@ describe("arrows run from the dependent to the general node", () => {
 describe("every class links to its glossary definition", () => {
   test("in the PlantUML", () => {
     expect(classes.length).toBeGreaterThan(0);
-    expect(classes.filter((l) => !/\[\[\.\.\/\.\.\/\.\.\/glossary\/#[\w-]+\]\]/.test(l))).toEqual([]);
+    // On the owning instance's authored page, which the anchor's first segment names.
+    const linked = classes.map((l) => l.match(/\[\[\.\.\/\.\.\/\.\.\/([\w/-]+)\/authored\/([\w-]+)\/#(([\w-]+?)--[\w-]+)\]\]/));
+    expect(classes.filter((_, i) => !linked[i])).toEqual([]);
+    for (const m of linked) expect(m![2]).toBe(m![4]);
   });
 
   test("and on the page, since the SVG is shown as an image", () => {
     const md = glossaryLinksMd();
     expect(md.match(/\]\(/g)?.length).toBe(classes.length);
+  });
+
+  test("a term's page is its owning instance's authored glossary page", () => {
+    expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/authored\/cat-harness\/$/);
+    expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/authored\/bootstrap\/$/);
   });
 
   test("a class whose term the page lacks is reported, and no page is could-not-determine", () => {
