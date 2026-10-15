@@ -365,6 +365,11 @@ export function page(
     `title: "${title}"`,
     `description: "The Tool nodes ${whose} — how each is installed and invoked, and which skill it satisfies."`,
     GENERATED_FM,
+    // The page is the Tools' own words, and a Tool may describe a Liquid
+    // step in them: an IG layer's build-ig-site named its include tags and
+    // site-data references, and Jekyll failed smart-ra's whole build on the
+    // page (2026-10-15). Nothing here is Liquid, so none is rendered.
+    "render_with_liquid: false",
     "---",
     `<style>${CSS}</style>`,
     "",

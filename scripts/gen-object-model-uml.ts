@@ -40,8 +40,8 @@
  *
  * @module scripts/gen-object-model-uml
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { z } from "zod";
 
@@ -92,6 +92,15 @@ if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find t
 // there; the fallback is the route core declares today, the same one glossary-page.ts uses.
 const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
 const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
+/**
+ * Where a term's entry is: on the page of the instance that owns its scheme,
+ * `<route>/authored/<instance>/` (folio-assistant-core, owner 2026-10-15: the
+ * authored terms left the glossary index for one page per owning instance).
+ * The instance is the anchor's first segment, `<instance>--<scheme>--<id>`.
+ */
+export function termPageRoute(term: string): string {
+  return `${GLOSSARY_ROUTE}/authored/${term.split("--", 1)[0]}/`;
+}
 
 // ── JSON Schema, reduced to what a class box shows ────────────────────────
 
@@ -322,11 +331,25 @@ function assertEdges(classes: ClassDef[], edges: Edge[]): string[] {
   return problems;
 }
 
-/** The `<dt id>` anchors on the rendered glossary page, or null if there is none. */
+/**
+ * The `<dt id>` anchors each at the page it is on — the index and every
+ * instance's authored page — or null if there is no glossary page. An anchor
+ * counts only on the page {@link termPageRoute} links to, so a class cannot
+ * pass on an entry its link does not reach.
+ */
 function glossaryAnchors(): Set<string> | null {
   if (!existsSync(GLOSSARY_PAGE)) return null;
-  const page = readFileSync(GLOSSARY_PAGE, "utf8");
-  return new Set([...page.matchAll(/<dt id="([^"]+)"/g)].map((m) => m[1]));
+  const authored = join(dirname(GLOSSARY_PAGE), "authored");
+  const pages = existsSync(authored)
+    ? readdirSync(authored, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && existsSync(join(authored, e.name, "index.md")))
+        .map((e) => [e.name, readFileSync(join(authored, e.name, "index.md"), "utf8")] as const)
+    : [];
+  return new Set(
+    pages.flatMap(([instance, page]) =>
+      [...page.matchAll(/<dt id="([^"]+)"/g)].map((m) => m[1]!).filter((id) => id.split("--", 1)[0] === instance),
+    ),
+  );
 }
 
 /**
@@ -340,7 +363,7 @@ export function assertTerms(classes: readonly { id: string; term: string }[], an
 
 /** A class's glossary link from the SVG, which sits at `assets/img/uml/`. */
 function termHref(term: string): string {
-  return `../../../glossary/#${term}`;
+  return `../../../${termPageRoute(term)}#${term}`;
 }
 
 /**
@@ -351,7 +374,7 @@ export function glossaryLinksMd(): string {
   const { classes } = build(null);
   const kept = classes.filter((c) => !STATE_CLASSES.has(c.id));
   return "**Definitions:** " + kept
-    .map((c) => `[${c.title}]({{ '/glossary/' | relative_url }}#${c.term})`)
+    .map((c) => `[${c.title}]({{ '/${termPageRoute(c.term)}' | relative_url }}#${c.term})`)
     .join(" · ");
 }
 

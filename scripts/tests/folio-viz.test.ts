@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
+import { folioSubjects, readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
 import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import { FolioGraphProjectionSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
 import { MARKER } from "../folio-mount.ts";
@@ -262,5 +262,31 @@ describe("the 'list' view is the harness's own file list (bean ohx6)", () => {
     expect(html).toContain('<div id="files"></div>');
     expect(html.indexOf('id="files"')).toBeLessThan(html.indexOf('id="nodes"'));
     expect(html).toContain("List view: files");
+  });
+});
+
+describe("per-instance folio pages (bean folio-assistant-1nu0)", () => {
+  const d = (id: string, absPath: string, declaredBy: string, kinds = ["folio"]) => ({ id, absPath, declaredBy, graphTypologies: kinds });
+
+  test("one subject per instance holding a folio directory, the declarer's by-id directory excluded", () => {
+    const subjects = folioSubjects(
+      [
+        d("folio", "/x/cat-harness/folio", "cat-harness"),
+        d("folios", "/x/core/folios", "folio-assistant-core"),
+        d("folio", "/x/who-iris/folio", "who-iris"),
+        d("beans", "/x/who-iris/beans", "who-iris", ["beans"]),
+      ],
+      "cat-harness",
+      ["folio"],
+    );
+    expect(subjects.map((s) => s.name)).toEqual(["folio-assistant-core", "who-iris"]);
+    expect(subjects[0]!.dirs).toEqual(["/x/core/folios"]);
+  });
+
+  test("an instance page names its instance and links back to the full view", () => {
+    const html = viewerHtml("../../../../assets/folio/who-iris/index.json", "who-iris");
+    expect(html).toContain("folio — who-iris");
+    expect(html).toContain('<a href="../">the full view</a>');
+    expect(html).not.toContain("`");
   });
 });

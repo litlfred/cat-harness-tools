@@ -935,6 +935,7 @@ export function previewData(
   log: (s: string) => void,
 ): void {
   git(repo, ["fetch", "-q", "origin", f.base]);
+  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform instance resolved by inPlatform against each instance's root.
   const folio = join("folio", f.instance);
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
