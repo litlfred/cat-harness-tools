@@ -3,7 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, pinGeneratedData, shellFlags } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
+import type { DeclaredArtefact } from "../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
   test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
@@ -165,3 +166,45 @@ describe("pinGeneratedData — the build's data never stays in a mount (litlfred
   });
 });
 
+
+describe("the chrome's publish-time writers run before the chrome is composed (smart-ra avatars.css)", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "bis-chrome-"));
+  const chrome = join(tmp, "cat-harness/site-chrome");
+  const docs = join(tmp, "cat-harness/docs");
+  const entry = (path: string, writer: string, under = chrome): DeclaredArtefact => ({ instance: "cat-harness", abs: join(under, path), path, writer: [writer], because: "checkout" });
+  const css = entry("assets/css/avatars.css", "avatars:css");
+  const page = entry("_data/harness.json", "docs:pages", docs);
+
+  test("an entry inside a chrome layer is the chrome's; one in the site directory is not", () => {
+    expect(chromeArtefacts(tmp, [css, page], [chrome])).toEqual([css]);
+  });
+
+  test("a writer that built its artefact passes, and runs once however many artefacts name it", () => {
+    const calls: string[] = [];
+    const twin = entry("assets/css/other.css", "avatars:css");
+    const r = buildChrome(tmp, [css, twin], (w) => {
+      calls.push(w);
+      mkdirSync(join(chrome, "assets/css"), { recursive: true });
+      writeFileSync(css.abs, ".a{}");
+      writeFileSync(twin.abs, ".b{}");
+      return { kind: "ran" };
+    });
+    expect(calls).toEqual(["avatars:css"]);
+    expect(r.ran).toEqual(["avatars:css"]);
+  });
+
+  test("a writer that fails refuses the build", () => {
+    expect(() => buildChrome(tmp, [css], () => ({ kind: "failed", exit: 1 }))).toThrow(/avatars:css failed/);
+  });
+
+  test("a writer that ran and built nothing refuses the build: the chrome links it", () => {
+    const gone = entry("assets/js/never.js", "never:js");
+    expect(() => buildChrome(tmp, [gone], () => ({ kind: "ran" }))).toThrow(/missing or empty/);
+  });
+
+  test("a writer that does not apply to this root (exit 78) is reported, and its artefacts excused", () => {
+    const na = entry("assets/js/na.js", "na:js");
+    const r = buildChrome(tmp, [na], () => ({ kind: "skipped", why: "no frobnicator here" }));
+    expect(r.skipped.get("na:js")).toBe("no frobnicator here");
+  });
+});

@@ -187,6 +187,26 @@ export function baseDocsDir(repo = REPO): string {
 }
 
 /**
+ * The harness's CHROME layers: its instance-scoped `docs` layers other than
+ * its site directory — `site-chrome/` since slice 1 of the semantic subgraphs,
+ * the theme every shell carries — the same reading {@link baseDocsDir} makes
+ * from the other side. A layer that is declared built at publish and not yet
+ * built (`pending`) is still a chrome layer: it is exactly what a build must
+ * write before it composes.
+ *
+ * The site build reads this to run the publish-time writers whose output
+ * lands in the chrome (`avatars.css`): a folio's site composes the chrome
+ * without ever running `derive:publish`, so a stylesheet the head links was
+ * missing and the link check refused the publish (smart-ra, 2026-10-15).
+ */
+export function chromeLayers(repo = REPO): DocsLayer[] {
+  const harness = join(repo, "cat-harness");
+  const site = existsSync(harness) ? resolve(harness, siteDirFor(harness)) : undefined;
+  const { layers, pending } = docsLayers(repo);
+  return [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site);
+}
+
+/**
  * The directories an instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
  * cat-harness `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
  * absolute paths ending in the separator. Read as `check-declared-dirs.ts`
