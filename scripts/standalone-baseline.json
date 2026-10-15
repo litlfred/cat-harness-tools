@@ -60,7 +60,6 @@
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > .github/actions/lake-cache-restore/action.yml: every lake-cache name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > fhir-harness/scripts/ig-cache.sh: every fhir-ast name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > ig-cache.sh's fallback list is newest first",
-        "scripts/tests/check-context-emission.test.ts > a prefix onto our own namespace is the declaring instance's stub > NS_PREFIXES: every key IS its namespace's stub, and a declared one",
         "scripts/tests/check-document-kind-sources.test.ts > the judgement > a declared graph id passes",
         "scripts/tests/check-document-kind-sources.test.ts > the judgement > the real corpus makes claims, and every one resolves",
         "scripts/tests/check-document-kind-sources.test.ts > what an instance can name > a graph only an instance ABOVE declares is not reachable: fhir-harness cannot name smart-base-findings",

@@ -70,7 +70,7 @@ const docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
 
 /**
  * `sourceDocument` as an ADDRESS, not a path — #1772. It is a link-type term
- * (`@id` in the content context), and `check:context-emission` refuses a file
+ * (`@id` in the content context), and `check:content-keys` refuses a file
  * path there: a reader resolving a relative path against the node's own IRI
  * lands somewhere that is not the file. The asset's `source` is relative to
  * this instance, and may now leave it (`../<instance>/processes/…`, since a

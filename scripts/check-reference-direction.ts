@@ -683,7 +683,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
   { file: "cat-harness/schemas/harness-config.ts", names: 3 },
   { file: "cat-harness/docs/source/fhir-ig-publisher/what-it-cannot-be-asked-for.md", names: 2 },
-  { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
   { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
   { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },

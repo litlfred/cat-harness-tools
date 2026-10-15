@@ -7,9 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { contentDocuments as checkCorpus } from "../check-context-emission.ts";
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, render } from "../gen-instance-contexts.ts";
-import { contentDocuments } from "../lib/jsonld-corpus.ts";
 
 const root = mkdtempSync(join(tmpdir(), "gen-instance-contexts-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -125,12 +123,6 @@ describe("gen-instance-contexts — remote-context terms", () => {
     expect(by("lone").terms).toEqual([]);
     const { problems } = findings(result);
     expect(problems.some((l) => l.startsWith("lone/a.jsonld: term `title`") && l.includes("which lone does not need"))).toBe(true);
-  });
-});
-
-describe("the corpus lives in lib/jsonld-corpus.ts", () => {
-  test("check-context-emission re-exports the same function, so the check can be deleted without the generator noticing", () => {
-    expect(checkCorpus).toBe(contentDocuments);
   });
 });
 

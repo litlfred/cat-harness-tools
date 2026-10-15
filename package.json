@@ -148,7 +148,7 @@
     "check:workflow-submodules": "bun run cat-harness-tools/scripts/check-workflow-submodules.ts",
     "check:code-accounting": "bun run cat-harness-tools/scripts/check-code-accounting.ts",
     "check:command-paths": "bun run cat-harness-tools/scripts/check-command-paths.ts",
-    "check:context-emission": "bun run cat-harness-tools/scripts/check-context-emission.ts",
+    "check:content-keys": "bun run cat-harness-tools/scripts/check-content-keys.ts",
     "check:corpus-gate": "bun run cat-harness-tools/scripts/check-corpus-gate.ts",
     "check:concern-groups": "bun run cat-harness-tools/scripts/check-concern-groups.ts",
     "check:declaration-claims": "bun run cat-harness-tools/scripts/check-declaration-claims.ts",

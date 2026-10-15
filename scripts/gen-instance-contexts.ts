@@ -31,9 +31,8 @@
  *   it comes from cat-harness's `NS_PREFIXES` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
- *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`, the
- *   same corpus `check:context-emission` reads, held apart from that check so
- *   this generator outlives it), each assigned to its innermost instance.
+ *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`), each
+ *   assigned to its innermost instance.
  *   EXCLUDED: a context document under `ns/` (a file whose only key is
  *   `@context`). The emission check counts those, so the published content
  *   context's own CURIE-valued term definitions were counted as documents
@@ -64,9 +63,11 @@
  * the prefix. A prefix met only as a literal string (`leanRef: "qou:QOU.x"`) is
  * REPORTED, never failed on — see `pipeline/jsonld-contexts.ts`.
  *
- * `check:context-emission` and its `FORWARD_DECLARED` stay for now: documents
- * still reference `ns/content/v1.jsonld`. Retiring both is the follow-up once
- * emitters write per-instance context URLs.
+ * The emitters write per-instance context URLs (cat-harness
+ * `atInstanceContext`), so `check:context-emission` and its `FORWARD_DECLARED`
+ * are retired: a context generated from use binds nothing unused, and the
+ * `--check` above fails on anything used and unbound. Its key and path halves
+ * live on in `check-content-keys.ts`.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-instance-contexts.ts
@@ -150,7 +151,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
 
 /**
  * An instance's own namespace, if it has one: `NS_PREFIXES` first (the stub →
- * namespace table `check:context-emission` holds spellings to — it is how
+ * namespace table that holds the stub spellings — it is how
  * `bootstrap` reaches `cat-bootstrap`'s namespace), then the `own-namespaces`
  * code list by code.
  */
