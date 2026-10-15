@@ -35,14 +35,17 @@ function fixture(): { parent: string; checkout: string } {
 
   // The stranger: a sibling clone this build has no business reading. Its
   // declaration is invalid on purpose — reading it throws, so a scan that
-  // reaches it fails loudly instead of passing silently.
+  // reaches it fails loudly instead of passing silently. Its typology is
+  // one NO layer declares: `lake-cache`, the name in the measured failure,
+  // is folio-assistant-sci's kind, so it was invalid only in a checkout
+  // without sci and read as valid in an index that mounts it.
   mkdirSync(join(parent, "aaa-stranger"));
   writeFileSync(
     join(parent, "aaa-stranger", "aaa-stranger.json"),
     json({
       name: "aaa-stranger",
       description: "an unrelated clone beside the checkout",
-      directories: [{ id: "lake-cache", path: "lake-cache/", graphTypologies: ["lake-cache"] }],
+      directories: [{ id: "stranger-cache", path: "stranger-cache/", graphTypologies: ["no-layer-declares-this"] }],
     }),
   );
 
@@ -73,7 +76,7 @@ describe("gen-landing-data for a checkout-root landing", () => {
   test("the stranger's declaration really is invalid (not vacuous)", () => {
     const { parent } = fixture();
     try {
-      expect(() => readDeclaration(join(parent, "aaa-stranger"))).toThrow(/lake-cache/);
+      expect(() => readDeclaration(join(parent, "aaa-stranger"))).toThrow(/no-layer-declares-this/);
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }
