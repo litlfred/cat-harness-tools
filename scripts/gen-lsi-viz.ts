@@ -104,6 +104,8 @@ import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg } from "./lib/site-target.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
@@ -372,7 +374,20 @@ if (import.meta.main) {
     page = renderCommitted();
   }
 
-  if (check) {
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The committed
+  // page was "a function of the tree alone", and the tree is the CHECKOUT:
+  // `proseGraphs` reads every instance the index mounts, so the page moved
+  // with the index's pins rather than with cat-harness's commit. cat-harness
+  // declares the route `builtAtPublish` with this script as its writer, and
+  // `derive:publish` runs it; under `--check` a declared page has no committed
+  // bytes to compare, so it is skipped there (the `folio:viz` rule).
+  const harnessRoot = join(REPO, "cat-harness");
+  const builtHere =
+    SITE === undefined &&
+    isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], relative(harnessRoot, OUT).split("\\").join("/"));
+  if (check && builtHere && !detail) {
+    console.log("lsi viewer: " + relative(REPO, OUT) + " is built at publish (builtAtPublish), not committed — nothing to compare; `bun run cat lsi:viz` writes it");
+  } else if (check) {
     const cur = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
     if (cur !== page) {
       console.error(

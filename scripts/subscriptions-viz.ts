@@ -50,6 +50,7 @@ import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-
 import { instanceRepositories } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
 import { partRecordsIn, snapshotDirOf, type PartView } from "./kg-subscribe.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE = resolve(HARNESS_ROOT);
@@ -257,7 +258,16 @@ if (import.meta.main) {
   const cards = subscriptionCards(REPO);
   const text = render(substrates, cards);
   const rel = relative(REPO, OUT);
-  if (check) {
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page reads
+  // every instance declaration in the checkout (planned repositories,
+  // associated harnesses, subscriptions), so it moved with the index's pins.
+  // The instance declares it `builtAtPublish` with this script as its writer,
+  // and `derive:publish` runs it; under `--check` a declared page has no
+  // committed bytes to compare, so it is skipped there (the `folio:viz` rule).
+  const builtHere = isBuiltAtPublish(readDeclaration(INSTANCE)?.builtAtPublish ?? [], relative(INSTANCE, OUT).split("\\").join("/"));
+  if (check && builtHere) {
+    console.log(`✓ ${rel} is built at publish (builtAtPublish), not committed — nothing to compare; \`bun run cat subscriptions:viz\` writes it`);
+  } else if (check) {
     const current = existsSync(OUT) ? readFileSync(OUT, "utf-8") : "";
     if (current !== text) {
       console.error(`✗ stale: ${rel}. Run \`bun run cat subscriptions:viz\` and commit the result.`);

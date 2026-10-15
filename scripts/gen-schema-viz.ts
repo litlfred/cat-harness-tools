@@ -510,6 +510,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -1552,7 +1553,26 @@ let stale = 0;
  * since 2026-10-07: the pages are themed, so the theme's sidebar is their
  * navigation and there is no rail to inject.
  */
-const emit = makeEmit({ check, onStale: () => { stale++; } });
+const emitOrCheck = makeEmit({ check, onStale: () => { stale++; } });
+/**
+ * BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The projection and
+ * the pages are drawn over the WHOLE checkout (issue #2278): every instance
+ * the index mounts, at its pin. So the committed copies moved with the
+ * index's pins, not with this instance's commit. The instance declares them
+ * `builtAtPublish` with this script as the writer, and `derive:publish` runs
+ * it; under `--check` a declared file has no committed bytes to compare, so it
+ * is skipped there (the `folio:viz` rule) and written otherwise. Asked by the
+ * file's path in the instance's own site, so `--site` asks the same question.
+ */
+let builtSite: string | undefined;
+function builtHere(path: string): boolean {
+  builtSite ??= siteTarget(join(ROOT, siteDirFor(ROOT)));
+  return isBuiltAtPublish(readDeclaration(ROOT)?.builtAtPublish ?? [], join(siteDirFor(ROOT), relative(builtSite, path)).split(sep).join("/"));
+}
+const emit = (path: string, content: string): void => {
+  if (check && builtHere(path)) return;
+  emitOrCheck(path, content);
+};
 
 if (import.meta.main) {
   // The WHOLE checkout, dependencies included (issue #2278). This is a
@@ -1751,6 +1771,9 @@ if (import.meta.main) {
   for (const name of owned) {
     const dir = join(pageDir, name);
     if (check) {
+      // Under a built-at-publish route a stale local page is not a committed
+      // orphan; a write run still prunes it.
+      if (builtHere(join(dir, "index.html"))) continue;
       console.error(`  ✗ ${dir} is an orphan — it serves a subject the declaration no longer describes`);
       stale++;
       continue;
