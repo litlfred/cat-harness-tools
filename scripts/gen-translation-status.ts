@@ -49,7 +49,7 @@
  * tests in this session hardcoding it.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
@@ -60,6 +60,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
 import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -653,11 +654,28 @@ function main(): void {
     : undefined;
   const today = typeof kept === "string" && /^\d{4}-\d{2}-\d{2}$/.test(kept) ? kept : new Date().toISOString().slice(0, 10);
 
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). Both files carry
+  // `instances` — the catalogues of every OTHER instance in the checkout — so
+  // they moved with the index's pins, not with this instance's commit. The
+  // instance declares them `builtAtPublish` with this script as the writer,
+  // and `derive:publish` runs it; under `--check` a declared file has no
+  // committed bytes to compare, so it is skipped there (the `folio:viz` rule).
+  // Asked by the file's path in the instance's own site, so `--site` asks the
+  // same question.
+  const declaredBuilt = readDeclaration(ROOT)?.builtAtPublish ?? [];
+  const builtHere = (p: string): boolean =>
+    isBuiltAtPublish(declaredBuilt, join(siteDirFor(ROOT), relative(site, p)).split(sep).join("/"));
+
   let stale = 0;
+  let built = 0;
   for (const [p, render] of [
     [assetPath, json],
     [pagePath, page],
   ] as const) {
+    if (check && builtHere(p)) {
+      built += 1;
+      continue;
+    }
     const have = existsSync(p) ? readFileSync(p, "utf-8") : null;
     // COMPARED WITHOUT THE DATE, and then written WITH it. Comparing the
     // rendered date would make this gate fail on the calendar: the artefact
@@ -692,6 +710,7 @@ function main(): void {
       (totals.unreadable > 0 ? `, ${totals.unreadable} unreadable` : ""),
   );
 
+  if (check && built > 0) console.log(`  · ${built} file(s) built at publish (builtAtPublish), not committed — nothing to compare`);
   if (check && stale > 0) {
     console.error("Run `bun run cat translation:status` and commit.");
     process.exit(1);

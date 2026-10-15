@@ -392,7 +392,7 @@ function projectionFor(id: string): string | null {
 export function declaredVisualiserFor(
   id: string,
   cov: string | undefined,
-  roots: { site: string; repoRoot: string; pageDir?: string } = { site: SITE, repoRoot: REPO_ROOT },
+  roots: { site: string; repoRoot: string; pageDir?: string; built?: (abs: string) => boolean } = { site: SITE, repoRoot: REPO_ROOT },
 ): Pick<StateGraph, "state" | "declaredVisualiser" | "href"> {
   const { site: SITE, repoRoot: REPO_ROOT } = roots;
   const pageDir = roots.pageDir ?? join(SITE, id);
@@ -400,7 +400,12 @@ export function declaredVisualiserFor(
   // REPO-root relative — see `REPO_ROOT`. This is the line that would silently
   // report all 27 as missing if it used `ROOT`.
   const target = join(REPO_ROOT, cov);
-  if (!existsSync(target)) return { state: "unresolved", declaredVisualiser: cov };
+  // A target the harness BUILDS AT PUBLISH (`built`, its `builtAtPublish`) is
+  // there, not unresolved, though it is not on disk yet: often this very run
+  // writes it, after this page (a per-instance page of the same visualiser).
+  // Asked of the disk alone, a fresh publish drew "not there" on the page and
+  // only a second run said "elsewhere" — the committed copy hid that.
+  if (!existsSync(target) && !(roots.built?.(target) ?? false)) return { state: "unresolved", declaredVisualiser: cov };
   // Linkable only if the target is published BY THIS SITE. Asked of the site
   // directly rather than by inspecting the relative path for leading `..`,
   // which answers the same question by a proxy that a sibling directory named
@@ -447,6 +452,7 @@ function stateGraphsOf(decl: CatHarnessDeclaration, visOf: ReadonlyMap<string, s
             site: SITE,
             repoRoot: REPO_ROOT,
             pageDir: pageDirOf(vis),
+            built: builtAtPublishHere,
           })
         : { state: "live" as const }),
       // The declaration's own words, clipped to its first sentence. Restating
@@ -1116,6 +1122,18 @@ export function instanceHubPage(vis: { id: string; title?: string }, subjects: r
 }
 
 /**
+ * Whether a per-instance visualiser's OWN route gets {@link instanceHubPage}:
+ * when no state dashboard draws it, it has instance pages, and its kinds are
+ * not state — a registry, or `code`. Without it `en/cat-harness/code/` had a
+ * page per instance and none at its own route, which `site-coverage.ts`
+ * refuses (dth-hrh and smart-immunizations, 2026-10-15).
+ */
+export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
+  if (drawnByDashboard || subjects === 0 || kinds.length === 0) return false;
+  return kinds.every((k) => k === "code") || kinds.every((k) => REGISTRY_KINDS.has(k));
+}
+
+/**
  * The kinds that make up ONE bean store: the store (`beans`) and the parts its
  * `beans.json` declares from within — work items, PR addenda and running BPMN
  * instances (bean `folio-assistant-750a`). A visualiser covering any of them
@@ -1690,8 +1708,10 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
-  // state), so its hub is drawn here, listing the instance pages.
-  if (!graphs.some((g) => g.vis === v.id) && subjects.length > 0 && kinds.every((k) => REGISTRY_KINDS.has(k))) {
+  // state, and neither is `code`), so its hub is drawn here, listing the
+  // instance pages. Without it `code/` had a page per instance and none at
+  // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
+  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), subjects.length)) {
     hubs.push(v.id);
     emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }
