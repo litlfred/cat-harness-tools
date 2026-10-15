@@ -209,7 +209,7 @@ describe("a store state:mount does not mount names the Tool that does (bean j9cs
       };
       writeFileSync(join(root, "t.json"), JSON.stringify({ name: "t", directories: [entry] }, null, 2) + "\n");
       expect(delegatedStores(root)).toEqual([
-        { id: "cache", path: "cache/", branch: "p/cache/", keyedBy: "family", tool: "site-build-local", invoke: "cat-harness-tools/scripts/preview-site.sh" },
+        { id: "cache", path: "cache/", branch: "p/cache/", keyedBy: "family", tool: "site-build-local", invoke: "bun run cat preview:site" },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

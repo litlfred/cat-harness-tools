@@ -10,6 +10,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+
 /** `run-script.ts`, beside the scripts that call it. */
 export const RUN_SCRIPT = resolve(import.meta.dir, "..", "run-script.ts");
 
@@ -40,4 +42,25 @@ export function ownsScript(root: string, name: string): boolean {
  */
 export function writerCommand(root: string, writer: string): string[] {
   return ownsScript(root, "cat") ? ["bun", "run", "cat", writer] : ["bun", "run", RUN_SCRIPT, writer];
+}
+
+/**
+ * The command a declaration names, with a script KEY expanded: `bun run cat
+ * <key> [args…]` becomes the command the checkout's script table declares for
+ * `<key>`, with the arguments after it; any other command comes back as it is.
+ * Undefined when the key is declared in no manifest.
+ *
+ * Owner, 2026-10-15 ("J2"): a Tool definition in the harness names the KEY,
+ * and the layer that implements the Tool declares which command implements it
+ * (its `checkoutScripts`), so the definition never names the layer above it.
+ * `bun run cat` resolves the key when the command runs (`run-script.ts`); this
+ * is the same lookup for a reader that needs the command itself — a check that
+ * its path exists, or the `-f <Dockerfile>` of a build line.
+ */
+export function resolveScriptCommand(repoRoot: string, command: string): { key?: string; command: string } | undefined {
+  const m = /^\s*bun run cat ([A-Za-z0-9:_.-]+)(\s.*)?$/.exec(command);
+  if (m === null || /\.(?:m?[jt]s)$/.test(m[1]!)) return { command };
+  const entry = scriptTable(repoRoot).get(m[1]!);
+  if (entry === undefined) return undefined;
+  return { key: m[1]!, command: `${entry.command}${m[2] ?? ""}` };
 }

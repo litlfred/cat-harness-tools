@@ -42,6 +42,7 @@ import { instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } 
 import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { resolveScriptCommand } from "./lib/script-command.ts";
 
 /**
  * THIS INSTANCE'S OWN `schemas` directory, or the convention.
@@ -154,12 +155,21 @@ export function unresolvedPaths(
 
     const shell = typeof inv.shell === "string" ? inv.shell : undefined;
     if (shell !== undefined) {
+      // A script KEY (`bun run cat <key>`, owner ruling J2, 2026-10-15) is
+      // resolved from the checkout's script table first: a key no manifest
+      // declares is a command that does not run, and a declared one is
+      // checked by the path its declared command names.
+      const resolved = resolveScriptCommand(REPO, shell);
+      if (resolved === undefined) {
+        out.push({ field: "invoke.shell", tool: t.id, value: shell, expected: `a checkout script named \`${shell.trim().split(/\s+/)[3]}\` in some instance's checkoutScripts` });
+      }
+      const command = resolved?.command ?? "";
       // `bun run X` where X is a path, or a bare path to a script or workflow.
-      const m = /^(?:bun|bunx) run (?:cat )?([^\s]+)/.exec(shell);
-      const target = m?.[1] ?? (/^[.\w][\w./-]*\.(?:ts|sh|ya?ml)$/.test(shell) ? shell : undefined);
+      const m = /^(?:bun|bunx) run (?:cat )?([^\s]+)/.exec(command);
+      const target = m?.[1] ?? (/^[.\w][\w./-]*\.(?:ts|sh|ya?ml)$/.test(command) ? command : undefined);
       // A `package.json` script name, not a path — `check:tools` and friends.
       if (target !== undefined && /\.(?:ts|sh|ya?ml)$/.test(target) && !existsSync(join(REPO, target))) {
-        out.push({ field: "invoke.shell", tool: t.id, value: shell, expected: `${target} under the repository root` });
+        out.push({ field: "invoke.shell", tool: t.id, value: shell, expected: `${target} under the repository root${resolved?.key ? ` (the command script \`${resolved.key}\` declares)` : ""}` });
       }
     }
 
