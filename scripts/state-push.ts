@@ -60,6 +60,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import {
   locationKey,
   markerFor,
+  mountEmptyingReason,
   mountedIds,
   pendingMountChanges,
   pushMount,
@@ -174,8 +175,11 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
     try {
       if (opts.dryRun) {
         const changes = pendingMountChanges(loc, { repoRoot: root });
+        const emptying = changes === undefined ? undefined : mountEmptyingReason(loc, { repoRoot: root });
         if (changes === undefined) {
           graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
+        } else if (emptying) {
+          graphs.push({ ...base, state: "refused", reason: emptying, changes });
         } else {
           graphs.push({ ...base, state: "would-push", reason: `${changes.length} path(s) would be spliced onto the tip`, changes });
         }
