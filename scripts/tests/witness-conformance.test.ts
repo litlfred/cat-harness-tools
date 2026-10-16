@@ -14,7 +14,7 @@ import {
   ComputationWitnessConformanceSchema as Contract,
   ComputationWitnessSchema as Envelope,
 } from "@litlfred/cat-harness/schemas/computation-witness.ts";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { BASE_GRAPH_TYPOLOGIES, contentLayerInstance, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkWitnesses } from "../witness-conformance.ts";
 
 const CONFORMING = {
@@ -76,9 +76,16 @@ describe("the graph typology", () => {
   it("is registered as derived, with the envelope as its validator", () => {
     // Through the REGISTRY: since bean riit (step 1c) the validator is a
     // `validators/computation-witness.json` node the registry joins on, and
-    // the code entry names none.
-    expect(BASE_GRAPH_TYPOLOGIES["computation-witness"]).toBeDefined();
-    const k = defaultGraphTypologies.get("computation-witness")!;
+    // since folio-assistant#2598 the kind itself is a node in the content
+    // layer's `typologies/` graph, not a code entry here. Without a content
+    // layer composed the kind is absent, and that is the only way it may be.
+    const k = defaultGraphTypologies.get("computation-witness");
+    if (k === undefined) {
+      expect(contentLayerInstance()).toBeUndefined();
+      return;
+    }
+    expect(BASE_GRAPH_TYPOLOGIES["computation-witness"]).toBeUndefined();
+    expect(k.layer).toBe("core");
     expect(k.holds).toBe("derived");
     expect(k.validator).toBe("schemas/computation-witness.ts#ComputationWitnessSchema");
     expect(k.nodeSchemas).toBeUndefined();

@@ -59,6 +59,7 @@ import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
@@ -93,9 +94,15 @@ if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find t
 // Under the page locale since 2026-10-16 (owner, "c"), `en/<harness>/<visualiser>`,
 // like every other visualiser's page; the page is read at its old address too
 // until the site holding it is regenerated, and the link always goes to the new one.
-const CORE_ROOT = resolve(HARNESS, "..", "folio-assistant-core");
-const GLOSSARY_ROUTE = declaredPageRoute(CORE_ROOT, "glossary-page") ?? `${PAGE_LOCALE}/folio-assistant-core/glossary`;
-const GLOSSARY_LEGACY_ROUTE = declaredRoute(CORE_ROOT, "glossary-page") ?? "folio-assistant-core/glossary";
+// The instance that owns the glossary is the one declaring the `core` layer's
+// kinds — `glossary` among them — read from where they were declared, not
+// spelt here (folio-assistant#2598). With no content layer composed there is
+// no glossary page to link, and the bare alias stands in.
+const CONTENT = contentLayerInstance();
+const CORE_ROOT = CONTENT?.root ?? resolve(HARNESS, "..");
+const GLOSSARY_FALLBACK = CONTENT ? `${CONTENT.name}/glossary` : "glossary";
+const GLOSSARY_ROUTE = (CONTENT && declaredPageRoute(CORE_ROOT, "glossary-page")) ?? `${PAGE_LOCALE}/${GLOSSARY_FALLBACK}`;
+const GLOSSARY_LEGACY_ROUTE = (CONTENT && declaredRoute(CORE_ROOT, "glossary-page")) ?? GLOSSARY_FALLBACK;
 const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
 const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(p)) ?? glossaryPageAt(GLOSSARY_ROUTE);
 /**

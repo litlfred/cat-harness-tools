@@ -81,7 +81,8 @@ import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { NS_PREFIXES, propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
@@ -257,7 +258,7 @@ export function graphTypologyId(kindName: string): string {
 
 /** A type IRI with whichever folio namespace it carries removed. */
 export function stripNamespace(iri: string): string {
-  for (const ns of Object.values(NS_PREFIXES)) if (iri.startsWith(ns)) return iri.slice(ns.length);
+  for (const ns of Object.values(ownPrefixTable())) if (iri.startsWith(ns)) return iri.slice(ns.length);
   return iri;
 }
 
@@ -306,7 +307,7 @@ function namingTable(id: string): VocabMapping {
  */
 export function buildContext(): Record<string, unknown> {
   const link = { "@type": "@id" } as const;
-  const prefixes = { ...NS_PREFIXES, prov: PROV, rdfs: RDFS, schema: SCHEMA, xsd: XSD };
+  const prefixes = { ...ownPrefixTable(), prov: PROV, rdfs: RDFS, schema: SCHEMA, xsd: XSD };
   return {
     "@version": 1.1,
     ...prefixes,
@@ -330,7 +331,7 @@ export function buildContext(): Record<string, unknown> {
     // sees the standard property.
     ...contextBindings([namingTable("kg-node-naming"), namingTable("role-naming")], {
       inContext: prefixes,
-      prefixes: { ...STANDARD_PREFIXES, ...NS_PREFIXES },
+      prefixes: { ...STANDARD_PREFIXES, ...ownPrefixTable() },
     }),
     generatedAt: { "@id": `${PROV}generatedAtTime`, "@type": `${XSD}dateTime` },
     // Provenance of the SOURCE, as against provenance of the run above.
@@ -2469,7 +2470,8 @@ function collectGraphTypologies(root: string = ROOT): Node[] {
     return {
       // The individual IS the kind — there is no class per kind (owner,
       // 2026-09-30, bean `3r47`). Its namespace is its layer's: `skills` is
-      // bootstrap's, `voices` core's. `graphTypologyIri` is the one answer, so a
+      // bootstrap's, `voices` the harness's, and a `core` kind the namespace of
+      // the instance that declared it. `graphTypologyIri` is the one answer, so a
       // directory's `holdsGraph` and this node cannot disagree.
       "@id": graphTypologyId(name),
       "@type": termIri("GraphTypology"),
