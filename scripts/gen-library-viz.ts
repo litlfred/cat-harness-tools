@@ -1167,7 +1167,7 @@ export function notHeldHtml(n: { file: string; elsewhere: readonly { label: stri
         .join(" or ")}.`
     : " No public link is recorded for it.";
   return `<section class="lib-view lib-view-absent" id="lib-view">
-<p><strong>${escHtml(n.file)}</strong> is not held on this site (rights).${out}</p>
+<p><strong>${escHtml(n.file)}</strong> is not held on this site.${out}</p>
 </section>`;
 }
 
