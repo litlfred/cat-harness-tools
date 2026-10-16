@@ -619,7 +619,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // cmsl measured five of the mirror ids had already drifted.
   "core-skills": "Content layer ({instance})",
   // The science layer's Lean tooling (folio-assistant#1492): tooling lives in
-  // folio-assistant-sci, never in core. Declared from within sci's `skills/`.
+  // the formal-math (sci) layer, never in core. Declared from within sci's `skills/`.
   "lean-skills": "Science layer: Lean tooling ({instance})",
   "data-skills": "Science layer: reference data ({instance})",
   // `large-datasets` is a package of the harness's `library` group since bean
