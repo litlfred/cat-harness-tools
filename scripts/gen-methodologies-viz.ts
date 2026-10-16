@@ -295,6 +295,8 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
     const rel = posix.relative(posix.dirname(fromPage), path!) || ".";
     parts.push(`[\`${cell(e)}\`](${rel}/#${hash})`);
   } else parts.push(`\`${cell(e)}\``);
+  // The entry's own page: its document, and its held source in the view panel.
+  if (l.entry !== undefined) parts.push(`[view](${posix.relative(posix.dirname(fromPage), l.entry) || "."}/)`);
   if (l.readme !== undefined) parts.push(`[item page](${l.readme})`);
   if (l.source !== undefined) parts.push(`[source](${l.source})`);
   return `- ${parts.join(" · ")}`;

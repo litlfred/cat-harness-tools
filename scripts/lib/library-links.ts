@@ -13,6 +13,11 @@
  * 3. `source` — the document's own record upstream: arXiv or DOI, from the
  *    identifier its manifest records (read as its README reads it). None is
  *    invented for an item without one.
+ * 4. `entry` — the item's OWN page, `<instance page>/<id>/`, where its
+ *    document is drawn and its held source opens in the view panel (owner,
+ *    2026-10-16: *"how do you actually see a methodology linked"* — the
+ *    listing anchor and the README showed neither). Site-relative, like
+ *    `viewer`; only when that page is on disk.
  *
  * Read, never composed: the item from the library projection
  * (`assets/library/index.json`, written by `gen-library-viz.ts`), the viewer
@@ -32,6 +37,7 @@ import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness
 /** The links a library reference resolves to; each absent where it does not. */
 export interface LibraryLinks {
   viewer?: string;
+  entry?: string;
   readme?: string;
   source?: string;
 }
@@ -85,6 +91,7 @@ export function libraryResolver(repo: string, instanceRoot: string): LibraryReso
           // gen-library-viz.ts matches `e.instance + "/" + e.id`), so a bare id
           // would open the page without selecting anything.
           out.viewer = `${relative(base, dir).split(sep).join("/")}/#${encodeURIComponent(`${e.instance}/${e.id}`)}`;
+          if (existsSync(join(dir, e.id, "index.html"))) out.entry = `${relative(base, join(dir, e.id)).split(sep).join("/")}/`;
         }
       }
       const readme = `${e.dir}/README.md`;

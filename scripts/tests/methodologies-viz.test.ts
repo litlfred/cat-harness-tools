@@ -194,6 +194,13 @@ describe("ingested sources link what resolves (qgjh)", () => {
     );
   });
 
+  it("links the entry's own page as [view] when it has one (owner, 2026-10-16)", () => {
+    const withEntry = { links: () => ({ viewer: "cat-harness/library/cat-harness/#k", entry: "cat-harness/library/cat-harness/k/" }) };
+    expect(evidenceLine("library/k", withEntry, "methodologies/index.md")).toBe(
+      "- [`library/k`](../cat-harness/library/cat-harness/#k) · [view](../cat-harness/library/cat-harness/k/)",
+    );
+  });
+
   it("leaves an unknown item, or no resolver, as code", () => {
     expect(evidenceLine("library/unknown", links, "methodologies/index.md")).toBe("- `library/unknown`");
     expect(evidenceLine("library/known-item")).toBe("- `library/known-item`");
