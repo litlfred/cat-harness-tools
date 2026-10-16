@@ -1033,7 +1033,11 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       const harnesses = ownSite
         ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot)
         : instantiatedHarnesses(built, toRoot);
-      const before = readFileSync(file, "utf-8");
+      const read = readFileSync(file, "utf-8");
+      // A Jekyll-laid-out page inside a mount (who-iris's `catalogue/`) wears
+      // the theme's side bar; the rail replaces it here as it does on every
+      // other themed page (`railStandalonePages`), or the page shows both.
+      const before = pageTree !== undefined && hasThemeSidebar(read) ? stripThemeSidebar(read) : read;
       const mark = instanceMark(built, m.name, toRoot);
       const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
@@ -1052,9 +1056,15 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       });
       if (railed === undefined) {
         skipped.push(file.slice(siteAbs.length + 1));
+        // Not railed here, but painted by the site's rule all the same: a page
+        // its generator railed (who-iris's replica pages) reaches this pass
+        // with no first-paint snippet, and the standalone pass never sees a
+        // mount route.
+        const schemed = withSavedScheme(read);
+        if (schemed !== read) writeFileSync(file, schemed);
         continue;
       }
-      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) });
+      const after = withSavedScheme(withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) }));
       // The docs pages' own locale chrome, on a page Jekyll never laid out (#2219).
       writeFileSync(file, m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after);
       injected++;
@@ -1111,7 +1121,10 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
  * and reports a page that merely MENTIONS `.fa-nav-toggle` in prose as railed
  * too, which is what the navbar wireframe does.
  */
-const NAVIGATED = /<nav class="fa-nav"|id="site-nav"/;
+// ELEMENTS, not substrings: a page whose prose quotes `id="site-nav"` in a
+// code span (reference/skill-instructions/rendered-verification) matched the
+// bare attribute, was counted as navigated, and kept its theme side bar.
+const NAVIGATED = /<nav class="fa-nav"|<nav\b[^>]*\bid="site-nav"/;
 
 /** A meta-refresh redirect stub, which {@link railStandalonePages} leaves bare. */
 const REDIRECT = /<meta\s+http-equiv="refresh"/i;
