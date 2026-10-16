@@ -919,7 +919,7 @@ describe("per-instance health and attestations pages (bean folio-assistant-1nu0)
 
 describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
   test("every registry kind draws per instance", () => {
-    for (const k of ["typologies", "validators", "qa-checkers", "block-kinds", "content-adapters", "code-list"]) {
+    for (const k of ["typologies", "validators", "qa-checkers", "block-kinds", "content-adapters", "code-list", "pipeline-plugins", "editor-checkers"]) {
       expect(REGISTRY_KINDS.has(k)).toBe(true);
       expect(PER_INSTANCE_KINDS.has(k)).toBe(true);
     }
@@ -1096,5 +1096,23 @@ describe("per-instance memory pages (the library page's last \"no viewer yet\" r
     const p = perInstanceSubjects({ coversKinds: ["memory"] }, ROOT, readDeclaration(ROOT)?.name ?? "cat-harness");
     expect(p.memory).toBe(true);
     expect(p.unread).toEqual([]);
+  });
+});
+
+describe("pipeline plugins and editor checkers are registries (cat-harness-tools#386)", () => {
+  test("a plugin is listed by its slot and rationale", () => {
+    const root = mkdtempSync(join(tmpdir(), "sv-plug-"));
+    const at = join(root, "pipeline-plugins");
+    mkdirSync(at, { recursive: true });
+    writeFileSync(join(at, "x.json"), JSON.stringify({ $schema: "folio-pipeline-plugin/v1", slot: "site-publisher-ig", rationale: "builds the IG" }));
+    try {
+      const [row] = registryRowsOf(at);
+      expect(row!.id).toBe("site-publisher-ig");
+      expect(row!.text).toBe("builds the IG");
+      expect(drawsInstanceHub(["pipeline-plugins"], false, 1)).toBe(true);
+      expect(drawsInstanceHub(["editor-checkers"], false, 1)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

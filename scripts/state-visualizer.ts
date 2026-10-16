@@ -1030,6 +1030,11 @@ export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
   "block-kinds",
   "content-adapters",
   "code-list",
+  // The pipeline's plugin slots and the editor's checkers: `folio-pipeline-
+  // plugin/v1` and `folio-editor-checker/v1` nodes, one per file
+  // (fhir-harness, folio-assistant-sci; cat-harness-tools#386).
+  "pipeline-plugins",
+  "editor-checkers",
 ]);
 
 /**
@@ -1047,6 +1052,8 @@ export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
   "block-kinds",
   "content-adapters",
   "code-list",
+  "pipeline-plugins",
+  "editor-checkers",
 ]);
 
 /** One registry node, as an instance page lists it. */
@@ -1054,9 +1061,9 @@ export interface RegistryRow {
   /** Path under the declared directory. */
   file: string;
   schema?: string;
-  /** The node's `id`, `name` or `kind`, else the file stem. */
+  /** The node's `id`, `name`, `kind` or `slot`, else the file stem. */
   id: string;
-  /** Its `title`, `label`, `summary` or `description`, clipped. */
+  /** Its `title`, `label`, `summary`, `description` or `rationale`, clipped. */
   text?: string;
   /** Why the file is not listed with its fields. */
   note?: string;
@@ -1078,11 +1085,11 @@ export function registryRowsOf(absPath: string): RegistryRow[] {
       }
       if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return { file, id: stem, note: "not a JSON object" };
       const r = doc as Record<string, unknown>;
-      const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]);
+      const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]) ?? str(r["rationale"]);
       return {
         file,
         ...(str(r["$schema"]) ? { schema: str(r["$schema"]) } : {}),
-        id: str(r["id"]) ?? str(r["name"]) ?? str(r["kind"]) ?? stem,
+        id: str(r["id"]) ?? str(r["name"]) ?? str(r["kind"]) ?? str(r["slot"]) ?? stem,
         ...(text ? { text: text.length > 160 ? `${text.slice(0, 159)}\u2026` : text } : {}),
       };
     });
