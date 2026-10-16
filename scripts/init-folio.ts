@@ -49,7 +49,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { prefixForLayer } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
@@ -888,10 +888,21 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
  * folio's to name. A guessed command would publish a preview built by
  * something the author never chose.
  */
+/**
+ * The layer that builds a document site: the content layer, the instance that
+ * declares the `core` layer's kinds, read from where they were declared rather
+ * than spelt here (folio-assistant#2598).
+ */
+function documentSiteLayer(): string {
+  const c = contentLayerInstance();
+  if (c === undefined) throw new Error("init-folio: a document folio needs the content layer, and none is composed");
+  return c.name;
+}
+
 function stagingWorkflow(assistant: string, contentType: InitFolioOptions["contentType"]): string {
   const on = contentType === "document";
   const build = on
-    ? `bun run ${assistant}/${prefixForLayer("core")}/scripts/build-document-site.ts --out _site`
+    ? `bun run ${assistant}/${documentSiteLayer()}/scripts/build-document-site.ts --out _site`
     : `echo "::error::set build_command in .github/workflows/staging.yml to build this folio''s site" && exit 1`;
   const header = on
     ? `# The site is built by the platform's build-document-site.ts: one page per

@@ -51,12 +51,19 @@ import {
 } from "@litlfred/cat-harness/schemas/detangle.js";
 import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { ownElementPattern, prefixForLayer } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
+
+/** The content layer's schemas, when one is composed: the instance declaring the `core` layer's kinds. */
+function contentLayerScan(): Array<{ path: string }> {
+  const c = contentLayerInstance();
+  return c === undefined ? [] : [{ path: `${c.name}/schemas` }];
+}
 
 /**
  * Directories scanned. The depth at which each names its groups is DERIVED —
@@ -91,8 +98,10 @@ const LITERAL_SCAN: Array<{ path: string }> = [
   // declared-path-literal: the scan list is REPO-relative. The grouping depth it
   // used to pair with each path is now derived (`groupDepthFor`); the PATHS
   // remain literals, which is a separate and still-open concern.
-  // The core term layer's instance, named by the harness's namespace table.
-  { path: `${prefixForLayer("core")}/schemas` },
+  // The content layer's schemas: the instance declaring the `core` layer's
+  // kinds, read from where they were declared (folio-assistant#2598), and
+  // absent when no content layer is composed.
+  ...contentLayerScan(),
   { path: "bootstrap/skills" },
   { path: "bootstrap/processes" },
 ];

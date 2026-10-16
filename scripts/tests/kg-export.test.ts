@@ -40,7 +40,8 @@ import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishe
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
@@ -56,7 +57,7 @@ import { dirname } from "node:path";
  * it would have failed on every bootstrap and core term — which is the test
  * doing its job, not a bug in it.
  */
-const inFolioNs = (iri: string): boolean => Object.values(NS_PREFIXES).some((ns) => iri.startsWith(ns));
+const inFolioNs = (iri: string): boolean => Object.values(ownPrefixTable()).some((ns) => iri.startsWith(ns));
 
 // The repo's own canonicalUrl, so the shared fixture is the CANONICAL export.
 // Using an arbitrary base made it a preview, which (correctly) gave it an
