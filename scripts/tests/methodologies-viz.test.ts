@@ -201,6 +201,14 @@ describe("ingested sources link what resolves (qgjh)", () => {
     );
   });
 
+  it("links each node's extracted method, the body the page does not draw (owner, 2026-10-16)", () => {
+    const row = { name: "m", title: "M", origin: "o", appliesWhen: "a", instance: "cat-harness", evidence: [], state: "cited-only" as const, path: "cat-harness/methodologies/m.md" };
+    const report = { undetermined: false, nodes: 1, invalid: [], unresolved: [], noEvidence: [], untagged: [], resolved: [] };
+    const md = page([row], report, undefined, "", (p) => `https://github.com/o/r/blob/main/${p}`);
+    expect(md).toContain("**The method, as extracted:** [m.md](https://github.com/o/r/blob/main/cat-harness/methodologies/m.md)");
+    expect(page([row], report)).not.toContain("The method, as extracted");
+  });
+
   it("leaves an unknown item, or no resolver, as code", () => {
     expect(evidenceLine("library/unknown", links, "methodologies/index.md")).toBe("- `library/unknown`");
     expect(evidenceLine("library/known-item")).toBe("- `library/known-item`");

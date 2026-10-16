@@ -66,6 +66,9 @@ import {
   type MethodologyNode,
 } from "./check-methodology-evidence.js";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
+import { blobUrl, forgeAt } from "./lib/library-source.ts";
+import { repoOf } from "../src/core/edit-links.ts";
+import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -106,6 +109,8 @@ export interface MethodologyRow {
   readonly instance: string;
   readonly evidence: readonly string[];
   readonly state: "ingested" | "cited-only" | "dangling";
+  /** The node's file, relative to the repository root — where its full method is written. */
+  readonly path?: string;
 }
 
 /**
@@ -176,6 +181,7 @@ export function methodologyRows(
         instance: instanceOf(n.node, instanceRoot, repoRoot),
         evidence: f.evidence ?? [],
         state,
+        path: relative(repoRoot, resolve(instanceRoot, n.node)).split("\\").join("/"),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -302,11 +308,29 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
   return `- ${parts.join(" · ")}`;
 }
 
+/**
+ * Where a node's full method is read: the file on its repository host, through
+ * the same mount-aware `forgeAt` the library's source links use. The page draws
+ * only each node's front matter; the method an agent extracted from the source
+ * is the body (owner, 2026-10-16: *"i thought the methodologies were extracted
+ * into derived content"*), and it was linked from nowhere.
+ */
+export function nodeHrefResolver(repoRoot = REPO): (path: string) => string | undefined {
+  // The checkout's origin, else the harness's declared repository — gen-library-viz's `LINK_REPO` fallback.
+  const d = readDeclaration(INSTANCE_ROOT) as { livesAt?: { repository?: string }; repository?: string } | undefined;
+  const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || d?.livesAt?.repository || d?.repository;
+  return (path) => {
+    const at = forgeAt(repoRoot, path, checkoutRepo);
+    return at ? blobUrl(at) : undefined;
+  };
+}
+
 export function page(
   rows: readonly MethodologyRow[],
   report: EvidenceReport,
   links?: LibraryResolver,
   fromPage = "",
+  nodeHref?: (path: string) => string | undefined,
 ): string {
   const byState = (s: MethodologyRow["state"]): number => rows.filter((r) => r.state === s).length;
   const instances = [...new Set(rows.map((r) => r.instance))].sort();
@@ -384,6 +408,8 @@ export function page(
       `**Origin.** ${cleanOrigin}`,
       "",
     );
+    const full = r.path && nodeHref ? nodeHref(r.path) : undefined;
+    if (full) b.push(`**The method, as extracted:** [${cell(posix.basename(r.path!))}](${full})`, "");
     if (r.evidence.length > 0) {
       b.push(
         r.state === "dangling"
@@ -465,7 +491,7 @@ if (import.meta.main) {
   }
 
   const rendered = withRenderedByFrontMatter(
-    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE),
+    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE, nodeHrefResolver(REPO)),
     VIEWER_TOOL,
   );
   const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
