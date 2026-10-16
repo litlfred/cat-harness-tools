@@ -4,9 +4,11 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { ALLOWED, scan } from "../check-structure-accessor.ts";
+import { ALLOWED, declaredAllowed, GATE, scan } from "../check-structure-accessor.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
@@ -42,7 +44,39 @@ describe("the real corpus", () => {
     expect(r.status).toBe(0);
   });
 
-  test("every allowlist entry carries a reason", () => {
-    for (const [f, why] of Object.entries(ALLOWED)) expect(why.length > 20 ? "" : f).toBe("");
+  test("every allowlist entry carries a reason, the declared ones included", () => {
+    for (const [f, why] of Object.entries({ ...ALLOWED, ...declaredAllowed(REPO) })) expect(why.length > 20 ? "" : f).toBe("");
+  });
+
+  test("this layer's own list names no file of an instance above it", () => {
+    // Item 6b (owner, 2026-10-16): a layer above declares its own entries.
+    for (const f of Object.keys(ALLOWED)) expect(f.startsWith("cat-harness/") ? "" : f).toBe("");
+  });
+});
+
+describe("entries an instance declares for its own files", () => {
+  const made: string[] = [];
+  const corpus = (gateExemptions: unknown): string => {
+    const root = mkdtempSync(join(tmpdir(), "structure-accessor-"));
+    made.push(root);
+    mkdirSync(join(root, "up"), { recursive: true });
+    writeFileSync(join(root, "up", "up.json"), JSON.stringify({ name: "up", version: "0.1.0", needs: [], gateExemptions }));
+    return root;
+  };
+
+  test("are read repo-relative, with their reason, for this gate only", () => {
+    const root = corpus({
+      files: [
+        { gate: GATE, file: "schemas/x.ts", reason: "existence only" },
+        { gate: "check:something-else", file: "schemas/y.ts", reason: "another gate's entry" },
+      ],
+    });
+    expect(declaredAllowed(root)).toEqual({ "up/schemas/x.ts": "existence only" });
+    for (const r of made) rmSync(r, { recursive: true, force: true });
+  });
+
+  test("an instance declaring none contributes none", () => {
+    expect(declaredAllowed(corpus({ scripts: [] }))).toEqual({});
+    for (const r of made) rmSync(r, { recursive: true, force: true });
   });
 });

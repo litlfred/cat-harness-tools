@@ -14,7 +14,8 @@
  * misreads the next — a notebook's cell range taken for pages, or an
  * undeclared variant half-rendered. So the quoted token `"structure.json"` on
  * a CODE line is refused outside the accessor and a short allowlist, each
- * entry carrying its reason. Use `STRUCTURE_FILENAME` and `readStructure`.
+ * entry carrying its reason: {@link ALLOWED} for this layer and below, and
+ * each instance's own `gateExemptions.files` for its files. Use `STRUCTURE_FILENAME` and `readStructure`.
  *
  * ## What it matches, and what it deliberately does not
  *
@@ -35,21 +36,43 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 
-/** Files that may spell the token, and why. Repo-relative. */
+/** This gate's name, as an instance's `gateExemptions.files[].gate` names it. */
+export const GATE = "check:structure-accessor";
+
+/**
+ * Files of THIS layer and below that may spell the token, and why.
+ * Repo-relative. A file of a layer above is not named here: that layer
+ * declares it, in `gateExemptions.files` of its own declaration, and
+ * {@link declaredAllowed} reads it (owner, 2026-10-16, item 6b of the
+ * folio-assistant#2598 wrong-direction triage).
+ */
 // declared-path-literal: these are the allowlist's KEYS — named source files
 // this gate exempts, compared against git's corpus listing, not directories
 // any declaration resolves.
 export const ALLOWED: Readonly<Record<string, string>> = {
   "cat-harness/schemas/document-structure.ts": "the accessor itself: it defines STRUCTURE_FILENAME",
-  "folio-assistant-core/schemas/library-ref.ts":
-    "EXISTENCE only — whether an entry was ingested at all — and it never parses the file",
-  "folio-assistant-core/scripts/check-catalogue.ts":
-    "EXISTENCE only — whether a catalogue item's libraryId was ingested — and it never parses the file",
 };
+
+/**
+ * Every present instance's declared entries for this gate, repo-relative —
+ * `<instance root>/<file>` — with the declared reason.
+ */
+export function declaredAllowed(repo: string = REPO): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const root of instanceRootsIn(repo)) {
+    for (const e of readDeclaration(root)?.gateExemptions?.files ?? []) {
+      if (e.gate !== GATE) continue;
+      out[relative(repo, resolve(root, e.file)).split("\\").join("/")] = e.reason;
+    }
+  }
+  return out;
+}
 
 const TOKEN = /["']structure\.json["']/;
 const COMMENT = /^\s*(\*|\/\/|\/\*)/;
@@ -84,8 +107,9 @@ if (import.meta.main) {
     .map((p) => relative(REPO, p))
     .filter((p) => !p.endsWith(".test.ts") && !p.endsWith(".d.ts") && !p.includes("node_modules/"));
   const hits = scan(files, (f) => readFileSync(resolve(REPO, f), "utf-8"));
-  const unlisted = [...hits.keys()].filter((f) => !(f in ALLOWED));
-  const stale = Object.keys(ALLOWED).filter((f) => !hits.has(f));
+  const allowed = { ...declaredAllowed(), ...ALLOWED };
+  const unlisted = [...hits.keys()].filter((f) => !(f in allowed));
+  const stale = Object.keys(allowed).filter((f) => !hits.has(f));
   for (const f of unlisted) {
     for (const h of hits.get(f)!) console.error(`✗ ${f}:${h.line}  ${h.text}`);
   }
@@ -98,5 +122,5 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  console.log(`✓ structure.json is named only by its accessor and ${Object.keys(ALLOWED).length - 1} reasoned exception(s).`);
+  console.log(`✓ structure.json is named only by its accessor and ${Object.keys(allowed).length - 1} reasoned exception(s).`);
 }
