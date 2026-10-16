@@ -79,16 +79,33 @@ export function darkRules(rules: string): string {
  * just-the-docs its theme-sheet swap finds no `jtd` and does nothing.
  */
 export function withSavedScheme(html: string): string {
+  const script = firstPaintSchemeScript().replace(/^<script\b/i, `<script ${SCHEME_MARK}`);
+  // A snippet THIS function put there earlier — or a page that copied one —
+  // is brought up to the current rule rather than trusted for carrying the
+  // mark: `slices/search.html` shipped the 2026-10-05 rule (the stored choice
+  // and nothing else, so the static dark sheet decided for everyone else) a
+  // day after the rule changed, because the mark alone made this a no-op.
+  if (html.includes(SCHEME_MARK)) {
+    let first = true;
+    const out = html.replace(MARKED, (m) => {
+      if (!first) return "";
+      first = false;
+      return script;
+    });
+    // A mark that is not on a <script> is prose, not a snippet: fall through.
+    if (!first) return out;
+  }
   // A themed page already carries the snippet itself, from head_custom.html.
-  if (html.includes(SCHEME_MARK) || html.includes(firstPaintSchemeScript())) return html;
+  if (html.includes(firstPaintSchemeScript())) return html;
   const head = /<head\b[^>]*>/i.exec(html);
   if (!head) return html;
-  const script = firstPaintSchemeScript().replace(/^<script\b/i, `<script ${SCHEME_MARK}`) + "\n";
   const at = head.index + head[0].length;
-  return html.slice(0, at) + "\n" + script + html.slice(at);
+  return html.slice(0, at) + "\n" + script + "\n" + html.slice(at);
 }
 
 const SCHEME_MARK = `data-folio-saved-scheme`;
+/** A marked snippet, whatever rule it carries. */
+const MARKED = new RegExp(`<script ${SCHEME_MARK}>[\\s\\S]*?</script>`, "g");
 
 /** The markers `head_custom.html` wraps its first-paint block in. */
 export const FIRST_PAINT_BEGIN = "<!-- fa-first-paint:begin -->";

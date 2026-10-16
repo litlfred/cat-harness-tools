@@ -8,6 +8,7 @@ import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../lib/navbar.ts";
 import { elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../lib/site-bar.ts";
 import { railStandalonePages } from "../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../page-layout.ts";
+import { firstPaintSchemeScript } from "../lib/scheme-css.ts";
 
 /**
  * One rail and one top bar on every page — owner, 2026-10-15: "folio rail
@@ -133,6 +134,61 @@ describe("the rail pass with --theme-source: one rail on every page (option A)",
     const again = railStandalonePages(site, "cat-harness", "cat-harness", [], undefined, { themeSource: source });
     expect(again.injected).toBe(0);
     expect(readFileSync(join(site, "guide/install.html"), "utf-8")).toBe(before);
+  });
+});
+
+describe("every railed page is FINISHED: one rail, the current first-paint snippet (2026-10-16)", () => {
+  // Measured on the live root: 56 railed pages without the snippet (the mount
+  // routes, and who-iris's replica pages railed by their own generator), and
+  // two theme pages whose side bar survived beside the rail.
+  const source = mkdtempSync(join(tmpdir(), "finish-src-"));
+  put(source, { "index.md": fm({ title: "Home", nav_order: 1 }) });
+  const site = mkdtempSync(join(tmpdir(), "finish-site-"));
+  const RAIL = `<nav class="fa-nav" aria-label="folio-assistant" data-fa-rail="pending"><a href="../">x</a></nav>`;
+  const MENTION = THEME_PAGE("Verification").replace("<h2 id=\"a\">", `<p><code>&lt;nav&gt;</code> with <code>id="site-nav"</code></p><h2 id="a">`);
+  put(site, {
+    // A skill page whose PROSE names the theme sidebar's id.
+    "reference/verification.html": MENTION,
+    // A theme page under a mount route, railed by the mount pass and not stripped.
+    "who-iris/catalogue/index.html": THEME_PAGE("Catalogue").replace("<body>", `<body>${RAIL}`),
+    // A replica page railed by its own generator, no snippet.
+    "who-iris/item.html": `<!doctype html><html><head><title>r</title></head><body>${RAIL}<p>replica</p></body></html>`,
+    // A page outside the mount routes, railed and still wearing the theme sidebar.
+    "guide/both.html": THEME_PAGE("Both").replace("<body>", `<body>${RAIL}`),
+  });
+  const r = railStandalonePages(site, "cat-harness", "cat-harness", ["who-iris"], undefined, { themeSource: source });
+  const read = (rel: string) => readFileSync(join(site, rel), "utf-8");
+  const SNIPPET = firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme");
+
+  test("a page that only MENTIONS id=\"site-nav\" is railed, its side bar replaced", () => {
+    const html = read("reference/verification.html");
+    expect(hasThemeSidebar(html)).toBe(false);
+    expect(html).not.toContain('<nav aria-label="Main" id="site-nav"');
+    expect(html.match(/<nav class="fa-nav"/g)).toHaveLength(1);
+  });
+  test("a railed page under a mount route loses the theme side bar and gains the snippet", () => {
+    const html = read("who-iris/catalogue/index.html");
+    expect(hasThemeSidebar(html)).toBe(false);
+    expect(html.match(/<nav class="fa-nav"/g)).toHaveLength(1);
+    expect(html).toContain(SNIPPET);
+  });
+  test("a replica page railed by its generator keeps its rail and gains the snippet", () => {
+    const html = read("who-iris/item.html");
+    expect(html).toBe(`<!doctype html><html><head>\n${SNIPPET}\n<title>r</title></head><body>${RAIL}<p>replica</p></body></html>`);
+    expect(r.finished).toBe(2);
+  });
+  test("a railed page outside the mount routes loses the theme side bar", () => {
+    const html = read("guide/both.html");
+    expect(hasThemeSidebar(html)).toBe(false);
+    expect(html.match(/<nav class="fa-nav"/g)).toHaveLength(1);
+    expect(html).toContain(SNIPPET);
+  });
+  test("running it again changes nothing", () => {
+    const before = ["reference/verification.html", "who-iris/catalogue/index.html", "who-iris/item.html", "guide/both.html"].map(read);
+    const again = railStandalonePages(site, "cat-harness", "cat-harness", ["who-iris"], undefined, { themeSource: source });
+    expect(again.injected).toBe(0);
+    expect(again.finished).toBe(0);
+    expect(["reference/verification.html", "who-iris/catalogue/index.html", "who-iris/item.html", "guide/both.html"].map(read)).toEqual(before);
   });
 });
 
