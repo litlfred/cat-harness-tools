@@ -223,7 +223,7 @@ jobs:
           date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/pin/at"
           # The tips of the graphs kept on branches (`cat/<instance>/<graph>`:
           # beans, todos, ...), read ONCE for the run, so both sides mount
-          # each graph at the same commit (`BRANCH_STORE_PIN_FILE`). Read
+          # each graph at the same commit (state-pin.sh). Read
           # live per side, they were minutes apart, and a bean pushed in
           # between was charged to the PR (smart-base#107, run 38884159693).
           # A remote that cannot be read is left out, and mounts live.
@@ -528,22 +528,30 @@ jobs:
         # read them (owner's session 01Pc8v, 2026-10-14: declaration-resolution
         # was red only because neither was done).
         working-directory: fa
-        env:
-          BRANCH_STORE_PIN_FILE: ${{ runner.temp }}/pin/state.json
         run: |
           set -euo pipefail
-          bun -e '
-            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
-            const r = mountState({});
-            console.log(report(r));
-            // Not fatal: both sides mount the same branches at the same
-            // pinned tips (BRANCH_STORE_PIN_FILE), so a graph that
-            // will not mount reads the same on base and head, and the compare
-            // job judges what the PR changed. Dying here judged nothing
-            // (smart-ra#59: issue-marks has no branch on that remote).
-            if (r.state === "failed" || r.state === "partial")
-              console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
-          '
+          # Both sides mount at the tips the pin step read once for the run
+          # (state-pin.sh): GitHub is rewritten to local mirrors of those
+          # commits, for the mount only. The root's origin is put in the
+          # `.git` form the rewrite matches, and put back after.
+          origin="$(git remote get-url origin)"
+          git remote set-url origin "${origin%.git}.git"
+          (
+            eval "$(bash ../ci/.github/scripts/layer-pr-checks/state-pin.sh "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/state-mirror")"
+            bun -e '
+              import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+              const r = mountState({});
+              console.log(report(r));
+              // Not fatal: both sides mount the same branches at the same
+              // pinned tips, so a graph that will not mount reads the same on
+              // base and head, and the compare job judges what the PR
+              // changed. Dying here judged nothing (smart-ra#59: issue-marks
+              // has no branch on that remote).
+              if (r.state === "failed" || r.state === "partial")
+                console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
+            '
+          )
+          git remote set-url origin "$origin"
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi

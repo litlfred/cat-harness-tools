@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { BranchStore, BranchStoreUsageError, MANIFEST_SCHEMA, pinnedTips, type BranchStoreOptions } from "../branch-store.js";
+import { BranchStore, BranchStoreUsageError, MANIFEST_SCHEMA, type BranchStoreOptions } from "../branch-store.js";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const BRANCH = "cat/cat-harness/beans";
@@ -107,34 +107,6 @@ describe("reading", () => {
     const t = s.readTree("beans/defs");
     expect(t.state).toBe("hit");
     if (t.state === "hit") expect([...t.files.keys()].sort()).toEqual(["beans/defs/a.md", "beans/defs/b.md"]);
-  });
-
-  test("a pin file holds every reader at the run's pinned tip, and hides branches pushed after it (smart-base#107)", () => {
-    const f = fixture();
-    const pinned = seeded(f);
-    const file = join(dirname(f.bare), "pins.json");
-    const repo = f.bare.replace(/\.git$/, "").split("/").slice(-2).join("/");
-    writeFileSync(file, JSON.stringify({ [repo]: { [BRANCH]: pinned } }));
-    // The tip moves after the run pinned it, and a new branch appears.
-    const moved = f.seed("next", { "manifest.json": MANIFEST, "beans/defs/a.md": "---\ntitle: A moved\n---\n" });
-    git(f.bare, "update-ref", `refs/heads/${BRANCH}`, moved);
-    f.seed("cat/cat-harness/todos", { "manifest.json": MANIFEST, "todos/x.md": "x" });
-    expect(pinnedTips(f.url, file)).toEqual({ [BRANCH]: pinned });
-    const prev = process.env.BRANCH_STORE_PIN_FILE;
-    process.env.BRANCH_STORE_PIN_FILE = file;
-    try {
-      const r = BranchStore.open(BRANCH, f.container("p")).readFile("beans/defs/a.md");
-      expect(r).toMatchObject({ state: "hit", tip: pinned, text: "---\ntitle: A\n---\n" });
-      expect(BranchStore.open("cat/cat-harness/todos", f.container("p2")).readFile("todos/x.md").state).toBe("miss");
-    } finally {
-      if (prev === undefined) delete process.env.BRANCH_STORE_PIN_FILE;
-      else process.env.BRANCH_STORE_PIN_FILE = prev;
-    }
-    // Unpinned, the same reader sees the live tip.
-    expect(BranchStore.open(BRANCH, f.container("live")).readFile("beans/defs/a.md")).toMatchObject({ state: "hit", tip: moved });
-    // A remote the file does not name, or no file, reads live.
-    expect(pinnedTips("file:///elsewhere/other.git", file)).toBeUndefined();
-    expect(pinnedTips(f.url, undefined)).toBeUndefined();
   });
 
   test("miss: a path not at the tip, and a branch the remote does not have", () => {
