@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 import { mountState } from "../state-mount.js";
 import { pushState, report, unknownArgs } from "../state-push.js";
-import { BRANCH, cleanup, git, PDF, richSeed, stateFixture } from "./state-fixture.js";
+import { BRANCH, cleanup, git, MANIFEST, PDF, richSeed, stateFixture } from "./state-fixture.js";
 
 afterEach(cleanup);
 
@@ -116,6 +116,32 @@ describe("an emptied mount is not pushed as a deletion (bean sp0e)", () => {
 
   test("the flag is understood", () => {
     expect(unknownArgs(["--allow-empty"])).toEqual([]);
+  });
+
+  test("deleting more than 50% of a mount's files without replacement is refused unless --allow-mass-delete is passed (bean 1ple)", () => {
+    const { f, root, push } = mounted({
+      "manifest.json": MANIFEST,
+      "todos/a.md": "A\n",
+      "todos/b.md": "B\n",
+      "todos/c.md": "C\n",
+      "todos/d.md": "D\n",
+    });
+    const before = f.tip();
+    // Delete 3 of 4 files (75%).
+    unlinkSync(join(root, "todos/a.md"));
+    unlinkSync(join(root, "todos/b.md"));
+    unlinkSync(join(root, "todos/c.md"));
+
+    const refused = push();
+    expect(refused.state).not.toBe("pushed");
+    expect(refused.graphs[0]?.state).toBe("refused");
+    expect(report(refused)).toContain("--allow-mass-delete");
+    expect(f.tip()).toBe(before);
+
+    const allowed = push({ allowMassDelete: true });
+    expect(allowed.state).toBe("pushed");
+    expect(f.tip()).not.toBe(before);
+    expect(unknownArgs(["--allow-mass-delete"])).toEqual([]);
   });
 });
 

@@ -169,7 +169,7 @@ function trackedRels(dir: string, repo = REPO): string[] {
     // to consult, so the walk is the answer rather than an error.
     if (!(e instanceof BranchStoreUsageError)) throw e;
   }
-  if (m && resolve(m.into) === resolve(dir)) {
+  if (m && resolve(repo, m.into) === resolve(dir)) {
     return Object.keys(m.files)
       .filter((r) => existsSync(join(dir, r)))
       .sort();

@@ -55,7 +55,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 /** The lock's shape, read structurally — this file may not import the schema (see the header). */
 export interface LockDir {
@@ -135,7 +135,11 @@ export function stateMountedDirs(root: string): string[] {
     if (!n.endsWith(".json")) continue;
     try {
       const m = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; into?: unknown };
-      if (m.$schema === "branch-mount/v1" && typeof m.into === "string") out.push(resolve(m.into));
+      if (m.$schema === "branch-mount/v1" && typeof m.into === "string") {
+        const abs = resolve(root, m.into);
+        const rel = relative(resolve(root), abs);
+        if (rel && !rel.startsWith("..") && !isAbsolute(rel)) out.push(abs);
+      }
     } catch {
       // An unreadable marker skips nothing: the digest then judges those bytes.
     }

@@ -100,7 +100,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -1156,7 +1156,7 @@ export interface MountMarker {
   branchPath?: string;
   /** The repository the branch was read from, when it is not this checkout's `origin` (see {@link TipLocation.repository}). */
   repository?: string;
-  /** The absolute local mount. */
+  /** The checkout-relative local mount path (legacy markers may hold an in-repo absolute path until next mount). */
   into: string;
   /**
    * The tip the files on disk were read at. A push does NOT move it: a push
@@ -1187,6 +1187,28 @@ export type MountResult =
 export type PushResult = WriteResult | { state: "refused"; reason: string };
 
 /**
+ * Resolve a marker's `into` against `repoRoot`, refusing any path that resolves
+ * outside `repoRoot` (or to `repoRoot` itself). Bean `1ple`: a copied checkout
+ * carrying an old absolute marker must never follow `into` back into the
+ * original checkout.
+ */
+export function resolveMarkerInto(
+  repoRoot: string,
+  m: Pick<MountMarker, "id" | "key" | "into">,
+): { ok: true; abs: string; rel: string } | { ok: false; reason: string } {
+  const root = resolve(repoRoot);
+  const abs = resolve(root, m.into);
+  const rel = relative(root, abs).split(sep).join("/");
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    return {
+      ok: false,
+      reason: `marker for ${m.key ?? m.id} points at ${m.into}, outside this checkout (${root})`,
+    };
+  }
+  return { ok: true, abs, rel };
+}
+
+/**
  * The PER-WORKTREE git directory. Not `--git-common-dir`: that one is shared
  * by every linked worktree of a checkout, so two worktrees mounting the same
  * id would overwrite each other's marker, and one could push the other's
@@ -1197,6 +1219,27 @@ function worktreeGitDir(repoRoot: string): string {
   const c = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-dir"], { cwd: repoRoot, encoding: "utf-8" });
   if (c.status !== 0) throw new BranchStoreUsageError(`cannot find the git directory of ${repoRoot}`);
   return c.stdout.trim();
+}
+
+/**
+ * When `repoRoot` is a copied linked worktree whose `.git` file still points at
+ * another existing checkout's git directory, return that other checkout's root.
+ */
+function sharedGitDirOwner(repoRoot: string): string | undefined {
+  const dotGit = join(repoRoot, ".git");
+  if (!existsSync(dotGit) || !lstatSync(dotGit).isFile()) return undefined;
+  const raw = readFileSync(dotGit, "utf-8").trim();
+  if (!raw.startsWith("gitdir:")) return undefined;
+  const gitDir = resolve(repoRoot, raw.replace(/^gitdir:\s*/, ""));
+  const gitdirFile = join(gitDir, "gitdir");
+  let owner: string | undefined;
+  if (existsSync(gitdirFile)) {
+    owner = dirname(resolve(gitDir, readFileSync(gitdirFile, "utf-8").trim()));
+  } else if (gitDir.endsWith(`${sep}.git`)) {
+    owner = dirname(gitDir);
+  }
+  if (owner && existsSync(owner) && realpathSync(owner) !== realpathSync(repoRoot)) return owner;
+  return undefined;
 }
 
 /**
@@ -1278,9 +1321,24 @@ export function mountedIds(repoRoot: string = gitTopLevel()): string[] {
 }
 
 function writeMarker(repoRoot: string, m: MountMarker): void {
+  const resolved = resolveMarkerInto(repoRoot, m);
+  if (!resolved.ok) throw new BranchStoreUsageError(resolved.reason);
   const p = markerPath(repoRoot, m.key ?? m.id);
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+  writeFileSync(p, JSON.stringify({ ...m, into: resolved.rel }, null, 2) + "\n");
+}
+
+/**
+ * Migrate an in-repo absolute `into` on `m` to checkout-relative on disk (bean `1ple`).
+ * Returns `m` with its checkout-relative `into`.
+ */
+export function migrateMarkerInto(repoRoot: string, m: MountMarker): MountMarker {
+  if (!isAbsolute(m.into) || sharedGitDirOwner(repoRoot) !== undefined) return m;
+  const resolved = resolveMarkerInto(repoRoot, m);
+  if (!resolved.ok) return m;
+  const next = { ...m, into: resolved.rel };
+  writeMarker(repoRoot, next);
+  return next;
 }
 
 /**
@@ -1371,14 +1429,17 @@ function localEntry(abs: string): { bytes: Buffer; mode: "100644" | "100755" | "
 
 /** The local edits since the mount: what a push would send. */
 function localChanges(m: MountMarker, repoRoot: string): Change[] {
+  const resolved = resolveMarkerInto(repoRoot, m);
+  if (!resolved.ok) throw new BranchStoreUsageError(resolved.reason);
+  const into = resolved.abs;
   const onBranch = m.branchPath ?? m.path;
-  const local = new Set(walkFiles(m.into));
+  const local = new Set(walkFiles(into));
   const changes: Change[] = [];
   const fresh = [...local].filter((r) => !m.files[r]);
-  const ignored = ignoredByCheckout(repoRoot, m.into, fresh);
+  const ignored = ignoredByCheckout(repoRoot, into, fresh);
   for (const rel of local) {
     if (!m.files[rel] && ignored.has(rel)) continue;
-    const { bytes, mode } = localEntry(join(m.into, rel));
+    const { bytes, mode } = localEntry(join(into, rel));
     const prev = m.files[rel];
     if (prev && prev.blob === gitBlobId(bytes) && prev.mode === mode) continue;
     changes.push({ path: `${onBranch}/${rel}`, content: bytes, expect: prev ? prev.blob : null, mode });
@@ -1425,8 +1486,11 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
   }
   const repoRoot = opts.repoRoot ?? gitTopLevel();
   const into = resolve(repoRoot, opts.into ?? loc.path);
-  const relInto = relative(repoRoot, into);
-  if (!relInto.startsWith("..")) {
+  const relInto = relative(resolve(repoRoot), into).split(sep).join("/");
+  if (relInto === "" || relInto.startsWith("..") || isAbsolute(relInto)) {
+    return { state: "refused", reason: `mount path ${opts.into ?? loc.path} resolves to ${into}, outside repository root ${repoRoot}` };
+  }
+  {
     // input-site: store #6bf16bae — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
     const tracked = spawnSync("git", ["ls-files", "--", relInto || "."], { cwd: repoRoot, encoding: "utf-8" });
     if (tracked.status === 0 && tracked.stdout.trim()) {
@@ -1436,26 +1500,39 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
   const store = BranchStore.open(loc.branch, { repoRoot, ...storeOptionsFor(loc, repoRoot, opts.store) });
   const prior = markerFor(repoRoot, loc);
   // A marker lives in the per-worktree git directory, but a COPY of a linked
-  // worktree shares that directory: its `.git` file names the same one. The
-  // marker then records the other checkout's mount, and re-mounting here
-  // would delete that checkout's files and move its marker away from it — so
-  // a later push from there reads every file as deleted (`emptyingReason`).
-  // Refused while the other mount is still on disk; a checkout that was moved
-  // leaves nothing behind and is re-mounted.
-  if (prior && resolve(prior.into) !== into && existsSync(prior.into)) {
+  // worktree shares that directory: its `.git` file names the same one.
+  const sharedOwner = prior ? sharedGitDirOwner(repoRoot) : undefined;
+  if (prior && sharedOwner !== undefined && existsSync(resolve(sharedOwner, prior.into))) {
     return {
       state: "refused",
       reason:
-        `this worktree's marker for ${loc.id} records its mount at ${prior.into}, not ${into}: another checkout shares this git directory ` +
+        `this worktree's marker for ${loc.id} records its mount in ${sharedOwner}, not ${into}: another checkout shares this git directory ` +
         `(a copied linked worktree). Mounting here would delete that checkout's files; mount from there, or make this checkout its own worktree (\`git worktree add\`)`,
     };
   }
+  let priorAbsInto: string | undefined;
   if (prior) {
+    const resolvedPrior = resolveMarkerInto(repoRoot, prior);
+    if (!resolvedPrior.ok) {
+      return { state: "refused", reason: resolvedPrior.reason };
+    }
+    priorAbsInto = resolvedPrior.abs;
+    if (priorAbsInto !== into && existsSync(priorAbsInto)) {
+      return {
+        state: "refused",
+        reason:
+          `this worktree's marker for ${loc.id} records its mount at ${prior.into}, not ${relInto}: another mount path is still on disk. ` +
+          `Mounting here would delete those files`,
+      };
+    }
     const pending = localChanges(prior, repoRoot);
     // A mount that is GONE — every file deleted, nothing written — holds no
     // edit to lose: re-mounting it is the remedy `emptyingReason` names, so it
     // is not refused as "unpushed changes".
-    if (pending.length && !emptyingReason(prior, pending)) return { state: "refused", reason: `${prior.into} has ${pending.length} unpushed change(s); push or discard them before re-mounting` };
+    if (pending.length && !emptyingReason(prior, pending, repoRoot)) {
+      migrateMarkerInto(repoRoot, prior);
+      return { state: "refused", reason: `${prior.into} has ${pending.length} unpushed change(s); push or discard them before re-mounting` };
+    }
   } else if (existsSync(into)) {
     // Files the checkout itself ignores are local scratch, not a competing
     // copy: `fsh-guts/logs/` is written by the log writer whether or not the
@@ -1469,7 +1546,7 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
   const onBranch = branchPathOf(loc);
   const r = store.readTreeEntries(onBranch);
   if (r.state !== "hit") return r;
-  if (prior) for (const rel of Object.keys(prior.files)) rmSync(join(prior.into, rel), { force: true });
+  if (prior && priorAbsInto) for (const rel of Object.keys(prior.files)) rmSync(join(priorAbsInto, rel), { force: true });
   const unsupported = [...r.files].filter(([, f]) => !["100644", "100755", "120000"].includes(f.mode));
   if (unsupported.length) return { state: "corrupt", reason: `${unsupported[0]![0]} has mode ${unsupported[0]![1].mode}, which a mount cannot hold` };
   const files: MountMarker["files"] = {};
@@ -1496,7 +1573,7 @@ export function mountTip(loc: TipLocation, opts: MountOptions = {}): MountResult
     // Recorded only when the store was really opened on it (no remote override), so a push goes back where the read came from.
     // input-site: store #db8f72f8 — records which remote the branch-store read used; the read itself goes through TreeStore.git(), which is traced
     ...(loc.repository && !opts.store?.remote && !process.env.BRANCH_STORE_REMOTE ? { repository: loc.repository } : {}),
-    into,
+    into: relInto,
     tip: r.tip,
     files,
   });
@@ -1540,11 +1617,12 @@ export function pendingMountChanges(id: string | TipLocation, opts: MountOptions
  * deletion of the graph on the way out. Retiring a graph is a steward act on
  * its branch, not an edit.
  */
-export function emptyingReason(m: MountMarker, changes: readonly Change[]): string | undefined {
+export function emptyingReason(m: MountMarker, changes: readonly Change[], repoRoot?: string): string | undefined {
   const recorded = Object.keys(m.files).length;
   if (recorded === 0 || changes.some((c) => c.content !== null)) return undefined;
   if (changes.length < recorded) return undefined;
-  const why = existsSync(m.into) ? `${m.into} holds no files` : `${m.into} does not exist`;
+  const absInto = repoRoot ? resolve(repoRoot, m.into) : m.into;
+  const why = existsSync(absInto) ? `${m.into} holds no files` : `${m.into} does not exist`;
   return (
     `${why}, so this push would delete all ${recorded} file(s) of ${m.key ?? m.id} on ${m.branch} and leave ` +
     `${m.branchPath ?? m.path} absent there, which every later \`state:mount\` reports as a miss. Nothing was sent. ` +
@@ -1560,7 +1638,31 @@ export function emptyingReason(m: MountMarker, changes: readonly Change[]): stri
 export function mountEmptyingReason(id: string | TipLocation, opts: MountOptions = {}): string | undefined {
   const repoRoot = opts.repoRoot ?? gitTopLevel();
   const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
-  return m ? emptyingReason(m, localChanges(m, repoRoot)) : undefined;
+  return m ? emptyingReason(m, localChanges(m, repoRoot), repoRoot) : undefined;
+}
+
+/**
+ * Why `changes` look like a damaged mount rather than an ordinary edit: more
+ * than half of the mounted tip's files are deleted (bean `1ple`).
+ */
+export function massDeletionReason(m: MountMarker, changes: readonly Change[]): string | undefined {
+  const recorded = Object.keys(m.files).length;
+  if (recorded < 2) return undefined;
+  const deleted = changes.filter((c) => c.content === null).length;
+  const written = changes.filter((c) => c.content !== null).length;
+  if (deleted * 2 <= recorded || (deleted - written) * 2 <= recorded) return undefined;
+  return (
+    `${deleted} of ${recorded} file(s) (>50% of the tip) under ${m.into} are deleted locally; ` +
+    `if the mount is damaged, re-mount it (\`rm -rf ${m.path} && bun run cat state:mount\`), ` +
+    `or pass \`--allow-mass-delete\` to \`state:push\` if deleting ${deleted} file(s) is meant`
+  );
+}
+
+/** {@link massDeletionReason} for a mounted location, or `undefined`. */
+export function mountMassDeletionReason(id: string | TipLocation, opts: MountOptions = {}): string | undefined {
+  const repoRoot = opts.repoRoot ?? gitTopLevel();
+  const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
+  return m ? massDeletionReason(m, localChanges(m, repoRoot)) : undefined;
 }
 
 /**
@@ -1586,7 +1688,10 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
       // By PATH first: an id several instances declare is filed under
       // `<instance>.<id>`, and only the path says which of them this is.
       const m = markerAtPath(repoRoot, repoRelative(repoRoot, d.absPath)) ?? readMarker(repoRoot, id);
-      if (m) return { state: "present", dir: m.into, via: "mount" };
+      if (m) {
+        const resolved = resolveMarkerInto(repoRoot, m);
+        if (resolved.ok) return { state: "present", dir: resolved.abs, via: "mount" };
+      }
       return {
         state: "not-mounted",
         dir,
@@ -1631,11 +1736,13 @@ export function pushMount(id: string | TipLocation, message: string, opts: PushM
   const m = typeof id === "string" ? readMarker(repoRoot, id) : markerFor(repoRoot, id);
   const name = typeof id === "string" ? id : locationKey(id);
   if (!m) return { state: "refused", reason: `${name} is not mounted in ${repoRoot}` };
+  const resolved = resolveMarkerInto(repoRoot, m);
+  if (!resolved.ok) return { state: "refused", reason: resolved.reason };
   // The MARKER says where the mount came from, not the declaration: a mount
   // pushes back to the repository it was read from.
   const changes = localChanges(m, repoRoot);
   if (!changes.length) return { state: "unchanged", reason: `no local edits under ${m.into}`, branch: m.branch, attempts: 0 };
-  const emptying = opts.allowEmpty ? undefined : emptyingReason(m, changes);
+  const emptying = opts.allowEmpty ? undefined : emptyingReason(m, changes, repoRoot);
   if (emptying) return { state: "refused", reason: emptying };
   const store = BranchStore.open(m.branch, { repoRoot, ...storeOptionsFor(m, repoRoot, opts.store) });
   const w = store.write(changes, message);
@@ -1647,7 +1754,7 @@ export function pushMount(id: string | TipLocation, message: string, opts: PushM
       else m.files[rel] = { blob: gitBlobId(Buffer.from(c.content)), mode: c.mode ?? "100644" };
     }
     // `tip` stays the MOUNTED tip: see MountMarker.tip.
-    writeMarker(repoRoot, { ...m, lastPush: w.commit });
+    writeMarker(repoRoot, { ...m, into: resolved.rel, lastPush: w.commit });
   }
   return w;
 }

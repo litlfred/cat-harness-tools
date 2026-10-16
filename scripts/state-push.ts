@@ -61,6 +61,7 @@ import {
   locationKey,
   markerFor,
   mountEmptyingReason,
+  mountMassDeletionReason,
   mountedIds,
   pendingMountChanges,
   pushMount,
@@ -91,6 +92,12 @@ export interface PushOptions {
    * mount that was cleared than a graph someone means to delete (bean `sp0e`).
    */
   allowEmpty?: boolean;
+  /**
+   * Push a graph whose mount has deleted more than half of the mounted tip's
+   * files. Off by default: a mass deletion without replacement is far more
+   * often a damaged mount than a deliberate pruning (bean `1ple`).
+   */
+  allowMassDelete?: boolean;
 }
 
 /**
@@ -182,10 +189,14 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
       if (opts.dryRun) {
         const changes = pendingMountChanges(loc, { repoRoot: root });
         const emptying = changes === undefined || opts.allowEmpty ? undefined : mountEmptyingReason(loc, { repoRoot: root });
+        const massDel =
+          changes === undefined || opts.allowEmpty || opts.allowMassDelete ? undefined : mountMassDeletionReason(loc, { repoRoot: root });
         if (changes === undefined) {
           graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
         } else if (emptying) {
           graphs.push({ ...base, state: "refused", reason: emptying, changes });
+        } else if (massDel) {
+          graphs.push({ ...base, state: "refused", reason: massDel, changes });
         } else {
           graphs.push({ ...base, state: "would-push", reason: `${changes.length} path(s) would be spliced onto the tip`, changes });
         }
@@ -195,6 +206,12 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
       const emptied = changes === undefined || opts.allowEmpty ? undefined : emptiedGraph(root, loc, changes);
       if (emptied !== undefined) {
         graphs.push({ ...base, state: "refused", reason: emptied, changes });
+        continue;
+      }
+      const massDel =
+        changes === undefined || opts.allowEmpty || opts.allowMassDelete ? undefined : mountMassDeletionReason(loc, { repoRoot: root });
+      if (massDel !== undefined) {
+        graphs.push({ ...base, state: "refused", reason: massDel, changes });
         continue;
       }
       const message = opts.message ?? `state: ${loc.id} from its mount`;
@@ -364,7 +381,7 @@ export function report(r: PushResult): string {
 }
 
 /** The flags `state:push` understands; `-m` and `--id` each take one value. */
-const FLAGS = new Set(["--dry-run", "--json", "--allow-empty"]);
+const FLAGS = new Set(["--dry-run", "--json", "--allow-empty", "--allow-mass-delete"]);
 const VALUED = new Set(["-m", "--id"]);
 
 /**
@@ -395,7 +412,7 @@ if (import.meta.main) {
   const bad = unknownArgs(argv);
   if (bad.length > 0) {
     console.error(`state:push: not understood: ${bad.join(", ")}. Nothing was pushed.`);
-    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--allow-empty] [--json]");
+    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--allow-empty] [--allow-mass-delete] [--json]");
     process.exit(2);
   }
   const at = argv.indexOf("-m");
@@ -403,6 +420,7 @@ if (import.meta.main) {
   const r = pushState({
     dryRun: argv.includes("--dry-run"),
     allowEmpty: argv.includes("--allow-empty"),
+    allowMassDelete: argv.includes("--allow-mass-delete"),
     message: at === -1 ? undefined : argv[at + 1],
     id: i === -1 ? undefined : argv[i + 1],
   });
