@@ -36,6 +36,9 @@ import {
   codeSubjectPage,
   listCodeFiles,
   pinnedBlobBase,
+  MEMORY_KINDS,
+  memoryRowsOf,
+  memorySubjectPage,
   drawsInstanceHub,
   perInstanceSubjects,
   VIEWER_TOOL,
@@ -1044,5 +1047,54 @@ describe("drawsInstanceHub: a per-instance visualiser no dashboard draws gets it
     expect(drawsInstanceHub(["code"], true, 3)).toBe(false);
     expect(drawsInstanceHub(["code"], false, 0)).toBe(false);
     expect(drawsInstanceHub(["beans"], false, 2)).toBe(false);
+  });
+});
+
+describe("per-instance memory pages (the library page's last \"no viewer yet\" row)", () => {
+  test("a memory directory's lessons, interaction node and waivers are all listed; absent is null", () => {
+    const root = mkdtempSync(join(tmpdir(), "sv-mem-"));
+    const at = join(root, "memory");
+    mkdirSync(at, { recursive: true });
+    writeFileSync(join(at, "README.md"), "# memory\n");
+    writeFileSync(join(at, "b-lesson.md"), "---\n$schema: folio-memory/v1\nid: b-lesson\nlabel: trap\nsummary: \"Mind {{ this }}\"\n---\nbody\n");
+    writeFileSync(join(at, "a-old.md"), "---\n$schema: folio-memory/v1\nid: a-old\nlabel: stable\nsummary: \"Old\"\narchived: true\n---\n");
+    writeFileSync(join(at, "interaction.json"), JSON.stringify({ $schema: "folio-interaction/v1", id: "interaction", title: "How to ask" }));
+    writeFileSync(join(at, "bad.json"), "{not json");
+    try {
+      const rows = memoryRowsOf(at)!;
+      expect(rows.map((r) => r.file)).toEqual(["a-old.md", "b-lesson.md", "bad.json", "interaction.json"]);
+      expect(rows[0]!.archived).toBe(true);
+      expect(rows[1]!.label).toBe("trap");
+      expect(rows[1]!.text).toBe("Mind {{ this }}");
+      expect(rows[2]!.note).toBe("does not parse as JSON");
+      expect(memoryRowsOf(join(root, "absent"))).toBeNull();
+
+      const [s] = instanceSubjectsOf(
+        [{ id: "memory", path: "memory/", absPath: at, declaredBy: "x", graphTypologies: ["memory", "waiver", "interaction"] }],
+        ["memory"],
+      );
+      const html = memorySubjectPage({ id: "memory", title: "Memory" }, s!, [s!], "https://github.com/o/x/blob/abc/");
+      expect(html).toContain("render_with_liquid: false");
+      expect(html).toContain("2 lessons (1 archived), 2 other nodes");
+      expect(html).toContain('href="https://github.com/o/x/blob/abc/memory/b-lesson.md"');
+      expect(html).toContain("Mind {{ this }}");
+      expect(html).toContain(GENERATED_BY);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an instance whose memory is not in the build says unknown, not empty", () => {
+    const s = { name: "x", path: "memory/", absPath: "/nowhere/memory", instanceRoot: "/nowhere" };
+    const html = memorySubjectPage({ id: "memory" }, s, [s], undefined, null);
+    expect(html).toContain("<strong>unknown</strong>, not empty");
+  });
+
+  test("memory is drawn per instance, with a hub, and is not refused as unread", () => {
+    expect(MEMORY_KINDS.has("memory")).toBe(true);
+    expect(drawsInstanceHub(["memory"], false, 2)).toBe(true);
+    const p = perInstanceSubjects({ coversKinds: ["memory"] }, ROOT, readDeclaration(ROOT)?.name ?? "cat-harness");
+    expect(p.memory).toBe(true);
+    expect(p.unread).toEqual([]);
   });
 });

@@ -145,6 +145,7 @@ import {
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
 import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
@@ -1131,7 +1132,148 @@ export function instanceHubPage(vis: { id: string; title?: string }, subjects: r
  */
 export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
   if (drawnByDashboard || subjects === 0 || kinds.length === 0) return false;
-  return kinds.every((k) => k === "code") || kinds.every((k) => REGISTRY_KINDS.has(k));
+  return kinds.every((k) => k === "code") || kinds.every((k) => REGISTRY_KINDS.has(k)) || kinds.every((k) => MEMORY_KINDS.has(k));
+}
+
+/**
+ * The kinds a declared `memory/` directory holds (`cat-harness.json`): agent
+ * lessons (`folio-memory/v1`, front matter on a `.md`), the `interaction`
+ * node and any `folio-waiver/v1` waivers (JSON), told apart by `$schema`.
+ * `context`, not state, so no dashboard draws them: each instance holding one
+ * gets a page listing its nodes, and the visualiser's route gets the hub.
+ * Until this, memory was the library page's last "no viewer yet" row.
+ */
+export const MEMORY_KINDS: ReadonlySet<string> = new Set(["memory", "waiver", "interaction"]);
+
+/** One node of a memory directory, as its instance page lists it. */
+export interface MemoryRow {
+  /** Path under the declared directory. */
+  file: string;
+  schema?: string;
+  /** The node's `id`, else the file stem. */
+  id: string;
+  /** Its `summary`, `title` or `description`, clipped. */
+  text?: string;
+  /** A lesson's `label` (`stable`, `trap`, `baseline`). */
+  label?: string;
+  archived?: boolean;
+  /** Why the file is not listed with its fields. */
+  note?: string;
+}
+
+/**
+ * Every node under a memory directory, in path order: each `.md` by its front
+ * matter and each `.json` by its fields. A `README.md` is the directory's own
+ * page, not a node. Absent is `null`, which the page says is unknown.
+ */
+export function memoryRowsOf(absPath: string): MemoryRow[] | null {
+  if (!existsSync(absPath)) return null;
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
+  const clip = (t: string | undefined): string | undefined => (t && t.length > 160 ? `${t.slice(0, 159)}\u2026` : t);
+  const files = [
+    ...jsonFilesIn(absPath),
+    ...readdirSync(absPath)
+      .filter((f) => f.endsWith(".md") && f !== "README.md" && !f.startsWith("."))
+      .map((f) => join(absPath, f)),
+  ]
+    .map((p) => relative(absPath, p).split(sep).join("/"))
+    .sort();
+  return files.map((file): MemoryRow => {
+    const stem = basename(file).replace(/\.(md|json)$/, "");
+    let r: Record<string, unknown>;
+    try {
+      const text = readFileSync(join(absPath, file), "utf-8");
+      if (file.endsWith(".md")) {
+        r = parseFrontMatter(text).fm as Record<string, unknown>;
+      } else {
+        const doc: unknown = JSON.parse(text);
+        if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return { file, id: stem, note: "not a JSON object" };
+        r = doc as Record<string, unknown>;
+      }
+    } catch {
+      return { file, id: stem, note: file.endsWith(".md") ? "could not be read" : "does not parse as JSON" };
+    }
+    const text = clip(str(r["summary"]) ?? str(r["title"]) ?? str(r["description"]));
+    const archived = r["archived"] === true || r["archived"] === "true";
+    return {
+      file,
+      ...(str(r["$schema"]) ? { schema: str(r["$schema"]) } : {}),
+      id: str(r["id"]) ?? stem,
+      ...(text ? { text } : {}),
+      ...(str(r["label"]) ? { label: str(r["label"]) } : {}),
+      ...(archived ? { archived: true } : {}),
+    };
+  });
+}
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's memory: every lesson,
+ * the interaction node and any waivers, each linked to its file on GitHub at
+ * the pinned commit when the instance is a pinned mount. Not run through
+ * Liquid, since a lesson's summary is authored text.
+ */
+export function memorySubjectPage(
+  vis: { id: string; title?: string },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  blobBase: string | undefined,
+  rows: MemoryRow[] | null = memoryRowsOf(s.absPath),
+): string {
+  const title = vis.title ?? "Memory";
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  const base = s.path.replace(/^\.\//, "").replace(/\/+$/, "");
+  const href = (f: string): string => {
+    const p = base ? `${base}/${f}` : f;
+    return blobBase ? `${blobBase}${p.split("/").map(encodeURIComponent).join("/")}` : "";
+  };
+  let body: string;
+  if (rows === null) {
+    body =
+      `<h2 class="sv-h2">Not available in this build</h2>` +
+      `<p class="sv-sub"><code>${esc(s.path)}</code> of ${esc(s.name)} is not in this build, so its memory is ` +
+      `<strong>unknown</strong>, not empty.</p>`;
+  } else {
+    const lessons = rows.filter((r) => r.schema === "folio-memory/v1");
+    const archived = lessons.filter((r) => r.archived).length;
+    const tr = rows
+      .map((r) => {
+        const u = href(r.file);
+        const file = u ? `<a href="${esc(u)}"><code>${esc(r.file)}</code></a>` : `<code>${esc(r.file)}</code>`;
+        const status = r.archived ? "archived" : (r.label ?? "");
+        return (
+          `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.note ?? r.text ?? "")}</td><td>${esc(status)}</td>` +
+          `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td>${file}</td></tr>`
+        );
+      })
+      .join("");
+    body =
+      `<p class="sv-sub">${lessons.length} lesson${lessons.length === 1 ? "" : "s"}` +
+      (archived > 0 ? ` (${archived} archived)` : "") +
+      `, ${rows.length - lessons.length} other node${rows.length - lessons.length === 1 ? "" : "s"}. ` +
+      (blobBase ? "Files open on GitHub at the commit this site was built from." : "This instance is not a pinned mount here, so files are listed without links.") +
+      `</p>` +
+      (rows.length === 0
+        ? `<p class="sv-sub">The directory is on disk and holds no node.</p>`
+        : `<h2 class="sv-h2">Nodes — ${rows.length}</h2>` +
+          `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>summary</th><th>label</th><th>$schema</th><th>file</th></tr></thead>` +
+          `<tbody>${tr}</tbody></table></div>`);
+  }
+  return page({
+    title: `${s.name} — ${title}`,
+    noLiquid: true,
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
+      body +
+      `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
 }
 
 /**
@@ -1283,6 +1425,7 @@ export function perInstanceSubjects(
   kinds: readonly string[];
   beans: boolean;
   code: boolean;
+  memory: boolean;
   unread: string[];
   candidates: ReturnType<typeof checkoutDirectories>;
   subjects: InstanceSubject[];
@@ -1291,13 +1434,14 @@ export function perInstanceSubjects(
   const kinds = v.coversKinds ?? [];
   const beans = kinds.includes("beans") && kinds.every((k) => BEAN_STORE_KINDS.has(k));
   const code = kinds.length > 0 && kinds.every((k) => k === "code");
-  const unread = beans || code ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
-  if (kinds.length === 0 || unread.length > 0) return { kinds, beans, code, unread, candidates: [], subjects: [], unrouted: [] };
+  const memory = kinds.length > 0 && kinds.every((k) => MEMORY_KINDS.has(k));
+  const unread = beans || code || memory ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  if (kinds.length === 0 || unread.length > 0) return { kinds, beans, code, memory, unread, candidates: [], subjects: [], unrouted: [] };
   const byId = new Set(beans ? [] : (v.covers ?? []));
   const candidates = checkoutDirectories(root).filter((d) => !(d.declaredBy === harness && byId.has(d.id)));
   const all = instanceSubjectsOf(candidates, beans ? ["beans"] : kinds);
   const routed = (s: InstanceSubject) => ROUTE_SEGMENT.test(s.name);
-  return { kinds, beans, code, unread, candidates, subjects: all.filter(routed), unrouted: all.filter((s) => !routed(s)) };
+  return { kinds, beans, code, memory, unread, candidates, subjects: all.filter(routed), unrouted: all.filter((s) => !routed(s)) };
 }
 
 /**
@@ -1710,11 +1854,11 @@ for (const g of graphs) {
 const subjectOrphans: string[] = [];
 const hubs: string[] = [];
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
-  const { kinds, beans, code, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
+  const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
-        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, ...BEAN_STORE_KINDS, "code"].join(", ")}) — none drawn`,
+        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, ...BEAN_STORE_KINDS, ...MEMORY_KINDS, "code"].join(", ")}) — none drawn`,
     );
     continue;
   }
@@ -1727,7 +1871,9 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
       ? beansSubjectPage(v, s, subjects)
       : code
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
-        : instanceSubjectPage(v, s, subjects);
+        : memory
+          ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
+          : instanceSubjectPage(v, s, subjects);
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
