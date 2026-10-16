@@ -158,7 +158,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "check:code-accounting": TREE_READER,
   "check:command-paths": READ_ONLY,
   "check:concern-groups": TREE_READER,
-  "check:context-emission": READ_ONLY,
+  "check:content-keys": READ_ONLY,
   "check:declaration-claims": TREE_READER,
   "check:declaration-filename": TREE_READER,
   "check:declared-assets": TREE_READER,
