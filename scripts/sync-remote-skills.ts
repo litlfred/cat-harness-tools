@@ -245,7 +245,7 @@ export function syncedPackageDir(skillsDir: string, skill: string): string {
 /**
  * Every skills directory in the checkout that holds a `remote-packages/`
  * directory. A wrapper belongs to the instance whose skills use it — sci holds
- * `claude-scientific-skills`, fhir-harness `smarter-fhir` (placement PR1) — so
+ * `claude-scientific-skills`, the FHIR IG harness `smarter-fhir` (placement PR1) — so
  * a check rooted at the harness alone would read none of them.
  */
 export function wrapperSkillsDirs(instance: string): string[] {

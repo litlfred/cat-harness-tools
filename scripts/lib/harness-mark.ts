@@ -2,7 +2,7 @@
  * A harness's navbar MARK, read one way by every surface that draws it.
  *
  * Bean `2vpn`, owner 2026-10-04: *"who-iris is missing top icon on LHS navbar
- * … all needs to be consistent and consolidated"*. who-iris DECLARED a mark —
+ * … all needs to be consistent and consolidated"*. The IRIS replica DECLARED a mark —
  * its open-book glyph in WHO blue, since the owner removed its emblem on
  * 2026-09-23 — and the header drew the letter "W" on every page anyway. Two
  * defects composed:

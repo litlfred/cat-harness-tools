@@ -9,7 +9,7 @@
  * graph-typologies:          # the kinds of graph it governs, wherever they are
  *   - voices
  * governs:              # one directory, <instance>/<id>, where the kind is too general
- *   - smart-trust/smart-trust-docs
+ *   - <instance>/<instance>-docs
  * ```
  *
  * `graph-typologies:` already existed (B3) and is the normal form: a skill that
@@ -18,10 +18,10 @@
  * where listing the generic kind would claim every directory of it (measured
  * 2026-09-24: 5 directories, each of kind `docs`, `tools` or `skills` alone).
  * Instance-qualified because a directory id is unique only within its
- * instance: `smart-base` and `cat-harness` each declare one called `tools`.
+ * instance: the DAK base layer and `cat-harness` each declare one called `tools`.
  *
  * A kind claim reaches only the skill's own instance and the instances that
- * DEPEND on it: `fhir-harness`'s `ig-build-pipeline` governs fhir-harness's
+ * DEPEND on it: the FHIR IG harness's `ig-build-pipeline` governs that harness's
  * tools and never `cat-harness`'s, which does not depend on it.
  *
  * @module scripts/skill-governance

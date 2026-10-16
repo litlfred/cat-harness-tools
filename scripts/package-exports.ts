@@ -8,7 +8,7 @@
  *
  * ## Why
  *
- * `folio-assistant-core` reached into this layer through 146 relative imports
+ * The content core reached into this layer through 146 relative imports
  * (`../../cat-harness-tools/src/core/rbac.js`), and could not import it by
  * package name because `package.json` `exports` listed ten hand-picked files.
  * A hand list is a second answer to "what may another layer import", and it

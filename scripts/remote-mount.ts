@@ -156,7 +156,7 @@ function holdStateMounts(checkout: string, target: string): { restore: () => voi
  * rightly declines to install inside one, because the root's own `bun install`
  * provides it. Deleting it therefore left the member with no dependencies of
  * its own until the root was installed again: a nested devDependency the
- * member pins (folio-assistant-sci's `katex@0.18.10`, beside the root's 0.16)
+ * member pins (the formal-math layer's `katex@0.18.10`, beside the root's 0.16)
  * then resolved to the root's copy, which is how `crepe-latex.test.ts` failed
  * its version guard on CI after `state:mount` re-laid the mount.
  */

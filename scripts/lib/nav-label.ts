@@ -151,7 +151,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
  *
  * Stage C of #1767 made each ingested IG's generated landing declare itself
  * the `fhir-artifact-index` viewer (`rendered-by: ig-pages`), so that kind's
- * row opened `/smart-base/` — the page the harness row already opens as
+ * row opened the DAK base layer's root — the page the harness row already opens as
  * "SMART Base". One page was then "SMART Base" on the harness row and "FHIR
  * artefact index" one row below it, on the sidebar, the landing and the rail.
  * The harness name wins because the page is the instance's front door first:

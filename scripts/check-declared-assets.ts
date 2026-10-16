@@ -54,11 +54,11 @@ import { declaredAssets, instanceRootsIn } from "@litlfred/cat-harness/schemas/c
  * (bean `6tkl`).
  *
  * **How far it had drifted, measured 2026-09-20 while adding the sixth
- * instance** (`folio-assistant-sci`, bean `frs5`): the list still said two while
- * `folio-assist-core`, `who-iris`, `detangle`, `kg-navigation` and
+ * instance** (the formal-math layer, bean `frs5`): the list still said two while
+ * `folio-assist-core`, the IRIS replica, `detangle`, `kg-navigation` and
  * `large-datasets` had all arrived. Five instances the gate had never opened,
  * reported in the same words as a clean run — and the README declared by
- * `folio-assistant-sci`'s brand-new `harness.json` would have been the sixth.
+ * the formal-math layer's brand-new `harness.json` would have been the sixth.
  * Widening it immediately found a dead link the list had been hiding.
  */
 export function declaredInstances(repoRoot: string): string[] {

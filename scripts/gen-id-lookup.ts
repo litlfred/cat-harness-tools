@@ -34,7 +34,7 @@
  * catalogue no longer references.
  *
  * Usage:
- *   bun run cat id-lookup                    # write every hosted index (who-iris/id-lookup/ today)
+ *   bun run cat id-lookup                    # write every hosted index (one library's id-lookup/ today)
  *   bun run cat id-lookup:check              # fail if any is stale
  *   bun run cat id-lookup -- --source <name> # one instance's only
  */
@@ -52,7 +52,7 @@ const REPO = resolve(TOOLS, "..");
  * lookup (D3: an instance hosts its own generated outputs; bean `j7ql`).
  *
  * Found by id rather than by instance name, so this generator names no corpus:
- * it named `"who-iris"` as a constant until 2026-10-01, which was an upward
+ * it named the IRIS replica's instance as a constant until 2026-10-01, which was an upward
  * name from the layer below every catalogue. Overrides match on id, never on
  * path, so an id is the stable handle a relocation keeps.
  */

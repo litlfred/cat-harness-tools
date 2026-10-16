@@ -5,7 +5,7 @@
  * @module scripts/lib/graph-typology-nav
  *
  * Bean `yag0`, folded into `v8n5` by the owner's ruling of 2026-09-30. On
- * 2026-09-23 the owner clicked who-iris's `docs` row meaning `library`. The two
+ * 2026-09-23 the owner clicked the IRIS replica's `docs` row meaning `library`. The two
  * rows sat adjacent, each a ONE-LETTER glyph (`D`, `L` — the kind's initial)
  * beside a bare kind word, and at rest the strip shows the glyphs only. The
  * initial is not even distinct across kinds: `catalogue` and `code` were both
@@ -20,7 +20,7 @@
  *     rows differ in shape AND colour;
  *   - a **full accessible name** — the kind word, then the head of the kind's
  *     own `summary` from the graph-typology registry and the instance it belongs
- *     to (`library — L1 source content, who-iris`). The kind word stays the
+ *     to (`library — L1 source content, <instance>`). The kind word stays the
  *     visible label, so the accessible name CONTAINS the visible one (WCAG SC
  *     2.5.3), and the words still carry the meaning without the colour (SC
  *     1.4.1, the `j66n` rule: a hue never removes the second channel).

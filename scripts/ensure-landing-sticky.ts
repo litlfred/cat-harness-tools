@@ -381,14 +381,14 @@ export function contributingRoots(root: string): string[] {
   //
   // The walk above finds a layer only when THIS instance declares a directory
   // inside it — which is how `bootstrap/` is found, since cat-harness declares
-  // `bootstrap/skills/`. `folio-assistant-core/` is declared by nobody: it is a
+  // `bootstrap/skills/`. The content core's directory is declared by nobody: it is a
   // sibling directory that declares itself, and under the rule everywhere else
   // here — an instance is a directory holding its own `harness.json` — it is an
   // instance the moment it exists.
   //
   // Without this, adding a layer meant ALSO editing the layer above to mention
   // it, which is the ownership inversion the whole contribution design undoes.
-  // Measured: `folio-assistant-core/` declared its card and the board did not show
+  // Measured: the content core declared its card and the board did not show
   // it.
   // GUARDED ON `.git`, and the guard is not belt-and-braces — without it this
   // scan is actively wrong. `repoRootFor` is just `instanceRoot/..`, so for a
@@ -759,7 +759,7 @@ if (import.meta.main) {
   // separated instance's own repository, this script sits in the REMOTE-MOUNTED
   // cat-harness, so its own root is the mount: the mounted layers were then not
   // recognised as mounts and were written into, and the instance actually being
-  // composed — who-iris — never had its `folio` graph declared.
+  // composed — the IRIS replica — never had its `folio` graph declared.
   const positional = process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !["--begin", "--complete"].includes(all[i - 1] ?? ""));
   const root = positional === undefined ? HARNESS_ROOT : resolve(positional);
   if (positional !== undefined && declarationPathIn(root) === undefined) {

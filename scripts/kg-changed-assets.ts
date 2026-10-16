@@ -27,7 +27,7 @@
  *   could not be read. Could-not-determine is never "nothing changed": an
  *   empty `changedAssets` means the graphs were compared and agree.
  *
- * An instance that declares its own `canonicalUrl` (smart-base, fhir-harness)
+ * An instance that declares its own `canonicalUrl` (the DAK base layer, the FHIR IG harness)
  * is exported with no `--base-url` (`instance-exports.ts`), so its staged
  * document is not a preview and is skipped, said in the log: it has no
  * staging identity to link a node to.

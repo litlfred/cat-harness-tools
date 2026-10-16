@@ -97,7 +97,7 @@ export interface MethodologyRow {
   readonly origin: string;
   readonly appliesWhen: string;
   /**
-   * WHICH instance declared it — `cat-harness`, `smart-base`, `folio-assistant-core`.
+   * WHICH instance declared it — `cat-harness`, or a layer above it such as a DAK base layer.
    *
    * The graph spans all three, and a page that did not say which would make
    * `grade` read as this instance's own adoption when it is the WHO material's.
@@ -113,7 +113,7 @@ export interface MethodologyRow {
  *
  * RESOLVED, not split. `methodologyNodes` spells every path relative to the
  * INSTANCE root, so a sibling instance's node arrives as
- * `../smart-base/methodologies/diig.md` — and taking the first segment of that
+ * `../<instance>/methodologies/diig.md` — and taking the first segment of that
  * gives `..`, which is what the first version of this page printed in the
  * "declared by" column for two of its nine rows, and what made its instance
  * count say 2 where the graph spans 3. Found by reading the rendered page, not

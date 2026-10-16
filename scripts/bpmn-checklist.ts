@@ -31,14 +31,14 @@
  *
  * - Not one directory for every instance's diagrams. That was the default
  *   (`cat-harness/docs/assets/workflows/checklists`), and nothing had ever
- *   been written there. Committed, it would hold folio-assistant-core's,
- *   smart-base's and sci's diagrams inside cat-harness: 33 new wrong-direction
+ *   been written there. Committed, it would hold the content core's, the
+ *   DAK base layer's and sci's diagrams inside cat-harness: 33 new wrong-direction
  *   references in 27 files (measured with `check:reference-direction`), and a
  *   red check in cat-harness whenever a layer above it edits a diagram. That
  *   is the B1 defect, a commit that cannot hold an artefact current.
  * - Beside the diagram, not in the owner's site directory. A diagram's
  *   directory is mounted wherever the diagram is, by construction. A site
- *   directory is not always: smart-base's `docs/` is built from the mount and
+ *   directory is not always: the DAK base layer's `docs/` is built from the mount and
  *   never committed.
  * - **Except below the harness.** bootstrap and bootstrap-tools must not refer
  *   to a harness, and a checklist names `workflow_complete` and this

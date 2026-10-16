@@ -8,7 +8,7 @@
  * Bean `p11x`: `check:partition` is rooted at ONE instance, `check:instance-graph`
  * judges declarations and never imports, and `kg:detangle:direction` reaches only
  * the directories in its `SCAN` list — which omitted `cat-harness/adapters/`, so
- * the two `intake-records` imports into `folio-assistant-core` sat under three
+ * the two `intake-records` imports into the content core sat under three
  * green checks until #1687 moved the file. `bf5l`'s sentence stands: *"three
  * green checks did not mean the layering held."* `check:reference-direction`
  * is the PROSE axis (a name mentioned), not this one (a module loaded).
@@ -39,7 +39,7 @@
  *   2026-10-14 every bare specifier was skipped, so an import written by
  *   package name crossed layers unseen; bean `7pvn` rewrites core's 260
  *   cross-layer imports that way, and they must stay graded.
- * - **Module-path literals**: a string such as `"../folio-assistant-sci/adapters/paper/index.ts"`
+ * - **Module-path literals**: a string such as `"../<layer>/adapters/paper/index.ts"`
  *   handed to a VARIABLE `import(abs)`. `src/builtin-adapters.ts` was exactly
  *   that until this change, and its own docblock said *"the one edge no
  *   static-import gate here can see"*. A literal that climbs out with `../` and
