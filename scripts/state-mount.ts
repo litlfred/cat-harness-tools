@@ -96,7 +96,20 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { locationKey, mountEmptyingReason, mountTip, namespaceCarried, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
+import {
+  locationKey,
+  markerFor,
+  migrateMarkerInto,
+  mountEmptyingReason,
+  mountMassDeletionReason,
+  mountTip,
+  namespaceCarried,
+  pendingMountChanges,
+  resolveMarkerInto,
+  tipLocations,
+  type BranchStoreOptions,
+  type TipLocation,
+} from "./branch-store.js";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
@@ -134,7 +147,8 @@ interface GraphMountBase {
  */
 export type GraphMount =
   | (GraphMountBase & { state: "mounted"; tip: string; files?: number })
-  | (GraphMountBase & { state: "stale" | "refused" | "miss" | "corrupt" | "unknown" })
+  | (GraphMountBase & { state: "stale"; damaged?: boolean })
+  | (GraphMountBase & { state: "refused" | "miss" | "corrupt" | "unknown" })
   /**
    * A checkout-level (`scope: "repository"`) graph that a mounted instance
    * declares, that the root does not declare, and whose branch the root's
@@ -294,10 +308,19 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
       // layer is re-laid over it — is no one's work: it is re-mounted, never
       // reported as edits to push. Pushing it emptied five graphs on
       // 2026-10-15 and broke every later mount (`emptyingReason`).
-      const pending = pendingMountChanges(loc, { repoRoot: root });
-      if (pending !== undefined && pending.length > 0 && mountEmptyingReason(loc, { repoRoot: root }) === undefined) {
-        graphs.push({ ...base, state: "stale", reason: `${pending.length} unpushed change(s) left untouched; push them with \`bun run cat state:push\`` });
-        continue;
+      const prior = markerFor(root, loc);
+      if (prior && resolveMarkerInto(root, prior).ok) {
+        migrateMarkerInto(root, prior);
+        const pending = pendingMountChanges(loc, { repoRoot: root });
+        if (pending !== undefined && pending.length > 0 && mountEmptyingReason(loc, { repoRoot: root }) === undefined) {
+          const mass = mountMassDeletionReason(loc, { repoRoot: root });
+          if (mass !== undefined) {
+            graphs.push({ ...base, state: "stale", damaged: true, reason: `damaged? ${mass}` });
+          } else {
+            graphs.push({ ...base, state: "stale", reason: `${pending.length} unpushed change(s) left untouched; push them with \`bun run cat state:push\`` });
+          }
+          continue;
+        }
       }
       const r = mountTip(loc, { repoRoot: root, store });
       if (r.state === "mounted") {
@@ -353,7 +376,16 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
 function graphTable(graphs: GraphMount[]): string[] {
   const L = ["| graph | branch | path | state | detail |", "|---|---|---|---|---|"];
   for (const g of graphs) {
-    const mark = g.state === "mounted" ? "mounted" : g.state === "stale" ? "⚠️ stale" : g.state === "absent" ? "absent" : `🛑 ${g.state}`;
+    const mark =
+      g.state === "mounted"
+        ? "mounted"
+        : g.state === "stale"
+          ? g.damaged
+            ? "⚠️ damaged?"
+            : "⚠️ stale"
+          : g.state === "absent"
+            ? "absent"
+            : `🛑 ${g.state}`;
     L.push(`| \`${g.id}\` | \`${g.branch}\` | \`${g.path}\` | ${mark} | ${g.reason} |`);
   }
   return L;
@@ -367,7 +399,8 @@ export function report(r: MountResult): string {
   }
   const present = r.graphs.filter(isPresent);
   const failed = r.graphs.filter((g) => !isSettled(g));
-  const stale = r.graphs.filter((g) => g.state === "stale");
+  const stale = r.graphs.filter((g) => g.state === "stale" && !g.damaged);
+  const damaged = r.graphs.filter((g) => g.state === "stale" && g.damaged);
   const absent = r.graphs.filter((g) => g.state === "absent");
   if (r.graphs.length > 0 && failed.length === 0) {
     L.push(`Mounted ${present.length} declared graph(s), each from its own branch at its own declared path.`, "");
@@ -378,6 +411,9 @@ export function report(r: MountResult): string {
           `and not on this checkout's remote. Not a failure; declare it at the root to keep it here.`,
         "",
       );
+    }
+    if (damaged.length) {
+      L.push(`⚠️ ${damaged.map((g) => `\`${g.id}\``).join(", ")} look damaged? (>50% of files deleted locally) and were left untouched — do not push without \`--allow-mass-delete\`.`, "");
     }
     if (stale.length) {
       L.push(`⚠️ ${stale.map((g) => `\`${g.id}\``).join(", ")} hold unpushed edits and were left untouched. Nothing was discarded.`, "");

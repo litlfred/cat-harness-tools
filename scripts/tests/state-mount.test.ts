@@ -263,3 +263,28 @@ describe("a successful mount is ignored by the checkout", () => {
     expect(() => withStateIgnoreBlock(`${STATE_IGNORE_BEGIN}\n/x/**\n`, [{ path: "todos" }])).toThrow(/unpaired/);
   });
 });
+
+describe("checkout-relative markers and damaged mounts (bean 1ple)", () => {
+  test("a mount missing >50% of its recorded files is reported as damaged? rather than unpushed change(s)", () => {
+    const seed = {
+      "manifest.json": MANIFEST,
+      "todos/a.md": "A\n",
+      "todos/b.md": "B\n",
+      "todos/c.md": "C\n",
+      "todos/d.md": "D\n",
+    };
+    const { root, store } = stateFixture("state-mount-t-", seed).checkout("a");
+    expect(mountState({ repoRoot: root, store }).state).toBe("mounted");
+    rmSync(join(root, "todos/a.md"));
+    rmSync(join(root, "todos/b.md"));
+    rmSync(join(root, "todos/c.md"));
+
+    const r = mountState({ repoRoot: root, store });
+    expect(r.graphs[0]?.state).toBe("stale");
+    expect(r.graphs[0]?.damaged).toBe(true);
+    const text = report(r);
+    expect(text).toContain("damaged?");
+    expect(text).not.toContain("push them with `bun run cat state:push`");
+    expect(text).toContain("--allow-mass-delete");
+  });
+});

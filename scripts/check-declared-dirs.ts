@@ -237,6 +237,7 @@ export function tipPresence(
     };
   }
   let marker;
+  let markerRoot = repoRoot;
   try {
     // By PATH first. An id several instances of an index declare (`health`,
     // four times on 2026-10-11) is filed under `<instance>.<id>`, so the id
@@ -251,6 +252,7 @@ export function tipPresence(
     if (!marker && abs) {
       try {
         marker = readMarker(dirname(abs), markerId);
+        if (marker) markerRoot = dirname(abs);
       } catch {
         // fallback failed
       }
@@ -261,7 +263,8 @@ export function tipPresence(
       detail: `could not determine whether ${loc.branch} is mounted here: ${(err as Error).message}. Not a pass — nothing read this path.`,
     };
   }
-  if (marker && existsSync(marker.into)) return { state: "mounted", into: marker.into };
+  const into = marker ? resolve(markerRoot, marker.into) : undefined;
+  if (into && existsSync(into)) return { state: "mounted", into };
   return {
     state: "unmounted",
     detail:

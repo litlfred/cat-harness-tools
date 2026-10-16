@@ -322,8 +322,71 @@ describe("push", () => {
     if (r.state === "refused") expect(r.reason).toContain("shares this git directory");
     // The original's files and marker are untouched, so its push still has nothing to send.
     expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
-    expect(readMarker(root, "fsh-guts")!.into).toBe(join(root, "fsh-guts"));
+    expect(readMarker(root, "fsh-guts")!.into).toBe("fsh-guts");
     expect(pushMount("fsh-guts", "x", opts).state).toBe("unchanged");
+  });
+
+  test("markers store a checkout-relative into; cp -a of a checkout followed by mountTip in the copy leaves the original byte-identical (bean 1ple)", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    expect(readMarker(root, "fsh-guts")!.into).toBe("fsh-guts");
+
+    // Copy the entire checkout with its .git/branch-mounts/ marker intact.
+    const copy = `${root}-full-copy`;
+    made.push(copy);
+    spawnSync("cp", ["-a", root, copy]);
+
+    // Advance the remote tip and add an untracked local file in the original's mount.
+    writeFileSync(join(root, "fsh-guts/local-draft.md"), "keep me\n");
+    const b = f.checkout("b");
+    mountTip(LOC, b.opts);
+    writeFileSync(join(b.root, "fsh-guts/retired/b.md"), "updated on remote\n");
+    expect(pushMount("fsh-guts", "b", b.opts).state).toBe("pushed");
+
+    // Re-mounting in the copy must mount into the COPY, leaving the original untouched.
+    expect(mountTip(LOC, { ...opts, repoRoot: copy }).state).toBe("mounted");
+    expect(readFileSync(join(copy, "fsh-guts/retired/b.md"), "utf-8")).toBe("updated on remote\n");
+    expect(readFileSync(join(root, "fsh-guts/retired/b.md"), "utf-8")).toBe("---\ntitle: B\n---\n");
+    expect(readFileSync(join(root, "fsh-guts/local-draft.md"), "utf-8")).toBe("keep me\n");
+  });
+
+  test("a marker whose into resolves outside repoRoot is refused by mountTip and pushMount (bean 1ple)", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+
+    // Simulate a legacy copied checkout whose marker still holds the ORIGINAL's absolute path.
+    const copy = `${root}-legacy-copy`;
+    made.push(copy);
+    spawnSync("cp", ["-a", root, copy]);
+    const mp = markerPath(copy, "fsh-guts");
+    const legacy = { ...readMarker(copy, "fsh-guts")!, into: join(root, "fsh-guts") };
+    writeFileSync(mp, JSON.stringify(legacy, null, 2) + "\n");
+
+    const mr = mountTip(LOC, { ...opts, repoRoot: copy });
+    expect(mr.state).toBe("refused");
+    if (mr.state === "refused") expect(mr.reason).toContain("outside this checkout");
+
+    const pr = pushMount("fsh-guts", "x", { ...opts, repoRoot: copy });
+    expect(pr.state).toBe("refused");
+    if (pr.state === "refused") expect(pr.reason).toContain("outside this checkout");
+
+    // Original checkout's files are untouched.
+    expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
+  });
+
+  test("an existing in-repo absolute marker is migrated to checkout-relative on next mount (bean 1ple)", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    const mp = markerPath(root, "fsh-guts");
+    const legacy = { ...readMarker(root, "fsh-guts")!, into: join(root, "fsh-guts") };
+    writeFileSync(mp, JSON.stringify(legacy, null, 2) + "\n");
+    expect(readMarker(root, "fsh-guts")!.into).toBe(join(root, "fsh-guts"));
+
+    expect(mountTip(LOC, opts).state).toBe("mounted");
+    expect(readMarker(root, "fsh-guts")!.into).toBe("fsh-guts");
   });
 
   test("deleting all but one file, or replacing every file, is an edit and still pushes", () => {
