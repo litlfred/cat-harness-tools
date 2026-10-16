@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome } from "../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../build-instance-site.ts";
 import type { DeclaredArtefact } from "../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -223,5 +223,18 @@ describe("the chrome's publish-time writers run before the chrome is composed (s
     const na = entry("assets/js/na.js", "na:js");
     const r = buildChrome(tmp, [na], () => ({ kind: "skipped", why: "no frobnicator here" }));
     expect(r.skipped.get("na:js")).toBe("no frobnicator here");
+  });
+});
+
+describe("gateSteps — every site build runs the library gate folio-assistant's publish runs (owner, 2026-10-16)", () => {
+  test("the library gate runs first, before the recipe's own pre steps", () => {
+    expect(gateSteps(["check:archimate"])).toEqual([LIBRARY_GATE, "check:archimate"]);
+    expect(gateSteps([])).toEqual(["check:l1-complete"]);
+  });
+  test("a recipe that already names it does not run it twice", () => {
+    expect(gateSteps(["check:l1-complete", "ig-site:ast"])).toEqual(["check:l1-complete", "ig-site:ast"]);
+  });
+  test("it is a script name a step may carry", () => {
+    expect(SCRIPT_NAME.test(LIBRARY_GATE)).toBe(true);
   });
 });
