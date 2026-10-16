@@ -4,10 +4,10 @@
  *
  * Owner, 2026-09-21:
  *
- * > the folio visualisation … should by convention be available on any
- * > harness for consistent feel. who-iris, smart-* etc are content libraries
- * > a user is browsing and their "folio" from the cat-harness is consistent
- * > across them.
+ * (paraphrased) the folio visualisation should by convention be available on
+ * any harness for a consistent feel: the content instances are libraries a
+ * user browses, and the "folio" the cat-harness gives them is consistent
+ * across them.
  *
  * ## What was measured, and why this is possible now and was not before
  *

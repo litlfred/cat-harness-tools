@@ -12,9 +12,10 @@
  * instantiated and enbaled (by default enabled)."*
  *
  * And then the CORRECTION, the same session, which is the one this file
- * implements: *"your right… it should be `<base-url>library/who-iris`. note
- * rule on harnesses that instantiate a director like fsh-guts, docs/ library/
- * need to create a visualize for them."*
+ * implements: the owner agreed the address should be `<base-url>library/<instance>`
+ * for the content instance in question, and noted the rule that a harness which
+ * instantiates a directory (fsh-guts, docs/, library/ and the like) must
+ * create a visualiser for it.
  *
  * So a mount point is keyed on the **graph typology**: a harness that instantiates
  * a directory gets a visualiser for it, and that visualiser lives at
@@ -27,9 +28,9 @@
  *
  * ## TWO handlers register, not one, and they render different things
  *
- * Owner, 2026-09-20, looking at the deployed preview: *"`/docs/who-iris/`
- * should be the cat-harness handler default for docs. who-iris themed at
- * `/who-iris/`."*
+ * Owner, 2026-09-20, looking at the deployed preview (paraphrased): an
+ * instance's `/docs/<instance>/` should be the cat-harness handler's default
+ * for docs, and the same instance themed at `/<instance>/`.
  *
  * So each instance's content is reachable two ways, and the difference is
  * **which handler produced it**:
@@ -348,9 +349,9 @@ export function publishedDocsPrefix(repo: string, built: string): string | undef
  *
  * **This is what the rail's per-kind link should point at, and pointing it at
  * the mount route instead is the defect this function exists for.** The owner,
- * looking at the deployed rail: *"clicking on doc/ or library/ under who-iris
- * navbar did nothing … under library/ the 3 assets listed. are those
- * interfaces not done?"* They were done. `/library/<instance>/` mounts the
+ * looking at the deployed rail, reported (paraphrased) that clicking doc/ or
+ * library/ under a content instance's navbar did nothing, though library/
+ * listed its three assets, and asked whether those interfaces were not done. They were done. `/library/<instance>/` mounts the
  * replica's `library/` verbatim, and that directory's `index.html` is the IRIS
  * replica home — the very page `/<instance>/` already serves. So the link
  * navigated correctly to a byte-identical document, which is indistinguishable
@@ -709,8 +710,8 @@ export function pagesUnder<T extends { href?: string; children?: readonly T[] }>
  * site the same path names the folio's own root, where none of them exists
  * (owner, 2026-10-05: "still missing navbar icons on upper left" on smart-ra).
  * Re-basing them all onto the platform fixed the 404 and created the next
- * defect (#2263, owner 2026-10-06: *"the beans and todos badges seems to be
- * countts from folio-assistant and not litlfred/smart-trust"*): a beans icon
+ * defect (#2263, owner 2026-10-06, paraphrased: the beans and todos badges on
+ * a content IG's site counted the platform's work, not that IG's): a beans icon
  * on that IG's site opened the PLATFORM's work plan. So the row is scoped
  * by the one rule `lib/foreign-site-scope.ts` states: a state graph the folio
  * does not publish here gets no link and SAYS so, and a platform graph is
@@ -1195,8 +1196,8 @@ export interface ForeignSiteRail {
    * linking to its root, followed by the landing and what it is built on,
    * each linking to its own page on the platform's site. The landing's other
    * graphs are not this site's, and stay reachable from the landing's row.
-   * Owner, 2026-10-14, on smart-hiv: *"active graphs have broken links, they
-   * go back to smart-base, not smart-hiv"*.
+   * Owner, 2026-10-14, on one content IG (paraphrased): its active graphs had
+   * broken links that went back to the base IG it builds on, not to itself.
    */
   landing?: boolean;
 }

@@ -3,9 +3,10 @@
  *
  * Owner, 2026-09-23, naming three pages and then the rule:
  *
- * > navbar should be on sub pages like `/cat-harness/catalogue/who-iris/` or
- * > `/cat-harness/auto-docs/index/docs/who-iris-docs/` or library
- * > etc... **common fixture unless explicty removed in harness visualtion.**
+ * (paraphrased) the navbar should be on sub pages such as
+ * `/cat-harness/catalogue/<instance>/`, `/cat-harness/auto-docs/index/docs/<instance>-docs/`
+ * or library pages — **a common fixture unless explicitly removed in the
+ * harness visualisation.**
  *
  * The last clause inverts the default. The rail is PRESENT unless a
  * visualisation explicitly removes it, rather than absent unless a generator

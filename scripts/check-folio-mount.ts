@@ -7,8 +7,8 @@
  *
  * The owner's requirement is **consistency**, not quality:
  *
- * > who-iris, smart-* etc are content libraries a user is browsing and their
- * > "folio" from the cat-harness is consistent across them.
+ * (paraphrased) the content instances are libraries a user browses, and the
+ * "folio" the cat-harness gives them is consistent across them.
  *
  * `board-windows` states the test that follows from it — *"the test is not
  * 'is this folio good' but 'is this the same folio'"*. A reader moving

@@ -481,8 +481,8 @@ function uploadState(e){
 
 var COLS = [
   /* THE SLUG OPENS THE ENTRY'S VISUALISER -- e.view, generated per entry by
-     the projection (owner, 2026-10-02: "click on smart-trust slug and open
-     up the visualizer"). A site-root path, composed like an avatar; an entry
+     the projection (owner, 2026-10-02, paraphrased: clicking an entry's slug
+     should open its visualiser). A site-root path, composed like an avatar; an entry
      whose projection carries none keeps a plain slug. */
   { k:"id",       t:"slug",     n:false, f:function(e){
       var v = typeof e.view === "string" && e.view.charAt(0) === "/" ? SITE_ROOT + e.view.slice(1) : "";
@@ -1325,8 +1325,8 @@ export function instanceRootRoutes(repoRoot: string): Map<string, string> {
 /**
  * An entry's `view` — the site-root path of the page that RENDERS it.
  *
- * Owner, 2026-10-02: *"i also expected to be able to click on "smart-trust"
- * slug and open up the visualizer for smart-trust"*. Two cases:
+ * Owner, 2026-10-02 (paraphrased): clicking a referenced instance's slug
+ * should open that instance's visualiser. Two cases:
  *
  * - a REFERENCED entry whose record links a `site_path` that is another
  *   instance's DECLARED root route (`instanceRootRoutes`) is rendered there —
@@ -1497,9 +1497,9 @@ if (import.meta.main) {
   //
   // Owner, 2026-09-20, reducing three cases to two:
   //
-  //   > i want two rules.... not three. one is cat-harness handling the
-  //   > library/ dir which has who-iris assets in it. one is who-iris handler
-  //   > to mock current iris website.
+  //   (paraphrased) two rules, not three: one is cat-harness handling the
+  //   library/ dir, which holds a content instance's assets; the other is that
+  //   instance's own handler, which replicates the source website.
   //
   // So the form is `<base>/<handler>/<kind>/<optional subject>` — which is the
   // owner's own first example, `<base>/cat-harness/docs/<instance>/`. The

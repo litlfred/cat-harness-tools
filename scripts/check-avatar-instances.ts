@@ -85,8 +85,8 @@ const REPO = repoRootFor(HARNESS_ROOT);
  * avatar fails, and this check reported exactly that before anyone noticed.
  *
  * The reason it carried — *"its mark is not this repository's to choose"* —
- * was about the LOGO, and the owner has now separated the two: *"no logo on
- * who-iris icon (for now). just WHO blue"*. Using an organisation's published
+ * was about the LOGO, and the owner has now separated the two (paraphrased):
+ * no logo on the IRIS replica's icon for now, only its organisation's blue. Using an organisation's published
  * colour with a neutral glyph is not inventing its identity, which is what the
  * exemption existed to prevent.
  *
