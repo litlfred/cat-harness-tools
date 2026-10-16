@@ -5,11 +5,10 @@ status: completed
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:47Z
-updated_at: 2026-10-11T12:25:34Z
+updated_at: 2026-10-16T07:00:00Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-3o5b
-    - folio-assistant-zaui
 ---
 
 Arc `3fva`, proposal §3.3 and §4 item 5.6. Blocked on the TEST PROCESS bean.
@@ -72,3 +71,5 @@ Built to the owner's option 4 (no threshold).
 - **Done-when 1:** the signed certification is filed with fileSignedCertification (cat-harness#151). Signer: the owner, by the human route. The decision was relayed from lane A's session, and the record says so.
 - **Done-when 2:** the report renders (test-report.md) and its badge links to the run (scripts/render-test-report.ts, #122).
 - **Not done:** the signed report is not stored on qa-reports. cat-harness has no qa-reports branch, and bean 3hk4 refuses a one-run entry. So Task_StoreSigned stays open in beans/workflows/, and certification-resolves (zaui) reads this certification as unknown until a full cat-harness qa publish exists.
+
+_2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, items 1 and 9): the `zaui` block is lifted. `zaui` is completed, this bean is completed, and the folio-assistant copy had already dropped the edge. Session https://claude.ai/code/session_01K9Xi9QSxCNYju8QNu7EuHg.
