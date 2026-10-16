@@ -36,7 +36,7 @@
 # A gate or test already red on main is listed in the step summary, never
 # hidden and never counted against the PR.
 #
-# How a run is laid out (cat-harness-tools#397). smart-base run 38866215814
+# How a run is laid out (cat-harness-tools#397). A trial run (38866215814)
 # took 87 minutes: its shards waited 33-52 minutes for runners, every one of
 # eight shards rebuilt its side for 6-10 minutes, main's cached answer never
 # matched, and the gates were split by count, not by time. Now:
@@ -146,7 +146,7 @@ jobs:
   # (cat-harness-tools#397): mount, lower layers at main, the caller swapped
   # in, the graphs kept on branches, the IG pages and `derive:publish`. Every
   # shard used to repeat all of it, 6-10 minutes each, eight times a run
-  # (smart-base run 38866215814: 67 of 200 work-minutes).
+  # (trial run 38866215814: 67 of 200 work-minutes).
   prepare-head:
     name: Prepare the PR side (and typecheck)
     if: github.event.action != 'closed'
@@ -188,7 +188,7 @@ jobs:
       # One pin time per run attempt, shared by every job through the cache
       # (cat-harness-tools#397). It replaces the `pin` job, which cost the run
       # a second wait for a runner before anything else could start (5 min on
-      # smart-base run 38866215814, 33 min on run 38869216177). The first job
+      # trial run 38866215814, 33 min on run 38869216177). The first job
       # to get here writes the time; a job that finds it reads it. Every ref
       # this run follows (the index, the lower layers at main, the judging
       # scripts) is then resolved as of that time, by `resolve-at.sh`, so both
@@ -212,7 +212,7 @@ jobs:
           # beans, todos, ...), read ONCE for the run, so both sides mount
           # each graph at the same commit (state-pin.sh). Read
           # live per side, they were minutes apart, and a bean pushed in
-          # between was charged to the PR (smart-base#107, run 38884159693).
+          # between was charged to the PR (the trial PR, run 38884159693).
           # A remote that cannot be read is left out, and mounts live.
           for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
             if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
@@ -814,7 +814,7 @@ jobs:
   # same lock, which the mount cache makes quick, and applies what its side's
   # prepare job built on top of it. The base side is not run at all when
   # main's answer is cached. The gates are split by the seconds the last run
-  # recorded, so the shards finish together, rather than by count (smart-base
+  # recorded, so the shards finish together, rather than by count (trial
   # run 38866215814: 2267 s in one shard, 626 s in another).
   run:
     name: ${{ matrix.side }} — tests and gates, shard ${{ matrix.shard }}/${{ inputs.gate-shards }}
