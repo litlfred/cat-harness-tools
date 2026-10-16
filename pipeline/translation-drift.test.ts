@@ -176,7 +176,7 @@ describe("the glossary pages are recorded at their DECLARED routes", () => {
         JSON.stringify({ name: "acme", visualisers: [{ id: "terms", renderedBy: GLOSSARY_RENDERER }] }),
       );
       expect(uncatalogedGlossaries(repo).map((u) => u.translation)).toEqual(
-        ["ar", "es", "fr", "ru", "zh"].map((l) => `${l}/acme/terms`),
+        ["ar", "es", "fr", "ru", "zh"].flatMap((l) => [`${l}/acme/terms`, `${l}/en/acme/terms`]),
       );
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -206,7 +206,7 @@ describe("the glossary pages are recorded at their DECLARED routes", () => {
       mkdirSync(join(site, "acme", "notes"), { recursive: true });
       writeFileSync(join(site, "acme", "notes", "index.md"), "---\ntitle: Notes\n---\n# Notes\n");
       expect(uncatalogedGlossaries(repo, site).map((u) => u.translation)).toEqual(
-        ["ar", "es", "fr", "ru", "zh"].map((l) => `${l}/acme/terms`),
+        ["ar", "es", "fr", "ru", "zh"].flatMap((l) => [`${l}/acme/terms`, `${l}/en/acme/terms`]),
       );
       expect(uncatalogedGlossaries(repo).map((u) => u.translation)).toEqual([]);
     } finally {
