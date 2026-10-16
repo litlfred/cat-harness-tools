@@ -18,7 +18,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { gitBlobId, MANIFEST_SCHEMA, markerPath, mountTip, pushMount, readMarker, type TipLocation } from "../branch-store.js";
+import { gitBlobId, MANIFEST_SCHEMA, markerPath, mountEmptyingReason, mountTip, pushMount, readMarker, type TipLocation } from "../branch-store.js";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const BRANCH = "cat/cat-harness/fsh-guts";
@@ -269,6 +269,73 @@ describe("push", () => {
     const f = fixture();
     const { opts } = f.checkout("a");
     expect(pushMount("fsh-guts", "x", opts).state).toBe("refused");
+  });
+
+  // 2026-10-15: a layer re-laid over five nested mounts left their markers
+  // behind, and one bare `state:push` emptied all five graphs — after which
+  // every `state:mount` reported a miss and the docs site stopped publishing.
+  test("a mount deleted from under its marker is refused, never pushed as the deletion of every file", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    const before = f.tip();
+    rmSync(join(root, "fsh-guts"), { recursive: true, force: true });
+    const r = pushMount("fsh-guts", "x", opts);
+    expect(r.state).toBe("refused");
+    if (r.state === "refused") expect(r.reason).toContain("does not exist");
+    expect(mountEmptyingReason("fsh-guts", opts)).toContain("does not exist");
+    expect(f.tip()).toBe(before);
+    expect(f.remoteFile("fsh-guts/retired/a.md")).toBeDefined();
+    // The remedy the refusal names works: a gone mount holds no edit to lose.
+    expect(mountTip(LOC, opts).state).toBe("mounted");
+    expect(readFileSync(join(root, "fsh-guts/uploads/doc.pdf")).equals(PDF)).toBe(true);
+  });
+
+  test("a mount emptied of every file is refused too: the branch would then be a miss", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    const before = f.tip();
+    rmSync(join(root, "fsh-guts"), { recursive: true, force: true });
+    mkdirSync(join(root, "fsh-guts"));
+    const r = pushMount("fsh-guts", "x", opts);
+    expect(r.state).toBe("refused");
+    if (r.state === "refused") expect(r.reason).toContain("holds no files");
+    expect(f.tip()).toBe(before);
+    // The marker is untouched, so a re-mount restores the files.
+    expect(mountTip(LOC, opts).state).toBe("mounted");
+    expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
+  });
+
+  test("a copy of a linked worktree, sharing its git directory, cannot re-mount over the original's mount", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    // The copy: same files, and a `.git` FILE naming the original's git directory.
+    const copy = `${root}-copy`;
+    made.push(copy);
+    spawnSync("cp", ["-a", root, copy]);
+    rmSync(join(copy, ".git"), { recursive: true, force: true });
+    writeFileSync(join(copy, ".git"), `gitdir: ${join(root, ".git")}\n`);
+    const r = mountTip(LOC, { ...opts, repoRoot: copy });
+    expect(r.state).toBe("refused");
+    if (r.state === "refused") expect(r.reason).toContain("shares this git directory");
+    // The original's files and marker are untouched, so its push still has nothing to send.
+    expect(readFileSync(join(root, "fsh-guts/retired/a.md"), "utf-8")).toBe("---\ntitle: A\n---\n");
+    expect(readMarker(root, "fsh-guts")!.into).toBe(join(root, "fsh-guts"));
+    expect(pushMount("fsh-guts", "x", opts).state).toBe("unchanged");
+  });
+
+  test("deleting all but one file, or replacing every file, is an edit and still pushes", () => {
+    const f = fixture();
+    const { root, opts } = f.checkout("a");
+    mountTip(LOC, opts);
+    for (const p of ["retired/b.md", "uploads/doc.pdf", "scripts/run.sh", "scripts/a-link.md"]) unlinkSync(join(root, "fsh-guts", p));
+    expect(pushMount("fsh-guts", "most", opts).state).toBe("pushed");
+    unlinkSync(join(root, "fsh-guts/retired/a.md"));
+    writeFileSync(join(root, "fsh-guts/only.md"), "only\n");
+    expect(pushMount("fsh-guts", "replace", opts).state).toBe("pushed");
+    expect(f.remoteFile("fsh-guts/only.md")!.toString()).toBe("only\n");
   });
 });
 

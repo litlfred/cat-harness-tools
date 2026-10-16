@@ -300,7 +300,7 @@ export function slugOf(branch: string): string | undefined {
 }
 
 /** Files a preview's data steps write that are not a site on their own (the workflow's list). */
-const DATA_ONLY = /^(changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
+const DATA_ONLY = /^(changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
 
 /** True when the build wrote at least one file that is a page, not only data (bean `oisv`). */
 export function builtSomething(siteDir: string): boolean {
@@ -798,7 +798,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
     // declared-path-literal: a path INSIDE another platform instance, resolved
     // by inPlatform against each instance's root, never against this one.
     const changeset = inPlatform(platform, "schemas/changeset.ts");
-    if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json")]);
+    if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
     else log("· this platform has no ChangeSet tool: no review data on this preview");
     const impact = inPlatform(platform, "scripts/document-rendered-impact.ts");
     if (changeset && impact) {
@@ -887,6 +887,7 @@ export async function stageDeclared(
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
+  if (d.recipe.finalSteps?.length) log(`final       ${d.recipe.finalSteps.join(", ")} (after the platform's own writers)`);
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
   if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
   if (target === "main") {
@@ -894,6 +895,7 @@ export async function stageDeclared(
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
+  const pr = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
   const r = await buildInstanceSite({
     root: repo,
     instance: d.instance,
@@ -903,10 +905,12 @@ export async function stageDeclared(
     pre: d.recipe.pre,
     sourceSteps: d.recipe.sourceSteps,
     siteSteps: d.recipe.siteSteps,
+    ...(d.recipe.finalSteps ? { finalSteps: d.recipe.finalSteps } : {}),
     ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
-    ...(target === "preview" ? { staging: branch } : {}),
+    ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -914,6 +918,99 @@ export async function stageDeclared(
     remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
+}
+
+/**
+ * The open pull request whose head is `branch`, or `undefined`, said in the
+ * log. A preview's review comments are the tagged comments on that PR (bean
+ * 423d), and the workflow is handed its number by the event; a local build has
+ * to ask. A lookup that fails (no network, a rate limit) costs the preview its
+ * comments, not its publish.
+ */
+export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<number | undefined> {
+  const q = `https://api.github.com/repos/${owner}/${name}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`;
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    const r = await fetch(q, { headers: { accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) } });
+    if (!r.ok) {
+      log(`· no PR looked up for ${branch} (GitHub answered ${r.status}): no review comments on this preview`);
+      return undefined;
+    }
+    const prs = (await r.json()) as { number: number }[];
+    if (!prs.length) log(`· ${branch} has no open pull request: no review comments on this preview`);
+    return prs[0]?.number;
+  } catch (e) {
+    log(`· no PR looked up for ${branch} (${(e as Error).message}): no review comments on this preview`);
+    return undefined;
+  }
+}
+
+/**
+ * A declared-recipe preview's review data, as the workflow-described path
+ * writes it: the ChangeSet (`changeset.json`, `changeset-text.json`) from the
+ * platform's content layer when it carries one, and the staging banner with
+ * its `staging.json`. Without them the review page of a `site.build` folio
+ * (dth-hrh) said there was nothing to compare against (bean xp72). The folio
+ * is `folio/<instance>`, the conventional root; a checkout without one gets
+ * the banner and no ChangeSet, and says so.
+ */
+export function previewData(
+  repo: string,
+  f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string; pr?: number },
+  site: string,
+  log: (s: string) => void,
+): void {
+  git(repo, ["fetch", "-q", "origin", f.base]);
+  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform instance resolved by inPlatform against each instance's root.
+  const folio = join("folio", f.instance);
+  const changeset = inPlatform(repo, "schemas/changeset.ts");
+  if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
+  else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no ChangeSet on this preview`);
+  else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
+  // The PR's tagged review comments, as the workflow's `stage` job ingests them:
+  // `blocks.json` from the head's manifests and `review-comments.json`, with the
+  // statuses committed to the folio's todos graph winning (bean 423d).
+  const comments = inPlatform(repo, "scripts/review-comments.ts");
+  if (f.pr === undefined) {
+    // said by openPrFor
+  } else if (!comments) log("· this platform has no review-comments Tool: no review comments on this preview");
+  else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no review comments on this preview`);
+  else {
+    // declared-path-literal: the folio's todos graph root, as `review-comment-move.ts` reads it (`todos/todos.json`).
+    const todos = join(repo, "todos");
+    const hasTodos = existsSync(join(todos, "todos.json"));
+    run(repo, "bun", [
+      "run", comments, "--repo", `${f.owner}/${f.name}`, "--pr", String(f.pr), "--commit", f.sha,
+      "--folio", folio, "--blocks-out", join(site, "blocks.json"), "--out", join(site, "review-comments.json"),
+      ...(hasTodos ? ["--todos", todos, "--write-decided"] : []),
+    ]);
+    // A `resolve:` decision applied above is RECORDED, not only published
+    // (owner, 2026-10-15): the Tool wrote each decided comment into the todos
+    // graph's feedback directory, and a graph kept on its own state branch is
+    // spliced there by `state:push` (a no-op when nothing changed, and when the
+    // graph is not branch-kept). A todos graph in the feature branch's tree is
+    // left for the editor to commit. A push that fails costs the record, which
+    // the next build writes again, not the preview.
+    const push = hasTodos ? inPlatform(repo, "scripts/state-push.ts") : undefined;
+    if (push) {
+      const r = spawnSync("bun", ["run", push, "--id", "todos", "-m", `review decisions from PR #${f.pr}`], { cwd: repo, encoding: "utf-8" });
+      const said = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n").slice(-2).join(" ");
+      log(r.status === 0 ? `· todos: ${said || "pushed"}` : `⚠ todos not pushed (${said}): the next build records the decisions again`);
+    }
+  }
+  const banner = inPlatform(repo, "scripts/staging-banner.ts");
+  if (!banner) { log("· this platform has no staging banner: no staging.json on this preview"); return; }
+  const gh = `https://github.com/${f.owner}/${f.name}`;
+  run(repo, "bun", [
+    "run", banner,
+    "--site", site, "--branch", f.branch, "--sha", f.sha.slice(0, 7),
+    "--built", `${new Date().toISOString().replace(/\.\d+Z$/, "Z")} (built locally by an agent)`,
+    ...(f.pr !== undefined
+      ? ["--pr", String(f.pr), "--pr-url", `${gh}/pull/${f.pr}`]
+      : ["--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`]),
+    "--branch-url", `${gh}/tree/${f.branch}`, "--issues-url", `${gh}/issues`,
+    "--run-url", f.runUrl ?? `${gh}/commit/${f.sha}`, "--main-site", `https://${f.owner}.github.io/${f.name}/`, "--before-ref", f.base,
+  ]);
 }
 
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]

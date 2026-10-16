@@ -40,7 +40,7 @@ import { join, resolve } from "node:path";
 
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 
-import { declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
 
 export type ConflictStrategy = "take-base" | "owned-tree" | "generated-regions" | "qa-sidecar" | "refuse";
 
@@ -69,6 +69,7 @@ export interface ConflictPattern {
 const CHECKOUT_ROOT = resolve(import.meta.dir, "..", "..");
 
 /** The harness site's directory, repo-relative, as every glob below spells it. */
+// declared-path-literal: the prefix of the merge-conflict path patterns below, matched against the paths git reports as conflicted in the index checkout, so it is repo-relative by definition; resolving it through a declaration would change what git is asked about.
 const SITE = "cat-harness/docs";
 
 /** The Tool that draws a glossary page; the routes of the visualisers it renders are the glossary pages. */
@@ -202,12 +203,20 @@ export const PATTERNS: readonly ConflictPattern[] = [
     id: "glossary",
     // At their DECLARED routes since 2026-10-09 (`<harness>/<visualiser>/`):
     // every visualiser the glossary renderer draws (the content core declares
-    // one), and cat-harness's `lsi` — the latter under the page locale since
-    // folio-assistant#2527, and at its old address until the site is
-    // regenerated. The glossary routes are read from the declarations, so the
+    // one), and cat-harness's `lsi` — both under the page locale (the lsi
+    // since folio-assistant#2527, the glossary since 2026-10-16), and at
+    // their old address until the site is regenerated. The glossary routes are read from the declarations, so the
     // glob is still repo-relative: the same path git reports.
     // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
-    globs: [...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**"), "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
+    // The English glossary pages are under the page locale since 2026-10-16
+    // (owner, "c"); the unlocalised glob is kept for branches that still carry
+    // them at the old address.
+    globs: [
+      ...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**", PAGE_LOCALE),
+      ...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**"),
+      "cat-harness/docs/en/cat-harness/lsi/**",
+      "cat-harness/docs/cat-harness/lsi/**",
+    ],
     strategy: "take-base",
     why:
       "the generated glossary and LSI pages (173 + 34). Whole-corpus aggregates; concurrent term additions always collide. " +

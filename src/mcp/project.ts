@@ -32,7 +32,7 @@
 import { z } from "zod";
 
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, isInjectionSafe, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
 import type { InvocationAuthority, InvocationContext, ToolInvocation } from "@litlfred/cat-harness/schemas/tool-invocation.js";
 
 /** An MCP tool declaration, as `tools/list` returns it. */
@@ -54,10 +54,9 @@ export interface Projection {
   omissions: Omission[];
 }
 
-/** The `$defs` name a port's schema IRI ends in. */
+/** The shared type a port's schema IRI names (`toolTypeNameOf`, bean `tdir`). */
 export function portTypeName(port: { schema: string }): ToolTypeName | undefined {
-  const n = port.schema.split("#/$defs/")[1];
-  return n !== undefined && n in TOOL_TYPES ? (n as ToolTypeName) : undefined;
+  return toolTypeNameOf(port.schema);
 }
 
 /** Host facts a `requires` block is evaluated against. */

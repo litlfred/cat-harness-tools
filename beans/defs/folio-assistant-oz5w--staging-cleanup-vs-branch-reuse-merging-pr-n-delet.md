@@ -1,11 +1,11 @@
 ---
 # folio-assistant-oz5w
 title: 'STAGING CLEANUP vs BRANCH REUSE: merging PR N deletes the preview PR N+1 just published'
-status: scrapped
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-21T20:12:17Z
-updated_at: 2026-10-10T16:44:10Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -97,3 +97,5 @@ _2026-09-29_ — **Re-parented `ahvw` → `1xhc`** by subject, per todo-manager 
 ## Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the `cleanup` job of folio-assistant's `feature-staging.yml` deleting previews on `gh-pages`. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: fix commit 2804121f is on litlfred/cat-harness main and all four boxes are ticked; both outcomes are closed, completed is what the evidence shows. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

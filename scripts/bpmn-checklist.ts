@@ -54,6 +54,7 @@
  *   bun run cat bpmn:checklist:check    # exit 1 if any is stale, missing or orphaned
  *   … [--out <dir>]                      # write them all into one directory instead
  *
+ * @covers processes — every declared BPMN diagram, and the committed checklist beside it
  * @module scripts/bpmn-checklist
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";

@@ -68,6 +68,7 @@ import {
 import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
+import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
@@ -159,6 +160,7 @@ interface RawDecl {
   name?: string;
   visualisers?: HarnessVisualiser[];
   directories?: { id: string; path?: string; graphTypologies?: string[] }[];
+  builtAtPublish?: { path: string; writer: string[] }[];
 }
 
 function readRaw(root: string): RawDecl | undefined {
@@ -169,6 +171,51 @@ function readRaw(root: string): RawDecl | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The script FILES behind a `builtAtPublish` entry's writer NAMES, repository-
+ * relative — or `undefined` when any name does not resolve to a file on disk.
+ *
+ * A writer is declared by its script name (`processes:viz`), and a
+ * visualisation's `writer` is a file (`visualisationResolves` checks each one
+ * exists). The name is resolved through `scriptTable`, the table `bun run cat`
+ * itself runs from: the command's first argument with a script extension is
+ * the file.
+ */
+export function writerFilesFor(repoRoot: string, names: readonly string[]): string[] | undefined {
+  let table: Map<string, { command: string }>;
+  try {
+    table = scriptTable(repoRoot);
+  } catch {
+    return undefined;
+  }
+  const files: string[] = [];
+  for (const name of names) {
+    const file = (table.get(name)?.command ?? "").split(/\s+/).find((t) => /\.(ts|js|mjs|py|sh)$/.test(t));
+    if (file === undefined || !existsSync(join(repoRoot, file))) return undefined;
+    files.push(file);
+  }
+  return files;
+}
+
+/**
+ * The writer of a visualiser page its HARNESS builds at publish, or `undefined`.
+ *
+ * A page under the harness's `builtAtPublish` (bean 0b8c) is never committed:
+ * it exists only after `derive:publish`. Without its writer the visualisation
+ * looked absent on every checkout that had not built the site, and the navbar
+ * said "no viewer yet" over viewers the deploy serves — processes, tools,
+ * schemas and the rest (owner, 2026-10-15). The writer is read from the entry
+ * the harness already declares for that route, not restated on the visualiser.
+ */
+export function builtAtPublishWriter(repoRoot: string, harnessRoot: string, ref: string): string[] | undefined {
+  const rel = relative(harnessRoot, join(repoRoot, ref)).split(sep).join("/");
+  if (rel.startsWith("..")) return undefined;
+  const entry = (readRaw(harnessRoot)?.builtAtPublish ?? []).find((e) =>
+    e.path.endsWith("/") ? rel.startsWith(e.path) : rel === e.path,
+  );
+  return entry === undefined ? undefined : writerFilesFor(repoRoot, entry.writer);
 }
 
 /** Every instance root in the checkout: top level, and every remote mount wherever it landed. */
@@ -547,26 +594,50 @@ export function viewersOf(
     // declaring harness does not hold a directory of that id itself: a bare
     // `skills` is cat-harness's own, `core-skills` can only be core's.
     const harnessIds = new Set((readRaw(v.harnessRoot)?.directories ?? []).map((x) => x.id));
+    // `subgraphUnder` nests either kind of sub-graph: the glossary's
+    // per-instance pages sit at `glossary/instance/<instance>/` (owner,
+    // 2026-10-15, "3a") so an instance name cannot meet an asset-type page.
     const subs =
       v.subgraphs === "instance"
-        ? [owner]
+        ? [at(owner)]
         : v.subgraphs === "directory"
           ? owner === v.harness
             ? [at(d.id)]
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
-    const subRef = subs.map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!)).find((r) => existsSync(join(repoRoot, r)));
+    // A sub-graph page counts when it is on disk OR when the declaring harness
+    // builds it at publish (`builtAtPublish`): a page that is deliberately not
+    // committed is not missing, and its writer is named on the tile instead.
+    const subRef = subs
+      .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
+      .find((r) => existsSync(join(repoRoot, r)) || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this instance is not its viewer.
-    const byId = !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
+    //
+    // A directory the visualiser ALSO names by id (`covers`) keeps its full
+    // view when no sub-graph page was drawn for it (bean
+    // `folio-assistant-1nu0`): `beans` draws cat-harness's own repository
+    // store as the full board and every other instance's store as a page of
+    // its own, so the declarer's row must not lose the board it already had.
+    const byId =
+      (v.harness === owner && (v.covers ?? []).includes(d.id)) ||
+      !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
     if (subs.length > 0 && subRef === undefined && !byId) continue;
-    const ref = subRef ?? visualiserPageRef(repoRoot, full, site);
+    // A directory the visualiser NAMES by id keeps its full view even when a
+    // sub-graph page of the same instance exists (bean `folio-assistant-750a`):
+    // `beans` draws the repository store as the board AND as `beans/cat-harness/`,
+    // the page its parts (`defs/`, `notes/`, `workflows/`) open, and the store's
+    // own row must still open the board.
+    const named = v.harness === owner && (v.covers ?? []).includes(d.id);
+    const ref = (named ? undefined : subRef) ?? visualiserPageRef(repoRoot, full, site);
     const { id: _id, renderedBy: _by, covers: _c, coversKinds: _k, subgraphs: _s, subgraphUnder: _u, alias: _a, harness: _h, harnessRoot: _r, ...tile } = v;
     // `writer` is declared relative to the HARNESS (its own scripts), and read
     // repository-relative like `ref`, so a mount path is never written down.
     // ...where it is IMPLEMENTED: the harness's scripts live in cat-harness-tools (bean 70lx).
-    const writer = v.writer?.map((w) => renderedPath(repoRoot, join(implementingRootFor(v.harnessRoot, w), w)));
+    const writer =
+      v.writer?.map((w) => renderedPath(repoRoot, join(implementingRootFor(v.harnessRoot, w), w))) ??
+      (existsSync(join(repoRoot, ref)) ? undefined : builtAtPublishWriter(repoRoot, v.harnessRoot, ref));
     // The directory's tile is the DEFAULT dress; what the visualiser declares
     // about itself wins, since a directory drawn twice needs two names.
     out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: v.title ?? d.tile?.title ?? d.id });

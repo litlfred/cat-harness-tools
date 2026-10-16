@@ -49,7 +49,7 @@ function main(): number {
   const site = at("--site");
   const built = at("--built");
   if (!site || !built) {
-    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--foreign-site [--home-label <name>] [--instance <name> [--landing]]]");
+    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--theme-source <jekyll source>] [--foreign-site [--home-label <name>] [--instance <name> [--landing]]]");
     return 2;
   }
   // `--foreign-site`: the site is a FOLIO's, not the platform's (folio-staging.yml).
@@ -77,13 +77,28 @@ function main(): number {
   // ASKED, not guessed — see `mountRoutes`. Guessing from directory names
   // called `bootstrap` a mount and skipped the ten pages this step exists for.
   const routes = foreign ? [] : mountRoutes(built);
-  const r = railStandalonePages(siteAbs, built, built, routes, foreign);
+  // `--theme-source <jekyll source>`: the theme's own pages are railed too, their
+  // side bar replaced by the rail and its Pages (owner, 2026-10-15, option A).
+  const themeSource = at("--theme-source");
+  if (themeSource && !existsSync(resolve(themeSource))) {
+    console.error(`  ? --theme-source ${themeSource} does not exist — the page tree cannot be read`);
+    return 2;
+  }
+  const r = railStandalonePages(siteAbs, built, built, routes, foreign, themeSource ? { themeSource: resolve(themeSource) } : {});
   console.log(
     `rail-standalone-pages: rail on ${r.injected} page(s), ` +
       `${r.alreadyNavigated} already navigated, ${r.redirects} redirect stub(s) left bare, ` +
       `${r.declined} declined in their own markup (folio-navbar: none), ` +
+      `${r.replacedThemeSidebar} theme side bar(s) replaced by the rail, ` +
       `${routes.length} mount route(s) left to the mount pass`,
   );
+  if (r.pinned) {
+    // Owner, 2026-10-15, "pinned copy per site": what the railed pages link is shipped beside them.
+    console.log(
+      `  pinned chrome: ${r.pinned.copied.length} copied, ${r.pinned.same.length} already identical` +
+        (r.pinned.differing.length ? `, ${r.pinned.differing.length} left as the site built them (${r.pinned.differing.join(", ")})` : ""),
+    );
+  }
   if (r.skipped.length) {
     console.log(`  ${r.skipped.length} file(s) took no rail (no <body>):`);
     for (const f of r.skipped.slice(0, 5)) console.log(`      ${f}`);

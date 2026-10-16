@@ -32,7 +32,7 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 
 import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
@@ -42,6 +42,28 @@ export function instanceConfigs(repoRoot: string): string[] {
     .map((r) => join(r, "tsconfig.json"))
     .filter((p) => existsSync(p))
     .sort();
+}
+
+/** Run `tsc --noEmit -p <cfg>` across all `configs` in parallel, returning each outcome in `configs` order. */
+export async function runTypechecks(
+  repoRoot: string,
+  tsc: string,
+  configs: readonly string[],
+): Promise<Array<{ rel: string; status: number; output: string }>> {
+  return Promise.all(
+    configs.map(
+      (cfg) =>
+        new Promise<{ rel: string; status: number; output: string }>((resolve) => {
+          const rel = relative(repoRoot, cfg);
+          const child = spawn("bun", [tsc, "--noEmit", "-p", cfg], { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] });
+          const chunks: Buffer[] = [];
+          child.stdout.on("data", (d: Buffer) => chunks.push(d));
+          child.stderr.on("data", (d: Buffer) => chunks.push(d));
+          child.on("error", (err) => resolve({ rel, status: 1, output: `${err.message}\n` }));
+          child.on("close", (code) => resolve({ rel, status: code ?? 1, output: Buffer.concat(chunks).toString("utf8") }));
+        }),
+    ),
+  );
 }
 
 if (import.meta.main) {
@@ -56,14 +78,14 @@ if (import.meta.main) {
     console.error("typecheck:instances: no instance carries a tsconfig.json — nothing was typechecked. NOT a pass.");
     process.exit(2);
   }
+  const results = await runTypechecks(repoRoot, tsc, configs);
   const failed: string[] = [];
-  for (const cfg of configs) {
-    const rel = relative(repoRoot, cfg);
-    if (process.env.GITHUB_ACTIONS) console.log(`::group::tsc --noEmit -p ${rel}`);
-    else console.log(`── tsc --noEmit -p ${rel}`);
-    const r = spawnSync("bun", [tsc, "--noEmit", "-p", cfg], { cwd: repoRoot, stdio: "inherit" });
+  for (const r of results) {
+    if (process.env.GITHUB_ACTIONS) console.log(`::group::tsc --noEmit -p ${r.rel}`);
+    else console.log(`── tsc --noEmit -p ${r.rel}`);
+    if (r.output) process.stdout.write(r.output);
     if (process.env.GITHUB_ACTIONS) console.log("::endgroup::");
-    if (r.status !== 0) failed.push(rel);
+    if (r.status !== 0) failed.push(r.rel);
   }
   if (failed.length > 0) {
     console.error(`${failed.length} of ${configs.length} instance typecheck(s) failed: ${failed.join(", ")}`);

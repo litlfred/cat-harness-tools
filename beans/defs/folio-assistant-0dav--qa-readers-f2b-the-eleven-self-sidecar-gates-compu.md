@@ -5,10 +5,9 @@ status: todo
 type: task
 priority: high
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-10T16:25:26Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-3fva
 blocked_by:
-    - folio-assistant-16ei
     - folio-assistant-oq1j
     - folio-assistant-2gst
 ---
@@ -72,3 +71,7 @@ The compute-and-judge work is on main: `judgeQaResult` is used by audit-coverage
 - **readme:subgraphs:check**: with `cat-harness/test/results`, `cat-harness/test/health/results` and `folio-assistant-core/test/results` moved aside, it exits 2 (UNKNOWN) before it reaches its own check. The cause is `bun run cat qa:refresh`: folio-assistant's root `"cat"` script still points at `cat-harness/scripts/run-script.ts`, which now lives at `cat-harness-tools/scripts/run-script.ts`. That fix belongs to the folio-assistant root, and I have passed it on.
 
 Re-run done-when #1 once oq1j and 2gst close.
+
+_2026-10-15T16:49Z_ — Block lifted: `16ei` is completed (qa-store landed via #1764, closed 2026-10-06 on re-measured evidence). The edge was the work plan's "Block never lifted" finding (owner, 2026-10-15). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-16T06:30:00Z_ — The note above is mirrored from the folio-assistant store (commit 0b8d249), where this edge was lifted on 2026-10-15; lifted here too (Owner ruling 2026-10-16, item 9). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

@@ -25,7 +25,7 @@ function railOf(root: string, rel: string): { shared: RailShared; toRoot: string
   expect(p).toBeDefined();
   const file = join(root, "assets/navbar", `${p!.data}.js`);
   expect(existsSync(file)).toBe(true);
-  const shared = JSON.parse(railDataJson(readFileSync(file, "utf-8")).split("@fa-rail-root@").join(p!.root)) as RailShared;
+  const shared = JSON.parse(railDataJson(readFileSync(file, "utf-8")).split("@fa-rail-to-root@").join(p!.toRoot).split("@fa-rail-root@").join(p!.root)) as RailShared;
   return { shared, toRoot: p!.toRoot };
 }
 

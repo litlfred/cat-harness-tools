@@ -14,7 +14,7 @@
  * standing alone too.
  */
 import { beforeAll, describe, expect, it } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawnBounded } from "../support/bounded-spawn.ts";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -31,21 +31,27 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 
 // The page is BUILT AT PUBLISH (bean 0b8c, #2230): derived from a graph kept on
-// a branch, so it is never committed. Build it the way the site build does —
-// `state:mount`, then `derive:publish`, then compose — so the compose below
-// sees what a real build sees. Fails loudly, like the build, when unmounted.
-// Where it cannot be built (no mount; a standalone layer with no root script),
-// the tests that need the page fail on their own, by name, rather than this
-// hook failing the whole file.
+// a branch, so it is never committed. Build it with the writer cat-harness
+// declares for it (`visualisers`: fsh-guts, writer `scripts/gen-fsh-guts-viz.ts`,
+// the `fsh-guts:viz` script), so the compose below sees the page a real build
+// writes. Fails loudly, like the build, when fsh-guts is unmounted. Where it
+// cannot be built (no mount; a standalone layer with no root script), the
+// tests that need the page fail on their own, by name, rather than this hook
+// failing the whole file.
 //
-// The hook gets an explicit budget. It spawns a whole build, which measured
-// 6.2 s on a composed checkout (2026-10-09) against bun's 5 s default for a
-// hook, so the default killed the build mid-write and failed the file with
-// no assertion run. 60 s bounds a hang without racing an honest build.
+// Not the whole `derive:publish`. Since B1 (owner, 2026-10-14) that runs
+// every declared `builtAtPublish` writer of every instance: 112 s on run
+// 38696377785's publish job, and past this hook's 300 s budget in bun-test
+// shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
+// timed out" with no assertion run. It also rewrote, mid-shard, artefacts
+// other test files were reading. This file needs one page; it builds one page.
 const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
-  const r = spawnSync("bun", ["run", "cat", "derive:publish"], { cwd: REPO, encoding: "utf8" });
-  if (r.status !== 0) console.warn(`derive:publish did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
+  // Bounded, and its whole process group killed on a timeout (`spawnBounded`):
+  // a writer left running would keep writing into the tree after this hook.
+  const r = spawnBounded(["bun", "run", "cat", "fsh-guts:viz"], REPO, BUILD_BUDGET_MS);
+  if (r.timedOut) console.warn(`fsh-guts:viz did not finish within ${BUILD_BUDGET_MS} ms; its process group was killed`);
+  else if (r.status !== 0) console.warn(`fsh-guts:viz did not build the page (is fsh-guts mounted? \`bun run cat state:mount\`):\n${r.stdout}${r.stderr}`);
 }, BUILD_BUDGET_MS);
 
 function composeTo(opts: { staging?: boolean }): { dir: string; report: ReturnType<typeof compose> } {
@@ -60,7 +66,10 @@ describe("the real declaration withholds fsh-guts and nothing else", () => {
    * whether this repository's own declaration produces the intended set.
    */
   it("withholds exactly the fsh-guts page directory", () => {
-    expect(withheldFromCanonical(REPO)).toEqual(["fsh-guts/"]);
+    // At both addresses since the locale routes (folio-assistant#2527): the
+    // localised route the page is written to, and the old one, where a site
+    // not yet regenerated still holds it (compose-docs `withheldFromCanonical`).
+    expect(withheldFromCanonical(REPO)).toEqual(["cat-harness/fsh-guts/", "en/cat-harness/fsh-guts/"]);
   });
 });
 
@@ -69,9 +78,11 @@ describe("composing honours the default, which is the restrictive one", () => {
     // THE ASSERTION THIS FILE EXISTS FOR. Passing no options is what
     // `docs-site.yml` does, so this is the canonical publisher's own call.
     const { dir, report } = composeTo({});
+    // Where the generator writes the page, in the composed tree too.
+    const page = pageRelPath(REPO)!;
     try {
-      expect(existsSync(join(dir, "fsh-guts", "index.md"))).toBe(false);
-      expect(report.withheld).toContain("fsh-guts/index.md");
+      expect(existsSync(join(dir, page))).toBe(false);
+      expect(report.withheld).toContain(page);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -80,7 +91,7 @@ describe("composing honours the default, which is the restrictive one", () => {
   it("an explicit staging compose includes the page", () => {
     const { dir, report } = composeTo({ staging: true });
     try {
-      expect(existsSync(join(dir, "fsh-guts", "index.md"))).toBe(true);
+      expect(existsSync(join(dir, pageRelPath(REPO)!))).toBe(true);
       expect(report.withheld).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -1,11 +1,11 @@
 ---
 # folio-assistant-5xfr
 title: qou's pin bump must rename folio.config.json AND add qaAxes in the same commit, or it silently loses both
-status: scrapped
+status: todo
 type: task
 priority: normal
 created_at: 2026-09-20T14:37:58Z
-updated_at: 2026-10-10T16:44:10Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -351,3 +351,5 @@ different kind of evidence and the PR says so.
 ## Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns litlfred/qou's `.folio-assistant-pin` bump (renaming `folio.config.json` and adding `qaAxes` in the same commit), a change made in qou. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository" (qou pin bump); no done-when met. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

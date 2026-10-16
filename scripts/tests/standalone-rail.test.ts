@@ -16,8 +16,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { mountRoutes, railStandalonePages } from "../mount-instance-docs.js";
-import { navbarRowJsonOf } from "../lib/harness-rail.ts";
+import { PINNED_CHROME_FILES, PINNED_DATA_FILES, mountRoutes, pinPlatformChrome, railStandalonePages } from "../mount-instance-docs.js";
+import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { expandRail, navbarRowJsonOf, railDataJson } from "../lib/harness-rail.ts";
 
 const page = (body: string): string =>
   `<!doctype html>\n<html><head><title>t</title></head><body>${body}</body></html>\n`;
@@ -146,11 +148,16 @@ describe("what it must NOT touch — each failure renders fine and is therefore 
     expect(r.alreadyNavigated).toBeGreaterThan(0);
   });
 
-  test("a page ALREADY carrying the harness rail is left alone", () => {
+  test("a page ALREADY carrying the harness rail keeps it, and gains only the first-paint snippet", () => {
     const root = site();
     const before = readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8");
     run(root);
-    expect(readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8")).toBe(before);
+    const after = readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8");
+    expect(after.replace(/\n<script data-folio-saved-scheme>[\s\S]*?<\/script>\n/, "")).toBe(before);
+    expect(after.match(/<nav class="fa-nav"/g)).toHaveLength(1);
+    expect(after).toContain("data-folio-saved-scheme");
+    run(root);
+    expect(readFileSync(join(root, "cat-harness/library/x/index.html"), "utf-8")).toBe(after); // idempotent
   });
 
   test("a page that DECLINES the rail in its own markup keeps that decision (#1881)", () => {
@@ -246,11 +253,19 @@ describe("a FOLIO's site (folio-staging.yml): platform links point at the platfo
     const r = railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
     expect(r.injected).toBe(1);
 
-    const html = readFileSync(join(root, "dpi-h-ra", "index.html"), "utf-8");
+    // As a browser shows it once navbar.js has drawn the rail from its shared
+    // data: the page itself carries only the home link until then.
+    const html = expandRail(readFileSync(join(root, "dpi-h-ra", "index.html"), "utf-8"), (name) =>
+      railDataJson(readFileSync(join(root, "assets", "navbar", `${name}.js`), "utf-8")),
+    );
     expect(html).toMatch(/<nav class="fa-nav"/);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]!);
-    // Every link the platform owns resolves on the platform's site...
-    const platform = hrefs.filter((h) => !h.startsWith("#") && h !== "../");
+    // The rail's own stylesheets are the site's pinned copy (2026-10-15)...
+    const sheets = hrefs.filter((h) => /\/assets\/(?:css\/)?[^/]+\.css$/.test(h));
+    expect(sheets.length).toBeGreaterThan(0);
+    for (const h of sheets) expect(h.startsWith("../assets/")).toBe(true);
+    // ...and every link the platform owns resolves on the platform's site...
+    const platform = hrefs.filter((h) => !h.startsWith("#") && h !== "../" && !sheets.includes(h));
     expect(platform.length).toBeGreaterThan(0);
     for (const h of platform) expect(h.startsWith(`${BASE}/`)).toBe(true);
     // ...and home, named for the folio, is the folio site's own root.
@@ -258,7 +273,7 @@ describe("a FOLIO's site (folio-staging.yml): platform links point at the platfo
     expect(html).toContain("smart-ra");
   });
 
-  test("the icon row is drawn: docs-ui loads from the platform, and the row's links are the platform's", () => {
+  test("the icon row is drawn: docs-ui loads from the site's pinned copy, and the row's links are the platform's", () => {
     // Owner, 2026-10-05: "still missing navbar icons on upper left". The row
     // is drawn by docs-ui.js from #fa-navbar-row, which a folio site never
     // loaded, and its links were site-absolute (/todos/) on the folio's site.
@@ -266,8 +281,11 @@ describe("a FOLIO's site (folio-staging.yml): platform links point at the platfo
     writeFileSync(join(root, "index.html"), page("<h1>Doc</h1>"));
     railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
     const html = readFileSync(join(root, "index.html"), "utf-8");
-    expect(html).toContain(`<script src="${BASE}/assets/js/docs-ui.js" defer`);
-    expect(html).toContain(`href="${BASE}/assets/css/docs-ui.css"`);
+    // Owner, 2026-10-15, "pinned copy per site": the code is the site's own,
+    // and the platform's base is DECLARED for the data docs-ui still reads.
+    expect(html).toContain(`<script src="./assets/js/docs-ui.js" defer`);
+    expect(html).toContain(`href="./assets/css/docs-ui.css"`);
+    expect(html).toContain(`<meta name="fa-platform-base" content="${BASE}"`);
     // On a folio's site the row is written ONCE beside the rail's data and the
     // page's island names it (2026-10-10); read it as a browser would.
     expect(html).toMatch(/<script type="application\/json" id="fa-navbar-row"[^>]* data-fa-row-src="row-[a-z0-9]+"><\/script>/);
@@ -315,5 +333,42 @@ describe("a FOLIO's site (folio-staging.yml): platform links point at the platfo
     new Function("document", body)({ getElementById: (id: string) => (id === "fa-navbar-row" ? node : null) });
     expect(island.attrs.has("data-fa-row-src")).toBe(false);
     expect((JSON.parse(island.text) as { icons?: unknown }).icons).toBeDefined();
+  });
+
+  test("PINNED COPY: no page links the platform's live assets, and every file it links is shipped beside it (owner, 2026-10-15)", () => {
+    const root = mkdtempSync(join(tmpdir(), "folio-pinned-"));
+    mkdirSync(join(root, "a", "b"), { recursive: true });
+    writeFileSync(join(root, "index.html"), page("<h1>Doc</h1><h2 id=\"x\">X</h2><h2 id=\"y\">Y</h2>"));
+    writeFileSync(join(root, "a", "b", "index.html"), page("<h1>Deep</h1>"));
+    const r = railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
+    expect(r.pinned?.copied.slice().sort()).toEqual([...PINNED_CHROME_FILES, ...PINNED_DATA_FILES].sort());
+    for (const [rel, toRoot] of [["index.html", "."], ["a/b/index.html", "../.."]] as const) {
+      const html = readFileSync(join(root, rel), "utf-8");
+      // No script or stylesheet from the platform's live site.
+      const loaded = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)].map((m) => m[1]!);
+      expect(loaded.filter((u) => u.startsWith(BASE) && /\.(js|css)$/.test(u))).toEqual([]);
+      // Every local script and stylesheet the page loads exists in the site.
+      for (const u of loaded.filter((u) => u.startsWith(`${toRoot}/`) && /\.(js|css)$/.test(u))) {
+        expect(existsSync(join(root, rel, "..", u))).toBe(true);
+      }
+    }
+    // The platform data docs-ui reads is the site's own too, and the page says so.
+    expect(readFileSync(join(root, "index.html"), "utf-8")).toContain('<meta name="fa-pinned-data" content=".">');
+    // The copies are the pinned harness's bytes.
+    for (const f of PINNED_CHROME_FILES) {
+      expect(readFileSync(join(root, f)).equals(readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, f))))).toBe(true);
+    }
+    // A second pass copies nothing and finds them identical.
+    const again = railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-ra" });
+    expect(again.pinned).toBeUndefined();
+  });
+
+  test("a file the site already built with other bytes is left, and reported", () => {
+    const root = mkdtempSync(join(tmpdir(), "folio-pinned-own-"));
+    mkdirSync(join(root, "assets", "js"), { recursive: true });
+    writeFileSync(join(root, "assets", "js", "docs-ui.js"), "/* the site's own */");
+    const r = pinPlatformChrome(root);
+    expect(r.differing).toEqual(["assets/js/docs-ui.js"]);
+    expect(readFileSync(join(root, "assets", "js", "docs-ui.js"), "utf-8")).toBe("/* the site's own */");
   });
 });

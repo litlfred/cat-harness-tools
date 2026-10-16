@@ -39,11 +39,14 @@
  *   bun run cat check:l1-complete -- --write   # commit the verdict as a sidecar
  *
  * Exit: 0 complete (or nothing to check), 1 a requirement unmet, 2 could not check.
+ * An unmet requirement in {@link QA_ONLY} is a QA finding: reported and
+ * written, never exit 1.
  *
  * @module scripts/check-l1-complete
  * @covers library
  */
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -78,7 +81,7 @@ import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -187,7 +190,10 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "undete
  * **nothing else anywhere**.
  */
 // `figures/` is the vector arm's renders — `pdf-vector-figures.py`, bean `ay3x`.
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "blocks", "images", "ocr", VECTOR_FIGURES_DIR];
+// `sheets/` is a workbook's grouping nodes, one per sheet, the tabular
+// counterpart of `sections/` (`pipeline/tabular-nodes.ts`, written by
+// gen-library-jsonld under its `GROUPING_DIRS`).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
@@ -228,7 +234,66 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // Authored, not produced by an arm: an editor's title, read by
   // gen-library-jsonld over the extracted one (bean `v8wg`).
   TITLE_CORRECTION_FILE,
+  // The two review-anchor arms of the document adapter (`docx-structure.py`,
+  // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
+  // written beside `structure.json` so a public comment citing "page 12, line
+  // 340" of a circulated draft still resolves after the folio is edited. Each
+  // names the source it was read from by sha256, like every sidecar here.
+  "docx-structure.json",
+  "pdf-line-map.json",
 ];
+
+/**
+ * The children of an entry that ARE the source it was derived from — held in
+ * the entry, byte for byte.
+ *
+ * An entry normally holds what the arms derived and keeps its source in
+ * `uploads/`. Some sources must stay with their derivation: a draft circulated
+ * for public comment is FROZEN, every comment cites a page and line of those
+ * exact bytes, and moving them is the edit the freeze forbids. The closed set
+ * above cannot name such a file, because its name is the document's.
+ *
+ * So the rule is a fact the entry already records, not a name: a child is a
+ * held source when a sidecar of this entry names it as its `source` (`file`,
+ * or a `files[]` member's `path`) AND its bytes hash to the sha256 that
+ * sidecar recorded. A misfiled arm output, a stray upload or a later edit of
+ * the source fails the hash and stays a stray — the `3psh` reasoning holds,
+ * because nothing is admitted by its spelling.
+ */
+export function heldSources(dir: string, sidecars: Iterable<string>): Set<string> {
+  const claims = new Map<string, Set<string>>();
+  const claim = (file: unknown, sha: unknown) => {
+    if (typeof file !== "string" || typeof sha !== "string" || !file || file.includes("/") || file.includes("\\")) return;
+    if (!claims.has(file)) claims.set(file, new Set());
+    claims.get(file)!.add(sha.toLowerCase());
+  };
+  for (const name of sidecars) {
+    if (!name.endsWith(".json") && !name.endsWith(".jsonld")) continue;
+    const f = join(dir, name);
+    if (!existsSync(f)) continue;
+    let src: unknown;
+    try {
+      src = (JSON.parse(readFileSync(f, "utf-8")) as Record<string, unknown>)?.source;
+    } catch {
+      continue; // the owning requirement reports an unparseable sidecar
+    }
+    if (!src || typeof src !== "object") continue;
+    const s = src as Record<string, unknown>;
+    claim(s.file, s.sha256);
+    if (Array.isArray(s.files)) for (const m of s.files) if (m && typeof m === "object") claim((m as Record<string, unknown>).path, (m as Record<string, unknown>).sha256);
+  }
+  const held = new Set<string>();
+  for (const [file, shas] of claims) {
+    const p = join(dir, file);
+    try {
+      if (!statSync(p).isFile()) continue;
+      if (shas.has(createHash("sha256").update(readFileSync(p)).digest("hex"))) held.add(file);
+    } catch {
+      continue; // absent: the source is held elsewhere, which is the normal case
+    }
+  }
+  return held;
+}
 
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
@@ -469,6 +534,23 @@ export function entryKind(has: (file: string) => boolean): EntryKind {
   return "undetermined";
 }
 
+/**
+ * Requirements reported as QA findings, never as a failed check (owner,
+ * 2026-10-15: "make QA check"). An unmet one stays `unmet` in the entry's
+ * verdict and in the `library-qa` sidecar `--write` commits, so the QA views
+ * still show it; it just does not set the exit code, so it cannot stop a
+ * publish. `image-descriptions` is here because a document gains images the
+ * moment it is ingested, while a narrative for each is written later by a
+ * person or an agent: smart-immunizations' library stopped every publish on
+ * 42 undescribed figures (folio-assistant run 38801998160).
+ */
+export const QA_ONLY: ReadonlySet<string> = new Set(["image-descriptions"]);
+
+/** The unmet requirements that fail the check: every unmet one not in {@link QA_ONLY}. */
+export function blockingUnmet(requirements: readonly Requirement[]): Requirement[] {
+  return requirements.filter((q) => q.state === "unmet" && !QA_ONLY.has(q.name));
+}
+
 /** Requirements that only make sense for a PAGED document. */
 export const PAGED_ONLY: readonly string[] = [
   "structure",
@@ -583,8 +665,9 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     const declaredSubgraphs = new Set(
       entrySubgraphDirs(dir, registry).map((d) => relative(resolve(dir), d.abs).split(/[\\/]/)[0]),
     );
+    const held = heldSources(dir, [...allowed].filter((c) => children.includes(c)));
     const stray = children.filter(
-      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c),
+      (c) => !allowed.has(c) && !c.startsWith(".") && !generatedReadme(c) && !declaredSubgraphs.has(c) && !held.has(c),
     );
     if (stray.length > 0) {
       out.push({
@@ -597,7 +680,13 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           `Reported, not removed.`,
       });
     } else if (children.length > 0) {
-      out.push({ name: "contents", state: "met", detail: `${children.length} child(ren), all declared` });
+      out.push({
+        name: "contents",
+        state: "met",
+        detail:
+          `${children.length} child(ren), all declared` +
+          (held.size ? `; ${held.size} held source(s) matching their recorded sha256: ${[...held].sort().join(", ")}` : ""),
+      });
     }
   }
 
@@ -1343,8 +1432,11 @@ export function checkAll(root: string): EntryReport[] | undefined {
   const presence = splitDeclared(libs);
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
+    const others = nonEntryDirs(lib);
     for (const d of readdirSync(lib).sort()) {
       if (!statSync(join(lib, d)).isDirectory()) continue;
+      // Another kind's directory kept in the library is not an entry.
+      if (others.has(join(lib, d))) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(
@@ -1502,14 +1594,15 @@ function format(reports: EntryReport[]): string {
   const mark = { met: "✓", unmet: "✗", "not-derivable": "·" } as const;
   const out: string[] = [];
   for (const r of reports) {
-    const unmet = r.requirements.filter((q) => q.state === "unmet");
+    const unmet = blockingUnmet(r.requirements);
     // `<library>/<slug>/` when several libraries are in play, `library/<slug>/`
     // when there is only one — an instance with a single library reads exactly
     // as it always did.
     out.push(`${unmet.length ? "✗" : "✓"} ${r.library ?? "library"}/${r.slug}/`);
     for (const q of r.requirements) {
       if (q.state === "not-derivable") continue;
-      out.push(`    ${mark[q.state]} ${q.name.padEnd(16)} ${q.detail}`);
+      const qa = q.state === "unmet" && QA_ONLY.has(q.name);
+      out.push(`    ${qa ? "◦" : mark[q.state]} ${q.name.padEnd(16)} ${qa ? "QA finding, not gating: " : ""}${q.detail}`);
     }
     for (const q of unmet) void q;
   }
@@ -1633,5 +1726,12 @@ if (import.meta.main) {
         `(${t.stale} stale), ${t.draft} draft(s) awaiting a person. Advisory — bun run cat summaries`,
     );
   }
-  process.exit(reports.some((r) => r.requirements.some((q) => q.state === "unmet")) ? 1 : 0);
+  const findings = reports.filter((r) => r.requirements.some((q) => q.state === "unmet" && QA_ONLY.has(q.name)));
+  if (findings.length) {
+    console.log(
+      `\n  ◦ ${findings.length} entr${findings.length === 1 ? "y carries" : "ies carry"} QA findings ` +
+        `(${[...QA_ONLY].join(", ")}): recorded in the library-qa verdicts, not gating`,
+    );
+  }
+  process.exit(reports.some((r) => blockingUnmet(r.requirements).length > 0) ? 1 : 0);
 }

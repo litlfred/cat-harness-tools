@@ -26,7 +26,8 @@ describe("schemas visualiser wireframe fixes (folio-assistant-nnpk)", () => {
   });
 
   it("Finding 2: sets compact #items max-height on small viewports to prevent nested scroll trapping", () => {
-    expect(html).toMatch(/@media\s*\(max-width:\s*640px\)\s*\{\s*#items\s*\{\s*max-height:\s*35vh;\s*\}\s*\}/);
+    // Scoped under `.sc-page` since aa499bc dropped the unscoped duplicates.
+    expect(html).toMatch(/@media\s*\(max-width:\s*640px\)\s*\{\s*\.sc-page ul#items\s*\{\s*max-height:\s*35vh;\s*\}\s*\}/);
   });
 
   it("Finding 3: points to filter below and collapses empty #ov-svg", () => {
@@ -52,5 +53,62 @@ describe("schemas visualiser wireframe fixes (folio-assistant-nnpk)", () => {
     // box width and text slicing use maxChars and maxTypeChars
     expect(html).toContain("Math.min(w, maxChars) * CH + PAD * 2");
     expect(html).toContain("f.type.replace(/^z\\./, \"\").slice(0, maxTypeChars)");
+  });
+});
+
+describe("source descriptors in a schemas directory (folio-assistant-1nu0)", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { sourceDescriptorRows } = await import("../gen-schema-viz.ts");
+
+  const valid = {
+    $schema: "folio-source-descriptor/v1",
+    id: "demo",
+    title: "Demo corpus",
+    system: "DSpace 7",
+    nodeKind: "item",
+    subsetStrategies: ["identifier"],
+    subsetIsSelfContained: true,
+    identifiers: [{ name: "Handle", authoritative: true, example: "1/2" }],
+    enumeration: { method: "page the REST API", pageSize: 10, totalNodes: 95, basis: "measured" },
+    character: { remote: true, large: false, volatility: "versioned", availability: "unknown", hasOwnSearch: false, basis: "read" },
+  };
+
+  const repo = mkdtempSync(join(tmpdir(), "srcdesc-"));
+  mkdirSync(join(repo, "inst", "sources"), { recursive: true });
+  writeFileSync(join(repo, "inst", "sources", "demo.json"), JSON.stringify(valid));
+  writeFileSync(join(repo, "inst", "sources", "broken.json"), JSON.stringify({ $schema: "folio-source-descriptor/v1", id: "broken", title: "Broken" }));
+  // Neither of these is a source descriptor, and neither may become a row.
+  writeFileSync(join(repo, "inst", "sources", "schemas.json"), JSON.stringify({ $schema: "concern-groups/v1", groups: [] }));
+  writeFileSync(join(repo, "inst", "sources", "x.schema.json"), JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema" }));
+  const rows = sourceDescriptorRows(["inst/sources"], repo);
+  rmSync(repo, { recursive: true });
+
+  it("reads only folio-source-descriptor/v1 files, attributed to the instance holding them", () => {
+    expect(rows.map((r) => r.id)).toEqual(["broken", "demo"]);
+    expect(rows.every((r) => r.instance === "inst")).toBe(true);
+  });
+
+  it("carries what the descriptor says about enumerating it, with the request cost derived", () => {
+    const d = rows.find((r) => r.id === "demo")!;
+    expect(d.title).toBe("Demo corpus");
+    expect(d.system).toBe("DSpace 7");
+    expect(d.file).toBe("inst/sources/demo.json");
+    expect(d.enumeration).toEqual({ method: "page the REST API", pageSize: 10, totalNodes: 95, requests: 10 });
+    expect(d.identifiers).toEqual([{ name: "Handle", authoritative: true, example: "1/2" }]);
+    expect(d.note).toBeUndefined();
+  });
+
+  it("lists a descriptor that fails its schema, and says why, rather than dropping it", () => {
+    const b = rows.find((r) => r.id === "broken")!;
+    expect(b.title).toBe("Broken");
+    expect(b.note).toContain("does not satisfy folio-source-descriptor/v1");
+  });
+
+  it("the page carries a source-descriptor table, hidden until a scope holds one", () => {
+    const html = viewerHtml("assets/schemas/index.json", "who-iris", [], "../../");
+    expect(html).toContain('<details id="sources" open hidden>');
+    expect(html).toContain("function renderSources()");
   });
 });

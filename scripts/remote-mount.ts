@@ -116,9 +116,57 @@ import { RemoteTree, type UrlFor } from "./remote-tree.ts";
  * nothing scanning the checkout sees it, and on the same filesystem, so a
  * rename moves it. `restore` replaces whatever the re-lay put at those paths.
  */
+/**
+ * The directory ids a declaration's `builtAtPublish` names: an entry's
+ * `directory`, or the declared directory whose `path` is the entry's. Such a
+ * directory is built by the publish and is never committed, so a pin of it
+ * has nothing there to copy; the remote mount must not report it absent.
+ */
+export function builtAtPublishDirectories(declText: Buffer | string): Set<string> {
+  const out = new Set<string>();
+  let d: { builtAtPublish?: unknown; directories?: unknown };
+  try {
+    d = JSON.parse(String(declText));
+  } catch {
+    return out;
+  }
+  if (!Array.isArray(d.builtAtPublish)) return out;
+  const norm = (x: string) => x.replace(/^\.\//, "").replace(/\/+$/, "");
+  const paths = new Set<string>();
+  for (const e of d.builtAtPublish as Array<{ path?: unknown; directory?: unknown }>) {
+    if (!e || typeof e !== "object") continue;
+    if (typeof e.directory === "string") out.add(e.directory);
+    if (typeof e.path === "string") paths.add(norm(e.path));
+  }
+  for (const dir of Array.isArray(d.directories) ? (d.directories as Array<{ id?: unknown; path?: unknown }>) : [])
+    if (dir && typeof dir.id === "string" && typeof dir.path === "string" && paths.has(norm(dir.path))) out.add(dir.id);
+  return out;
+}
+
 function holdStateMounts(checkout: string, target: string): { restore: () => void } {
   const under = resolve(target) + "/";
-  const inside = stateMountedDirs(checkout).filter((d) => (resolve(d) + "/").startsWith(under) && existsSync(d));
+  return holdPaths(checkout, stateMountedDirs(checkout).filter((d) => (resolve(d) + "/").startsWith(under)));
+}
+
+/**
+ * Move each mounted directory's `node_modules/` out of the way for a re-lay,
+ * and return how to put it back. An install artefact is outside every digest
+ * and is never this mount's bytes, so a re-lay must not delete it — and for a
+ * WORKSPACE MEMBER it cannot be rebuilt here: {@link installDependencies}
+ * rightly declines to install inside one, because the root's own `bun install`
+ * provides it. Deleting it therefore left the member with no dependencies of
+ * its own until the root was installed again: a nested devDependency the
+ * member pins (folio-assistant-sci's `katex@0.18.10`, beside the root's 0.16)
+ * then resolved to the root's copy, which is how `crepe-latex.test.ts` failed
+ * its version guard on CI after `state:mount` re-laid the mount.
+ */
+function holdInstallArtefacts(checkout: string, dirs: readonly string[]): { restore: () => void } {
+  return holdPaths(checkout, [...new Set(dirs.map((d) => resolve(d, "node_modules")))]);
+}
+
+/** Rename each existing path in `paths` into a hold beside the git directory; `restore` puts each back. */
+function holdPaths(checkout: string, paths: readonly string[]): { restore: () => void } {
+  const inside = paths.filter((d) => existsSync(d));
   if (inside.length === 0) return { restore: () => {} };
   // input-site: inert #8ef446b5 — where a re-lay parks a state mount for a moment; it is put back before the mount returns
   const gitPath = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "branch-mount-hold"], { cwd: checkout, encoding: "utf-8" });
@@ -759,8 +807,13 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         // sent their deletion. Set aside here, put back after the digest, so
         // the lock hashes only what this mount laid down.
         const held = holdStateMounts(plan.instanceRoot, target);
+        const installs = holdInstallArtefacts(
+          plan.instanceRoot,
+          [target, ...(before?.directories ?? []).map((d) => join(plan.instanceRoot, d.path))],
+        );
         const dirs: LockedInstance["directories"] = [];
         const absent: string[] = [];
+        const skipped: string[] = [];
         const assets: NonNullable<LockedInstance["assets"]> = [];
         let declText: Buffer;
         try {
@@ -773,10 +826,15 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           mkdirSync(target, { recursive: true });
           declText = readFileSync(join(work, p.declarationFile));
           writeFileSync(join(target, `${p.instance}.json`), declText);
+          const built = builtAtPublishDirectories(declText);
           for (const d of p.directories) {
             const src = join(work, d.upstreamPath);
             if (!existsSync(src)) {
-              absent.push(d.id);
+              // A directory the declaration builds at publish is never in the
+              // pinned commit: absent is its committed state, not a defect.
+              // It is left out of the lock, so verify asks nothing of it.
+              if (!built.has(d.id)) absent.push(d.id);
+              else skipped.push(d.id);
               continue;
             }
             const dst = join(plan.instanceRoot, d.path);
@@ -798,7 +856,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           }
           // Digest AFTER every copy, so a nested directory's digest covers what is on disk.
           for (const d of p.directories) {
-            if (absent.includes(d.id)) continue;
+            if (absent.includes(d.id) || skipped.includes(d.id)) continue;
             dirs.push({ id: d.id, path: d.path, upstreamPath: d.upstreamPath, ...digestOf(join(plan.instanceRoot, d.path)) });
           }
           for (const a of p.assets ?? []) {
@@ -807,6 +865,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           }
         } finally {
           held.restore();
+          installs.restore();
         }
         const ignored = ensureIgnored(plan.instanceRoot, p.path, true);
         if (ignored === "excluded") excluded.push(p.path);

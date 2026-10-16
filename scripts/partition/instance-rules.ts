@@ -938,6 +938,14 @@ export const RULES: Rule[] = [
       // edge `namespaces.ts` was extracted to remove. Measured on first run:
       // the prefix rule claimed it for core and the edge appeared immediately.
       "schemas/vocabulary.ts",
+      // The external vocabularies an instance's JSON-LD speaks, as DECLARED
+      // data (bean folio-assistant-63q4, owner 2026-10-14). Harness by the
+      // same argument as `namespaces.ts`: `cat-harness.ts` reads the
+      // declaration's `jsonldPrefixes` field through its schema, so a core
+      // placement — which the `schemas/` prefix rule gave it — was a
+      // wrong-direction edge the moment the module landed.
+      "schemas/jsonld-prefixes.ts", // declared-path-literal: a partition plan names modules by path.
+
       // bootstrap's own Zod (graph, discussion, requirement, and since
       // 2026-09-30 the graph document's) lives in `bootstrap-tools/` (bean
       // `xsqm`), outside this partition.

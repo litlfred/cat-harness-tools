@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { darkRules } from "../lib/scheme-css.ts";
+import { darkRules, firstPaintSchemeScript, withSavedScheme } from "../lib/scheme-css.ts";
 
 /** Issue #2208: one sheet, two deciders — the OS until the reader picks, then the reader. */
 describe("darkRules", () => {
@@ -23,5 +23,52 @@ describe("darkRules", () => {
 
   test("a nested block is refused, not half-copied", () => {
     expect(() => darkRules("@supports (x: y) { a { color: red; } }")).toThrow(/flat rules only/);
+  });
+});
+
+/**
+ * Owner, 2026-10-15: *"follow os else light"* — the reader's stored choice,
+ * then the OS, then LIGHT; and ONE source for that rule. The snippet is run
+ * here exactly as `head_custom.html` ships it, against stubbed globals.
+ */
+describe("the first-paint scheme — stored, else the OS, else light", () => {
+  const body = firstPaintSchemeScript().replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "");
+  function decide(o: { stored?: string | null; os?: "dark" | "light" | "none" | "absent" | "throws"; site?: string }): string | null {
+    const attrs: Record<string, string> = {};
+    const document = {
+      documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } },
+      getElementById: (id: string) => (id === "fa-site-scheme" && o.site ? { textContent: JSON.stringify({ scheme: o.site }) } : null),
+    };
+    const localStorage = { getItem: (_k: string) => o.stored ?? null };
+    const window: Record<string, unknown> = {};
+    if (o.os === "throws") window.matchMedia = () => { throw new Error("no"); };
+    else if (o.os !== "absent") window.matchMedia = (q: string) => ({ matches: o.os !== "none" && q === `(prefers-color-scheme: ${o.os})` });
+    new Function("document", "localStorage", "window", body)(document, localStorage, window);
+    return attrs["data-fa-scheme"] ?? null;
+  }
+
+  test("a stored choice wins over the OS", () => {
+    expect(decide({ stored: "light", os: "dark" })).toBe("light");
+    expect(decide({ stored: "dark", os: "light" })).toBe("dark");
+  });
+  test("nothing stored: the OS decides", () => {
+    expect(decide({ os: "dark" })).toBe("dark");
+    expect(decide({ os: "light" })).toBe("light");
+  });
+  test("nothing stored and the OS says nothing: LIGHT", () => {
+    expect(decide({ os: "none" })).toBe("light");
+    expect(decide({ os: "absent" })).toBe("light");
+    expect(decide({ os: "throws" })).toBe("light");
+    expect(decide({ stored: "garbage", os: "none" })).toBe("light");
+  });
+  test("a site that DECLARES dark does not decide the reader's scheme", () => {
+    expect(decide({ os: "none", site: "dark" })).toBe("light");
+    expect(decide({ os: "light", site: "dark" })).toBe("light");
+  });
+  test("a standalone page carries the same bytes, marked once", () => {
+    const page = withSavedScheme("<!doctype html><html><head><title>x</title></head><body></body></html>");
+    const tag = /<script data-folio-saved-scheme>[\s\S]*?<\/script>/.exec(page)?.[0];
+    expect(tag).toBe(firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme"));
+    expect(withSavedScheme(page)).toBe(page);
   });
 });

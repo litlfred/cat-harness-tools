@@ -103,7 +103,7 @@
 
 import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/diff-renderers.js";
 import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
-import { cleanRendered, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
+import { cleanRendered, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
 import { measuredModel, renderedModel, renderMeasured, renderRendered } from "./review-rendered.js";
@@ -160,6 +160,10 @@ const STYLE = `
   del { background: #fbdada; color: #5c0b0b; text-decoration: line-through; }
   ${darkRules(`ins { background: #12391d; color: #c8f2d0; } del { background: #45181a; color: #f5caca; }`)}
   .diff-sbs { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .diff-fields table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  .diff-fields caption { text-align: left; font-weight: 600; padding: .25rem 0; }
+  .diff-fields th, .diff-fields td { border: 1px solid var(--rule); padding: .25rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  .diff-fields td:last-child { white-space: nowrap; font-weight: 600; }
   .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: .3rem; background: #fff; }
   @media (max-width: 40rem) { .diff-sbs { grid-template-columns: 1fr; } }
   /* Visual diff (0rxe): pictures on a white card, since they are screenshots
@@ -295,8 +299,23 @@ const SCRIPT = `
     d.appendChild(el("span", c.summary));
     if (r.anchoredFrom && r.anchoredFrom.length) d.appendChild(el("span", " (made on " + r.anchoredFrom.join(", ") + ")", "muted"));
     if (r.commentUrl) { d.appendChild(el("span", " ")); var a = el("a", "read on the pull request"); a.href = r.commentUrl; d.appendChild(a); }
+    // Deciding it is a pull-request comment too (bean 423d, owner 2026-10-15):
+    // the page is static and writes nothing. The words offered are the moves
+    // the review-comment table allows from this status; the build applies
+    // the tag for a repository owner, member or collaborator.
+    var next = DECIDE[c.status];
+    if (next && c.id) {
+      var h = el("div", null, "muted");
+      h.appendChild(el("span", "To decide it, comment "));
+      h.appendChild(el("code", "resolve: " + c.id, "tagline"));
+      h.appendChild(el("span", " with the line "));
+      next.forEach(function (w, i) { if (i) h.appendChild(el("span", i === next.length - 1 ? " or " : ", ")); h.appendChild(el("code", "decision: " + w, "tagline")); });
+      d.appendChild(h);
+    }
     return d;
   }
+  // From each status, the decisions the review-comment table allows (folio-assistant-core review-comment.ts).
+  var DECIDE = { open: ["addressed", "adjudicated", "withdrawn"], addressed: ["resolved", "reopened", "adjudicated", "withdrawn"] };
   function commentList(cs) {
     var box = el("div", null, "comments");
     cs.forEach(function (c) { box.appendChild(commentEl(c)); });
@@ -324,8 +343,11 @@ const SCRIPT = `
   var VIEW_KEY = "folio-review:view";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
-  function defaultFor(kind) {
+  function defaultFor(kind, structured) {
     var fb = null;
+    // A block the build published fields for opens on the field renderer
+    // (STRUCTURED, bean f327) before any renderer its kind names.
+    if (structured) for (var j = 0; j < RENDERERS.length; j++) if (RENDERERS[j].defaultFor.indexOf("@structured") >= 0) return RENDERERS[j].id;
     for (var i = 0; i < RENDERERS.length; i++) {
       if (RENDERERS[i].defaultFor.indexOf(kind) >= 0) return RENDERERS[i].id;
       if (RENDERERS[i].defaultFor.indexOf("*") >= 0) fb = RENDERERS[i].id;
@@ -339,6 +361,7 @@ const SCRIPT = `
       if (n === "text" && !ctx.text) return "no prose on either side";
       if (n === "pages" && !ctx.before && !ctx.after) return "no page to show";
       if (n === "screenshots" && !ctx.visual) return "no pictures on this build";
+      if (n === "structure" && !ctx.structure) return "no fields for this block";
     }
     return null;
   }
@@ -357,6 +380,8 @@ const SCRIPT = `
       out = renderSideBySide(document, ctx.before, ctx.after);
     } else if (id === "visual") {
       out = renderVisual(document, ctx.visual, ROOT, "vis-" + panel.id);
+    } else if (id === "fields") {
+      out = renderFields(document, ctx.structure);
     }
     if (typeof out === "string") panel.appendChild(el("p", out, "muted"));
     else if (out) panel.appendChild(out);
@@ -386,7 +411,8 @@ const SCRIPT = `
         // can, preferring those that list this block's kind (0rxe: a table
         // with no pictures opens side by side, not on a word diff).
         var can = RENDERERS.filter(function (x) { return !unavailable(x, ctx); });
-        r = can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] || can[0];
+        r = (ctx.structure ? can.filter(function (x) { return x.defaultFor.indexOf("@structured") >= 0; })[0] : null) ||
+          can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] || can[0];
       }
       if (!r) { while (panel.firstChild) panel.removeChild(panel.firstChild); panel.appendChild(el("p", "Nothing to show for this change: it is to the manifest only.", "muted")); return; }
       sel.value = r.id;
@@ -395,12 +421,12 @@ const SCRIPT = `
     sel.addEventListener("change", function () { pick(sel.value); });
     row.appendChild(lab);
     row.appendChild(sel);
-    var v = { row: row, panel: panel, pick: pick, kind: ctx.kind };
+    var v = { row: row, panel: panel, pick: pick, kind: ctx.kind, structured: !!ctx.structure };
     viewers.push(v);
     return v;
   }
   function applyView(global) {
-    viewers.forEach(function (v) { v.pick(global || defaultFor(v.kind)); });
+    viewers.forEach(function (v) { v.pick(global || defaultFor(v.kind, v.structured)); });
   }
   var viewAll = document.getElementById("view");
   var none = el("option", "Each block's default");
@@ -440,7 +466,9 @@ const SCRIPT = `
       get(ROOT + "block-qa.json").catch(function () { return null; }),
       get(ROOT + "outline.json").catch(function () { return null; }),
       get(ROOT + "visual-diff.json").catch(function () { return null; }),
+      get(ROOT + "changeset-structure.json").catch(function () { return null; }),
     ]).then(function (both) {
+      var structureFile = both[7];
       var visualFile = both[6];
       OUTLINE = both[5];
       var blocksFile = both[3];
@@ -529,6 +557,7 @@ const SCRIPT = `
             kind: (c.head || c.base || {}).kind || "",
             text: txt && txt.blocks ? txt.blocks[c.label] || null : null,
             visual: visualFile && visualFile.blocks ? visualFile.blocks[c.label] || null : null,
+            structure: structureFile && structureFile.blocks ? structureFile.blocks[c.label] || null : null,
             before: before,
             after: after,
           });
@@ -571,7 +600,7 @@ const SCRIPT = `
         section("Orphaned: the block these were made on is gone", rc.comments
           .filter(function (c) { return c.review && c.review.orphaned; })
           .map(function (c) { var d = el("div"); d.appendChild(el("span", c.targetLabel, "label")); d.appendChild(commentList([c])); return d; }));
-        section("Comments whose tag could not be read", rc.malformed.map(function (m) {
+        section("Tags that could not be read or applied", rc.malformed.map(function (m) {
           var d = el("div");
           d.appendChild(el("span", m.error + " "));
           var a = el("a", "fix it on the pull request"); a.href = m.url; d.appendChild(a);
@@ -712,6 +741,7 @@ var wordDiff = ${wordDiff.toString()};
 var cleanRendered = ${cleanRendered.toString()};
 var renderWordDiff = ${renderWordDiff.toString()};
 var renderInline = ${renderInline.toString()};
+var renderFields = ${renderFields.toString()};
 var renderSideBySide = ${renderSideBySide.toString()};
 var renderVisual = ${renderVisual.toString()};
 var computeHeat = ${computeHeat.toString()};

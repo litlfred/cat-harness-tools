@@ -1,11 +1,11 @@
 ---
 # folio-assistant-5rmf
 title: 'NAVBAR QR ICON GONE: the LHS top row''s QR code for the current page no longer appears, though its generator still loads'
-status: todo
+status: completed
 type: bug
 priority: normal
 created_at: 2026-10-06T06:51:27Z
-updated_at: 2026-10-12T16:11:34Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-9rq1
 ---
 
@@ -48,3 +48,5 @@ With e2e running (PR #69 for g9m3), `navbar-row.e2e.ts` fails exactly the 5rmf c
 - [x] **The e2e check now fails if the code opens in a closed bar**, or if closing it leaves the bar pinned or held open. It fails on cat-harness main and passes with the fix. `navbar-row`, `sidebar-rail`, `rail-tips`, `rail-icon-row` and `site-title-rtl` pass 100/100.
 - [x] **Screenshots** (desktop 1280px, phone 390px) are in `test/results/5rmf/`, taken from the e2e fixture with the fix applied.
 - [ ] **Still open:** the commit that dropped the icon is still not named. The pre-split history is in the folio-assistant monorepo, and this session's clone is shallow. This is archaeology only; nothing that ships depends on it.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: completed, cat-harness-tools: todo). Evidence: every done-when ticked 2026-10-14 with evidence: QR button in navbar-row.js, test/navbar-qr.test.ts in cat-harness-tools (since d8d42ab); cat-harness#171 and cat-harness-tools#156 merged. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

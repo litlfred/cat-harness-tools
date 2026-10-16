@@ -938,11 +938,6 @@ test.describe("on an Arabic page the rest of the chrome is English, laid out as 
     ["the glass handle (Folio ▾)", ".fa-glass-handle"],
     ["the search band's search", ".fa-search-home"],
     ["each icon in the sidebar's row, so its tooltip and count", ".fa-nav-icons > *"],
-    ["the document index's heading", ".fa-doc-index__heading"],
-    ["the document index's sub-section folds", ".fa-doc-index__fold-heading"],
-    ["Folders", ".fa-nav-folders"],
-    ["the Pages heading", ".fa-nav-pages"],
-    ["▦ Harnesses", ".fa-nav-harness-group"],
     ["the page's TR badge, from a translated copy's markup", '.fa-qa-badge[data-qa-key="page.translation"]'],
     ["an older generator's inert badge, which nothing paints", ".fa-qa-badge.fa-qa-fam-block"],
   ] as const) {
@@ -1001,10 +996,9 @@ test.describe("on an Arabic page the rest of the chrome is English, laid out as 
 
   test("what is translated, and the rows that mirror, keep the page's direction", async ({ page: p }) => {
     await open(p);
-    // The index's ROWS are the page's own (Arabic) headings.
-    for (const g of await langDir(p, ".fa-doc-index__link")) expect(g).toEqual({ lang: "ar", dir: "rtl" });
-    // The page list is translated per locale.
-    for (const g of await langDir(p, ".site-nav")) expect(g).toEqual({ lang: "ar", dir: "rtl" });
+    // The sections of the sidebar ("On this page", "Pages", "Folders",
+    // "Harnesses") are the folio rail's since 2026-10-15 and are drawn on the
+    // server (cat-harness-tools `lib/navbar.ts`), English-marked there.
     // Rows whose ORDER is layout mirror with the page.
     for (const sel of [".fa-nav-icons", ".fa-glass-band"]) {
       expect(await p.locator(sel).first().evaluate((e) => getComputedStyle(e).direction)).toBe("rtl");

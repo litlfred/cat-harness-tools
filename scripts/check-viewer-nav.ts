@@ -80,6 +80,7 @@ import {
 } from "@litlfred/cat-harness/schemas/viewer-nav-qa.ts";
 import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
 import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
+import { RAIL_SECTION_LABELS } from "./lib/navbar.ts";
 import { againstOrUsage, qaResultsFile, readBaseline } from "./qa-results.ts";
 
 const ROOT = HARNESS_ROOT;
@@ -149,7 +150,7 @@ export function layoutFlags(html: string, marked: ReadonlySet<string> = new Set(
 
   const summaries = [...nav.matchAll(/<details class="fa-nav-group"( open)?><summary>[\s\S]*?<span class="fa-nav-label">([^<]*)</g)];
   const open = summaries.filter((m) => m[1]);
-  const own = (label: string): boolean => label !== "Graphs" && label !== "Harnesses";
+  const own = (label: string): boolean => label !== RAIL_SECTION_LABELS.folders && label !== RAIL_SECTION_LABELS.harnesses;
   if (!summaries.some((m) => own(m[2]!))) flags.push("visualiser-nav");
   if (open.length !== 1 || !own(open[0]![2]!)) flags.push("single-open");
 
@@ -165,7 +166,7 @@ export function layoutFlags(html: string, marked: ReadonlySet<string> = new Set(
   if (untippedControls(nav).length > 0 || (needsTips(nav) && !paintsTips(css, ".fa-nav"))) {
     flags.push("rail-tips");
   }
-  const harnesses = summaries.some((m) => m[2] === "Harnesses");
+  const harnesses = summaries.some((m) => m[2] === RAIL_SECTION_LABELS.harnesses);
   if (!harnesses || hidesSummaryAtRest(css)) flags.push("harnesses-at-rest");
   return flags;
 }

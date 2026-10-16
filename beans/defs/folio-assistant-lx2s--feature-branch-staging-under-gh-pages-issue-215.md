@@ -1,11 +1,11 @@
 ---
 # folio-assistant-lx2s
 title: 'Feature-branch staging under gh-pages (issue #215)'
-status: scrapped
+status: todo
 type: task
 priority: normal
 created_at: 2026-09-17T22:29:53Z
-updated_at: 2026-10-10T16:44:10Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -185,3 +185,5 @@ Released `in-progress` → `todo` on the owner's instruction (review session htt
 ## Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It tracks litlfred/folio-assistant issue #215 and that repository's `.github/workflows/feature-staging.yml`; its done-when is the issue's author closing it. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; folio-assistant issue #215 is still open. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

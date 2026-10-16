@@ -254,8 +254,12 @@ export interface VocabularyReport {
 }
 
 /** Assemble the vocabulary, and report what is missing rather than guessing. */
-/** Where bootstrap's own vocabulary is, relative to the cat-harness instance root. */
+/** Where bootstrap's own vocabulary is, whether `root` is the index/workspace root or an instance root under it. */
 export function bootstrapVocabularyPath(root = ROOT): string {
+  const atRoot = join(root, "bootstrap", "ns.jsonld");
+  if (existsSync(atRoot)) return atRoot;
+  const inPlatform = join(findPlatformRoot(root), "bootstrap", "ns.jsonld");
+  if (existsSync(inPlatform)) return inPlatform;
   return join(root, "..", "bootstrap", "ns.jsonld");
 }
 
@@ -290,6 +294,12 @@ export function buildVocabulary(
    * asserting ownership of a term in somebody else's namespace.
    */
   exact = false,
+  /**
+   * The block kinds to emit, discovered from the platform when omitted. A
+   * parameter so a test can add a kind without `mock.module`, which bun cannot
+   * undo and which would leak the fake kind into every later test file.
+   */
+  blockKindsIn?: ReturnType<typeof discoverBlockKinds>,
 ): { doc: unknown; report: VocabularyReport } {
   const kinds = graphTypologyIndividuals();
   // A kind is an individual under `graphTypology/`, so it cannot share a name
@@ -394,7 +404,7 @@ export function buildVocabulary(
   // Block kind classes: each instance generates its own ns document for the block-kind
   // classes it mints (folio-assistant-2osx).
   const platform = findPlatformRoot(root);
-  const blockKinds = discoverBlockKinds(platform);
+  const blockKinds = blockKindsIn ?? discoverBlockKinds(platform);
   const publishingInstances = new Set(instancesPublishingNs(root));
 
   for (const bk of blockKinds) {

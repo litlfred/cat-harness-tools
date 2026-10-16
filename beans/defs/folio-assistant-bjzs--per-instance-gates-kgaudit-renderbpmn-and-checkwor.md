@@ -1,11 +1,11 @@
 ---
 # folio-assistant-bjzs
 title: 'PER-INSTANCE GATES: kg:audit, render:bpmn and check:workflow-refs run at the root only, so 15 nested instances are counted and none is audited'
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-26T04:14:07Z
-updated_at: 2026-09-27T11:27:47Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-d308
 ---
 
@@ -837,3 +837,5 @@ existed.
       CI gate that keeps them current
 - [x] the ROOT instance is audited too — done by `pgzn` (PR #1842)
 - [ ] the `dh4f` zero-diagram question — no corpus case; guard by construction
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-09); commit bce18c14 is on folio-assistant main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

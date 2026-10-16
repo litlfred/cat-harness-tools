@@ -38,6 +38,10 @@ describe("contentInstanceCode — this checkout", () => {
       "scripts/tests/catalogue-links.test.ts",
       "scripts/tests/gen-iris-pages.test.ts",
       "scripts/tests/iris-oxigraph.test.ts",
+      // The untainted round-trip translation report over who-iris's own
+      // catalogues (bean `folio-assistant-ktt2`), and its test.
+      "scripts/tests/translation-roundtrip-report.test.ts",
+      "scripts/translation-roundtrip-report.ts",
       "themes/themes.test.ts",
       "themes/themes.ts",
       // Its Tool node (2026-10-09): the `iris-pages` generator its catalogue

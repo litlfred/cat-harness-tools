@@ -37,6 +37,9 @@
  *    NEW literal naming an existing file fails, and `--update` may drop a
  *    witness but never adds one. Four had crept in unseen since the list was
  *    first written.
+ *    A MOVE is not a new literal: a witness whose literal left its file and
+ *    is now named in another is carried by `--update` one for one
+ *    (`relocatedWitnesses`; cat-harness #286 moved eight).
  *  - **it carries `declared-path-literal: <reason>`** in a comment on its own
  *    line or the line above. The base cases are here: the module that supplies
  *    the defaults, the scaffolder that CREATES the layout, the partition plan
@@ -157,7 +160,8 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -249,6 +253,20 @@ export function absentResultDirs(root: string): string[] {
 export function underAbsentResults(root: string, literal: string, absent: readonly string[]): boolean {
   const abs = join(root, literal);
   return absent.some((d) => abs === d.replace(/\/+$/, "") || abs.startsWith(d.replace(/\/+$/, "") + "/"));
+}
+
+/**
+ * Is `literal` (relative to `root`) an artefact `root` declares it BUILDS AT
+ * PUBLISH (`builtAtPublish`, `schemas/built-at-publish.ts`; owner,
+ * 2026-10-14, "B1")? Such a file is never committed and is on disk only after
+ * `derive:publish`, so a recorded witness naming it is held by the
+ * declaration when this checkout has not built it: absent is its correct
+ * state here, not a lost artefact (the `check-declared-dirs.ts`
+ * `builtAtPublishDirs` rule, for a file).
+ */
+export function underBuiltAtPublish(root: string, literal: string): boolean {
+  const decl = readDeclaration(root) as { builtAtPublish?: Array<{ path: string }> } | undefined;
+  return isBuiltAtPublish(decl?.builtAtPublish ?? [], literal.replace(/^\.\//, ""));
 }
 
 /**
@@ -593,6 +611,35 @@ export function newWitnesses(recorded: readonly string[], current: readonly stri
   return current.filter((w) => !known.has(w));
 }
 
+/**
+ * The new witnesses that are recorded witnesses MOVED to another file: a
+ * literal the recorded file no longer names (so it is lost), written now in
+ * a file that did not name it before (so it is new). Paired one to one, by
+ * the literal, so the list never grows.
+ *
+ * A move of the code naming an artefact is not a new literal. cat-harness #286
+ * (bean `tdir`) split `tools/index.ts` into `tools/<id>/<id>.ts`: eight
+ * witnesses went lost and the same eight literals came back new, and the gate
+ * could neither drop the lost ones (`--update` refused over the new) nor
+ * admit the new. Under the `gz47` ruling the debt is the LITERAL, and a move
+ * carries it: one lost witness hands on to one new one, never two, and a
+ * literal that was EDITED is a different literal, which pairs with nothing.
+ */
+export function relocatedWitnesses(
+  lost: readonly string[],
+  added: readonly string[],
+): Array<{ from: string; to: string }> {
+  const literalOf = (w: string) => w.slice(w.indexOf("::") + 2);
+  const free = new Map<string, string[]>();
+  for (const w of [...lost].sort()) free.set(literalOf(w), [...(free.get(literalOf(w)) ?? []), w]);
+  const pairs: Array<{ from: string; to: string }> = [];
+  for (const w of [...added].sort()) {
+    const from = free.get(literalOf(w))?.shift();
+    if (from !== undefined) pairs.push({ from, to: w });
+  }
+  return pairs;
+}
+
 if (import.meta.main) {
   const { prefixes, artefacts, marked, refused } = scanDeclaredPaths(root);
 
@@ -622,8 +669,21 @@ if (import.meta.main) {
 
   const witnesses = witnessesOf({ prefixes, artefacts, marked, refused });
   const held = new Set(witnesses);
-  const lost = (prior.resolves ?? []).filter((w) => !held.has(w) && !unverifiableKeys.has(w));
-  const added = newWitnesses(prior.resolves ?? [], witnesses);
+  // A recorded witness naming a publish-time artefact this checkout has not
+  // built is held by the declaration, not lost (see `underBuiltAtPublish`).
+  const atPublish = (prior.resolves ?? []).filter(
+    (w) => !held.has(w) && !unverifiableKeys.has(w) && underBuiltAtPublish(root, w.slice(w.indexOf("::") + 2)),
+  );
+  const atPublishKeys = new Set(atPublish);
+  const lostAll = (prior.resolves ?? []).filter((w) => !held.has(w) && !unverifiableKeys.has(w) && !atPublishKeys.has(w));
+  const addedAll = newWitnesses(prior.resolves ?? [], witnesses);
+  // A witness whose file was renamed is neither lost nor new: `--update`
+  // carries it to the new file (see `relocatedWitnesses`).
+  const relocated = relocatedWitnesses(lostAll, addedAll);
+  const movedFrom = new Set(relocated.map((r) => r.from));
+  const movedTo = new Set(relocated.map((r) => r.to));
+  const lost = lostAll.filter((w) => !movedFrom.has(w));
+  const added = addedAll.filter((w) => !movedTo.has(w));
 
   const over: Array<{ file: string; was: number; now: number }> = [];
   for (const [file, n] of Object.entries(current)) {
@@ -644,10 +704,14 @@ if (import.meta.main) {
   );
 
   console.log(
-    `  ${lost.length || added.length ? "✗" : "✓"} ${String(artefacts.length).padStart(3)}  ` +
+    `  ${lost.length || added.length || relocated.length ? "✗" : "✓"} ${String(artefacts.length).padStart(3)}  ` +
       `name a file that exists — ${witnesses.length} witnessed, ${lost.length} lost, ${added.length} new` +
+      (relocated.length ? `, ${relocated.length} relocated` : "") +
       (unverifiable.length ? `, ${unverifiable.length} could not be checked` : ""),
   );
+  if (atPublish.length) {
+    console.log(`  · ${String(atPublish.length).padStart(3)}  witnessed, built at publish — declared \`builtAtPublish\`, not built in this checkout`);
+  }
   console.log(`  · ${String(marked.length).padStart(3)}  declared base cases, each with a reason`);
   console.log(
     `  ${over.length ? "✗" : "·"} ${String(refused.length).padStart(3)}  ` +
@@ -713,6 +777,16 @@ if (import.meta.main) {
     }
   }
 
+  if (relocated.length) {
+    console.log(
+      "\nRELOCATED — a recorded witness's literal left its file and is now named in\n" +
+        "another. The code moved, not the artefact: re-run with --update to carry it.",
+    );
+    for (const r of relocated) {
+      console.log(`  ✗ ${r.from.split("::")[0]}  →  ${r.to.split("::")[0]}   "${r.to.split("::")[1]}"`);
+    }
+  }
+
   if (unverifiable.length) {
     console.log(
       "\nCOULD NOT DETERMINE — these witnesses name files under a results tree that\n" +
@@ -771,7 +845,9 @@ if (import.meta.main) {
         "raising a count or dropping a witness is a diff somebody reviews. See " +
         "the module header of scripts/check-declared-paths.ts.",
       files: Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b))),
-      resolves: witnesses,
+      // A publish-time witness this checkout did not build is KEPT: dropping it
+      // here would lose it over an artefact nobody looked for.
+      resolves: [...new Set([...witnesses, ...atPublish])].sort(),
     };
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`);
     const counted = Object.values(current).reduce((a, b) => a + b, 0);
@@ -784,8 +860,9 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  if (lost.length || added.length) {
+  if (lost.length || added.length || relocated.length) {
     if (lost.length) console.log(`\n${lost.length} witnessed literal(s) no longer resolve.`);
+    if (relocated.length) console.log(`\n${relocated.length} witness(es) relocated; the baseline is stale until --update.`);
     if (added.length) console.log(`\n${added.length} new literal(s) name an existing file.`);
     process.exit(1);
   }

@@ -33,11 +33,18 @@ import { checkEntry } from "../check-l1-complete.ts";
 import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { declaredPageRoute } from "../viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = resolve(HARNESS, "..");
 const SITE = join(HARNESS, siteDirFor(HARNESS));
-const LIB = join(SITE, readDeclaration(HARNESS)!.name!, "library");
+/**
+ * The library viewer's DECLARED page route, `<locale>/<harness>/<id>` (owner,
+ * 2026-10-09) — the route `gen-library-viz.ts` writes under, asked rather than
+ * composed, so the locale segment the route gained is not restated here.
+ */
+const ROUTE = declaredPageRoute(HARNESS, "library-viewer")!;
+const LIB = join(SITE, ROUTE);
 
 /** The shipped source, evaluated — what is tested is what the page runs. */
 const { entryFromPath, legacyKey } = new Function(`${ADDRESS_JS}\nreturn { entryFromPath, legacyKey };`)() as {
@@ -245,11 +252,11 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     // A referenced entry the smart-trust instance renders, at its declared root.
     expect(byKey.get("smart-base/smart-trust")?.view).toBe("/smart-trust/");
     // An ingested PDF: rendered by the library viewer, at its own entry page.
-    expect(byKey.get("smart-base/who-rhr-1806-eng")?.view).toBe("/cat-harness/library/smart-base/who-rhr-1806-eng/");
+    expect(byKey.get("smart-base/who-rhr-1806-eng")?.view).toBe(`/${ROUTE}/smart-base/who-rhr-1806-eng/`);
     for (const e of index.entries) {
       expect(e.view, `${e.instance}/${e.id}`).toBeDefined();
       // Every view is a page that exists on the site, or an instance root route.
-      if (e.view!.startsWith("/cat-harness/library/")) expect(existsSync(join(SITE, e.view!, "index.html"))).toBe(true);
+      if (e.view!.startsWith(`/${ROUTE}/`)) expect(existsSync(join(SITE, e.view!, "index.html"))).toBe(true);
     }
   });
   test("the asset never references a rendering of itself", () => {

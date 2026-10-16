@@ -50,6 +50,7 @@ import { unresolvedPaths } from "../../scripts/check-tools.ts";
 import { tools, toolsOf } from "../../tools/discover.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { resolveScriptCommand } from "../../scripts/lib/script-command.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -135,5 +136,48 @@ describe("what the check deliberately does NOT rule on", () => {
     expect(scripted.length).toBeGreaterThan(5);
     const flagged = unresolvedPaths().map((u) => u.tool);
     for (const t of scripted) expect(flagged).not.toContain(t.id);
+  });
+});
+
+/**
+ * Owner, 2026-10-15 ("J2"): a Tool DEFINED in the harness names its command by
+ * a script KEY (`bun run cat <key>`), and the layer that implements it declares
+ * the command under that key (`checkoutScripts`), so the definition never names
+ * the layer above it. The key is resolved when the command runs
+ * (`run-script.ts`), and by any reader that needs the command itself.
+ */
+describe("a harness Tool names its command by a script key, resolved from a declaration", () => {
+  test("a key resolves to the command its manifest declares, arguments kept", () => {
+    const r = resolveScriptCommand(REPO, "bun run cat pdf:viewer --embed");
+    expect(r?.key).toBe("pdf:viewer");
+    expect(r?.command).toMatch(/\/scripts\/pdf-viewer\.ts --embed$/);
+  });
+
+  test("a key no manifest declares does not resolve, and is a finding rather than a pass", () => {
+    expect(resolveScriptCommand(REPO, "bun run cat no-such:script-key")).toBeUndefined();
+  });
+
+  test("a command that is not a key comes back unchanged", () => {
+    expect(resolveScriptCommand(REPO, "beans list")).toEqual({ command: "beans list" });
+    expect(resolveScriptCommand(REPO, "bun run cat scripts/x.ts")).toEqual({ command: "bun run cat scripts/x.ts" });
+  });
+
+  test("no command or install line of the harness's own Tools names the tools layer's code", () => {
+    const harness = instanceRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
+    const lines = toolsOf(harness).flatMap((t) => [
+      ...Object.values(t.invoke as Record<string, unknown>).filter((v): v is string => typeof v === "string").map((v) => ({ id: t.id, v })),
+      ...Object.values(t.install as Record<string, unknown>).filter((v): v is string => typeof v === "string").map((v) => ({ id: t.id, v })),
+    ]);
+    expect(lines.length).toBeGreaterThan(20);
+    const tooling = /(?:^|[\s"'/])cat-harness-tools\//;
+    expect(lines.filter((l) => tooling.test(l.v)).map((l) => `${l.id}: ${l.v}`)).toEqual([]);
+  });
+
+  test("every key a harness Tool names is declared, so every one of them runs", () => {
+    const harness = instanceRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
+    const keyed = toolsOf(harness)
+      .flatMap((t) => [t.invoke.shell, t.install.cli, t.install.container].filter((v): v is string => typeof v === "string" && /^bun run cat [^\s]+/.test(v)).map((v) => ({ id: t.id, v })));
+    expect(keyed.length).toBeGreaterThan(40);
+    expect(keyed.filter((k) => resolveScriptCommand(REPO, k.v) === undefined).map((k) => `${k.id}: ${k.v}`)).toEqual([]);
   });
 });
