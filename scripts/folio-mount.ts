@@ -11,12 +11,12 @@
  *
  * ## What was measured, and why this is possible now and was not before
  *
- * `jpjt` measured the gap on the `who-iris` replica pages: `docs-ui.js` on
+ * `jpjt` measured the gap on the IRIS replica's pages: `docs-ui.js` on
  * **0** of them, and loading it there would have mounted **nothing**, because
  * every folio surface was bound to just-the-docs page furniture — the
  * launcher wants a sidebar header, the board wants `<main>`, the language bar
  * wants `.main-content`. A replica page has none of those and must not grow
- * them: who-iris exists to look like WHO.
+ * them: the IRIS replica exists to look like WHO.
  *
  * R25's glass is the surface that does not care. It comes down OVER whatever
  * is being browsed, so `mountGlass()` appends to `document.body` and is
@@ -41,8 +41,8 @@
  *
  * ## Why the root is derived in the browser
  *
- * These pages are served from **two** mount routes — `/who-iris/` and
- * `/docs/who-iris/` — so one generated file sits at two different depths
+ * These pages are served from **two** mount routes — `/<instance>/` and
+ * `/docs/<instance>/` — so one generated file sits at two different depths
  * below the site root. A document-relative `href` is therefore correct under
  * one mount and 404s under the other, and `gen-iris-pages.ts` already says so
  * about its architecture drawing. An absolute site URL is the other obvious
@@ -58,7 +58,7 @@
  *
  * ## Why the route shape is the CALLER's
  *
- * A generic module that hard-coded `who-iris` would be the platform knowing
+ * A generic module that hard-coded the replica's name would be the platform knowing
  * about one library, which is the boundary this repository exists to keep.
  * The caller passes the pattern that finds its own instance root; the
  * platform owns the mount, the marker and the gate.
@@ -83,10 +83,10 @@ export const MARKER = "data-fa-folio-mount";
  * instance's own root.
  *
  * `pattern` is a regular expression whose **first capture group is the site
- * root, including its trailing slash**. For who-iris, mounted at both
- * `/who-iris/` and `/docs/who-iris/`:
+ * root, including its trailing slash**. For an instance `<name>`, mounted at both
+ * `/<name>/` and `/docs/<name>/`:
  *
- *     /^(.*?)(?:docs\/)?who-iris\//
+ *     /^(.*?)(?:docs\/)?<name>\//
  *
  * Non-greedy, so it anchors on the FIRST occurrence: a library item whose
  * slug happened to contain the instance name cannot move the root.
