@@ -57,6 +57,7 @@ import {
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { prefixForLayer } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
@@ -598,7 +599,7 @@ function main(): number {
     script: "cat-harness-tools/scripts/check-term-mapping.ts",
     scriptAbsPath: import.meta.path,
     // declared-path-literal: a QA subject ID (the glossary's declared route), recorded in the sidecar; nothing reads it as a filesystem path.
-    subject: { kind: "glossary", id: "folio-assistant-core/glossary" },
+    subject: { kind: "glossary", id: `${prefixForLayer("core")}/glossary` },
     families: Object.fromEntries(
       MAPPING_TARGETS.map((t) => [
         t,

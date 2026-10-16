@@ -76,6 +76,10 @@ import {
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
+// The instance that declares the `core` term layer, as the harness's own
+// namespace table names it. Read from there rather than spelt here, so this
+// layer does not carry the name of an instance above it.
+const CORE_INSTANCE: string = prefixForLayer("core");
 const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
 const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const OWL = "http://www.w3.org/2002/07/owl#";
@@ -125,7 +129,7 @@ export function vocabularyIri(): string {
 export function findPlatformRoot(start: string = ROOT): string {
   let curr = resolve(start);
   while (curr !== dirname(curr)) {
-    if (existsSync(join(curr, "folio-assistant-core"))) return curr;
+    if (existsSync(join(curr, CORE_INSTANCE))) return curr;
     curr = dirname(curr);
   }
   return repoRootFor(start);
@@ -135,7 +139,7 @@ export function findPlatformRoot(start: string = ROOT): string {
 export function namespaceForPrefixOrLayer(target: string): string {
   if (target === "bootstrap") return namespaceForLayer("bootstrap");
   if (target === "harness" || target === "cat-harness") return namespaceForLayer("harness");
-  if (target === "core" || target === "folio-assistant-core") return namespaceForLayer("core");
+  if (target === "core" || target === CORE_INSTANCE) return namespaceForLayer("core");
   const prefixes = defaultInstancePrefixes();
   const ns = prefixes.get(target);
   if (ns) return ns;
@@ -314,7 +318,7 @@ export function buildVocabulary(
     ? (target as TermLayer)
     : target === "cat-harness"
       ? "harness"
-      : target === "folio-assistant-core"
+      : target === CORE_INSTANCE
         ? "core"
         : undefined;
 
@@ -414,10 +418,10 @@ export function buildVocabulary(
     let inBlockSlice = false;
     if (target === undefined) {
       inBlockSlice = publishingInstances.has(prefix);
-    } else if (target === prefix || (target === "core" && prefix === "folio-assistant-core")) {
+    } else if (target === prefix || (target === "core" && prefix === CORE_INSTANCE)) {
       inBlockSlice = true;
     } else if (!exact) {
-      if ((targetLayer === "core" || target === "core") && prefix === "folio-assistant-core") {
+      if ((targetLayer === "core" || target === "core") && prefix === CORE_INSTANCE) {
         inBlockSlice = true;
       }
     }
@@ -435,7 +439,7 @@ export function buildVocabulary(
     defined.add(bk.folioType);
 
     const scheme = conceptSchemeIriFor(prefix);
-    const bkLayer = prefix === "folio-assistant-core" ? "core" : prefix;
+    const bkLayer = prefix === CORE_INSTANCE ? "core" : prefix;
 
     nodes.push({
       "@id": bk.folioType,
@@ -489,7 +493,7 @@ export function buildVocabulary(
         }
       }
       if (name === "cat-harness") name = "harness";
-      if (name === "folio-assistant-core") name = "core";
+      if (name === CORE_INSTANCE) name = "core";
       return {
         "@id": iri,
         "@type": "skos:ConceptScheme",

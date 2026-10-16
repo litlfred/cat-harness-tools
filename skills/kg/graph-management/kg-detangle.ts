@@ -51,7 +51,7 @@ import {
 } from "@litlfred/cat-harness/schemas/detangle.js";
 import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern, prefixForLayer } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
@@ -91,7 +91,8 @@ const LITERAL_SCAN: Array<{ path: string }> = [
   // declared-path-literal: the scan list is REPO-relative. The grouping depth it
   // used to pair with each path is now derived (`groupDepthFor`); the PATHS
   // remain literals, which is a separate and still-open concern.
-  { path: "folio-assistant-core/schemas" },
+  // The core term layer's instance, named by the harness's namespace table.
+  { path: `${prefixForLayer("core")}/schemas` },
   { path: "bootstrap/skills" },
   { path: "bootstrap/processes" },
 ];

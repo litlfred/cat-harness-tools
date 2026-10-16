@@ -49,6 +49,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { prefixForLayer } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
@@ -890,7 +891,7 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
 function stagingWorkflow(assistant: string, contentType: InitFolioOptions["contentType"]): string {
   const on = contentType === "document";
   const build = on
-    ? `bun run ${assistant}/folio-assistant-core/scripts/build-document-site.ts --out _site`
+    ? `bun run ${assistant}/${prefixForLayer("core")}/scripts/build-document-site.ts --out _site`
     : `echo "::error::set build_command in .github/workflows/staging.yml to build this folio''s site" && exit 1`;
   const header = on
     ? `# The site is built by the platform's build-document-site.ts: one page per
