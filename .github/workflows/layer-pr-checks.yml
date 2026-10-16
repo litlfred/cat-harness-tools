@@ -688,7 +688,8 @@ jobs:
       # The base side is main, and main's answer does not depend on the PR
       # (bean cis2). It is cached under what it is computed FROM: the index
       # commit, the caller's base tree, the lower layers' commits, the judging
-      # scripts' content and the inputs that change the gate set. The old key
+      # scripts' content, the branch-kept graphs' tips and the inputs that
+      # change the gate set. The old key
       # also held the current main tips of cat-harness-tools and cat-harness,
       # which layer mode never mounts (it mounts the index's lock), so any
       # merge to either missed every layer's cache (cat-harness-tools#397).
@@ -719,7 +720,21 @@ jobs:
             lower="$lower $r=$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "litlfred/$r" main "$PIN_AT")"
           done
           scripts="$(cd ci/.github/scripts/layer-pr-checks && find . -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)"
-          raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH"
+          # The graphs kept on branches (`cat/<instance>/<graph>`: beans,
+          # todos, ...), which both sides mount at their tips. Bean lpcs's open
+          # question, answered here: in the key, so a bean that moved
+          # since main was judged is never charged to the PR. A miss costs
+          # runner time only; the base side runs beside the head side. A tip
+          # that cannot be read is a miss, never a hit.
+          state=""
+          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+            if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
+              state="$state $repo=$(printf '%s\n' "$tips" | sort | sha256sum | cut -d' ' -f1)"
+            else
+              state="$state $repo=unreadable-$(date +%s%N)"
+            fi
+          done
+          raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
           echo "main's answer is computed from: $raw"
           key="layer-pr-checks-main-v3-${GITHUB_REPOSITORY}-$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
           echo "key=$key" >> "$GITHUB_OUTPUT"
