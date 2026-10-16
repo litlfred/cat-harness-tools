@@ -2046,6 +2046,13 @@ export { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
  * generated `.html` ever overwritten: the generator's page wins over a
  * rendering of its source.
  *
+ * EXCEPT front matter whose only key is `generated` ({@link generatedOnlyFrontMatter}):
+ * a page's declaration that a generator wrote it, not a request to be a Jekyll
+ * page. bootstrap-tools' `subgraph-readmes` opens every README it writes
+ * wholly with one (owner, 2026-10-16, decision 4a; bootstrap-tools#24). Such a
+ * file is rendered as it was before it carried the key, with the block
+ * stripped, so a mounted directory's generated README keeps its README.html.
+ *
  * **A link that leaves the mounted directory** resolves nowhere on the site —
  * the rest of the instance is not published beside it. Given `source`, such a
  * link that stays inside the instance becomes a repository URL,
@@ -2055,6 +2062,21 @@ export { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
  * OUT of the instance is returned in `unresolved` rather than published as a
  * dead link: it is a source defect, and the caller fails on it.
  */
+/**
+ * The front matter block `text` opens with (closing newline included) when
+ * its only top-level key is `generated` -- the declaration a generator writes
+ * on a page it owns wholly, such as bootstrap-tools' `generatedFrontMatter`.
+ * `undefined` when there is no front matter or it holds any other key: that
+ * is a Jekyll page and stays one. Indented lines (a folded value) and YAML
+ * comments are not keys.
+ */
+export function generatedOnlyFrontMatter(text: string): string | undefined {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+  if (!m) return undefined;
+  const keys = m[1]!.split(/\r?\n/).filter((l) => l.trim() !== "" && !/^\s/.test(l) && !l.startsWith("#"));
+  return keys.length === 1 && /^generated:\s*\S/.test(keys[0]!) ? m[0] : undefined;
+}
+
 export async function renderMountedMarkdown(
   dest: string,
   source?: { dir: string; instanceDir: string; repository?: string },
@@ -2070,8 +2092,10 @@ export async function renderMountedMarkdown(
         continue;
       }
       if (!e.isFile() || !e.name.endsWith(".md")) continue;
-      const text = readFileSync(abs, "utf-8");
-      if (/^---\r?\n/.test(text)) continue;
+      const raw = readFileSync(abs, "utf-8");
+      const generated = generatedOnlyFrontMatter(raw);
+      if (generated === undefined && /^---\r?\n/.test(raw)) continue;
+      const text = generated === undefined ? raw : raw.slice(generated.length);
       const rel = relative(dest, abs).split(sep).join("/");
       // Where this file sits in the INSTANCE, so a relative link can be resolved there.
       const fileDir = posix.dirname(posix.join(mountRel, rel));
