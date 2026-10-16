@@ -40,7 +40,7 @@
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
  *   `<dir>/<dir>.json` — never by importing the layer above.
  * - An instance's OWN namespace (`<stub>` → `…/<stub>/0.1.0/ns#`) is implicit:
- *   it comes from cat-harness's `NS_PREFIXES` / `own-namespaces.json`, not from
+ *   it comes from cat-harness's `ownPrefixTable` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
  *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`), each
@@ -98,7 +98,8 @@ import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/sche
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
-import { NS_PREFIXES, ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 
@@ -193,13 +194,14 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
 }
 
 /**
- * An instance's own namespace, if it has one: `NS_PREFIXES` first (the stub →
- * namespace table that holds the stub spellings — it is how
- * `bootstrap` reaches `cat-bootstrap`'s namespace), then the `own-namespaces`
- * code list by code.
+ * An instance's own namespace, if it has one: the own-prefix table first
+ * (`ownPrefixTable`: the harness's stub spellings — it is how `bootstrap`
+ * reaches `cat-bootstrap`'s namespace — and the content layer's, derived from
+ * its declaration since folio-assistant#2598), then the `own-namespaces` code
+ * list by code.
  */
 export function defaultOwnNamespace(stub: string): string | undefined {
-  const known = (NS_PREFIXES as Readonly<Record<string, string>>)[stub];
+  const known = ownPrefixTable()[stub];
   if (known !== undefined) return known;
   try {
     return ownNamespace(stub);

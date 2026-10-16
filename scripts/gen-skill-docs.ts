@@ -31,7 +31,8 @@ import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "pat
 import { isSkillMd, kgDirectories, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { processRows, type ProcessRow } from "./gen-processes-viz.js";
-import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { stripInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
@@ -616,11 +617,11 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // (`folio-assistant-core-skills`, `folio-assistant-sci-lean-skills`, …) are
   // gone, and the corpus is read from each owner's own declaration — where
   // cmsl measured five of the mirror ids had already drifted.
-  "core-skills": "Content layer (folio-assistant-core)",
+  "core-skills": "Content layer ({instance})",
   // The science layer's Lean tooling (folio-assistant#1492): tooling lives in
   // the formal-math (sci) layer, never in core. Declared from within sci's `skills/`.
-  "lean-skills": "Science layer: Lean tooling (folio-assistant-sci)",
-  "data-skills": "Science layer: reference data (folio-assistant-sci)",
+  "lean-skills": "Science layer: Lean tooling ({instance})",
+  "data-skills": "Science layer: reference data ({instance})",
   // `large-datasets` is a package of the harness's `library` group since bean
   // `j7ql` (2026-10-01), keyed by basename like the packages above; it was
   // the `large-datasets-skills` root of its own instance before.
@@ -632,9 +633,35 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // packages answer different questions — how an IG is BUILT versus how a
   // client TALKS to a server — and a reader meeting `smart-launch` under "IG
   // build pipeline" would reasonably conclude it is a build step.
-  "fhir-ig-base": "FHIR IG build (fhir-harness/skills/fhir-ig-base)",
-  "fhir-client": "FHIR client & SMART launch (fhir-harness/skills/fhir-client)",
+  "fhir-ig-base": "FHIR IG build ({instance-path})",
+  "fhir-client": "FHIR client & SMART launch ({instance-path})",
 };
+
+/**
+ * A heading with the declaring instance filled in.
+ *
+ * A heading for a package another instance owns names that instance, and the
+ * name is READ from the declaration found above the directory rather than
+ * written into this table: this layer sits below the instances whose skills
+ * it publishes, and must not spell their names. `{instance}` is the declared
+ * `name`; `{instance-path}` is that name followed by the directory's path
+ * inside the instance (`<name>/skills/<package>`). A heading with neither
+ * placeholder is returned as written.
+ */
+export function headingFor(template: string, dir: string): string {
+  if (!template.includes("{instance")) return template;
+  let root = resolve(dir);
+  while (findDeclarationFile(root) === undefined) {
+    const up = dirname(root);
+    if (up === root) throw new Error(`gen-skill-docs: no instance declaration above ${dir}, for heading "${template}"`);
+    root = up;
+  }
+  const name = readDeclaration(root)?.name ?? basename(root);
+  const inside = relative(root, resolve(dir)).split(sep).join("/");
+  return template
+    .replaceAll("{instance-path}", inside === "" ? name : `${name}/${inside}`)
+    .replaceAll("{instance}", name);
+}
 
 /**
  * Every skill package under `skills/`, found on disk.
@@ -701,7 +728,7 @@ function discoverGroups(): Group[] {
     if (holdsSkill(skillsRoot)) {
       const direct = SKILLS_CATEGORIES[decl.id];
       if (direct === undefined) undeclared.push(decl.id);
-      else out.push({ category: direct, dir: skillsRoot, repoPrefix: repoRelative(skillsRoot) });
+      else out.push({ category: headingFor(direct, skillsRoot), dir: skillsRoot, repoPrefix: repoRelative(skillsRoot) });
     }
     for (const d of packageDirsIn(skillsRoot)) {
       const dir = d.dir;
@@ -721,7 +748,7 @@ function discoverGroups(): Group[] {
         undeclared.push(d.name);
         continue;
       }
-      out.push({ category, dir, repoPrefix: repoRelative(dir) });
+      out.push({ category: headingFor(category, dir), dir, repoPrefix: repoRelative(dir) });
     }
   }
   if (undeclared.length > 0) {

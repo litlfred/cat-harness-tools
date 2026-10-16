@@ -33,7 +33,7 @@ import {
   unknownArgument,
 } from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 import { contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import { manifestLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
@@ -614,7 +614,7 @@ describe("D4: a library item's licence is dcterms:license, by the row a glossary
 
   test("the published context binds both keys as the licence-naming table does", () => {
     const table = vocabMapping(join(HARNESS_ROOT), "licence-naming");
-    const bound = contextBindings([table], { inContext: {}, prefixes: { ...STANDARD_PREFIXES, ...NS_PREFIXES } });
+    const bound = contextBindings([table], { inContext: {}, prefixes: { ...STANDARD_PREFIXES, ...ownPrefixTable() } });
     const ctx = CONTENT_CONTEXT as unknown as Record<string, { "@id": string }>;
     const expand = (c: string) => {
       const [pfx, local] = c.split(":") as [string, string];

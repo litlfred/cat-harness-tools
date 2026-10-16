@@ -31,7 +31,7 @@
  */
 import { relative, resolve } from "node:path";
 
-import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { STANDARD_PREFIXES, expandCurie, toConceptMap } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
 import { loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -79,7 +79,7 @@ function run(argv: string[]): number {
   const instance = argv.includes("--instance") ? resolve(argv[argv.indexOf("--instance") + 1]!) : ROOT;
   const dirs = vocabMappingDirs(instance);
   const tables = loadVocabMappings(dirs); // throws, naming the file, on a malformed table
-  const prefixes = { ...STANDARD_PREFIXES, ...NS_PREFIXES };
+  const prefixes = { ...STANDARD_PREFIXES, ...ownPrefixTable() };
   console.log(`${tables.size} vocabulary mapping table(s) in ${dirs.map((d) => relative(resolve(ROOT, ".."), d)).join(", ") || "(none declared)"}:`);
   for (const m of [...tables.values()].sort((a, b) => a.id.localeCompare(b.id))) {
     const rows = m.group.reduce((n, g) => n + g.element.reduce((k, e) => k + (e.target?.length ?? 0), 0), 0);

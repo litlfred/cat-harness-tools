@@ -31,7 +31,8 @@ import {
   type ExternalSchema,
 } from "@litlfred/cat-harness/schemas/external-schema.js";
 
-import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_NAMESPACE_VALUES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { directoriesForGraph, instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
@@ -192,7 +193,7 @@ export function jsonLdNamespacesInUse(root = ROOT): Map<string, string[]> {
 
 /** Ours: an own namespace, or an IRI under one (a document or base we publish). */
 function isOwn(iri: string): boolean {
-  return OWN_NAMESPACE_VALUES.some((o) => iri === o || iri.startsWith(o) || o.startsWith(iri));
+  return ownNamespaceValues().some((o) => iri === o || iri.startsWith(o) || o.startsWith(iri));
 }
 
 /**
