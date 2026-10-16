@@ -88,7 +88,7 @@ import { parseFrontMatter, scalar, type FrontMatter } from "@litlfred/cat-harnes
 /**
  * Claude Code's skill-loader stub file name. Under `.claude/skills/` it is a
  * trigger pointing at a corpus skill, so a group holding only that is not a
- * group of skills. Elsewhere `SKILL.md` IS a skill's own file (who-iris's
+ * group of skills. Elsewhere `SKILL.md` IS a skill's own file (the IRIS replica's
  * voices use that layout), so this is checked only where the stubs live.
  */
 export const LOADER_STUB = "SKILL.md";
@@ -405,7 +405,7 @@ export function isSkillMd(path: string): boolean {
  * through a SECOND home — eleven because they also have a
  * `schemas/skills/<name>/` I/O contract, and `smart-base-tools` because it
  * also had `.claude/skills/local/smart-base-tools.json` (now under
- * `smart-base/skills/skill-definitions/`, bean `rqao`). Delete any one of
+ * the DAK base layer's `skills/skill-definitions/`, bean `rqao`). Delete any one of
  * those second homes and `check-workflow-refs` reports a real, present skill
  * as dangling: the "wall of false dangling refs" this module's own header says
  * it exists to prevent, arriving from the module itself.
@@ -567,7 +567,7 @@ export function skillMdFile(root: string, name: string, scope: CorpusScope = cor
  * `remote-packages/`, so it was a THIRD definition. Under it,
  * `scientific-visualization`, `hypothesis-generation` and
  * `scientific-critical-thinking` read as dangling, and all three were deleted
- * from `folio-assistant-sci/skills/content/authoring-math/package-manifest.json` two hours after bean
+ * from the formal-math layer's `skills/content/authoring-math/package-manifest.json` two hours after bean
  * `m4zg` recorded that deleting them would be wrong. The evidence offered was a
  * `git log --diff-filter=A` search finding no file ever added for any of them —
  * which is the wrong question, because a remote skill has no file here by
@@ -608,7 +608,7 @@ export function remotePackageDeclarations(root: string): RemoteDeclaration[] {
   const out: RemoteDeclaration[] = [];
   // EVERY declared skills root, not `kgRoots(root)[0]`: a wrapper sits with
   // the instance whose skills use it — sci holds `claude-scientific-skills`,
-  // fhir-harness `smarter-fhir` (placement PR1, bean `ybwt`) — and from the
+  // the FHIR IG harness `smarter-fhir` (placement PR1, bean `ybwt`) — and from the
   // checkout the first root is the deepest instance's, which holds none.
   const dirs = [...new Set(kgRoots(root).map((d) => resolve(d, "remote-packages")))].filter((d) => existsSync(d));
   for (const dir of dirs) for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {

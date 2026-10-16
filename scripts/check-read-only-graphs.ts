@@ -31,7 +31,7 @@
  * ## `exception` exists because the corpus falsified the binary immediately
  *
  * The first version had three kinds, and "declared writable over materialized
- * content" was flatly a contradiction. It fired on `who-iris/uploads/` — the
+ * content" was flatly a contradiction. It fired on the IRIS replica's `uploads/` — the
  * ingestion DROP ZONE, which `adapters/document/paths.ts` creates on a first
  * ingest precisely so somebody can write there, and which holds a materialized
  * node. The declaration was right and the gate was wrong.

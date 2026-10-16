@@ -25,7 +25,7 @@ import {
 import { REPO_ROOT } from "./lib/roots.ts";
 
 // What recorded paths are relative to. Before bean `tlat` moved this file down
-// from `folio-assistant-core/scripts/` it was `import.meta.dir/../..`, which
+// from the content core's `scripts/` it was `import.meta.dir/../..`, which
 // happens to be the same directory from here — but only inside this checkout.
 // Standalone, this layer has no repository root, and the container being read
 // is the caller's, so the working directory is the honest base.

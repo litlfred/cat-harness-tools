@@ -1135,7 +1135,7 @@ export function instanceHubPage(vis: { id: string; title?: string }, subjects: r
  * when no state dashboard draws it, it has instance pages, and its kinds are
  * not state — a registry, or `code`. Without it `en/cat-harness/code/` had a
  * page per instance and none at its own route, which `site-coverage.ts`
- * refuses (dth-hrh and smart-immunizations, 2026-10-15).
+ * refuses (dth-hrh and a DAK IG, 2026-10-15).
  */
 export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
   if (drawnByDashboard || subjects === 0 || kinds.length === 0) return false;

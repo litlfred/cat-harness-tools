@@ -22,7 +22,7 @@
  * That split is the substance rather than a tidy-up. `s8nu` proposed the
  * ownership test as the axis and expected all four selectors to become call
  * sites, but two of them do not share this unit at all — `prunableStickies`
- * walks flat `.json` FILES, and `who-iris`'s `OWNED`/`OWNED_LIB`/`OWNED_DOCS`
+ * walks flat `.json` FILES, and the IRIS replica's `OWNED`/`OWNED_LIB`/`OWNED_DOCS`
  * match flat filenames because that site publishes no subject directories.
  * The bean names generalising the unit as *"a real design step rather than a
  * rename"* for `OWNED`, and does not notice `prunableStickies` sits on the

@@ -53,7 +53,7 @@
  * Tone 28 is the work plan (`beans`, `bean-defs`, `attestations`,
  * `issue-marks`); tone 268 is the harness and its sources; and tone 199 settles
  * it beyond inference, because the convention is written into the data — both
- * `who-iris` and `smart-base` say *"in WHO blue"* in their own `reads` string.
+ * the IRIS replica and the DAK base layer say *"in WHO blue"* in their own `reads` string.
  *
  * So hue is **reported and never graded**, all of it. A gate failing on 11
  * deliberate decisions is not a strict gate, it is a wrong one. And the

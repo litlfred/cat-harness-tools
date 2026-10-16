@@ -5,7 +5,7 @@
  * §12.15 of `docs/proposals/rag-document-ingestion.md` states the target: the
  * content block is the source, and rendering fans out to a FHIR IG, some
  * Excels, and a PDF. §12.16 established that the PDF renderer **exists
- * nowhere** — `smart-base`'s only PDF dependency is `pdfplumber`, used to
+ * nowhere** — the DAK base layer's only PDF dependency is `pdfplumber`, used to
  * *read* PDFs when extracting personas. This is the first thing that produces
  * one.
  *
@@ -72,7 +72,7 @@ interface Assembly {
  * on: a repository is a DAK iff its root `sushi-config.yaml` declares a
  * dependency on `smart.who.int.base`. Verified against all three WHO
  * repositories in hand — `smart-dak-immz` and `smart-dak-bds` pin `current`,
- * `smart-immunizations` pins `0.2.0`.
+ * one DAK IG pins `0.2.0`.
  *
  * This is a *declaration*, not an inference. Nothing here looks at directory
  * names, file counts, or whether `input/business-processes/` happens to exist:
@@ -265,7 +265,7 @@ function findByExt(root: string, ext: string, depth = 4): string[] {
 }
 
 /**
- * WHO's own decision-table stylesheet, from a smart-base checkout.
+ * WHO's own decision-table stylesheet, from a checkout of the DAK base layer.
  *
  * `local-template/package/content/assets/css/dmn.css` carries the WHO palette
  * (`--dmn-who-blue: #0093d0`), light/dark theming and DMN table rules, and the
@@ -362,7 +362,7 @@ export function toHtml(a: Assembly): string {
   const who = whoStylesheet();
   const print = printCss();
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(a.title)}</title>
-${who ? `<!-- WHO styling from smart-base ${who.source} -->\n<style>\n${who.css}\n</style>` : "<!-- no smart-base checkout: WHO styling unavailable -->"}
+${who ? `<!-- WHO styling from ${who.source} -->\n<style>\n${who.css}\n</style>` : "<!-- no DAK base checkout (SMART_BASE_HOME): WHO styling unavailable -->"}
 <style>${print}</style>
 <style>
   body { margin: 0; }

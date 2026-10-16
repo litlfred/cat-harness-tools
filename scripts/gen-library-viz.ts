@@ -481,8 +481,8 @@ function uploadState(e){
 
 var COLS = [
   /* THE SLUG OPENS THE ENTRY'S VISUALISER -- e.view, generated per entry by
-     the projection (owner, 2026-10-02: "click on smart-trust slug and open
-     up the visualizer"). A site-root path, composed like an avatar; an entry
+     the projection (owner, 2026-10-02, paraphrased: clicking an entry's slug
+     should open its visualiser). A site-root path, composed like an avatar; an entry
      whose projection carries none keeps a plain slug. */
   { k:"id",       t:"slug",     n:false, f:function(e){
       var v = typeof e.view === "string" && e.view.charAt(0) === "/" ? SITE_ROOT + e.view.slice(1) : "";
@@ -495,7 +495,7 @@ var COLS = [
   { k:"title",    t:"title",    n:false, c:"t-title", f:function(e){
       /* THE TITLE OPENS THE ENTRY'S OWN PAGE -- its path IRI (#1881). It
          used to open the item's README on GitHub, which a referenced entry
-         may not have (owner, 2026-10-02: the smart-trust title went to a
+         may not have (owner, 2026-10-02: a DAK IG's title went to a
          404). The README stays as a secondary link, only when one exists. */
       var t = '<a class="lib-title" href="'+esc(entryHref(e))+'">'+esc(e.title)+"</a>";
       var src = e.arxiv ? "https://arxiv.org/abs/"+encodeURIComponent(e.arxiv) : e.doi ? "https://doi.org/"+e.doi : "";
@@ -1325,12 +1325,12 @@ export function instanceRootRoutes(repoRoot: string): Map<string, string> {
 /**
  * An entry's `view` — the site-root path of the page that RENDERS it.
  *
- * Owner, 2026-10-02: *"i also expected to be able to click on "smart-trust"
- * slug and open up the visualizer for smart-trust"*. Two cases:
+ * Owner, 2026-10-02 (paraphrased): clicking a referenced instance's slug
+ * should open that instance's visualiser. Two cases:
  *
  * - a REFERENCED entry whose record links a `site_path` that is another
  *   instance's DECLARED root route (`instanceRootRoutes`) is rendered there —
- *   smart-trust's IG viewer at `/smart-trust/`. The link chooses the
+ *   a DAK IG's viewer at its `/<instance>/` root. The link chooses the
  *   candidate; the declaration is what makes it a visualiser rather than a
  *   page that merely exists, so a link to anything else is not taken;
  * - every other entry is rendered by this viewer, at its own entry page.
@@ -1497,17 +1497,17 @@ if (import.meta.main) {
   //
   // Owner, 2026-09-20, reducing three cases to two:
   //
-  //   > i want two rules.... not three. one is cat-harness handling the
-  //   > library/ dir which has who-iris assets in it. one is who-iris handler
-  //   > to mock current iris website.
+  //   (paraphrased) two rules, not three: one is cat-harness handling the
+  //   library/ dir, which holds a content instance's assets; the other is that
+  //   instance's own handler, which replicates the source website.
   //
   // So the form is `<base>/<handler>/<kind>/<optional subject>` — which is the
-  // owner's own first example, `<base>/cat-harness/docs/who-iris/`. The
+  // owner's own first example, `<base>/cat-harness/docs/<instance>/`. The
   // handler is THIS instance (the machinery), the kind names what it renders,
   // and the subject scopes it to one instance's assets.
   //
   // **A subject page must NOT be published at `<base>/<subject>/<kind>/`.**
-  // That is rule 2's namespace — `<base>/who-iris/` is who-iris presenting
+  // That is rule 2's namespace — `<base>/<instance>/` is the IRIS replica presenting
   // ITSELF, mocking the IRIS website — and a viewer parked there would squat
   // on the instance's own site. An earlier draft of this file was about to do
   // exactly that.

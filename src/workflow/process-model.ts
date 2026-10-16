@@ -307,7 +307,7 @@ export interface ProcessNode {
    * are the answers it may give.
    *
    * The declared enum a recorded outcome is validated against. Its document
-   * contract is `folio-assistant-core/schemas/adjudication.ts`; see
+   * contract is the content core's `schemas/adjudication.ts`; see
    * {@link adjudicationOf} for why the two are not one import.
    */
   adjudication?: { codes: string[]; list?: string };
@@ -696,7 +696,7 @@ function noCallReasonOf(ext: { $type: string; reason?: string }[], id: string): 
  *
  * Bean `5vo9`, the owner's *"formalized adjudication process so there is 'use
  * judgement'"*. The contract for the request and outcome DOCUMENTS lives in
- * `folio-assistant-core/schemas/adjudication.ts`; this is the harness half,
+ * the content core's `schemas/adjudication.ts`; this is the harness half,
  * and the two meet at the data rather than by import — core `needs`
  * cat-harness, so an import from here would run up the layer stack.
  *
@@ -1201,7 +1201,7 @@ function ownInstanceProcessIndex(dir: string): Map<string, string> {
  * `refresh-materialized.bpmn` into `large-datasets/processes/` made it the
  * first diagram whose callee (`Process_Adjudication`) is in ANOTHER
  * instance — one it is allowed to reach, since large-datasets needs
- * folio-assistant-core, which needs cat-harness. Without this the call went
+ * the content core, which needs cat-harness. Without this the call went
  * silently opaque: no descent, and `checkAcceptedCodes` never ran. (Bean
  * `j7ql`, 2026-10-01, dissolved large-datasets into cat-harness, so the
  * diagram is back in `cat-harness/processes/` beside its callee; the

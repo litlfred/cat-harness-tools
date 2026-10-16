@@ -18,7 +18,7 @@
  * and behaviour — they can no longer disagree about a width — but `sjic`'s own
  * note is right that *"cannot disagree" is not "one renderer"*: two files still
  * decided independently what a harness row contains, and they came apart. The
- * sidebar let a reader reach `who-iris/library/` from a harness row; the rail
+ * sidebar let a reader reach an instance's `library/` from a harness row; the rail
  * stopped at the harness.
  *
  * So the Liquid file becomes a one-line `{% include %}` and this writes what it

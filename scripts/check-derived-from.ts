@@ -15,7 +15,7 @@
  * - **An id declared nowhere** is refused.
  * - **An id declared only by an instance the edge's instance does not need**
  *   is a LAYERING GAP: the chrome case, where an IG's pages are styled by
- *   smart-base's chrome across no `needs` path. The owner ruled it a RATCHET
+ *   the DAK base layer's chrome across no `needs` path. The owner ruled it a RATCHET
  *   (option 1 of 3). It is held in `derived-from.baseline.ts` with a reason; a
  *   new gap fails, and a cleared one leaves the baseline stale until shrunk.
  * - **A cycle** is refused.
@@ -388,7 +388,7 @@ if (import.meta.main) {
   const order = renderingOrder(tree, j.edges);
   const at = process.argv.indexOf("--downstream");
   if (at !== -1) {
-    // A query, not the gate: `--downstream smart-base/smart-base-themes …`.
+    // A query, not the gate: `--downstream <instance>/<directory-id> …`.
     const asked = process.argv.slice(at + 1).filter((a) => !a.startsWith("--"));
     const unknown = asked.filter((n) => !order.includes(n));
     if (unknown.length > 0) {

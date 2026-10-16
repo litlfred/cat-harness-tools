@@ -285,10 +285,10 @@ function render(){
   // AND NO --library VALUE IS PRINTED, which is the part that had to be
   // measured rather than assumed. A sibling convention (<instance>/library)
   // looks obvious and the corpus contradicts it in ALL THREE queues:
-  // uploads/ has landed files in agent-skills (5) AND smart-base (7);
-  // cat-harness/uploads in cat-harness (5) AND folio-assistant-sci (1);
-  // who-iris/uploads in none at all, where the convention would have
-  // confidently said who-iris/library. A QUEUE HAS NO SINGLE DESTINATION —
+  // uploads/ has landed files in agent-skills (5) AND the DAK base layer (7);
+  // cat-harness/uploads in cat-harness (5) AND the formal-math layer (1);
+  // the IRIS replica's uploads in none at all, where the convention would have
+  // confidently said that replica's library. A QUEUE HAS NO SINGLE DESTINATION —
   // the choice is per document, which is exactly why ingest itself refuses to
   // guess it. The page says the same thing the tool says.
   $("add").innerHTML = qs.length === 0 ? "" :

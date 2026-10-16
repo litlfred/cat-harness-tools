@@ -314,7 +314,7 @@ const SCRIPT = `
     }
     return d;
   }
-  // From each status, the decisions the review-comment table allows (folio-assistant-core review-comment.ts).
+  // From each status, the decisions the review-comment table allows (the content core's review-comment.ts).
   var DECIDE = { open: ["addressed", "adjudicated", "withdrawn"], addressed: ["resolved", "reopened", "adjudicated", "withdrawn"] };
   function commentList(cs) {
     var box = el("div", null, "comments");

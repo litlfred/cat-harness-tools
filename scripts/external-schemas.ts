@@ -114,7 +114,7 @@ export function targetNamespacesInUse(
   base = resolve(ROOT, ".."),
 ): Map<string, string[]> {
   // The DECLARED workflow graph, not a literal `processes/`: that reaches a
-  // dependency's diagrams too (smart-base's), which call into the same corpus.
+  // dependency's diagrams too (the DAK base layer's), which call into the same corpus.
   const out = new Map<string, string[]>();
   for (const f of files.filter((f) => f.endsWith(".bpmn"))) {
     const src = readFileSync(f, "utf-8");
@@ -137,8 +137,8 @@ export function targetNamespacesInUse(
  *   a list that goes stale — and the namespace literals they carry;
  * - every committed `.jsonld` under this instance, by its `@context` bindings.
  *
- * NOT third-party documents another instance ingested (`smart-base`'s,
- * `smart-trust`'s FHIR artefact indexes): those are that instance's data.
+ * NOT third-party documents another instance ingested (the DAK base layer's
+ * and a DAK IG's FHIR artefact indexes): those are that instance's data.
  * `@base` is not a namespace and is not read; an IRI of OURS (the
  * `own-namespaces` code list, or one under it) is excluded — ours need
  * spelling one way, not a registry record.
@@ -334,7 +334,7 @@ export function namespaceMentions(iris: readonly string[], repoRoot = resolve(RO
 export function skosTermsInUse(root = resolve(ROOT, "..")): string[] {
   const out = new Set<string>();
   // This script's own exporters, plus every instance's DECLARED `schemas`
-  // graph. The third entry used to be the literal `folio-assistant-core/schemas`:
+  // graph. The third entry used to be a literal path to the content core's `schemas`:
   // a path into a layer above cat-harness that no import gate sees, and one
   // that would scan nothing, silently, once cat-harness stands alone
   // (separation placement review, 2026-10-06, bean `0r7u` step 0).

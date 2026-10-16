@@ -25,7 +25,7 @@
  * ## What it would have caught
  *
  * The first cut of the ACTIVE/STATIC rule read "declares any `state` graph",
- * which made the repository root and `who-iris` ACTIVE on `uploads` alone.
+ * which made the repository root and the IRIS replica ACTIVE on `uploads` alone.
  * An ingestion queue is live state and is not work anybody is partway
  * through, so an agent told the graph was active would have arrived looking
  * for something to prioritise and found a directory of unprocessed files.

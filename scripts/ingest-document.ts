@@ -45,7 +45,7 @@
  *   bun run cat ingest uploads/FILE.pdf --dry-run
  *   bun run cat ingest uploads/FILE.pdf --refresh-meta   # technical facts only
  *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title (w6fu)
- *   bun run cat ingest uploads/FILE.pdf --library who-iris
+ *   bun run cat ingest uploads/FILE.pdf --library <instance>
  *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
  *   bun run cat ingest uploads/FILE.md --text   # Markdown/MDX/XML: text has no magic bytes, so the caller says so
  *
@@ -187,7 +187,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   // this document go", it is a coin toss that files it somewhere plausible.
   //
   // THREE states, and the middle one arrived with bean `frs5`, which moved the
-  // corpus into `who-iris/` and `folio-assistant-sci/`:
+  // corpus into the IRIS replica's and the formal-math layer's directories:
   //
   //   none declared   -> throw: ingesting into a guessed directory files the
   //                     document where nothing scans it
@@ -217,13 +217,13 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   }
 
   // Matched EXACTLY, on either spelling a caller would reasonably use: the
-  // relative path the declaration resolves to (`../who-iris/library`) or the
-  // instance directory holding it (`who-iris`). Both work and neither is a
+  // relative path the declaration resolves to (`../<instance>/library`) or the
+  // instance directory holding it (`<instance>`). Both work and neither is a
   // second vocabulary to learn.
   //
   // IT WAS A SUBSTRING MATCH, and that is a guess wearing the clothes of a
   // match. Measured 2026-09-20: `--library c` matched exactly one declared
-  // library — `../folio-assistant-sci/library` is the only one containing a `c`
+  // library — the formal-math layer's was the only one whose path contained a `c`
   // — so a one-character typo filed a document into the science corpus and
   // printed success. In the one function whose stated job is refusing to
   // guess a write target, and directly under a comment saying ambiguity
@@ -236,7 +236,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   const instanceOf = (d: string): string => {
     const rel = named(d);
     const parts = rel.split("/").filter((p) => p.length > 0 && p !== "..");
-    // `../who-iris/library` -> `who-iris`; a bare `library` is this instance's.
+    // `../<instance>/library` -> `<instance>`; a bare `library` is this instance's.
     return parts.length > 1 ? parts[parts.length - 2]! : ".";
   };
   const hits = declared.filter((d) => named(d) === choice || instanceOf(d) === choice);
@@ -1083,8 +1083,8 @@ if (import.meta.main) {
   const chosenLibrary = libraryChoice(argv);
   // The positional is the first argument that is neither a flag NOR a flag's
   // VALUE. `argv.find((a) => !a.startsWith("--"))` was enough while every flag
-  // was boolean; `--library who-iris` breaks it, because `who-iris` does not
-  // start with `--` and would be ingested as a filename — producing "who-iris:
+  // was boolean; `--library <instance>` breaks it, because `<instance>` does not
+  // start with `--` and would be ingested as a filename — producing "<instance>:
   // not there" while the real argument sat untouched two places along.
   const takesValue = new Set(["--library", "--reference", "--title", "--instance"]);
   let pdf: string | undefined;
@@ -1283,8 +1283,8 @@ if (import.meta.main) {
   // `libraryRoot` returns an INSTANCE-RELATIVE path — that is its contract, and
   // it is what every `-o` argument wants. `resolve()` with one argument
   // resolves against `process.cwd()`, so running this from the repository root
-  // (which is where `bun run` puts you) turned `../who-iris/library` into
-  // `/home/user/who-iris/library` — OUTSIDE THE CHECKOUT. It then copied the
+  // (which is where `bun run` puts you) turned `../<instance>/library` into
+  // `/home/user/<instance>/library` — OUTSIDE THE CHECKOUT. It then copied the
   // staged tree there, deleted the staging directory, and printed `✓ promoted`.
   //
   // Latent before bean `frs5` and load-bearing after it: while the only

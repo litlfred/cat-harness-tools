@@ -11,7 +11,7 @@
  * ✍ suggest editor) shows a variable's current value from this file, so the
  * value is read from the graph rather than re-derived in the browser.
  *
- * A pass-through prefix (`site.data`, fhir-harness) is resolved by Jekyll or
+ * A pass-through prefix (`site.data`, the FHIR IG harness) is resolved by Jekyll or
  * the IG Publisher, later than this runs: its references are listed with
  * `state: "pass-through"` and no value, for that pipeline to fill. A reference
  * that does not resolve is listed with its reason, never left out: an absent

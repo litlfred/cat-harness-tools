@@ -116,7 +116,7 @@ export function shellWords(cmd: string): string[] {
 /** A word this check declines to judge, with the reason it declines. */
 export function skipReason(tok: string): string | undefined {
   if (tok.startsWith("-")) return "a flag";
-  // `export SMART_BASE_HOME=/path/to/smart-base` — an assignment, not a path.
+  // `export SMART_BASE_HOME=/path/to/checkout` — an assignment, not a path.
   if (tok.includes("=")) return "an assignment";
   if (/[$<>*?~{}|@:]/.test(tok)) return "a template, a placeholder or a ref";
   if (tok.startsWith("/")) return "absolute — not repository-relative";
@@ -520,7 +520,7 @@ export function instanceRoots(repo: string): string[] {
 export function sourceFiles(repo: string): string[] {
   // DISCOVERED from the instance roots, not listed. The first draft named
   // `cat-harness/{scripts,src,content,schemas}`, and a merge from `main`
-  // brought a `who-iris/` instance with its own `scripts/` that the check
+  // brought the IRIS replica instance with its own `scripts/` that the check
   // then walked straight past — a hardcoded list going stale inside the check
   // whose whole subject is hardcoded paths going stale.
   const out: string[] = [];

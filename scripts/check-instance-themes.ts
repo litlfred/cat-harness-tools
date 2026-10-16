@@ -12,7 +12,7 @@
  * the three resolved a themes directory.** `check-theme-art` reads
  * `readDeclaration` + `THEME_LAYOUTS`; `gen-themes-css` and
  * `render-theme-sheet` read `THEMES`. Those are the platform's own theme
- * constants and an instance's declared theme ART — and the who-iris
+ * constants and an instance's declared theme ART — and the IRIS replica's
  * declaration is explicit that they are a different thing from its graph:
  *
  * > These are NOT the platform's twelve themes: those are cat-harness's own
@@ -41,7 +41,7 @@
  * **Reported, never graded:** which KINDS an instance's themes carry. The
  * board styles a card only from `sticky` themes, and whether an instance
  * authors one is an authoring decision, not a defect: #1584 reserved it for
- * the owner, who answered it for who-iris on 2026-09-30 ("author iris-sticky",
+ * the owner, who answered it for the IRIS replica on 2026-09-30 ("author iris-sticky",
  * bean `v8n5`) and for no other instance. So the kinds are printed with their
  * denominator and no verdict is attached. A check that failed on a missing
  * `sticky` would be answering a question its author was told not to.

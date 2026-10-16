@@ -490,10 +490,10 @@ function foldersOf(
 
 /**
  * THE INSTANCES A PAGE CAN BE INSIDE, for the rail's PAGES and FOLDERS
- * (issue #1902). Owner, viewing `/smart-trust/`: *"there are also 101 pages
- * under .../smart-trust/, which I would have expected only those in the IG
- * TOC. i think it is showing all the folio pages, not the harnessed
- * smart-trust's pages ... same for 'folders'."*
+ * (issue #1902). Owner, viewing a DAK IG's root (paraphrased): 101 pages were
+ * listed under that IG's path where only the IG's TOC was expected — the rail
+ * was showing all the folio's pages rather than the harnessed IG's own, and
+ * the same for 'folders'.
  *
  * A scope is an instance whose tile goes to its OWN THEMED ROOT
  * (`hrefKind: "folio"`) at a path of its own. Two kinds of href are not a

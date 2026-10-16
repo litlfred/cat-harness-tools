@@ -56,8 +56,8 @@ export interface ExpectedPage {
   /**
    * On the site OF the instance that declares it, the same view at that site's
    * own root: a folio's site reads `/<instance>/…` as `/…` (`ownHref` in
-   * `lib/foreign-site-scope.ts`), so who-iris's catalogue tile,
-   * `/who-iris/catalogue/`, lands on `catalogue/`. Set only for that instance.
+   * `lib/foreign-site-scope.ts`), so the IRIS replica's catalogue tile,
+   * `/<instance>/catalogue/`, lands on `catalogue/`. Set only for that instance.
    */
   ownSiteRoute?: string;
 }
@@ -94,10 +94,10 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
  *
  * "A sub-directory is an entry" is the right test for a library, an uploads
  * queue or a bean store, and the wrong one for a `tools` graph: a Tool is a
- * node the writer loads (`toolSubjects`), not a folder. smart-immunizations
- * (2026-10-15) inherits smart-base's `tools` declaration as a member, and its
+ * node the writer loads (`toolSubjects`), not a folder. A DAK IG
+ * (2026-10-15) inherits the DAK base layer's `tools` declaration as a member, and its
  * repository root holds the IG's own `tools/` folder of FHIR scripts: the guard
- * expected `en/cat-harness/tools/smart-immunizations/`, the writer rightly drew
+ * expected `en/cat-harness/tools/<dak-ig>/`, the writer rightly drew
  * nothing (no Tool node there), and the build failed on a page nobody owed.
  * Owner ruling B1: a declaration names only what an index mounting the
  * instance has — a folder that merely matches a declared path is not a graph.

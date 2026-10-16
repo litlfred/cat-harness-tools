@@ -16,7 +16,7 @@
  *
  * Two path rules meet there. `<base>/<handler>/<kind>/` is the machinery
  * rendering something; `<base>/<instance>/` is an instance presenting itself,
- * which is how who-iris mocks the IRIS website. This instance is both, so the
+ * which is how the IRIS replica mocks the IRIS website. This instance is both, so the
  * rules collided at exactly one path, and the owner settled it on 2026-09-21:
  * **the handler wins**. The authored page moved to `docs/platform.md` and
  * this generated index took the route. Bean `8h42`.
@@ -92,7 +92,7 @@ export interface HandlerRow {
  * Every (instance, kind) this handler renders, sorted by kind then instance.
  *
  * By KIND first, because the question a reader arrives with is "where are the
- * schemas" far more often than "what does who-iris have" — and the navbar
+ * schemas" far more often than "what does that instance have" — and the navbar
  * already answers the second, one tile per instance.
  */
 export function handlerRows(tiles: readonly HarnessTile[]): HandlerRow[] {

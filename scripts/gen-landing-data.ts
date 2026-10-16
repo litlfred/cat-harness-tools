@@ -89,7 +89,7 @@ const ROOT = landingRoot();
  * (`/concepts/agentic-harness.html`) and `publishedHref` maps it to where
  * Jekyll publishes it (`/docs/cat-harness/…`) by reading that directory. While
  * cat-harness was the landing the two were one directory; on a site whose
- * landing is another instance (who-iris's own site, 2026-10-09) the landing's
+ * landing is another instance (the IRIS replica's own site, 2026-10-09) the landing's
  * docs hold none of those pages, so every link was left at its source spelling
  * and 404'd. An unknown contributor keeps the old answer, the landing's.
  */

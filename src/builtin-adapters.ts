@@ -20,8 +20,8 @@
  *
  * ## Why it is not a TABLE either, since 2026-09-30
  *
- * The switch became a table here of `../folio-assistant-sci/adapters/paper/index.ts`
- * and `../folio-assistant-core/adapters/document/index.ts`, loaded by variable
+ * The switch became a table here of the formal-math layer's `adapters/paper/index.ts`
+ * and the content core's `adapters/document/index.ts`, loaded by variable
  * path. That fixed the load failure and kept the edge: the harness still named
  * two instances built on top of it, so it could not be lifted into its own
  * repository, and — being a variable import — no static gate could see it.

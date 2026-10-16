@@ -28,7 +28,7 @@
  *
  * So the rules live here, pure and tested, and the fetch stays with whoever
  * can do it: an agent pipes the listing in. The same split as
- * `who-iris/scripts/catalogue-baseline.ts` — the decisions are testable, the
+ * the IRIS replica's `scripts/catalogue-baseline.ts` — the decisions are testable, the
  * I/O is at the edge. Presenting this as a gate would be worse than not
  * shipping it, because a gate that silently examines nothing reports a clean
  * run over everything, which is the `dh4f` defect this repository keeps

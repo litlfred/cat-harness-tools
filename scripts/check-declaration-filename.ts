@@ -67,8 +67,8 @@
  * all, which is the one thing a bare count most needed to say and could not.
  *
  * **Call sites outside the instance that owns the constant.** Measured: two,
- * both in `folio-assistant-core/schemas/library-ref.ts`, and
- * `folio-assistant-core` imports **nothing** from `cat-harness` today. Making
+ * both in the content core's `schemas/library-ref.ts`, and
+ * the content core imports **nothing** from `cat-harness` today. Making
  * these use the constant would create this repository's first cross-instance
  * code dependency, and giving core its own copy would make two constants —
  * which is the defect this check exists to stop, one layer up.

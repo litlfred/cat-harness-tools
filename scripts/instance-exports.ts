@@ -11,8 +11,8 @@
  *
  * Measured on `main` 2026-10-04: fourteen directories declare an instance and
  * the site published three graphs — the host's, bootstrap's and the checkout
- * root's. The other eleven (`smart-base`, `who-iris`, `folio-assistant-core`,
- * …) had a declaration and no document, so nothing could fetch one harness on
+ * root's. The other eleven (the DAK base layer, the IRIS replica, the content
+ * core, …) had a declaration and no document, so nothing could fetch one harness on
  * its own. Each of them already exported cleanly with `kg-export --instance`
  * in one to three seconds; nothing ran the command.
  *
@@ -95,7 +95,7 @@ export interface PlannedExport {
    * minted against that and a `--base-url` is NOT passed: `exportIdentity`
    * puts a self-based instance at `<base>/<stub>.jsonld`, which under a
    * preview's base is a path nothing writes (measured 2026-10-04 for
-   * `cat-harness-tools`, `cat-openapi`, `fhir-harness` and `smart-base`).
+   * `cat-harness-tools`, `cat-openapi`, the FHIR IG harness and the DAK base layer).
    * Its own address is the honest one in every build.
    */
   ownCanonical: boolean;
