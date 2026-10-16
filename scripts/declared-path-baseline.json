@@ -31,7 +31,6 @@
     "scripts/check-avatar-coverage.ts::schemas/avatars.ts",
     "scripts/check-image-roles.ts::schemas/kg-node.ts",
     "scripts/eval-crdm-detect.ts::skills/sdlc/crdm/crdm-detect.md",
-    "scripts/eval-crdm-detect.ts::test/results/crdm-detect-eval.test-run.json",
     "scripts/partition/instance-rules.ts::schemas/assistant-package.ts",
     "scripts/partition/instance-rules.ts::schemas/assistant-types.ts",
     "scripts/partition/instance-rules.ts::schemas/assistant-workflow.ts",
