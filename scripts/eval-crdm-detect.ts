@@ -139,6 +139,7 @@ console.log(
 // PROCESS. The skill is in the process basis deliberately — it is what the
 // phrase list is derived FROM, so editing it can change the result without
 // touching a line of this script, which is exactly the `cv10` failure.
+// declared-path-literal: the harness's own QA results, joined under HARNESS_ROOT; it names no other instance's test/results/, though any instance declaring that path spells it the same.
 const OUT = join(root, "test/results/crdm-detect-eval.test-run.json");
 const run = buildTestRun({
   // bean 70lx: the corpus and the code are this layer's, the skill is the harness's
