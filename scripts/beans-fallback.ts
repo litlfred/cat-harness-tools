@@ -37,7 +37,7 @@
  *   bun run cat beans:fallback show <id>
  *   bun run cat beans:fallback create "<title>" [--type task] [--status todo] [--body "..."]
  *   bun run cat beans:fallback claim <id>
- *   bun run cat beans:fallback update <id> --status completed
+ *   bun run cat beans:fallback update <id> --status completed   # also lifts the blocks it held
  *   bun run cat beans:fallback note <id> "<text>"
  *   ... add --json to any of them
  *
@@ -324,10 +324,89 @@ function setField(bean: Bean, key: string, value: string): void {
   writeFileSync(bean.path, setFieldInText(readFileSync(bean.path, "utf-8"), key, value), "utf-8");
 }
 
-export function updateBean(root: string, id: string, fields: Record<string, string>): Bean {
+/** The statuses that finish a bean. Closing one lifts the blocks it holds. */
+export const CLOSING_STATUSES = new Set(["completed", "scrapped"]);
+
+/** The ids in a block-style front-matter sequence (`key:` then `    - id` lines). */
+function sequenceIn(front: string, key: string): { ids: string[]; span?: [number, number] } {
+  const m = new RegExp(`^${key}:[ \\t]*\\n((?:[ \\t]+-[ \\t]*\\S.*(?:\\n|$))+)`, "m").exec(front);
+  if (!m) return { ids: [] };
+  const ids = m[1]!
+    .split("\n")
+    .map((l) => l.replace(/^[ \t]*-[ \t]*/, "").trim().replace(/^['"]|['"]$/g, ""))
+    .filter((s) => s.length > 0);
+  return { ids, span: [m.index, m.index + m[0].length] };
+}
+
+/**
+ * Remove `blocker` from a bean's `key:` sequence, as a pure TEXT transform,
+ * dropping the key when nothing is left and appending a dated note that says
+ * why. `undefined` when the sequence does not name it, so a caller can tell
+ * "nothing to lift" from "lifted".
+ */
+export function liftBlockInText(
+  raw: string,
+  key: "blocked_by" | "blocking",
+  blocker: string,
+  note: string,
+  now = nowStamp(),
+): string | undefined {
+  const m = FM.exec(raw);
+  if (!m) throw new Error("not a bean file: no front matter");
+  const front = m[1]!;
+  const { ids, span } = sequenceIn(front, key);
+  if (!span || !ids.includes(blocker)) return undefined;
+  const kept = ids.filter((x) => x !== blocker);
+  const replacement = kept.length ? `${key}:\n${kept.map((x) => `    - ${x}`).join("\n")}\n` : "";
+  let nextFront = front.slice(0, span[0]) + replacement + front.slice(span[1]);
+  nextFront = nextFront.replace(/\n+$/, "");
+  return appendNoteToText(`---\n${nextFront}\n---\n${m[2]}`, note, now);
+}
+
+/**
+ * Lift every block a bean holds, because it has just closed.
+ *
+ * A block is declared from either end: `blocked_by:` on the blocked bean, or
+ * `blocking:` on the blocker. Closing the blocker used to leave both in place,
+ * so the blocked bean read as waiting on work that had already finished, and
+ * the store collected "Block never lifted" findings (34 edges on
+ * `cat/cat-harness/beans`, 2026-10-15) that someone had to clear by hand. So
+ * closing a bean removes its id from every other bean's `blocked_by:` and
+ * clears its own `blocking:`, with a dated note on each file it changes.
+ *
+ * Returns the ids of the beans whose `blocked_by:` changed.
+ */
+export function liftBlocksOf(root: string, closed: Bean, status: string, cfg = readStoreConfig(root)): string[] {
+  const lifted: string[] = [];
+  const now = nowStamp();
+  for (const b of listBeans(root, cfg)) {
+    if (b.id === closed.id) continue;
+    const raw = readFileSync(b.path, "utf-8");
+    const next = liftBlockInText(raw, "blocked_by", closed.id, `Block lifted: \`${closed.id}\` is ${status}.`, now);
+    if (next !== undefined) {
+      writeFileSync(b.path, next, "utf-8");
+      lifted.push(b.id);
+    }
+  }
+  const own = readFileSync(closed.path, "utf-8");
+  const m = FM.exec(own);
+  for (const target of m ? sequenceIn(m[1]!, "blocking").ids : []) {
+    const cur = readFileSync(closed.path, "utf-8");
+    const next = liftBlockInText(cur, "blocking", target, `Block on \`${target}\` lifted: this bean is ${status}.`, now);
+    if (next !== undefined) writeFileSync(closed.path, next, "utf-8");
+  }
+  return lifted.sort();
+}
+
+export function updateBean(root: string, id: string, fields: Record<string, string>): Bean & { lifted?: string[] } {
   const bean = findBean(root, id);
   if (!bean) throw new Error(`No bean matching "${id}" in this store.`);
   for (const [k, v] of Object.entries(fields)) setField(bean, k, v);
+  const status = fields.status;
+  if (status !== undefined && CLOSING_STATUSES.has(status) && !CLOSING_STATUSES.has(bean.status)) {
+    const lifted = liftBlocksOf(root, bean, status);
+    return { ...parseBean(bean.path)!, lifted };
+  }
   return parseBean(bean.path)!;
 }
 
@@ -428,7 +507,8 @@ if (import.meta.main) {
         }
         if (!Object.keys(fields).length) throw new Error("update needs at least --status, --priority, --type or --issue.");
         const b = updateBean(root, rest[0] ?? "", fields);
-        emit(b, `${b.id} → ${Object.entries(fields).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+        const lifted = b.lifted?.length ? `\n  block lifted on: ${b.lifted.join(", ")}` : "";
+        emit(b, `${b.id} → ${Object.entries(fields).map(([k, v]) => `${k}=${v}`).join(" ")}${lifted}`);
         break;
       }
       case "note": {
