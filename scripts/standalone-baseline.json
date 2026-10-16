@@ -208,7 +208,7 @@
         "test/coordinator/bootstrap-graph-repo-root.test.ts > the document is published where it says it is > the site build actually writes it, at that path",
         "test/coordinator/check-bean-parents-repo-root.test.ts > every open bean belongs to an epic > the real corpus passes",
         "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > bootstrap — the content half of a real pair — passes",
-        "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > who-iris is a QA warning, naming its ten IRIS-specific code files",
+        "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > who-iris is a QA warning, naming its eleven IRIS-specific code files",
         "test/coordinator/contributions-root-sci-checkout.test.ts > contributionsRoot > loading from contributionsRoot() registers both contributed cost checkers",
         "test/coordinator/directory-storage-checkout.test.ts > the real declarations (bean 5hox) > every declared qa directory is stored, and every stored working copy is ignored",
         "test/coordinator/dispatch-gates-can-pass.test.ts > the catalogue gate can pass on a non-pull_request event > a base that still cannot be found stays exit 2, never a pass",
