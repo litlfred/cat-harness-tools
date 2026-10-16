@@ -81,7 +81,9 @@ describe("every activity names a skill or declares why it has none", () => {
         m.lanes
           .filter((l) => {
             const role = roleForLane(graph!, l.name, l.roleRef);
-            return role?.actedUpon === true || role?.judgementOnly === true;
+            // `judgementOnly` alone: the `actedUpon` exemption was retired on
+            // 2026-10-16 (owner) — a mechanical role's tasks name its contract skills.
+            return role?.judgementOnly === true;
           })
           .map((l) => l.id),
       );
