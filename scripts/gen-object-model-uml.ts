@@ -59,7 +59,7 @@ import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { declaredRoute } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 /** Colours from `uml.css`, the one place they are declared. */
@@ -90,8 +90,14 @@ if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find t
 // harness's site: cat-harness f999d7f6 moved it from `glossary/` to that route, and the
 // bare `/glossary/` is now only its declared alias. Read from the sibling mount when it is
 // there; the fallback is the route core declares today, the same one glossary-page.ts uses.
-const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
-const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
+// Under the page locale since 2026-10-16 (owner, "c"), `en/<harness>/<visualiser>`,
+// like every other visualiser's page; the page is read at its old address too
+// until the site holding it is regenerated, and the link always goes to the new one.
+const CORE_ROOT = resolve(HARNESS, "..", "folio-assistant-core");
+const GLOSSARY_ROUTE = declaredPageRoute(CORE_ROOT, "glossary-page") ?? `${PAGE_LOCALE}/folio-assistant-core/glossary`;
+const GLOSSARY_LEGACY_ROUTE = declaredRoute(CORE_ROOT, "glossary-page") ?? "folio-assistant-core/glossary";
+const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
+const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(p)) ?? glossaryPageAt(GLOSSARY_ROUTE);
 /**
  * Where a term's entry is: on the page of the instance that owns its scheme,
  * `<route>/instance/<instance>/` (folio-assistant-core, owner 2026-10-15: the
