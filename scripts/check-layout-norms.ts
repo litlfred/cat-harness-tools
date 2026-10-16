@@ -323,6 +323,10 @@ if (import.meta.main) {
       BASELINE,
       `${JSON.stringify(
         {
+          // The file's own declaration that a tool wrote it — the `_generated`
+          // key `check-reference-direction.ts` reads. Its pairs name the layers
+          // they were found in, which an authored file here may not do.
+          _generated: "scripts/check-layout-norms.ts --update — do not hand-edit",
           _comment:
             "Nested declared directories that EXIST and are not yet resolved. Not intended layout — " +
             "see scripts/check-layout-norms.ts. Anything not listed here fails the check, so this file " +
