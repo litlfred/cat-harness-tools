@@ -35,7 +35,7 @@ import { BpmnModdle } from "bpmn-moddle";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
-import { ACTOR_KINDS, type ActorKind } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
 import { WORK_PLAN_OPS, type WorkPlanOp } from "./bean-link.js";
 import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/code-list.js";
@@ -167,7 +167,9 @@ export interface ProcessNode {
   /** Id of that lane, so a finding can name the element rather than a string. */
   laneId?: string;
   /**
-   * `<bootstrap.processes:role ref="…"/>` on the lane, when the diagram binds explicitly.
+   * The Role the node's lane names — its `partitionElementRef`, or the
+   * legacy `<bootstrap.processes:role ref="…"/>` when that is absent
+   * ({@link LaneDef.roleRef}).
    *
    * A lane NAME is free text and sixty of them spell two dozen positions
    * (`schemas/role-graph.ts`); an explicit ref is the join that does not
@@ -388,7 +390,8 @@ export interface ProcessFlow {
 }
 
 /**
- * One swimlane, which is to say one **role**.
+ * One swimlane, which names one **role** — a lane is a partition that names
+ * the Role its tasks are performed in, not the Role itself (owner, 2026-10-16).
  *
  * Kept as a first-class part of the model rather than only as a string on each
  * node, because the questions worth asking are about the lane: does it bind a
@@ -401,8 +404,49 @@ export interface LaneDef {
   name?: string;
   /** `<bpmn:documentation>` on the lane — what the role does IN this diagram. */
   documentation?: string;
-  /** `<bootstrap.processes:role ref="…"/>` on the lane, when declared. */
+  /**
+   * The id of the Role this lane NAMES, from whichever binding it carries.
+   *
+   * Owner, 2026-10-16 (thread "BPMN lane, role and skill modelling"): *"Lane
+   * names Role, not Actor"* — a lane is a partition that names a Role, it is
+   * not itself one. The standard way BPMN says that is `partitionElementRef`
+   * on `<bpmn:lane>`, pointing at a top-level `<bpmn:resource>` whose `id` is
+   * the Role's id in `roles.json`, verbatim. That is read FIRST.
+   *
+   * `<bootstrap.processes:role ref="…"/>` is the legacy spelling, deprecated
+   * the same day and accepted for one release: it is read only when
+   * `partitionElementRef` is absent, and {@link LaneDef.roleBinding} says
+   * which one answered so a consumer can warn. One field for both, so the
+   * dozen consumers of `roleRef` (`laneBinding`, `kg-export`'s `bindsRole`,
+   * the workflow engine) are right before and after the diagrams migrate.
+   *
+   * The precedence is not decided here: it is cat-harness's `laneRoleRef`
+   * (`schemas/role-graph.ts`), the one reader every layer asks.
+   */
   roleRef?: string;
+  /**
+   * WHICH binding produced {@link roleRef}: `partitionElementRef` (the
+   * standard one), or `legacy-role-ref` — the deprecated
+   * `<bootstrap.processes:role ref>`, which `kg:audit` reports as
+   * `lane-role-legacy-binding`. `laneRoleRef`'s `source`; absent when the
+   * lane names no Role.
+   */
+  roleBinding?: "partitionElementRef" | "legacy-role-ref";
+  /**
+   * `laneRoleRef`'s warning: the lane uses the deprecated binding, or carries
+   * a `partitionElementRef` and a legacy ref that disagree (the standard one
+   * wins). Readers accept the legacy form for one release AS A WARNING, and
+   * this is the warning, carried to whoever reports it.
+   */
+  roleBindingWarning?: string;
+  /**
+   * `false` when `partitionElementRef` names an id that no top-level
+   * `<bpmn:resource>` in the file declares. The Role id is still the value
+   * written — the resource's id IS the role id, so nothing is lost — but the
+   * diagram is not well-formed BPMN until the resource is declared, and a
+   * reader is told so rather than having the load refused. Absent otherwise.
+   */
+  roleResourceDeclared?: boolean;
   /**
    * `<bootstrap.processes:role variable="true"/>` — this lane's PERFORMER VARIES, declared.
    *
@@ -546,7 +590,10 @@ export interface ProcessModel {
    * in `schemas/kg-qa.ts` is what notices when it is missing.
    */
   documentation?: string;
-  /** The process's lanes, in document order. A lane IS a role — see below. */
+  /**
+   * The process's lanes, in document order. A lane NAMES the Role its tasks
+   * are performed in; it is not itself a Role (owner, 2026-10-16).
+   */
   lanes: LaneDef[];
   /** Every start event, in document order. */
   startNodes: string[];
@@ -1107,6 +1154,8 @@ interface ModdleElement {
       name?: string;
       flowNodeRef?: { id: string }[];
       extensionElements?: { values?: { $type: string; ref?: string }[] };
+      /** BPMN's own `partitionElementRef`, resolved by moddle to the element it names. */
+      partitionElementRef?: { id?: string; $type?: string };
     }[];
   }[];
   rootElements?: ModdleElement[];
@@ -1319,6 +1368,52 @@ export function normaliseOwnExtensions(root: unknown): void {
   walk(root);
 }
 
+/**
+ * The moddle warnings a diagram may raise BY DESIGN under the 2026-10-16
+ * lane / role / skill model, separated from the ones that still refuse a load.
+ *
+ * `loadProcessModel` refuses a diagram with any parse warning, and that rule
+ * stays. Two warnings are not defects in what the diagram says, though:
+ *
+ * - **`unresolved reference` on a lane's `partitionElementRef`.** The value is
+ *   the Role's id verbatim, so the binding is fully known even when the file
+ *   has not (yet) declared the `<bpmn:resource>` it points at. It is handed
+ *   back, keyed by lane id, and recorded as `roleResourceDeclared: false` —
+ *   reported, not refused, because refusing would make every diagram whose
+ *   migration is half-done unloadable by the engine that runs it.
+ * - **`unresolved reference` on `<bpmn:extension definition="…">`** naming one
+ *   of OUR extension elements. The first draft of the spec declared extension
+ *   use that way; bpmn-moddle resolves `definition` as an id reference and
+ *   warns, which is why the spec moved to `<bpmn:import>` the same day. A file
+ *   written to the first draft still means exactly what it says.
+ */
+export function partitionTolerated(raw: readonly unknown[]): {
+  warnings: unknown[];
+  unresolvedPartitions: Map<string, string>;
+} {
+  const warnings: unknown[] = [];
+  const unresolvedPartitions = new Map<string, string>();
+  for (const w of raw) {
+    const ww = w as { message?: string; property?: string; value?: unknown; element?: { $type?: string; id?: string } };
+    const unresolved = typeof ww.message === "string" && ww.message.startsWith("unresolved reference");
+    if (unresolved && ww.property === "bpmn:partitionElementRef" && ww.element?.$type === "bpmn:Lane" && typeof ww.value === "string") {
+      if (ww.element.id) unresolvedPartitions.set(ww.element.id, ww.value);
+      continue;
+    }
+    if (
+      unresolved &&
+      ww.property === "bpmn:definition" &&
+      ww.element?.$type === "bpmn:Extension" &&
+      typeof ww.value === "string" &&
+      /^[\w.-]+\.processes:[\w-]+$/.test(ww.value)
+    ) {
+      continue;
+    }
+    warnings.push(w);
+  }
+  return { warnings, unresolvedPartitions };
+}
+
 export async function loadProcessModel(
   bpmnPath: string,
   /** Process ids already on the load path, so a call-activity cycle is refused. */
@@ -1332,7 +1427,9 @@ export async function loadProcessModel(
   homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string> }> = new Map(),
 ): Promise<ProcessModel> {
   const moddle = new BpmnModdle();
-  const { rootElement, warnings } = await moddle.fromXML(readFileSync(bpmnPath, "utf-8"));
+  const parsed = await moddle.fromXML(readFileSync(bpmnPath, "utf-8"));
+  const { rootElement } = parsed;
+  const { warnings, unresolvedPartitions } = partitionTolerated(parsed.warnings);
   normaliseOwnExtensions(rootElement);
   if (warnings.length > 0) {
     throw new UnsupportedBpmn(
@@ -1369,7 +1466,16 @@ export async function loadProcessModel(
     const laneId = lane.id ?? lane.name ?? `lane_${lanes.length}`;
     const laneExt = lane.extensionElements?.values ?? [];
     const roleEl = laneExt.find((v) => v.$type === "folio:role");
-    const roleRef = roleEl?.ref;
+    // `partitionElementRef` arrives resolved to its `<bpmn:resource>`; when the
+    // file declares no such resource, moddle leaves it unset and the id comes
+    // from the tolerated warning instead (`partitionTolerated`).
+    const unresolved = lane.id ? unresolvedPartitions.get(lane.id) : undefined;
+    const binding = laneRoleRef({
+      id: lane.id,
+      partitionElementRef: lane.partitionElementRef?.id ?? unresolved,
+      extensionElements: { values: roleEl ? [{ $type: "role", ref: roleEl.ref, variable: (roleEl as { variable?: string }).variable }] : [] },
+    });
+    const roleRef = binding.ref;
     // Moddle carries an unregistered attribute through as a string, which is
     // how `ref` already arrives — so `variable` needs no schema registration.
     // Only the exact string "true" counts: anything else is a typo, and
@@ -1380,7 +1486,17 @@ export async function loadProcessModel(
       .map((v) => v.ref!);
     const nodeIds = (lane.flowNodeRef ?? []).map((r) => r.id);
     const laneDoc = (lane as ModdleElement).documentation?.[0]?.text?.replace(...DOC_WS).trim() || undefined;
-    lanes.push({ id: laneId, name: lane.name, ...(laneDoc ? { documentation: laneDoc } : {}), roleRef, performerVaries, nodes: nodeIds });
+    lanes.push({
+      id: laneId,
+      name: lane.name,
+      ...(laneDoc ? { documentation: laneDoc } : {}),
+      roleRef,
+      ...(binding.source !== "none" ? { roleBinding: binding.source } : {}),
+      ...(binding.warning ? { roleBindingWarning: binding.warning } : {}),
+      ...(unresolved !== undefined && lane.partitionElementRef?.id === undefined ? { roleResourceDeclared: false } : {}),
+      performerVaries,
+      nodes: nodeIds,
+    });
     for (const id of nodeIds) {
       if (lane.name) laneOf.set(id, lane.name);
       laneIdOf.set(id, laneId);

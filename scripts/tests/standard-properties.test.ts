@@ -78,11 +78,13 @@ describe("a term that restates a standard is the standard's property", () => {
       ["to", "targetRef"],
       ["partOf", "isPartOf"],
       ["holdsGraph", "type"],
-      ["implementedBy", "skill"],
+      // Task → Skill: `requires` on both sides, `dcterms:requires` (owner,
+      // 2026-10-16; was `implementedBy` here and `skill` there).
+      ["requires", "requires"],
       ["title", "title"],
       ["description", "description"],
     ];
     for (const [k, b] of pairs) expect(expand(ctxIri(ours, k), ours)).toBe(expand(ctxIri(theirs, b), theirs));
-    expect(replacementIri("implementedBy")).toBe(`${BOOTSTRAP_PROCESSES_NS}skill`);
+    expect(replacementIri("requires")).toBe("http://purl.org/dc/terms/requires");
   });
 });
