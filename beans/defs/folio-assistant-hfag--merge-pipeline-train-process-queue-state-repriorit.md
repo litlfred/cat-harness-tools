@@ -5,10 +5,8 @@ status: in-progress
 type: epic
 priority: high
 created_at: 2026-10-02T17:17:27Z
-updated_at: 2026-10-04T15:12:15Z
+updated_at: 2026-10-16T10:40:00Z
 parent: folio-assistant-rwmf
-blocking:
-    - folio-assistant-7x5n
 ---
 
 Owner, 2026-10-02: the merge pipeline gets its own top-level epic, marked as blocking the separation epic `7x5n`. Running the queue is NOT part of this epic; this epic is the finite build list below.
@@ -71,3 +69,5 @@ carrying honest open boxes is what makes the plan readable:
 The PR body's own checklist was stale in **both** directions — it showed finished work
 as open, and omitted that these three were not done. The bean is the authority; it has
 now been reconciled against the branch rather than against that body.
+
+_2026-10-16T10:40:00Z_ — Block `hfag` → `7x5n` dropped: the merge pipeline is not holding up separation, and a whole epic blocking another read as the separation arc waiting on all six open hfag beans, CI speed-ups included (owner choice 4b, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
