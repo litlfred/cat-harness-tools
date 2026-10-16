@@ -154,6 +154,23 @@ export function viewableOf(
   return viewKindOf(basename(source));
 }
 
+/**
+ * Where a reader can find a source this site does NOT hold — its DOI and arXiv
+ * pages, from the entry's own identifiers. Owner, 2026-10-16: *"some of
+ * sources not held b/c IP issues (but in that case we cant use viewer on CDN
+ * b/c XSS)"* — so these are plain links out, never fed to the viewer. A DOI
+ * still carrying a template's placeholder suffix (`10.1145/nnnnnnn`) names
+ * nothing and is dropped.
+ */
+export function elsewhereLinks(e: { doi?: unknown; arxiv?: unknown }): { label: string; href: string }[] {
+  const out: { label: string; href: string }[] = [];
+  const doi = typeof e.doi === "string" ? e.doi.trim() : "";
+  if (/^10\.\d{4,9}\/\S+$/.test(doi) && !/\/n{3,}$/i.test(doi)) out.push({ label: `doi:${doi}`, href: `https://doi.org/${encodeURI(doi)}` });
+  const arxiv = typeof e.arxiv === "string" ? e.arxiv.trim() : "";
+  if (/^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/i.test(arxiv)) out.push({ label: `arXiv:${arxiv}`, href: `https://arxiv.org/abs/${arxiv}` });
+  return out;
+}
+
 /** What the view panel needs: the kind, the bytes, and for a PDF the pdf.js viewer's page-relative href. */
 export interface ViewSource {
   kind: ViewKind;

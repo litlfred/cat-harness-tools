@@ -59,7 +59,7 @@ import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
+import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -237,6 +237,7 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .lib-view summary { cursor:pointer; font-size:1rem; }
 .lib-page .lib-view .pdf-viewer { margin:.6rem 0 0 !important; }
 .lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
+.lib-page .lib-view-absent p { margin:0; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -923,6 +924,8 @@ export interface ShellEntry {
   graphs?: { label: string; href: string }[];
   /** Every published file the page renders — {@link entrySources}. */
   sources?: SourceLink[];
+  /** Set when the entry names a source file this site does not hold — {@link notHeldHtml}. */
+  notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -1150,6 +1153,24 @@ ${body}
 </section>`;
 }
 
+/**
+ * Where the view panel would be, for a source this site does not hold — owner,
+ * 2026-10-16: some sources are not held for rights reasons, and the viewer may
+ * not load a file from another origin (XSS). So the page says so and links
+ * out, in a new tab, to wherever the entry's identifiers point
+ * ({@link elsewhereLinks}); with none recorded it says only that.
+ */
+export function notHeldHtml(n: { file: string; elsewhere: readonly { label: string; href: string }[] }): string {
+  const out = n.elsewhere.length
+    ? ` Find it at ${n.elsewhere
+        .map((l) => `<a href="${escHtml(l.href)}" target="_blank" rel="noopener noreferrer">${escHtml(l.label)}</a>`)
+        .join(" or ")}.`
+    : " No public link is recorded for it.";
+  return `<section class="lib-view lib-view-absent" id="lib-view">
+<p><strong>${escHtml(n.file)}</strong> is not held on this site (rights).${out}</p>
+</section>`;
+}
+
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
 export const LIBRARY_CONFIG_ID = "fa-library-config";
 
@@ -1309,7 +1330,7 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     }`,
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     sources: sourcesHtml(entry.sources ?? []),
-    view: viewPanelHtml(entry.sources ?? []),
+    view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
     searchExclude: true,
   });
 }
@@ -1861,6 +1882,13 @@ if (import.meta.main) {
           id: e.id,
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
+          ...(() => {
+            // No viewable source held, and the entry names one: say so where the panel would be.
+            const held = sourceFileOf(repoRoot, e, g.uploads);
+            return !held && e.sourceFile && e.provenance !== "referenced"
+              ? { notHeld: { file: e.sourceFile, elsewhere: elsewhereLinks(e) } }
+              : {};
+          })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
             repo: entryRepoLinks({
