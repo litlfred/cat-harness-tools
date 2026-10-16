@@ -80,6 +80,7 @@ import {
 import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
+import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
@@ -792,6 +793,15 @@ function entryTitle(
  * READ from `dir` and the identity is minted for `locatedAt`.
  */
 export function buildEntryNodes(docId: string, dir: string, locatedAt: string = dir): EntryOutcome {
+  const outcome = buildEntryNodesAtContentContext(docId, dir, locatedAt);
+  if (outcome.state !== "built") return outcome;
+  // Every node names the context of the instance it will LIVE in — `locatedAt`,
+  // the same place its identity is minted for (bean folio-assistant-63q4).
+  return { ...outcome, files: outcome.files.map((f) => ({ ...f, content: serialisedAtInstanceContext(f.content, join(locatedAt, f.path)) })) };
+}
+
+/** {@link buildEntryNodes} before the context switch: every node names the shared content context. */
+function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: string): EntryOutcome {
   const instance = libraryInstanceOf(locatedAt);
   const iri = iriFor(docId, instance);
   const subgraphStart = librarySubgraphStart(locatedAt);

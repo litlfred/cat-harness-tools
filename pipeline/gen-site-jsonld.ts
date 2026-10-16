@@ -43,6 +43,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { atInstanceContext } from "./instance-document-context.ts";
 import {
   DOCS_SITE_BASE,
   siteNodeSitePath,
@@ -92,7 +93,8 @@ function serialise(doc: Record<string, unknown>): string {
 }
 
 function emit(path: string, doc: Record<string, unknown>): void {
-  const next = serialise(doc);
+  // Names the context of the instance `path` sits in (bean folio-assistant-63q4).
+  const next = serialise(atInstanceContext(doc, path));
   const prev = existsSync(path) ? readFileSync(path, "utf-8") : undefined;
   if (prev === next) {
     unchanged++;

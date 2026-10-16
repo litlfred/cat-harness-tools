@@ -111,11 +111,12 @@ import {
   type UsedPrefixes,
   type UsedTerms,
 } from "../pipeline/jsonld-contexts.ts";
+import { INSTANCE_CONTEXT_PATH as BOUNDARY_INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
 import { contentDocuments } from "./lib/jsonld-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** Instance-relative, and why it is this path: see the module note. */
-export const INSTANCE_CONTEXT_PATH = "ns/context/v1.jsonld";
+/** Instance-relative, and why it is this path: see the module note. Defined once, beside the write boundary. */
+export const INSTANCE_CONTEXT_PATH = BOUNDARY_INSTANCE_CONTEXT_PATH;
 
 /** The namespace DOCUMENT an instance may hold at its root, staged at the extensionless `ns`. */
 export const NS_DOCUMENT = "ns.jsonld";
@@ -139,6 +140,8 @@ export interface InstanceDecl {
   root: string;
   name: string;
   stub: string;
+  /** The declared `iriBase`: the instance's context is published at `<iriBase>ns/context/v1.jsonld`. */
+  iriBase?: string;
   needs: string[] | undefined;
   /** The declared table, or the error that made it unreadable. */
   prefixes: JsonldPrefixTable;
@@ -159,7 +162,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
   return instanceRootsIn(repoRoot).flatMap((root) => {
     const file = findDeclarationFile(root);
     if (file === undefined) return [];
-    let raw: { name?: unknown; stub?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };
+    let raw: { name?: unknown; stub?: unknown; iriBase?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };
     try {
       raw = JSON.parse(readFileSync(join(root, file), "utf-8"));
     } catch {
@@ -173,6 +176,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
         root,
         name: raw.name,
         stub: typeof raw.stub === "string" ? raw.stub : raw.name,
+        ...(typeof raw.iriBase === "string" ? { iriBase: raw.iriBase } : {}),
         needs: Array.isArray(raw.needs) ? raw.needs.filter((n): n is string => typeof n === "string") : undefined,
         prefixes: parsed?.success ? parsed.data : {},
         contextPath,
@@ -310,6 +314,23 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
   const aliases = options.remoteContexts ?? platform!.aliases;
   const bindings = options.bindingContexts ?? platform!.bindings;
   const termSources = options.termSources ?? platform!.terms;
+  // A document already switched to its instance's OWN context (cat-harness
+  // `atInstanceContext`) names `<iriBase>ns/context/v1.jsonld`, not the
+  // content context. Its terms are still the content context's — the instance
+  // context is generated from them — so that URL reads as the content context
+  // here, and the generated file stays a FIXED POINT of what it generates:
+  // without this, switching the emitters would make the next run see no terms
+  // and drop them all. Only with the platform defaults; a caller passing its
+  // own contexts (a test) says exactly what is readable.
+  if (platform !== undefined) {
+    const content = CONTENT_CONTEXT as Record<string, unknown>;
+    for (const d of decls) {
+      if (d.iriBase === undefined) continue;
+      const url = instanceContextUrl(d.iriBase);
+      if (options.remoteContexts === undefined) (aliases as Map<string, Record<string, unknown>>).set(url, content);
+      if (options.termSources === undefined) (termSources as Map<string, TermSource>).set(url, { instance: "cat-harness", context: content });
+    }
+  }
 
   const tableOf = (d: InstanceDecl): DeclaredPrefixes => {
     const ns = own(d.stub);

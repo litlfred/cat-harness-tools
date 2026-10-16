@@ -55,7 +55,8 @@ import { join, relative, resolve } from "node:path";
 import jsonld from "jsonld";
 
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { OWN_NAMESPACE_VALUES } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
 import { duplicateIds } from "./check-duplicate-ids";
@@ -143,7 +144,31 @@ export function isOurs(doc: unknown, bases: readonly string[] = []): boolean {
   if (typeof d["@id"] === "string" && bases.some((b) => underBase(d["@id"] as string, b))) return true;
   if (d["@context"] === undefined) return false;
   const s = JSON.stringify(d["@context"]);
-  return s.includes(CONTENT_CONTEXT_URL) || OWN_NAMESPACE_VALUES.some((ns) => s.includes(ns));
+  return (
+    s.includes(CONTENT_CONTEXT_URL) ||
+    OWN_NAMESPACE_VALUES.some((ns) => s.includes(ns)) ||
+    [...instanceContextFiles().keys()].some((url) => s.includes(url))
+  );
+}
+
+let contextFiles: Map<string, string> | undefined;
+
+/**
+ * Every instance context URL in this checkout — `<iriBase>ns/context/v1.jsonld`
+ * (bean folio-assistant-63q4) — with the file `jsonld:contexts` writes for it.
+ * An emitted document names its own instance's context, which lives under that
+ * instance's `iriBase`, not under the content context's base, so the loader
+ * resolves it from the instance in the checkout.
+ */
+export function instanceContextFiles(repoRoot = resolve(dirname(HARNESS_ROOT))): Map<string, string> {
+  if (contextFiles === undefined) {
+    contextFiles = new Map();
+    for (const root of instanceRootsIn(repoRoot)) {
+      const iriBase = (readDeclaration(root) as { iriBase?: unknown } | undefined)?.iriBase;
+      if (typeof iriBase === "string") contextFiles.set(instanceContextUrl(iriBase), join(root, INSTANCE_CONTEXT_PATH));
+    }
+  }
+  return contextFiles;
 }
 
 /**
@@ -175,7 +200,7 @@ export function localLoader(dir: string) {
     if (url === PROV_JSONLD_CONTEXT_URL) {
       return { contextUrl: null, documentUrl: url, document: heldProvJsonldContext(resolve(dirname(HARNESS_ROOT))) };
     }
-    const fallback = url === CONTENT_CONTEXT_URL ? resolve(HARNESS_ROOT, "ns", "content", "v1.jsonld") : undefined;
+    const fallback = url === CONTENT_CONTEXT_URL ? resolve(HARNESS_ROOT, "ns", "content", "v1.jsonld") : instanceContextFiles().get(url);
     const file = p && existsSync(p) ? p : fallback;
     if (!file) throw new Error(`refused to fetch ${url}: not in the tree being verified`);
     return { contextUrl: null, documentUrl: url, document: JSON.parse(readFileSync(file, "utf-8")) };

@@ -50,6 +50,7 @@ import { blockId, libraryInstanceOf, licenceProperties, sectionKey } from "../pi
 import { manifestLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
 import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { serialisedAtInstanceContext } from "../pipeline/instance-document-context.ts";
 import { typesForKind } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { STRUCTURE_FILENAME, pagesOf, readStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
@@ -132,7 +133,7 @@ export function buildL1(dir: string, write = true): BuildResult {
       provenance: "ingested",
     };
     if (write) {
-      writeFileSync(join(blocksDir, `${bid}.jsonld`), `${JSON.stringify(node, null, 2)}\n`);
+      writeFileSync(join(blocksDir, `${bid}.jsonld`), serialisedAtInstanceContext(`${JSON.stringify(node, null, 2)}\n`, join(blocksDir, `${bid}.jsonld`)));
     }
   }
 
@@ -168,7 +169,7 @@ export function buildL1(dir: string, write = true): BuildResult {
       disposition: "ingested source material — attributed to its document, not folio content",
     },
   };
-  if (write) writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (write) writeFileSync(manifestPath, serialisedAtInstanceContext(`${JSON.stringify(manifest, null, 2)}\n`, manifestPath));
 
   return { docId: st.doc_id, blocks: declared.length, missing: [] };
 }
