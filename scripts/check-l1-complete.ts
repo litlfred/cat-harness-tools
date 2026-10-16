@@ -190,7 +190,10 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "undete
  * **nothing else anywhere**.
  */
 // `figures/` is the vector arm's renders — `pdf-vector-figures.py`, bean `ay3x`.
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "blocks", "images", "ocr", VECTOR_FIGURES_DIR];
+// `sheets/` is a workbook's grouping nodes, one per sheet, the tabular
+// counterpart of `sections/` (`pipeline/tabular-nodes.ts`, written by
+// gen-library-jsonld under its `GROUPING_DIRS`).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
