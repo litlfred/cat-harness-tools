@@ -4,10 +4,8 @@ title: 'Merge refused: #2065 authored conflict with main'
 status: completed
 type: bug
 created_at: 2026-10-04T14:30:41Z
-updated_at: 2026-10-07T14:55:47Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-hfag
-blocking:
-    - folio-assistant-30jr
 ---
 
 PR #2065, handed back by the Merge Manager on 2026-10-04 (BACKFILLED at 14:50Z: the hand-back was made as a PR comment and a queue entry only, without this bean. Owner: "Backfill + enforce").
@@ -43,3 +41,7 @@ Closed on evidence of landed work:
 
 
 _2026-10-07T16:55:00Z_ — Closed on owner confirmation and verified evidence of landed work on `main`.
+
+_2026-10-15T16:49Z_ — Block on `30jr` lifted: this bean is completed (#2065 merged 2026-10-05). The edge was the work plan's "Block never lifted" finding (owner, 2026-10-15). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-16T06:30:00Z_ — The note above is mirrored from the folio-assistant store (commit 0b8d249), where this edge was lifted on 2026-10-15; lifted here too (Owner ruling 2026-10-16, item 9). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

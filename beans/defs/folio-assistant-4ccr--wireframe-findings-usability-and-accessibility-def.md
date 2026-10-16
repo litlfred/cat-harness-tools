@@ -1,14 +1,14 @@
 ---
 # folio-assistant-4ccr
 title: 'WIREFRAME FINDINGS: usability and accessibility defects the as-is wireframes observed (#1023)'
-status: todo
+status: completed
 type: epic
 priority: normal
 tags:
     - wireframe-findings
     - ui
 created_at: 2026-09-23T10:36:13Z
-updated_at: 2026-10-05T04:57:14Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -50,3 +50,5 @@ Every finding in the 22 child beans was re-measured on a local build of that com
   - References that are not links (`qgjh`: all 9 pages, 0 links in tools' 104 rows).
 - **New regression:** `g9r2`, the who-iris replica.
 - `mylx` is fixed in #1512.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: completed 2026-10-12 in the folio-assistant store once kx0p, 6eiw and dm4j were closed again (beans commit 83def980). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

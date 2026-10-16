@@ -1,11 +1,11 @@
 ---
 # folio-assistant-najo
 title: 'MERGE QUEUE OFF MAIN: the queue graph on its own branch store, so a steward can record a decision without opening a PR'
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-04T08:20:32Z
-updated_at: 2026-10-04T08:21:20Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-hfag
 ---
 
@@ -54,3 +54,5 @@ make the graph look used (the reason bean `30jr` left its tile box open). Not cu
 - [ ] a reader that keeps `absent` / `declared-but-absent` / `unreachable` / `read` apart and THROWS rather than returning an empty queue
 - [ ] a steward write path that records a decision with no PR to `main`
 - [ ] `bun run cat gates` green, or the blocker named with its measurement
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-10); commit 8f55441e is on folio-assistant main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

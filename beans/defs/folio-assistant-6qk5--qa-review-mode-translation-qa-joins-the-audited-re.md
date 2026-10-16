@@ -1,11 +1,11 @@
 ---
 # folio-assistant-6qk5
 title: 'QA REVIEW MODE: translation QA joins the audited review record under test/results'
-status: scrapped
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-19T08:55:36Z
-updated_at: 2026-10-10T16:48:25Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -65,3 +65,5 @@ Superseded by arc `3fva` (lane B drain, 2026-10-10). #363's principle, that plac
 - The 122 block verdicts beside their blocks, and the block/translation readers, are the subject of `folio-assistant-8wj1` (QA READERS F4, in progress) under the same arc.
 
 So done-when 1 and 3 are answered by the arc's design, and done-when 2 is owned by 8wj1.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: closure lists the moved results (test/results/translation-qa, block-qa) with $schema on main; both outcomes are closed, completed is what the evidence shows. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

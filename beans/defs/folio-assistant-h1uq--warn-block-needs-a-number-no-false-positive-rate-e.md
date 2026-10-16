@@ -1,10 +1,10 @@
 ---
 # folio-assistant-h1uq
 title: 'WARN -> BLOCK NEEDS A NUMBER: no false-positive rate exists for any agentic reviewer, and only a warn-only phase can produce one'
-status: todo
+status: completed
 type: task
 created_at: 2026-10-03T00:02:50Z
-updated_at: 2026-10-03T00:02:50Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-nok9
 ---
 
@@ -66,3 +66,4 @@ published leaderboard, and this repository already has one by accident.
 - [ ] a decision recorded either way — promoting, or staying warn with the
       measured reason
 
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-09); commit f6f06e54 is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

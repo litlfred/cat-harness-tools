@@ -1,11 +1,11 @@
 ---
 # folio-assistant-34cm
 title: The committed site build under cat-harness/docs/ is 44% of all merge conflicts, and the publish workflow rebuilds it anyway
-status: scrapped
+status: todo
 type: bug
 priority: normal
 created_at: 2026-10-03T08:34:21Z
-updated_at: 2026-10-10T16:43:49Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-hfag
 ---
 
@@ -210,3 +210,5 @@ this long: the files are cheap to move and the gates are not.
 ## Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the committed site build under `cat-harness/docs/` in litlfred/cat-harness and the publish workflow that rebuilds it; every done-when is a decision about that repository's tree. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository", yet its subject (cat-harness/docs in litlfred/cat-harness) is still undecided. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
