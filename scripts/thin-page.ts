@@ -43,6 +43,7 @@
  * `check-viewer-nav.ts` reads it as `linked`, railed at build.
  */
 import { NAVBAR_LINKED } from "./lib/harness-rail.ts";
+import { pageLayoutTags } from "./page-layout.ts";
 
 /** HTML-escape for text and attribute values, both quote characters included. */
 export function escHtml(value: string): string {
@@ -68,6 +69,13 @@ export interface ThinPage {
   script: string;
   /** An optional stylesheet, relative to the page. */
   stylesheet?: string;
+  /**
+   * Link the shared page layout (`page-layout.ts`): the path from the page to
+   * the site root that serves it, `""` at the root or `"../"` one level down.
+   * The body then opts in by its classes (`fa-page-bar`, `fa-page-main`).
+   * Absent, nothing is linked.
+   */
+  layout?: string;
   /**
    * The id of the `<script type="application/json">` config block. Each
    * family of pages names its own, which is what lets a generator recognise
@@ -138,7 +146,7 @@ export function thinPageHtml(p: ThinPage): string {
 <title>${escHtml(p.title)}</title>
 <link rel="canonical" href="${escHtml(p.canonical ?? "./")}">
 <link rel="icon" href="${escHtml(p.icon ?? DEFAULT_ICON)}">
-${p.navbar ? "" : `${NAVBAR_LINKED}\n`}${p.jsonld !== undefined ? `<link rel="alternate" type="application/ld+json" href="${escHtml(p.jsonld)}">\n` : ""}${p.stylesheet ? `<link rel="stylesheet" href="${escHtml(p.stylesheet)}">\n` : ""}</head>
+${p.navbar ? "" : `${NAVBAR_LINKED}\n`}${p.jsonld !== undefined ? `<link rel="alternate" type="application/ld+json" href="${escHtml(p.jsonld)}">\n` : ""}${p.layout !== undefined ? `${pageLayoutTags(escHtml(p.layout))}\n` : ""}${p.stylesheet ? `<link rel="stylesheet" href="${escHtml(p.stylesheet)}">\n` : ""}</head>
 <body>
 ${p.body.trimEnd()}
 <noscript>${noscript}</noscript>

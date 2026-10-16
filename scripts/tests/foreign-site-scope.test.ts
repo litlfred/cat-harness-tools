@@ -26,8 +26,9 @@
  *       its own, so its count is not fetched from a site that has none
  *       (it showed "?").
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -54,12 +55,97 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const BASE = "https://litlfred.github.io/folio-assistant";
 const CAT_HARNESS = join(REPO, "cat-harness");
 /** The platform's own harness data, at its declared site directory (`siteDirFor`), never a literal. */
 const PLATFORM_DATA = join(CAT_HARNESS, siteDirFor(CAT_HARNESS), "_data", "harness.json");
+const SMART_TRUST = join(REPO, "smart-trust");
+
+// The platform's harness data is BUILT AT PUBLISH (cat-harness's
+// `builtAtPublish`, B1), and so is smart-trust's own site, which it reads:
+// `docs:harness` gives smart-trust a rail scope only when that site exists.
+// Neither is committed. Until 2026-10-15 this file read whatever an earlier
+// `derive:publish` had left in the tree — CI's step before `bun test`, or
+// another file's hook (`staging-only-publish` ran the whole of it until
+// a1794c8) — so in a checkout with no such run, or alone, the describes below
+// threw ENOENT at collection, and over a build in the wrong order they read a
+// harness.json with no smart-trust rail scope.
+//
+// So this file builds what it reads, and only that: the writers the
+// declarations name for those two artefacts, in `derive:publish`'s own order
+// (`declaredPlan`, consumers first — smart-trust:pages before docs:pages and
+// docs:harness), run the way it runs them (`runWriter`). About 10 s, against
+// the whole `derive:publish`'s 300 s and more. At module scope, not in a
+// hook, because the describes compute their fixtures at collection time.
+// The writers resolve their paths from the checkout they belong to, so they
+// write into this tree's ignored, publish-time paths, as a site build does.
+//
+// And it takes away again what it ADDED, once its tests have run. `docs:pages`
+// writes far more than harness.json (the todos pages, the bean and QA
+// projections, the witnesses under test/results/) and smart-trust:pages a
+// whole site; a test file run after this one in the same `bun test` must see
+// the tree it would have seen without it. pr-tests.yml runs no
+// `derive:publish`, so left behind they gave every later file a tree main's
+// run never has: "Tests (no new failures)" went red on PR #306, and locally
+// compose-docs' "the cut, on the REAL tree" passes with them absent and
+// fails with them present. A path that existed before is left as the
+// writers made it: they are deterministic over the same inputs (harness.json
+// rebuilt twice is byte-identical).
+//
+// Where they cannot be built — a layer standing alone without smart-trust
+// (the standalone ratchet), or no state mounted — this says why and builds
+// nothing, and the tests that read the data fail on their own, by name, as
+// they do without it; it does not turn the whole file into one load error.
+/** Every file and directory under `roots`, so what this file's build adds can be taken away again. */
+function inventory(roots: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (d: string): void => {
+    let es: Dirent[];
+    try {
+      es = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of es) {
+      if (e.name === "node_modules" || e.name === ".git") continue;
+      const p = join(d, e.name);
+      out.add(p);
+      if (e.isDirectory()) walk(p);
+    }
+  };
+  for (const r of roots) walk(r);
+  return out;
+}
+const BUILD_ROOTS = [CAT_HARNESS, SMART_TRUST];
+const BEFORE_BUILD = inventory(BUILD_ROOTS);
+afterAll(() => {
+  const added = [...inventory(BUILD_ROOTS)].filter((p) => !BEFORE_BUILD.has(p));
+  // Deepest first, so a directory goes after what it holds; one the build made goes whole.
+  for (const p of added.sort((a, b) => b.length - a.length)) rmSync(p, { recursive: true, force: true });
+});
+
+try {
+  const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
+  const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
+  if (READ_PLAN.length !== READS.size) {
+    console.warn(
+      `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
+    );
+  } else {
+    for (const w of writersOf(READ_PLAN)) {
+      const o = runWriter(["bun", "run", "cat", w], REPO);
+      if (o.kind !== "ran") {
+        console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
+        break;
+      }
+    }
+  }
+} catch (e) {
+  console.warn(`foreign-site-scope: built nothing — could not read the publish plan: ${(e as Error).message}`);
+}
 
 /** A scope over a made-up declaration set, so the rule matrix is stated rather than inherited. */
 function fakeScope(over: Partial<ForeignScope> = {}): ForeignScope {
@@ -239,7 +325,12 @@ describe("smart-trust, against the platform's real harness data", () => {
       navbar: { hrefs: Record<string, string>; whose?: Record<string, string> };
       foreignSite: { absent: Record<string, string> };
     };
-    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}/fsh-guts/`);
+    // Re-based onto the platform: the platform's OWN root-relative href for its
+    // fsh-guts page (since 2026-10-09 under its declared `<locale>/<harness>/`
+    // route), read from the platform's data rather than restated here.
+    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"]!;
+    expect(platformHref.startsWith("/")).toBe(true);
+    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
     expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.fshGuts).toBe("smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.translationQa).toBe("smart-trust publishes no translation QA sweep on this site");

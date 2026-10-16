@@ -134,3 +134,26 @@ describe("check:wireframes reads the recorded topic", () => {
     expect(r.incomplete).toContainEqual({ wireframe: "beans", problem: 'checks/report.json was written for topic "todos"' });
   });
 });
+
+describe("check:wireframes reads each instance's own index (cat-harness-tools#281)", () => {
+  test("a second instance's wireframe is named <instance>/<topic> and judged by its bare topic", () => {
+    const own = join(ROOT, "own");
+    const other = join(ROOT, "other");
+    for (const d of [own, other]) {
+      put(join(d, "page", "as-is.html"));
+      writeFileSync(join(d, "page", "intent.md"), "intent");
+      mkdirSync(join(d, "page", "checks"), { recursive: true });
+      writeFileSync(join(d, "page", "checks", "report.json"), JSON.stringify({ topic: "page", candidates: [] }));
+      writeFileSync(join(d, "index.json"), JSON.stringify({ wireframes: { page: { covers: [] } } }));
+    }
+    const r = checkWireframes(ROOT, [
+      { dir: own, prefix: "" },
+      { dir: other, prefix: "content-layer/" },
+    ]);
+    const names = r.incomplete.map((i) => i.wireframe);
+    // Neither is refused for its topic: the report says "page", and "page" is each one's topic.
+    expect(r.incomplete.filter((i) => i.problem.includes("was written for topic"))).toEqual([]);
+    expect(names).toContain("page");
+    expect(names).toContain("content-layer/page");
+  });
+});

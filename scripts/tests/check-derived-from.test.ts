@@ -127,7 +127,9 @@ describe("downstream of a change", () => {
 });
 
 /** The real-tree cases need the IG instances; standing alone they are skipped, named as skipped. */
-const HAS_IGS = ["fhir-harness", "smart-base", "smart-trust", "smart-immunizations"].every((i) =>
+// smart-immunizations is mounted but declares no directories since the owner's
+// B1 ruling (2026-10-15, `directories: []`), so it has no IG pages to carry.
+const HAS_IGS = ["fhir-harness", "smart-base", "smart-trust"].every((i) =>
   existsSync(join(resolve(dirname(HARNESS_ROOT)), i)),
 );
 
@@ -136,7 +138,7 @@ describe.skipIf(!HAS_IGS)("this checkout's IG pages", () => {
     const tree = readTree();
     const { edges } = judge(tree);
     const down = downstreamOf(["smart-base/smart-base-themes"], renderingOrder(tree, edges), edges);
-    for (const ig of ["smart-base", "smart-trust", "smart-immunizations"]) expect(down).toContain(`${ig}/${ig}-docs`);
+    for (const ig of ["smart-base", "smart-trust"]) expect(down).toContain(`${ig}/${ig}-docs`);
   });
 });
 
@@ -149,7 +151,7 @@ describe("writer", () => {
   });
   it.skipIf(!HAS_IGS)("this checkout's IG page sets name gen-ig-pages as their writer", () => {
     const pages = readTree().flatMap((i) => i.dirs.filter((d) => d.id === `${i.name}-docs` && d.writer).map((d) => d.writer));
-    expect(pages).toHaveLength(3);
+    expect(pages).toHaveLength(2);
     for (const w of pages) expect(w).toContain("fhir-harness/scripts/gen-ig-pages.ts");
   });
 });

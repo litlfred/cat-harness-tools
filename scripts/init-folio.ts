@@ -51,7 +51,11 @@ import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
+import { parseRemote } from "./pages-bootstrap.ts";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
+
+/** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
+export const INITIAL_VERSION = "0.1.0";
 
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";
@@ -104,6 +108,14 @@ export interface InitInstanceOptions {
   dryRun?: boolean;
   /** Skip `git submodule add` / `git init`. */
   skipVcs?: boolean;
+  /**
+   * The address the instance's IRIs are minted under, and where its JSON-LD
+   * context is published (`<iriBase>ns/context/v1.jsonld`). `initInstance`
+   * derives `https://<owner>.github.io/<repo>/` from a GitHub `origin` when
+   * this is absent and the instance is its repository's root; otherwise none
+   * is declared, and the publish workflow skips with a notice until one is.
+   */
+  iriBase?: string;
 }
 
 /** An instance that holds a folio: the instance, plus what its adapter scaffolds. */
@@ -450,6 +462,14 @@ function instanceDeclaration(o: MaybeFolio): string {
       $schema: CAT_HARNESS_DECLARATION_SCHEMA_TAG,
       name: o.slug,
       title: o.title,
+      // Where its IRIs are minted and its context is published (bean
+      // folio-assistant-63q4). Only when known: an invented address is worse
+      // than none. With a `version` beside it, always: `releaseIris` mints
+      // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
+      // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
+      // which is how the restored smart-trust and smart-immunizations
+      // declarations broke their IG publish on 2026-10-15.
+      ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
       // A contentless instance declares no `folio` directory: declaring one it
       // does not hold would be the `dh4f` defect (a consumer scans nothing and
       // reports a clean run). Bean `mer2`.
@@ -1521,12 +1541,92 @@ export function initInstance(options: InitInstanceOptions): InitFolioResult {
   const o: MaybeFolio = { ...options, contentType: undefined };
   checkSlug(o.slug);
   const s = startScaffold(o);
+  // Checked before anything is written, as for a folio (bean `zdfa`): GitHub
+  // reads workflows only at the repository root.
+  const enclosing = enclosingRepoRoot(s.root);
+  if (o.iriBase === undefined && !enclosing) o.iriBase = githubPagesBase(s.root);
   if (!o.dryRun) mkdirSync(s.root, { recursive: true });
   writeInstanceFiles(s);
   s.write("README.md", instanceReadme(o));
   s.write("AGENTS.md", instanceAgentsMd(o, s.assistant));
+  writePublishContext(s, enclosing);
   finishScaffold(s);
   return s.result;
+}
+
+/**
+ * `https://<owner>.github.io/<repo>/` from a GitHub `origin`, the address
+ * GitHub Pages serves a project repository at; `undefined` when there is no
+ * such remote (a fresh `git init`), because a guessed address would be
+ * minted into every IRI the instance writes.
+ */
+export function githubPagesBase(root: string): string | undefined {
+  let probe = resolve(root);
+  while (!existsSync(probe)) {
+    const up = dirname(probe);
+    if (up === probe) return undefined;
+    probe = up;
+  }
+  const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd: probe, stdio: "pipe" });
+  if (r.status !== 0) return undefined;
+  const url = r.stdout.toString().trim();
+  // github.com only: `parseRemote` takes owner/repo from any host, and a
+  // proxied or mirrored remote would otherwise mint an address nobody serves.
+  if (!/^(?:git@github\.com:|(?:https?|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)/.test(url)) return undefined;
+  const parsed = parseRemote(url);
+  if (!parsed) return undefined;
+  const owner = parsed.owner.toLowerCase();
+  // A `<owner>.github.io` repository is served at the root, not under its name.
+  return parsed.repo.toLowerCase() === `${owner}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${parsed.repo}/`;
+}
+
+/** The caller of cat-harness-tools' `layer-publish-context.yml` (bean folio-assistant-63q4). */
+export function publishContextWorkflow(slug: string): string {
+  return `# Publish this instance's JSON-LD context to gh-pages, at
+# <iriBase>ns/context/v1.jsonld, on every push to main. Everything is decided in
+# the reusable workflow; it creates gh-pages on its first run if it is absent.
+# GitHub Pages is switched on once, by hand, after that first run:
+# Settings -> Pages -> "Deploy from a branch: gh-pages, / (root)".
+name: Publish JSON-LD context
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    uses: litlfred/cat-harness-tools/.github/workflows/layer-publish-context.yml@main
+    with:
+      instance: ${slug}
+`;
+}
+
+/**
+ * Turn on the context's publishing (bean folio-assistant-63q4, owner
+ * 2026-10-15: *"this should be a part of cat-harness initiation process"*).
+ * Only at a repository's root, where GitHub reads workflows.
+ */
+function writePublishContext(s: Scaffold, enclosing: string | null): void {
+  const { o, write, result } = s;
+  if (enclosing) {
+    result.notes.push(
+      `Inside the repository at '${enclosing}', so no publish-context workflow was written: GitHub reads workflows only at that ` +
+        `repository's root. Its own publish-context workflow (cat-harness-tools' layer-publish-context.yml) publishes ` +
+        `<iriBase>ns/context/v1.jsonld for an instance it holds, with path-in-repo naming the instance's directory.`,
+    );
+    return;
+  }
+  write(".github/workflows/publish-context.yml", publishContextWorkflow(o.slug));
+  result.notes.push(
+    o.iriBase === undefined
+      ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
+          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          `${instanceDeclarationFilename(o.slug)}.`
+      : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
+          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
+  );
 }
 
 /** Scaffold a folio: `initInstance`'s writes, plus the adapter's folio scaffold. */
@@ -1964,6 +2064,9 @@ Options:
   --force             Overwrite files that already exist
   --dry-run           Report what would be written
   --skip-vcs          Do not run git init / git submodule add
+  --iri-base <url>    With --instance: where its IRIs are minted and its
+                      JSON-LD context is published (default: derived from a
+                      GitHub origin, https://<owner>.github.io/<repo>/)
   --staged <path>     A sub-KG staged INSIDE the host repo at --dir: writes
                       only <path>/<slug>.json and <path>/platform.ts
                       (bean 3tza). Needs --repository and --needs; the slug
@@ -1998,6 +2101,7 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
   let force = false;
   let dryRun = false;
   let skipVcs = false;
+  let iriBase: string | undefined;
   let instance = false;
   let typeGiven = false;
   let staged: string | undefined;
@@ -2036,6 +2140,7 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
       case "--force": force = true; break;
       case "--dry-run": dryRun = true; break;
       case "--skip-vcs": skipVcs = true; break;
+      case "--iri-base": iriBase = next(); break;
       case "--staged": staged = next(); break;
       case "--repository": repository = next(); break;
       case "--host-repository": hostRepository = next(); break;
@@ -2066,8 +2171,10 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
     // Refused rather than ignored: a content type passed to a contentless
     // init is a caller who wanted a folio and would silently not get one.
     if (typeGiven) throw new Error("--instance takes no --type: an instance with a content type is a folio");
-    return { kind: "instance", options: common };
+    if (iriBase !== undefined && !/^https?:\/\/.+\/$/.test(iriBase)) throw new Error(`--iri-base must be a URL ending in '/', got '${iriBase}'`);
+    return { kind: "instance", options: { ...common, ...(iriBase !== undefined ? { iriBase } : {}) } };
   }
+  if (iriBase !== undefined) throw new Error("--iri-base goes with --instance");
   if (authors.length === 0) throw new Error("--author is required (repeat for several)");
 
   return { kind: "folio", options: { ...common, contentType, authors } };

@@ -707,10 +707,15 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
  * that generator began writing `generated:` into every page it draws
  * (folio-assistant#2529, PR 3 of the reference-direction batch).
+ *
+ * The third: `cat-harness/docs/en/cat-harness/methodologies/index.md`, held
+ * naming three, is `gen-methodologies-viz.ts`'s, and left when that generator
+ * — with `gen-tools-viz.ts` and `gen-lsi-viz.ts` — began writing `generated:`
+ * (D1 aftermath, 2026-10-15). `cat-harness/docs/cat-harness/published-graphs.md`
+ * left the same day: nothing in it names a layer above any more.
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "cat-harness/docs/cat-harness/published-graphs.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   { file: "cat-harness/cat-harness.json", names: 2 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
@@ -725,7 +730,6 @@ const PENDING: readonly { file: string; names: number }[] = [
   { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
   { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
   { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
-  { file: "cat-harness/docs/en/cat-harness/methodologies/index.md", names: 3 }, // moved by t4xb from docs/methodologies/ (ruling (i), 2026-10-11)
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
   { file: "cat-harness/schemas/namespaces.ts", names: 2 },
   { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
@@ -1364,6 +1368,48 @@ export function rekeyMovedPairs(baseline: QaResult, ev: MoveEvidence): { result:
   return { result: { ...baseline, families }, rekeyed };
 }
 
+/**
+ * A Tool split into its folder (bean `tdir`, folder = file = id): a Tool once
+ * declared in `<D>/tools/index.ts`, or alone in `<D>/tools/<id>.ts`, now lives
+ * in `<D>/tools/<id>/<id>.ts`. `tools/index.ts` survives the split, so
+ * {@link movedTo}'s "old path is gone" cannot see it; the evidence is in the
+ * FRESH run instead. A baseline pair `(old, T)` that the fresh run no longer
+ * holds is re-keyed to the one fresh pair `(<D>/tools/<id>/<id>.ts, T)` that
+ * could be it — from `index.ts` any id, from `<id>.ts` only that id. Two
+ * candidates are ambiguous and are not re-keyed, as in {@link movedTo}.
+ */
+export function rekeyToolSplits(baseline: QaResult, fresh: QaResult): { result: QaResult; rekeyed: number } {
+  let rekeyed = 0;
+  const families = { ...baseline.families };
+  for (const f of REKEYED_FAMILIES) {
+    const fam = families[f];
+    if (fam === undefined) continue;
+    const now = ((fresh.families[f]?.entries ?? []) as { file?: unknown; target?: unknown }[]).filter(
+      (e): e is { file: string; target: string } => typeof e.file === "string" && typeof e.target === "string",
+    );
+    const held = new Set(now.map((e) => `${e.file}\0${e.target}`));
+    const taken = new Set<string>();
+    const entries = (fam.entries as { file?: unknown; target?: unknown }[]).map((e) => {
+      if (typeof e.file !== "string" || typeof e.target !== "string" || held.has(`${e.file}\0${e.target}`)) return e;
+      const m = /^(.*\/)?tools\/([^/]+)\.ts$/.exec(e.file);
+      if (m === null) return e;
+      const dir = `${m[1] ?? ""}tools/`;
+      const stem = m[2];
+      const candidates = now.filter((c) => {
+        if (c.target !== e.target || !c.file.startsWith(dir) || taken.has(`${c.file}\0${c.target}`)) return false;
+        const f2 = /^([^/]+)\/([^/]+)\.ts$/.exec(c.file.slice(dir.length));
+        return f2 !== null && f2[1] === f2[2] && (stem === "index" || f2[1] === stem);
+      });
+      if (candidates.length !== 1) return e;
+      taken.add(`${candidates[0].file}\0${candidates[0].target}`);
+      rekeyed++;
+      return { ...e, file: candidates[0].file };
+    });
+    families[f] = { ...fam, entries };
+  }
+  return { result: { ...baseline, families }, rekeyed };
+}
+
 /** The evidence {@link movedTo} reads, from the checkout at `root`. */
 export function moveEvidence(root = REPO_ROOT): MoveEvidence {
   const rel = (abs: string) => relative(root, abs).split(sep).join("/");
@@ -1571,8 +1617,14 @@ function main(): number {
       failOnNew: [...CHECK_FAIL_ON_NEW],
       baseline: { root: INSTANCE_ROOT, stem: SIDECAR_STEM, writer: GATE, against },
       rekeyBaseline: (b) => {
-        const { result, rekeyed } = rekeyMovedPairs(b, moveEvidence());
-        return { result, note: `${rekeyed} entr(y/ies) on a moved file compared at the file's new path (ruling (i), 2026-10-11)` };
+        const moved = rekeyMovedPairs(b, moveEvidence());
+        const split = rekeyToolSplits(moved.result, fresh);
+        return {
+          result: split.result,
+          note:
+            `${moved.rekeyed} entr(y/ies) on a moved file compared at the file's new path (ruling (i), 2026-10-11); ` +
+            `${split.rekeyed} on a Tool split into its folder (bean tdir)`,
+        };
       },
     }).exit;
   }

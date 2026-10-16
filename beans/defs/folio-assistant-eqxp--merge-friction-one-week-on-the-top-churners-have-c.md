@@ -1,11 +1,11 @@
 ---
 # folio-assistant-eqxp
 title: 'MERGE FRICTION, one week on: the top churners have changed and four more pass 1swy''s test'
-status: scrapped
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-30T23:35:24Z
-updated_at: 2026-10-10T16:48:58Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -252,3 +252,5 @@ Obsolete after the separation (lane B drain, 2026-10-10). The bean re-measured c
 - `cat-harness/docs/**` (glossary, `_data/harness.json`, lsi): those paths are in litlfred/cat-harness, and whether its generated docs stay on main is `34cm`'s open decision in that store.
 
 If merge friction recurs, it should be re-measured per repository against that repository's own `.gitattributes`, with 1swy's three-part test applied unchanged. That would be a new bean in the store of whichever repository it is.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: PR #1746 merged 2026-10-01 (the .gitattributes entry and two refusals); both outcomes are closed, completed is what the evidence shows. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

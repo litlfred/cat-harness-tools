@@ -59,7 +59,7 @@
  *   bun run schema:viz          # write
  *   bun run schema:viz:check    # fail if either artefact is stale
  */
-import { rmSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { readSchemaGraph, schemaRoots, type SchemaGraph } from "./schema-graph.ts";
@@ -69,6 +69,12 @@ import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kind-va
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
+import {
+  SOURCE_DESCRIPTOR_SCHEMA_TAG,
+  SourceDescriptorSchema,
+  enumerationCost,
+} from "@litlfred/cat-harness/schemas/source-descriptor.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
@@ -208,12 +214,140 @@ export async function nodeKindRows(g: SchemaGraph, root: string, repoRoot: strin
   return [...rows.values()].sort((a, b) => a.id.localeCompare(b.id) || a.source.localeCompare(b.source));
 }
 
+/**
+ * One source descriptor, as a subject page lists it (bean `folio-assistant-1nu0`).
+ *
+ * ## Why a schema graph lists data files at all
+ *
+ * The `schemas` graph typology admits `folio-source-descriptor/v1` as a node
+ * schema (`graph-typology-registry.ts`, `nodeSchemas`), so a directory of
+ * descriptors — an instance's `sources/`, as two content instances hold — is a
+ * `schemas` directory by declaration. That classification is deliberate and
+ * this generator does not second-guess it.
+ *
+ * What it got wrong was the READ: `readSchemaGraph` collects `.ts` modules and
+ * `*.schema.json` files, and a descriptor is neither, so a directory holding
+ * only descriptors produced no module, its instance was no subject, no page
+ * was written, and the site's tile read "no viewer yet". An instance whose
+ * only `schemas` directory holds descriptors was invisible here for a reason
+ * no page said.
+ *
+ * The rows are NOT declarations and are not folded into the declaration list
+ * or its counts: a descriptor says how to enumerate a corpus, which is a node
+ * of a schema rather than a schema. They are a separate table on the page.
+ *
+ * Only `folio-source-descriptor/v1` is read. Another `.json` in a schemas
+ * directory (a `concern-groups/v1` grouping file, say) is a different family
+ * with a different shape and is left to whatever owns it, rather than shown
+ * here as a row with nothing to say.
+ */
+export interface SourceDescriptorRow {
+  /** The descriptor's own `id`, or the file stem when it has none. */
+  id: string;
+  /** Repo-relative path of the descriptor file. */
+  file: string;
+  /** The instance holding it, by the same rule `readSchemaGraph` uses for a module. */
+  instance: string;
+  title?: string;
+  system?: string;
+  baseUrl?: string;
+  nodeKind?: string;
+  subsetStrategies?: string[];
+  subsetIsSelfContained?: boolean;
+  identifiers?: { name: string; authoritative: boolean; example?: string }[];
+  enumeration?: { method: string; pageSize?: number; totalNodes?: number; requests?: number };
+  termsUrl?: string;
+  character?: { remote: boolean; large: boolean; volatility: string; availability: string; hasOwnSearch: boolean };
+  /** Why the file does not satisfy its schema, when it does not. Its row is still listed. */
+  note?: string;
+}
+
+/** Every source descriptor in the declared schema directories, in path order. */
+export function sourceDescriptorRows(
+  /** Repo-relative schema directories, as `SchemaGraph.roots` carries them. */
+  roots: readonly string[],
+  repoRoot: string,
+  /** The instance a directory at the checkout's root belongs to. */
+  rootName?: string,
+): SourceDescriptorRow[] {
+  const rows: SourceDescriptorRow[] = [];
+  const clip = (s: string): string => (s.length > DOC_MAX ? s.slice(0, DOC_MAX - 1) + "\u2026" : s);
+  for (const dir of [...roots].sort()) {
+    const instance = dir.includes("/") ? dir.split("/")[0]! : rootName;
+    if (instance === undefined) continue;
+    let files: string[];
+    try {
+      files = readdirSync(join(repoRoot, dir)).sort();
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      if (!f.endsWith(".json") || f.endsWith(".schema.json")) continue;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(readFileSync(join(repoRoot, dir, f), "utf-8"));
+      } catch {
+        continue;
+      }
+      if ((raw as { $schema?: unknown } | null)?.$schema !== SOURCE_DESCRIPTOR_SCHEMA_TAG) continue;
+      const file = `${dir}/${f}`;
+      const parsed = SourceDescriptorSchema.safeParse(raw);
+      if (!parsed.success) {
+        const r = raw as { id?: unknown; title?: unknown };
+        const issue = parsed.error.issues[0];
+        rows.push({
+          id: typeof r.id === "string" ? r.id : basename(f, ".json"),
+          file,
+          instance,
+          ...(typeof r.title === "string" ? { title: r.title } : {}),
+          note: `does not satisfy ${SOURCE_DESCRIPTOR_SCHEMA_TAG}: ${issue ? `${issue.path.join(".") || "(root)"} — ${issue.message}` : "unknown issue"}`,
+        });
+        continue;
+      }
+      const d = parsed.data;
+      const requests = enumerationCost(d);
+      rows.push({
+        id: d.id,
+        file,
+        instance,
+        title: d.title,
+        ...(d.system ? { system: d.system } : {}),
+        ...(d.baseUrl ? { baseUrl: d.baseUrl } : {}),
+        nodeKind: d.nodeKind,
+        subsetStrategies: [...d.subsetStrategies],
+        subsetIsSelfContained: d.subsetIsSelfContained,
+        identifiers: d.identifiers.map((i) => ({
+          name: i.name,
+          authoritative: i.authoritative,
+          ...(i.example ? { example: i.example } : {}),
+        })),
+        enumeration: {
+          method: clip(d.enumeration.method),
+          ...(d.enumeration.pageSize !== undefined ? { pageSize: d.enumeration.pageSize } : {}),
+          ...(d.enumeration.totalNodes !== undefined ? { totalNodes: d.enumeration.totalNodes } : {}),
+          ...(requests !== undefined ? { requests } : {}),
+        },
+        ...(d.termsUrl ? { termsUrl: d.termsUrl } : {}),
+        character: {
+          remote: d.character.remote,
+          large: d.character.large,
+          volatility: d.character.volatility,
+          availability: d.character.availability,
+          hasOwnSearch: d.character.hasOwnSearch,
+        },
+      });
+    }
+  }
+  return rows;
+}
+
 /** The projection, trimmed for the page. */
 function projection(
   g: SchemaGraph,
   /** Subject-page counts, `directory id -> [count, unit]`. Empty is normal. */
   scoped: Readonly<Record<string, readonly [number, string]>>,
   nodeKinds: readonly NodeKindRow[] = [],
+  sources: readonly SourceDescriptorRow[] = [],
 ): unknown {
   return {
     $schema: "folio-schema-graph/v1",
@@ -299,6 +433,7 @@ function projection(
     })),
     edges: g.edges,
     nodeKinds,
+    sources,
   };
 }
 
@@ -331,8 +466,8 @@ function projection(
  * the rendering instance's name and the graph typology. That gives the right
  * answer for `cat-harness/schemas/` by coincidence — the directory happens to
  * sit at owner/kind — and the WRONG one for every directory that does not:
- * `who-iris/library/` would have been addressed as `cat-harness/library`,
- * naming the machinery where the rule names the data. Taking the path means
+ * a content instance's `<instance>/library/` would have been addressed as
+ * `cat-harness/library`, naming the machinery where the rule names the data. Taking the path means
  * the two can never disagree, because there is only one of them.
  *
  * ## Why the data path is computed rather than written
@@ -374,6 +509,8 @@ import { orphanSubjectPages } from "./orphan-pages.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
+import { siteTarget } from "./lib/site-target.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -436,7 +573,7 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page input { flex: 1 1 180px; min-width: 0; }
 .sc-page ul#items { list-style: none; margin: 0; padding: 0 0 24px; max-height: 70vh; overflow: auto; }
 @media (max-width: 640px) {
-  #items { max-height: 35vh; }
+  .sc-page ul#items { max-height: 35vh; }
 }
 .sc-page #items > li { margin: 0; padding: 0; }
 .sc-page #items > li::before { content: none; }
@@ -459,9 +596,6 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page table { display: table; border-collapse: collapse; width: 100%; font-size: .86rem; margin: 8px 0 16px; }
 .sc-page th, .sc-page td { border: 0; background: transparent; text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .sc-page th { color: var(--muted); font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
-td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }
-#detail table td code { word-break: normal; overflow-wrap: anywhere; }
-#detail table td:first-child code { white-space: nowrap; }
 .sc-page td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }
 .sc-page #detail table td code { word-break: normal; overflow-wrap: anywhere; }
 .sc-page #detail table td:first-child code { white-space: nowrap; }
@@ -490,7 +624,6 @@ td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-b
 .sc-page .ov-body { padding: 0 16px 14px; }
 .sc-page .ov-cap { color: var(--muted); font-size: .8rem; margin: 0 0 8px; }
 .sc-page #ov-svg { width: 100%; height: auto; display: block; max-height: 78vh; }
-#ov-svg:empty { display: none; }
 .sc-page #ov-svg:empty { display: none; }
 .sc-page .dia-e { fill: none; stroke-width: 1.6; }
 .sc-page .dia-field { stroke: var(--accent); }
@@ -528,6 +661,16 @@ td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-b
 .sc-page #nk-table td code, .sc-page #nk-table td .sub { white-space: nowrap; word-break: normal; }
 .sc-page #nk-table button { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
 .sc-page .tag.nk { color: var(--accent); border-color: var(--accent); }
+/* Source descriptors (bean folio-assistant-1nu0). Hidden until the
+   projection says this scope holds one, so a page with none shows no empty
+   panel claiming there is nothing to describe. */
+.sc-page #sources { border-bottom: 1px solid var(--line); }
+.sc-page #sources > summary { cursor: pointer; padding: 10px 16px; font-weight: 600; font-size: .9rem; list-style: revert; }
+.sc-page #sources > summary:hover { color: var(--accent); }
+.sc-page .src-wrap { overflow-x: auto; }
+.sc-page #src-table { margin: 0; }
+.sc-page #src-table td { min-width: 9em; }
+.sc-page #src-table td.how { min-width: 18em; }
 ${subjectNavCss("sc-page")}
 </style>
 <div class="sc-page">
@@ -539,6 +682,16 @@ ${subjectNavCss("sc-page")}
     <strong>generalisation</strong>. A reference carried as a string id is not drawn &mdash; it is
     invisible to a syntactic reader, not absent from the model.</p>
 </div>
+<details id="sources" open hidden>
+  <summary>Source descriptors &mdash; <span id="src-count">loading&hellip;</span></summary>
+  <div class="ov-body">
+    <p class="ov-cap">A <b>source descriptor</b> (<code>folio-source-descriptor/v1</code>) says how to enumerate a corpus
+      and ask it for a subset: what one node is, which identifiers it mints and which of them to resolve by, and how
+      the whole is listed. It is a node the <code>schemas</code> graph typology holds, not a declaration, so it is listed
+      here rather than among the declarations below.</p>
+    <div class="src-wrap"><table id="src-table"><thead><tr><th>source</th><th>node</th><th>how to enumerate</th><th>subset</th><th>identifiers</th><th>character</th></tr></thead><tbody id="src-rows"></tbody></table></div>
+  </div>
+</details>
 <details id="overview">
   <summary>Relationship diagram &mdash; what is defined here, and how it is linked</summary>
   <div class="ov-body">
@@ -855,6 +1008,51 @@ function renderKinds() {
   }).join("") || '<tr><td colspan="4" class="empty">' +
     (all.length ? "No node kind matches the search." : "No node kind or family is defined in " + esc(SCOPE || "this graph") + ".") +
     "</td></tr>";
+}
+
+/* The source-descriptor table: scoped like the list, narrowed by the same
+   search. A scope holding descriptors and no modules shows ONLY the table:
+   an empty declaration list beside it would read as a page that failed. */
+function renderSources() {
+  var q = $("q") ? $("q").value.trim().toLowerCase() : "";
+  var all = (G.sources || []).filter(nkInScope);
+  $("sources").hidden = all.length === 0;
+  if (!all.length) return;
+  var rows = all.filter(function (r) {
+    if (!q) return true;
+    return [r.id, r.title, r.system, r.nodeKind, r.file].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  $("src-count").textContent = rows.length + " of " + all.length + (SCOPE ? " held in " + SCOPE : "");
+  function n(x) { return typeof x === "number" ? x.toLocaleString("en") : ""; }
+  $("src-rows").innerHTML = rows.map(function (r) {
+    var e = r.enumeration;
+    var nums = e ? [
+      e.totalNodes !== undefined ? "<b>" + n(e.totalNodes) + "</b> nodes" : "total <b>unknown</b>",
+      e.pageSize !== undefined ? "page size " + n(e.pageSize) : "",
+      e.requests !== undefined ? "~" + n(e.requests) + " requests to list all" : "",
+    ].filter(Boolean).join(" &middot; ") : "";
+    var ids = (r.identifiers || []).map(function (i) {
+      return esc(i.name) + (i.authoritative ? ' <span class="tag nk">authoritative</span>' : "") +
+        (i.example ? '<br><span class="sub"><code>' + esc(i.example) + "</code></span>" : "");
+    }).join("<br>");
+    var c = r.character;
+    var ch = c ? [c.remote ? "remote" : "local", c.large ? "large" : "small", esc(c.volatility),
+      esc(c.availability), c.hasOwnSearch ? "has its own search" : "no search of its own"].join(", ") : "";
+    var head = "<b>" + esc(r.title || r.id) + "</b><br><code>" + esc(r.id) + "</code>" +
+      (r.system ? '<br><span class="sub">' + esc(r.system) + "</span>" : "") +
+      (r.baseUrl ? '<br><a href="' + esc(r.baseUrl) + '">' + esc(r.baseUrl) + "</a>" : "") +
+      (r.termsUrl ? '<br><a class="sub" href="' + esc(r.termsUrl) + '">terms</a>' : "") +
+      '<br><span class="sub">' + esc(r.file) + "</span>" +
+      (SCOPE || !r.instance ? "" : '<br><span class="sub">' + esc(r.instance) + "</span>");
+    if (r.note) {
+      return "<tr><td>" + head + '</td><td colspan="5"><p class="note">' + esc(r.note) + "</p></td></tr>";
+    }
+    return "<tr><td>" + head + "</td><td>" + esc(r.nodeKind || "") +
+      '</td><td class="how">' + (e ? esc(e.method) : "") + (nums ? '<br><span class="sub">' + nums + "</span>" : "") +
+      "</td><td>" + esc((r.subsetStrategies || []).join(", ")) +
+      '<br><span class="sub">' + (r.subsetIsSelfContained ? "self-contained" : "needs its dependency closure") + "</span>" +
+      "</td><td>" + ids + "</td><td>" + ch + "</td></tr>";
+  }).join("") || '<tr><td colspan="6" class="empty">No source descriptor matches the search.</td></tr>';
 }
 
 /** The three filter controls, read once so every caller sees one state. */
@@ -1207,7 +1405,17 @@ function render() {
     "<b>" + rows.length + "</b> of <b>" + scoped.length + "</b> declarations &middot; <b>" +
     mods.length + "</b> modules &middot; <b>" + edgeCount + "</b> edges &middot; <b>" +
     scoped.filter(function (d) { return d.kind === "undetermined"; }).length + "</b> undetermined";
+  var srcs = (G.sources || []).filter(nkInScope).length;
+  if (srcs) $("counts").innerHTML += " &middot; <b>" + srcs + "</b> source descriptor" + (srcs === 1 ? "" : "s");
+  /* A scope with descriptors and no modules has no declarations to browse:
+     the declaration panels are hidden rather than shown empty. */
+  var onlySources = srcs > 0 && mods.length === 0;
+  ["overview", "kinds"].forEach(function (id) { $(id).hidden = onlySources; });
+  /* style, not the hidden attribute: .sc-main sets display: grid, which
+     outranks the attribute's display: none. */
+  document.querySelector(".sc-page .sc-main").style.display = onlySources ? "none" : "";
   renderKinds();
+  renderSources();
 }
 
 function select(id) {
@@ -1345,7 +1553,26 @@ let stale = 0;
  * since 2026-10-07: the pages are themed, so the theme's sidebar is their
  * navigation and there is no rail to inject.
  */
-const emit = makeEmit({ check, onStale: () => { stale++; } });
+const emitOrCheck = makeEmit({ check, onStale: () => { stale++; } });
+/**
+ * BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The projection and
+ * the pages are drawn over the WHOLE checkout (issue #2278): every instance
+ * the index mounts, at its pin. So the committed copies moved with the
+ * index's pins, not with this instance's commit. The instance declares them
+ * `builtAtPublish` with this script as the writer, and `derive:publish` runs
+ * it; under `--check` a declared file has no committed bytes to compare, so it
+ * is skipped there (the `folio:viz` rule) and written otherwise. Asked by the
+ * file's path in the instance's own site, so `--site` asks the same question.
+ */
+let builtSite: string | undefined;
+function builtHere(path: string): boolean {
+  builtSite ??= siteTarget(join(ROOT, siteDirFor(ROOT)));
+  return isBuiltAtPublish(readDeclaration(ROOT)?.builtAtPublish ?? [], join(siteDirFor(ROOT), relative(builtSite, path)).split(sep).join("/"));
+}
+const emit = (path: string, content: string): void => {
+  if (check && builtHere(path)) return;
+  emitOrCheck(path, content);
+};
 
 if (import.meta.main) {
   // The WHOLE checkout, dependencies included (issue #2278). This is a
@@ -1360,7 +1587,7 @@ if (import.meta.main) {
     console.log("  · no schemas directory — nothing to publish");
     process.exit(0);
   }
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   /**
    * The published segment is the DECLARED directory's own name, read rather
    * than written down.
@@ -1404,8 +1631,9 @@ if (import.meta.main) {
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/who-iris/`. The handler is THIS instance, the
-  // kind names what it renders, the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
+  // subject. The handler is THIS instance, the kind names what it renders,
+  // the subject scopes it to one instance.
   //
   // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
   // subject page must never be published there: it would squat on that
@@ -1429,14 +1657,18 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  // One page per SUBJECT — read from the modules actually found, so a
-  // declared-but-empty directory gets no page claiming to show it.
-  const subjects = [...new Set(g.modules.map((m) => m.instance))].sort();
+  // One page per SUBJECT — read from what was actually found, so a
+  // declared-but-empty directory gets no page claiming to show it. "Found"
+  // includes source descriptors: an instance whose only `schemas` directory
+  // holds them (bean `folio-assistant-1nu0`) has something to show and gets
+  // its page, rather than a tile reading "no viewer yet".
+  const sources = sourceDescriptorRows(g.roots, REPO_ROOT, rootInstanceName(REPO_ROOT));
+  const subjects = [...new Set([...g.modules.map((m) => m.instance), ...sources.map((r) => r.instance)])].sort();
 
   /**
    * Each subject page's tile count, keyed by the DECLARED directory id.
    *
-   * Nothing is composed from the subject name. `folio-assistant-core`'s
+   * Nothing is composed from the subject name. The content core's
    * directory is declared `folio-assist-core-schemas` while its three
    * siblings follow `${subject}-schemas`, so a composed key would badge three
    * tiles and leave the fourth silently uncounted — see
@@ -1487,22 +1719,28 @@ if (import.meta.main) {
   if (wholeId !== undefined) scoped[wholeId] = modules(g.modules.length);
 
   // Then each SUBJECT page, counted over that subject alone.
+  // A subject with no modules but some source descriptors counts those, in
+  // their own unit: "0 modules" over a page listing two descriptors would be
+  // the badge disagreeing with its page.
   for (const subject of subjects) {
     const id = idOf(`/${subject}`);
     if (id === undefined) continue;
-    scoped[id] = modules(g.modules.filter((m) => m.instance === subject).length);
+    const n = g.modules.filter((m) => m.instance === subject).length;
+    const s = sources.filter((r) => r.instance === subject).length;
+    scoped[id] = n === 0 && s > 0 ? [s, s === 1 ? "source descriptor" : "source descriptors"] : modules(n);
   }
 
   const kinds = await nodeKindRows(g, ROOT, REPO_ROOT);
-  const data = JSON.stringify(projection(g, scoped, kinds), null, 2) + "\n";
+  const data = JSON.stringify(projection(g, scoped, kinds, sources), null, 2) + "\n";
   // Indented for the reason the todo and bean indices both document: a
   // minified projection is one line, git merges by line, and two branches each
   // adding a schema would conflict on the whole file every time.
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/who-iris/`. The handler is THIS instance, the
-  // kind names what it renders, the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
+  // subject. The handler is THIS instance, the kind names what it renders,
+  // the subject scopes it to one instance.
   //
   // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
   // subject page must never be published there: it would squat on that
@@ -1533,6 +1771,9 @@ if (import.meta.main) {
   for (const name of owned) {
     const dir = join(pageDir, name);
     if (check) {
+      // Under a built-at-publish route a stale local page is not a committed
+      // orphan; a write run still prunes it.
+      if (builtHere(join(dir, "index.html"))) continue;
       console.error(`  ✗ ${dir} is an orphan — it serves a subject the declaration no longer describes`);
       stale++;
       continue;
@@ -1545,6 +1786,7 @@ if (import.meta.main) {
     console.log(
       `  ${g.modules.length} module(s), ${g.decls.length} declaration(s), ${g.edges.length} edge(s), ` +
         `${g.decls.filter((d) => d.kind === "undetermined").length} undetermined; ` +
+        `${sources.length} source descriptor(s); ` +
         `${subjects.length} subject page(s); ` +
         `projection ${(Buffer.byteLength(data) / 1024).toFixed(0)} KB`,
     );

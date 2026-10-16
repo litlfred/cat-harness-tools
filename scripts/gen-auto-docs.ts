@@ -105,6 +105,7 @@ import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, rendere
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 function decodeEntities(s: string): string {
   return s
@@ -1374,7 +1375,7 @@ if (import.meta.main) {
     console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
     process.exit(0);
   }
-  const site = join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
 
   /** Items indexed per BUILT type — what the level pages below count. */
   const built = new Map<string, number>();

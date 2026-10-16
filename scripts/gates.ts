@@ -119,6 +119,8 @@ import {
   type GateStatus,
 } from "./content-compile-gates.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
+import { rootGateSet, rootProfile } from "./lib/root-gate-set.ts";
 
 export {
   CONTENT_COMPILE_GATES,
@@ -144,8 +146,11 @@ export function contentCompileGates(paths: readonly string[]): ContentCompileGat
 // `loadGates` would have thrown `NoGatesFound` on a workflow that is fine.
 const ROOT = repoRootFor(resolve(HARNESS_ROOT));
 
-/** The workflow that defines the FAST set. One place, declared. */
-export const GATES_WORKFLOW = join(".github", "workflows", "code-quality-gates.yml");
+/** The workflow that defines the FAST set. One place, declared: `lib/gates-workflow.ts`. */
+export { GATES_WORKFLOW };
+
+/** The job a content root's gates are reported under: the shared PR checks that run them. */
+export const LAYER_PR_CHECKS = "layer-pr-checks.yml";
 
 /** Where every workflow lives. `--all` reads all of them, not just the one. */
 export const WORKFLOW_DIR = join(".github", "workflows");
@@ -992,6 +997,21 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "builds a release tarball; only a release run, dispatched by hand, has anything to pack",
   },
   {
+    match: "bun run cat processes:viz",
+    kind: "covered-by",
+    reason:
+      "the site builds write the processes pages (docs-site.yml, feature-staging.yml, after the drawings they embed); " +
+      "`processes:viz:check` is in the gate set, and `processes-viz.test.ts` covers the generator in `bun test`",
+  },
+  {
+    match: "scripts/staging-changes.ts",
+    kind: "ci-only",
+    reason:
+      "writes a preview's `STAGING/<slug>/changes/` page at deploy time: its inputs are the PR's file list, the base " +
+      "commit's lock, the built `_site` and the published `gh-pages` root, which exist only in the staging job. " +
+      "Its expansion, prediction and comparison are covered by `staging-changes.test.ts` in `bun test`",
+  },
+  {
     match: "run cat render:bpmn",
     kind: "covered-by",
     reason: "`render:bpmn:check` is in the gate set; the site build runs the writer",
@@ -1240,6 +1260,14 @@ export class NoGatesFound extends Error {
  * silent one.
  */
 export function loadUnresolved(root: string, opts: { all?: boolean } = {}): Gate[] {
+  // A content root: the gates its CI runs with an input this side does not
+  // hold (`run-gates.py` SUPPLIED_INPUTS, kind `input-absent`). CI runs them;
+  // this tool cannot (cat-harness-tools#281).
+  if (rootProfile(root) === "content") {
+    return Object.entries(rootGateSet(root).skipped)
+      .filter(([, s]) => s.kind === "input-absent")
+      .map(([name, s]) => ({ job: LAYER_PR_CHECKS, step: name, command: s.command }));
+  }
   // Publishers are dropped here as in `loadGates`: they are not gates, so
   // they are neither run nor reported as unrunnable (bean `16ei`).
   return unresolvedGatesFrom(readFileSync(join(root, GATES_WORKFLOW), "utf-8"), { ...opts, skipPublishers: true });
@@ -1265,6 +1293,15 @@ export function loadGatesCiRuns(root: string, opts: { all?: boolean } = {}): Gat
 
 /** Read and parse, refusing an empty result. The RUNNER's list — see {@link loadGatesCiRuns}. */
 export function loadGates(root: string, opts: { all?: boolean } = {}): Gate[] {
+  // A root that is not a harness is measured against its OWN gate set: the
+  // gates `layer-pr-checks.yml` runs for it, derived once by `run-gates.py`
+  // (owner, cat-harness-tools#281: "hold smart-ra to its own gate set").
+  // `--all` adds nothing there: that set is everything its PR checks run.
+  if (rootProfile(root) === "content") {
+    const gates = Object.entries(rootGateSet(root).gates).map(([name, command]) => ({ job: LAYER_PR_CHECKS, step: name, command }));
+    if (gates.length === 0) throw new NoGatesFound(`${LAYER_PR_CHECKS} (run-gates.py --list)`);
+    return gates;
+  }
   const path = join(root, GATES_WORKFLOW);
   // The RUNNER's list, so the filter belongs here rather than in `gatesFrom`:
   // a command referencing a shell variable this reader discarded cannot be run
@@ -1381,6 +1418,15 @@ export interface ScriptExemption {
  * whole difference, since the comment silently covered six of nine.
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
+  {
+    script: "jsonld:contexts:check",
+    kind: "report",
+    reason:
+      "RED WHERE IT LANDED (891c678): smart-base, smart-trust and smart-immunizations publish no `ns/context/v1.jsonld` " +
+      "yet, and `cat-harness/docs/subgraph/cat-harness/index.jsonld` uses an unbound `folio-assistant-core` prefix. " +
+      "Wiring it into CI now would red every PR on pre-existing gaps; it becomes a gate once those contexts are generated " +
+      "(folio-assistant#2529 triage, 2026-10-15)",
+  },
   {
     script: "software:check",
     kind: "report",

@@ -4,12 +4,20 @@
  * in bottom LHS navbar link back to folio-assist, not smart-immz").
  */
 import { describe, expect, test } from "bun:test";
+import { dirname, join, resolve } from "node:path";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { instanceHarnesses } from "../mount-instance-docs.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
+
+const REPO = resolve(dirname(HARNESS_ROOT));
 
 describe("instanceHarnesses", () => {
   const rows = instanceHarnesses("cat-harness", "smart-immunizations", "https://example.org/fa", ".")!;
   test("the instance comes first and links to its own site's root", () => {
-    expect(rows[0]!.label).toBe("smart-immunizations");
+    // Labelled as every row is (label, else title, else name): the restored
+    // declaration (2026-10-15) carries a title, so that is its label.
+    const decl = readDeclaration(join(REPO, "smart-immunizations"));
+    expect(rows[0]!.label).toBe(decl?.title ?? "smart-immunizations");
     expect(rows[0]!.href).toBe(".");
   });
   test("it lists the harnesses the instance is built on, re-based on the platform", () => {

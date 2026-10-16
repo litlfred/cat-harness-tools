@@ -85,8 +85,9 @@ function checkerFiles(): Array<{ label: string; abs: string }> {
   return out.sort((a, b) => a.label.localeCompare(b.label));
 }
 
+const checkerFileList = checkerFiles();
 const sources = new Map<string, string>(
-  checkerFiles().map((f) => [f.label, readFileSync(f.abs, "utf-8")]),
+  checkerFileList.map((f) => [f.label, readFileSync(f.abs, "utf-8")]),
 );
 
 // The name convention is `qa-checker-discovery`'s, not this test's: discovery
@@ -100,9 +101,15 @@ const checkerFnName = checkerFunctionName;
  * agreement.
  */
 function hostFiles(id: string): string[] {
+  return hostEntries(id).map((h) => h.label);
+}
+
+/** As {@link hostFiles}, with each host's absolute path. */
+function hostEntries(id: string): Array<{ label: string; abs: string }> {
   const fn = checkerFnName(id);
-  const out: string[] = [];
-  for (const [f, s] of sources) {
+  const out: Array<{ label: string; abs: string }> = [];
+  for (const f of checkerFileList) {
+    const s = sources.get(f.label) ?? "";
     if (s.includes(`"${id}":`) || s.includes(`export function ${fn}(`)) out.push(f);
   }
   return out;
@@ -128,11 +135,17 @@ describe("getCriterionSourceFile — declared source must host the checker", () 
         mismatched.push(`${def.id}: ${located.reason}`);
         continue;
       }
+      // Compared by the file the resolver READS — its `root` joined to its
+      // `sourceFile` — not by label: a core criterion's label stays the path
+      // as declared while its bytes are read from the implementing instance
+      // (owner ruling T7, bean `70lx`), so a label match would need this test
+      // to know which layer implements core's checkers.
       const declared = located.label;
-      const hosts = hostFiles(def.id);
+      const declaredAbs = resolve(located.root, located.sourceFile);
+      const hosts = hostEntries(def.id);
       if (hosts.length === 0) continue; // reported separately below
-      if (!hosts.includes(declared)) {
-        mismatched.push(`${def.id}: declared ${declared}, found in ${hosts.join(", ")}`);
+      if (!hosts.some((h) => h.abs === declaredAbs)) {
+        mismatched.push(`${def.id}: declared ${declared}, found in ${hosts.map((h) => h.label).join(", ")}`);
       }
     }
     // Named in the failure so a fix does not need a re-run to find them.

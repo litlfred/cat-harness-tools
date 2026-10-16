@@ -432,6 +432,39 @@ export function definitionPrefixes(definition: unknown): string[] {
   return [...out].sort();
 }
 
+/**
+ * A definition with every CURIE its source context can expand written as the
+ * full IRI, for COMPARISON only. Two contexts that spell one IRI differently
+ * (`dcterms:title` in the content context, `http://purl.org/dc/terms/title` in
+ * the generated subgraph context) define the term the SAME way; comparing the
+ * text called that a conflict and failed `derive:publish`. A CURIE the context
+ * does not bind is left as written, so it still compares unequal to an IRI.
+ */
+function expandedForComparison(definition: unknown, context: Record<string, unknown> | undefined): unknown {
+  if (context === undefined) return definition;
+  const expand = (s: string): string => {
+    const p = curiePrefix(s);
+    if (p === undefined) return s;
+    const iri = contextBinding(context, p);
+    return iri === undefined ? s : iri + s.slice(p.length + 1);
+  };
+  const visit = (v: unknown, key?: string): unknown => {
+    if (typeof v === "string") return key === undefined || key === "@id" || key === "@type" || key === "@reverse" ? expand(v) : v;
+    if (Array.isArray(v)) return v.map((x) => visit(x, key));
+    if (!isRecord(v)) return v;
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) {
+      if (k === "@context" && isRecord(x)) {
+        const scoped: Record<string, unknown> = {};
+        for (const [tk, tv] of Object.entries(x)) scoped[tk] = tk.startsWith("@") ? tv : visit(tv);
+        out[k] = scoped;
+      } else out[k] = k.startsWith("@") ? visit(x, k) : x;
+    }
+    return out;
+  };
+  return visit(definition);
+}
+
 /** Stable JSON for comparing two definitions: key order does not make them different. */
 function canonical(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
@@ -507,7 +540,7 @@ export function buildInstanceContext(input: InstanceContextInput): InstanceConte
     }
     for (const [term, t] of terms ?? []) {
       const byDef = termUses.get(term) ?? new Map();
-      const key = canonical(t.definition);
+      const key = canonical(expandedForComparison(t.definition, sources.get(t.context)?.context));
       const slot = byDef.get(key) ?? { context: t.context, definition: t.definition, documents: new Set<string>() };
       slot.documents.add(where);
       byDef.set(key, slot);

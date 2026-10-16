@@ -195,7 +195,8 @@ test.describe("kg viewer", () => {
     await page.locator("#q").fill("beans-cli");
     await page.locator("#list li button").first().click();
     await expect(page.locator(".detail h3")).toContainText("beans CLI");
-    await expect(page.locator(".detail .iri")).toContainText("#tool/beans-cli");
+    // A Tool's IRI is its own document beside the graph's (bean `tdir`).
+    await expect(page.locator(".detail .iri")).toContainText("/tools/beans-cli.jsonld");
     await expect(page.locator(".detail th", { hasText: /^satisfies$/ })).toHaveCount(1);
   });
 
@@ -266,7 +267,7 @@ test.describe("kg viewer", () => {
         undeclaredTerms: [{ term: "undeclaredProbe", onTypes: ["Tool"], occurrences: 1 }],
         problems: [],
         danglingLinks: [],
-        "@graph": [{ "@id": "https://example.invalid/fixture.jsonld#tool/probe", "@type": `${NS}Tool`, name: "probe", undeclaredProbe: "dropped on expansion" }],
+        "@graph": [{ "@id": "https://example.invalid/tools/probe.jsonld", "@type": `${NS}Tool`, name: "probe", undeclaredProbe: "dropped on expansion" }],
       }),
     );
 
@@ -339,7 +340,11 @@ test.describe("kg viewer", () => {
       ([] as unknown[]).concat(n.satisfies ?? []).some((v) =>
         typeof v === "string" && /^https?:/.test(v) && !ids.has(v)));
     test.skip(!target, "the export has no node linking only into another graph");
-    await page.locator("#q").fill(String(target!["@id"]).split("#").pop()!);
+    // The id as the list shows it (kg-viewer.ts `short`): the fragment, or a
+    // per-Tool document IRI's `tool/<id>` (bean tdir), which has no fragment.
+    const id = String(target!["@id"]);
+    const tool = /\/tools\/([^/]+)\.jsonld$/.exec(id);
+    await page.locator("#q").fill(id.includes("#") ? id.split("#").pop()! : tool ? `tool/${decodeURIComponent(tool[1])}` : id);
     await page.locator("#list li button").first().click();
     await expect(page.locator(".detail td .elsewhere").first()).toContainText("in another graph");
     await expect(page.locator(".detail p.empty")).not.toHaveText("No links to or from this node.");

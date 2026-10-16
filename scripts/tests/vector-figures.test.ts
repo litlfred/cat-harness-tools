@@ -232,6 +232,7 @@ describe("the entry may carry the arm's outputs", () => {
   test("`vector-figures.json` and `figures/` are declared entry contents", () => {
     expect(ENTRY_SIDECARS).toContain(VECTOR_FIGURES_FILE);
     expect(ENTRY_DIRECTORIES).toContain("figures");
+    expect(ENTRY_DIRECTORIES).toContain("sheets");
   });
 });
 

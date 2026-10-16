@@ -265,6 +265,16 @@ export interface NavbarModel {
    */
   visualiser?: NavGroup;
   /**
+   * The SITE's own page tree — "Pages" (owner, 2026-10-15, "folio rail
+   * everywhere"): on a just-the-docs site the rail carries what the theme's
+   * `site-nav` carried, built on the server (`lib/jekyll-pages-nav.ts`).
+   * Drawn in the scrolling middle after the page's own section and before the
+   * graphs; folded on arrival unless it holds the current page and the page
+   * has no section of its own — the same rule as {@link graphs}. Absent on a
+   * site with no page tree, and then not drawn at all.
+   */
+  pages?: NavGroup;
+  /**
    * The instance's own themed root — its front door, in the fixed top.
    *
    * NOT inside the graphs group: a group labelled "Graphs" that contains the
@@ -364,6 +374,8 @@ export interface NavbarModel {
 /** How a rendering pass writes its hrefs. Threaded rather than global. */
 export interface Ctx {
   readonly liquid: boolean;
+  /** Numbers the folds of ONE rendering, so each toggle names its own list. */
+  readonly folds?: { n: number };
 }
 
 const esc = (s: string): string =>
@@ -497,17 +509,20 @@ export function navbarCss(): string {
     // column it never uses is a strip that is narrower than it looks.
     `.fa-nav-row{display:grid;grid-template-columns:1fr auto;align-items:center}`,
     `.fa-nav-row>a,.fa-nav-row>.fa-nav-dead{min-width:0}`,
-    `.fa-nav-kids,.fa-nav-fold{grid-column:1/-1}`,
-    // A FOLDED SET OF CHILDREN (bean `r2ld`): the summary is a small row under
-    // its parent, indented one step, with the caret every disclosure here
-    // wears. 24px floor: it is a target (SC 2.5.8).
-    `.fa-nav-fold>summary{display:flex;align-items:center;gap:6px;min-height:24px;`,
-    `padding:2px ${NAV_PAD_PX}px 2px ${NAV_PAD_PX + NAV_GLYPH_PX + 8}px;font-size:12px;opacity:.8;`,
-    `cursor:pointer;user-select:none;list-style:none}`,
-    `.fa-nav-fold>summary::-webkit-details-marker{display:none}`,
-    `.fa-nav-fold>summary::before{content:"\\25B8";display:inline-block;transition:transform .12s}`,
-    `.fa-nav-fold[open]>summary::before{transform:rotate(90deg)}`,
-    `.fa-nav-fold>summary:hover{background:#30363d;opacity:1}`,
+    `.fa-nav-kids{grid-column:1/-1}`,
+    `.fa-nav-kids[hidden]{display:none}`,
+    // THE FOLD TOGGLE sits on its parent's row (owner, 2026-10-15): a
+    // chevron in the row's control column, turned when open. 24px target
+    // (SC 2.5.8); hidden with the labels when the strip is at rest, like
+    // every other control here.
+    `.fa-nav-row--fold{grid-template-columns:1fr auto auto}`,
+    `.fa-nav-row--fold>a,.fa-nav-row--fold>.fa-nav-dead{overflow:hidden}`,
+    `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden;text-overflow:ellipsis}`,
+    `.fa-nav-twisty{display:none;align-items:center;justify-content:center;min-width:24px;min-height:24px;`,
+    `margin-right:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
+    `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:#30363d}`,
+    `.fa-nav-twisty>span{display:inline-block;transition:transform .12s}`,
+    `.fa-nav-twisty[aria-expanded="true"]>span{transform:rotate(90deg)}`,
     // The control is hidden with the labels rather than on its own timer: at
     // rest the strip shows marks only, and a ⚙ floating beside a mark with no
     // label names nothing. Same trigger as `.fa-nav-label`, so the two cannot
@@ -517,6 +532,8 @@ export function navbarCss(): string {
     `.fa-nav-action:hover,.fa-nav-action:focus-visible{opacity:1}`,
     `.fa-nav:hover .fa-nav-action,.fa-nav:has(:focus-visible) .fa-nav-action,`,
     `.fa-nav:has(.fa-nav-open:checked) .fa-nav-action{display:block}`,
+    `.fa-nav:hover .fa-nav-twisty,.fa-nav:has(:focus-visible) .fa-nav-twisty,`,
+    `.fa-nav:has(.fa-nav-open:checked) .fa-nav-twisty{display:inline-flex}`,
     // THE EXPLODING MENU. `<details>` so it is keyboard-operable and announces
     // its own state with no script.
     `.fa-nav-group>summary{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
@@ -714,17 +731,80 @@ function itemHtml(i: NavItem, c: Ctx): string {
       ` aria-label="${esc(i.action.label)}" data-fa-tip="${esc(i.action.label)}">${esc(i.action.glyph)}</button>`
     : "";
   const inner = i.children?.length ? i.children.map((k) => itemHtml(k, c)).join("") : "";
-  const kids = !inner
-    ? ""
-    : i.fold
-      ? `<details class="fa-nav-fold"><summary><span class="fa-nav-label">${esc(i.fold)}</span></summary>` +
-        `<div class="fa-nav-kids">${inner}</div></details>`
-      : `<div class="fa-nav-kids">${inner}</div>`;
+  // A FOLDED SET OF CHILDREN is opened from ITS PARENT'S ROW — owner,
+  // 2026-10-15, on a "▸ 26 pages" row under "Skill schema reference": *"what
+  // is 26? why unlabeled?"*. A count on a row of its own read as an item with
+  // no name. So the toggle is a chevron button beside the parent's link, as
+  // the theme's site-nav draws it: the title stays the link, the button
+  // expands, and its accessible name says whose children and how many
+  // ({@link foldLabel}). Open on arrival when the reader's page is among them.
+  let toggle = "";
+  let kids = "";
+  if (inner && i.fold) {
+    const folds = c.folds ?? { n: 0 };
+    const id = `fa-nav-fold-${++folds.n}`;
+    const open = (i.children ?? []).some(holdsCurrent);
+    const name = foldLabel(i.label, i.fold, open);
+    toggle =
+      `<button type="button" class="fa-nav-twisty" aria-expanded="${open}" aria-controls="${id}"` +
+      ` aria-label="${esc(name)}" data-fa-tip="${esc(name)}" data-fa-fold="${esc(i.fold)}">` +
+      `<span aria-hidden="true">\u25B8</span></button>`;
+    kids = `<div class="fa-nav-kids" id="${id}"${open ? "" : " hidden"}>${inner}</div>`;
+  } else if (inner) {
+    kids = `<div class="fa-nav-kids">${inner}</div>`;
+  }
   // `fa-nav-row` exists so the row and its action can sit on one line without
   // the children joining them. Without it the action would have to be absolutely
   // positioned against a row it is not inside, which is the kind of geometry
   // `navbar-geometry.ts` exists to stop being re-decided.
-  return `<div class="fa-nav-row">${row}${action}${kids}</div>`;
+  return `<div class="fa-nav-row${toggle ? " fa-nav-row--fold" : ""}">${row}${action}${toggle}${kids}</div>`;
+}
+
+/**
+ * A fold toggle's accessible name: "Show Skill schema reference's 26 pages",
+ * "Hide …" once open. ONE wording, used by the server and by
+ * {@link wireNavFolds} when it flips the state.
+ */
+export function foldLabel(parent: string, fold: string, open: boolean): string {
+  return `${open ? "Hide" : "Show"} ${parent}'s ${fold}`;
+}
+
+/**
+ * The fold toggles' behaviour: a click flips `aria-expanded`, the controlled
+ * list's `hidden`, and the name. Delegated from the document, so a rail drawn
+ * after load (`navbar.js`) is covered too, and idempotent per document.
+ * Bundled into `navbar.js`; inlined beside a rail rendered into the page
+ * ({@link injectNavbar}) — the same function either way.
+ */
+export function wireNavFolds(doc: Document): void {
+  const w = doc as Document & { faNavFolds?: boolean };
+  if (w.faNavFolds) return;
+  w.faNavFolds = true;
+  doc.addEventListener("click", (e) => {
+    const t = e.target as Element | null;
+    const b = t && typeof t.closest === "function" ? t.closest("button.fa-nav-twisty") : null;
+    if (!b) return;
+    const list = doc.getElementById(b.getAttribute("aria-controls") || "");
+    if (!list) return;
+    const open = b.getAttribute("aria-expanded") !== "true";
+    b.setAttribute("aria-expanded", String(open));
+    if (open) list.removeAttribute("hidden");
+    else list.setAttribute("hidden", "");
+    const row = b.closest(".fa-nav-row");
+    const label = row && row.querySelector(":scope > a .fa-nav-label, :scope > .fa-nav-dead .fa-nav-label");
+    const parent = label ? (label.textContent || "").split(" — ")[0]!.trim() : "";
+    const fold = b.getAttribute("data-fa-fold") || "";
+    if (parent && fold) {
+      const name = (open ? "Hide" : "Show") + " " + parent + "'s " + fold;
+      b.setAttribute("aria-label", name);
+      b.setAttribute("data-fa-tip", name);
+    }
+  });
+}
+
+/** {@link wireNavFolds} as an inline script, for a rail rendered into the page. */
+export function navFoldsScript(): string {
+  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);</script>`;
 }
 
 /** Does this row, or any row beneath it, stand for the page being read? */
@@ -822,8 +902,9 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
 }
 
 export function navbarRegionsHtml(m: NavbarModel): string {
-  const c: Ctx = { liquid: m.hrefs === "liquid" };
+  const c: Ctx = { liquid: m.hrefs === "liquid", folds: { n: 0 } };
   const graphs = m.graphs && m.graphs.items.length > 0 ? m.graphs : undefined;
+  const pages = m.pages && m.pages.items.length > 0 ? m.pages : undefined;
   return (
     // One checkbox behind two labels, so open and close cannot disagree.
     //
@@ -848,9 +929,10 @@ export function navbarRegionsHtml(m: NavbarModel): string {
     `</div>` +
     // A Graphs group with no rows is not drawn: an empty fold is a control
     // that opens onto nothing (a site that holds none of its landing's graphs).
-    (graphs || m.visualiser
+    (graphs || pages || m.visualiser
       ? `<div class="fa-nav-graphs">` +
         (m.visualiser ? groupHtml({ ...m.visualiser, collapsible: true, open: true }, c) : "") +
+        (pages ? groupHtml(graphsOnArrival(pages, m.visualiser !== undefined), c) : "") +
         (graphs ? groupHtml(graphsOnArrival(graphs, m.visualiser !== undefined), c) : "") +
         `</div>`
       : "") +
@@ -872,13 +954,16 @@ export function navbarRegionsHtml(m: NavbarModel): string {
  */
 export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string } = {}): string | undefined {
   if (html.includes('class="fa-nav"')) return undefined;
-  const body = /<body\b[^>]*>/i.exec(html);
+  const body = bodyTag(html);
   if (!body) return undefined;
   const at = body.index + body[0].length;
   // `cssHref`: the SAME rules, published once as {@link NAVBAR_CSS} and linked —
   // for a thin page, where 4.3 KB of inlined style is most of the page (bean `lnoy`).
   const style = o.cssHref ? `<link rel="stylesheet" href="${o.cssHref}">` : `<style>${navbarCss()}</style>`;
-  return html.slice(0, at) + style + navbarHtml(m) + html.slice(at);
+  const nav = navbarHtml(m);
+  // The fold toggles need their few lines of script where no `navbar.js` runs.
+  const folds = nav.includes("fa-nav-twisty") ? navFoldsScript() : "";
+  return html.slice(0, at) + style + nav + folds + html.slice(at);
 }
 
 /**
@@ -886,7 +971,59 @@ export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string
  * generated by `bun run navbar:css`, held to `navbarCss()` by
  * `navbar-css-file.test.ts`. Bean `lnoy`.
  */
+/**
+ * The first real `<tag …>` matching `tag` in a page — never one QUOTED in an
+ * HTML comment or inside a `<script>`. A theme's head carries comments that
+ * name `<body>` and `</head>` in prose (`head_custom.html` does), and the
+ * first textual match there put the whole rail inside a comment: measured on
+ * a just-the-docs page railed by `--theme-source`, 2026-10-15.
+ */
+export function realTag(html: string, tag: RegExp): RegExpExecArray | null {
+  const re = new RegExp(`<!--[\\s\\S]*?-->|<script\\b[^>]*>[\\s\\S]*?<\\/script\\s*>|(${tag.source})`, "gi");
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    if (m[1] === undefined) continue;
+    const hit = [m[1]] as unknown as RegExpExecArray;
+    hit.index = m.index;
+    hit.input = html;
+    return hit;
+  }
+  return null;
+}
+/** The page's real `<body …>` tag ({@link realTag}). */
+export const bodyTag = (html: string): RegExpExecArray | null => realTag(html, /<body\b[^>]*>/);
+/** The page's real `</head>` tag ({@link realTag}). */
+export const headEndTag = (html: string): RegExpExecArray | null => realTag(html, /<\/head\s*>/);
+/** `html` with `insert` placed just before its real `</head>`, or unchanged when it has none. */
+export function beforeHeadEnd(html: string, insert: string): string {
+  const h = headEndTag(html);
+  return h ? html.slice(0, h.index) + insert + html.slice(h.index) : html;
+}
+
 export const NAVBAR_CSS = "assets/css/navbar.css";
+
+/**
+ * THE RAIL'S SECTION NAMES — one vocabulary on every site (owner,
+ * 2026-10-15, "folio rail everywhere"). The just-the-docs sidebar
+ * (`docs-ui.js`, `gen-navbar-include.ts`) and this rail used to name the same
+ * sections differently: "Graphs" here, "Folders" there; "Contents" here, "On
+ * this page" there. A section a reader learns on one site must be called the
+ * same on the next, so every surface takes its heading from here, and
+ * `rail-section-parity.test.ts` holds `docs-ui.js` (which cannot import this)
+ * to the same strings.
+ *
+ * - `pages` — the site's own page tree (the theme's site-nav).
+ * - `onThisPage` — the open document's headings.
+ * - `folders` — the instance's graphs, one row per folder.
+ * - `harnesses` — the harnesses this site is built on.
+ *
+ * The home row is not a section: it is named after the site.
+ */
+export const RAIL_SECTION_LABELS = {
+  pages: "Pages",
+  onThisPage: "On this page",
+  folders: "Folders",
+  harnesses: "Harnesses",
+} as const;
 
 /**
  * The open document's own index, read off the page it is being injected into.
@@ -926,7 +1063,7 @@ export const NAVBAR_CSS = "assets/css/navbar.css";
  * that is one extra row in a menu, which is why it is an acceptable trade
  * here and would not be in a validator.
  */
-export function documentIndexOf(html: string, label = "Contents"): NavGroup | undefined {
+export function documentIndexOf(html: string, label: string = RAIL_SECTION_LABELS.onThisPage): NavGroup | undefined {
   const flat: NavItem[] = [];
   const re = /<(h2|h3)\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/gi;
   for (const m of html.matchAll(re)) {
@@ -974,7 +1111,7 @@ export const VISUALISER_NAV_ATTR = "data-fa-visualiser-nav";
 /**
  * What a page calls its own section, declared beside its section:
  * `<meta name="fa-visualiser-label" content="…">`. A railed page's section is
- * "Contents" unless it says otherwise; an IG site names it after the IG
+ * "On this page" ({@link RAIL_SECTION_LABELS}) unless it says otherwise; an IG site names it after the IG
  * (owner, 2026-10-05, bean `mftp`: *"WHO SMART Trust"*). Undefined when the
  * page declares none.
  */

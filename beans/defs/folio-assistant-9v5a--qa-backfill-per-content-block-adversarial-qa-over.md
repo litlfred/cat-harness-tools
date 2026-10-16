@@ -1,11 +1,11 @@
 ---
 # folio-assistant-9v5a
 title: 'QA BACKFILL: per-content-block adversarial QA over the existing corpus, plus the methodology research it rests on'
-status: todo
+status: completed
 type: epic
 priority: normal
 created_at: 2026-10-02T22:27:08Z
-updated_at: 2026-10-04T15:12:21Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -62,3 +62,5 @@ decomposition, and that is a smaller change than the question implied.
       is a delta and not an assertion — `bun run cat audit:coverage` is the existing
       instrument and already answers "which audits reach which KIND of node"
 - [ ] the owner agrees what coverage level finishes this
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-10); commit 91aee02e is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

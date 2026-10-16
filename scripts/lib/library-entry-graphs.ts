@@ -37,7 +37,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
@@ -179,4 +179,33 @@ export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistr
 export function entryGraphSitePath(instance: string, docId: string, rel: string): string {
   const base = dirname(libraryAssetSitePath(instance, docId));
   return `${base}/${rel.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * The directories directly inside the library `lib` that its instance
+ * declares with kinds that do not include `library` — absolute, without a
+ * trailing separator. They are other graphs kept in the library, not entries:
+ * smart-immunizations keeps its L1 scenario worked example at
+ * `library/l1-recommendation-scenarios/` as `l1-extraction`, and a reader that
+ * walked it as an entry graded it for a manifest and sections it never had.
+ */
+export function nonEntryDirs(lib: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Set<string> {
+  const out = new Set<string>();
+  const inst = findInstanceRoot(lib);
+  if (inst === undefined) return out;
+  // The RESOLVED directories, not the declaration file alone: a library names
+  // a directory of another kind FROM WITHIN (`library/library.json`'s
+  // `directories`, the #980 shape `check:layout-norms` sanctions), and a
+  // reader of the root file alone graded that directory as an entry missing
+  // its manifest, sections and blocks (cat-harness-tools#281). The raw
+  // declaration stays the fallback for a declaration the resolver refuses.
+  const resolved = declaredDirectoriesOf(inst, registry);
+  const entries: { path: string; graphTypologies?: readonly string[]; scope?: string }[] =
+    resolved ?? readDeclaration(inst)?.directories ?? [];
+  for (const e of entries) {
+    if (e.scope === "repository") continue;
+    const abs = join(inst, e.path).replace(/[/\\]+$/, "");
+    if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies ?? []).includes("library")) out.add(abs);
+  }
+  return out;
 }

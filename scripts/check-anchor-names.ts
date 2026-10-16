@@ -67,7 +67,7 @@
  * @covers docs
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { findDeclarationFile, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
@@ -180,11 +180,20 @@ export function instanceDirs(repo: string): string[] {
   return out;
 }
 
+/**
+ * Every `.ts` under `dir`, NOT following symbolic links. An ascent is resolved
+ * against the path the file was reached by, so a file read through a link
+ * (cat-harness-tools' transitional `content/pipeline -> ../pipeline`, bean
+ * `rnfl`) has its `..` counted from the link and lands one level off: a
+ * finding about a path no code runs from. The link's target is walked at its
+ * real path anyway.
+ */
 function walkTs(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".") || name === "node_modules") continue;
     const p = join(dir, name);
+    if (lstatSync(p).isSymbolicLink()) continue;
     if (statSync(p).isDirectory()) out.push(...walkTs(p));
     else if (name.endsWith(".ts")) out.push(p);
   }

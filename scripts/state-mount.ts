@@ -96,7 +96,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { locationKey, mountTip, namespaceCarried, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
+import { locationKey, mountEmptyingReason, mountTip, namespaceCarried, pendingMountChanges, tipLocations, type BranchStoreOptions, type TipLocation } from "./branch-store.js";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
@@ -290,8 +290,12 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
     try {
       // A prior mount holding unpushed edits is somebody's work: on disk,
       // readable, and left untouched. Asked BEFORE mounting, never inferred.
+      // A mount that is GONE — every file deleted, nothing written, as when a
+      // layer is re-laid over it — is no one's work: it is re-mounted, never
+      // reported as edits to push. Pushing it emptied five graphs on
+      // 2026-10-15 and broke every later mount (`emptyingReason`).
       const pending = pendingMountChanges(loc, { repoRoot: root });
-      if (pending !== undefined && pending.length > 0) {
+      if (pending !== undefined && pending.length > 0 && mountEmptyingReason(loc, { repoRoot: root }) === undefined) {
         graphs.push({ ...base, state: "stale", reason: `${pending.length} unpushed change(s) left untouched; push them with \`bun run cat state:push\`` });
         continue;
       }

@@ -42,6 +42,7 @@
 
 import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve } from "path";
@@ -493,6 +494,7 @@ const instancesSection: ReadmeSection = {
     let mute = 0;
     let undocumented = 0;
     let notOnDisk = 0;
+    let atPublish = 0;
 
     for (const root of roots) {
       const rel = relative(repo, root);
@@ -539,6 +541,15 @@ const instancesSection: ReadmeSection = {
           .filter((d) => (d.graphTypologies ?? []).includes(kind))
           .map((d) => ({ path: d.path, scope: d.scope }))
           .filter((d) => {
+            // A directory BUILT AT PUBLISH is never committed, and whether it
+            // is on disk depends on which writers ran before this render (in
+            // CI, `smart:pages` writes smart-trust's `docs/` before the tests
+            // that check this file is current). Linking it on presence made
+            // the committed README depend on the run; it is counted instead.
+            if (d.scope !== "repository" && isBuiltAtPublish(decl.builtAtPublish ?? [], d.path)) {
+              atPublish += 1;
+              return false;
+            }
             const base = d.scope === "repository" ? repo : root;
             if (existsSync(join(base, d.path))) return true;
             notOnDisk += 1;
@@ -599,6 +610,13 @@ const instancesSection: ReadmeSection = {
         `**${notOnDisk}** declared \`memory\` or \`docs\` director${notOnDisk === 1 ? "y is" : "ies are"} not on disk in this ` +
           "checkout — a mount that lays down only some of an instance's directories — so " +
           `${notOnDisk === 1 ? "it is" : "they are"} not linked.`,
+      );
+    }
+
+    if (atPublish > 0) {
+      gaps.push(
+        `**${atPublish}** declared \`memory\` or \`docs\` director${atPublish === 1 ? "y is" : "ies are"} built at publish, ` +
+          `never committed, so ${atPublish === 1 ? "it is" : "they are"} not linked from a committed file.`,
       );
     }
 

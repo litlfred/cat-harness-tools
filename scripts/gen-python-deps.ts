@@ -36,6 +36,7 @@ import {
   type DepTier,
 } from "@litlfred/cat-harness/schemas/python-deps.ts";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { resolveScriptCommand } from "./lib/script-command.ts";
 import { tools } from "../tools/discover.ts";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
 
@@ -101,7 +102,7 @@ export function requirementsBody(tier: DepTier): string {
  * This read the ROOT `Dockerfile` until 2026-10-07 — the one image no workflow
  * built — while every image that WAS built retyped its own list, the exact
  * drift it was written for. An image is now part of the Tool that uses it: a
- * Tool's `install.container` is its `docker build` line, and the
+ * Tool's `install.container` is its `docker build` line (or the script key that declares it), and the
  * `-f <Dockerfile>` there is the image checked. The set of images is the
  * declared one rather than a path chosen here, so deleting a Dockerfile cannot
  * turn this into a check of nothing — the Tool that declared it reports it
@@ -187,8 +188,15 @@ export function dockerfileFindings(text: string, generated = generatedPaths()): 
 export function imageFindings(defs: ToolDefinition[], root = DOCKER_ROOT): ImageFinding[] {
   const out: ImageFinding[] = [];
   for (const t of defs) {
-    const build = t.install.container;
-    if (build === undefined) continue;
+    const declared = t.install.container;
+    if (declared === undefined) continue;
+    // A script key (owner ruling J2) is read as the command it is declared to
+    // run: the definition names the key, the implementing layer the line.
+    const build = resolveScriptCommand(root, declared)?.command;
+    if (build === undefined) {
+      out.push({ tool: t.id, dockerfile: null, problem: `\`install.container\` names a script key no manifest declares: ${declared}` });
+      continue;
+    }
     const df = dockerfileOf(build);
     if (df === null) {
       out.push({ tool: t.id, dockerfile: null, problem: "`install.container` names no `-f <Dockerfile>`" });

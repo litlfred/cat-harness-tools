@@ -49,7 +49,7 @@
  * tests in this session hardcoding it.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
@@ -58,6 +58,9 @@ import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./view
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
+import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
+import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -417,8 +420,17 @@ export function statusPage(doc: {
    * the default is that same shape, never a hand-counted `../`.
    */
   siteRoot?: string;
+  /**
+   * Whether the site carries the `translation-manager` skill's page. False in
+   * a repository's own site (`--site`), which holds no harness reference pages:
+   * the skill is then named, not linked. True when absent.
+   */
+  skillPage?: boolean;
 }): string {
   const siteRoot = doc.siteRoot ?? siteRootFrom(pageParts({ harness: "harness", visualiser: "visualiser" }));
+  const skill = doc.skillPage === false
+    ? "<code>translation-manager</code> skill"
+    : `<a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>`;
   const others = (doc.instances ?? [])
     .map(
       (i) => `
@@ -523,7 +535,7 @@ ${localeTable(i.locales, `${i.instance}-`, i.scope)}`,
 <h1 id="ts-title">translations — status</h1>
 <p class="ts-sub">The gettext side of the <code>translation-sources</code> graph, measured from the files in
 <code>${esc(doc.scope)}</code>. Every number here is derived on each run; none is written down. Governed by the
-<a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a>. These
+${skill}. These
 numbers last <strong>changed</strong> on ${esc(doc.changedAt)}.</p>
 
 <div class="ts-questions-legend">
@@ -555,7 +567,7 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
 <div class="ts-onward">
 <h2 id="onward-links">Onward links</h2>
 <ul>
-  <li><strong>Skill:</strong> <a href="${siteRoot}reference/skill-instructions/translation-manager.html"><code>translation-manager</code> skill</a> — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
+  <li><strong>Skill:</strong> ${skill} — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
   <li><strong>Sources:</strong> <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(doc.scope)}"><code>${esc(doc.scope)}</code> on GitHub</a> — catalogues (<code>.po</code>) and extractable templates (<code>.pot</code>).</li>
 </ul>
 </div>
@@ -580,7 +592,7 @@ function main(): void {
   const ownScope = `${declName}/translations`;
   const locales = localeStatuses(translationsDir);
   const instances = otherInstances(REPO_ROOT, ROOT);
-  const site = localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT));
+  const site = siteTarget(localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT)));
 
   // The projection first, the page second: the page is a rendering OF the
   // projection, and writing them the other way round invites a page whose
@@ -628,7 +640,7 @@ function main(): void {
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
   // front matter.
   const page = (changedAt: string) =>
-    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up }), VIEWER_TOOL);
+    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up, skillPage: siteArg() === undefined || sitePageAt(site, `${SKILL_PAGES_DIR}/translation-manager.html`) }), VIEWER_TOOL);
   const json = (changedAt: string) => `${JSON.stringify({ ...doc, changedAt }, null, 2)}\n`;
 
   // The date the NUMBERS last changed is the projection's to say. When the
@@ -642,11 +654,28 @@ function main(): void {
     : undefined;
   const today = typeof kept === "string" && /^\d{4}-\d{2}-\d{2}$/.test(kept) ? kept : new Date().toISOString().slice(0, 10);
 
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). Both files carry
+  // `instances` — the catalogues of every OTHER instance in the checkout — so
+  // they moved with the index's pins, not with this instance's commit. The
+  // instance declares them `builtAtPublish` with this script as the writer,
+  // and `derive:publish` runs it; under `--check` a declared file has no
+  // committed bytes to compare, so it is skipped there (the `folio:viz` rule).
+  // Asked by the file's path in the instance's own site, so `--site` asks the
+  // same question.
+  const declaredBuilt = readDeclaration(ROOT)?.builtAtPublish ?? [];
+  const builtHere = (p: string): boolean =>
+    isBuiltAtPublish(declaredBuilt, join(siteDirFor(ROOT), relative(site, p)).split(sep).join("/"));
+
   let stale = 0;
+  let built = 0;
   for (const [p, render] of [
     [assetPath, json],
     [pagePath, page],
   ] as const) {
+    if (check && builtHere(p)) {
+      built += 1;
+      continue;
+    }
     const have = existsSync(p) ? readFileSync(p, "utf-8") : null;
     // COMPARED WITHOUT THE DATE, and then written WITH it. Comparing the
     // rendered date would make this gate fail on the calendar: the artefact
@@ -681,6 +710,7 @@ function main(): void {
       (totals.unreadable > 0 ? `, ${totals.unreadable} unreadable` : ""),
   );
 
+  if (check && built > 0) console.log(`  · ${built} file(s) built at publish (builtAtPublish), not committed — nothing to compare`);
   if (check && stale > 0) {
     console.error("Run `bun run cat translation:status` and commit.");
     process.exit(1);

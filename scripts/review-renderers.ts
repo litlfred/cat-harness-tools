@@ -265,3 +265,82 @@ export function renderVisual(
   show(start);
   return box;
 }
+
+/**
+ * The field diff (bean f327): a structured block's manifest fields on each
+ * side (`changeset-structure.json`), one row per field. A changed, added or
+ * removed field is named in WORDS in its own column, so no colour carries
+ * meaning alone; the unchanged fields are folded under a count. Self-contained:
+ * the page embeds it with `toString()`.
+ */
+export function renderFields(
+  doc: Document,
+  s: { kind: string; base?: Record<string, string>; head?: Record<string, string> },
+): HTMLElement {
+  const base = s.base || {};
+  const head = s.head || {};
+  const keys = Object.keys(base).concat(Object.keys(head).filter((k) => !(k in base))).sort();
+  const box = doc.createElement("div");
+  box.className = "diff diff-fields";
+  const table = (rows: string[][], caption: string) => {
+    const t = doc.createElement("table");
+    const cap = doc.createElement("caption");
+    cap.textContent = caption;
+    t.appendChild(cap);
+    const tr0 = doc.createElement("tr");
+    ["field", "main", "this preview", "change"].forEach((h) => {
+      const th = doc.createElement("th");
+      th.scope = "col";
+      th.textContent = h;
+      tr0.appendChild(th);
+    });
+    t.appendChild(tr0);
+    rows.forEach((r) => {
+      const tr = doc.createElement("tr");
+      tr.className = "f-" + r[3];
+      r.forEach((c, i) => {
+        const td = doc.createElement(i === 0 ? "th" : "td");
+        if (i === 0) (td as HTMLTableCellElement).scope = "row";
+        if (i === 0) {
+          const code = doc.createElement("code");
+          code.textContent = c;
+          td.appendChild(code);
+        } else td.textContent = c;
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    return t;
+  };
+  const changed: string[][] = [];
+  const same: string[][] = [];
+  keys.forEach((k) => {
+    const b = k in base ? base[k]! : null;
+    const h = k in head ? head[k]! : null;
+    if (b === h) same.push([k, b ?? "", h ?? "", "unchanged"]);
+    else changed.push([k, b ?? "—", h ?? "—", b === null ? "added" : h === null ? "removed" : "changed"]);
+  });
+  const sideless = !s.base ? "This block is new: every field is added." : !s.head ? "This block was removed: every field is removed." : null;
+  if (sideless) {
+    const p = doc.createElement("p");
+    p.className = "muted";
+    p.textContent = sideless;
+    box.appendChild(p);
+  }
+  if (changed.length) box.appendChild(table(changed, changed.length + " field" + (changed.length === 1 ? "" : "s") + " differ (" + s.kind + ")"));
+  else {
+    const p = doc.createElement("p");
+    p.className = "muted";
+    p.textContent = "No field differs: the change is to the manifest's form, not its values.";
+    box.appendChild(p);
+  }
+  if (same.length) {
+    const d = doc.createElement("details");
+    const sum = doc.createElement("summary");
+    sum.textContent = same.length + " unchanged field" + (same.length === 1 ? "" : "s");
+    d.appendChild(sum);
+    d.appendChild(table(same, "Unchanged fields"));
+    box.appendChild(d);
+  }
+  return box;
+}

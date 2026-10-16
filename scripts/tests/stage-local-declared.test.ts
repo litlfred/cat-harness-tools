@@ -47,6 +47,12 @@ describe("recipeFromConfig", () => {
     expect(recipeFromConfig(d, "demo")).toEqual({ home: "README.md", pre: [], sourceSteps: ["site:document"], siteSteps: [] });
   });
 
+  test("finalSteps: read when declared, absent when not, held to package script names", () => {
+    const d = checkout({ site: { build: { siteSteps: ["site:a"], finalSteps: ["site:bar"] } } });
+    expect(recipeFromConfig(d, "demo")).toEqual({ pre: [], sourceSteps: [], siteSteps: ["site:a"], finalSteps: ["site:bar"] });
+    expect(() => recipeFromConfig(checkout({ site: { build: { finalSteps: ["rm -rf /"] } } }), "demo")).toThrow(/package script names/);
+  });
+
   test("no config, or a config with no site.build, is undefined", () => {
     expect(recipeFromConfig(checkout(undefined), "demo")).toBeUndefined();
     expect(recipeFromConfig(checkout({ site: { landing: true } }), "demo")).toBeUndefined();

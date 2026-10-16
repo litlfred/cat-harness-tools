@@ -54,7 +54,10 @@ describe("the profile partition", () => {
       // `figure` joined the document profile with bean `d5f1` (2026-09-20): an
       // image extracted from a source document asserts nothing formal, so it
       // belongs here rather than in the math set. Reviewed, not inherited.
-      ["algorithm", "diagram", "equation", "example", "figure", "prose", "remark", "simulator", "table"],
+      // `recommendation` joined with bean `55ao` (folio-assistant-core's
+      // block-kinds/recommendation.json, `profile: "document"`): a normative
+      // statement an L1 document makes, proved by nothing, so not a math kind.
+      ["algorithm", "diagram", "equation", "example", "figure", "prose", "recommendation", "remark", "simulator", "table"],
     );
     expect([...(MATH_BLOCK_KINDS as readonly string[])].sort()).toEqual(
       ["conjecture", "corollary", "definition", "lemma", "proof", "proposition", "theorem"],
@@ -103,7 +106,8 @@ describe("profileAcceptsKind", () => {
 
   test("an unknown kind is admitted by no profile", () => {
     for (const p of CONTENT_PROFILES) {
-      expect(profileAcceptsKind(p, "recommendation")).toBe(false);
+      // Not `recommendation`, which became a real document kind (bean `55ao`).
+      expect(profileAcceptsKind(p, "no-such-kind")).toBe(false);
       expect(profileAcceptsKind(p, "")).toBe(false);
     }
   });

@@ -22,7 +22,7 @@ const WHO_IRIS = /^(.*?)(?:docs\/)?who-iris\//;
 const CDN = "https://cdn.jsdelivr.net/gh/acme/";
 
 /** Evaluate the shim with `src` and return what it asked pdf.js to open, or the refusal. */
-async function runShim(src: string | null, opts: { sameOriginParent?: boolean } = {}) {
+async function runShim(src: string | null, opts: { sameOriginParent?: boolean; fails?: string } = {}) {
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const parentListeners: Record<string, ((e: unknown) => void)[]> = {};
   const opened: string[] = [];
@@ -41,12 +41,11 @@ async function runShim(src: string | null, opts: { sameOriginParent?: boolean } 
     : win;
   const location = { search: src === null ? "" : `?src=${encodeURIComponent(src)}`, href: "https://site.example/assets/vendor/pdfjs/web/viewer.html", origin: "https://site.example" };
   win.PDFViewerApplicationOptions = { set: (k: string, v: unknown) => (set[k] = v) };
-  win.PDFViewerApplication = { initializedPromise: Promise.resolve(), open: (o: { url: string }) => opened.push(o.url) };
+  win.PDFViewerApplication = { initializedPromise: Promise.resolve(), open: (o: { url: string }) => (opened.push(o.url), opts.fails ? Promise.reject(new Error(opts.fails)) : Promise.resolve()) };
   new Function("window", "document", "location", "parent", openShim([CDN]))(win, doc, location, parent);
   const fire = opts.sameOriginParent ? parentListeners : listeners;
   for (const f of fire["webviewerloaded"] ?? []) f({ detail: { source: win } });
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 4; i++) await Promise.resolve();
   return { opened, refused, set };
 }
 
@@ -73,6 +72,14 @@ describe("openShim", () => {
 
   test("listens on the parent document too — where pdf.js dispatches when framed same-origin", async () => {
     expect((await runShim(`${CDN}r/x.pdf`, { sameOriginParent: true })).opened).toEqual([`${CDN}r/x.pdf`]);
+  });
+
+  test("a document that fails to load is SAID on screen, with its address, not left as an empty viewer", async () => {
+    // who-iris, 2026-10-15: a CDN 403 showed "0 of 0" and nothing else.
+    const r = await runShim(`${CDN}r/x.pdf`, { fails: "Unexpected server response (403)" });
+    expect(r.opened).toEqual([`${CDN}r/x.pdf`]);
+    expect(r.refused[0]).toContain("could not be loaded (Unexpected server response (403))");
+    expect(r.refused[0]).toContain(`${CDN}r/x.pdf`);
   });
 
   test("no ?src= opens nothing and refuses nothing", async () => {

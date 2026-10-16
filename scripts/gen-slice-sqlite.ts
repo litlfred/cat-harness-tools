@@ -144,6 +144,7 @@ import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { nodeKind } from "@litlfred/cat-harness/schemas/node-kind.ts";
 import { z } from "zod";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
@@ -1046,6 +1047,69 @@ export const SliceIndexSchema = z
     ),
   })
   .strict();
+
+/**
+ * `folio-slice-index/v1` as a node kind (issue #2195), so its validator node
+ * names a kind and `node-kinds:check` files the family under it. Unversioned:
+ * the family's tag is not SemVer, so the `$schema` literal stays a field of
+ * the shape. Strict, as {@link SliceIndexSchema} is.
+ */
+export const SliceIndexKind = nodeKind("folio-slice-index", [], SliceIndexSchema.shape, { strict: true });
+
+/**
+ * The shape of one `<slice>.sqlite3.json` manifest — {@link SliceManifest}, which
+ * {@link buildSlice} returns and {@link manifestText} writes, as a Zod schema so
+ * the `folio-slice-sqlite/v1` family has a validator node (cat-harness
+ * `validators/slice-sqlite.json`). Strict, like the index: the writer emits
+ * exactly these keys. The type check below fails to compile when the interface
+ * holds a field the schema does not accept.
+ */
+export const SliceManifestSchema = z
+  .object({
+    $schema: z.literal(MANIFEST_SCHEMA),
+    slice: z.string().min(1),
+    file: z.string().min(1),
+    schemaVersion: z.number().int().nonnegative(),
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    bytes: z.number().int().nonnegative(),
+    contentDigest: z.string().min(1),
+    sqliteVersion: z.string().min(1),
+    pageSize: z.number().int().positive(),
+    fts5: z
+      .object({
+        table: z.string().min(1),
+        rowsOf: z.string().min(1),
+        columns: z.array(z.string().min(1)),
+        contentless: z.literal(true),
+        detail: z.literal("full"),
+      })
+      .strict(),
+    payloadPath: z.string().min(1),
+    payloads: z.object({ mode: z.enum(["deploy", "published"]), count: z.number().int().nonnegative(), bytes: z.number().int().nonnegative() }).strict(),
+    rows: z.record(z.string(), z.number().int().nonnegative()),
+    duplicateIds: z.array(z.string()),
+    findings: z.array(z.string()),
+    overBudget: z.boolean(),
+    search: z
+      .object({
+        noun: z.string().min(1),
+        title: z.string().min(1),
+        placeholder: z.string(),
+        select: z.string().min(1),
+        alias: z.string().min(1),
+        like: z.string().min(1),
+        body: z.enum(["markdown", "library-entry"]),
+      })
+      .strict(),
+    source: z.object({ graph: z.string().min(1), path: z.string().min(1) }).strict(),
+  })
+  .strict();
+// A manifest the writer can return must be one the schema can type.
+const _manifestShapeAgrees = (m: SliceManifest): z.infer<typeof SliceManifestSchema> => m;
+void _manifestShapeAgrees;
+
+/** `folio-slice-sqlite/v1` as a node kind: {@link SliceManifestSchema}, strict. */
+export const SliceManifestKind = nodeKind("folio-slice-sqlite", [], SliceManifestSchema.shape, { strict: true });
 
 export function sliceIndexText(manifests: SliceManifest[]): string {
   const slices = manifests

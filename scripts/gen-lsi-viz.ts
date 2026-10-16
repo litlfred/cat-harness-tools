@@ -103,14 +103,27 @@ import { readQaTree } from "./qa-store.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteArg } from "./lib/site-target.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
+/**
+ * Every page this writes declares itself generated in its own front matter —
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
+ * `gen-processes-viz.ts` does. A page lists the declared prose graphs and the instances that own them, which belong to every
+ * instance in the checkout, so without the key those names read as authored
+ * prose in the committing layer naming the layers above it.
+ */
+const GENERATED_FM = "generated: gen-lsi-viz.ts — do not hand-edit; run `bun run cat lsi:viz`";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 // declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
-const OUT = join(VIEWER_DIR, "index.md");
+/** `--site <dir>`: the same route under a site being built (`visualiser-writers.ts`). */
+const SITE = siteArg();
+const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(join(REPO, "cat-harness/docs"), VIEWER_DIR), "index.md");
 const DIMS_SHOWN = 8;
 
 function sidecars(dir = RESULTS, out: string[] = []): string[] {
@@ -205,6 +218,7 @@ function draw(read?: Extract<IndexesRead, { state: "hit" }>): string {
   L.push("---");
   L.push('title: "Latent semantic indexes"');
   L.push('description: "Every published LSI index over a declared prose graph — its latent dimensions, its findings, and which graphs still need one."');
+  L.push(GENERATED_FM);
   L.push("---");
   L.push("<style>");
   L.push(".lv-grid{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}");
@@ -360,7 +374,20 @@ if (import.meta.main) {
     page = renderCommitted();
   }
 
-  if (check) {
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The committed
+  // page was "a function of the tree alone", and the tree is the CHECKOUT:
+  // `proseGraphs` reads every instance the index mounts, so the page moved
+  // with the index's pins rather than with cat-harness's commit. cat-harness
+  // declares the route `builtAtPublish` with this script as its writer, and
+  // `derive:publish` runs it; under `--check` a declared page has no committed
+  // bytes to compare, so it is skipped there (the `folio:viz` rule).
+  const harnessRoot = join(REPO, "cat-harness");
+  const builtHere =
+    SITE === undefined &&
+    isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], relative(harnessRoot, OUT).split("\\").join("/"));
+  if (check && builtHere && !detail) {
+    console.log("lsi viewer: " + relative(REPO, OUT) + " is built at publish (builtAtPublish), not committed — nothing to compare; `bun run cat lsi:viz` writes it");
+  } else if (check) {
     const cur = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
     if (cur !== page) {
       console.error(

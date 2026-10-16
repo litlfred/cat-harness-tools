@@ -29,6 +29,7 @@ import {
   coverage,
 } from "../audit-coverage.ts";
 import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -164,6 +165,15 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     expect(review.flags).toHaveLength(findings.filter((f) => f.weight === "blocking").length);
   });
 
+  it("records the declared not-disclosed model, never a hard-coded id (owner E1, 2026-10-15)", () => {
+    const { review } = reviewNodeAdversarially(
+      { id: "test-gates", kind: "tool" as AdversarialContentKind, path: "scripts/gates.ts", sourceHash: "abc123456789" },
+      ROOT,
+    );
+    expect(review.reviewer.model).toBe(NOT_DISCLOSED);
+    expect(review.reviewer.session).toBeTruthy();
+  });
+
   it("detects known defect pattern in review (narrative asserts code)", () => {
     const badSkillNode = {
       id: "bad-skill",
@@ -218,8 +228,11 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {
   it("adversarialCoverageByGraph reports reviewed for kinds with reviewed sidecars", () => {
     const advMap = adversarialCoverageByGraph(REPO, ROOT);
+    // `schemas` is not asserted: its one adversarially reviewed sidecar,
+    // `schemas/kg-qa`, was removed as dead with the owner's authorisation
+    // (cat-harness 4f72623f), so no schemas review is left to restore
+    // (cat-harness d37c20c4). The two that were restored are asserted.
     expect(advMap.get("tools")).toBe("reviewed");
-    expect(advMap.get("schemas")).toBe("reviewed");
     expect(advMap.get("skills")).toBe("reviewed");
   });
 
@@ -235,8 +248,7 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     const toolsRow = rows.find((r) => r.kind === "tools");
     expect(toolsRow?.adversarial).toBe("reviewed");
 
-    const schemasRow = rows.find((r) => r.kind === "schemas");
-    expect(schemasRow?.adversarial).toBe("reviewed");
+    // `schemas`: see the test above — no reviewed schemas sidecar is left.
 
     const skillsRow = rows.find((r) => r.kind === "skills");
     expect(skillsRow?.adversarial).toBe("reviewed");

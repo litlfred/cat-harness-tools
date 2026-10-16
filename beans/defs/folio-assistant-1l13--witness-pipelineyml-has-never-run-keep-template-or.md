@@ -1,11 +1,11 @@
 ---
 # folio-assistant-1l13
 title: witness-pipeline.yml has never run — keep, template, or retire?
-status: scrapped
+status: todo
 type: task
 priority: normal
 created_at: 2026-09-24T06:47:37Z
-updated_at: 2026-10-10T16:44:10Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -26,3 +26,5 @@ Relevant to the owner question: qou now has an executable replacement for the re
 ## Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It asks whether folio-assistant's `.github/workflows/witness-pipeline.yml` should be kept, templated or retired, and the remaining box is an owner decision about that repository. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; the witness-pipeline keep/template/retire decision is still the owner's. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

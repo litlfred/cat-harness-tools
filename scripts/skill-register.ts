@@ -225,6 +225,7 @@ import { packageDirsIn } from "./skill-topics.js";
 import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { BUILDING_ENV } from "./qa-working-copy.ts";
 
 /**
  * This instance's root — `cat-harness/`, one level up from `scripts/`.
@@ -479,6 +480,11 @@ export interface Step {
   readonly verify: readonly string[];
   /** Why this is in the chain, so a reader can re-derive rather than trust. */
   readonly because: string;
+  /**
+   * The writer draws the QA working copy (`requireCurrentWorkingCopy`), so it
+   * does not run INSIDE a build of that copy — see {@link stepsToRun}.
+   */
+  readonly readsQaCopy?: true;
 }
 
 /**
@@ -542,6 +548,7 @@ export const STEPS: readonly Step[] = [
     write: ["uml:overview"],
     verify: ["uml:overview:check"],
     because: "the UML overview renders the QA tree the two steps above just wrote",
+    readsQaCopy: true,
   },
   {
     write: ["subgraph:jsonld"],
@@ -566,6 +573,31 @@ export const CHAIN: readonly string[] = STEPS.map((s) => s.write.join(" "));
 
 /** The checks that decide convergence. Derived from {@link STEPS}. */
 export const CHECKS: readonly string[] = STEPS.map((s) => s.verify.join(" "));
+
+/**
+ * The steps this run performs, and the ones it defers because a build of the
+ * QA working copy is in progress ({@link BUILDING_ENV} set by
+ * `qa-working-copy.ts` and `qa:refresh` for their own steps).
+ *
+ * Measured 2026-10-15 in a `derive:publish`: the process chain ran
+ * `uml:overview` → (its working copy was stale) `qa:refresh` → its
+ * `skill:register` writer → `uml:overview`, and `uml:overview:check`
+ * (`publish-check.ts uml:overview`, which RUNS its writer) → `uml:overview`.
+ * A writer was run from inside the build of its own input, twice, drawing a
+ * QA tree half of whose writers had not run yet; only the env guard in
+ * `requireCurrentWorkingCopy` kept the cycle from recursing further. Every
+ * step that reads the copy is the build's CONSUMER, never one of its steps:
+ * whoever asked for the build (the generator, `regen`, the gates job) draws
+ * from the finished copy after it. So inside a build such a step is neither
+ * written nor verified here, and is reported as not run.
+ */
+export function stepsToRun(
+  steps: readonly Step[] = STEPS,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): { run: Step[]; deferred: Step[] } {
+  if (env[BUILDING_ENV] !== "1") return { run: [...steps], deferred: [] };
+  return { run: steps.filter((s) => !s.readsQaCopy), deferred: steps.filter((s) => s.readsQaCopy) };
+}
 
 /** Scripts named here that `package.json` does not declare. */
 export function missingScripts(instance: string = INSTANCE_ROOT): string[] {
@@ -816,6 +848,8 @@ function declarationVerdicts(f: Findings): DeclarationVerdict[] {
 async function main(): Promise<number> {
   const flags = parseFlags(process.argv);
   const checking = flags.check;
+  // Inside a build of the QA working copy, the steps that read it are deferred to its consumer.
+  const { run: active, deferred } = stepsToRun();
 
   if (process.argv.includes("--help")) {
     console.log(HELP);
@@ -919,8 +953,8 @@ async function main(): Promise<number> {
       );
     }
 
-    console.log(`\nRegenerating ${STEPS.length} artefact(s) that adding a skill stales.\n`);
-    for (const s of STEPS) {
+    console.log(`\nRegenerating ${active.length} artefact(s) that adding a skill stales.\n`);
+    for (const s of active) {
       console.log(`── ${s.write.join(" ")}   (${s.because})`);
       const rc = run(s.write);
       if (rc !== 0) {
@@ -943,8 +977,23 @@ async function main(): Promise<number> {
   if (!flags.json) console.log(`\nVerifying — each check run on its own, never through \`gates\`:\n`);
   const red: string[] = [];
   const verdicts: StepVerdict[] = [];
-  const codes = await Promise.all(STEPS.map((s) => verifyQuietly(s.verify)));
-  for (const [i, s] of STEPS.entries()) {
+  // A check that WRITES is not safe beside the others. Since B1 (owner,
+  // 2026-10-14) several of these are `publish-check.ts <writer>`: each runs its
+  // writer and then compares, and run concurrently they overwrite one another's
+  // pages mid-comparison, so every such check read red here while each passed
+  // alone (folio-assistant#2529). The read-only ones still share the cores; the
+  // writing ones run after them, one at a time, in STEPS order.
+  const table = scriptsOf(resolve(INSTANCE_ROOT, ".."));
+  const writes = (s: Step): boolean => /publish-check\.ts/.test(table[s.verify[0]!] ?? "");
+  const codes: number[] = new Array(active.length);
+  await Promise.all(active.map(async (s, i) => (writes(s) ? undefined : (codes[i] = await verifyQuietly(s.verify)))));
+  for (const [i, s] of active.entries()) if (writes(s)) codes[i] = await verifyQuietly(s.verify);
+  for (const s of deferred) {
+    // Listed, not run: `ran: false`, never a pass (see {@link writeReport}).
+    verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: false });
+    if (!flags.json) console.log(`  – ${s.verify.join(" ")}  (not run: it reads the QA working copy this run is part of building; ${BUILDING_ENV}=1)`);
+  }
+  for (const [i, s] of active.entries()) {
     const rc = codes[i]!;
     verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: true, current: rc === 0 });
     if (!flags.json) console.log(`${rc === 0 ? "  ✓" : "  ✗"} ${s.verify.join(" ")}`);

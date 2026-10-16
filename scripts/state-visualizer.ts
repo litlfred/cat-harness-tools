@@ -127,7 +127,9 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -142,8 +144,13 @@ import {
   type CatHarnessDeclaration,
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { QA_GRAPH_INDEX_SCHEMA } from "../pipeline/qa-graph-index.ts";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
+import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
+import { isOpen, readBeans, type BeanNode } from "./beans.ts";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";
 import {
@@ -157,12 +164,14 @@ import {
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { wrapRaw } from "./lib/liquid-raw.ts";
+import { siteTarget } from "./lib/site-target.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
-const VIEWER_TOOL = "state-viewer";
+export const VIEWER_TOOL = "state-viewer";
 
 const ROOT = HARNESS_ROOT;
-const SITE = join(ROOT, siteDirFor(ROOT));
+const SITE = siteTarget(join(ROOT, siteDirFor(ROOT)));
 /**
  * `coverage.*` is REPO-root relative, while a directory's `path` is relative
  * to the INSTANCE. Measured across both declarations 2026-09-20: of 27
@@ -384,7 +393,7 @@ function projectionFor(id: string): string | null {
 export function declaredVisualiserFor(
   id: string,
   cov: string | undefined,
-  roots: { site: string; repoRoot: string; pageDir?: string } = { site: SITE, repoRoot: REPO_ROOT },
+  roots: { site: string; repoRoot: string; pageDir?: string; built?: (abs: string) => boolean } = { site: SITE, repoRoot: REPO_ROOT },
 ): Pick<StateGraph, "state" | "declaredVisualiser" | "href"> {
   const { site: SITE, repoRoot: REPO_ROOT } = roots;
   const pageDir = roots.pageDir ?? join(SITE, id);
@@ -392,7 +401,12 @@ export function declaredVisualiserFor(
   // REPO-root relative — see `REPO_ROOT`. This is the line that would silently
   // report all 27 as missing if it used `ROOT`.
   const target = join(REPO_ROOT, cov);
-  if (!existsSync(target)) return { state: "unresolved", declaredVisualiser: cov };
+  // A target the harness BUILDS AT PUBLISH (`built`, its `builtAtPublish`) is
+  // there, not unresolved, though it is not on disk yet: often this very run
+  // writes it, after this page (a per-instance page of the same visualiser).
+  // Asked of the disk alone, a fresh publish drew "not there" on the page and
+  // only a second run said "elsewhere" — the committed copy hid that.
+  if (!existsSync(target) && !(roots.built?.(target) ?? false)) return { state: "unresolved", declaredVisualiser: cov };
   // Linkable only if the target is published BY THIS SITE. Asked of the site
   // directly rather than by inspecting the relative path for leading `..`,
   // which answers the same question by a proxy that a sibling directory named
@@ -439,6 +453,7 @@ function stateGraphsOf(decl: CatHarnessDeclaration, visOf: ReadonlyMap<string, s
             site: SITE,
             repoRoot: REPO_ROOT,
             pageDir: pageDirOf(vis),
+            built: builtAtPublishHere,
           })
         : { state: "live" as const }),
       // The declaration's own words, clipped to its first sentence. Restating
@@ -523,9 +538,19 @@ export function prunableDashboards(site: string, wantedIds: readonly string[]): 
  * instance, so the rail lists this instance's graphs and no instance is
  * inferred from the id.
  */
+/**
+ * Whether `path` is an artefact this instance builds at publish and never
+ * commits (`builtAtPublish`, owner 2026-10-14 B1): `--check` has no committed
+ * bytes to compare it with, so a missing copy there is the normal case.
+ */
+function builtAtPublishHere(path: string): boolean {
+  return isBuiltAtPublish(readDeclaration(ROOT)?.builtAtPublish ?? [], relative(ROOT, path).split(sep).join("/"));
+}
+
 function emit(path: string, content: string): void {
   content = withViewerNav(content, path, { built: basename(ROOT), docsRoot: SITE }) ?? content;
   const rel = relative(ROOT, path);
+  if (check && builtAtPublishHere(path)) return;
   if (check) {
     if (!existsSync(path)) {
       console.error(`  ✗ ${rel} is missing`);
@@ -549,11 +574,16 @@ function emit(path: string, content: string): void {
  * caller, relative to where that page sits, so the depth is expressed once at
  * the only place that knows it.
  */
-function page(opts: { title: string; body: string }): string {
+function page(opts: { title: string; body: string; noLiquid?: boolean; liquid?: boolean }): string {
+  // A page that quotes AUTHORED text (a registry node's title or summary, file
+  // names, a declaration's descriptions) must not be run through Liquid, or a
+  // `{{ … }}` or `{%` in that text is evaluated and the site build fails on it.
+  // `noLiquid: true` and `liquid: false` say the same thing.
+  const noLiquid = opts.noLiquid === true || opts.liquid === false;
   return `---
 layout: default
 title: ${JSON.stringify(opts.title)}
-nav_exclude: true
+nav_exclude: true${noLiquid ? "\nrender_with_liquid: false" : ""}
 ---
 <!--
   ${GENERATED_BY}: the next run
@@ -883,17 +913,35 @@ export function projectionSchema(id: string): string | null {
 export function qaPanels(id: string, src: string): string {
   const p = projectionFor(id);
   if (p === null) return "";
-  let ix: {
-    files?: number;
-    families?: Array<{ schema: string; files: number; rollUpField: string | null; buckets?: Record<string, number> }>;
-    unclassified?: number;
-    unreadable?: number;
-  };
+  let ix: QaPanelsInput;
   try {
-    ix = JSON.parse(readFileSync(p, "utf8")) as typeof ix;
+    ix = JSON.parse(readFileSync(p, "utf8")) as QaPanelsInput;
   } catch {
     return `<p>The projection at <a href="${src}">${esc(src)}</a> could not be read.</p>`;
   }
+  return qaPanelsOf(ix, src);
+}
+
+/** A `folio-qa-graph/v1` projection, as {@link qaPanelsOf} reads it: the counted form or the `unknown` one. */
+type QaPanelsInput = {
+  files?: number;
+  families?: Array<{ schema: string; files: number; rollUpField: string | null; buckets?: Record<string, number> }>;
+  unclassified?: number;
+  unreadable?: number;
+};
+
+/**
+ * The family panels for a projection already in hand. `src`, when given, is
+ * where the same data is published as JSON; a per-instance page has no
+ * published projection of its own, so it passes none and says nothing about one.
+ */
+export function qaPanelsOf(
+  ix: QaPanelsInput | QaGraphProjection,
+  src?: string,
+  opts: { qaFamilies?: boolean } = {},
+): string {
+  const qaFamilies = opts.qaFamilies ?? true;
+  const dataLine = src === undefined ? "" : `<p class="sv-sub">The data is <a href="${src}">a plain JSON file</a>.</p>`;
   // The build had no QA corpus to count (bean `tfqf`, C9). Said, with its
   // reason, rather than rendered as "Families — 0, over 0 document(s)", which
   // would be a census of nothing.
@@ -903,10 +951,11 @@ export function qaPanels(id: string, src: string): string {
       `<h2 class="sv-h2">Not available in this build</h2>` +
       `<p class="sv-sub">${esc(unknown.reason ?? "No reason was recorded")}. ` +
       `This is <strong>unknown</strong>, not zero.</p>` +
-      `<p class="sv-sub">The data is <a href="${src}">a plain JSON file</a>.</p>`
+      dataLine
     );
   }
-  const families = ix.families ?? [];
+  const counted = ix as QaPanelsInput;
+  const families = counted.families ?? [];
   const panels = families
     .map((f) => {
       const buckets = f.buckets ?? {};
@@ -937,20 +986,616 @@ export function qaPanels(id: string, src: string): string {
   // BOTH third states printed every run, including at zero. A count that
   // appears only when non-zero cannot be told from one nobody measured.
   const thirdStates =
-    `<p class="sv-sub">${ix.unclassified ?? 0} document(s) carry no <code>$schema</code> ` +
-    `(could not determine); ${ix.unreadable ?? 0} would not parse.</p>`;
+    `<p class="sv-sub">${counted.unclassified ?? 0} document(s) carry no <code>$schema</code> ` +
+    `(could not determine); ${counted.unreadable ?? 0} would not parse.</p>`;
 
   return (
-    `<h2 class="sv-h2">Families — ${families.length}, over ${ix.files ?? 0} document(s)</h2>` +
-    `<p class="sv-sub">There is deliberately <strong>no total across these families</strong>. ` +
-    `The two largest that roll up disagree on the container (<code>totals</code> against ` +
-    `<code>counts</code>), on the spelling of not-applicable (<code>n/a</code> against ` +
-    `<code>na</code>) and on whether <code>warn</code> exists at all; the third declares no ` +
-    `roll-up. A single number over them would be three silent decisions.</p>` +
+    `<h2 class="sv-h2">Families — ${families.length}, over ${counted.files ?? 0} document(s)</h2>` +
+    // The no-total argument is about the QA families specifically (three
+    // roll-up conventions); another kind's page groups by `$schema` the same
+    // way and says only that, rather than repeating a claim about QA.
+    (qaFamilies
+      ? `<p class="sv-sub">There is deliberately <strong>no total across these families</strong>. ` +
+        `The two largest that roll up disagree on the container (<code>totals</code> against ` +
+        `<code>counts</code>), on the spelling of not-applicable (<code>n/a</code> against ` +
+        `<code>na</code>) and on whether <code>warn</code> exists at all; the third declares no ` +
+        `roll-up. A single number over them would be three silent decisions.</p>`
+      : `<p class="sv-sub">Documents are grouped by the <code>$schema</code> each one declares; ` +
+        `there is no total across families.</p>`) +
     panels +
     thirdStates +
-    `<p class="sv-sub">The data is <a href="${src}">a plain JSON file</a>.</p>`
+    dataLine
   );
+}
+
+/**
+ * The kinds a `subgraphs: "instance"` visualiser can draw one page per
+ * instance for: those whose documents are self-describing JSON (a `$schema`
+ * tag), which the family reader (`readQaGraph`) counts without knowing the
+ * kind. `qa` (`test/results/`), `health` (`health-report/v1`) and
+ * `attestations` (`qa-attestations/v1`) are that shape; a kind outside this
+ * set is refused loudly rather than drawn as a census of nothing.
+ */
+export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
+  "qa",
+  "health",
+  "attestations",
+  // The harness's own registries (bean `folio-assistant-k7ro`): one
+  // `folio-*/v1` JSON node per file, so the family reader counts them as it
+  // counts QA, and `registryRowsOf` lists each node.
+  "typologies",
+  "validators",
+  "qa-checkers",
+  "block-kinds",
+  "content-adapters",
+  "code-list",
+]);
+
+/**
+ * The registry kinds among {@link PER_INSTANCE_KINDS} (bean
+ * `folio-assistant-k7ro`): directories of `folio-graph-typology/v1`,
+ * `folio-validator/v1`, `folio-qa-checker/v1`, `folio-block-kind/v1`,
+ * `folio-content-adapter/v1` and `folio-code-list/v1` nodes. A census of
+ * them says little on its own — every file is one family — so their page also
+ * lists each node.
+ */
+export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
+  "typologies",
+  "validators",
+  "qa-checkers",
+  "block-kinds",
+  "content-adapters",
+  "code-list",
+]);
+
+/** One registry node, as an instance page lists it. */
+export interface RegistryRow {
+  /** Path under the declared directory. */
+  file: string;
+  schema?: string;
+  /** The node's `id`, `name` or `kind`, else the file stem. */
+  id: string;
+  /** Its `title`, `label`, `summary` or `description`, clipped. */
+  text?: string;
+  /** Why the file is not listed with its fields. */
+  note?: string;
+}
+
+/** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
+export function registryRowsOf(absPath: string): RegistryRow[] {
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
+  return jsonFilesIn(absPath)
+    .map((p) => relative(absPath, p).split(sep).join("/"))
+    .sort()
+    .map((file): RegistryRow => {
+      const stem = basename(file, ".json");
+      let doc: unknown;
+      try {
+        doc = JSON.parse(readFileSync(join(absPath, file), "utf-8"));
+      } catch {
+        return { file, id: stem, note: "does not parse as JSON" };
+      }
+      if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return { file, id: stem, note: "not a JSON object" };
+      const r = doc as Record<string, unknown>;
+      const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]);
+      return {
+        file,
+        ...(str(r["$schema"]) ? { schema: str(r["$schema"]) } : {}),
+        id: str(r["id"]) ?? str(r["name"]) ?? str(r["kind"]) ?? stem,
+        ...(text ? { text: text.length > 160 ? `${text.slice(0, 159)}\u2026` : text } : {}),
+      };
+    });
+}
+
+/** The node table of a registry page. */
+export function registryTable(rows: readonly RegistryRow[]): string {
+  if (rows.length === 0) return "";
+  const tr = rows
+    .map(
+      (r) =>
+        `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.note ?? r.text ?? "")}</td>` +
+        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td></tr>`,
+    )
+    .join("");
+  return (
+    `<h2 class="sv-h2">Nodes — ${rows.length}</h2>` +
+    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th></tr></thead>` +
+    `<tbody>${tr}</tbody></table></div>`
+  );
+}
+
+/**
+ * `<base>/<harness>/<vis>/` for a per-instance visualiser that no state graph
+ * draws (the registry kinds are not state): the list of instances, so the
+ * "every instance's …" link from each instance page has somewhere to go.
+ */
+export function instanceHubPage(vis: { id: string; title?: string }, subjects: readonly InstanceSubject[]): string {
+  const title = vis.title ?? vis.id;
+  const items = subjects.map((s) => `<li><a href="${esc(s.name)}/">${esc(s.name)}</a> · <code>${esc(s.path)}</code></li>`).join("");
+  return page({
+    title,
+    noLiquid: true,
+    body:
+      `<h1 id="${esc(vis.id)}">${esc(title)}</h1>` +
+      `<p class="sv-sub">One page per instance in this checkout holding a directory of this kind.</p>` +
+      `<ul class="sv-list">${items}</ul>`,
+  });
+}
+
+/**
+ * Whether a per-instance visualiser's OWN route gets {@link instanceHubPage}:
+ * when no state dashboard draws it, it has instance pages, and its kinds are
+ * not state — a registry, or `code`. Without it `en/cat-harness/code/` had a
+ * page per instance and none at its own route, which `site-coverage.ts`
+ * refuses (dth-hrh and smart-immunizations, 2026-10-15).
+ */
+export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
+  if (drawnByDashboard || subjects === 0 || kinds.length === 0) return false;
+  return kinds.every((k) => k === "code") || kinds.every((k) => REGISTRY_KINDS.has(k));
+}
+
+/**
+ * The kinds that make up ONE bean store: the store (`beans`) and the parts its
+ * `beans.json` declares from within — work items, PR addenda and running BPMN
+ * instances (bean `folio-assistant-750a`). A visualiser covering any of them
+ * draws the store's page, which lists all three; see {@link beanStorePartsSection}.
+ */
+export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set(["beans", "bean-defs", "bean-notes", "workflow-state"]);
+
+/** One bean-store part's directories, read from the store's own `beans.json`. */
+function storePartDirs(storeAbs: string, kind: string): string[] {
+  let decl: { directories?: Array<{ path?: string; graphTypologies?: string[] }> };
+  try {
+    decl = JSON.parse(readFileSync(join(storeAbs, "beans.json"), "utf-8"));
+  } catch {
+    return [];
+  }
+  return (decl.directories ?? [])
+    .filter((d) => typeof d.path === "string" && (d.graphTypologies ?? []).includes(kind))
+    .map((d) => join(storeAbs, d.path!));
+}
+
+/** The files of `ext` in `dirs`, sorted; a missing directory contributes none. */
+function filesIn(dirs: readonly string[], ext: string): string[] {
+  const out: string[] = [];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) if (f.endsWith(ext) && f !== "README.md") out.push(join(dir, f));
+  }
+  return out.sort((a, b) => basename(a).localeCompare(basename(b)));
+}
+
+/**
+ * The bean store's two other parts, server-side: its PR addenda (`bean-notes`,
+ * `<bean>--<date>--<branch>.md`) and its running BPMN instances
+ * (`workflow-state`, `folio-workflow-instance/v1`). Bean
+ * `folio-assistant-750a`: both are declared inside `beans/beans.json`, so the
+ * store's page is their viewer, and it must SHOW them rather than only be
+ * linked from their rows. Where an instance is is read from its own `tokens`;
+ * this page keeps no second idea of position.
+ */
+export function beanStorePartsSection(storeAbs: string): string {
+  const notes = filesIn(storePartDirs(storeAbs, "bean-notes"), ".md");
+  const noteRows = notes
+    .map((f) => {
+      const [bean = "", date = "", ...branch] = basename(f, ".md").split("--");
+      return `<tr><td><code>${esc(bean)}</code></td><td>${esc(date)}</td><td>${esc(branch.join("--"))}</td></tr>`;
+    })
+    .join("");
+  const flows = filesIn(storePartDirs(storeAbs, "workflow-state"), ".json");
+  const flowRows = flows
+    .map((f) => {
+      let w: { id?: string; processId?: string; status?: string; tokens?: unknown; bean?: string } = {};
+      try {
+        w = JSON.parse(readFileSync(f, "utf-8"));
+      } catch {
+        return `<tr><td><code>${esc(basename(f))}</code></td><td colspan="4">not readable JSON</td></tr>`;
+      }
+      const at = Array.isArray(w.tokens) ? w.tokens.map(String).join(", ") : "";
+      return (
+        `<tr><td><code>${esc(w.id ?? basename(f, ".json"))}</code></td><td>${esc(w.processId ?? "")}</td>` +
+        `<td>${esc(w.status ?? "")}</td><td>${esc(at)}</td><td>${esc(w.bean ?? "")}</td></tr>`
+      );
+    })
+    .join("");
+  // In a raw block: the page is Liquid-rendered, and branch names, ids and
+  // token names are data nobody screened for `{{`.
+  return wrapRaw(
+    `<h2 class="sv-h2" id="bean-notes">Bean notes — ${notes.length}</h2>` +
+    (notes.length === 0
+      ? `<p class="sv-sub">No pull-request addenda in this store.</p>`
+      : `<table><thead><tr><th>bean</th><th>date</th><th>branch</th></tr></thead><tbody>${noteRows}</tbody></table>`) +
+    `<h2 class="sv-h2" id="workflow-state">Workflow instances — ${flows.length}</h2>` +
+    (flows.length === 0
+      ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
+      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`),
+  ).join("\n");
+}
+
+/**
+ * One instance's graph of a kind: the sub-graph a `subgraphs: "instance"`
+ * visualiser draws a page for (bean `folio-assistant-1nu0`, owner 2026-10-15:
+ * "per-instance pages"; "each viewer draws one page per instance").
+ *
+ * `name` is the instance the directory BELONGS to — `member` for an inherited
+ * subgraph, else the declarer — which is the sub-graph segment `viewersOf`
+ * looks for. `instanceRoot` is that instance's root, recovered from the
+ * declared path rather than composed, so the corpus-availability probe asks
+ * the instance that holds the directory.
+ */
+export interface InstanceSubject {
+  name: string;
+  path: string;
+  absPath: string;
+  instanceRoot: string;
+}
+
+/**
+ * The instances in the checkout holding a directory of one of `kinds`, one
+ * subject each, sorted by name.
+ *
+ * Read from the RESOLVED checkout (`checkoutDirectories`), never from a list:
+ * an instance is a subject because it declares the kind, so a new instance
+ * holding such a directory gets its page with no edit here. A declared
+ * directory that is NOT on disk still gets one, and that page says the corpus
+ * is unknown in this build: derived QA lives on the `qa-reports` branch and
+ * health reports are written by a sweep and never committed, so an absent tree
+ * is the normal case, not an empty graph — and with no page the instance's
+ * tile would have nowhere to go.
+ */
+export function instanceSubjectsOf(
+  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
+  kinds: readonly string[],
+): InstanceSubject[] {
+  const out = new Map<string, InstanceSubject>();
+  for (const d of dirs) {
+    if (!d.graphTypologies.some((k) => kinds.includes(k))) continue;
+    const name = d.member ?? d.declaredBy;
+    if (out.has(name)) continue;
+    const up = d.path.split("/").filter((x) => x.length > 0 && x !== ".").length;
+    const instanceRoot = resolve(d.absPath, ...Array.from({ length: up }, () => ".."));
+    out.set(name, { name, path: d.path, absPath: d.absPath, instanceRoot });
+  }
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * What a per-instance visualiser (`subgraphs: "instance"`) draws in the
+ * checkout at `root`: its kinds, the kinds it has no reader for, and the
+ * instances that get a page. One home for the selection, because the page
+ * writer and the orphan keep-set both depend on it — the keep-set test held a
+ * hand-written list and missed the seven hubs #294 added.
+ *
+ * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are drawn
+ * on the store's own page, so the subjects are the stores (bean
+ * `folio-assistant-750a`). A directory the visualiser ALSO names by id
+ * (`covers`) is drawn on its full view, and `viewersOf` opens that view for
+ * it: no subject page — except a bean store, whose board draws its beans
+ * only, so its notes and workflow instances need a page of their own. A
+ * directory the checkout ROOT declares (`(root)`, the index's own `test/`)
+ * belongs to no instance and has no route segment: it is `unrouted`.
+ */
+export function perInstanceSubjects(
+  v: { coversKinds?: readonly string[]; covers?: readonly string[] },
+  root: string,
+  harness: string,
+): {
+  kinds: readonly string[];
+  beans: boolean;
+  code: boolean;
+  unread: string[];
+  candidates: ReturnType<typeof checkoutDirectories>;
+  subjects: InstanceSubject[];
+  unrouted: InstanceSubject[];
+} {
+  const kinds = v.coversKinds ?? [];
+  const beans = kinds.includes("beans") && kinds.every((k) => BEAN_STORE_KINDS.has(k));
+  const code = kinds.length > 0 && kinds.every((k) => k === "code");
+  const unread = beans || code ? [] : kinds.filter((k) => !PER_INSTANCE_KINDS.has(k));
+  if (kinds.length === 0 || unread.length > 0) return { kinds, beans, code, unread, candidates: [], subjects: [], unrouted: [] };
+  const byId = new Set(beans ? [] : (v.covers ?? []));
+  const candidates = checkoutDirectories(root).filter((d) => !(d.declaredBy === harness && byId.has(d.id)));
+  const all = instanceSubjectsOf(candidates, beans ? ["beans"] : kinds);
+  const routed = (s: InstanceSubject) => ROUTE_SEGMENT.test(s.name);
+  return { kinds, beans, code, unread, candidates, subjects: all.filter(routed), unrouted: all.filter((s) => !routed(s)) };
+}
+
+/**
+ * One instance's directory of `kinds`, projected with the same family reader
+ * the whole-graph QA projection uses (`projectQaGraph`, bean `tfqf` C9), and
+ * the same availability rule: absent is UNKNOWN, never zero.
+ *
+ * `qa` keeps its own probe (`qaCorpusAvailability`): its corpus is the derived
+ * results trees, which a `test/results/` holding only committed attestations
+ * does not answer for. Every other kind is present exactly when its declared
+ * directory is on disk.
+ */
+export function projectInstanceSubject(s: InstanceSubject, kinds: readonly string[]): QaGraphProjection {
+  if (kinds.includes("qa")) return projectQaGraph(s.absPath, qaCorpusAvailability(s.instanceRoot).present);
+  return projectQaGraph(
+    s.absPath,
+    existsSync(s.absPath),
+    `\`${s.path}\` of ${s.name} is not in this build (it is not committed here, or was not fetched), so it was not counted`,
+  );
+}
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's graph of the kinds
+ * the visualiser covers.
+ *
+ * An instance whose corpus is not in the build says so — unknown, not zero —
+ * instead of counting the few files that happen to be committed.
+ */
+export function instanceSubjectPage(
+  vis: { id: string; title?: string; coversKinds?: readonly string[] },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  ix: QaGraphProjection = projectInstanceSubject(s, vis.coversKinds ?? []),
+): string {
+  const title = vis.title ?? vis.id;
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  const qaFamilies = (vis.coversKinds ?? []).includes("qa");
+  const registry = (vis.coversKinds ?? []).length > 0 && (vis.coversKinds ?? []).every((k) => REGISTRY_KINDS.has(k));
+  return page({
+    title: `${s.name} — ${title}`,
+    ...(registry ? { noLiquid: true } : {}),
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
+      qaPanelsOf(ix, undefined, { qaFamilies }) +
+      (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
+      `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
+}
+
+/**
+ * What a per-instance beans page is given: the store's beans, or why it could
+ * not be read. `null` beans is "no store at the declared path", which is
+ * not the same as a store holding none.
+ */
+export type BeanStoreRead = { beans: BeanNode[] | null } | { unreachable: string };
+
+/** Read one instance's bean store, keeping "could not read" apart from "empty". */
+export function readSubjectBeans(instanceRoot: string): BeanStoreRead {
+  try {
+    return { beans: readBeans(instanceRoot) };
+  } catch (e) {
+    return { unreachable: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Priority order for the open-bean table; an unknown priority sorts last. */
+const PRIORITY_ORDER = ["critical", "high", "normal", "low", "deferred"];
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's work plan (bean
+ * `folio-assistant-1nu0`, owner 2026-10-15: "per-instance pages").
+ *
+ * Each instance's `beans/` is its OWN store (`cat-tools-…`,
+ * `folio-assistant-…` ids), not the repository store the full board draws,
+ * so the page reads that store and lists its open beans. Rendered
+ * SERVER-SIDE: the board's client (`work-plan.js`) reads the one bean index
+ * the layout names, so it cannot be pointed at a second store from a page.
+ */
+export function beansSubjectPage(
+  vis: { id: string; title?: string },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
+): string {
+  const title = vis.title ?? "Beans";
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  let body: string;
+  if ("unreachable" in read) {
+    body =
+      `<h2 class="sv-h2">Not available in this build</h2>` +
+      `<p class="sv-sub">${esc(read.unreachable)}. This is <strong>unknown</strong>, not zero.</p>`;
+  } else if (read.beans === null) {
+    body =
+      `<h2 class="sv-h2">No bean store</h2>` +
+      `<p class="sv-sub">${esc(s.path)} holds no <code>bean-defs</code> node, so there is no work plan to list. ` +
+      `That is no store, not an empty one.</p>`;
+  } else {
+    const all = read.beans;
+    const open = all
+      .filter(isOpen)
+      .sort((a, b) => {
+        const pa = PRIORITY_ORDER.indexOf(a.priority);
+        const pb = PRIORITY_ORDER.indexOf(b.priority);
+        return (pa < 0 ? PRIORITY_ORDER.length : pa) - (pb < 0 ? PRIORITY_ORDER.length : pb) || a.id.localeCompare(b.id);
+      });
+    const rows = open
+      .map(
+        (b) =>
+          `<tr><td><code>${esc(b.id)}</code></td><td>${esc(b.title)}</td><td>${esc(b.status)}</td>` +
+          `<td>${esc(b.type)}</td><td>${esc(b.priority)}</td></tr>`,
+      )
+      .join("");
+    body =
+      `<h2 class="sv-h2">Open — ${open.length} of ${all.length} bean(s)</h2>` +
+      (open.length === 0
+        ? `<p class="sv-sub">Every bean in this store is completed or scrapped.</p>`
+        : `<table><thead><tr><th>id</th><th>title</th><th>status</th><th>type</th><th>priority</th></tr></thead>` +
+          `<tbody>${rows}</tbody></table>`) +
+      // Only beside a store that was read: an unreadable one is unknown, and
+      // its parts would read as zero (bean `folio-assistant-750a`).
+      beanStorePartsSection(s.absPath);
+  }
+  return page({
+    title: `${s.name} — ${title}`,
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">the repository work plan</a></p>` +
+      body +
+      `<h2 class="sv-h2">Instances holding a work plan of their own</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
+}
+
+/**
+ * One declared code directory of an instance, for its per-instance code page
+ * (bean `folio-assistant-svgx`).
+ */
+export interface CodeDirectory {
+  id: string;
+  path: string;
+  absPath: string;
+  description?: string;
+}
+
+/**
+ * Every directory of `kinds` that instance `name` holds, in declaration
+ * order. Unlike {@link instanceSubjectsOf}, which keeps ONE directory per
+ * instance, an instance declares code in many places (`scripts/`,
+ * `schemas/`, `pipeline/`, …) and its code page lists them all.
+ */
+export function codeDirectoriesOf(
+  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[]; description?: string }>,
+  name: string,
+  kinds: readonly string[],
+): CodeDirectory[] {
+  const out: CodeDirectory[] = [];
+  const seen = new Set<string>();
+  for (const d of dirs) {
+    if ((d.member ?? d.declaredBy) !== name) continue;
+    if (!d.graphTypologies.some((k) => kinds.includes(k))) continue;
+    if (seen.has(d.absPath)) continue;
+    seen.add(d.absPath);
+    out.push({ id: d.id, path: d.path, absPath: d.absPath, ...(d.description ? { description: d.description } : {}) });
+  }
+  return out;
+}
+
+/** Directory names a source listing never descends into. */
+const CODE_SKIP = new Set(["node_modules", ".git", ".lake", "__pycache__", "dist", "build"]);
+
+/** At most this many files are listed per directory; the total is always given. */
+export const CODE_FILE_LIMIT = 300;
+
+/**
+ * The files under a code directory, `/`-separated and relative to it, sorted.
+ * `null` when the directory is not on disk — not in this build, which is
+ * unknown, not empty.
+ */
+export function listCodeFiles(absPath: string, limit: number = CODE_FILE_LIMIT): { files: string[]; total: number } | null {
+  if (!existsSync(absPath)) return null;
+  const all: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (CODE_SKIP.has(e.name) || e.name.startsWith(".")) continue;
+        walk(join(dir, e.name), r);
+      } else if (e.isFile()) {
+        all.push(r);
+      }
+    }
+  };
+  walk(absPath, "");
+  all.sort();
+  return { files: all.slice(0, limit), total: all.length };
+}
+
+/**
+ * `https://github.com/<repo>/blob/<ref>/` for an instance mounted from a
+ * pinned commit — read from the checkout's `index.lock.json` — so a file links
+ * to the source the site was built from. `undefined` when the instance is not
+ * a locked mount (a layer repository's own checkout): the page then lists
+ * names without links rather than guess a ref.
+ */
+export function pinnedBlobBase(repoRoot: string, instance: string): string | undefined {
+  try {
+    const lock = JSON.parse(readFileSync(join(repoRoot, "index.lock.json"), "utf-8")) as {
+      mounts?: Array<{ harness?: string; repository?: string; ref?: string }>;
+    };
+    const m = (lock.mounts ?? []).find((x) => x.harness === instance);
+    if (!m?.repository || !m.ref || !/^[\w.-]+\/[\w.-]+$/.test(m.repository) || !/^[0-9a-f]{7,40}$/.test(m.ref)) return undefined;
+    return `https://github.com/${m.repository}/blob/${m.ref}/`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `<base>/<harness>/<vis>/<instance>/` — one instance's code: each declared
+ * code directory with its files, linked to GitHub at the pinned commit
+ * (bean `folio-assistant-svgx`, child of `46ob`). A source LISTING, not a
+ * rendered source browser: the file opens on GitHub, which already renders
+ * it.
+ */
+export function codeSubjectPage(
+  vis: { id: string; title?: string },
+  s: InstanceSubject,
+  subjects: readonly InstanceSubject[],
+  dirs: readonly CodeDirectory[],
+  blobBase: string | undefined,
+  list: (absPath: string) => { files: string[]; total: number } | null = (p) => listCodeFiles(p),
+): string {
+  const title = vis.title ?? "Code";
+  const others = subjects
+    .map((o) =>
+      o.name === s.name
+        ? `<li><span class="sv-here">${esc(o.name)}</span></li>`
+        : `<li><a href="../${esc(o.name)}/">${esc(o.name)}</a></li>`,
+    )
+    .join("");
+  const href = (p: string): string => (blobBase ? `${blobBase}${p.split("/").map(encodeURIComponent).join("/")}` : "");
+  const sections = dirs
+    .map((d) => {
+      const read = list(d.absPath);
+      const base = d.path.replace(/^\.\//, "").replace(/\/+$/, "");
+      const heading = `<h3><code>${esc(base || ".")}/</code> <span class="sv-tag">${esc(d.id)}</span></h3>`;
+      const desc = d.description ? `<p class="sv-sub">${esc(d.description)}</p>` : "";
+      if (read === null) {
+        return `<section class="sv-item">${heading}${desc}<p class="sv-sub">Not in this build, so its files are <strong>unknown</strong>, not none.</p></section>`;
+      }
+      const items = read.files
+        .map((f) => {
+          const p = base ? `${base}/${f}` : f;
+          const u = href(p);
+          return u ? `<li><a href="${esc(u)}"><code>${esc(f)}</code></a></li>` : `<li><code>${esc(f)}</code></li>`;
+        })
+        .join("");
+      const more = read.total > read.files.length ? `<p class="sv-sub">First ${read.files.length} of ${read.total} files listed.</p>` : "";
+      return (
+        `<section class="sv-item">${heading}${desc}` +
+        `<p class="sv-sub">${read.total} file${read.total === 1 ? "" : "s"}</p>` +
+        `<ul>${items}</ul>${more}</section>`
+      );
+    })
+    .join("\n");
+  const where = blobBase
+    ? `Files open on GitHub at the commit this site was built from.`
+    : `This instance is not a pinned mount here, so files are listed without links.`;
+  return page({
+    title: `${s.name} — ${title}`,
+    liquid: false,
+    body:
+      `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
+      `<p class="sv-sub">${esc(s.name)} · ${dirs.length} declared code director${dirs.length === 1 ? "y" : "ies"} · ${esc(where)}</p>` +
+      sections +
+      `<h2 class="sv-h2">Instances holding code</h2>` +
+      `<ul class="sv-list">${others}</ul>`,
+  });
 }
 
 if (import.meta.main) main();
@@ -998,13 +1643,23 @@ const checkoutDirs = rootDirs.filter((d) => !ownIds.has(d.id));
 const mine = (declRead?.visualisers ?? []).filter((v) => v.renderedBy === VIEWER_TOOL);
 const visOf = new Map<string, string>();
 for (const v of mine) for (const c of v.covers ?? []) if (!visOf.has(c)) visOf.set(c, v.id);
+// Covered BY KIND (`coversKinds`): every state directory here holding one of
+// those kinds is drawn by that visualiser, keyed by its id as `covers` is.
+for (const v of mine) {
+  for (const d of [...(decl.directories ?? []), ...checkoutDirs]) {
+    if ((v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k as never)) && !visOf.has(d.id)) visOf.set(d.id, v.id);
+  }
+}
 const ownRefs = ownVisualiserRefs(REPO_ROOT, SITE, harnessOf(), mine.map((v) => v.id));
 const all = [
   ...stateGraphsOf(decl, visOf, ownRefs),
   ...stateGraphsOf({ ...decl, directories: checkoutDirs }, visOf, ownRefs),
 ].sort((a, b) => a.id.localeCompare(b.id));
 for (const v of mine) {
-  if (!all.some((g) => g.vis === v.id)) {
+  // A per-instance visualiser over a kind that is not state (`code`, a
+  // registry) draws its pages below, not a dashboard here, so covering no
+  // state graph is expected.
+  if (!all.some((g) => g.vis === v.id) && v.subgraphs !== "instance") {
     console.error(`  ! visualiser \`${v.id}\` covers no declared state graph (${(v.covers ?? []).join(", ") || "no covers"}) — nothing drawn`);
   }
 }
@@ -1043,6 +1698,56 @@ for (const g of graphs) {
   emit(join(pageDirOf(g.vis), "index.html"), html2);
 }
 
+// PER-INSTANCE PAGES (bean `folio-assistant-1nu0`, owner 2026-10-15:
+// "per-instance pages"). A visualiser declaring `subgraphs: "instance"` gets
+// one page per instance in the checkout holding a directory of a kind it
+// covers, at `<locale>/<harness>/<vis>/<instance>/` — the sub-graph route
+// `viewersOf` resolves a tile to. The kinds in `PER_INSTANCE_KINDS`
+// (self-describing JSON the family reader counts) draw on the shared instance
+// page, and `beans` on its own store reader; any other kind has no
+// per-instance reader here, and is refused loudly rather than drawn as an
+// empty page.
+const subjectOrphans: string[] = [];
+const hubs: string[] = [];
+for (const v of mine.filter((x) => x.subgraphs === "instance")) {
+  const { kinds, beans, code, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
+  if (kinds.length === 0 || unread.length > 0) {
+    console.error(
+      `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
+        `${unread.join(", ") || "no kind"} has no per-instance renderer (only ${[...PER_INSTANCE_KINDS, ...BEAN_STORE_KINDS, "code"].join(", ")}) — none drawn`,
+    );
+    continue;
+  }
+  for (const s of unrouted) {
+    console.error(`  ! visualiser \`${v.id}\`: \`${s.path}\` is declared by ${s.name}, which is not an instance with a route — no page`);
+  }
+  for (const s of subjects) {
+    const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
+    const html = beans
+      ? beansSubjectPage(v, s, subjects)
+      : code
+        ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
+        : instanceSubjectPage(v, s, subjects);
+    emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+  }
+  // No state graph draws this visualiser's own page (a registry kind is not
+  // state, and neither is `code`), so its hub is drawn here, listing the
+  // instance pages. Without it `code/` had a page per instance and none at
+  // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
+  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), subjects.length)) {
+    hubs.push(v.id);
+    emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
+  }
+  const parent = pageDirOf(v.id);
+  const { owned, foreign } = orphanSubjectPages(parent, subjects.map((s) => s.name), carriesMarker(GENERATED_BY));
+  for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
+  // Under a built-at-publish route a stale local copy is not a committed
+  // orphan, so `--check` does not report it; a write run still prunes it.
+  if (!(check && builtAtPublishHere(join(parent, "x", "index.html")))) {
+    subjectOrphans.push(...owned.map((name) => relative(SITE, join(parent, name))));
+  }
+}
+
 // Orphans, AFTER the writes so the keep-set is what this run actually wanted.
 // Reported by name rather than counted: a deletion nobody is told about is the
 // shape `deletion-requires-confirmation` exists to stop, and a bare number
@@ -1058,7 +1763,7 @@ const harnessSegment = harnessName ?? basename(ROOT);
 // read off the route of any one of them (the segment name is immaterial).
 const localisedSegment = dirname(relative(SITE, pageDirOf("dashboard")));
 const orphans = [
-  ...prunableDashboards(join(SITE, localisedSegment), graphs.map((g) => g.vis)).map((o) => join(localisedSegment, o)),
+  ...prunableDashboards(join(SITE, localisedSegment), [...graphs.map((g) => g.vis), ...hubs]).map((o) => join(localisedSegment, o)),
   ...(localisedSegment === harnessSegment
     ? []
     : prunableDashboards(join(SITE, harnessSegment), []).map((o) => join(harnessSegment, o))),
@@ -1067,18 +1772,21 @@ const orphans = [
 for (const o of orphans) {
   console.error(`  ${check ? "!" : "-"} orphan dashboard ${check ? "" : "removed "}${o}`);
 }
+for (const o of subjectOrphans) {
+  console.error(`  ${check ? "!" : "-"} orphan instance page ${check ? "" : "removed "}${o}`);
+}
 
 if (check) {
   // Orphans FAIL the check. That is the defect this whole pass fixes: the old
   // `--check` inspected only the files it was about to write, so it reported
   // "up to date" with a page sitting there that answers to no declaration.
-  if (stale > 0 || taken.length > 0 || orphans.length > 0) {
+  if (stale > 0 || taken.length > 0 || orphans.length > 0 || subjectOrphans.length > 0) {
     if (stale > 0) {
       console.error(`\n${stale} dashboard(s) stale or missing — run \`bun run cat state:visualizer\`.`);
     }
-    if (orphans.length > 0) {
+    if (orphans.length + subjectOrphans.length > 0) {
       console.error(
-        `\n${orphans.length} orphan dashboard(s) answer to no declared graph — ` +
+        `\n${orphans.length + subjectOrphans.length} orphan dashboard(s) answer to no declared graph — ` +
           "run `bun run cat state:visualizer` to remove them.",
       );
     }
@@ -1087,6 +1795,7 @@ if (check) {
   console.log(`state visualiser: ${graphs.length} dashboard(s) up to date, no orphans`);
 } else {
   for (const o of orphans) unlinkSync(join(SITE, o));
+  for (const o of subjectOrphans) rmSync(join(SITE, o), { recursive: true });
   console.log(`\nWrote ${wrote} dashboard(s) under ${relative(ROOT, SITE)}/`);
   if (taken.length > 0) process.exit(1);
 }
