@@ -1031,8 +1031,8 @@ export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
   "content-adapters",
   "code-list",
   // The pipeline's plugin slots and the editor's checkers: `folio-pipeline-
-  // plugin/v1` and `folio-editor-checker/v1` nodes, one per file
-  // (fhir-harness, folio-assistant-sci; cat-harness-tools#386).
+  // plugin/v1` and `folio-editor-checker/v1` nodes, one per file, declared
+  // by layers above this one (cat-harness-tools#386).
   "pipeline-plugins",
   "editor-checkers",
 ]);
