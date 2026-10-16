@@ -244,6 +244,22 @@ export function siteFields(text: string, file: string): { name: string; title?: 
   };
 }
 
+/**
+ * The gate every site build runs before its recipe's own `pre` steps: the
+ * library completeness check folio-assistant's publish runs (`qa:refresh` runs
+ * `check:l1-complete --write`). A per-repository site carried library pages the
+ * index's publish would refuse, because nothing ran the check there (owner,
+ * 2026-10-16: "1" — every repository refuses what folio-assistant refuses).
+ * A QA-only finding such as `image-descriptions` (#364) is reported and does
+ * not fail it; an entry with nothing to check exits 0.
+ */
+export const LIBRARY_GATE = "check:l1-complete";
+
+/** The pre steps a build runs, in order: the library gate first, then the recipe's own, the gate never twice. */
+export function gateSteps(pre: readonly string[]): string[] {
+  return [LIBRARY_GATE, ...pre.filter((p) => p !== LIBRARY_GATE)];
+}
+
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
 export const SCRIPT_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
@@ -731,7 +747,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     [STEP_ENV.baseurl]: baseurl,
     [STEP_ENV.upstreamPages]: upstreamFile,
   };
-  for (const p of o.pre) run(`pre: ${p}`, stepCommand(root, p), root, env);
+  for (const p of gateSteps(o.pre)) run(`pre: ${p}`, stepCommand(root, p), root, env);
   // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
   // whichever mount holds the harness or the landing — cat-harness, or smart-base for an
   // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
