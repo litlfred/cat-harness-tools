@@ -55,12 +55,13 @@
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, posix } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
 import {
   checkMethodologyEvidence,
+  frontMatterOf,
   methodologyNodes,
   type EvidenceReport,
   type MethodologyNode,
@@ -325,6 +326,85 @@ export function nodeHrefResolver(repoRoot = REPO): (path: string) => string | un
   };
 }
 
+/**
+ * ONE PAGE PER METHODOLOGY (owner, 2026-10-16: *"use same URL pattern as other
+ * viewers"*): `<route>/<instance>/<name>/`, the library's
+ * `<route>/<instance>/<id>/`. The list page is `<route>/index.md`; a node's
+ * page is this directory under it.
+ */
+export function nodePageDir(r: Pick<MethodologyRow, "instance" | "name">): string {
+  return `${encodeURIComponent(r.instance)}/${encodeURIComponent(r.name)}/`;
+}
+
+/** The node page's path, relative to the site, from the list page's. */
+export function nodePageRel(listPage: string, r: Pick<MethodologyRow, "instance" | "name">): string {
+  return posix.join(posix.dirname(listPage), r.instance, r.name, "index.md");
+}
+
+/** A node file's text with its front matter removed — the extracted method. */
+export function bodyOf(text: string): string {
+  const fm = frontMatterOf(text);
+  if (fm === undefined) return text;
+  const end = text.indexOf("\n---", 3);
+  return text.slice(text.indexOf("\n", end + 4) + 1).replace(/^\s*\n/, "");
+}
+
+/**
+ * A link in a node's body that is relative to the node FILE (`../skills/x.md`)
+ * would resolve against the page's URL instead and 404. Each is rewritten to
+ * the file on its repository host; absolute URLs, anchors and site-rooted
+ * paths are left alone, and one `nodeHref` cannot place stays as written.
+ */
+export function rebaseLinks(body: string, nodePath: string, nodeHref: (path: string) => string | undefined): string {
+  return body.replace(/\]\(([^)\s]+)\)/g, (all, target: string) => {
+    if (/^([a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) return all;
+    const [path, hash] = target.split("#");
+    const href = nodeHref(posix.normalize(posix.join(posix.dirname(nodePath), path!)));
+    return href ? `](${href}${hash !== undefined ? `#${hash}` : ""})` : all;
+  });
+}
+
+/** A methodology's own page: what the list says of it, its sources, then the method itself. */
+export function nodePage(
+  r: MethodologyRow,
+  body: string,
+  links?: LibraryResolver,
+  fromPage = "",
+  nodeHref?: (path: string) => string | undefined,
+): string {
+  const q = (v: string): string => JSON.stringify(cell(v));
+  const file = r.path && nodeHref ? nodeHref(r.path) : undefined;
+  const b: string[] = [
+    "---",
+    `title: ${q(r.title)}`,
+    `description: ${q(short(r.appliesWhen, 200))}`,
+    "nav_exclude: true",
+    GENERATED_FM,
+    "---",
+    `<style>${CSS}</style>`,
+    "",
+    "[&larr; All methodologies](../../)",
+    "",
+    `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
+    "",
+    `**Applies when.** ${cell(r.appliesWhen)}`,
+    "",
+    `**Origin.** ${cell(r.origin)}`,
+    "",
+  ];
+  if (r.evidence.length > 0) {
+    b.push(
+      r.state === "dangling" ? "**Cited sources — at least one does not resolve:**" : "**Ingested sources:**",
+      "",
+      ...r.evidence.map((e) => evidenceLine(e, links, fromPage)),
+      "",
+    );
+  }
+  if (file) b.push(`**Node file:** [${cell(posix.basename(r.path!))}](${file})`, "");
+  b.push("---", "", r.path && nodeHref ? rebaseLinks(body, r.path, nodeHref) : body);
+  return b.join("\n").trimEnd() + "\n";
+}
+
 export function page(
   rows: readonly MethodologyRow[],
   report: EvidenceReport,
@@ -408,8 +488,7 @@ export function page(
       `**Origin.** ${cleanOrigin}`,
       "",
     );
-    const full = r.path && nodeHref ? nodeHref(r.path) : undefined;
-    if (full) b.push(`**The method, as extracted:** [${cell(posix.basename(r.path!))}](${full})`, "");
+    if (r.path && nodeHref) b.push(`**The method, as extracted:** [read it](${nodePageDir(r)})`, "");
     if (r.evidence.length > 0) {
       b.push(
         r.state === "dangling"
@@ -514,11 +593,37 @@ if (import.meta.main) {
       console.error(`::error::gen-methodologies-viz: ${PAGE} is stale — run \`bun run cat methodologies:viz\``);
       process.exit(1);
     }
+    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const hrefOf = nodeHrefResolver(REPO);
+    for (const r of rows) {
+      if (!r.path) continue;
+      const rel = nodePageRel(PAGE, r);
+      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf), VIEWER_TOOL);
+      const dest = join(docsBase, rel);
+      if ((existsSync(dest) ? readFileSync(dest, "utf-8") : "") !== want) {
+        console.error(`::error::gen-methodologies-viz: ${rel} is stale — run \`bun run cat methodologies:viz\``);
+        process.exit(1);
+      }
+    }
     console.log(`✓ methodologies viewer is current — ${rows.length} methodolog(ies)`);
   } else {
     mkdirSync(join(out, ".."), { recursive: true });
     writeFileSync(out, rendered);
-    console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}`);
+    // One page per node under the list page. Each instance's directory is
+    // this writer's alone, so it is cleared first: a node renamed or removed
+    // leaves no page behind.
+    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const hrefOf = nodeHrefResolver(REPO);
+    for (const inst of new Set(rows.map((r) => r.instance))) rmSync(join(out, "..", inst), { recursive: true, force: true });
+    for (const r of rows) {
+      if (!r.path) continue;
+      const rel = nodePageRel(PAGE, r);
+      const dest = join(docsBase, rel);
+      mkdirSync(join(dest, ".."), { recursive: true });
+      const body = bodyOf(readFileSync(join(REPO, r.path), "utf-8"));
+      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf), VIEWER_TOOL));
+    }
+    console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}, and one page each under it`);
     console.log(
       `  ${rows.filter((r) => r.state === "ingested").length} with the source held, ` +
         `${rows.filter((r) => r.state === "cited-only").length} cited only, ` +
