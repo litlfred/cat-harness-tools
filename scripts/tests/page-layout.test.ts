@@ -79,6 +79,14 @@ describe("page-layout.js", () => {
     // It gives way to the reader.
     expect(js).toMatch(/if \(reader \|\|/);
   });
+
+  it("re-places a full-width bar when the rail opens: body's border box, the rail, and the padding transition (owner, 2026-10-15)", () => {
+    // A body whose max-width fixes its content box does not resize when the
+    // open rail widens its padding, so the content box alone is not enough.
+    expect(js).toContain('observe(document.body, { box: "border-box" })');
+    expect(js).toMatch(/querySelector\("nav\.fa-nav"\)[\s\S]*new ResizeObserver\(queueBleed\)\.observe\(rail\)/);
+    expect(js).toContain('"transitionend"');
+  });
 });
 
 describe("tags, stamping and writing", () => {
