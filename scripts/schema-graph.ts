@@ -107,7 +107,7 @@ export interface SchemaGraphScope {
  * against the wrong subjects on a run that exited 0.
  *
  * It threw the moment this branch met main. Four instances declare a
- * `schemas` graph now — `schemas/`, `folio-assistant-core/schemas/`,
+ * `schemas` graph now — `schemas/`, the content core's `schemas/`,
  * `large-datasets/schemas/` and `detangle/schemas/` — so the singular question
  * has no answer, and the guard said so rather than picking one. **The right
  * fix is not to pick one.** The schema graph genuinely spans instances, a

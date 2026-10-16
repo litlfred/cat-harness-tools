@@ -8,7 +8,7 @@
  * "Withheld — copyright not granted" with a link to the catalogue record; and
  * a banner at the top of a withheld entry says why.
  *
- * Measured before (PR #1799): both withheld who-iris entries — 121 and 250
+ * Measured before (PR #1799): both withheld IRIS replica entries — 121 and 250
  * blocks — rendered every row "(no content carried)". That sentence is TRUE of
  * a page-scan with no text and FALSE of a refused work, whose text is held
  * here and deliberately not published. A reader could not tell "nothing was

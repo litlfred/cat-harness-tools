@@ -42,7 +42,7 @@
  * serve a source that is not Markdown (`[".json"]`), and a host can name a
  * profile by id with `data-suggest-mode`.
  *
- * The node's schema is its declaring instance's (folio-assistant-sci
+ * The node's schema is its declaring instance's (the formal-math layer's
  * `schemas/editor-checker.ts`); it is read raw here, as `declared-nodes.ts`
  * reads declarations, because this layer may not import the one above it.
  * What is checked here is only what the bundle needs: a code ref that names a

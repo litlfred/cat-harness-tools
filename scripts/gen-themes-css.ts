@@ -79,7 +79,7 @@ export function themesCssPath(root: string): string {
  *
  * That is also the owner's own instruction for this work — *"reuse all existing
  * justthedocs infra (see sibling work on variable substitution)"*. `_data/` is
- * exactly the pass-through bean `kott` settled for fhir-harness: Jekyll
+ * exactly the pass-through bean `kott` settled for the FHIR IG harness: Jekyll
  * resolves `site.data` as it always has, and no new mechanism is introduced to
  * carry values into a page.
  *

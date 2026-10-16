@@ -327,7 +327,7 @@ const escHtml = (s: string): string =>
  * re-based onto it with {@link siteHref}, and marked `external`, because the
  * landing template applies `relative_url` only to a non-external link and
  * doing that to an absolute URL breaks it. A link inside the folio's own root
- * stays the folio's. Found on who-iris's own site (2026-10-09): the platform's
+ * stays the folio's. Found on the IRIS replica's own site (2026-10-09): the platform's
  * sticky linked `/docs/cat-harness/concepts/…` under the folio's baseurl, where
  * no such page is.
  */

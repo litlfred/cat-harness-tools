@@ -158,7 +158,7 @@ export function checkModuleScopeResolution(root = REPO_ROOT): ModuleScopeReport 
   const files: string[] = [];
   // EVERY instance, not just `cat-harness`. This walked one directory until
   // 2026-09-21, and on that day the repository grew a contributing instance
-  // with pipeline code of its own (`folio-assistant-sci`, bean `rfev`) — so a
+  // with pipeline code of its own (the formal-math layer, bean `rfev`) — so a
   // call site there was invisible to a gate reporting a clean run. Reading the
   // instance list rather than naming a second directory, because the next
   // instance would be invisible again.

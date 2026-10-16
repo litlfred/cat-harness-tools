@@ -7,7 +7,7 @@
  * its own `$id` names — so a consumer holding an `harness.json` it does
  * not understand has somewhere to go.
  *
- * ## The trick, from `WorldHealthOrganization/smart-base`
+ * ## The trick, from the WHO DAK base IG
  *
  * `generate_logical_model_schemas.py` mints `$id` as
  * `{schema_base_url}/StructureDefinition-{model}.schema.json` — the URL the
@@ -15,7 +15,7 @@
  * each schema as browsable HTML at that address. The schema is not merely
  * *described* somewhere; it **is** its own documentation endpoint.
  *
- * Copied here with one deliberate difference. smart-base derives its schemas
+ * Copied here with one deliberate difference. That IG derives its schemas
  * from FHIR StructureDefinitions; ours derive from Zod, because
  * `directory-conventions` §"What lives in the `schemas` graph" settled that
  * the `.ts` is authoritative and every other form is generated. So this is a
@@ -64,10 +64,10 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  *
  * It read the declared `schemas` directory (`instanceDirectoryForGraph`) until
  * bean `4ak5` item 1 generalised this to every instance, and for the host the
- * two agree. They do not agree elsewhere: `folio-assistant-sci` declares
+ * two agree. They do not agree elsewhere: the formal-math layer declares
  * `sources/` as its `schemas` graph (source descriptors) and keeps its six
- * contracts under `schemas/skills/`, where its skills' refs point; `fhir-harness`
- * and `smart-base` declare no `schemas` graph at all and hold eight and two
+ * contracts under `schemas/skills/`, where its skills' refs point; the FHIR IG
+ * harness and a DAK base layer declare no `schemas` graph at all and hold eight and two
  * (measured 2026-10-05). Reading the declaration would have published none of
  * the sixteen.
  *
@@ -559,9 +559,9 @@ export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
  * Its DECLARED `schemas` graph when it declares one, else `<root>/schemas/` by
  * convention — the fallback `schemasRoot` in `gen-schema-docs.ts` already uses.
  * Unlike {@link contractsDir}, nothing NAMES these modules by path, so the
- * declaration is the authority here. Measured 2026-10-05: `folio-assistant-sci`
- * and `who-iris` declare `sources/` (source descriptors, JSON only), so they
- * are scanned there and hold none; `fhir-harness`, `smart-base` and the other
+ * declaration is the authority here. Measured 2026-10-05: the formal-math layer
+ * and the IRIS replica declare `sources/` (source descriptors, JSON only), so they
+ * are scanned there and hold none; the FHIR IG harness, a DAK base layer and the other
  * undeclared instances fall back to `schemas/`.
  *
  * The PLURAL accessor, because the singular throws when an instance declares

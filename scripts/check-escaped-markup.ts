@@ -295,7 +295,7 @@ export function checkEscapedMarkup(siteDir: string): {
  *
  * **Deliberately not covered:** ingested `library/` content. One latent instance
  * is there — Lean anonymous-constructor syntax `<kunnethMap_injective C D n,`
- * in `folio-assistant-sci/library/arxiv-2602.16554v1/sections/sec-014-…md` —
+ * in the formal-math layer's `library/arxiv-2602.16554v1/sections/sec-014-…md` —
  * and `library/` publishes **0 of 1460** built pages, so covering it would fail
  * a gate over a page nobody renders. Recorded on `7pp6` rather than swept in.
  *

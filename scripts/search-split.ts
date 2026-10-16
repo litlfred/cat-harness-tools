@@ -8,9 +8,9 @@
  * Measured 2026-10-03 on a local build: 12,040 entries, 13.7 MB raw, and the
  * lunr index built from it costs ~4.7 s of main-thread script and ~315 MB of
  * heap (bean `2tfy`, which moved that cost from every page load to the first
- * search). A reader searching a smart-trust page still pays for all of it —
+ * search). A reader searching a DAK IG's page still pays for all of it —
  * including 7.9 MB of platform pages and 2.5 MB of translations they are not
- * reading. Split by where a page lives, a smart-trust page's own scope is
+ * reading. Split by where a page lives, that IG page's own scope is
  * 1.5 MB.
  *
  * ## What a scope is — derived, never listed
@@ -48,7 +48,7 @@
  * the lunr index the theme would build from it, serialized, and named in the
  * manifest's `index`. The client LOADS it instead of building one. Measured
  * 2026-10-03 in Chromium on a local build, first search: `section-reference`
- * 1,747 → 342 ms of script, smart-trust 484 → 95 ms — paid for with the
+ * 1,747 → 342 ms of script, that IG's scope 484 → 95 ms — paid for with the
  * index's bytes, downloaded on top of the entries (0.4–2.9 MB gzipped).
  *
  * Usage:
@@ -161,7 +161,7 @@ export const PLATFORM = "_platform";
  * `mm2n`, issue #1972).
  *
  * **Basis: measured.** First-search script cost runs at ~0.33 s per MB of
- * scope (#1988: smart-trust's 1.5 MB, 504 ms), so a section under 512 KiB
+ * scope (#1988: a DAK IG's 1.5 MB, 504 ms), so a section under 512 KiB
  * costs under ~0.17 s — not worth a scope, and not worth the reader having to
  * widen to find it. Measured 2026-10-03, 512 KiB cuts the 7.82 MB platform
  * scope into five section scopes — `reference` 3.85 MB, `glossary` 0.97,
@@ -249,13 +249,13 @@ export function split(
  *
  * **Basis: measured, 2026-10-03, Node, lunr 2.3.9 on the built site.**
  * Building costs ~3–5 µs per token; loading a serialized index is 5–8×
- * faster (`section-reference` 2,593 ms → 546 ms, `smart-trust` 683 → 82) —
+ * faster (`section-reference` 2,593 ms → 546 ms, a DAK IG's scope 683 → 82) —
  * but the index is 2–3× the entries' gzipped size and is downloaded ON TOP
  * of them, since results are rendered from the entries. Under ~128 Ki tokens
  * the build is ~0.4–0.6 s, comparable to fetching the extra bytes on a slow
  * link, so a small scope builds as before. On that build the budget prebuilt
- * five scopes — `section-reference`, `smart-immunizations`, `_platform`,
- * `smart-trust`, `section-glossary` — and the owner chose "big scopes only".
+ * five scopes — `section-reference`, two DAK IGs' scopes, `_platform`,
+ * `section-glossary` — and the owner chose "big scopes only".
  *
  * TOKENS rather than milliseconds because the output must be the same bytes
  * for the same index (`--check`, and the hash `search-scopes` verifies); a

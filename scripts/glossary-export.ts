@@ -516,7 +516,7 @@ export function buildGlossary(opts: {
     // — omitting it would be `dh4f`, a glossary silently short of the
     // vocabulary it claims to index. It is reported in `undrawn` instead.
     // Alternative labels from two sources, merged: the names the role's lanes
-    // are drawn with, and the role's own authored `otherNames` (smart-base's
+    // are drawn with, and the role's own authored `otherNames` (the DAK base layer's
     // Generic Persona field, owner 2026-09-30). Retired names are NOT here —
     // `formerNames` become `hiddenLabel`: findable, never offered as current.
     const altLabels = [

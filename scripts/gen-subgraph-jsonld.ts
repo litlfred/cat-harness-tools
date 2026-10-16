@@ -330,7 +330,7 @@ type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
  * every one of `NS_PREFIXES`, so an IRI in the namespace of an instance ABOVE
  * `root` compacted to a CURIE: cat-harness's root frames core's graph kinds
  * (`folio-assistant-core:graphTypology/library`, …), and the overlaid
- * `folio-assistant-core/` tree names its own. cat-harness does not need core
+ * content-core tree names its own. cat-harness does not need core
  * — core is above it — so the CURIE was unbound in the one table that governs
  * the file, and `jsonld:contexts` failed `derive:publish`.
  *
@@ -560,7 +560,7 @@ export function planSubgraphs(
 
   // WHICH DIRECTORIES — the same corpus kg-export read, not this instance's
   // alone. kg-export overlays every instance the checkout stacks on this one
-  // (`corpusScopeFor`), so its graph holds `folio-assistant-core`'s processes
+  // (`corpusScopeFor`), so its graph holds the content core's processes
   // and skills too, and until bean `ax6r` every one of them fell to the ROOT,
   // which has no hydrated file: "every process of this graph" was not one
   // fetch, nor any number of them. An overlaid instance's directory now

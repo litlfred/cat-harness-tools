@@ -3,9 +3,10 @@
  *
  * Owner, 2026-09-23, naming three pages and then the rule:
  *
- * > navbar should be on sub pages like `/cat-harness/catalogue/who-iris/` or
- * > `/cat-harness/auto-docs/index/docs/who-iris-docs/` or library
- * > etc... **common fixture unless explicty removed in harness visualtion.**
+ * (paraphrased) the navbar should be on sub pages such as
+ * `/cat-harness/catalogue/<instance>/`, `/cat-harness/auto-docs/index/docs/<instance>-docs/`
+ * or library pages — **a common fixture unless explicitly removed in the
+ * harness visualisation.**
  *
  * The last clause inverts the default. The rail is PRESENT unless a
  * visualisation explicitly removes it, rather than absent unless a generator
@@ -48,9 +49,9 @@
  * than once.
  *
  * **Nothing in the committed tree uses it today**, and that is stated rather
- * than hidden: the owner named `catalogue/who-iris/` as a page that SHOULD
+ * than hidden: the owner named the IRIS replica's `catalogue/` page as one that SHOULD
  * carry the rail, so the obvious candidate is not a candidate. The real one is
- * the mounted IRIS replica at `/who-iris/`, which is not a generated viewer
+ * the mounted IRIS replica at its `/<instance>/` root, which is not a generated viewer
  * page and so is not in this family at all. An opt-out with no user is still
  * the difference between "this page deliberately has no rail" and "nobody
  * wired it", and those two must not render the same — `check-viewer-nav.ts`
@@ -113,8 +114,8 @@ export interface ViewerNav {
    *
    * A generator that knows better PASSES it — `gen-library-viz` writes
    * `library/<instance>/` and has the instance in hand. What no caller does is
-   * INFER it from the path: `auto-docs/index/skills/who-iris-skills/` would
-   * have to be un-suffixed to yield `who-iris`, and a rule that strips
+   * INFER it from the path: `auto-docs/index/skills/<instance>-skills/` would
+   * have to be un-suffixed to yield `<instance>`, and a rule that strips
    * `-skills` here is a second answer to a question the generator already
    * answered, free to disagree with it and silently wrong on the first
    * directory that ends in those characters for another reason.
@@ -166,7 +167,7 @@ export function subjectSection(
    *
    * Called with `undefined`, it names the WHOLE-VIEW page. That page is a
    * destination too: an instance with a graph of this kind but no subject page
-   * of its own (who-iris's and folio-assistant-sci's `schemas`, since bean
+   * of its own (the IRIS replica's and the formal-math layer's `schemas`, since bean
    * `j7ql`) links it, and the sidebar and landing call it "Schemas". Naming it
    * "all" here was a second name for that one page. Omitted, it is "all".
    */
@@ -211,7 +212,7 @@ export function toRootForPage(docsRoot: string, pageAbs: string): string {
   return depth === 0 ? "." : new Array(depth).fill("..").join("/");
 }
 
-/** The page's own site-absolute path, e.g. `/cat-harness/library/who-iris/`. */
+/** The page's own site-absolute path, e.g. `/cat-harness/library/<instance>/`. */
 export function sitePathForPage(docsRoot: string, pageAbs: string): string {
   const dir = relative(docsRoot, dirname(pageAbs)).split(sep).filter(Boolean);
   return dir.length === 0 ? "/" : `/${dir.join("/")}/`;

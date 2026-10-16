@@ -271,7 +271,7 @@ function drawFamily(
     // properties are the fields the sub-graph actually declares.
     //
     // A schema with no properties of its own (a value set's `enum`, or one
-    // composed by `$ref`/`allOf`) has no fields to draw, and smart-base holds
+    // composed by `$ref`/`allOf`) has no fields to draw, and the DAK base layer holds
     // 22 of them: one empty box each was the same defect 22 times over. They
     // are listed, one line each, in a single summary class instead.
     const docs = (filesByTag(join(REPO, section.path)).get(f.tag) ?? []).sort();
