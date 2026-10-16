@@ -1035,7 +1035,7 @@ export function retireInstance(path: string, opts: RetireOptions): RetireResult 
   // Archive a tree holding ONLY the leaving paths, not `head` itself: `git
   // archive` applies the archived tree's `.gitattributes`, and the root's
   // `eol=crlf` on `*.bat` rewrote every Windows wrapper, so the snapshot of
-  // folio-assistant-sci/ extracted to a tree HEAD never held. A temporary
+  // the formal-math layer's directory extracted to a tree HEAD never held. A temporary
   // index keeps the real one untouched.
   const index = join(mkdtempSync(join(tmpdir(), "separation-index-")), "index");
   const env = { ...process.env, GIT_INDEX_FILE: index };

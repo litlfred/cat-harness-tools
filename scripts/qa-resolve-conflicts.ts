@@ -322,15 +322,15 @@ export function qaDirOwners(repoRoot: string, instances: readonly string[]): Map
  *
  * `qaDirs` is EVERY declared `qa` directory in the checkout, repo-relative,
  * not only the root instance's — measured 2026-10-02 on #1822: a
- * `who-iris/test/results/kg-qa/…` sidecar was classified `qa-sidecar` by
+ * `<instance>/test/results/kg-qa/…` sidecar was classified `qa-sidecar` by
  * `merge-conflict-patterns.ts`, handed here, and "left alone — outside the
  * declared qa graph", because this walked `cat-harness/test/results/` only.
  * merge-base then aborted on a conflict the pattern had promised to resolve.
  *
  * `instanceRoot` names whose attestation store must hold a sidecar's
  * non-script entries before it may be dropped (bean `2gst`). A string means
- * one instance for every path; a function answers per path, so a who-iris
- * sidecar is checked against who-iris's store and not the root's.
+ * one instance for every path; a function answers per path, so a content
+ * layer's sidecar is checked against that layer's store and not the root's.
  */
 export function plan(
   repoRoot: string,
@@ -434,7 +434,7 @@ if (import.meta.main) {
 
   // The instance that owns the `qa` directory a path lies in: ITS
   // `test/attestations/` is the store that must hold the path's non-script
-  // verdicts — a who-iris sidecar is judged against who-iris's store, never
+  // verdicts — a content layer's sidecar is judged against its own store, never
   // the root's. The longest matching directory wins, since homes nest.
   const owners = qaDirOwners(repoRoot, instanceRootsIn(repoRoot));
   const instanceFor = (path: string): string | undefined => {

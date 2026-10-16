@@ -71,7 +71,7 @@
  *
  * | harness | the page it passed on | words |
  * |---|---|---|
- * | `smart-trust` | `docs/category/`**`Other.md`** | 14158 |
+ * | a DAK IG | `docs/category/`**`Other.md`** | 14158 |
  * | `cat-harness` | `docs/proposals/placement-audit-2026-10-01.md` | 17605 |
  * | `folio-assistant` | `docs/README.md` | 299 |
  *
@@ -100,7 +100,7 @@
  * That is deliberate and has an owner. Measured 2026-10-03: **1 populated, 5
  * unknown, 0 thin** — and the shape of that result is the point. Four of the
  * six harnesses declare no `processes` and no `scenarios` directory at all, and
- * `smart-base` declares processes but no roles, so for five of six the question
+ * the DAK base layer declares processes but no roles, so for five of six the question
  * §4(b) asks **cannot be put**. That is a fact about the declarations rather
  * than about the pages, and gating on it would fail a harness for a graph it
  * never claimed to have.

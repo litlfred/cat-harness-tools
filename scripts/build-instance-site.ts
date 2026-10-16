@@ -87,7 +87,7 @@ import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
-import { chromeLayers } from "./compose-docs.ts";
+import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
@@ -275,7 +275,7 @@ export interface SiteRecipe {
   keep?: string[];
   /**
    * Which platform steps run around the declared ones ({@link PROFILE_STEPS}): `folio` (the
-   * default) runs every one; `ig-repo-site` runs exactly the platform steps fhir-harness's
+   * default) runs every one; `ig-repo-site` runs exactly the platform steps the FHIR IG harness's
    * `templates/ig-repo-site/folio-site.yml` runs — the shell, its navbar, Jekyll, the rail.
    */
   profile?: SiteProfile;
@@ -291,14 +291,14 @@ export type SiteProfile = "folio" | "ig-repo-site";
  * The platform steps each profile runs besides the shell, its navbar, Jekyll and the rail.
  * An IG repository's own site (`folio-site.yml`) never ran the folio's landing data, instance
  * mounts, PDF viewer, `lang` pass or identifier lookup: run there, `mount-instance-docs` laid
- * seven other instances' directories at an IG's root (smart-trust, measured 2026-10-14).
+ * seven other instances' directories at an IG's root (a DAK IG, measured 2026-10-14).
  *
  * `own-chrome`: the shell carries the chrome of the checkout root's OWN docs layers as well as
  * the platform's. `folio-site.yml` composed the shell in a folio-assistant checkout, which
  * declares no root docs layer, so an IG's shell never carried its own; run from the IG's
  * checkout it did, and the IG's `docs/assets/` arrived twice — once in the shell, once from
  * `stage-ig-sites`, which builds `docs/` into the IG site and refuses a path the host already
- * holds (smart-trust, 2026-10-14). `stage-ig-sites` owns that directory.
+ * holds (a DAK IG, 2026-10-14). `stage-ig-sites` owns that directory.
  */
 export const PROFILE_STEPS: Record<SiteProfile, ReadonlySet<string>> = {
   folio: new Set(["sync", "landing", "mount", "pdf", "suggest", "lang", "lookup", "own-chrome"]),
@@ -621,7 +621,7 @@ export const GENERATED_DATA = ["_data/harness.json", "_data/stickies.json"] as c
 /**
  * {@link keepPinned} for every {@link GENERATED_DATA} file in every mount's site
  * directory. Not only cat-harness: `gen-landing-data` writes the LANDING's
- * `stickies.json`, which for an IG landing on smart-base is in the smart-base
+ * `stickies.json`, which for an IG landing on the DAK base layer is in that layer's
  * mount (litlfred/smart-hiv, 2026-10-14). A mount with no declaration has no site
  * directory and nothing to keep.
  */
@@ -749,7 +749,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   };
   for (const p of gateSteps(o.pre)) run(`pre: ${p}`, stepCommand(root, p), root, env);
   // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
-  // whichever mount holds the harness or the landing — cat-harness, or smart-base for an
+  // whichever mount holds the harness or the landing — cat-harness, or the DAK base layer for an
   // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
   // every mount stays as the lock pins it.
   const restoreHarnessData = pinGeneratedData(root, mounted);
@@ -802,6 +802,14 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${JSON.stringify(docs)} --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // The forwarding pages at the old addresses (folio-assistant#2527). The
+    // chrome step composes with `--shell`, which writes none, so a visualiser
+    // that moved under its locale lost its old address on every instance site
+    // and the parity guard refused the publish (smart-base, 2026-10-16: the
+    // glossary under `en/`). Written last, on the built site, so they forward
+    // to the pages as published and never replace one.
+    const fwd = writeForwardingPages(site, root);
+    console.log(`forwarding: ${fwd.written.length} page(s) at old addresses${fwd.superseded.length ? `; ${fwd.superseded.length} left as published pages` : ""}`);
   } finally {
     restoreHarnessData();
   }

@@ -41,8 +41,8 @@
  * ## Why the site root is derived in the browser
  *
  * The same reason as `folio-mount.ts`, which this reuses rather than restates:
- * one generated page is served at several depths (`/who-iris/`,
- * `/folio-assistant/who-iris/`, `/STAGING/<branch>/who-iris/`), so a relative
+ * one generated page is served at several depths (`/<instance>/`,
+ * `/folio-assistant/<instance>/`, `/STAGING/<branch>/<instance>/`), so a relative
  * or absolute viewer URL is right on at most one of them. The caller passes
  * the route pattern; `siteRootOf` and the inlined client apply the same one.
  *
@@ -165,7 +165,7 @@ export function openShim(allow: readonly string[]): string {
       if (!href) { refuse("This viewer opens only documents this site publishes. Refused: " + src); return; }
       // pdf.js shows NOTHING on screen when the fetch fails: "0 of 0" and a
       // console line (v6.4.299). A 403 from a CDN read as an empty viewer
-      // (owner, 2026-10-15, who-iris). Say it, with the document's address.
+      // (owner, 2026-10-15, on the IRIS replica). Say it, with the document's address.
       var opened = app.open({ url: href });
       if (opened && typeof opened.catch === "function") {
         opened.catch(function (err) {
@@ -272,8 +272,13 @@ export type EmbedOptions = {
   src: string;
   /** What the document is — the iframe's accessible name. */
   title: string;
-  /** The route pattern whose group 1 is the site root — `folio-mount.ts`'s convention. */
-  route: RegExp;
+  /**
+   * Where the viewer is. Either the route pattern whose group 1 is the site
+   * root (`folio-mount.ts`'s convention), for a page served at more than one
+   * depth, or the viewer's href relative to the page, when the writer already
+   * knows it (the library's entry pages: `hrefFrom(shellDir, VIEWER_PATH)`).
+   */
+  route: RegExp | { viewer: string };
   /** Open at this page (1-based). */
   page?: number;
   /** CSS height of the frame. */
@@ -299,13 +304,20 @@ export function embed(o: EmbedOptions): string {
 <figcaption style="font-size:.9em">Search, page jump, print and download are in the viewer's toolbar.
   <a href="${esc(o.src)}" target="_blank" rel="noopener">Open the PDF on its own</a>
   &middot; <a href="${esc(o.src)}" download>Download</a></figcaption>
-<script>${client(o.route.source)}</script>
+<script>${client(o.route instanceof RegExp ? { pattern: o.route.source } : { viewer: o.route.viewer })}</script>
 </figure>`;
 }
 
 /**
  * The browser half of {@link embed}: derive the root, then point the frame at
  * the viewer when it comes within 200px of the viewport — not before.
+ *
+ * **Inside a closed `<details>`, not until it is opened** (owner, 2026-10-16:
+ * *"wait on pdf viewer (or other viewer) library to load until panel opens so
+ * page load is not heavy"*). The library's entry pages put the source in a
+ * view panel under the heading, so it is in view on load; the observer alone
+ * would fetch the viewer for every visitor. A frame in an open `<details>`, or
+ * in none, is unchanged.
  *
  * Lazy by an observer rather than by `loading="lazy"` alone, because the
  * attribute's behaviour on a script-assigned `src` differs across engines,
@@ -320,14 +332,20 @@ export function embed(o: EmbedOptions): string {
  * where a fixed `viewer.html` was masked by a cached one. The viewer ignores
  * the parameter; only caches see it.
  */
-function client(patternSource: string): string {
+function client(at: { pattern: string } | { viewer: string }): string {
+  const viewer = "viewer" in at
+    ? `var v=${JSON.stringify(at.viewer)};`
+    : `var m=location.pathname.match(new RegExp(${JSON.stringify(at.pattern)}));
+if(!m||m[1]==null){f.srcdoc="<p style=\\"font:1rem system-ui\\">The viewer could not find this site's root from the page address. Use the links below.</p>";return;}
+var v=m[1]+${JSON.stringify(VIEWER_PATH)};`;
   return `(function(){
 var f=document.currentScript.parentNode.querySelector("iframe[data-src]");
-var m=location.pathname.match(new RegExp(${JSON.stringify(patternSource)}));
 if(!f)return;
-if(!m||m[1]==null){f.srcdoc="<p style=\\"font:1rem system-ui\\">The viewer could not find this site's root from the page address. Use the links below.</p>";return;}
+${viewer}
 var lm=Date.parse(document.lastModified);
-var url=m[1]+${JSON.stringify(VIEWER_PATH)}+"?src="+encodeURIComponent(f.getAttribute("data-src"))+"&v="+${JSON.stringify(VIEWER_REV)}+"."+(lm>0?lm.toString(36):"0")+f.getAttribute("data-hash");
+var url=v+"?src="+encodeURIComponent(f.getAttribute("data-src"))+"&v="+${JSON.stringify(VIEWER_REV)}+"."+(lm>0?lm.toString(36):"0")+f.getAttribute("data-hash");
+var d=f.closest?f.closest("details"):null;
+if(d&&!d.open){d.addEventListener("toggle",function h(){if(d.open){d.removeEventListener("toggle",h);f.src=url;}});return;}
 if(!("IntersectionObserver" in window)){f.src=url;return;}
 var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting;})){io.disconnect();f.src=url;}},{rootMargin:"200px"});
 io.observe(f);

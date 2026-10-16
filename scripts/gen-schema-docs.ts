@@ -42,7 +42,7 @@ const SCHEMA_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
  * below composes a path INSIDE this directory. The question is "where is MY
  * schemas directory", not "who declares schemas" — and from the `cat-harness`
  * root those have different answers: measured 2026-09-20, `schemas` resolves
- * to FOUR homes (`cat-harness/`, `folio-assistant-core/`, `large-datasets/`,
+ * to FOUR homes (`cat-harness/`, the content core, `large-datasets/`,
  * `detangle/`), three of them arriving through the dependency overlay and
  * belonging to somebody else. `[0]` was right only because the resolver
  * happens to order the root's own declarations first; a reordering would have

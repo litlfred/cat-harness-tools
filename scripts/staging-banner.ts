@@ -186,7 +186,7 @@ const BANNER_STYLE =
  *
  * Reported by the owner 2026-10-02 with a screenshot: the banner was **not at
  * the top**. Measured in Chromium against the served bytes of
- * `STAGING/…/cat-harness/library/smart-base/smart-trust/`, the banner rendered
+ * `STAGING/…/cat-harness/library/<dak-base>/<dak-ig>/`, the banner rendered
  * at `top: 8, left: 64` where it should have been `0, 56`.
  *
  * **It assumed the page resets `body`'s margin.** `position: sticky; top: 0`
@@ -212,7 +212,7 @@ const BANNER_STYLE =
  *
  * ## Fixed, full width, since 2026-10-04 — it was still sticky inside body
  *
- * Owner, with three screenshots of a who-iris replica page: *"banner is wrong
+ * Owner, with three screenshots of an IRIS replica page: *"banner is wrong
  * on page load, scrolls, and then is at top. should always be at top"* and
  * *"upper left corner should be filled with green banner too"*. Both were the
  * banner living in `body`'s flow:
@@ -372,8 +372,8 @@ function htmlFiles(dir: string, out: string[] = [], root: string = dir): string[
  * `head_custom.html` is in the `<head>` of every just-the-docs page, so that
  * sentence is the first `<body>` in the file and the non-global `replace`
  * spent its one substitution on it. The real tag, hundreds of lines later,
- * got nothing. The `who-iris` pages were fine because they are generated
- * without that include — which is why the failure looked like a `who-iris`
+ * got nothing. The IRIS replica's pages were fine because they are generated
+ * without that include — which is why the failure looked like a replica
  * feature rather than a bug.
  *
  * **A comment about the banner broke the banner**, and nothing said so: the

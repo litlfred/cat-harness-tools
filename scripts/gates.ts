@@ -822,7 +822,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // call (bean `ojcx`). It computes over a folio's `folio` graph against
     // its base, and this repository holds no folio, so there is nothing for
     // a gate here to run it on. Its logic is not exempt: every change kind
-    // is asserted by `folio-assistant-core/schemas/changeset.test.ts` in
+    // is asserted by the content core's `schemas/changeset.test.ts` in
     // `bun test`, which IS in the gate set.
     match: "changeset.ts",
     kind: "no-folio",
@@ -1422,8 +1422,8 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "jsonld:contexts:check",
     kind: "report",
     reason:
-      "RED WHERE IT LANDED (891c678): smart-base, smart-trust and smart-immunizations publish no `ns/context/v1.jsonld` " +
-      "yet, and `cat-harness/docs/subgraph/cat-harness/index.jsonld` uses an unbound `folio-assistant-core` prefix. " +
+      "RED WHERE IT LANDED (891c678): the DAK base layer and two DAK IGs publish no `ns/context/v1.jsonld` " +
+      "yet, and `cat-harness/docs/subgraph/cat-harness/index.jsonld` uses an unbound prefix for the content core. " +
       "Wiring it into CI now would red every PR on pre-existing gaps; it becomes a gate once those contexts are generated " +
       "(folio-assistant#2529 triage, 2026-10-15)",
   },

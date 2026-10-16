@@ -15,7 +15,7 @@
  *
  * - the theme's side bar (`#site-nav`) and a search box (`#search-input`),
  *   which a page Jekyll laid out with just-the-docs carries, and which an IG
- *   site's own search box carries too (fhir-harness `ig-search.ts`);
+ *   site's own search box carries too (the FHIR IG harness's `ig-search.ts`);
  * - the language picker's block (`#fa-translation-meta`), from which docs-ui
  *   draws the language picker at the top of the page (owner, 2026-10-15:
  *   *"what happened to search/language select at top of display window?"* —

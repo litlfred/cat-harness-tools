@@ -227,7 +227,7 @@ function builtAtPublishIn(instanceRoot: string): Set<string> {
  * writes it. That is `derive:publish`'s question, which refuses an entry that
  * came out empty. It is said and left out, never refused: an IG's own site
  * build, which makes its pages from the AST, never runs that step
- * (smart-trust, 2026-10-15).
+ * (a DAK IG, 2026-10-15).
  */
 export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[]; pending: DocsLayer[] } {
   const decl = JSON.parse(readFileSync(declarationPathIn(join(repo, "cat-harness"))!, "utf-8")) as {
@@ -308,7 +308,7 @@ export interface ComposedInstance {
  * is a different thing and is what leaves those pages with no layout at all.
  *
  * **Opt-in, read off `composed` on the directory.** A composed default would
- * silently restyle `who-iris/`, which is a replica of somebody else's site and
+ * silently restyle the IRIS replica instance, which is a replica of somebody else's site and
  * must not wear just-the-docs' chrome — the same reason `mount-instance-docs`
  * gives where it declines to run Jekyll over these.
  *
@@ -370,7 +370,7 @@ export interface CarryDecision {
 /**
  * Which composed instances a preview must carry, given the branch's own diff.
  *
- * Bean `ga8a`, following `tebu` one directory over. `smart-trust/docs/` is
+ * Bean `ga8a`, following `tebu` one directory over. A DAK IG's `docs/` is
  * **3.2 MB of markdown** in the checkout and **111.6 MB of HTML** in a
  * preview — 681 pages at ~164 KiB each, because just-the-docs inlines the
  * whole navigation into every page. Measured across `origin/gh-pages` on
@@ -378,15 +378,15 @@ export interface CarryDecision {
  * tree**, against a 1 GB Pages limit the main site shares. Every preview
  * carried it, whether or not its branch mentioned the instance.
  *
- * It does not deduplicate either. The `smart-trust` tree hash is DISTINCT in
+ * It does not deduplicate either. That IG's tree hash is DISTINCT in
  * all 13 previews, because the staging banner injects the slug into every
  * page — so unlike the dedup argument `tebu` rightly rejected for a
  * published-size threshold, this weighs on both budgets.
  *
  * ## The predicate is the INSTANCE, not its composed directory
  *
- * `smart-trust/docs/` is generated from `smart-trust/fhir-artifact-index/` by
- * `smart-trust/scripts/`, so a branch that changes the generator and
+ * That IG's `docs/` is generated from its `fhir-artifact-index/` by its own
+ * `scripts/`, so a branch that changes the generator and
  * regenerates in the same commit must still get the rebuilt pages. Matching
  * the instance root is the superset that covers all three, and a superset is
  * the right direction here for the reason below.
@@ -431,7 +431,7 @@ export function carriedInstances(
     }));
   }
   // Normalised because a path may reach here with a leading `./` from a diff
-  // tool, and `smart-trust/x` must not miss `./smart-trust/x`.
+  // tool, and `<instance>/x` must not miss `./<instance>/x`.
   const changed = files.map((f) => f.replace(/^\.\//, ""));
   return composed.map((instance) => {
     const prefix = `${instance.root}/`;
@@ -868,10 +868,10 @@ export interface ComposeOptions {
    * and reported in `leftOut`. Only with `shell`.
    *
    * An IG repository's own site (`ig-repo-site`) asks for this. Its shell was
-   * always composed in a folio-assistant checkout (fhir-harness's
+   * always composed in a folio-assistant checkout (the FHIR IG harness's
    * `templates/ig-repo-site/folio-site.yml`), whose root declares no docs
    * layer, so it carried the platform's chrome and nothing of the IG's. Run
-   * from the IG's own checkout, the root's `docs` entry (smart-trust's
+   * from the IG's own checkout, the root's `docs` entry (a DAK IG's
    * `docs/`, the IG's artefact pages and their `assets/`) became an overlay,
    * and its assets arrived twice: once here, once from `stage-ig-sites`, which
    * builds that directory into the IG site (`igSite`) and refuses a path the
@@ -934,7 +934,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       // THE HOST'S COUNT PROJECTIONS ARE NOT CHROME EITHER (#2263): the bean
       // and todo indexes, their `count.json`, the library and QA indexes. On
       // an IG's site the icon row fetched them as that site's own, and
-      // smart-trust showed folio-assistant's 537 open beans. Left out, they
+      // a DAK IG showed folio-assistant's 537 open beans. Left out, they
       // 404 there, which the badge reads as ABSENT -- not as zero. The same
       // goes for the host's translation sweep and index under `_data/`
       // (`HOST_DATA_PROJECTIONS`): "Swept 49/689" on a folio's page was the
@@ -972,8 +972,8 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   }
 
   // Composed instances land UNDER THEIR OWN NAME, after the layers, so an
-  // instance cannot shadow a base page by accident: `who-iris/index.md` in a
-  // composed tree is `<out>/who-iris/index.md`, never `<out>/index.md`.
+  // instance cannot shadow a base page by accident: `<instance>/index.md` in a
+  // composed tree is `<out>/<instance>/index.md`, never `<out>/index.md`.
   const composedInst = opts.shell ? [] : composedInstances(repo);
   const carry = carriedInstances(
     composedInst,
@@ -1040,7 +1040,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     // the folio's site lists a platform note, and the footer includes nothing.
     const todoListing = join(out, "_data", "todo_listing.json");
     if (existsSync(todoListing)) writeFileSync(todoListing, `${JSON.stringify(EMPTY_TODO_LISTING, null, 2)}\n`);
-    // The landing stickies' platform links, re-based the same way (who-iris's
+    // The landing stickies' platform links, re-based the same way (the IRIS replica's
     // own site, 2026-10-09: they resolved under the folio's baseurl and 404'd).
     const stickiesData = join(out, "_data", "stickies.json");
     if (existsSync(stickiesData)) {

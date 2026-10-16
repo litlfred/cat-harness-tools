@@ -10,7 +10,7 @@
  * bun run cat-harness-tools/openapi/scripts/ig-site-openapi.ts <built site> [--ig <checkout>]
  * ```
  *
- * Owner, 2026-10-14, on smart-trust losing its OpenAPI pages when it dropped
+ * Owner, 2026-10-14, on a DAK IG losing its OpenAPI pages when it dropped
  * its own declaration: *"that should already be there in ... cat-harness or so
  * for openapi"*. The renderer is this layer's (`gen-openapi-pages.ts`); what
  * an IG repository lacks is the declaration it used to find the graph through.

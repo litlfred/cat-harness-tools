@@ -34,6 +34,7 @@ const INSTANCE_ROOT = join(HARNESS_ROOT);
 const DOCS_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
 const DATA_DIR = join(DOCS_DIR, "_data");
 const OUTPUT_FILE = join(DATA_DIR, "translation-qa.json");
+const GENERATED_BY = "pipeline/translation-qa-sweep.ts — do not hand-edit; rerun the sweep";
 
 /**
  * The instance's own answer, not a literal — `translation-index.ts` reads the
@@ -83,6 +84,14 @@ interface PageTranslationStatus {
 }
 
 interface TranslationQaSweepResult {
+  /**
+   * The file's own declaration that a generator wrote it — the top-level
+   * `"_generated"` key `sync-docs-harness.ts` writes into `harness.json`.
+   * `check-reference-direction.ts` reads it (`declaresGenerated`): the page
+   * paths listed below name whatever layers the site renders pages for, and
+   * without the key every such path read as authored prose naming them.
+   */
+  _generated: string;
   /** ISO timestamp of the sweep */
   sweptAt: string;
   /** Total docs pages scanned */
@@ -212,6 +221,7 @@ export function runTranslationQaSweep(): TranslationQaSweepResult {
   }
 
   return {
+    _generated: GENERATED_BY,
     sweptAt: new Date().toISOString(),
     totalPages: pages.length,
     // A page is TRANSLATED when it exists in a language other than its own.

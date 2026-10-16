@@ -92,12 +92,28 @@
  * by first mention), and a cycle is REFUSED, naming the writers in it: two
  * writers that each read the other's output have no order that is right.
  *
+ * ## Reused when nothing it reads moved, and run side by side (issue #400)
+ *
+ * The declared writers (28 of them for cat-harness's 149 entries) ran one
+ * after another with nothing remembered, and `smart:pages` ran twice in a
+ * layer-PR job. Now each declared writer is keyed (`derive-cache.ts`: its
+ * input-hash fingerprint — the audited script closure, tool versions and its
+ * declared inputs, or the whole tree when it declares none — plus its
+ * predecessors' outputs), and a writer whose key has a recorded result is
+ * RESTORED from `CAT_DERIVE_CACHE_DIR` (default `build/derive-cache`) and
+ * reported `reused <writer> (inputs unchanged since <key>)` — never as built.
+ * Writers the declared edges leave unordered run at once, at most
+ * `CAT_DERIVE_JOBS` (default: the cores); with `CAT_DERIVE_JOBS=1` it is the
+ * sequential order above, output unbuffered. `--no-cache` turns reuse off;
+ * so does `CI`, unless `CAT_DERIVE_CACHE_DIR` opts in.
+ *
  * ```
  * bun run cat derive:publish            # run every writer
  * bun run cat derive:publish --list     # print what would run, run nothing
+ * bun run cat derive:publish --no-cache # run every writer, reuse nothing
  * ```
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -109,6 +125,24 @@ import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-or
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { dirname } from "node:path";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { FileDigests, TRACKED, fingerprint, trackedTreeDigest, type Fingerprint } from "./input-hash.ts";
+import { TASK_IO } from "./task-io.ts";
+import {
+  cacheDirOf,
+  commitStaged,
+  deriveCacheEnabled,
+  digestPaths,
+  hasEntry,
+  jobsOf,
+  nestedForeign,
+  outputsByWriter,
+  predecessorsOf,
+  restoreOutputs,
+  schedule,
+  stageOutputs,
+  writerKey,
+} from "./derive-cache.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -288,6 +322,43 @@ export function runWriter(argv: readonly string[], cwd: string): WriterOutcome {
 }
 
 /**
+ * {@link runWriter}, without blocking, so writers the declared edges leave
+ * unordered run side by side. `buffer`: collect the writer's output and hand
+ * it back, so parallel writers' logs come out whole rather than interleaved.
+ */
+export function runWriterAsync(argv: readonly string[], cwd: string, buffer: boolean): Promise<{ outcome: WriterOutcome; log: string }> {
+  // input-site: inert #d24ef100 — a temp dir for the writer's reason, removed before this resolves
+  const dir = mkdtempSync(join(tmpdir(), "derive-publish-"));
+  const file = join(dir, "not-applicable.txt");
+  return new Promise((done) => {
+    let log = "";
+    // input-site: inert #7d277848 — hands the environment on to a writer, plus the path it writes its reason to
+    const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: buffer ? ["ignore", "pipe", "pipe"] : "inherit", env: { ...process.env, [NOT_APPLICABLE_REASON_ENV]: file } });
+    child.stdout?.on("data", (d: Buffer) => (log += d.toString()));
+    child.stderr?.on("data", (d: Buffer) => (log += d.toString()));
+    const finish = (status: number | null) => {
+      const reason = existsSync(file) ? readFileSync(file, "utf-8") : undefined;
+      rmSync(dir, { recursive: true, force: true });
+      done({ outcome: outcomeOf(status, reason), log });
+    };
+    child.on("error", (e) => {
+      log += `${String(e)}\n`;
+      finish(null);
+    });
+    child.on("close", (code) => finish(code));
+  });
+}
+
+/**
+ * The input-hash fingerprint a declared writer is keyed on (`derive-cache.ts`):
+ * its own `task-io` inputs when it declares them, else `{tracked}` — the whole
+ * tree, never a narrowed guess (`task-io.ts`, "The rule for adding one").
+ */
+export function writerFingerprint(root: string, scripts: Readonly<Record<string, string>>, writer: string, digests: FileDigests): Fingerprint {
+  return fingerprint(root, scripts, [writer], { inputs: TASK_IO[writer]?.inputs ?? [TRACKED] }, digests);
+}
+
+/**
  * The declared artefacts excused because a writer of theirs declined this root,
  * and the ones that must be built: an entry naming a skipped writer cannot be
  * complete, so it is reported rather than refused.
@@ -339,8 +410,53 @@ if (import.meta.main) {
   // A failure still fails the step, after the rest have run.
   const skipped = new Map<string, string>();
   const failed = new Map<string, number | null>();
+  const reused = new Map<string, string>();
+  // ── Issue #400: key, reuse, and run unordered writers side by side ──
+  // input-site: inert #c6583b74 — the cache directory, the job count and the CI switch decide how the writers run, never what they write
+  const env = process.env;
+  const jobs = jobsOf(env);
+  const cacheOn = deriveCacheEnabled(process.argv, env);
+  const cacheDir = cacheDirOf(REPO_ROOT, env);
+  const edges = writerEdges(declared);
+  const byWriter = outputsByWriter(declared, REPO_ROOT);
+  const allOutputs = [...new Set([...byWriter.values()].flat())];
+  const scripts = cacheOn.on ? scriptsOf(REPO_ROOT) : {};
+  const digests = new FileDigests(REPO_ROOT);
+  // One tree digest for the run, over the tree as it stands before any declared
+  // writer runs, leaving out every declared output (each run rewrites them).
+  const treeBefore = cacheOn.on ? trackedTreeDigest(REPO_ROOT, digests, { exclude: allOutputs }) : undefined;
+  if (treeBefore !== undefined) digests.tree = treeBefore;
+  const base = new Map<string, Fingerprint>(cacheOn.on ? writers.map((w) => [w, writerFingerprint(REPO_ROOT, scripts, w, digests)] as const) : []);
+  const staged = new Map<string, { key: string; path: string }>();
+  console.log(
+    `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
+  );
+  const runOne = async (w: string): Promise<WriterOutcome> => {
+    const keep = nestedForeign(w, byWriter);
+    const fp = base.get(w);
+    let key: string | undefined;
+    let why = cacheOn.on ? "" : "reuse off";
+    if (fp !== undefined && "hash" in fp) {
+      const before = [...predecessorsOf(w, edges)].sort().flatMap((p) => byWriter.get(p) ?? []);
+      key = writerKey(w, fp.hash, digestPaths(REPO_ROOT, before, [...(byWriter.get(w) ?? [])]));
+      if (hasEntry(cacheDir, w, key) && restoreOutputs(cacheDir, w, key, REPO_ROOT, keep)) {
+        reused.set(w, key);
+        console.log(`  reused ${w} (inputs unchanged since ${key.slice(0, 12)}${fp.wholeTree ? ", keyed on the whole tree" : ""})`);
+        return { kind: "ran" };
+      }
+      why = `no result recorded for ${key.slice(0, 12)}`;
+    } else if (fp !== undefined) {
+      why = `inputs could not be determined: ${fp.undetermined}`;
+    }
+    const { outcome, log } = await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
+    if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
+    console.log(`  ran ${w} (${why})`);
+    if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
+    return outcome;
+  };
+  const outcomes = await schedule(writers, edges, jobs, runOne);
   for (const w of writers) {
-    const o = runWriter(["bun", "run", "cat", w], REPO_ROOT);
+    const o = outcomes.get(w)!;
     if (o.kind === "failed") {
       failed.set(w, o.exit);
       console.log(`::error::derive:publish: declared writer \`${w}\` exited ${o.exit ?? "on a signal"}`);
@@ -348,6 +464,18 @@ if (import.meta.main) {
     if (o.kind === "skipped") {
       skipped.set(w, o.why);
       console.log(`derive:publish: declared writer \`${w}\` skipped — it does not apply to this root: ${o.why}`);
+    }
+  }
+  // Record only over a tree that held still (`derive-cache.ts`): the digest the
+  // keys were computed over must be the digest now, fresh.
+  if (staged.size > 0 && treeBefore !== undefined && "hash" in treeBefore) {
+    const after = trackedTreeDigest(REPO_ROOT, new FileDigests(REPO_ROOT), { exclude: allOutputs });
+    if ("hash" in after && after.hash === treeBefore.hash) {
+      for (const [w, s] of staged) commitStaged(cacheDir, w, s.key, s.path);
+      console.log(`  recorded ${staged.size} writer result(s) for reuse`);
+    } else {
+      rmSync(join(cacheDir, ".staging"), { recursive: true, force: true });
+      console.log(`  recorded nothing: the tree outside the declared outputs moved during the run${"undetermined" in after ? ` (${after.undetermined})` : ""}`);
     }
   }
   const { excused: notHere, judged } = excused(declared, skipped);
@@ -365,5 +493,5 @@ if (import.meta.main) {
     console.log(`::error::derive:publish: ${parts.join("; ")}`);
     process.exit(1);
   }
-  console.log(`  ✓ ${judged.length} declared artefact(s) built${notHere.length ? `, ${notHere.length} skipped (their writer does not apply to this root)` : ""}`);
+  console.log(`  ✓ ${judged.length} declared artefact(s) built or reused${reused.size ? ` (${reused.size} writer(s) reused: ${[...reused.keys()].join(", ")})` : ""}${notHere.length ? `, ${notHere.length} skipped (their writer does not apply to this root)` : ""}`);
 }
