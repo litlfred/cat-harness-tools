@@ -47,7 +47,7 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "GNU gettext .pot template. Segments prose by paragraph, strips inline " +
       "formatting, skips code blocks and front matter. Output goes to " +
       "translations/<locale>/<name>.pot. Uses the same extraction state machine " +
-      "as smart-base's extract_translations.py.",
+      "as the WHO DAK base IG's extract_translations.py.",
     {
       path: z.string().describe(
         "Path to a .md file or directory of .md files (relative to repo root). " +

@@ -10,7 +10,7 @@
  *
  * 2026-09-23, bean `kn0t` ("PHASED TRANSITION: IG Publisher reduced to AST +
  * QA") was found holding a second copy of the contract in
- * `fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`. The copy had
+ * the FHIR IG harness's `skills/fhir-ig-base/ig-publisher-reduction.md`. The copy had
  * drifted in **four** places, and one of them was load-bearing:
  *
  * | | the bean said | the skill says |
@@ -89,7 +89,7 @@
  * The brief said *"a bean that **references a skill by path** should not also
  * carry a criterion block"*. Measured against the fixture: **the pre-repair
  * `kn0t` references no skill by path at all**, and
- * `fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md` existed at that
+ * that `skills/fhir-ig-base/ig-publisher-reduction.md` existed at that
  * commit (`git cat-file -e f8ed0c1a^:…` — it did). So requiring the pointer as
  * a *condition* reproduces the Jaccard failure exactly: the gate would have
  * caught none of the defect it was built for.

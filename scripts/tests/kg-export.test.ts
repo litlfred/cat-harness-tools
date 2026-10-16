@@ -40,7 +40,8 @@ import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishe
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
@@ -56,7 +57,7 @@ import { dirname } from "node:path";
  * it would have failed on every bootstrap and core term — which is the test
  * doing its job, not a bug in it.
  */
-const inFolioNs = (iri: string): boolean => Object.values(NS_PREFIXES).some((ns) => iri.startsWith(ns));
+const inFolioNs = (iri: string): boolean => Object.values(ownPrefixTable()).some((ns) => iri.startsWith(ns));
 
 // The repo's own canonicalUrl, so the shared fixture is the CANONICAL export.
 // Using an arbitrary base made it a preview, which (correctly) gave it an
@@ -154,7 +155,7 @@ describe("kg export", () => {
     const ids = new Set(typed("Skill").map((n) => n["@id"] as string));
     const referenced = new Set<string>();
     for (const n of typed("ProcessNode")) {
-      for (const s of (n.implementedBy as string[] | undefined) ?? []) referenced.add(s);
+      for (const s of (n.requires as string[] | undefined) ?? []) referenced.add(s);
     }
     expect(referenced.size).toBeGreaterThan(20); // Guard the guard.
     expect([...referenced].filter((r) => !ids.has(r)).sort()).toEqual([]);
@@ -164,7 +165,7 @@ describe("kg export", () => {
     const nodes = typed("ProcessNode");
     // A list of skills is not a graph. These two edges are the reason to publish.
     expect(nodes.filter((n) => n.performedBy !== undefined).length).toBeGreaterThan(100);
-    expect(nodes.filter((n) => ((n.implementedBy as string[]) ?? []).length > 0).length)
+    expect(nodes.filter((n) => ((n.requires as string[]) ?? []).length > 0).length)
       .toBeGreaterThan(50);
   });
 
@@ -188,7 +189,7 @@ describe("kg export", () => {
     // list of records that merely looks linked. This is cheap to lose in a
     // context edit and invisible when you do.
     const ctx = EXPORT["@context"] as Record<string, { "@type"?: string } | string>;
-    for (const term of ["partOf", "implementedBy", "performedBy", "inPackage",
+    for (const term of ["partOf", "requires", "performedBy", "inPackage",
                         "declaresSkill", "startNode", "from", "to", "holdsGraph"]) {
       const d = ctx[term];
       expect(typeof d === "object" && d !== null && d["@type"] === "@id").toBe(true);
@@ -839,16 +840,16 @@ describe("a Role comes from the registry; a lane is a Lane that binds one", () =
     expect(declared.filter((d) => !byName.has(d.id)).map((d) => d.id)).toEqual([]);
   });
 
-  test("a role that acts on nothing still reaches the graph", () => {
-    // `corpus`, `work-plan` and `log` are `actedUpon`: written to, never
-    // performing. The lane-derived view could not see them, because a lane
-    // was minted from the lanes FLOW NODES name and an `actedUpon` lane holds
-    // no flow nodes by construction. Exactly the roles whose emptiness is the
-    // point were the ones the graph dropped.
+  test("a role a machine plays still reaches the graph", () => {
+    // `corpus`, `work-plan` and `log` are played by a store or a log — real
+    // roles whose skills are their contract (owner, 2026-10-16; they were
+    // flagged `actedUpon` until then). The lane-derived view could not see
+    // them, because a lane was minted from the lanes FLOW NODES name, and a
+    // store's lane may hold none. The registry is where they come from.
     for (const id of ["corpus", "work-plan", "log"]) {
       const node = registry.find((r) => r.notation === id);
       expect(node, `${id} is missing from the graph`).toBeDefined();
-      expect(node!.actedUpon).toBe(true);
+      expect(node!.actedUpon).toBeUndefined();
     }
   });
 
@@ -866,9 +867,8 @@ describe("a Role comes from the registry; a lane is a Lane that binds one", () =
     );
   });
 
-  test("`actedUpon` and `judgementOnly` are two flags, not one", () => {
-    // Collapsing them would give a store an actor or a stakeholder a skill.
-    // Asserted on real rows so the distinction is observed, not just typed.
+  test("`judgementOnly` is published, and the retired `actedUpon` is not", () => {
+    // Asserted on real rows so the flag is observed, not just typed.
     const stakeholder = registry.find((r) => r.notation === "stakeholder")!;
     expect(stakeholder.judgementOnly).toBe(true);
     expect(stakeholder.actedUpon).toBeUndefined();

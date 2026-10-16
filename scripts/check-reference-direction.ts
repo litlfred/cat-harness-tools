@@ -767,29 +767,14 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "cat-harness/cat-harness.json", names: 2 },
   { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
-  { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
-  { file: "cat-harness/skills/kg/kg-core/directory-conventions.md", names: 2 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   // declared-path-literal: a FINDING's location, recorded repo-root-relative because that is
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
   { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
-  { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
   { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
-  { file: "cat-harness/schemas/namespaces.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
-  { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
-  { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
-  { file: "cat-harness/schemas/harness-config.ts", names: 3 },
-  { file: "cat-harness/docs/source/fhir-ig-publisher/what-it-cannot-be-asked-for.md", names: 2 },
-  { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
-  { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },
   { file: "smart-base/README.md", names: 2 },
   { file: "smart-base/AGENTS.md", names: 2 },

@@ -52,7 +52,7 @@ export function registerLsiQueryTools(server: McpServer): void {
       "it never establishes that a unit is relevant, correct, or a dependency.",
     {
       text: z.string().min(1).describe("The query, in any words."),
-      instance: z.string().optional().describe("Instance declaring the graph, e.g. `who-iris`. Omit for all."),
+      instance: z.string().optional().describe("Instance declaring the graph, e.g. `cat-harness`. Omit for all."),
       graph: z.string().optional().describe("Graph id within the instance, e.g. `library`, `skills`. Omit for all."),
       top: z.number().int().min(1).max(50).default(10).describe("Hits per graph."),
     },

@@ -32,11 +32,10 @@
 
 // The REGISTRY, not BASE_GRAPH_TYPOLOGIES: since bean dmx1 a harness DECLARES its
 // kinds in a typologies/ graph, and a sweep over the code list alone stopped checking
-// every kind that moved (fhir-harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
+// every kind that moved (the FHIR IG harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
 import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import { GLOSSARY_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/glossary-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
 import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/declared-nodes.js";
 import { typedBlockKinds } from "@litlfred/cat-harness/schemas/constraints.js";
@@ -85,7 +84,7 @@ export const FOREIGN_REPOSITORY_PREFIXES: readonly string[] = ["bootstrap-tools:
 
 /**
  * Every validator string a kind's AUTHORED definition still carries: the code
- * list, the kinds/ nodes and core's two code-registered kinds, read BEFORE the
+ * list, the kinds/ nodes and the code-registered `folio` kind, read BEFORE the
  * registry joins validator nodes on, which is what tells a string an author
  * wrote from one the registry filled in.
  */
@@ -100,7 +99,6 @@ export function authoredValidatorStrings(): { kind: string; family?: string; ref
   };
   for (const [k, d] of Object.entries(BASE_GRAPH_TYPOLOGIES)) add(k, d);
   add("folio", FOLIO_GRAPH_TYPOLOGY);
-  add("glossary", GLOSSARY_GRAPH_TYPOLOGY);
   for (const { node } of declaredKindNodes(join(import.meta.dir, "..", ".."))) add(node.kind, node);
   return out;
 }
@@ -229,7 +227,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   const out: FamilySweep[] = [];
   // Every directory the checkout declares, with the kinds it carries. A node
   // under a MORE SPECIFIC declared directory belongs to that directory's
-  // kinds, not to an enclosing one's: smart-base declares
+  // kinds, not to an enclosing one's: the DAK base layer declares
   // `library/<entry>/l1-extraction/` as `l1-extraction` inside its `library/`,
   // and the library map must not call that kind's run contexts and work lists
   // "unmapped" (folio-assistant#2529).

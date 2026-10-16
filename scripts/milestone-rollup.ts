@@ -132,10 +132,15 @@ export function milestoneRollup(input: readonly BeanNode[]): MilestoneReport {
   const kids = childrenOf(beans);
   const roots = beans.filter((b) => b.type === MILESTONE_TYPE);
 
-  // Ordered by id, not by share or count: a report that reorders between runs
-  // looks like it is reporting a change. `epicChart` on the board sorts for
-  // the same reason and says so.
-  const ordered = [...roots].sort((a, b) => a.id.localeCompare(b.id));
+  // Ordered by TITLE, numerically ("GOAL 2" before "GOAL 10"), then by id —
+  // not by share or count, since a report that reorders between runs looks
+  // like it is reporting a change. It was by id alone, which is just as
+  // stable but read as GOAL 5, 2, 4, 1, 3 on the board (owner, 2026-10-16:
+  // "why are they listed out of order?"). The goals are named in order, so
+  // their names are the order.
+  const ordered = [...roots].sort(
+    (a, b) => (a.title ?? "").localeCompare(b.title ?? "", "en", { numeric: true }) || a.id.localeCompare(b.id),
+  );
 
   const underAMilestone = new Set<string>();
   const milestones: MilestoneRollup[] = [];

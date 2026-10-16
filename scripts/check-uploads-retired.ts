@@ -51,7 +51,7 @@
  * holds until the next session, and this one did not survive its own commit.**
  *
  * `milnorlink.pdf` is the fourth case and the cleanest statement of it: it was
- * ingested to `folio-assistant-sci/library/`, so a sweep matching against
+ * ingested to the formal-math layer's `library/`, so a sweep matching against
  * `cat-harness/library/` saw no match and read it as still queued. The finding
  * is not "somebody was careless"; it is that a one-directory answer looks
  * exactly like a whole one.
@@ -94,8 +94,8 @@ const ROOT = resolve(import.meta.dir, "..", "..");
  * `dh4f`, in the check written to stop `dh4f`.
  *
  * `cat-harness` declares one, and its declaration reaches all six
- * (`cat-harness`, `who-iris`, `agent-skills`, `folio-assistant-sci`,
- * `folio-assistant-core`, `smart-base`). The repository root declares
+ * (`cat-harness`, `agent-skills`, and four content layers above this one: the
+ * IRIS replica, the formal-math layer, the content core and a DAK base layer). The repository root declares
  * `uploads/`, which `cat-harness` does not. So both are asked.
  *
  * Exported, and passed as an ARGUMENT rather than closed over, so a fixture
@@ -134,11 +134,11 @@ export type QueueState = "queued" | "retired" | "duplicated" | "orphaned-compani
 /**
  * Whether the file is a bare drop in the queue or part of a structured intake.
  *
- * `who-iris` keeps one DIRECTORY per source — the PDF beside an `intake.json`
+ * The IRIS replica keeps one DIRECTORY per source — the PDF beside an `intake.json`
  * and an `iris-capture/` — so the remedy the flat case prints (move the PDF,
  * write a sidecar) would leave an intake record pointing at a file that is no
  * longer there. Whether such a source retires as a file or as a directory is
- * a who-iris layout decision, and that layout is under revision in #1612.
+ * that library's layout decision, and that layout is under revision in #1612.
  *
  * So the two are reported as separate families and only the flat one blocks.
  * Not an exemption: the structured findings are counted and printed on every
@@ -267,7 +267,7 @@ export function resolvedQueues(roots: readonly string[] = DEFAULT_ROOTS): string
   }
   // An instance that declares a library declares its own queue, and that
   // declaration does not always reach the root's own resolution — measured in
-  // `library-graph.ts` on 2026-09-20 for `who-iris`. Asking each library's
+  // `library-graph.ts` on 2026-09-20 for the IRIS replica. Asking each library's
   // instance is what makes this total rather than nearly so.
   for (const lib of declaredLibraries(roots)) {
     for (const d of directoriesForGraph(resolve(lib, ".."), "uploads")) queues.add(d);
@@ -289,7 +289,7 @@ export function queueState(roots: readonly string[] = DEFAULT_ROOTS): QueueFile[
     // not a queue.
     const archive = archiveDir(base);
     if (archive !== undefined && resolve(q) === resolve(archive)) continue;
-    // A queue may hold a DIRECTORY per source — `who-iris/uploads/` keeps
+    // A queue may hold a DIRECTORY per source — the IRIS replica's `uploads/` keeps
     // `9789241548960-eng/` and three siblings that way. Listing only the top
     // level would report those four queues as empty, which is the same
     // could-not-see-it-so-it-is-clean shape this file exists to stop.
@@ -345,7 +345,7 @@ export function companionSource(rel: string): string | undefined {
  * present in the archive — that is, the source retired and left it behind.
  * A companion sitting beside a source still in the queue is as queued as the
  * source is, which is the live case in
- * `who-iris/uploads/wpr-rdo-2020-003-eng/iris-capture/`.
+ * the IRIS replica's `uploads/wpr-rdo-2020-003-eng/iris-capture/`.
  */
 export function withCompanions(files: QueueFile[], archivedNames: ReadonlySet<string>): QueueFile[] {
   const present = new Set(files.map((f) => f.rel));
@@ -449,7 +449,7 @@ if (import.meta.main) {
     }
     console.log("  Each sits beside an `intake.json`, so moving the PDF alone would leave");
     console.log("  that record naming a file that is not there. Whether such a source");
-    console.log("  retires as a FILE or as a DIRECTORY is a who-iris layout decision, and");
+    console.log("  retires as a FILE or as a DIRECTORY is that library's layout decision, and");
     console.log("  that layout is being reworked in #1612. Reported every run, and the");
     console.log("  count is the point: this is not a clean family.\n");
   }

@@ -48,7 +48,7 @@ const TOOLS_LAYER_ROOT = resolve(import.meta.dir, "..");
 
 /**
  * Which layer owns a group: the name of the instance whose Tool node declares
- * it (`cat-harness`, `folio-assistant-sci`, …). A string rather than a closed
+ * it (`cat-harness`, a content layer above it, …). A string rather than a closed
  * list of three since the groups are discovered across the dependency tree
  * (bean riit, 3c): a list here would have to name every instance above.
  */
@@ -189,7 +189,7 @@ export async function registerDeclaredToolGroups(
  * the KG, not because a list in code names it. Until then the same fact was
  * restated twice by hand — `SERVER_TOOL_GROUPS` in `server.ts` and the
  * "generic tools" inline in the document adapter — and the second lived in
- * `folio-assistant-core`, so with `cat-harness` alone no adapter was loaded,
+ * the content core, so with `cat-harness` alone no adapter was loaded,
  * none of them was registered, and the server refused to start.
  *
  * `layer` is "harness" for every group: these are the harness's own Tool

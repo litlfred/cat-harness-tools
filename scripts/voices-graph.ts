@@ -21,7 +21,7 @@
  *
  * ## Three declarations, and one of them is empty
  *
- * Measured 2026-09-21: `who-style-guide`, `folio-assistant-sci` and
+ * Measured 2026-09-21: `who-style-guide`, the formal-math layer and
  * `agent-skills` declare a `voices` graph. `agent-skills/voices/` **is not
  * there** (bean `26tu`), so this reader reports it as a declared directory
  * with no voices rather than omitting it. Those are different facts: the

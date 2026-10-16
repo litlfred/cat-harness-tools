@@ -57,7 +57,7 @@ import jsonld from "jsonld";
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { OWN_NAMESPACE_VALUES } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
 import { duplicateIds } from "./check-duplicate-ids";
 import { isVendoredViewer } from "./pdf-viewer.ts";
@@ -146,7 +146,7 @@ export function isOurs(doc: unknown, bases: readonly string[] = []): boolean {
   const s = JSON.stringify(d["@context"]);
   return (
     s.includes(CONTENT_CONTEXT_URL) ||
-    OWN_NAMESPACE_VALUES.some((ns) => s.includes(ns)) ||
+    ownNamespaceValues().some((ns) => s.includes(ns)) ||
     [...instanceContextFiles().keys()].some((url) => s.includes(url))
   );
 }

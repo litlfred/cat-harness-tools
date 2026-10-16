@@ -6,7 +6,7 @@
  * @module scripts/check-library-qa
  * @covers library
  *
- * Issue #1794, bean `8iqc`. Owner, 2026-10-01, looking at the who-iris
+ * Issue #1794, bean `8iqc`. Owner, 2026-10-01, looking at the IRIS replica's
  * library page: *"library entry is uninformative. no titles. and sometime
  * weird ones. review/QA checks on library assets after ingestion/KG build"*.
  *

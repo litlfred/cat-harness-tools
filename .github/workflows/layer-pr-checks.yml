@@ -36,6 +36,22 @@
 # A gate or test already red on main is listed in the step summary, never
 # hidden and never counted against the PR.
 #
+# How a run is laid out (cat-harness-tools#397). A trial run (38866215814)
+# took 87 minutes: its shards waited 33-52 minutes for runners, every one of
+# eight shards rebuilt its side for 6-10 minutes, main's cached answer never
+# matched, and the gates were split by count, not by time. Now:
+#   prepare-head, prepare-base  start at once. Each pins the run (one time,
+#       shared through the cache), mounts its side and builds it ONCE, then
+#       hands its shards what it built. prepare-head also typechecks.
+#       prepare-base stops early when main's answer is cached, keyed by what
+#       that answer is computed from. Both stop early when a layer PR changes
+#       only its own `index.lock.json` / `index.config.json`, which these
+#       checks never read.
+#   run     `gate-shards` jobs a side (head only when main is cached), split by
+#       the seconds the last run recorded.
+#   compare joins the shards and judges, as before, and keeps main's answer
+#       and the gate seconds for the next run.
+#
 # A caller is the one `uses:` line and nothing else (owner, 2026-10-14:
 # "there shouldnt be copying of code"):
 #
@@ -126,28 +142,25 @@ env:
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || (inputs.mode == 'layer' && github.event.repository.name || '') }}
 
 jobs:
-  # The folio-assistant commit every job checks out, resolved ONCE per run.
-  #
-  # `index-ref` names a branch, and a branch moves. Each job used to check it
-  # out when it started, so whenever the index was re-pinned while a run was
-  # queued, base and head mounted DIFFERENT layer pins and the compare job
-  # charged the difference to the PR.
-  # https://github.com/litlfred/fhir-harness/pull/86, run 38695852469: head
-  # checked out claude/nifty-johnson-w3mspn at 07:01:56Z (a3fa2e5), the branch
-  # moved to 725d8f8 at 07:04:45Z, base checked out at 07:08Z, and
-  # `render:bpmn:check`, red at the first pins and green at the second, was
-  # reported as a NEW FAILURE of a PR that touched no diagram. One sha, read
-  # here and passed to both sides, makes the two sides judge the same index.
-  # Index mode needs none of this: the caller IS the root, at the PR's merge
-  # commit.
-  pin:
-    name: Resolve the index commit
+  # Each side is prepared ONCE, by its own job, and handed to its shards
+  # (cat-harness-tools#397): mount, lower layers at main, the caller swapped
+  # in, the graphs kept on branches, the IG pages and `derive:publish`. Every
+  # shard used to repeat all of it, 6-10 minutes each, eight times a run
+  # (trial run 38866215814: 67 of 200 work-minutes).
+  prepare-head:
+    name: Prepare the PR side (and typecheck)
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
+    env:
+      SIDE: head
     outputs:
-      sha: ${{ steps.resolve.outputs.sha }}
+      at: ${{ steps.pins.outputs.at }}
+      index: ${{ steps.pins.outputs.index }}
+      tools: ${{ steps.pins.outputs.tools }}
       shards: ${{ steps.shards.outputs.list }}
+      skip: ${{ steps.lock-only.outputs.skip }}
+      typecheck: ${{ steps.tsc.outcome }}
     steps:
       # The shard matrix, [1..gate-shards], once, so `run` and `compare` agree
       # on it. A value that is not a whole number from 1 to 16 stops the run
@@ -164,39 +177,96 @@ jobs:
           list="$(seq -s, 1 "$N")"
           echo "gate shards: $N ([${list}])"
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
-      - id: resolve
+      - &judging-scripts
+        name: The judging scripts
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ inputs.tools-ref }}
+          path: ci
+          sparse-checkout: .github/scripts/layer-pr-checks
+      # One pin time per run attempt, shared by every job through the cache
+      # (cat-harness-tools#397). It replaces the `pin` job, which cost the run
+      # a second wait for a runner before anything else could start (5 min on
+      # trial run 38866215814, 33 min on run 38869216177). The first job
+      # to get here writes the time; a job that finds it reads it. Every ref
+      # this run follows (the index, the lower layers at main, the judging
+      # scripts) is then resolved as of that time, by `resolve-at.sh`, so both
+      # sides judge the same commits however far apart their jobs start. A
+      # re-run is a new attempt and so a new time: it judges main as it is.
+      - &pin-restore
+        id: pin-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/pin
+          key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
+      - &pin-write
+        if: steps.pin-restore.outputs.cache-hit != 'true'
         env:
           MODE: ${{ inputs.mode }}
-          REF: ${{ inputs.index-ref }}
         run: |
           set -euo pipefail
-          if [ "$MODE" = "index" ]; then
-            echo "index mode: the caller is the root; nothing to resolve"
-            echo "sha=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if printf '%s' "$REF" | grep -Eq '^[0-9a-f]{40}$'; then
-            sha="$REF"
-          else
-            # A branch, else an annotated tag's commit, else a light tag.
-            refs="$(git ls-remote https://github.com/litlfred/folio-assistant.git "refs/heads/$REF" "refs/tags/$REF" "refs/tags/$REF^{}")"
-            sha="$(printf '%s\n' "$refs" | awk -v r="refs/heads/$REF" '$2 == r { print $1 }')"
-            [ -n "$sha" ] || sha="$(printf '%s\n' "$refs" | awk -v r="refs/tags/$REF^{}" '$2 == r { print $1 }')"
-            [ -n "$sha" ] || sha="$(printf '%s\n' "$refs" | awk -v r="refs/tags/$REF" '$2 == r { print $1 }')"
-          fi
-          if [ -z "$sha" ]; then
-            echo "::error::index-ref '$REF' names no branch or tag of litlfred/folio-assistant"
-            exit 2
-          fi
-          echo "index-ref $REF is $sha for every job of this run"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-
-  typecheck:
-    name: Typecheck
-    needs: pin
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
+          mkdir -p "$RUNNER_TEMP/pin"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/pin/at"
+          # The tips of the graphs kept on branches (`cat/<instance>/<graph>`:
+          # beans, todos, ...), read ONCE for the run, so both sides mount
+          # each graph at the same commit (state-pin.sh). Read
+          # live per side, they were minutes apart, and a bean pushed in
+          # between was charged to the PR (the trial PR, run 38884159693).
+          # A remote that cannot be read is left out, and mounts live.
+          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+            if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
+              printf '%s\n' "$tips" > "$RUNNER_TEMP/pin/state-${repo//\//__}.tsv"
+            fi
+          done
+          python3 - "$RUNNER_TEMP/pin" <<'PY'
+          import json, pathlib, sys
+          pin = pathlib.Path(sys.argv[1])
+          out = {}
+          for f in sorted(pin.glob("state-*.tsv")):
+              repo = f.name[len("state-"):-len(".tsv")].replace("__", "/")
+              tips = {}
+              for line in f.read_text().splitlines():
+                  if "\t" in line:
+                      sha, ref = line.split("\t", 1)
+                      tips[ref.removeprefix("refs/heads/")] = sha
+              out[repo] = tips
+              f.unlink()
+          (pin / "state.json").write_text(json.dumps(out, sort_keys=True, indent=1) + "\n")
+          PY
+      - &pin-save
+        if: steps.pin-restore.outputs.cache-hit != 'true'
+        continue-on-error: true  # the other side saved first: read its time below
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/pin
+          key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
+      - &pin-reread
+        if: steps.pin-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/pin
+          key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
+      - &pins
+        name: Pin this run
+        id: pins
+        env:
+          MODE: ${{ inputs.mode }}
+          INDEX_REF: ${{ inputs.index-ref }}
+          TOOLS_REF: ${{ inputs.tools-ref }}
+        run: |
+          set -euo pipefail
+          at="$(cat "$RUNNER_TEMP/pin/at")"
+          resolve=ci/.github/scripts/layer-pr-checks/resolve-at.sh
+          index=""
+          [ "$MODE" = "index" ] || index="$(bash "$resolve" litlfred/folio-assistant "$INDEX_REF" "$at")"
+          tools="$(bash "$resolve" litlfred/cat-harness-tools "$TOOLS_REF" "$at")"
+          # The judging scripts at the pinned commit, not wherever the ref
+          # moved since this job checked it out.
+          git -C ci fetch -q --depth 1 origin "$tools"
+          git -C ci checkout -q FETCH_HEAD
+          echo "pinned at $at: index ${index:-the caller}, judging scripts $tools"
+          { echo "at=$at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
         uses: actions/checkout@v4
@@ -215,21 +285,90 @@ jobs:
           # first parent instead of the PR
           # (https://github.com/litlfred/smart-immunizations/pull/35, run
           # 38633852296: `-B main refs/remotes/origin/main`).
-          # Layer mode: the one commit the `pin` job resolved `index-ref` to,
-          # never the ref itself, so base and head mount the same pins.
-          ref: ${{ inputs.mode == 'index' && github.ref || needs.pin.outputs.sha }}
+          # Layer mode: the one commit `index-ref` named at this run's pin
+          # time (the "Pin this run" step), never the ref itself, so every
+          # job of the run mounts the same pins.
+          ref: ${{ inputs.mode == 'index' && github.ref || steps.pins.outputs.index }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
+      - &base-root
+        name: Base side of the root (index mode)
+        if: inputs.mode == 'index' && env.SIDE == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: fa
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
       - &setup-bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - id: base-cache
-        if: false
-        run: ":"
+      - &caller
+        name: Check out the caller
+        if: inputs.mode == 'layer'
+        uses: actions/checkout@v4
+        with:
+          path: src
+          fetch-depth: 2
+      # Layer mode mounts the folio-assistant index's lock, never the
+      # caller's own, so a PR that changes only the caller's pins
+      # (`index.lock.json`, `index.config.json`) changes nothing these checks
+      # read. It used to cost a full run that judged none of the moved pins
+      # (cat-harness-tools#397); it is now reported as such and passes.
+      - &lock-only
+        name: Does this PR change only the caller's own pins?
+        id: lock-only
+        if: inputs.mode == 'layer'
+        run: |
+          set -euo pipefail
+          skip=false
+          if git -C src rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            changed="$(git -C src diff --name-only 'HEAD^1' HEAD)"
+            if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Evq '(^|/)index\.(lock|config)\.json$'; then
+              skip=true
+              echo "only the caller's own pins changed:"; echo "$changed"
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      - &caller-base
+        name: Base side of the caller
+        if: inputs.mode == 'layer' && env.SIDE == 'base'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIR: src
+        run: |
+          # A PR's merge commit: its first parent is the main it merges into,
+          # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          set -euo pipefail
+          cd "$DIR"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            git checkout -q --detach 'HEAD^1'
+          else
+            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
+            git checkout -q --detach FETCH_HEAD
+          fi
+          git log -1 --format='base side: %h %s'
+      - name: Is there anything to prepare?
+        id: skip-prep
+        run: echo "hit=${{ steps.lock-only.outputs.skip == 'true' }}" >> "$GITHUB_OUTPUT"
+      - name: Keep the caller's git checkout aside, for the README report
+        # The swap below drops the caller's `.git`, and `subgraph-readmes.ts
+        # --repo` lists only what git tracks.
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
+        run: cp -a src "$RUNNER_TEMP/own"
       - &mount-cache
         name: Cache remote mounts (bean cis1)
-        if: steps.base-cache.outputs.cache-hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true'
         uses: actions/cache@v4
         with:
           path: /home/runner/.cache/cat-mount
@@ -245,7 +384,7 @@ jobs:
         # 70lx); it imports only node:*, so that one file is enough, as
         # the IRIS instance's checks.yml does.
         name: Mount every instance from the root's lock
-        if: steps.base-cache.outputs.cache-hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true'
         env:
           CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: |
@@ -271,23 +410,18 @@ jobs:
           done
           echo "::error::no mount-from-lock replayer at the cat-harness-tools or cat-harness commit fa/index.lock.json pins"
           exit 2
-      - name: Check out the PR
-        if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
-        with:
-          path: src
-      - name: Keep the caller's git checkout aside, for the README report
-        # The swap below drops the caller's `.git`, and `subgraph-readmes.ts
-        # --repo` lists only what git tracks.
-        if: inputs.mode == 'layer'
-        run: cp -a src "$RUNNER_TEMP/own"
+      - &mark
+        name: Mark the mounted tree, to hand the shards what is built on top of it
+        if: steps.skip-prep.outputs.hit != 'true'
+        run: python3 ci/.github/scripts/layer-pr-checks/snapshot.py mark fa "$RUNNER_TEMP/mounted.txt"
       - &lower-layers-main
         name: Take the lower layers at main
-        if: steps.base-cache.outputs.cache-hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true'
         env:
           LAYERS: ${{ inputs.layers-at-main }}
           MODE: ${{ inputs.mode }}
           SUBDIR: ${{ inputs.path-in-repo }}
+          PIN_AT: ${{ steps.pins.outputs.at }}
         run: |
           set -euo pipefail
           if [ "$LAYERS" = "auto" ]; then
@@ -307,10 +441,16 @@ jobs:
           )"
             echo "lower layers at main (from @litlfred/* dependencies): ${LAYERS:-none}"
           fi
+          # Each at the commit its main held at the run's pin time, so both
+          # sides, and every shard after them, take the same lower layers.
           for r in $LAYERS; do
             [ "$r" = "$INSTANCE" ] && continue
+            sha="$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "litlfred/$r" main "$PIN_AT")"
+            echo "$r at main: $sha"
             rm -rf "fa/$r"
-            git clone -q --depth 1 "https://github.com/litlfred/$r" "fa/$r"
+            git init -q "fa/$r"
+            git -C "fa/$r" fetch -q --depth 1 "https://github.com/litlfred/$r" "$sha"
+            git -C "fa/$r" checkout -q FETCH_HEAD
             rm -rf "fa/$r/.git"
           done
       - &swap
@@ -319,7 +459,7 @@ jobs:
         # as an instance. Lock mounts carry no `.git`; the swapped-in copy is
         # made to look the same.
         name: Put the caller in place of its locked mount
-        if: inputs.mode == 'layer' && steps.base-cache.outputs.cache-hit != 'true'
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
         env:
           SUBDIR: ${{ inputs.path-in-repo }}
         run: |
@@ -328,166 +468,23 @@ jobs:
           if [ "$SUBDIR" = "." ]; then mv src "fa/$INSTANCE"; else mv "src/$SUBDIR" "fa/$INSTANCE"; fi
           rm -rf "fa/$INSTANCE/.git"
           test -f "fa/$INSTANCE/$INSTANCE.json" || { echo "::error::fa/$INSTANCE/$INSTANCE.json is missing: is path-in-repo right?"; exit 2; }
-      - &install
-        name: Install
-        if: steps.base-cache.outputs.cache-hit != 'true'
-        working-directory: fa
-        run: bun install
-      - name: tsc --noEmit
-        working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
-        run: |
-          if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
-      - name: Directory READMEs (QA report, never a gate)
-        # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
-        # told when its directory READMEs are stale, as a warning and in the
-        # step summary; it is never failed for it. The post-merge regen
-        # (`layer-post-merge-regen.yml`) is what repairs them. Run from `fa`,
-        # so the graph typologies are the composed set, over the caller's own
-        # git checkout. A locked cat-harness-tools older than `--repo` reports
-        # that it could not judge, rather than a finding.
-        if: inputs.mode == 'layer'
-        continue-on-error: true
-        working-directory: fa
-        env:
-          SUBDIR: ${{ inputs.path-in-repo }}
-        run: |
-          set -uo pipefail
-          own="$RUNNER_TEMP/own/${SUBDIR:-.}"
-          out="$(bun cat-harness-tools/scripts/subgraph-readmes.ts --check --repo "$own" 2>&1)"
-          code=$?
-          echo "$out"
-          {
-            echo "### Directory READMEs (QA, does not block)"
-            case "$code" in
-              0) echo "Every directory README is current." ;;
-              1) echo "Stale READMEs; the post-merge regen opens a repair PR for them after merge:"
-                 echo '```'; echo "$out" | grep '✗' || true; echo '```' ;;
-              *) echo "Could not judge (exit $code): the locked cat-harness-tools may predate \`--repo\`." ;;
-            esac
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$code" = 1 ]; then
-            echo "::warning title=Directory READMEs (QA)::$(echo "$out" | grep -c '✗') stale directory README(s); not a gate, repaired after merge"
-          fi
-          exit 0
-
-  # Each side is `gate-shards` jobs, on separate machines with separate
-  # checkouts (bean lpcs, step 3). The ~300 gates ran one at a time, ~2500 s a
-  # side (smart-immunizations-uganda#4, run 38784912691: 2514 s base, 2637 s
-  # head), and cannot share one machine's pool because some of them write.
-  # Every shard repeats the setup (~1.5 min) so each judges a whole checkout.
-  run:
-    name: ${{ matrix.side }} — tests and gates, shard ${{ matrix.shard }}/${{ inputs.gate-shards }}
-    needs: pin
-    runs-on: ubuntu-latest
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        side: [base, head]
-        shard: ${{ fromJSON(needs.pin.outputs.shards) }}
-    steps:
-      - *checkout-index
-      - name: Base side of the root (index mode)
-        if: inputs.mode == 'index' && matrix.side == 'base'
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          DIR: fa
-        run: |
-          # A PR's merge commit: its first parent is the main it merges into,
-          # exactly. Anything else (workflow_dispatch): the default branch's tip.
-          set -euo pipefail
-          cd "$DIR"
-          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
-            git checkout -q --detach 'HEAD^1'
-          else
-            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
-            git checkout -q --detach FETCH_HEAD
-          fi
-          git log -1 --format='base side: %h %s'
-      - *setup-bun
-      - name: Check out the caller
-        if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
-        with:
-          path: src
-          fetch-depth: 2
-      - name: Base side of the caller
-        if: inputs.mode == 'layer' && matrix.side == 'base'
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          DIR: src
-        run: |
-          # A PR's merge commit: its first parent is the main it merges into,
-          # exactly. Anything else (workflow_dispatch): the default branch's tip.
-          set -euo pipefail
-          cd "$DIR"
-          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
-            git checkout -q --detach 'HEAD^1'
-          else
-            git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
-            git checkout -q --detach FETCH_HEAD
-          fi
-          git log -1 --format='base side: %h %s'
-      - name: Compute base ratchet cache key (bean cis2)
-        id: base-key
-        if: matrix.side == 'base'
-        env:
-          MODE: ${{ inputs.mode }}
-          LAYERS: ${{ inputs.layers-at-main }}
-          TOOLS_REF: ${{ inputs.tools-ref }}
-          TEST_PATH: ${{ inputs.test-path }}
-          # Each shard caches its own slice (bean lpcs): without the shard in
-          # the key, shard 1's results would be restored into every shard.
-          SHARD: ${{ matrix.shard }}
-          SHARDS: ${{ inputs.gate-shards }}
-        run: |
-          set -euo pipefail
-          fa_sha="$(git -C fa rev-parse HEAD)"
-          src_sha="none"
-          if [ "$MODE" = "layer" ] && [ -d src/.git ]; then
-            src_sha="$(git -C src rev-parse HEAD)"
-          fi
-          cht_sha="$(git ls-remote https://github.com/litlfred/cat-harness-tools.git "refs/heads/$TOOLS_REF" | cut -f1 || echo "$TOOLS_REF")"
-          ch_sha="$(git ls-remote https://github.com/litlfred/cat-harness.git refs/heads/main | cut -f1 || echo main)"
-          raw="${MODE}|${fa_sha}|${src_sha}|${cht_sha}|${ch_sha}|${LAYERS}|${TEST_PATH}|shard ${SHARD}/${SHARDS}"
-          key="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
-          echo "key=$key" >> "$GITHUB_OUTPUT"
-      - name: Cache base test and gate results (bean cis2)
-        id: base-cache
-        if: matrix.side == 'base'
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/base-results
-          key: layer-pr-checks-base-v2-${{ github.repository }}-${{ steps.base-key.outputs.key }}
-      - name: Restore cached base results
-        if: matrix.side == 'base' && steps.base-cache.outputs.cache-hit == 'true'
-        run: |
-          cp "$RUNNER_TEMP/base-results/junit.xml" "$RUNNER_TEMP/junit.xml"
-          cp "$RUNNER_TEMP/base-results/gates.json" "$RUNNER_TEMP/gates.json"
-          cp "$RUNNER_TEMP/base-results/gates-shard.json" "$RUNNER_TEMP/gates-shard.json"
-      - *mount-cache
-      - *mount
-      - *lower-layers-main
-      - name: The judging scripts, the same on both sides
-        if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: litlfred/cat-harness-tools
-          ref: ${{ inputs.tools-ref }}
-          path: ci
-          sparse-checkout: .github/scripts/layer-pr-checks
-      - *swap
-      - name: Give the root the `cat` script the harness's commands assume
-        if: steps.base-cache.outputs.cache-hit != 'true'
+      - &root-cat
+        name: Give the root the `cat` script the harness's commands assume
+        if: steps.skip-prep.outputs.hit != 'true'
         # The harness's scripts spawn `bun run cat <name>` from the root
         # (qa:refresh, kg:detangle, regen, ...). A root without that entry
         # (smart-ra) ran /usr/bin/cat instead (smart-ra#65: "/usr/bin/cat:
         # 'qa:refresh': No such file or directory"). Added to the working copy
         # only, the same on base and head; a root that has one keeps it.
         run: python3 ci/.github/scripts/layer-pr-checks/root-cat-script.py fa
-      - *install
-      - name: Install Chromium, for the checks that draw through a browser
-        if: steps.base-cache.outputs.cache-hit != 'true'
+      - &install
+        name: Install
+        if: steps.skip-prep.outputs.hit != 'true'
+        working-directory: fa
+        run: bun install
+      - &chromium
+        name: Install Chromium, for the checks that draw through a browser
+        if: steps.skip-prep.outputs.hit != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -502,8 +499,9 @@ jobs:
           else
             echo "no playwright in the index: no browser installed"
           fi
-      - name: Mount every graph kept on a branch, and build the IG pages
-        if: steps.base-cache.outputs.cache-hit != 'true'
+      - &state-mount
+        name: Mount every graph kept on a branch, and build the IG pages
+        if: steps.skip-prep.outputs.hit != 'true'
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
         # mounts them with `state:mount`, but through `mountState` directly:
@@ -515,22 +513,34 @@ jobs:
         working-directory: fa
         run: |
           set -euo pipefail
-          bun -e '
-            import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
-            const r = mountState({});
-            console.log(report(r));
-            // Not fatal: both sides mount the same branches, so a graph that
-            // will not mount reads the same on base and head, and the compare
-            // job judges what the PR changed. Dying here judged nothing
-            // (smart-ra#59: issue-marks has no branch on that remote).
-            if (r.state === "failed" || r.state === "partial")
-              console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
-          '
+          # Both sides mount at the tips the pin step read once for the run
+          # (state-pin.sh): GitHub is rewritten to local mirrors of those
+          # commits, for the mount only. The root's origin is put in the
+          # `.git` form the rewrite matches, and put back after.
+          origin="$(git remote get-url origin)"
+          git remote set-url origin "${origin%.git}.git"
+          (
+            eval "$(bash ../ci/.github/scripts/layer-pr-checks/state-pin.sh "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/state-mirror")"
+            bun -e '
+              import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
+              const r = mountState({});
+              console.log(report(r));
+              // Not fatal: both sides mount the same branches at the same
+              // pinned tips, so a graph that will not mount reads the same on
+              // base and head, and the compare job judges what the PR
+              // changed. Dying here judged nothing (smart-ra#59: issue-marks
+              // has no branch on that remote).
+              if (r.state === "failed" || r.state === "partial")
+                console.log("::warning::state mount " + r.state + ": see the report above; the gates that read those graphs see them unmounted on both sides");
+            '
+          )
+          git remote set-url origin "$origin"
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi
-      - name: Build the publish-time pages (derive:publish), on this side
-        if: steps.base-cache.outputs.cache-hit != 'true'
+      - &derive
+        name: Build the publish-time pages (derive:publish), on this side
+        if: steps.skip-prep.outputs.hit != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -599,7 +609,7 @@ jobs:
           # pages it did build still serve the gates that read them. In the index
           # it stays a gate, so the index's own build is held to every writer.
           if [ "$code" -ne 0 ] && [ ! -f .github/workflows/code-quality-gates.yml ]; then
-            echo "::warning::derive:publish exited $code on the ${{ matrix.side }} side of a root that is not the index; recorded as skipped, not judged"
+            echo "::warning::derive:publish exited $code on the ${{ env.SIDE }} side of a root that is not the index; recorded as skipped, not judged"
             python3 - "$rec" "$code" "$log" <<'PY'
           import json, sys
           tail = open(sys.argv[3], errors="replace").read().strip()[-600:].replace("\n", " / ")
@@ -607,7 +617,7 @@ jobs:
           PY
           else
             if [ "$code" -ne 0 ]; then
-              echo "::error::derive:publish exited $code on the ${{ matrix.side }} side; the gates still run, and the compare job judges it as the gate publish:derive:publish"
+              echo "::error::derive:publish exited $code on the ${{ env.SIDE }} side; the gates still run, and the compare job judges it as the gate publish:derive:publish"
             fi
             python3 - "$rec" "$code" "$log" <<'PY'
           import json, sys
@@ -615,8 +625,250 @@ jobs:
           json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
           PY
           fi
+      # The typecheck, once, here: it was its own job, a third machine and
+      # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
+      # to the compare job, which fails on it, so the shards still run.
+      - name: tsc --noEmit
+        id: tsc
+        if: steps.skip-prep.outputs.hit != 'true'
+        continue-on-error: true
+        working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
+        run: |
+          if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+      - name: Directory READMEs (QA report, never a gate)
+        # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
+        # told when its directory READMEs are stale, as a warning and in the
+        # step summary; it is never failed for it. The post-merge regen
+        # (`layer-post-merge-regen.yml`) is what repairs them. Run from `fa`,
+        # so the graph typologies are the composed set, over the caller's own
+        # git checkout. A locked cat-harness-tools older than `--repo` reports
+        # that it could not judge, rather than a finding.
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
+        continue-on-error: true
+        working-directory: fa
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -uo pipefail
+          own="$RUNNER_TEMP/own/${SUBDIR:-.}"
+          out="$(bun cat-harness-tools/scripts/subgraph-readmes.ts --check --repo "$own" 2>&1)"
+          code=$?
+          echo "$out"
+          {
+            echo "### Directory READMEs (QA, does not block)"
+            case "$code" in
+              0) echo "Every directory README is current." ;;
+              1) echo "Stale READMEs; the post-merge regen opens a repair PR for them after merge:"
+                 echo '```'; echo "$out" | grep '✗' || true; echo '```' ;;
+              *) echo "Could not judge (exit $code): the locked cat-harness-tools may predate \`--repo\`." ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" = 1 ]; then
+            echo "::warning title=Directory READMEs (QA)::$(echo "$out" | grep -c '✗') stale directory README(s); not a gate, repaired after merge"
+          fi
+          exit 0
+      - &timings-restore
+        name: The gate seconds the last run of this repository recorded
+        if: steps.skip-prep.outputs.hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/timings
+          key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}
+          restore-keys: |
+            layer-pr-checks-timings-v1-${{ github.repository }}-
+      - &snapshot-save
+        name: Hand this side's prepared root to its shards
+        if: steps.skip-prep.outputs.hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prepared"
+          python3 ci/.github/scripts/layer-pr-checks/snapshot.py save fa "$RUNNER_TEMP/mounted.txt" "$RUNNER_TEMP/prepared/root"
+          cp "$RUNNER_TEMP/derive-publish.json" "$RUNNER_TEMP/prepared/"
+          # The previous run's gate seconds, so the shards balance by time.
+          if [ -f "$RUNNER_TEMP/timings/gates.json" ]; then cp "$RUNNER_TEMP/timings/gates.json" "$RUNNER_TEMP/prepared/timings.json"; fi
+          zstd -q -T0 --rm "$RUNNER_TEMP/prepared/root.tar"
+          ls -la "$RUNNER_TEMP/prepared"
+      - &upload-prepared
+        name: Upload this side's prepared root
+        if: steps.skip-prep.outputs.hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-${{ env.SIDE }}
+          path: ${{ runner.temp }}/prepared
+          retention-days: 1
+          compression-level: 0  # already zstd
+          if-no-files-found: error
+
+  prepare-base:
+    name: Prepare the main side, unless main's answer is cached
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SIDE: base
+    outputs:
+      at: ${{ steps.pins.outputs.at }}
+      index: ${{ steps.pins.outputs.index }}
+      tools: ${{ steps.pins.outputs.tools }}
+      key: ${{ steps.base-key.outputs.key }}
+      cached: ${{ steps.base-lookup.outputs.cache-hit }}
+    steps:
+      - *judging-scripts
+      - *pin-restore
+      - *pin-write
+      - *pin-save
+      - *pin-reread
+      - *pins
+      - *checkout-index
+      - *base-root
+      - *setup-bun
+      - *caller
+      - *lock-only
+      - *caller-base
+      # The base side is main, and main's answer does not depend on the PR
+      # (bean cis2). It is cached under what it is computed FROM: the index
+      # commit, the caller's base tree, the lower layers' commits, the judging
+      # scripts' content, the branch-kept graphs' tips and the inputs that
+      # change the gate set. The old key
+      # also held the current main tips of cat-harness-tools and cat-harness,
+      # which layer mode never mounts (it mounts the index's lock), so any
+      # merge to either missed every layer's cache (cat-harness-tools#397).
+      - name: Key main's answer by what it is computed from (bean cis2)
+        id: base-key
+        env:
+          MODE: ${{ inputs.mode }}
+          LAYERS: ${{ inputs.layers-at-main }}
+          SUBDIR: ${{ inputs.path-in-repo }}
+          TEST_PATH: ${{ inputs.test-path }}
+          PIN_AT: ${{ steps.pins.outputs.at }}
+        run: |
+          set -euo pipefail
+          root_tree="$(git -C fa rev-parse 'HEAD^{tree}')"
+          src_tree="none"
+          [ "$MODE" = "layer" ] && src_tree="$(git -C src rev-parse 'HEAD^{tree}')"
+          if [ "$LAYERS" = "auto" ]; then
+            pkg="fa/package.json"; [ "$MODE" = "layer" ] && pkg="src/${SUBDIR:-.}/package.json"
+            LAYERS="$(python3 -c 'import json,sys
+          try: p=json.load(open(sys.argv[1]))
+          except FileNotFoundError: p={}
+          d={**p.get("dependencies",{}),**p.get("devDependencies",{}),**p.get("peerDependencies",{})}
+          print(" ".join(sorted(x.split("/",1)[1] for x in d if x.startswith("@litlfred/"))))' "$pkg")"
+          fi
+          lower=""
+          for r in $LAYERS; do
+            [ "$r" = "$INSTANCE" ] && continue
+            lower="$lower $r=$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "litlfred/$r" main "$PIN_AT")"
+          done
+          scripts="$(cd ci/.github/scripts/layer-pr-checks && find . -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)"
+          # The graphs kept on branches (`cat/<instance>/<graph>`: beans,
+          # todos, ...), which both sides mount at their tips. Bean lpcs's open
+          # question, answered here: in the key, so a bean that moved
+          # since main was judged is never charged to the PR. A miss costs
+          # runner time only; the base side runs beside the head side. A tip
+          # that cannot be read is a miss, never a hit.
+          # The tips this run pinned (the pin step), which both sides mount.
+          state="$(sha256sum < "$RUNNER_TEMP/pin/state.json" | cut -d' ' -f1)"
+          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+            python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
+              || state="$state $repo=unreadable-$(date +%s%N)"
+          done
+          raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
+          echo "main's answer is computed from: $raw"
+          key="layer-pr-checks-main-v3-${GITHUB_REPOSITORY}-$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+      - name: Is main's answer already known?
+        id: base-lookup
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: ${{ steps.base-key.outputs.key }}
+          lookup-only: true
+      - name: Skip the base side when it is
+        id: base-hit
+        run: |
+          hit="${{ steps.base-lookup.outputs.cache-hit == 'true' }}"
+          echo "hit=$hit" >> "$GITHUB_OUTPUT"
+          [ "$hit" = "true" ] && echo "main's answer is cached: the base side is not run again" || true
+      - name: Is there anything to prepare?
+        id: skip-prep
+        run: echo "hit=${{ steps.lock-only.outputs.skip == 'true' || steps.base-lookup.outputs.cache-hit == 'true' }}" >> "$GITHUB_OUTPUT"
+      - *mount-cache
+      - *mount
+      - *mark
+      - *lower-layers-main
+      - *swap
+      - *root-cat
+      - *install
+      - *chromium
+      - *state-mount
+      - *derive
+      - *timings-restore
+      - *snapshot-save
+      - *upload-prepared
+
+  # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
+  # The ~300 gates ran one at a time, ~2500 s a side
+  # (smart-immunizations-uganda#4, run 38784912691: 2514 s base, 2637 s
+  # head), and cannot share one machine's pool because some of them write. A
+  # shard no longer prepares its side (cat-harness-tools#397): it mounts the
+  # same lock, which the mount cache makes quick, and applies what its side's
+  # prepare job built on top of it. The base side is not run at all when
+  # main's answer is cached. The gates are split by the seconds the last run
+  # recorded, so the shards finish together, rather than by count (trial
+  # run 38866215814: 2267 s in one shard, 626 s in another).
+  run:
+    name: ${{ matrix.side }} — tests and gates, shard ${{ matrix.shard }}/${{ inputs.gate-shards }}
+    needs: [prepare-head, prepare-base]
+    if: needs.prepare-head.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        side: ${{ fromJSON(needs.prepare-base.outputs.cached == 'true' && '["head"]' || '["base","head"]') }}
+        shard: ${{ fromJSON(needs.prepare-head.outputs.shards) }}
+    env:
+      SIDE: ${{ matrix.side }}
+    steps:
+      # The steps shared with the prepare jobs ask whether there is anything
+      # to prepare; a shard always runs them.
+      - id: skip-prep
+        run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - name: The judging scripts, at the commit this run pinned
+        uses: actions/checkout@v4
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
+          path: ci
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - name: Check out the root, at the commit this run pinned
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
+          ref: ${{ inputs.mode == 'index' && github.ref || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
+          fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
+          path: fa
+      - *base-root
+      - *setup-bun
+      - *mount-cache
+      - *mount
+      - name: Fetch what this side's prepare job built
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-${{ matrix.side }}
+          path: ${{ runner.temp }}/prepared
+      - name: Apply it over the mount
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/prepared"
+          zstd -q -d --rm "$p/root.tar.zst"
+          python3 ci/.github/scripts/layer-pr-checks/snapshot.py apply fa "$p/root"
+          cp "$p/derive-publish.json" "$RUNNER_TEMP/derive-publish.json"
+          # The same seconds in every shard of this side, so they agree on the split.
+          if [ -f "$p/timings.json" ]; then echo "GATE_TIMINGS=$p/timings.json" >> "$GITHUB_ENV"; fi
+      - *install
+      - *chromium
       - name: bun test
-        if: steps.base-cache.outputs.cache-hit != 'true'
         working-directory: fa
         # Judged by the compare job, not by this exit code.
         #
@@ -645,7 +897,6 @@ jobs:
           fi
           test -s "$RUNNER_TEMP/junit.xml"
       - name: Gates
-        if: steps.base-cache.outputs.cache-hit != 'true'
         # Judged by the compare job, not by this exit code.
         #
         # The inputs gates take from this run (run-gates.py SUPPLIED_INPUTS):
@@ -668,7 +919,7 @@ jobs:
           GATE_SHARD: ${{ matrix.shard }}/${{ inputs.gate-shards }}
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
           MODE: ${{ inputs.mode }}
-          SIDE: ${{ matrix.side }}
+          SIDE: ${{ env.SIDE }}
         # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
         run: |
           set -euo pipefail
@@ -684,13 +935,6 @@ jobs:
           fi
           export GATE_DIFF_BASE
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
-      - name: Populate base ratchet cache directory (bean cis2)
-        if: matrix.side == 'base' && steps.base-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "$RUNNER_TEMP/base-results"
-          cp "$RUNNER_TEMP/junit.xml" "$RUNNER_TEMP/base-results/junit.xml"
-          cp "$RUNNER_TEMP/gates.json" "$RUNNER_TEMP/base-results/gates.json"
-          cp "$RUNNER_TEMP/gates-shard.json" "$RUNNER_TEMP/base-results/gates-shard.json"
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
@@ -700,44 +944,115 @@ jobs:
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
 
-  # `!cancelled()`, not the default `success()`: a shard that failed or timed
-  # out must make this job RED (its artefact is missing, merge-shards.py exits
-  # 2), never skip it, which a required check reads as a pass.
+  # `!cancelled()`, not the default `success()`: a shard or prepare job that
+  # failed or timed out must make this job RED (its artefact is missing,
+  # merge-shards.py exits 2), never skip it, which a required check reads as
+  # a pass.
   compare:
     name: No new failures (tests and gates)
-    needs: [pin, run]
-    if: ${{ !cancelled() }}
+    needs: [prepare-head, prepare-base, run]
+    if: ${{ !cancelled() && github.event.action != 'closed' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Does this PR change only the caller's own pins?
+        id: pins-only
+        env:
+          SKIP: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip == 'true' }}
+        run: |
+          if [ "$SKIP" = "true" ]; then
+            msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "only=false" >> "$GITHUB_OUTPUT"
+          fi
+      # Each prepare job pinned the run on its own (they share one time, the
+      # first to start writes it). Should both ever have written one, the two
+      # sides may have judged different commits: could not determine.
+      - name: Both sides judged the same commits
+        if: steps.pins-only.outputs.only != 'true'
+        env:
+          HEAD_INDEX: ${{ needs.prepare-head.outputs.index }}
+          BASE_INDEX: ${{ needs.prepare-base.outputs.index }}
+          HEAD_TOOLS: ${{ needs.prepare-head.outputs.tools }}
+          BASE_TOOLS: ${{ needs.prepare-base.outputs.tools }}
+        run: |
+          echo "index: head ${HEAD_INDEX:-the caller}, base ${BASE_INDEX:-the caller}"
+          echo "judging scripts: head $HEAD_TOOLS, base $BASE_TOOLS"
+          if [ -z "$HEAD_TOOLS" ] || [ "$HEAD_INDEX" != "$BASE_INDEX" ] || [ "$HEAD_TOOLS" != "$BASE_TOOLS" ]; then
+            echo "::error::the two sides were pinned to different commits, or one was not prepared: could not determine"
+            exit 2
+          fi
       - uses: actions/checkout@v4
+        if: steps.pins-only.outputs.only != 'true'
         with:
           repository: litlfred/cat-harness-tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
       - uses: actions/download-artifact@v4
+        if: steps.pins-only.outputs.only != 'true'
         with:
           path: results
           pattern: results-*
+      - name: Main's answer, cached (bean cis2)
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: ${{ needs.prepare-base.outputs.key }}
+          fail-on-cache-miss: true
       - name: Join each side's shards
+        id: join
+        if: steps.pins-only.outputs.only != 'true'
         # Exits 2 when any expected shard is missing or the shards do not
         # cover the gate set exactly once: could not determine, never a pass.
         env:
           N: ${{ inputs.gate-shards }}
+          CACHED: ${{ needs.prepare-base.outputs.cached }}
         run: |
           set -euo pipefail
-          for side in base head; do
+          sides="base head"
+          if [ "$CACHED" = "true" ]; then
+            mkdir -p merged
+            cp -r "$RUNNER_TEMP/base-results" merged/base
+            sides="head"
+          fi
+          for side in $sides; do
             python3 .github/scripts/layer-pr-checks/merge-shards.py results "$side" "$N" "merged/$side"
           done
+          if [ "$CACHED" != "true" ]; then
+            mkdir -p "$RUNNER_TEMP/base-results"
+            cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
+          fi
+          mkdir -p "$RUNNER_TEMP/timings"
+          cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
+      - name: Keep main's answer for the next run (bean cis2)
+        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: ${{ needs.prepare-base.outputs.key }}
+      - name: Keep the gate seconds, to balance the next run's shards
+        if: steps.join.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/timings
+          key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Tests
         id: tests
+        if: steps.pins-only.outputs.only != 'true'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-test-failures.py merged/base/junit.xml merged/head/junit.xml
       - name: Gates
         id: gates
+        if: steps.pins-only.outputs.only != 'true'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-gates.py merged/base/gates.json merged/head/gates.json
+      # The typecheck runs in the head side's prepare job; it is judged here.
       - name: Verdict
-        if: steps.tests.outcome != 'success' || steps.gates.outcome != 'success'
+        if: steps.pins-only.outputs.only != 'true' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')
         run: |
-          echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }} — see the step summary"
+          echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1

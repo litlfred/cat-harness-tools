@@ -12,7 +12,7 @@
  * scrollnig and such. please consolidate behaviours/appearance"*.
  *
  * The pages of such a site come from four generators in three layers (the
- * composed narrative pages and the thin artefact pages in fhir-harness, a hub
+ * composed narrative pages and the thin artefact pages in the FHIR IG harness, a hub
  * page in an overlay above it, the OpenAPI pages), and each carried its own
  * copy of a bar, a width and a font: a 60rem centred column on two of them,
  * none at all on the hub. The rules that make them one layout know nothing of

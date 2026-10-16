@@ -277,7 +277,7 @@ const STRIPPABLE = ["roles", "package", "capability"] as const;
  *
  * Asking the declaration also widens the subject correctly rather than by
  * accident: `kgDirectories` resolves a dependent instance's packages too
- * (`folio-assistant-core/skills/` and `who-iris/skills/`
+ * (the content core's and the IRIS replica's `skills/`
  * here), so a skill added in one of those is judged by the same gate instead of
  * being a case nobody thought of.
  *
@@ -288,7 +288,7 @@ const STRIPPABLE = ["roles", "package", "capability"] as const;
 export function skillPackages(instance: string = INSTANCE_ROOT): SkillPackage[] {
   const out: SkillPackage[] = [];
   // The corpus on the platform's own run (placement PR0): what the mirrors
-  // used to add — `fhir-harness/skills/`'s packages among them — is asked of
+  // used to add — the FHIR IG harness's `skills/` packages among them — is asked of
   // the checkout now.
   for (const graph of kgDirectories(instance, corpusScopeFor(instance))) {
     for (const d of packageDirsIn(graph.absPath)) {

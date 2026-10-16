@@ -36,7 +36,7 @@
  * than any of the three shapes `v1hw` proposed inventing. The badge follows,
  * counting documents and not plumbing (see {@link filesIn} on dotfiles):
  * `uploads/` **26 uningested of 28**, `cat-harness/uploads/` **0 of 1**,
- * `who-iris/uploads/` **1 of 4** — re-measured 2026-09-21, after bean `yl5w`
+ * the IRIS replica's `uploads/` **1 of 4** — re-measured 2026-09-21, after bean `yl5w`
  * moved the three WHO sources out of the harness queue and into the folio
  * beside their own intake records.
  *
@@ -44,7 +44,7 @@
  * six entries still report `upload=match` from a recomputed hash, across three
  * queues now instead of two: a name-matched relation would have broken the
  * moment the files changed directory, and this one did not notice. The one
- * uningested file under `who-iris/uploads/` is the IRIS home capture, which is
+ * uningested file under the IRIS replica's `uploads/` is the IRIS home capture, which is
  * a page grab rather than a document — uningested is the correct answer for it
  * rather than a backlog.
  *
@@ -183,7 +183,7 @@ export interface LibraryEntry {
    * whatever is associated to it if there is something"*.
    *
    * In order: the rendered COVER beside the entry (`<slug>-cover.png`, the
-   * file `folio-assistant-core/scripts/gen-covers.ts` writes, emblem already masked),
+   * file the content core's `scripts/gen-covers.ts` writes, emblem already masked),
    * then the first image `images.json` declares a `figure`. A logo is never
    * the avatar — it names who published the book, not the book.
    *
@@ -235,7 +235,7 @@ export interface LibraryEntry {
   /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
-   * the smart-trust IG is in smart-base's library as an EXTERNAL reference,
+   * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
    * so the row has nothing of its own to open and must say where the thing is.
    *
    * `href` is an absolute URL, or SITE-ROOT-relative with a leading `/` and no
@@ -778,8 +778,8 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   // An instance that declares a library declares its own queue, and that
   // declaration does not always reach the roots passed in: measured
   // 2026-09-20, `directoriesForGraph(cat-harness, "library")` resolves
-  // `who-iris/library` while `…(cat-harness, "uploads")` does NOT resolve
-  // `who-iris/uploads`. Reading the entries of a queue this reader then
+  // the IRIS replica's `library` while `…(cat-harness, "uploads")` does NOT
+  // resolve its `uploads`. Reading the entries of a queue this reader then
   // omitted would report an instance's corpus as though it arrived from
   // nowhere. So each library's own instance root is asked for its queue.
   for (const lib of [...libDirs]) {
@@ -795,7 +795,7 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   // Declared-but-absent is REPORTED, not read (bean `95ir`; the owner's ruling
   // of 2026-09-23: fail in CI for the declaration, `check:declared-dirs`, and
   // never in a scanner). Reading one threw ENOENT and took the whole graph
-  // with it (smart-immunizations declares library/ and is mounted without it).
+  // with it (a DAK IG declares library/ and is mounted without it).
   const presence = splitDeclared([...libDirs]);
   noteAbsent(presence.absent, "a library");
   for (const libDir of presence.present.sort()) {

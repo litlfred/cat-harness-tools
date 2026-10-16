@@ -195,8 +195,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     because: "script block verdicts over the docs tree; agent verdicts are composed from test/attestations/, which stays on main. Read by the witnesses below",
   },
   // `*/test/results`, not `${R}`: since cat-harness#12 each verdict is written
-  // under the instance that owns the library entry (who-iris, smart-base,
-  // fhir-harness …), and claiming only cat-harness's tree left 24 of them
+  // under the instance that owns the library entry (the IRIS replica, the DAK
+  // base layer, the FHIR IG harness …), and claiming only cat-harness's tree left 24 of them
   // `unclaimed` in the composed checkout (2026-10-09).
   { id: "check:l1-complete", run: ["check:l1-complete", "--write"], writes: [`*/test/results/library-qa/**`], because: "per-library-entry L1 completeness, under the instance owning each entry; `--write` is its writer form" },
   {
@@ -485,7 +485,7 @@ export function trackedQaFiles(repoRoot: string, roots: readonly string[]): stri
  * the aggregate's git, so `trackedQaFiles` names none of its files, but each one
  * was laid down from the mount's pinned commit and checked against its lock. Its
  * provenance is that commit, the same reason a tracked file is not `unclaimed`.
- * Measured 2026-10-10: who-iris's committed `test/results/translation-roundtrip/`
+ * Measured 2026-10-10: the IRIS replica's committed `test/results/translation-roundtrip/`
  * results were read as 11 `unclaimed` files, which failed every QA working copy.
  */
 export function carriedByMount(paths: readonly string[], mountedRoots: readonly string[]): string[] {

@@ -284,7 +284,7 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
   // at a time, is declared by its own instance under `taskIo` since bean
   // `0r7u`.)
   "check:l1-complete:check": "l1-complete:write",
-  // folio-assistant-sci's checkout script (bean `folio-assistant-63q4`):
+  // the formal-math layer's checkout script (bean `folio-assistant-63q4`):
   // `extract-references.ts` without `--check` rewrites exactly the
   // `extracted-references/` nodes the `--check` form compares. Spelled
   // `extract:references` where the check is `check:extracted-references`, so

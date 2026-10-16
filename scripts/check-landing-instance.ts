@@ -10,7 +10,7 @@
  * > "Flag it, with a default (recommended). The chosen instance's own
  * > `<name>.config.json` carries `"site": { "landing": true }`. If exactly one
  * > harness is instantiated, it is the landing page and no flag is needed.
- * > That covers smart-trust. If there are several and none is flagged, a gate
+ * > That covers [a single-IG repository]. If there are several and none is flagged, a gate
  * > fails. If more than one is flagged, then neutral hub with listing of
  * > harnesses, todos,"
  *

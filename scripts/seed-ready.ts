@@ -53,7 +53,7 @@
  * A layer is an instance declaration whose `livesAt` says it is staged in a
  * repository. Its directory is `livesAt.path`; its position is the longest
  * `needs` chain beneath it, so `bootstrap → bootstrap-tools → cat-harness →
- * cat-harness-tools → folio-assistant-core → {sci, fhir-harness, who-iris}`
+ * cat-harness-tools → <content core> → {the layers above it}`
  * falls out of the declarations rather than being restated. "The next layer"
  * is every instance one level up that needs L, directly or transitively. The
  * repository whose PRs are read is `livesAt.repository` — where the layer's
@@ -912,7 +912,7 @@ export function probeStandalone(
       // A REMOTE MOUNT (bean `nn8e`) is ignored by git, so `ls-files` lists
       // nothing for it and the member arrived EMPTY — every test reaching
       // bootstrap-tools then failed as an artefact of the rehearsal (measured on
-      // fhir-harness, 2026-10-07: 9 of 9). A mount is its repository's whole
+      // the FHIR IG harness, 2026-10-07: 9 of 9). A mount is its repository's whole
       // tree, so it is copied whole.
       if (mountScopeFor(rootOf(repoRoot, d)) !== undefined) {
         cpSync(join(repoRoot, rel), join(ws, rel), { recursive: true, verbatimSymlinks: true, filter: (src) => !src.endsWith("/.git") && !src.includes("/node_modules") });

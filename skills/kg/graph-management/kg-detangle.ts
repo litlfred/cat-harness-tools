@@ -52,11 +52,18 @@ import {
 import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
+
+/** The content layer's schemas, when one is composed: the instance declaring the `core` layer's kinds. */
+function contentLayerScan(): Array<{ path: string }> {
+  const c = contentLayerInstance();
+  return c === undefined ? [] : [{ path: `${c.name}/schemas` }];
+}
 
 /**
  * Directories scanned. The depth at which each names its groups is DERIVED —
@@ -91,7 +98,10 @@ const LITERAL_SCAN: Array<{ path: string }> = [
   // declared-path-literal: the scan list is REPO-relative. The grouping depth it
   // used to pair with each path is now derived (`groupDepthFor`); the PATHS
   // remain literals, which is a separate and still-open concern.
-  { path: "folio-assistant-core/schemas" },
+  // The content layer's schemas: the instance declaring the `core` layer's
+  // kinds, read from where they were declared (folio-assistant#2598), and
+  // absent when no content layer is composed.
+  ...contentLayerScan(),
   { path: "bootstrap/skills" },
   { path: "bootstrap/processes" },
 ];
@@ -105,7 +115,7 @@ const LITERAL_SCAN: Array<{ path: string }> = [
  * measurements, so a package is measured wherever its owner declares it.
  *
  * A declared directory nested inside one already scanned (e.g.
- * `folio-assistant-sci/skills/lean/` under `folio-assistant-sci/skills/`) is
+ * a layer's `skills/lean/` under that same layer's `skills/`) is
  * dropped, because scanning both would count its nodes twice.
  */
 function declaredSkillScan(literal: ReadonlyArray<{ path: string }>): Array<{ path: string }> {
@@ -144,8 +154,8 @@ const WIDENED = new Set(SCAN.slice(LITERAL_SCAN.length).map((s) => s.path));
  *
  * Topic membership is option A (bean `1g4s`): the same-named directory of every
  * instance stacked on the declarer is a MEMBER of the topic, never a group of
- * its own — `folio-assistant-core` declares `content`, so
- * `folio-assistant-sci/skills/content/authoring-math` is the group, exactly as
+ * its own — the content core declares `content`, so the formal-math layer's
+ * `skills/content/authoring-math` is the group, exactly as
  * `cat-harness/skills/authoring/authoring-math` was before placement PR1 moved
  * it. Only the widened entries inherit: the literal ones were measured with
  * their own topics before this change, and their groups must not shift.
@@ -336,7 +346,7 @@ const dangling: Array<{ from: string; ref: string; via: string }> = [];
 // `Record<string, "enforced" | "recorded">` — two of the three levels — while
 // the table below assigns `"prose"` and line 157 assigns it directly. A real
 // TS2322 that nothing caught, because `tsconfig.json` did not include this
-// tree; `detangle/`, `large-datasets/`, `who-iris/` and `folio-assistant-sci/`
+// tree; `detangle/`, `large-datasets/` and two content layers' directories
 // were all outside the program while the file's own comment said "Every tree
 // is now compiled".
 const AUTHORITY: Record<string, EdgeAuthority> = {

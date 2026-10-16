@@ -20,7 +20,7 @@
  *   shape, not an approximation of it;
  * - the url is `https://iris.who.int/items/<uuid>`, DSpace 7's item route;
  * - the title is a run of consecutive words cut from the real text of the
- *   three publications who-iris holds, at a length drawn uniformly from 20 to
+ *   three publications the IRIS replica holds, at a length drawn uniformly from 20 to
  *   `--title-max` characters (default 180, so a mean near 100). That is deliberately longer than the three real item
  *   titles here (mean 37), because bytes grow with titles and an index
  *   measured on short ones would flatter itself. Bytes per entry are
@@ -76,7 +76,7 @@ export function uuidV4(r: () => number): string {
 
 /**
  * Real running text to draw titles from: the sections of the publications
- * who-iris holds, found through its `library` declaration. Titles cut from
+ * the IRIS replica holds, found through its `library` declaration. Titles cut from
  * WHO's own prose carry WHO's vocabulary and its word frequencies, which a
  * made-up word list would not -- that does not matter to the lookup, whose
  * bytes depend only on length, but it decides how large an inverted index

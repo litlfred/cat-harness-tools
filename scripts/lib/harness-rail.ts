@@ -138,9 +138,9 @@ export interface RailOptions {
    * `navbar`, which is what the Jekyll sidebar reads through
    * `head_custom.html`'s `#fa-navbar-row`.
    *
-   * Bean `wckf` (#2147), owner 2026-10-05: *"still no LHS icons top navbar on
-   * who-iris page"*, then *"this should be a common navbar functionality in
-   * harness"* (bean `9rq1`). The row is drawn by ONE function,
+   * Bean `wckf` (#2147), owner 2026-10-05: still no left-hand icons in the top
+   * navbar on the IRIS replica's page (paraphrased), then *"this should be a
+   * common navbar functionality in harness"* (bean `9rq1`). The row is drawn by ONE function,
    * `mountNavIconRow` in `docs-ui.js`; a railed page lacked only its DATA, so
    * this writes the same block the theme writes and the same function draws
    * the same row. No second renderer here, and no script: the rail stays
