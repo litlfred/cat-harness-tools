@@ -261,6 +261,7 @@
     "auto:docs": "bun run cat-harness-tools/scripts/gen-auto-docs.ts",
     "auto:docs:check": "bun run cat-harness-tools/scripts/publish-check.ts auto:docs",
     "id-lookup": "bun run cat-harness-tools/scripts/gen-id-lookup.ts",
+    "judge:tree": "bun run cat-harness-tools/scripts/judge-tree.ts",
     "id-lookup:check": "bun run cat-harness-tools/scripts/gen-id-lookup.ts --check",
     "subgraph:resolve": "bun run cat-harness-tools/scripts/resolve-subgraph.ts",
     "lint": "eslint -c cat-harness-tools/eslint.config.mjs .",
