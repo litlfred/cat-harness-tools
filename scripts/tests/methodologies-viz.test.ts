@@ -227,6 +227,12 @@ describe("ingested sources link what resolves (qgjh)", () => {
     expect(md).toContain("[&larr; All methodologies](../../)");
   });
 
+  it("lists the skills whose uses-methodology names it (owner, 2026-10-16)", () => {
+    const md = nodePage(row, "# M\n", undefined, "", undefined, [{ skill: "s1", href: "https://h/s1.md" }, { skill: "s2" }]);
+    expect(md).toContain("**Applied by skills:**\n\n- [`s1`](https://h/s1.md)\n- `s2`");
+    expect(nodePage(row, "# M\n")).not.toContain("Applied by skills");
+  });
+
   it("leaves an unknown item, or no resolver, as code", () => {
     expect(evidenceLine("library/unknown", links, "methodologies/index.md")).toBe("- `library/unknown`");
     expect(evidenceLine("library/known-item")).toBe("- `library/known-item`");

@@ -63,12 +63,14 @@ import {
   checkMethodologyEvidence,
   frontMatterOf,
   methodologyNodes,
+  methodologyUses,
   type EvidenceReport,
   type MethodologyNode,
 } from "./check-methodology-evidence.js";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { blobUrl, forgeAt } from "./lib/library-source.ts";
 import { repoOf } from "../src/core/edit-links.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
@@ -364,13 +366,37 @@ export function rebaseLinks(body: string, nodePath: string, nodeHref: (path: str
   });
 }
 
-/** A methodology's own page: what the list says of it, its sources, then the method itself. */
+/** A skill that applies a methodology, as its page lists it. */
+export interface AppliedBy {
+  skill: string;
+  href?: string;
+}
+
+/**
+ * Which skills apply each methodology, by name: every skill in the checkout's
+ * instances that declares `uses-methodology` (cat-harness `schemas/methodology.ts`).
+ * The edge is the skill's; the methodology's page reads it back.
+ */
+export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
+  const out = new Map<string, AppliedBy[]>();
+  for (const root of instanceRootsIn(repoRoot)) {
+    for (const u of methodologyUses(root)) {
+      const href = nodeHref?.(relative(repoRoot, join(root, u.file)).split("\\").join("/"));
+      for (const n of u.names) out.set(n, [...(out.get(n) ?? []), { skill: u.skill, ...(href ? { href } : {}) }]);
+    }
+  }
+  for (const v of out.values()) v.sort((a, b) => a.skill.localeCompare(b.skill, "en"));
+  return out;
+}
+
+/** A methodology's own page: what the list says of it, its sources, the skills that apply it, then the method itself. */
 export function nodePage(
   r: MethodologyRow,
   body: string,
   links?: LibraryResolver,
   fromPage = "",
   nodeHref?: (path: string) => string | undefined,
+  appliedBy: readonly AppliedBy[] = [],
 ): string {
   const q = (v: string): string => JSON.stringify(cell(v));
   const file = r.path && nodeHref ? nodeHref(r.path) : undefined;
@@ -397,6 +423,14 @@ export function nodePage(
       r.state === "dangling" ? "**Cited sources — at least one does not resolve:**" : "**Ingested sources:**",
       "",
       ...r.evidence.map((e) => evidenceLine(e, links, fromPage)),
+      "",
+    );
+  }
+  if (appliedBy.length > 0) {
+    b.push(
+      "**Applied by skills:**",
+      "",
+      ...appliedBy.map((a) => (a.href ? `- [\`${cell(a.skill)}\`](${a.href})` : `- \`${cell(a.skill)}\``)),
       "",
     );
   }
@@ -595,10 +629,11 @@ if (import.meta.main) {
     }
     const links = libraryResolver(REPO, INSTANCE_ROOT);
     const hrefOf = nodeHrefResolver(REPO);
+    const applied = appliedByIndex(REPO, hrefOf);
     for (const r of rows) {
       if (!r.path) continue;
       const rel = nodePageRel(PAGE, r);
-      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf), VIEWER_TOOL);
+      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL);
       const dest = join(docsBase, rel);
       if ((existsSync(dest) ? readFileSync(dest, "utf-8") : "") !== want) {
         console.error(`::error::gen-methodologies-viz: ${rel} is stale — run \`bun run cat methodologies:viz\``);
@@ -614,6 +649,7 @@ if (import.meta.main) {
     // leaves no page behind.
     const links = libraryResolver(REPO, INSTANCE_ROOT);
     const hrefOf = nodeHrefResolver(REPO);
+    const applied = appliedByIndex(REPO, hrefOf);
     for (const inst of new Set(rows.map((r) => r.instance))) rmSync(join(out, "..", inst), { recursive: true, force: true });
     for (const r of rows) {
       if (!r.path) continue;
@@ -621,7 +657,7 @@ if (import.meta.main) {
       const dest = join(docsBase, rel);
       mkdirSync(join(dest, ".."), { recursive: true });
       const body = bodyOf(readFileSync(join(REPO, r.path), "utf-8"));
-      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf), VIEWER_TOOL));
+      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL));
     }
     console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}, and one page each under it`);
     console.log(

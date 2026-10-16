@@ -78,6 +78,7 @@ import {
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 
 /**
  * This module's own instance root.
@@ -104,6 +105,49 @@ export interface EvidenceReport {
   noEvidence: Finding[];
   untagged: Finding[];
   resolved: { node: string; name: string; evidence: string; at: string }[];
+  /** Skills whose `uses-methodology` names a methodology no declared directory holds — {@link methodologyUses}. */
+  badUses?: Finding[];
+}
+
+/**
+ * The skill → methodology edge's key (owner, 2026-10-16: *"uses-methodology in
+ * Skill"*). Defined, with its shape, in cat-harness `schemas/methodology.ts`
+ * (`USES_METHODOLOGY_FIELD`, litlfred/cat-harness#325); spelled here as well
+ * until this layer's pin of cat-harness carries that export.
+ */
+export const USES_METHODOLOGY = "uses-methodology";
+
+/** One skill's `uses-methodology` edge: the skill, its file relative to `root`, and the names. */
+export interface MethodologyUse {
+  skill: string;
+  file: string;
+  root: string;
+  names: string[];
+}
+
+/** Every skill under `root` that declares `uses-methodology`, read from its front matter. */
+export function methodologyUses(root: string): MethodologyUse[] {
+  const out: MethodologyUse[] = [];
+  for (const parts of skillMdDirs(root)) {
+    const dir = join(root, ...parts);
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).sort()) {
+      const abs = join(dir, f);
+      if (!f.endsWith(".md") || !isSkillMd(abs)) continue;
+      const fm = frontMatterOf(readFileSync(abs, "utf-8"));
+      if (fm === undefined || !fm.includes(USES_METHODOLOGY)) continue;
+      let parsed: Record<string, unknown> | undefined;
+      try {
+        parsed = parseYaml(fm) as Record<string, unknown>;
+      } catch {
+        continue; // unparseable front matter is the skill gates' finding, not this one
+      }
+      const v = parsed?.[USES_METHODOLOGY];
+      const names = Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : typeof v === "string" ? [v] : [];
+      out.push({ skill: typeof parsed?.name === "string" ? parsed.name : basename(f, ".md"), file: relative(root, abs), root, names });
+    }
+  }
+  return out;
 }
 
 /** Every `.md` under every directory declaring a `methodology` graph. */
@@ -243,6 +287,7 @@ export function checkMethodologyEvidence(root = INSTANCE_ROOT): EvidenceReport {
     noEvidence: [],
     untagged: [],
     resolved: [],
+    badUses: [],
   };
   if (r.undetermined) return r;
 
@@ -290,6 +335,22 @@ export function checkMethodologyEvidence(root = INSTANCE_ROOT): EvidenceReport {
     }
     for (const f of found) r.resolved.push({ node, name, evidence: f.ref, at: f.at });
   }
+
+  // The edge from this instance's skills: each name must be a node somewhere
+  // in the corpus, the same reach the nodes above were read from.
+  const names = new Set(methodologyNodes(root).flatMap((n) => (n.front ? [n.front.name] : [])));
+  for (const u of methodologyUses(root)) {
+    const missing = u.names.filter((n) => !names.has(n));
+    if (u.names.length === 0) {
+      r.badUses!.push({ node: u.file, name: u.skill, detail: "`uses-methodology` names no methodology; it is a list of methodology names" });
+    } else if (missing.length > 0) {
+      r.badUses!.push({
+        node: u.file,
+        name: u.skill,
+        detail: `\`uses-methodology\` names ${missing.map((m) => `\`${m}\``).join(", ")}, which no methodology directory holds`,
+      });
+    }
+  }
   return r;
 }
 
@@ -299,7 +360,7 @@ export function checkMethodologyEvidence(root = INSTANCE_ROOT): EvidenceReport {
  * fail only under `strict`, exactly as the writer's exit has always decided.
  */
 export function judgeMethodologyEvidence(r: EvidenceReport, strict = false): Judgement {
-  const hard = r.invalid.length + r.unresolved.length;
+  const hard = r.invalid.length + r.unresolved.length + (r.badUses?.length ?? 0);
   const soft = strict ? r.noEvidence.length + r.untagged.length : 0;
   return judgementOf({ failing: hard + soft, undetermined: r.undetermined });
 }
@@ -319,6 +380,7 @@ if (import.meta.main) {
     }
     for (const f of jr.unresolved) console.error(`  ✗ ${(f.name ?? f.node).padEnd(16)} ${f.detail}`);
     for (const f of jr.invalid) console.error(`  ✗ ${f.node}: ${f.detail}`);
+    for (const f of jr.badUses ?? []) console.error(`  ✗ ${f.node}: ${f.detail}`);
     process.exit(
       concludeJudgement({
         gate: GATE,
@@ -354,7 +416,7 @@ if (import.meta.main) {
     printReport(r);
   }
 
-  const hard = r.invalid.length + r.unresolved.length;
+  const hard = r.invalid.length + r.unresolved.length + (r.badUses?.length ?? 0);
   if (hard > 0) process.exit(1);
   if (strict && r.noEvidence.length + r.untagged.length > 0) process.exit(1);
 }
@@ -399,6 +461,18 @@ export function methodologyEvidenceDocument(r: EvidenceReport): QaResult {
           "graph can see, and that silence is indistinguishable from the file not being there.",
         entries: r.untagged,
       },
+      // Only when there is one, so a clean corpus's committed sidecar is unchanged.
+      ...((r.badUses?.length ?? 0) > 0
+        ? {
+            "uses-methodology-unresolved": {
+              summary:
+                "A skill's `uses-methodology` naming a methodology no declared directory holds: the typed " +
+                "skill → methodology edge (cat-harness `schemas/methodology.ts`) pointing at nothing. Fails by " +
+                "default, like an unresolved `evidence` reference, because a broken edge reads as an applied method.",
+              entries: r.badUses!,
+            },
+          }
+        : {}),
     },
   });
 }
@@ -414,6 +488,7 @@ function printReport(r: EvidenceReport): void {
   }
   for (const f of r.unresolved) console.log(`  ✗ ${(f.name ?? f.node).padEnd(16)} ${f.detail}`);
   for (const f of r.invalid) console.log(`  ✗ ${f.node}: ${f.detail}`);
+  for (const f of r.badUses ?? []) console.log(`  ✗ ${f.node}: ${f.detail}`);
   for (const f of r.untagged) console.log(`  ? ${f.node}: ${f.detail}`);
 
   // COUNT THE METHODOLOGIES, NOT THE REFERENCES. `resolved` holds one entry
