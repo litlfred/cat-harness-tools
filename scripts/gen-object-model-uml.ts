@@ -59,7 +59,7 @@ import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { declaredRoute } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 /** Colours from `uml.css`, the one place they are declared. */
@@ -90,8 +90,13 @@ if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find t
 // harness's site: cat-harness f999d7f6 moved it from `glossary/` to that route, and the
 // bare `/glossary/` is now only its declared alias. Read from the sibling mount when it is
 // there; the fallback is the route core declares today, the same one glossary-page.ts uses.
-const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
-const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
+// The English pages sit under the locale, `en/<route>`, like every other visualiser's
+// (`pageParts`); a site whose glossary was drawn before that move still holds them at
+// `<route>`, which is read and linked until its generator runs again.
+const GLOSSARY_BARE_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
+const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
+const GLOSSARY_ROUTE = [`${PAGE_LOCALE}/${GLOSSARY_BARE_ROUTE}`, GLOSSARY_BARE_ROUTE].find((r) => existsSync(glossaryPageAt(r))) ?? `${PAGE_LOCALE}/${GLOSSARY_BARE_ROUTE}`;
+const GLOSSARY_PAGE = glossaryPageAt(GLOSSARY_ROUTE);
 /**
  * Where a term's entry is: on the page of the instance that owns its scheme,
  * `<route>/instance/<instance>/` (folio-assistant-core, owner 2026-10-15: the

@@ -203,12 +203,12 @@ export const PATTERNS: readonly ConflictPattern[] = [
     id: "glossary",
     // At their DECLARED routes since 2026-10-09 (`<harness>/<visualiser>/`):
     // every visualiser the glossary renderer draws (the content core declares
-    // one), and cat-harness's `lsi` — the latter under the page locale since
-    // folio-assistant#2527, and at its old address until the site is
-    // regenerated. The glossary routes are read from the declarations, so the
+    // one), and cat-harness's `lsi` — both under the page locale (the lsi since
+    // folio-assistant#2527, the glossary's English pages since 2026-10-16), and
+    // at their old addresses until the site is regenerated. The glossary routes are read from the declarations, so the
     // glob is still repo-relative: the same path git reports.
     // declared-path-literal: merge-conflict path patterns, matched against the paths git reports as conflicted in the index checkout, so they are repo-relative by definition; resolving them through a declaration would change what git is asked about.
-    globs: [...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**"), "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
+    globs: [...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**", "en"), ...declaredRouteGlobs(CHECKOUT_ROOT, isGlossary, "**"), "cat-harness/docs/en/cat-harness/lsi/**", "cat-harness/docs/cat-harness/lsi/**"],
     strategy: "take-base",
     why:
       "the generated glossary and LSI pages (173 + 34). Whole-corpus aggregates; concurrent term additions always collide. " +
