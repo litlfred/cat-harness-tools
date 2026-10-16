@@ -110,17 +110,25 @@
         "command": "beans"
       },
       "github": {
-        "repo": "hmans/beans",
-        "tag": "v0.4.2",
+        "repo": "litlfred/beans",
+        "tag": "v0.4.3-story.1",
         "bin": "beans",
         "assets": {
           "linux-x64": {
             "asset": "beans_Linux_x86_64.tar.gz",
-            "sha256": "266d1e4dc7392c38131c4842c60cbd2f14d5e5f7a520bc297a9b9056fda7fcd0"
+            "sha256": "1b9397521370d54120b58142e1242943184f74af9e0fd003ddd9e5e12bf34bdf"
           },
           "linux-arm64": {
             "asset": "beans_Linux_arm64.tar.gz",
-            "sha256": "fc5ede1fd605963cd575d2577a9c8c3cf89abc8d60e9787a1f0390e2067f20df"
+            "sha256": "0ddbc8b37fc555e0fcfd13356236c6ac574efcc06ff641a72d6ebbad971e80bf"
+          },
+          "darwin-x64": {
+            "asset": "beans_Darwin_x86_64.tar.gz",
+            "sha256": "8b2a0c6bf0f7a80ebb4564f02049f8398eae8074f86cf6a001ecfa7b57f5f717"
+          },
+          "darwin-arm64": {
+            "asset": "beans_Darwin_arm64.tar.gz",
+            "sha256": "c48e5d8b74b8a5e3aa5ace04e421487a94a9b63c479ac70a1bded7fbee30fee9"
           }
         }
       },
@@ -128,7 +136,7 @@
       "usedBy": [
         "scripts/install-beans.sh"
       ],
-      "why": "The work-plan CLI. `install-beans.sh` builds it with `go install`; this is the route when Go is absent. Checksums from the release's own beans_0.4.2_checksums.txt (measured 2026-10-09)."
+      "why": "The work-plan CLI: the litlfred/beans fork of hmans/beans, which adds the `story` bean type (a Task here is a BPMN task; owner, 2026-10-16). `go install` cannot build the fork, so this release is the only route `install-beans.sh` uses. Built from litlfred/beans 47382ca; checksums from the release's beans_0.4.3-story.1_checksums.txt (measured 2026-10-16)."
     }
   ]
 }

@@ -186,8 +186,8 @@ echo
 #    was what every such session actually got, which is not the same as having
 #    the work plan.
 #
-# Bounded and quiet: one `go install` over the module proxy, 180 s. A sandbox
-# with no Go or no egress falls through to the reader below rather than failing
+# Bounded and quiet: one pinned release download, 180 s. A sandbox with no
+# egress falls through to the reader below rather than failing
 # the sweep — a session-start hook that exits non-zero takes the whole session's
 # priming with it.
 if ! command -v beans >/dev/null 2>&1 && [ -x "$HOME/.local/bin/beans" ]; then
@@ -195,14 +195,13 @@ if ! command -v beans >/dev/null 2>&1 && [ -x "$HOME/.local/bin/beans" ]; then
   export PATH
 fi
 
-if ! command -v beans >/dev/null 2>&1 && [ -x "$REPO_ROOT/scripts/install-beans.sh" ]; then
+# A beans that predates the pinned fork knows no `story` type, which is the
+# store's leaf type, so it counts as absent here.
+if ! beans version 2>/dev/null | grep -q -- '-story' && [ -x "$REPO_ROOT/scripts/install-beans.sh" ]; then
   timeout 180 "$REPO_ROOT/scripts/install-beans.sh" >/dev/null 2>&1 || true
-  # `go install` picks its bin dir from GOBIN/GOPATH, which may not be on this
-  # shell's PATH, so look where it actually went before giving up on it.
-  for candidate in "${GOBIN:-}" "${GOPATH:+$GOPATH/bin}" "$HOME/go/bin" "$HOME/.local/bin"; do
-    [ -n "$candidate" ] || continue
-    if [ -x "$candidate/beans" ]; then PATH="$candidate:$PATH"; export PATH; break; fi
-  done
+  # The install writes ~/.local/bin, which may not be on this shell's PATH, and
+  # an older beans elsewhere on PATH must not shadow it.
+  if [ -x "$HOME/.local/bin/beans" ]; then PATH="$HOME/.local/bin:$PATH"; export PATH; fi
 fi
 
 if command -v beans >/dev/null 2>&1; then

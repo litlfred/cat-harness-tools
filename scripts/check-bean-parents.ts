@@ -74,7 +74,7 @@ export { beanDefsDir };
  * defect for them.
  *
  * `beans prime` states this store's hierarchy as `milestone -> epic ->
- * feature -> task/bug`, so a milestone sits ABOVE an epic and has nothing to
+ * feature -> story/bug`, so a milestone sits ABOVE an epic and has nothing to
  * hang from. Until 2026-09-20 only `epic` was here, because no milestone had
  * ever been created — the type was configured and unused. The first three
  * (the owner's goals, bean `wqht`) failed this check on the day they landed,
@@ -96,7 +96,7 @@ const ROOT_TYPES = new Set(["milestone", "epic"]);
 /**
  * The types a parent may have.
  *
- * `milestone -> epic -> feature -> task/bug`, which is the hierarchy
+ * `milestone -> epic -> feature -> story/bug`, which is the hierarchy
  * `beans prime` states. Nothing wider: parenting a task to a task nests the
  * roadmap somewhere nobody looks, which is the original reason this
  * constraint exists.
@@ -142,7 +142,7 @@ const PARENT_TYPES = new Set(["milestone", "epic", "feature"]);
  * declines to judge what the hierarchy does not mention, rather than guessing
  * a position for it.
  */
-const RANK: Record<string, number> = { milestone: 0, epic: 1, feature: 2, task: 3, bug: 3 };
+const RANK: Record<string, number> = { milestone: 0, epic: 1, feature: 2, story: 3, task: 3, bug: 3 };
 
 export interface BeanParentsReport {
   store: string | null;
@@ -229,7 +229,7 @@ export function checkBeanParents(root: string): BeanParentsReport {
       });
     } else if (b.type === "epic" && p.type !== "milestone") {
       /* AN EPIC HANGS FROM A GOAL, and from nothing else. `beans prime`'s
-       * hierarchy says so: milestone -> epic -> feature -> task/bug.
+       * hierarchy says so: milestone -> epic -> feature -> story/bug.
        *
        * STATED POSITIVELY rather than as "not another epic", which is what it
        * said until `feature` joined `PARENT_TYPES` (owner's ruling, 2026-09-22).
@@ -289,7 +289,7 @@ export function checkBeanParents(root: string): BeanParentsReport {
         key: key(b.id, "parent-not-higher"),
         message:
           `${where}: a \`${b.type}\` hangs below a \`${p.type}\` in ` +
-          "`milestone -> epic -> feature -> task/bug`, so `" +
+          "`milestone -> epic -> feature -> story/bug`, so `" +
           `${b.parent}\` cannot be its parent`,
       });
     }
