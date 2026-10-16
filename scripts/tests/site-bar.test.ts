@@ -138,13 +138,14 @@ describe("the rail pass with --theme-source: one rail on every page (option A)",
 
 describe("a theme page whose prose QUOTES the theme's nav is still railed", () => {
   // reference/skill-instructions/rendered-verification, 2026-10-16: its text
-  // quotes `id="site-nav"` in a code span, and a substring test called the
-  // page navigated, so it kept the theme's side bar and got no rail.
+  // quotes `<nav class="fa-nav"` and `id="site-nav"` in code spans, and
+  // substring tests called the page navigated (or railed), so it kept the
+  // theme's side bar and got no rail.
   const source = mkdtempSync(join(tmpdir(), "theme-src-"));
   put(source, { "index.md": fm({ title: "Home", nav_order: 1 }) });
   const site = mkdtempSync(join(tmpdir(), "theme-site-"));
   put(site, {
-    "index.html": THEME_PAGE("Home").replace("<p>x</p>", `<p>The one that held was <code>id="site-nav"</code>.</p>`),
+    "index.html": THEME_PAGE("Home").replace("<p>x</p>", `<p>The one that held was <code>&lt;nav class="fa-nav"</code> OR <code>id="site-nav"</code>.</p>`),
   });
   const r = railStandalonePages(site, "cat-harness", "cat-harness", [], undefined, { themeSource: source });
 
@@ -155,6 +156,7 @@ describe("a theme page whose prose QUOTES the theme's nav is still railed", () =
     expect(hasThemeSidebar(html)).toBe(false);
     expect(html).toContain('<nav class="fa-nav"');
     expect(html).toContain(`<code>id="site-nav"</code>`);
+    expect(html).toContain(`<code>&lt;nav class="fa-nav"</code>`);
   });
 });
 

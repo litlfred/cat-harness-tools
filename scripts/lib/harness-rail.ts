@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -532,7 +532,7 @@ const PENDING = 'data-fa-rail="pending"';
 
 /** Inject the page block, the placeholder `<nav>` and the three links; emit the shared data. */
 function withSharedRail(html: string, o: RailOptions, root: string, documentIndex: NavGroup | undefined): string | undefined {
-  if (html.includes('class="fa-nav"')) return undefined;
+  if (hasRail(html)) return undefined;
   const body = bodyTag(html);
   if (!body) return undefined;
   const asset = railDataAsset(railSharedJson(o, root));

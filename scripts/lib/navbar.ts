@@ -952,8 +952,18 @@ export function navbarRegionsHtml(m: NavbarModel): string {
  * HTML only by extension is not a page this belongs on, and a caller that
  * could not tell the difference would report a page injected that was not.
  */
+/**
+ * Does the page already carry a rail? The `<nav class="fa-nav">` ELEMENT, not
+ * the attribute text: a page whose prose quotes `<nav class="fa-nav"` in a code
+ * span (reference/skill-instructions/rendered-verification, 2026-10-16) was
+ * taken as railed, so it got no rail and kept the theme's side bar.
+ */
+export function hasRail(html: string): boolean {
+  return /<nav\b[^>]*\bclass="fa-nav"/.test(html);
+}
+
 export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string } = {}): string | undefined {
-  if (html.includes('class="fa-nav"')) return undefined;
+  if (hasRail(html)) return undefined;
   const body = bodyTag(html);
   if (!body) return undefined;
   const at = body.index + body[0].length;
