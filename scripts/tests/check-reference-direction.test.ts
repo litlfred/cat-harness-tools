@@ -39,6 +39,7 @@ import {
   exemptionCounts,
   movedTo,
   rekeyMovedPairs,
+  rekeyToolSplits,
   type MoveEvidence,
   EXEMPTIONS_DECLARED,
   directionCensus,
@@ -1281,5 +1282,35 @@ describe("ruling (i) — a baseline pair on a MOVED file is compared at the file
     const v = judge(grew, true);
     expect(v.exit).toBe(1);
     expect(v.diff?.added["wrong-direction"]).toEqual([{ file: "cat-harness-tools/scripts/a.ts", target: "who-iris" }]);
+  });
+});
+
+// ── Bean tdir: a Tool split into its folder keeps its baseline pairs ──
+
+describe("bean tdir — a baseline pair on tools/index.ts is compared at the Tool's folder file", () => {
+  const mk = (entries: { file: string; target: string }[]): QaResult =>
+    ({ $schema: "qa-results/v1", families: { "wrong-direction": { count: entries.length, entries } } }) as unknown as QaResult;
+  const files = (r: QaResult) => (r.families["wrong-direction"]!.entries as { file: string }[]).map((e) => e.file);
+
+  test("from index.ts to the one tools/<id>/<id>.ts naming the same target", () => {
+    const base = mk([{ file: "fhir-harness/tools/index.ts", target: "smart-trust" }]);
+    const fresh = mk([{ file: "fhir-harness/tools/ig-ast/ig-ast.ts", target: "smart-trust" }]);
+    const { result, rekeyed } = rekeyToolSplits(base, fresh);
+    expect(rekeyed).toBe(1);
+    expect(files(result)).toEqual(["fhir-harness/tools/ig-ast/ig-ast.ts"]);
+  });
+
+  test("from tools/<id>.ts only to that id's folder", () => {
+    const base = mk([{ file: "core/tools/vocab-map.ts", target: "who-iris" }]);
+    expect(rekeyToolSplits(base, mk([{ file: "core/tools/vocab-map/vocab-map.ts", target: "who-iris" }])).rekeyed).toBe(1);
+    expect(rekeyToolSplits(base, mk([{ file: "core/tools/other/other.ts", target: "who-iris" }])).rekeyed).toBe(0);
+  });
+
+  test("FAILS to re-key when the old pair still holds, the target differs, or two folders could be it", () => {
+    const base = mk([{ file: "x/tools/index.ts", target: "smart-base" }]);
+    expect(rekeyToolSplits(base, mk([{ file: "x/tools/index.ts", target: "smart-base" }, { file: "x/tools/a/a.ts", target: "smart-base" }])).rekeyed).toBe(0);
+    expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/a.ts", target: "who-iris" }])).rekeyed).toBe(0);
+    expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/a.ts", target: "smart-base" }, { file: "x/tools/b/b.ts", target: "smart-base" }])).rekeyed).toBe(0);
+    expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/b.ts", target: "smart-base" }])).rekeyed).toBe(0);
   });
 });
