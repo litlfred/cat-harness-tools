@@ -350,8 +350,23 @@ export function trackedTreeDigest(
    * SOURCE tree and whose own output is ignored (`qa-working-copy.ts`: the QA
    * copy is what it builds). A skip fingerprint always includes them.
    */
-  opts: { ignored?: boolean } = {},
+  opts: {
+    ignored?: boolean;
+    /**
+     * Repo-relative paths (a file, or a directory and everything under it)
+     * left out of the digest. For `derive:publish` (bean `0b8c`, issue #400):
+     * its writers' DECLARED outputs are what each run rewrites, so a digest
+     * over them would key a writer on its own last output. Never a hand-picked
+     * list: the caller passes exactly the declared `builtAtPublish` paths.
+     */
+    exclude?: readonly string[];
+  } = {},
 ): { hash: string } | { undetermined: string } {
+  const excluded = (rel: string): boolean =>
+    (opts.exclude ?? []).some((x) => {
+      const d = x.replace(/\/$/, "");
+      return rel === d || rel.startsWith(`${d}/`);
+    });
   const git = (args: string[], stdin?: string): string | undefined => {
     // input-site: tree #e4bd9913 — ls-files listings of the index, the untracked and the ignored files, and hash-object of the files they name
     const r = Bun.spawnSync(["git", ...args], {
@@ -387,7 +402,7 @@ export function trackedTreeDigest(
       ids.set(path, `${mode === "160000" ? "commit" : "blob"} ${blob}`);
     }
   }
-  toHash.push(...split(untracked));
+  toHash.push(...split(untracked).filter((p) => !excluded(p)));
   if (toHash.length > 0) {
     const out = git(["hash-object", "--stdin-paths"], toHash.join("\n") + "\n");
     const got = out?.trim().split("\n") ?? [];
@@ -397,12 +412,12 @@ export function trackedTreeDigest(
     toHash.forEach((p, i) => ids.set(p, `blob ${got[i]}`));
   }
   const h = createHash("sha256");
-  for (const p of [...ids.keys()].sort()) h.update(`${p} ${ids.get(p)}\n`);
+  for (const p of [...ids.keys()].sort()) if (!excluded(p)) h.update(`${p} ${ids.get(p)}\n`);
   if (opts.ignored === false) return { hash: h.digest("hex") };
   const ignored = git(["ls-files", "-o", "-i", "--exclude-standard", "--directory", "-z"]);
   if (ignored === undefined) return { undetermined: "could not list the ignored files" };
   for (const entry of split(ignored).sort()) {
-    const r = ignoredDigest(root, entry, h, digests);
+    const r = ignoredDigest(root, entry, h, digests, excluded);
     if (r !== undefined) return { undetermined: r };
   }
   return { hash: h.digest("hex") };
@@ -439,11 +454,18 @@ export function trackedTreeDigest(
 // input-site: inert #5e55a69c — the list of build-output directories the tree digest leaves out; it reads none of them
 export const BUILD_OUTPUT_DIRS = ["build", "_kg", "_site", "dist"] as const;
 
-function ignoredDigest(root: string, entry: string, h: ReturnType<typeof createHash>, digests: FileDigests): string | undefined {
+function ignoredDigest(
+  root: string,
+  entry: string,
+  h: ReturnType<typeof createHash>,
+  digests: FileDigests,
+  excluded: (rel: string) => boolean = () => false,
+): string | undefined {
   const rel = entry.replace(/\/$/, "");
   if (/(^|\/)node_modules$/.test(rel) || rel === dirname(CACHE_FILE) || rel === CACHE_FILE) return undefined;
   if ((BUILD_OUTPUT_DIRS as readonly string[]).includes(rel.split("/")[0]!)) return undefined;
   const walk = (r: string): string | undefined => {
+    if (excluded(r)) return undefined;
     let st;
     try {
       st = statSync(join(root, r));
