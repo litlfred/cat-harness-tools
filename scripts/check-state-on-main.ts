@@ -97,6 +97,8 @@ import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 
 /** Where the recorded debt lives. One file, named in one place. */
 export const BASELINE = "cat-harness-tools/scripts/state-on-main-baseline.json";
+/** The baseline's top-level `_generated` — see where it is written. */
+export const STATE_ON_MAIN_GENERATED = "scripts/check-state-on-main.ts --update — do not hand-edit";
 
 /** A declared directory that holds state, and where its content lives. */
 export interface StateDirectory {
@@ -273,7 +275,12 @@ if (import.meta.main) {
     writeFileSync(
       join(repoRoot, BASELINE),
       JSON.stringify(
+        // `_generated` is the file's own declaration that a tool wrote it — the
+        // `sync-docs-harness.ts` convention `check-reference-direction.ts` reads.
+        // Its lines name the layers whose state it records, which an authored
+        // file in this layer may not do.
         {
+          _generated: STATE_ON_MAIN_GENERATED,
           _comment:
             "Declared directories whose graph typology `holds: \"state\"` and whose content is still on `main`, " +
             "as `<instance>::<id>` (`.` for the repository root). RECORDED DEBT, and it may only go DOWN: " +
