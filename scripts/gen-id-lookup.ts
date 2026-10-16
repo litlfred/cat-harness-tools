@@ -34,7 +34,7 @@
  * catalogue no longer references.
  *
  * Usage:
- *   bun run cat id-lookup                    # write every hosted index (one library's id-lookup/ today)
+ *   bun run cat id-lookup                    # write every hosted index (one library's `id-lookup` directory today)
  *   bun run cat id-lookup:check              # fail if any is stale
  *   bun run cat id-lookup -- --source <name> # one instance's only
  */
