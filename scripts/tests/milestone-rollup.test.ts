@@ -148,6 +148,14 @@ describe("milestoneRollup", () => {
     expect(r.milestones.map((m) => m.id)).toEqual(["aaa", "mmm", "zzz"]);
   });
 
+  it("orders milestones by title, numerically, so GOAL 1..10 read in order whatever their ids", () => {
+    // The live store, 2026-10-16: ids npuo, p5wm, rwmf, vuip, yg29 are GOALs
+    // 5, 2, 4, 1, 3 — id order put them on the board in exactly that order.
+    const goal = (id: string, n: number) => ({ ...bean(id, "milestone", "in-progress"), title: `GOAL ${n}: x` });
+    const r = milestoneRollup([goal("npuo", 5), goal("p5wm", 2), goal("rwmf", 10), goal("vuip", 1), goal("yg29", 3)]);
+    expect(r.milestones.map((m) => m.id)).toEqual(["vuip", "p5wm", "yg29", "npuo", "rwmf"]);
+  });
+
   it("counts a duplicated id once and reports that it was duplicated", () => {
     // Measured on this store 2026-10-03: `folio-assistant-t3n8` is held by two
     // files. Counting over files made `openTotal - orphanOpen` disagree with
