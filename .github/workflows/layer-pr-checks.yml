@@ -202,9 +202,38 @@ jobs:
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - &pin-write
         if: steps.pin-restore.outputs.cache-hit != 'true'
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/pin"
           date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/pin/at"
+          # The tips of the graphs kept on branches (`cat/<instance>/<graph>`:
+          # beans, todos, ...), read ONCE for the run, so both sides mount
+          # each graph at the same commit (`BRANCH_STORE_PIN_FILE`). Read
+          # live per side, they were minutes apart, and a bean pushed in
+          # between was charged to the PR (smart-base#107, run 38884159693).
+          # A remote that cannot be read is left out, and mounts live.
+          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+            if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
+              printf '%s\n' "$tips" > "$RUNNER_TEMP/pin/state-${repo//\//__}.tsv"
+            fi
+          done
+          python3 - "$RUNNER_TEMP/pin" <<'PY'
+          import json, pathlib, sys
+          pin = pathlib.Path(sys.argv[1])
+          out = {}
+          for f in sorted(pin.glob("state-*.tsv")):
+              repo = f.name[len("state-"):-len(".tsv")].replace("__", "/")
+              tips = {}
+              for line in f.read_text().splitlines():
+                  if "\t" in line:
+                      sha, ref = line.split("\t", 1)
+                      tips[ref.removeprefix("refs/heads/")] = sha
+              out[repo] = tips
+              f.unlink()
+          (pin / "state.json").write_text(json.dumps(out, sort_keys=True, indent=1) + "\n")
+          PY
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
@@ -482,13 +511,16 @@ jobs:
         # read them (owner's session 01Pc8v, 2026-10-14: declaration-resolution
         # was red only because neither was done).
         working-directory: fa
+        env:
+          BRANCH_STORE_PIN_FILE: ${{ runner.temp }}/pin/state.json
         run: |
           set -euo pipefail
           bun -e '
             import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
             const r = mountState({});
             console.log(report(r));
-            // Not fatal: both sides mount the same branches, so a graph that
+            // Not fatal: both sides mount the same branches at the same
+            // pinned tips (BRANCH_STORE_PIN_FILE), so a graph that
             // will not mount reads the same on base and head, and the compare
             // job judges what the PR changed. Dying here judged nothing
             // (smart-ra#59: issue-marks has no branch on that remote).
@@ -726,13 +758,11 @@ jobs:
           # since main was judged is never charged to the PR. A miss costs
           # runner time only; the base side runs beside the head side. A tip
           # that cannot be read is a miss, never a hit.
-          state=""
+          # The tips this run pinned (the pin step), which both sides mount.
+          state="$(sha256sum < "$RUNNER_TEMP/pin/state.json" | cut -d' ' -f1)"
           for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
-            if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
-              state="$state $repo=$(printf '%s\n' "$tips" | sort | sha256sum | cut -d' ' -f1)"
-            else
-              state="$state $repo=unreadable-$(date +%s%N)"
-            fi
+            python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
+              || state="$state $repo=unreadable-$(date +%s%N)"
           done
           raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
           echo "main's answer is computed from: $raw"
