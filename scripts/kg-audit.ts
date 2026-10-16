@@ -153,27 +153,32 @@ import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-g
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
 import { checkoutActors, checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
+import { skillEdgeIndex } from "./lib/skill-edges.ts";
 
 const ENGINE_VERSION = "1";
 
 /**
  * Does anybody in this role read prose?
  *
- * Only a reader needs a persona, a voice and use cases. Three kinds do not:
- * an `actedUpon` lane is a store that tasks act ON (the corpus, the work
- * plan); a `system` is a pipeline that consumes files, not pages; an
- * `external` participant is outside this instance entirely.
+ * Only a reader needs a persona, a voice and use cases. Two kinds do not: a
+ * `system` is a pipeline or a store that consumes files, not pages; an
+ * `external` participant is outside this instance entirely. A role only they
+ * play is mechanical (`isMechanicalRole`), and its skills are a contract to be
+ * tested, not prose to be read — `mechanical-role-untested` asks what does
+ * apply. (An `actedUpon` flag made the same exemption by hand until it was
+ * retired, owner, 2026-10-16.)
  *
  * Scoping this way rather than asking every role is what keeps the finding
  * actionable. "The IG publisher service has no persona" is a finding nobody
  * can act on, and a check that produces those is a check somebody switches
- * off — the same argument `role-has-actor` already makes for `actedUpon`.
+ * off.
  */
-function readsProse(r: { actedUpon?: boolean; actorKinds: string[] }): boolean {
+function readsProse(r: { actorKinds: string[] }): boolean {
   // ANY, not every. A role a person may take on has prose read in it, even
   // where a mechanical actor may also fill the lane — the question is whether
   // the instructions can reach a reader, and one reader is enough.
-  return !r.actedUpon && r.actorKinds.some((k) => k === "person" || k === "agent");
+  return r.actorKinds.some((k) => k === "person" || k === "agent");
 }
 
 /**
@@ -605,19 +610,9 @@ async function auditProcess(
   const undocumented: KgFinding[] = [];
   const calls = activities.filter((n) => n.calledElement !== undefined);
 
-  // Lane ids whose role is declared `actedUpon` — a store or an external
-  // system that is written to rather than a participant that acts.
-  const actedUponLanes = new Set(
-    graph
-      ? m.lanes.filter((l) => roleForLane(graph, l.name, l.roleRef)?.actedUpon === true).map((l) => l.id)
-      : [],
-  );
-  const actedUponNode = (n: { laneId?: string }): boolean =>
-    n.laneId !== undefined && actedUponLanes.has(n.laneId);
-
   // Lane ids whose role PERFORMS but by judgement — a stakeholder signing off.
-  // Unlike `actedUpon`, somebody really does the step; no instruction body can
-  // produce the answer for them.
+  // Somebody really does the step; no instruction body can produce the answer
+  // for them.
   const judgementLanes = new Set(
     graph
       ? m.lanes.filter((l) => roleForLane(graph, l.name, l.roleRef)?.judgementOnly === true).map((l) => l.id)
@@ -652,22 +647,19 @@ async function auditProcess(
     // redundant implementation — and the one that matters is checked by
     // `call-activity-resolves` below, so the exemption leaves no gap.
     //
-    // An `actedUpon` lane is the same category error one level up: the corpus
-    // and an external registry are WRITTEN TO, not participants that act, and
-    // the role graph already says so — `role-has-actor` is `n/a` for them for
-    // exactly this reason. Asking what skill the corpus uses to be committed
-    // into has no answer to give.
+    // There was a third exemption, the `actedUpon` lane — a store "written to,
+    // never acts". Retired, owner 2026-10-16: a role a machine plays is a real
+    // role whose skills are its contract, so its tasks name those skills.
     //
-    // Three declared exemptions, and each one is READ from a declaration
-    // rather than inferred: an `actedUpon` lane (nothing performs it), a
-    // `judgementOnly` lane (somebody performs it, but no procedure yields the
-    // answer), and `<cat-harness.processes:no-skill reason>` on the activity itself. Because
+    // Two declared exemptions, and each one is READ from a declaration
+    // rather than inferred: a `judgementOnly` lane (somebody performs it, but
+    // no procedure yields the answer), and `<cat-harness.processes:no-skill
+    // reason>` on the activity itself. Because
     // every legitimate case now SAYS SO, what is left is a real gap — which is
     // what lets this criterion gate instead of staying advisory.
     if (
       n.skills.length === 0 &&
       n.calledElement === undefined &&
-      !actedUponNode(n) &&
       !judgementNode(n) &&
       n.noSkillReason === undefined
     ) {
@@ -809,7 +801,7 @@ async function auditProcess(
       case "contradictory":
         contradictoryPerformer.push({
           where: lane.id,
-          detail: `lane "${lane.name ?? lane.id}" declares BOTH <bootstrap.processes:role ref="${b.ref}"/> and variable="true". A lane that names a role has not got a varying performer; drop whichever is wrong.`,
+          detail: `lane "${lane.name ?? lane.id}" names role "${b.ref}" (partitionElementRef, or the legacy <bootstrap.processes:role ref>) AND declares variable="true". A lane that names a role has not got a varying performer; drop whichever is wrong.`,
         });
         break;
       case "variable":
@@ -824,7 +816,7 @@ async function auditProcess(
       case "unbound":
         unboundLane.push({
           where: lane.id,
-          detail: `lane "${lane.name ?? lane.id}" matches no declared role. Add the name to a role's \`lanes\` in scenarios/roles.json, bind it with <bootstrap.processes:role ref="…"/>, or — if its performer genuinely varies — declare that with <bootstrap.processes:role variable="true"/>.`,
+          detail: `lane "${lane.name ?? lane.id}" names no declared role. Name one with partitionElementRef="<roleId>" on the lane and a top-level <bpmn:resource id="<roleId>"/> (owner, 2026-10-16: a lane names a Role), or — if its performer genuinely varies — declare that with <bootstrap.processes:role variable="true"/>.`,
         });
         break;
     }
@@ -853,16 +845,13 @@ async function auditProcess(
   // userTask is done by a person and a serviceTask without one — and until now
   // nothing joined that answer to the role graph's `actorKinds`.
   //
-  // Scoped the same way `activity-names-skill` is, and for the same reason. An
-  // `actedUpon` lane is a store, and "the corpus cannot perform a serviceTask"
-  // is a finding nobody can act on. An activity whose lane is unbound or absent
+  // An activity whose lane is unbound or absent
   // is already reported by `lane-binds-role` / `activity-in-lane`; repeating it
   // here would make one defect look like two.
   const wrongKind: KgFinding[] = [];
   let kindApplicable = 0;
   if (graph) {
     for (const n of activities) {
-      if (actedUponNode(n)) continue;
       const roleId = n.laneId ? laneRole.get(n.laneId) : undefined;
       if (!roleId) continue;
       const role = findRole(graph, roleId);
@@ -1057,6 +1046,14 @@ async function auditProcess(
       variablePerformer.length > 0 || contradictoryPerformer.length > 0,
     ),
     "role-carries-activity-skill": entry(skillNotCarried, Boolean(graph) && m.lanes.length > 0),
+    // The lane → Role → Skill report entries (owner, 2026-10-16; declared
+    // `minor` in kg-qa.ts, so reported and never gated). `n/a` when no lane
+    // names a role — there is no binding to be legacy.
+    "lane-role-legacy-binding": entry(legacyBindingFindings(m.lanes), m.lanes.some((l) => l.roleBinding !== undefined)),
+    "task-skill-outside-lane-role": entry(
+      graph ? skillsOutsideLaneRole(m.lanes, activities, graph) : [],
+      Boolean(graph) && m.lanes.length > 0,
+    ),
     "activity-names-skill": entry(noSkill),
     "activity-fulfilment-kind": entry(wrongKind, Boolean(graph) && kindApplicable > 0),
     // Three states: `n/a` when the diagram has no call activities; `fail` when
@@ -1082,7 +1079,9 @@ async function auditProcess(
   if (!graph) {
     // No role graph is a state the audit can be in, and it is not a pass.
     //
-    // FIVE criteria, not the seven this list used to hold. `role-ref-resolves`
+    // SIX criteria, not the seven this list used to hold (five, plus
+    // `task-skill-outside-lane-role` from 2026-10-16, which needs the same
+    // role objects `role-carries-activity-skill` does). `role-ref-resolves`
     // and `raci-role-resolves` were removed because they no longer need a graph
     // of this instance's own: both ask whether a named role EXISTS, and
     // `resolvableRoleIds` answers that down the `needs` chain. Leaving them here
@@ -1090,12 +1089,13 @@ async function auditProcess(
     // and the content core, whose every role reference resolves in
     // cat-harness.
     //
-    // The five that remain need role OBJECTS: which skills a role carries, what
+    // The six that remain need role OBJECTS: which skills a role carries, what
     // kind of performer it is, how many accountables a row names. A set of ids
     // cannot answer those, and this instance does not hold the definitions.
     for (const id of [
       "lane-binds-role",
       "role-carries-activity-skill",
+      "task-skill-outside-lane-role",
       "activity-fulfilment-kind",
       "raci-single-accountable",
       "raci-accountable-not-consulted",
@@ -1517,6 +1517,10 @@ function auditRoles(
     }
   }
   const declared = new Set(graph.roles.map((r) => r.id));
+  // `tested-by:` on every skill a role may carry — this instance's and every
+  // instance it `needs`, the reach `resolvableSkills` has — for
+  // `mechanical-role-untested`.
+  const skillEdges = skillEdgeIndex([root, ...orderedDependencies(root).map((d) => d.rootPath)]);
   const anyActorDeclaresRoles = actors.some((a) => (a.roles ?? []).length > 0);
 
   return graph.roles.filter((r) => subjects.has(r.id)).map((r) => {
@@ -1529,17 +1533,23 @@ function auditRoles(
     const badParents = (r.inherits ?? [])
       .filter((i) => !declared.has(i))
       .map((i) => ({ where: i, detail: `role "${r.id}" inherits "${i}", which is not declared.` }));
-    // A lane binds a role by its own `<bootstrap.processes:role ref>`; the role lists no lanes
-    // (data-modelling step 8, #1168).
+    // A lane names a role by its own `partitionElementRef` (or, for one more
+    // release, the legacy `<bootstrap.processes:role ref>` — `LaneDef.roleRef`
+    // reads both); the role lists no lanes (data-modelling step 8, #1168).
     const bindsSomething = explicitRefs.has(r.id);
     const laneFindings: KgFinding[] = bindsSomething
       ? []
-      : [{ where: r.id, detail: `role "${r.id}" is bound by no lane's <bootstrap.processes:role ref> in any diagram — nothing can enter it. Either a lane lost its ref, or the role is dead.` }];
+      : [{ where: r.id, detail: `role "${r.id}" is named by no lane's partitionElementRef (or legacy <bootstrap.processes:role ref>) in any diagram — nothing can enter it. Either a lane lost its binding, or the role is dead.` }];
 
     const criteria: Record<string, KgCriterionEntry> = {
       "role-skills-resolve": entry(badSkills),
       "role-inherits-resolves": entry(badParents, (r.inherits ?? []).length > 0),
       "role-binds-a-lane": entry(laneFindings),
+      // `n/a` for a role a person or an agent may take on: only a mechanical
+      // role's skills are a contract to be tested (owner, 2026-10-16).
+      "mechanical-role-untested": ((f) => (f === undefined ? entry([], false) : entry(f)))(
+        mechanicalRoleUntested(r, graph, skillEdges),
+      ),
       // The lane is the audience, so a role that READS has to be writable-for.
       "role-has-persona": !readsProse(r)
         ? entry([], false)
@@ -1559,12 +1569,10 @@ function auditRoles(
               ? []
               : [{ where: r.id, detail: `no user story in scenarios/stories.json is told as role "${r.id}" — nothing says what this reader came to do.` }],
           ),
-      // `actedUpon` lanes are stores, not participants — the work plan, the
-      // corpus, the publish target. Asking which actor fills the corpus is not
-      // a question, so it is `n/a` rather than a failure nobody can act on.
-      "role-has-actor": r.actedUpon
-        ? entry([], false)
-        : anyActorDeclaresRoles
+      // Asked of EVERY role, mechanical ones included: a store or a registry
+      // plays a real role (owner, 2026-10-16), and something has to play it.
+      // It was `n/a` for an `actedUpon` role until that flag was retired.
+      "role-has-actor": anyActorDeclaresRoles
         ? entry(
             actors.some((a) => (a.roles ?? []).includes(r.id))
               ? []
@@ -1585,13 +1593,10 @@ function auditRoles(
       // carried a single kind: an actor declares this role, so is its OWN kind
       // among the kinds the role admits?
       //
-      // `n/a` for an `actedUpon` lane (a store has no actor) and `unknown`
-      // where no entry declares `roles` at all — the same two scopings
-      // `role-has-actor` uses, for the same reasons, so the two directions of
+      // `unknown` where no entry declares `roles` at all — the same scoping
+      // `role-has-actor` uses, for the same reason, so the two directions of
       // one question cannot disagree about when it is askable.
-      "actor-kind-fits-role": r.actedUpon
-        ? entry([], false)
-        : anyActorDeclaresRoles
+      "actor-kind-fits-role": anyActorDeclaresRoles
         ? entry(
             actors
               .filter((a) => (a.roles ?? []).includes(r.id))
