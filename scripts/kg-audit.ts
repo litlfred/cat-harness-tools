@@ -767,7 +767,7 @@ async function auditProcess(
   // but "does this ref name a declared role?" needs only the IDS, and those
   // reach down the `needs` chain. Keeping the two apart is what lets an
   // instance with no graph of its own still have its refs resolved, instead of
-  // every ref in it being reported as unresolvable (`smart-base`, 2026-09-27).
+  // every ref in it being reported as unresolvable (a DAK base layer, 2026-09-27).
   const roleRefs = m.lanes.flatMap((l) => (l.roleRef !== undefined && !l.performerVaries ? [l] : []));
   for (const lane of roleRefs) {
     if (resolvableRoleIds.has(lane.roleRef!)) continue;
@@ -1086,8 +1086,8 @@ async function auditProcess(
     // and `raci-role-resolves` were removed because they no longer need a graph
     // of this instance's own: both ask whether a named role EXISTS, and
     // `resolvableRoleIds` answers that down the `needs` chain. Leaving them here
-    // overwrote a correct verdict with `unknown` — measured on `smart-base` and
-    // `folio-assistant-core`, whose every role reference resolves in
+    // overwrote a correct verdict with `unknown` — measured on a DAK base layer
+    // and the content core, whose every role reference resolves in
     // cat-harness.
     //
     // The five that remain need role OBJECTS: which skills a role carries, what
@@ -1412,8 +1412,8 @@ function auditTools(instance?: string): KgQaReport[] {
   // still read the whole checkout on the default run, because a Tool here may
   // name one there — resolution widens, coverage does not (`satisfiableSkills`
   // in `check-tools.ts`, ruling `pve3`). Until 2026-10-01 the default run
-  // iterated `tools()`, so it wrote 29 sidecars about Tools that fhir-harness
-  // (19), folio-assistant-core (4) and smart-base (6) declare and audit
+  // iterated `tools()`, so it wrote 29 sidecars about Tools that the FHIR IG
+  // harness (19), the content core (4) and a DAK base layer (6) declare and audit
   // themselves — a second copy of each verdict, free to drift (Q-A PR 4).
   const out: KgQaReport[] = [];
   for (const t of toolsOf(instance ?? root)) {
@@ -1797,7 +1797,7 @@ function proseNamesResolve(): KgCriterionEntry {
   }
   const basenames = new Set(new TextDecoder().decode(ls.stdout).split("\n").map((f) => f.split("/").pop()!));
   // Every instance's root, not only this one: `materialize-remote.bpmn`
-  // names `schemas/materialization.ts`, which is folio-assistant-core's, and
+  // names `schemas/materialization.ts`, which is the content core's, and
   // prose spells a sibling instance's path from that instance's root.
   const roots = [
     repo,
@@ -2586,14 +2586,14 @@ const skills = knownSkills(root, corpusScopeFor(root));
  * A skill ref names a body an activity's performer must read, and a body in a
  * DEPENDENCY is one this instance may read — that is what depending on it
  * means. Resolving refs against `knownSkills(root)` alone made every such ref
- * dangle: measured 2026-09-27, `smart-base` reported `skill-ref-resolves`
+ * dangle: measured 2026-09-27, a DAK base layer reported `skill-ref-resolves`
  * **fail (9)** on nine activities of `diig-investment-path.bpmn`, all naming
  * the one skill `methodology-adoption`, which lives at
  * `cat-harness/skills/process/process-core/methodology-adoption.md` — four layers down
  * its own declared `needs` chain. Nine criticals against a diagram that is
  * correct.
  *
- * The auditor's own run already knew: `test/results/kg-qa/_external/smart-base/`
+ * The auditor's own run already knew: `test/results/kg-qa/_external/<instance>/`
  * recorded `skill-ref-resolves` **pass (0)** for that same diagram, because from
  * here the skill is local. So the two runs disagreed about one file, and the
  * instance-scoped one was wrong. (That `_external/` copy was itself the
@@ -2620,8 +2620,8 @@ const skills = knownSkills(root, corpusScopeFor(root));
  *
  * ## `orderedDependencies` rather than a closure written here
  *
- * It already walks `needs` transitively — measured: `smart-base` yields
- * `bootstrap, cat-harness, folio-assistant-core, fhir-harness`, its whole
+ * It already walks `needs` transitively — measured: a DAK base layer yields
+ * `bootstrap`, `cat-harness`, the content core and the FHIR IG harness, its whole
  * chain; `cat-harness` yields `bootstrap` alone. A second walker would be a
  * second answer to one question, which is the `j79e` defect.
  */
@@ -2648,8 +2648,8 @@ const resolvableSkills: Set<string> = (() => {
  * dependencies, and only one of them has said so.
  *
  * MEASURED 2026-09-27: **5 of 16** instances here declare no `needs` —
- * `agent-skills`, `folio-assistant-sci`, `large-datasets`, `who-iris`,
- * `who-style-guide`. So this is a third of the subject, not a hypothetical.
+ * `agent-skills`, the formal-math content layer, `large-datasets`, the IRIS
+ * replica, `who-style-guide`. So this is a third of the subject, not a hypothetical.
  */
 const layeringUndetermined = ((): boolean => {
   try {
@@ -2670,7 +2670,7 @@ const layeringUndetermined = ((): boolean => {
  * to be. Only a ref that MISSES the own set depends on it — and then an
  * undeclared layering makes the answer unknown rather than a failure.
  *
- * Without this split, `who-iris` (1 own skill) and `large-datasets` (3) would
+ * Without this split, the IRIS replica (1 own skill) and `large-datasets` (3) would
  * have their true passes converted into `unknown`, which is a report getting
  * worse while looking more careful.
  */
@@ -2700,7 +2700,7 @@ let roleGraphPath = "";
  * The ids of the roles THIS instance's own role graph declares.
  *
  * The checkout overlay above also brings in the roles a higher instance owns
- * outright (smart-base's `l1-extraction-reviewer`, owner ruling 3b,
+ * outright (a DAK base layer's `l1-extraction-reviewer`, owner ruling 3b,
  * 2026-10-12). Those resolve here, but they are that instance's subjects:
  * its own `--instance` run audits them. Emitting them again from the
  * platform's run is the duplicated subject `instance-graph-isolation.test.ts`
@@ -2742,8 +2742,8 @@ if (graphError) {
  * ## The same defect as {@link resolvableSkills}, one graph over
  *
  * Measured 2026-09-27, after the skill half landed: 11 of 13 nested instances
- * reported ZERO criticals, and the two that did not — `smart-base` and
- * `folio-assistant-core` — reported `role-ref-resolves` and
+ * reported ZERO criticals, and the two that did not — a DAK base layer and
+ * the content core — reported `role-ref-resolves` and
  * `raci-role-resolves`. Their diagrams name `business-analyst`,
  * `programme-manager` and `deep-researcher`, and **all three are defined in
  * `cat-harness/scenarios/roles.json`**, a transitive dependency of both. So
@@ -2842,7 +2842,7 @@ reports.push(...auditFolioBlocks(root));
  * Drop every subject ANOTHER instance owns — it audits that subject itself.
  *
  * The default run walks the CHECKOUT (`corpusScopeFor`), so it loads
- * smart-base's, large-datasets' and folio-assistant-core's diagrams beside its
+ * a DAK base layer's, large-datasets' and the content core's diagrams beside its
  * own. Loading them is right: a call activity here may name one, and the
  * graph-level criteria need the whole corpus. Writing a VERDICT about them is
  * not — each owner's `kg:audit:all` run already writes one under its own

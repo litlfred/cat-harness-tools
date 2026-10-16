@@ -172,8 +172,8 @@ const ROOT = join(HARNESS_ROOT);
  * Three times now a hardcoded list has been the bug. First this module listed
  * six directories and missed `schemas/skills/`, reporting 11 BPMN refs as
  * dangling. Then, with that fixed, the same list still omitted
- * `smart-base/skills/content/authoring-who-smart-guidelines/` and its siblings, so
- * `smart-base-tools` — a file that plainly exists — came out as a dangling
+ * a DAK base layer's `skills/content/authoring-who-smart-guidelines/` and its
+ * siblings, so that layer's `-tools` package — a file that plainly exists — came out as a dangling
  * `declaresSkill` link. `knownSkills()` in `scripts/check-workflow-refs.ts`
  * carries a fourth, differently-wrong copy of the same list.
  *
@@ -280,7 +280,7 @@ function namingTable(id: string): VocabMapping {
 }
 
 /**
- * The active context, following `WorldHealthOrganization/smart-base`'s
+ * The active context, following the WHO DAK base IG's
  * `generate_jsonld_vocabularies.py`.
  *
  * Four things here are load-bearing rather than decorative:
@@ -294,7 +294,7 @@ function namingTable(id: string): VocabMapping {
  *
  * **No `@vocab`.** Every term is declared with its full namespace IRI, so an
  * undeclared key stays undeclared rather than silently resolving against a
- * default namespace and minting an IRI nobody chose. smart-base's type-usage
+ * default namespace and minting an IRI nobody chose. That IG's type-usage
  * document calls this out explicitly and it is the right call.
  *
  * **`id` and `type` are aliased** to `@id` and `@type`, so the published JSON
@@ -1567,7 +1567,7 @@ function stampSubgraph(graph: Node[], doc: string, instanceRoot: string = ROOT):
     .map((d) => ({ id: d.id, rel: relative(instanceRoot, d.absPath!).replace(/\\/g, "/").replace(/\/$/, "") }))
     // `..` is KEPT, and dropping it is what made this facet useless.
     //
-    // Every repository-scoped entry — `who-iris/`, `folio-assistant-core/`,
+    // Every repository-scoped entry — a content layer's directory,
     // `bootstrap/`, `detangle/`, `large-datasets/` —
     // resolves to `../<instance>/…` relative to this instance, so
     // `!startsWith("..")` excluded the entire set the facet exists to offer.
@@ -1580,7 +1580,7 @@ function stampSubgraph(graph: Node[], doc: string, instanceRoot: string = ROOT):
     // could not.
     //
     // A path that leaves the instance is still a path this graph carries —
-    // `schema-nodes.ts` mints `../folio-assistant-core/schemas/…` — so the
+    // `schema-nodes.ts` mints `../<content-core>/schemas/…` — so the
     // comparison below matches in the same space rather than excluding it.
     .filter((d) => d.rel.length > 0)
     .sort((a, b) => b.rel.length - a.rel.length);
@@ -1726,7 +1726,7 @@ async function collectProcesses(
   // found none, rather than passing over in silence" — but saying it and
   // FAILING the instance for it are different things, and only the first was
   // ever wanted. Three instances arrived at once (`kg-navigation`,
-  // `large-datasets`, `who-iris`), each holding one skill and no workflow,
+  // `large-datasets`, a library replica), each holding one skill and no workflow,
   // each rendering its nodes, each failed on this message alone. A skills
   // package with no process is an ordinary thing; requiring a diagram to stay
   // green is asking an instance to carry something it never claimed.
@@ -1739,7 +1739,7 @@ async function collectProcesses(
   // declaring a knowledge graph meant declaring PROCESSES. It does not. An
   // instance declaring `skills/` claims skills; a skills package with no
   // workflow is an ordinary thing and three arrived at once
-  // (`kg-navigation`, `large-datasets`, `who-iris`), each holding one skill,
+  // (`kg-navigation`, `large-datasets`, a library replica), each holding one skill,
   // each rendering its nodes, each failed on this message alone.
   //
   // That is the same shape the paragraph above rejects, one level in: asking
@@ -2043,10 +2043,10 @@ const skillHomes = new Map<string, string>();
 
 /**
  * `ownRoot` is the instance whose document `ownDoc` IS. It was always `ROOT`
- * until instance exports began collecting Tools (bean `tdir`): smart-base's
- * `extract-dak` satisfies a skill smart-base declares, and asking cat-harness
+ * until instance exports began collecting Tools (bean `tdir`): a DAK base
+ * layer's `extract-dak` satisfies a skill that layer declares, and asking cat-harness
  * "do you have it?" first would either keep a cat-harness-only skill in
- * smart-base's document (a dangling link) or send smart-base's own skill to a
+ * that layer's document (a dangling link) or send its own skill to a
  * sibling's. So the "this document wins" test asks the instance being
  * exported, and every OTHER instance, the host included, is a sibling.
  */
@@ -2095,8 +2095,8 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
  * ## Why it takes the root (bean `tdir`)
  *
  * It read `toolsOf(ROOT)` and nothing called it outside the host's branch of
- * `buildExport`, so `kg-export --instance ./smart-base` published 0 of
- * smart-base's 11 Tools and `--instance ./fhir-harness` 0 of its 32 —
+ * `buildExport`, so `kg-export --instance` on the DAK base layer published 0
+ * of its 11 Tools and on the FHIR IG harness 0 of its 32 —
  * measured 2026-10-15, both exports otherwise complete and silent about it.
  * Discovery (`tools/discover.ts`, bean `p0za`) had already made the Tools of
  * every instance loadable; the export simply never asked for them.
@@ -2107,7 +2107,7 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
  *   `satisfies` resolve against it, as every other node's links do.
  * - `typeBase` is where the I/O type vocabulary is published, which is the
  *   HARNESS's base for every instance (`harnessBase` in `discover.ts`).
- *   Minting smart-base's port types against smart-base's canonical named
+ *   Minting a DAK base layer's port types against its canonical named
  *   `http://smart.who.int/base/tool-types/...`, a document WHO does not
  *   publish (bean `p0za`). `undefined` lets discovery use the harness's
  *   declared base; a preview passes its own `--base-url`.
@@ -2829,7 +2829,7 @@ export interface ExportOptions {
    * cat-harness's own declared directories, and every instance stacked on it
    * is in that instance's own document (`instance-exports.ts`). Measured the
    * day it landed: 825 of 3369 nodes were other instances' — 495 of them
-   * folio-assistant-core's — under `cat-harness.jsonld#…` fragments. Each
+   * the content core's — under `cat-harness.jsonld#…` fragments. Each
    * `@id` the checkout graph had and this one lacks is answered by a
    * tombstone ({@link tombstonesFor}), for one release.
    *
@@ -3063,8 +3063,8 @@ export function exportIdentity(opts: ExportOptions = {}): {
   //
   // UNLESS THE INSTANCE DECLARES ITS OWN `canonicalUrl`. Then the base is its
   // own site, where it is the host, so it sits at `<canonicalUrl>/<stub>.jsonld`.
-  // Appending the foreign segment there doubled it: `fhir-harness` minted
-  // `…/fhir-harness/fhir-harness/fhir-harness.jsonld` (issue #1548, measured
+  // Appending the foreign segment there doubled it: the FHIR IG harness minted
+  // `…/<stub>/<stub>/<stub>.jsonld` (issue #1548, measured
   // 2026-09-30). `bootstrap` declares no base and is unchanged.
   const docPath = foreignInstance && !ownCanonical ? `${stub}/${stub}.jsonld` : `${stub}.jsonld`;
   const docIri = renderingPath(base, docPath);
@@ -3091,7 +3091,7 @@ export function exportIdentity(opts: ExportOptions = {}): {
  * `@id`s are minted against that whatever site builds it. Anything here that
  * names a node in ANOTHER instance's document has to mint the same way, or it
  * names a document nobody writes: `skillHome` passed this site's base and got
- * `<site>/smart-base.jsonld`, which the deploy never writes (measured
+ * `<site>/<stub>.jsonld` for a DAK base layer, which the deploy never writes (measured
  * 2026-10-05, bean `4ak5` item 2).
  */
 export function publishedIdentity(instanceRoot: string, baseUrl?: string): ReturnType<typeof exportIdentity> {
