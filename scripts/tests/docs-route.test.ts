@@ -130,6 +130,7 @@ describe("what moves and what stays — read off the real tree", () => {
     for (const rel of [
       // Visualisers at their DECLARED routes (owner, 2026-10-09).
       visualiserPage("processes"),
+      "en/folio-assistant-core/glossary/index.md",
       "folio-assistant-core/glossary/index.md",
       "proposals/index.md",
       "requirements/index.md",
