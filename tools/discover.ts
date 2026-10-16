@@ -7,7 +7,7 @@
  *
  * Eight of the nine modules that read a tool list imported
  * `cat-harness/tools/index.ts`, which holds only this instance's own Tools.
- * `smart-base/tools/` and `fhir-harness/tools/` declared Tool nodes that no
+ * The DAK base layer's and the FHIR IG harness's `tools/` declared Tool nodes that no
  * check, export or audit ever saw — declared, and unreachable. A barrel that
  * imported them would not fix it: the harness may not import an instance that
  * depends on it (`check:partition`), and a core Tool is exactly that.
@@ -58,7 +58,7 @@ const REPO = resolve(HARNESS, "..");
  * The tool-type vocabulary (`schemas/tool-types.ts`) is the harness's, and
  * it is published once, at the harness's base. Before discovery, each
  * instance's `tools()` fell back to its OWN canonical. Nothing checked that,
- * because nothing could see those Tools, and so smart-base's nine pointed at
+ * because nothing could see those Tools, and so the DAK base layer's nine pointed at
  * `http://smart.who.int/base/tool-types.schema.json`. That is a FHIR
  * canonical, and WHO publishes no such document. Found by `tools.test.ts` the
  * first time it saw them (bean p0za). A caller that names a base (a preview
@@ -203,7 +203,7 @@ export function tools(baseUrl?: string): ToolDefinition[] {
  * ONE instance's Tools: the ones its own `tools` graph declares.
  *
  * For a consumer that writes one instance's document. `kg-export` publishes
- * `<instance>.jsonld`, and filling the harness's document with smart-base's
+ * `<instance>.jsonld`, and filling the harness's document with a higher layer's
  * Tools would give them `satisfies` links into documents that are never
  * published. A check or an audit over the whole repository reads
  * {@link tools}.

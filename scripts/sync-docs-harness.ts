@@ -490,7 +490,7 @@ function foldersOf(
 
 /**
  * THE INSTANCES A PAGE CAN BE INSIDE, for the rail's PAGES and FOLDERS
- * (issue #1902). Owner, viewing `/smart-trust/`: *"there are also 101 pages
+ * (issue #1902). Owner, viewing a DAK IG's root: *"there are also 101 pages
  * under .../smart-trust/, which I would have expected only those in the IG
  * TOC. i think it is showing all the folio pages, not the harnessed
  * smart-trust's pages ... same for 'folders'."*

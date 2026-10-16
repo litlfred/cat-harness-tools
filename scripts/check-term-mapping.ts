@@ -85,8 +85,8 @@ interface GlossScheme {
  * any instance in this checkout.
  *
  * Found through the declarations, not a literal path: this script lives in
- * cat-harness and the glossary is declared by folio-assistant-core, a layer
- * ABOVE it. A hard-coded `folio-assistant-core/glossary` was an upward path no
+ * cat-harness and the glossary is declared by the content core, a layer
+ * ABOVE it. A hard-coded path to that layer's `glossary` was an upward path no
  * import gate sees, and it would scan nothing — silently — the day cat-harness
  * stands alone (separation placement review, 2026-10-06, bean `0r7u` step 0).
  */
