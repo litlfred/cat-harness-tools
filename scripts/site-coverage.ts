@@ -39,7 +39,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { toolSubjects } from "./gen-tools-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
@@ -158,7 +158,11 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     const legacy = visualiserRoute(forwardingParts(parts));
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
-    const instances = subjectInstances(v, root, dirs);
+    // A directory the checkout ROOT declares (`(root)`, the index's own
+    // `test/`) belongs to no instance and has no route segment, so no writer
+    // draws a page for it (`perInstanceSubjects` in state-visualizer.ts) and
+    // none is owed. Composing its route threw, and took the whole guard down.
+    const instances = subjectInstances(v, root, dirs).filter((i) => ROUTE_SEGMENT.test(i));
     for (const instance of instances) {
       const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
       const subLegacy = visualiserRoute(forwardingParts(sub));
