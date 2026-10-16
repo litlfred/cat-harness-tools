@@ -448,8 +448,8 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
   const qaStem = `kg-export.${instanceStub(inv.instance)}`;
   // The committed sidecar describes the DEPLOY's export, which passes no base.
   // Its findings name nodes by absolute IRI, so a stand-in base can never
-  // agree with it: measured 2026-10-04, `folio-assistant-core` and
-  // `smart-base` came out STALE under the stand-in and CURRENT without one.
+  // agree with it: measured 2026-10-04, the content core and the DAK base
+  // layer came out STALE under the stand-in and CURRENT without one.
   // So a stand-in run builds and counts the document and does not compare;
   // the base-less invocation of the same instance is the one that does
   // (bean `4ak5`).
@@ -640,7 +640,7 @@ const EXPORTED_STAR = /^export\s+(type\s+)?\*\s*(?:as\s+([A-Za-z_$][\w$]*)\s+)?f
  * and whether it also has a bare `export * from`.
  *
  * Re-exports count (bean `4ak5` follow-up, owner-approved 2026-10-05):
- * `folio-assistant-core/schemas/materialization.ts` re-exports
+ * the content core's `schemas/materialization.ts` re-exports
  * `SignatureSchema`, `SourceProvenanceSchema` and `FixitySchema` with
  * `export { … }`, which the publisher's import walk always saw and this half
  * never did. The exported name is the one AFTER `as`, since that is the key

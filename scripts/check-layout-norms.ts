@@ -5,7 +5,7 @@
  * ## The norm, in one sentence
  *
  * An instance's assets live at `<stub>/<asset>` — `cat-harness/skills/`,
- * `who-iris/library/`, `smart-base/methodologies/`. The owner, 2026-09-22:
+ * `<content>/library/`, `<ig>/methodologies/`. The owner, 2026-09-22:
  * *"dont bury sub-graph assets. same for `<stub>/skills`, etc."*
  *
  * ## What it measures, against the owner's NEWER ruling
@@ -48,7 +48,7 @@
  * ## Why the check is "nested inside another DECLARED directory"
  *
  * Depth is the wrong test and would produce false findings immediately.
- * `who-iris/library/` is two segments from the repository root and is exactly
+ * `<content>/library/` is two segments from the repository root and is exactly
  * right; `test/results/` is two segments from its instance root and is also
  * fine, because `test/` is not a graph. What is actually wrong is a declared
  * directory **contained by another declared directory** — then a consumer
@@ -63,8 +63,8 @@
  * ## Enforcement is a RATCHET, not a gate on the whole corpus
  *
  * Four instances nest `skills/voices` inside `skills/` today — `agent-skills`,
- * `folio-assistant-core`, `folio-assistant-sci` and `who-iris` (which took
- * them over from `who-style-guide`, bean `qsx4`). (Three,
+ * the content core, a paper folio and the IRIS replica (which took them over
+ * from a style-guide instance, bean `qsx4`). (Three,
  * said this line when it was written from a hand audit; the check found the
  * fourth. The baseline is the list, not this sentence.) Failing on those
  * would make this the "check that cries wolf is a check somebody switches off"
@@ -323,6 +323,10 @@ if (import.meta.main) {
       BASELINE,
       `${JSON.stringify(
         {
+          // The file's own declaration that a tool wrote it — the `_generated`
+          // key `check-reference-direction.ts` reads. Its pairs name the layers
+          // they were found in, which an authored file here may not do.
+          _generated: "scripts/check-layout-norms.ts --update — do not hand-edit",
           _comment:
             "Nested declared directories that EXIST and are not yet resolved. Not intended layout — " +
             "see scripts/check-layout-norms.ts. Anything not listed here fails the check, so this file " +

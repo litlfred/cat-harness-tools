@@ -4,7 +4,7 @@
  * Moved out of `routes/chat.ts` (bean `w2gr`, step 2). That route is server
  * code and moves to `cat-harness-tools`; the content half of an adapter —
  * `characterizeChanges` and `triageFeedback` — calls this too, and the owner
- * ruled on 2026-10-01 that `folio-assistant-core` does not depend on
+ * ruled on 2026-10-01 that the content core does not depend on
  * `cat-harness-tools`. A lazily built SDK client is neither, so it stays here
  * beside `git.ts` and `feedback.ts`, and `routes/chat.ts` re-exports it.
  *

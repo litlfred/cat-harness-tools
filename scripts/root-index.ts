@@ -112,7 +112,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
     // declares its own `canonicalUrl` mints `@id`s against that, so its
     // `docPath` is `<stub>.jsonld` under ITS base, while `instance-exports.ts`
     // writes the copy this site serves at `<stub>/<stub>.jsonld` (measured
-    // 2026-10-04 for cat-harness-tools, cat-openapi, fhir-harness, smart-base).
+    // 2026-10-04 for cat-harness-tools, cat-openapi, the FHIR IG harness, the DAK base layer).
     // Both are looked for, the foreign path first; the entry records which.
     const stub = artefactStub(decl);
     const served = [`${stub}/${stub}.jsonld`, id.docPath].find((p) => existsSync(join(site, p)));

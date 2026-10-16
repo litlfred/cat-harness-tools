@@ -189,7 +189,7 @@ function asLoadedBlock(
 export async function loadBlocksUnder(
   root: string,
   /**
-   * Kinds a dependency contributes (smart-base's DAK kinds, since bean
+   * Kinds a dependency contributes (a DAK base layer's DAK kinds, since bean
    * `1335`). Without them a contributed block — a persona, a user scenario,
    * a requirement — is silently not a block (litlfred/dth-hrh: 52 of 322).
    */

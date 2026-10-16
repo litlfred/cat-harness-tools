@@ -41,8 +41,8 @@
  * ## Why the site root is derived in the browser
  *
  * The same reason as `folio-mount.ts`, which this reuses rather than restates:
- * one generated page is served at several depths (`/who-iris/`,
- * `/folio-assistant/who-iris/`, `/STAGING/<branch>/who-iris/`), so a relative
+ * one generated page is served at several depths (`/<instance>/`,
+ * `/folio-assistant/<instance>/`, `/STAGING/<branch>/<instance>/`), so a relative
  * or absolute viewer URL is right on at most one of them. The caller passes
  * the route pattern; `siteRootOf` and the inlined client apply the same one.
  *
@@ -165,7 +165,7 @@ export function openShim(allow: readonly string[]): string {
       if (!href) { refuse("This viewer opens only documents this site publishes. Refused: " + src); return; }
       // pdf.js shows NOTHING on screen when the fetch fails: "0 of 0" and a
       // console line (v6.4.299). A 403 from a CDN read as an empty viewer
-      // (owner, 2026-10-15, who-iris). Say it, with the document's address.
+      // (owner, 2026-10-15, on the IRIS replica). Say it, with the document's address.
       var opened = app.open({ url: href });
       if (opened && typeof opened.catch === "function") {
         opened.catch(function (err) {

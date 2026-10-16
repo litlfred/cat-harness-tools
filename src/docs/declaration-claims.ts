@@ -210,9 +210,10 @@ export function claimsIn(markdown: string, file: string, graphs: GraphSources): 
  * | `library` | ingested source material nobody in this repository authored |
  *
  * **PATHS, not basenames**, and the difference was measured: `library` is
- * declared at `who-iris/library/`, `agent-skills/library/` and
- * `folio-assistant-sci/library/` as well as at the root. Pruning a walk by
- * first segment would have skipped the whole of `who-iris/` — three instances
+ * declared at `agent-skills/library/` and in two content layers' directories
+ * (the IRIS replica's and the formal-math layer's) as well as at the root.
+ * Pruning a walk by first segment would have skipped the whole of the IRIS
+ * replica's directory — three instances
  * silently unexamined, reported as a clean run. The `dh4f` shape arriving
  * through a convenience.
  */
@@ -227,9 +228,9 @@ export function historicalPrefixes(repoRoot: string): string[] {
       // `cat-harness/beans/` and `cat-harness/fsh-guts/`, neither of which
       // exists — those are `scope: "repository"`. The fix that followed joined
       // EVERY path onto the repository root instead, which is the same mistake
-      // the other way: an instance-scoped bean store (folio-assistant-core's
+      // the other way: an instance-scoped bean store (the content core's
       // and cat-harness-tools' own `beans/`, separated 2026-10-09) or
-      // `who-iris/library/` resolved to a root directory that is not there,
+      // the IRIS replica's `library/` resolved to a root directory that is not there,
       // and their history was read as live claims. `rootForScope` is the rule
       // the declaration resolver itself uses.
       const abs = resolve(rootForScope(instance, entry.scope), entry.path);

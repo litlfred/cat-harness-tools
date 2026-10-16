@@ -3,7 +3,7 @@
  *
  * ## Why this module exists at all
  *
- * Owner, 2026-09-21, looking at the who-iris rail working: *"we should have
+ * Owner, 2026-09-21, looking at the IRIS replica's rail working: *"we should have
  * same navbar across all folios though. presented same way. need to comine
  * the two."*
  *
@@ -95,7 +95,7 @@ export interface NavItem {
    * DECLARED, never inferred from the mark. A kind row sits in the strip's
    * column (bean `yag0`, the `a.fa-nav-kind` rule in {@link navbarCss}), and
    * that class used to be read off `glyphPath`: "an SVG mark means a kind".
-   * True only until #2122 gave seven HARNESSES glyph marks — smart-trust and
+   * True only until #2122 gave seven HARNESSES glyph marks — a DAK IG and
    * SMART Base then took the kind rows' indent and sat flush left of the
    * avatar-marked harnesses beside them (#2151, owner: *"alignment of
    * harnesses is off"*). What a row IS decides where it sits; what its mark
@@ -169,7 +169,7 @@ export interface NavItem {
    *
    * The Jekyll sidebar has rendered these since `603s` (`.fa-harness-tab__graphs`)
    * and this rail never has, which is the single largest difference between the
-   * two surfaces: the sidebar lets a reader reach `who-iris/library/` from the
+   * two surfaces: the sidebar lets a reader reach an instance's `library/` from the
    * harness row, and the rail stops at the harness. `sjic` calls that *"two
    * implementations of one navbar, disagreeing about whether a reader can reach
    * a graph"*.
@@ -545,7 +545,7 @@ export function navbarCss(): string {
     // A graph-typology row carries its OWN mark (bean `yag0`), so it sits in the
     // strip's column like the inert rows beside it. Indented as above, a
     // LINKED row's mark was pushed past the 56px strip at rest while an inert
-    // row's was not — measured on a built /who-iris/ page — so the strip showed
+    // row's was not — measured on a built IRIS replica page — so the strip showed
     // marks only for the rows that do not open.
     `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
     `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX}px}`,

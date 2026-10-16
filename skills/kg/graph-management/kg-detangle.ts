@@ -106,7 +106,7 @@ const LITERAL_SCAN: Array<{ path: string }> = [
  * measurements, so a package is measured wherever its owner declares it.
  *
  * A declared directory nested inside one already scanned (e.g.
- * `folio-assistant-sci/skills/lean/` under `folio-assistant-sci/skills/`) is
+ * a layer's `skills/lean/` under that same layer's `skills/`) is
  * dropped, because scanning both would count its nodes twice.
  */
 function declaredSkillScan(literal: ReadonlyArray<{ path: string }>): Array<{ path: string }> {
@@ -145,8 +145,8 @@ const WIDENED = new Set(SCAN.slice(LITERAL_SCAN.length).map((s) => s.path));
  *
  * Topic membership is option A (bean `1g4s`): the same-named directory of every
  * instance stacked on the declarer is a MEMBER of the topic, never a group of
- * its own — `folio-assistant-core` declares `content`, so
- * `folio-assistant-sci/skills/content/authoring-math` is the group, exactly as
+ * its own — the content core declares `content`, so the formal-math layer's
+ * `skills/content/authoring-math` is the group, exactly as
  * `cat-harness/skills/authoring/authoring-math` was before placement PR1 moved
  * it. Only the widened entries inherit: the literal ones were measured with
  * their own topics before this change, and their groups must not shift.
@@ -337,7 +337,7 @@ const dangling: Array<{ from: string; ref: string; via: string }> = [];
 // `Record<string, "enforced" | "recorded">` — two of the three levels — while
 // the table below assigns `"prose"` and line 157 assigns it directly. A real
 // TS2322 that nothing caught, because `tsconfig.json` did not include this
-// tree; `detangle/`, `large-datasets/`, `who-iris/` and `folio-assistant-sci/`
+// tree; `detangle/`, `large-datasets/` and two content layers' directories
 // were all outside the program while the file's own comment said "Every tree
 // is now compiled".
 const AUTHORITY: Record<string, EdgeAuthority> = {

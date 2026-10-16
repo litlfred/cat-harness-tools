@@ -41,7 +41,7 @@
  *
  * ## EXEMPT carries a reason, and a stale entry is itself a finding
  *
- * A content library's mark is its own. `who-iris` and `smart-trust` replicate
+ * A content library's mark is its own. The IRIS replica and a DAK IG replicate
  * someone else's identity, and choosing a glyph for them here would be this
  * repository inventing a mark for an organisation that has one. They are
  * exempt WITH THAT REASON, printed on every clean run so the hand-maintained
@@ -70,7 +70,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * here does.
  *
  * It surfaced as the exemptions reading stale, not as a silent pass: with no
- * instances found, `who-iris` and `smart-trust` were "gone", which is a
+ * instances found, both were "gone", which is a
  * finding. The guard caught the check's own misconfiguration before the
  * check could report a clean run over nothing — `dh4f`, avoided rather than
  * repeated.
@@ -80,17 +80,17 @@ const REPO = repoRootFor(HARNESS_ROOT);
 /**
  * Why an instantiated harness may carry no mark of its own.
  *
- * `who-iris` LEFT THIS LIST on 2026-09-23, and the exemption's own rule is
+ * The IRIS replica LEFT THIS LIST on 2026-09-23, and the exemption's own rule is
  * what removed it: an entry naming an instance that has since declared an
  * avatar fails, and this check reported exactly that before anyone noticed.
  *
  * The reason it carried — *"its mark is not this repository's to choose"* —
- * was about the LOGO, and the owner has now separated the two: *"no logo on
- * who-iris icon (for now). just WHO blue"*. Using an organisation's published
+ * was about the LOGO, and the owner has now separated the two (paraphrased):
+ * no logo on the IRIS replica's icon for now, only its organisation's blue. Using an organisation's published
  * colour with a neutral glyph is not inventing its identity, which is what the
  * exemption existed to prevent.
  *
- * `smart-trust` LEFT IT on 2026-10-04 (bean `2vpn`), on the same line. Its
+ * The DAK IG LEFT IT on 2026-10-04 (bean `2vpn`), on the same line. Its
  * entry was an agent's call, not a ruling, and the "art of its own" it
  * pointed at was the platform owner's shared operations card. Offered the
  * choice, the owner picked a WHO-blue glyph, so the list is empty — and an

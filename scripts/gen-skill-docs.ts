@@ -499,7 +499,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // Placement PR6 (bean `apcg`): the cataloguing methods that moved up out of
   // the harness's `library-core`.
   cataloguing: "Cataloguing methods (cataloguing)",
-  // folio-assistant-core 6fc33b4 (bean `0jtl`): a pointer package naming the
+  // The content core's 6fc33b4 (bean `0jtl`): a pointer package naming the
   // review skills in reading order. Without a heading `skills:docs` throws and
   // `skill:register` stops.
   review: "Where to start reviewing a large folio (review)",
@@ -607,11 +607,11 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // collision `todo-manager` and `bean-coordination` are listed for below, and
   // it is resolved the same way.
   "kg-navigation": "Knowledge-graph navigation (tooled)",
-  // folio-assistant-core’s own `skills/`, keyed by DECLARED ID for the same
+  // The content core’s own `skills/`, keyed by DECLARED ID for the same
   // reason as the two below it: the directory moves when core splits out and
   // the id does not. A LABEL is data, not a dependency — nothing here imports
   // core, so naming its package does not invert the layer order that
-  // `folio-assistant-core.json`’s `needs: ["cat-harness"]` fixes.
+  // the content core's declared `needs: ["cat-harness"]` fixes.
   //
   // THE OWNER'S ids since placement PR0 (bean `ejye`): the platform's mirrors
   // (`folio-assistant-core-skills`, `folio-assistant-sci-lean-skills`, …) are
@@ -627,7 +627,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // the `large-datasets-skills` root of its own instance before.
   "large-datasets": "Large data sets (subsetting, materializing, publishing)",
   "who-iris-skills": "WHO IRIS (catalogue instance)",
-  // The `fhir-harness` instance's two packages, keyed by BASENAME because they
+  // The FHIR IG harness instance's two packages, keyed by BASENAME because they
   // are package subdirectories of a declared root (`fhir-ig-skills`), not roots
   // holding skills directly. Two headings rather than one "FHIR IG" because the
   // packages answer different questions — how an IG is BUILT versus how a

@@ -214,7 +214,7 @@ function toolsDir(assistant: string): string {
  *
  * which assumed every adapter lives under the same instance. That stopped
  * being true on 2026-09-30, when `adapters/paper/` moved to
- * `folio-assistant-sci/` (bean `y5si`): one template cannot name two
+ * the formal-math (sci) layer (bean `y5si`): one template cannot name two
  * instances, so every paper folio scaffolded after the move would have got an
  * `adapterModule` pointing at a path that does not exist.
  *
@@ -272,7 +272,7 @@ function standsOn(assistant: string, contentType: InitFolioOptions["contentType"
   const declared = BUILTIN_ADAPTERS.find((a) => a.contentType === contentType);
   if (!declared) return harness;
   // The adapter's module is relative to the harness directory and passes
-  // through its instance's directory: `../folio-assistant-core/adapters/…`.
+  // through its instance's directory: `../<content-core>/adapters/…`.
   const segments = posixSegments(`${platformDir(assistant)}/${declared.module}`);
   const at = segments.lastIndexOf(declared.instance);
   return at < 0 ? harness : { name: declared.instance, path: segments.slice(0, at + 1).join("/") };
@@ -468,7 +468,7 @@ function instanceDeclaration(o: MaybeFolio): string {
       // than none. With a `version` beside it, always: `releaseIris` mints
       // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
       // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
-      // which is how the restored smart-trust and smart-immunizations
+      // which is how two restored DAK IG
       // declarations broke their IG publish on 2026-10-15.
       ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
       // A contentless instance declares no `folio` directory: declaring one it
@@ -873,9 +873,9 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
  * gets no STAGING build, and a reviewer has no "after" to compare.
  *
  * **A document folio gets it ON**, building with
- * `folio-assistant-core/scripts/build-document-site.ts` (bean `fyu2`). That
+ * the content core's `scripts/build-document-site.ts` (bean `fyu2`). That
  * command was rehearsed end to end on a folio this function scaffolds: site,
- * ChangeSet and banner. The path is `folio-assistant-core/` rather than
+ * ChangeSet and banner. The path is under the content core rather than
  * `cat-harness/` as of bean `yj6r`, 2026-09-30: rendering a folio to a site is
  * CONTENT machinery, and the script reads core's `schemas/changeset.ts`. The
  * string here is the invocation a scaffolded folio's staging workflow carries,

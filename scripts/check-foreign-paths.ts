@@ -196,7 +196,7 @@ export function scanText(
         if (nestedInAnotherCall(code, range[0], at)) continue;
         // ...and not when the call builds from the INSTANCE's own root:
         // `join(INSTANCE, "docs")` is that instance's directory (gz47, measured
-        // on fhir-harness), whatever another instance also declares.
+        // on the FHIR IG harness), whatever another instance also declares.
         if (INSTANCE_BASE.test(code.slice(range[0], at))) continue;
       }
       const site: ForeignSite = { file, line: n + 1, literal: value, target: hit.dir, owner: hit.owner };

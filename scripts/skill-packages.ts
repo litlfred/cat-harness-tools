@@ -102,7 +102,7 @@ export function discoverLocalPackages(root: string): Record<string, string> {
     // A kg directory may hold skills DIRECTLY as well as in subdirectories,
     // and BOTH shapes are real: `skills/` holds none directly and every
     // package is a subdirectory, while `bootstrap/skills/` and
-    // `who-iris/skills/` hold theirs at their root with no subdirectory.
+    // the IRIS replica's `skills/` hold theirs at their root with no subdirectory.
     //
     // The worked example through the rest of this comment is `src/skills/`,
     // which held `corpus-grep.md` beside the `.ts` implementing it. It is GONE
@@ -152,7 +152,7 @@ export function discoverLocalPackages(root: string): Record<string, string> {
     // `bootstrap/skills/` stays `bootstrap`, both measured unchanged
     // at the time; `theming/` becomes `theming`. Since #760 removed
     // `src/skills/`, the live subjects of rule 1 are `bootstrap/skills/` and
-    // `who-iris/skills/` — `kg-navigation/skills/` was one until bean `byql`
+    // the IRIS replica's `skills/` — `kg-navigation/skills/` was one until bean `byql`
     // folded it into `skills/kg/kg-navigation/`, and `large-datasets/skills/`
     // until bean `j7ql` dissolved it into `skills/library/large-datasets/`.
     //

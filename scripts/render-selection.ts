@@ -88,7 +88,7 @@ export interface StepInputs {
    * Graph TYPOLOGIES whose declared directories this step reads.
    *
    * **Preferred over spelling the paths into `inputs`.** `check:declared-paths`
-   * caught the first draft listing `who-iris/skills`, `kg-navigation/skills`
+   * caught the first draft listing a content layer's `skills`, `kg-navigation/skills`
    * and six more as literals, and it was right to: `harness.json` already
    * answers "where do the skills live", and a second answer goes stale the
    * moment a directory moves — while the render would go on hashing a path

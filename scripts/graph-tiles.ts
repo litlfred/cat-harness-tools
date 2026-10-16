@@ -486,7 +486,7 @@ export function withTileCounts(
  *
  * Issue #863. A tile's count is keyed by directory id ({@link withTileCounts}),
  * but a scoped viewer's generator knows the SUBJECT it is rendering — an
- * instance name like `folio-assistant-core` — not the id of the directory whose
+ * instance name like the content core's — not the id of the directory whose
  * declaration produced the tile. The obvious bridge is to compose one from the
  * other, and it is wrong on this repository's own corpus:
  *
@@ -494,7 +494,7 @@ export function withTileCounts(
  * |---|---|
  * | `detangle` | `detangle-schemas` |
  * | `large-datasets` | `large-datasets-schemas` |
- * | **`folio-assistant-core`** | **`folio-assist-core-schemas`** |
+ * | **the content core** | **`folio-assist-core-schemas`** |
  *
  * Three follow `${subject}-schemas` and the fourth does not. A composed key
  * would have badged three tiles, left the fourth silently uncounted, and

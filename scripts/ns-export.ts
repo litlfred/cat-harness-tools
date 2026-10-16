@@ -119,7 +119,7 @@ export function vocabularyIri(): string {
   //
   // Nothing is lost by moving: no term hangs off this document. Every term
   // lives in its layer's namespace (`bootstrap/ns`, `cat-harness/ns`,
-  // `folio-assistant-core/ns`), each of which IS a file and dereferences. The
+  // the content core's `ns`), each of which IS a file and dereferences. The
   // union is a convenience for a person reading the whole vocabulary at once,
   // so it can sit anywhere that resolves.
   return `${LEGACY_FOLIO_NS.replace(/ns#$/, "")}ns/vocabulary.jsonld`;

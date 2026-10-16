@@ -3,7 +3,7 @@
  *
  * Moved verbatim out of `src/types.ts` (bean `w2gr`, step 1). That file is the
  * server's plug-in contract and moves to `cat-harness-tools`; these types are
- * what a content package (`folio-assistant-core`'s document adapter, sci's
+ * what a content package (the content core's document adapter, sci's
  * paper adapter) implements and returns, and the owner ruled on 2026-10-01 that
  * core does not depend on that layer. (Superseded the same day by ruling C1,
  * which put the tools layer BELOW core; the content model staying in the

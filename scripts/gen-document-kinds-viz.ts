@@ -13,8 +13,8 @@
  * is nothing to filter.
  *
  * Generic on purpose: core knows that document kinds exist and never which
- * (`schemas/document-kind.ts`). The WHO DAK and L1 kinds are smart-base's
- * DATA, and this page draws them because smart-base declares them — the same
+ * (`schemas/document-kind.ts`). The WHO DAK and L1 kinds are the DAK base
+ * layer's DATA, and this page draws them because that layer declares them — the same
  * way it would draw any other harness's. Stage D5 of the smart-* separation,
  * #1767, bean `qvxh`.
  *
