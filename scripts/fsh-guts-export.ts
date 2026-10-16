@@ -44,7 +44,8 @@ import {
   artefactStub,
   readDeclaration,
   repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { NS_PREFIXES, propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.js";
 import { exitUnlessMounted } from "./branch-store.js";
@@ -243,7 +244,7 @@ export function buildFshGutsExport(root: string = ROOT, baseUrl?: string): FshGu
 
   return {
     "@context": {
-      ...NS_PREFIXES,
+      ...ownPrefixTable(),
       // `name` and `description` exactly as the main export maps them, and
       // now structurally so: both bindings are DERIVED from the row
       // kg-export's own context is derived from, table `kg-node-naming`
@@ -259,8 +260,8 @@ export function buildFshGutsExport(root: string = ROOT, baseUrl?: string): FshGu
       // expanded to an absolute IRI with the scheme `rdfs`, not to RDFS's
       // label (measured with the `jsonld` processor).
       ...contextBindings([vocabMapping(ROOT, "kg-node-naming")], {
-        inContext: NS_PREFIXES,
-        prefixes: { ...STANDARD_PREFIXES, ...NS_PREFIXES },
+        inContext: ownPrefixTable(),
+        prefixes: { ...STANDARD_PREFIXES, ...ownPrefixTable() },
         only: ["name", "description"],
       }),
       Subgraph: termIri("Subgraph"),

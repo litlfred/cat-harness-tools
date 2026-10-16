@@ -10,6 +10,7 @@
  *  3. the constants code reads are the list's values, so the two cannot drift.
  */
 import { afterAll, describe, expect, test } from "bun:test";
+import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -164,6 +165,7 @@ describe("our namespaces are the code list's values", () => {
     const found = [...jsonLdNamespacesInUse().keys()];
     expect(found).toContain("http://www.w3.org/ns/prov#");
     expect(found).toContain("http://www.w3.org/2004/02/skos/core#");
-    expect(found.filter((iri) => ns.OWN_NAMESPACE_VALUES.some((o) => iri.startsWith(o) || o.startsWith(iri)))).toEqual([]);
+    const ours = ownNamespaceValues();
+    expect(found.filter((iri) => ours.some((o) => iri.startsWith(o) || o.startsWith(iri)))).toEqual([]);
   });
 });

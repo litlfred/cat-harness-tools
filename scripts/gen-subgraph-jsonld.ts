@@ -121,7 +121,8 @@ import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceRootsIn
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { NS_PREFIXES, propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import {
   HEAVY_POINTERS,
   PAYLOAD_MEDIA_TYPES,
@@ -315,7 +316,7 @@ export const HEAVY_LITERAL_BYTES = 16 * 1024;
 type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
 
 /**
- * The own-namespace prefixes (`NS_PREFIXES` keys — each an instance's stub) a
+ * The own-namespace prefixes (`ownPrefixTable()` keys — each an instance's stub) a
  * subgraph file written under `root` may use as CURIEs: the stubs of `root`'s
  * instance and of every instance it `needs`, transitively. `undefined` when
  * `root`'s declaration is not among the checkout's instances — nothing is
@@ -327,9 +328,9 @@ type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
  * to `root`'s instance, and `check:jsonld-contexts` (`gen-instance-contexts`)
  * resolves the prefixes it uses through that instance's flattened table —
  * its own, plus those of what it `needs`. The framing context used to bind
- * every one of `NS_PREFIXES`, so an IRI in the namespace of an instance ABOVE
- * `root` compacted to a CURIE: cat-harness's root frames core's graph kinds
- * (`folio-assistant-core:graphTypology/library`, …), and the overlaid
+ * every own prefix (`ownPrefixTable()`), so an IRI in the namespace of an instance ABOVE
+ * `root` compacted to a CURIE: cat-harness's root frames the content layer's graph kinds
+ * (`<content prefix>:graphTypology/catalogue`, …), and the overlaid
  * content-core tree names its own. cat-harness does not need core
  * — core is above it — so the CURIE was unbound in the one table that governs
  * the file, and `jsonld:contexts` failed `derive:publish`.
@@ -371,7 +372,7 @@ export function subgraphContext(inScope?: ReadonlySet<string>): Record<string, u
   const dropped = new Map<string, string>(
     inScope === undefined
       ? []
-      : Object.entries(NS_PREFIXES as Readonly<Record<string, string>>).filter(([k]) => !inScope.has(k)),
+      : Object.entries(ownPrefixTable()).filter(([k]) => !inScope.has(k)),
   );
   const expandDropped = (v: unknown): unknown => {
     if (typeof v === "string") {

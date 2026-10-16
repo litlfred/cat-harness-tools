@@ -128,7 +128,8 @@ import { tagCompatible } from "@litlfred/bootstrap-tools/schemas/release-iri.ts"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { NS_PREFIXES, ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
@@ -673,7 +674,7 @@ export function buildGlossary(opts: {
       dcterms: DCTERMS,
       owl: OWL,
       rdfs: RDFS,
-      ...NS_PREFIXES,
+      ...ownPrefixTable(),
       label: "rdfs:label",
       prefLabel: "skos:prefLabel",
       altLabel: "skos:altLabel",

@@ -18,6 +18,8 @@
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
+ *   bun run cat mount:repin:standing [--dry-run]
+ *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts, #401)
  *
  * `state:mount` runs the mount after the branch mounts, so the session-start
  * hook needs no second entry point.
@@ -1218,7 +1220,7 @@ export function regenerateAgentSurface(root: string): { ok: boolean; lines: stri
 }
 
 /** The lock's bytes, or `undefined` when there is none — compared before and after a mount. */
-function lockBytes(root: string): string | undefined {
+export function lockBytes(root: string): string | undefined {
   const f = join(root, mountLockFilename());
   return existsSync(f) ? readFileSync(f, "utf-8") : undefined;
 }
@@ -1227,7 +1229,7 @@ function lockBytes(root: string): string | undefined {
  * After a mount: when the lock changed and the caller did not opt out,
  * re-render the agent surface and fold its outcome into the exit code.
  */
-function afterMount(root: string, before: string | undefined, argv: string[], code: number): number {
+export function afterMount(root: string, before: string | undefined, argv: string[], code: number): number {
   if (argv.includes("--no-agent-surface") || lockBytes(root) === before) return code;
   const r = regenerateAgentSurface(root);
   console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);

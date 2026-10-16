@@ -22,7 +22,8 @@ import {
   type PayloadPlan,
   type SubgraphPlan,
 } from "../gen-subgraph-jsonld.js";
-import { NS_PREFIXES, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import jsonld from "jsonld";
 import { exportIdentity } from "../kg-export.js";
 import { expandFindings, type localLoader } from "../publish-verify.js";
@@ -273,12 +274,12 @@ describe("gen-subgraph-jsonld", () => {
  * own-namespace prefix of an instance above it must not be compacted to.
  */
 describe("own-namespace prefixes stay inside the writing instance's reach", () => {
-  const ALL = Object.keys(NS_PREFIXES);
+  const ALL = Object.keys(ownPrefixTable());
 
   test("an out-of-scope prefix is not bound, and no term is defined through it", () => {
     const [kept, ...rest] = ALL;
     const ctx = subgraphContext(new Set([kept]));
-    expect(ctx[kept]).toBe((NS_PREFIXES as Record<string, string>)[kept]);
+    expect(ctx[kept]).toBe((ownPrefixTable() as Record<string, string>)[kept]);
     const text = JSON.stringify(ctx);
     for (const p of rest) {
       expect(ctx[p]).toBeUndefined();
@@ -286,12 +287,12 @@ describe("own-namespace prefixes stay inside the writing instance's reach", () =
     }
     // No narrowing without a scope: every own prefix is bound, as before.
     const full = subgraphContext();
-    for (const p of ALL) expect(full[p]).toBe((NS_PREFIXES as Record<string, string>)[p]);
+    for (const p of ALL) expect(full[p]).toBe((ownPrefixTable() as Record<string, string>)[p]);
   });
 
   test("a foreign IRI is spelt in full, and the triples are the ones the CURIE gave", async () => {
     const foreign = ALL[ALL.length - 1];
-    const ns = (NS_PREFIXES as Record<string, string>)[foreign];
+    const ns = (ownPrefixTable() as Record<string, string>)[foreign];
     const narrow = subgraphContext(new Set(ALL.filter((p) => p !== foreign)));
     const full = subgraphContext();
     const node = { "@id": "https://x.test/subgraph/h/", "@type": termIri("Subgraph"), holdsGraph: [`${ns}graphTypology/library`] };

@@ -42,6 +42,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { namespaceForLayer } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -81,7 +82,8 @@ function pairsIn(workflow: string): Array<{ layer: Layer; dir: string }> {
 
 /** The path segment a layer's namespace IRI names, e.g. `folio-assistant-core`. */
 function segmentOf(layer: Layer): string {
-  const ns = namespaceForLayer(layer);
+  // The core layer's namespace is its declaring instance's (folio-assistant#2598).
+  const ns = layer === "core" ? contentLayerInstance()!.namespace : namespaceForLayer(layer);
   // Skipping a release segment (`0.1.0`), which is the version and not the layer.
   const m = ns.match(/\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns#$/);
   if (!m) throw new Error(`namespace for ${layer} is not <base>/<segment>/ns#: ${ns}`);

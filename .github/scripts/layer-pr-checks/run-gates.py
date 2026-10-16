@@ -124,12 +124,18 @@ TIMEOUT_S = 1200
 # each has a CI run: a fact about other PRs at the moment the job runs, so it
 # moved between base and head on fhir-harness#83 (an unrelated folio-assistant
 # PR was "too-new" on base and "no-run" on head).
+# check:quiet-claims asks GitHub which beans an OPEN pull request or an
+# unmerged branch names (`check-quiet-claim-liveness.ts`): the same kind of
+# fact about other PRs. On smart-base run 38866215814 it hit the 1200 s
+# timeout and exited 2 on head, judging nothing, while holding one of the
+# shard's four slots for twenty minutes (cat-harness-tools#397).
 LIVE_STATE_SCRIPTS = {
     "check:ci-health",
     "check:head-has-run",
     "check:dependency-advisories",
     "check:merged",
     "check:prs-have-runs",
+    "check:quiet-claims",
     "post-merge:regen:check",
 }
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
@@ -338,11 +344,46 @@ def parse_shard(value):
     return i, n
 
 
-def shard_names(names, i, n):
-    """The names shard i of n runs: those whose index in sorted(names) is i-1 mod n.
-    Returned in the order `names` gives them, so n == 1 runs exactly today's order."""
-    mine = {x for k, x in enumerate(sorted(names)) if k % n == i - 1}
-    return [x for x in names if x in mine]
+def shard_names(names, i, n, timings=None):
+    """The names shard i of n runs.
+
+    With no `timings`, those whose index in sorted(names) is i-1 mod n, returned
+    in the order `names` gives them, so n == 1 runs exactly today's order.
+
+    With `timings` (gate name -> seconds, from an earlier run's gates.json),
+    the shards are balanced by time instead of by count (cat-harness-tools#397:
+    on smart-base run 38866215814 the count split gave one head shard 2267 s of
+    gates and another 626 s, and the slowest shard is the run's wall time).
+    Longest first, each gate goes to the shard with the least time so far; a
+    gate with no timing counts as the median, and ties go by name, so every
+    shard of a side computes the same partition from the same file. Still
+    returned in the order `names` gives them.
+    """
+    if not timings or n == 1:
+        mine = {x for k, x in enumerate(sorted(names)) if k % n == i - 1}
+        return [x for x in names if x in mine]
+    known = sorted(t for t in (timings.get(x) for x in names) if t is not None)
+    fallback = known[len(known) // 2] if known else 1.0
+    cost = {x: timings.get(x, fallback) for x in names}
+    load = [0.0] * n
+    owner = {}
+    for x in sorted(names, key=lambda x: (-cost[x], x)):
+        k = min(range(n), key=lambda s: (load[s], s))
+        owner[x] = k
+        load[k] += cost[x]
+    return [x for x in names if owner[x] == i - 1]
+
+
+def read_timings(path):
+    """gate name -> seconds from a gates.json an earlier run wrote (`GATE_TIMINGS`),
+    or None when unset, absent or unreadable: then the shards split by count."""
+    if not path:
+        return None
+    got = read_json(path)
+    if not isinstance(got, dict):
+        return None
+    out = {k: float(v["seconds"]) for k, v in got.items() if isinstance(v, dict) and isinstance(v.get("seconds"), (int, float))}
+    return out or None
 
 
 def tree_snapshotting(root):
@@ -438,7 +479,8 @@ def main():
         own, harness, runner, gates, skipped = derive(args[0], given, tmp)
         listed = {"own": own, "harness": harness, "runner": runner, "gates": gates, "skipped": skipped}
         if os.environ.get("GATE_SHARD", "").strip():
-            listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards)}
+            timings = read_timings(os.environ.get("GATE_TIMINGS"))
+            listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings)}
             listed["skipped"] = skipped if shard == 1 else {}
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
         json.dump(listed, sys.stdout, indent=1)
@@ -453,10 +495,12 @@ def main():
     print(f"script runner: {runner}", flush=True)
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     total = len(gates)
-    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards)}
+    timings = read_timings(os.environ.get("GATE_TIMINGS"))
+    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings)}
     if shard != 1:
         skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once
-    print(f"shard {shard}/{shards}: {len(gates)} of {total} gate(s)", flush=True)
+    split = "by recorded seconds" if timings and shards > 1 else "by count"
+    print(f"shard {shard}/{shards}: {len(gates)} of {total} gate(s), split {split}", flush=True)
 
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
