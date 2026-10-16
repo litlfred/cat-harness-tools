@@ -136,6 +136,24 @@ export function viewKindOf(name: string): ViewKind | undefined {
   return undefined;
 }
 
+/**
+ * The {@link ViewKind} of an entry's held source when its page will draw a view
+ * panel for it — the condition {@link entryRepoLinks} sets `view` under: not
+ * withheld, a source on disk ({@link sourceFileOf}), in a repository a link
+ * can name, of a kind a viewer shows.
+ */
+export function viewableOf(
+  repoRoot: string,
+  e: SourceEntry & { withheld?: unknown },
+  uploads: readonly SourceUpload[],
+  checkoutRepo: string | undefined,
+): ViewKind | undefined {
+  if (e.withheld) return undefined;
+  const source = sourceFileOf(repoRoot, e, uploads);
+  if (!source || !forgeAt(repoRoot, source, checkoutRepo)) return undefined;
+  return viewKindOf(basename(source));
+}
+
 /** What the view panel needs: the kind, the bytes, and for a PDF the pdf.js viewer's page-relative href. */
 export interface ViewSource {
   kind: ViewKind;

@@ -233,6 +233,13 @@ export interface LibraryEntry {
    */
   view?: string;
   /**
+   * The kind of viewer the entry's held source opens in — attached by the
+   * caller (`gen-library-viz`), set only when the page at {@link view} draws a
+   * view panel for it. The folio glass reads it to show its eye (owner,
+   * 2026-10-16). Absent means no viewer, or nobody derived it.
+   */
+  viewable?: "pdf" | "image";
+  /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,

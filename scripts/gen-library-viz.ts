@@ -59,7 +59,7 @@ import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -389,6 +389,17 @@ var CONFIG = (function(){
   try { return JSON.parse(el ? el.textContent : "{}") || {}; } catch (_e) { return {}; }
 })();
 var DATA_HREF = new URL(String(CONFIG.data || ""), location.href).href;
+/* ARRIVING AT #lib-view OPENS THE VIEW PANEL -- the folio glass's eye links
+   here (owner, 2026-10-16: "there should be [eye] icon to look at it"), and a
+   reader who pressed it came to look, not to press a second toggle. Opening
+   the panel is what loads the viewer (pdf-viewer's toggle rule). */
+function openViewPanel(){
+  if (location.hash !== "#lib-view") return;
+  var d = document.querySelector("#lib-view details");
+  if (d && !d.open) d.open = true;
+}
+openViewPanel();
+window.addEventListener("hashchange", openViewPanel);
 /* The SUBJECT this page is scoped to, or "" for the handler's whole view.
    One projection serves both — a second JSON per subject would be the same
    facts written N+1 times, free to disagree the moment one is regenerated. */
@@ -1656,6 +1667,10 @@ if (import.meta.main) {
   const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || LINK_REPO;
   for (const e of g.entries) {
     e.view = entryView(e, roots, relative(site, join(pageDir, e.instance, e.id)).split(sep).join("/"));
+    // The same test the entry page's view panel passes (`entryRepoLinks`): a
+    // held, published source whose kind has a viewer.
+    const kind = viewableOf(repoRoot, e, g.uploads, checkoutRepo);
+    if (kind) e.viewable = kind;
   }
 
   emit(join(dataDir, "index.json"), JSON.stringify(projection(g, scoped), null, 2) + "\n");
