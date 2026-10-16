@@ -34,7 +34,7 @@ import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.
 import type { LibraryGraph } from "../library-graph.ts";
 import { entryRepoLinks, forgeAt, sourceFileOf, viewKindOf } from "../lib/library-source.ts";
 import { readEntryDocument } from "../lib/library-document.ts";
-import { VIEWER_PATH } from "../pdf-viewer.ts";
+import { MARKER as PDF_MARKER, VIEWER_PATH } from "../pdf-viewer.ts";
 
 const SITE = "/site";
 const DATA = join(SITE, "assets", "library");
@@ -237,7 +237,7 @@ describe("an entry's repository links name the repository that holds it", () => 
 });
 
 describe("the primary asset has a view panel near the top (owner, 2026-10-16)", () => {
-  const pdf = { label: "e 1.pdf", href: "../../viewer.html?src=x", what: "source PDF", view: "pdf" as const };
+  const pdf = { label: "e 1.pdf", href: "../../viewer.html?src=x", what: "source PDF", view: { kind: "pdf" as const, src: "https://raw/e1.pdf", viewer: "../../viewer.html" } };
   const rest = [{ label: "manifest.jsonld", href: "m.jsonld", what: "JSON-LD" }];
 
   test("only a kind with a viewer is viewable", () => {
@@ -251,15 +251,20 @@ describe("the primary asset has a view panel near the top (owner, 2026-10-16)", 
     mkdirSync(join(repo, "uploads", "e1"), { recursive: true });
     writeFileSync(join(repo, "uploads", "e1", "e1.pdf"), "%PDF");
     const l = entryRepoLinks({ repoRoot: repo, dir: "lib/e1", source: "uploads/e1/e1.pdf", checkoutRepo: "o/host", viewerHref: "v.html" });
-    expect(l.filter((x) => x.view).map((x) => x.label)).toEqual(["e1.pdf"]);
+    expect(l.filter((x) => x.view).map((x) => [x.label, x.view])).toEqual([
+      ["e1.pdf", { kind: "pdf", src: "https://raw.githubusercontent.com/o/host/main/uploads/e1/e1.pdf", viewer: "v.html" }],
+    ]);
   });
 
-  test("the entry page draws the panel under the head, above the listing, closed until opened", () => {
+  test("the entry page draws the panel under the head, above the listing, closed, with the shared pdf.js embed", () => {
     const html = entryPageHtml("../../../../assets/library/index.json", "inst", "../../", { id: "e1", sources: [...rest, pdf] });
     const at = (needle: string): number => html.indexOf(needle);
     expect(at('id="lib-view"')).toBeGreaterThan(at('id="lib-title"'));
     expect(at('id="lib-view"')).toBeLessThan(at('id="listing"'));
-    expect(html).toContain('<iframe src="../../viewer.html?src=x" title="e 1.pdf" loading="lazy">');
+    expect(html).toContain(PDF_MARKER);
+    expect(html).toContain('data-src="https://raw/e1.pdf"');
+    expect(html).toContain('src="about:blank"'); // nothing fetched until the panel opens
+    expect(html).toContain(JSON.stringify("../../viewer.html"));
     expect(html).not.toMatch(/<details open/);
   });
 
@@ -270,7 +275,7 @@ describe("the primary asset has a view panel near the top (owner, 2026-10-16)", 
   });
 
   test("an image is drawn as itself", () => {
-    expect(viewPanelHtml([{ label: "c.png", href: "c.png", what: "image", view: "image" }])).toContain('<img src="c.png" alt="c.png" loading="lazy">');
+    expect(viewPanelHtml([{ label: "c.png", href: "c.png", what: "image", view: { kind: "image", src: "c.png" } }])).toContain('<img src="c.png" alt="c.png" loading="lazy">');
   });
 });
 

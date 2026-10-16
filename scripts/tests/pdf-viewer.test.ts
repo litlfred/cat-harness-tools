@@ -158,6 +158,42 @@ describe("embed", () => {
   });
 });
 
+describe("embed inside a closed <details> (owner, 2026-10-16: load the viewer only when the panel opens)", () => {
+  const html = embed({ src: "https://raw/a.pdf", title: "A", route: { viewer: "../../assets/vendor/pdfjs/web/viewer.html" } });
+  const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1]!;
+
+  function run(open: boolean) {
+    let toggle: (() => void) | undefined;
+    const details = { open, addEventListener: (_t: string, h: () => void) => (toggle = h), removeEventListener: () => (toggle = undefined) };
+    const frame: { src?: string; getAttribute: (a: string) => string; closest: () => typeof details } = {
+      getAttribute: (a) => (a === "data-src" ? "https://raw/a.pdf" : ""),
+      closest: () => details,
+    };
+    let observed = false;
+    class IO {
+      observe() {
+        observed = true;
+      }
+      disconnect() {}
+    }
+    const document = { currentScript: { parentNode: { querySelector: () => frame } }, lastModified: "" };
+    new Function("window", "document", "location", "IntersectionObserver", script)({ IntersectionObserver: IO }, document, { pathname: "/x/" }, IO);
+    return { frame, details, observed, open: () => { details.open = true; toggle?.(); } };
+  }
+
+  test("closed: nothing is fetched until the panel is opened, then the page-relative viewer", () => {
+    const r = run(false);
+    expect(r.frame.src).toBeUndefined();
+    expect(r.observed).toBe(false);
+    r.open();
+    expect(r.frame.src).toBe(`../../assets/vendor/pdfjs/web/viewer.html?src=${encodeURIComponent("https://raw/a.pdf")}&v=${VIEWER_REV}.0`);
+  });
+
+  test("open: the in-view observer, as before", () => {
+    expect(run(true).observed).toBe(true);
+  });
+});
+
 describe("install helpers", () => {
   test("the shim is loaded before pdf.js's own modules", () => {
     const out = patchViewerHtml(`<head><script src="../build/pdf.mjs" type="module"></script></head>`);

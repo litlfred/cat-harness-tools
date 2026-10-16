@@ -58,8 +58,8 @@ import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
-import { VIEWER_PATH } from "./pdf-viewer.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink, type ViewKind } from "./lib/library-source.ts";
+import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -235,7 +235,7 @@ html[data-fa-scheme="light"] .lib-page {
 /* The view panel (viewPanelHtml): the entry's primary asset, under the head. */
 .lib-page .lib-view { padding:10px 0; border-bottom:1px solid var(--line); }
 .lib-page .lib-view summary { cursor:pointer; font-size:1rem; }
-.lib-page .lib-view iframe { display:block; width:100%; height:80vh; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
+.lib-page .lib-view .pdf-viewer { margin:.6rem 0 0 !important; }
 .lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
@@ -933,7 +933,7 @@ export interface SourceLink {
   /** What the file is, in a reader's words — e.g. `JSON-LD`, `projection (JSON)`. */
   what: string;
   /** The entry's primary asset, shown in the page's view panel — {@link viewPanelHtml}. */
-  view?: ViewKind;
+  view?: ViewSource;
 }
 
 /** One instance's library, as the whole-library page lists it. */
@@ -1114,23 +1114,26 @@ ${list}${table}
  * (if that asset kind has a viewer)"*.
  *
  * The first source marked `view` is the primary asset. The panel is a closed
- * `<details>` under the page heading, so it costs nothing until opened: a lazy
- * `<iframe>` or `<img>` inside closed content is not fetched until it is shown,
- * with no script. An entry with no viewable source held gets no panel — its
- * sources list already says what is published.
+ * `<details>` under the page heading. A PDF is the site's shared pdf.js embed
+ * (`pdf-viewer.ts` `embed`, the one WHO-IRIS item pages use), whose client
+ * points the frame at the viewer only when the panel is opened, so a visitor
+ * who never opens it fetches none of pdf.js. An image is a lazy `<img>`, not
+ * fetched while the panel is closed. An entry with no viewable source held
+ * gets no panel — its sources list already says what is published.
  */
 export function viewPanelHtml(links: readonly SourceLink[]): string {
-  const v = links.find((l) => l.view);
-  if (!v) return "";
-  const href = escHtml(v.href);
-  const label = escHtml(v.label);
-  const body = v.view === "pdf"
-    ? `<iframe src="${href}" title="${label}" loading="lazy"></iframe>`
-    : `<img src="${href}" alt="${label}" loading="lazy">`;
+  const l = links.find((x) => x.view);
+  const v = l?.view;
+  if (!l || !v) return "";
+  const body = v.kind === "pdf" && v.viewer
+    ? pdfEmbed({ src: v.src, title: l.label, route: { viewer: v.viewer } })
+    : v.kind === "image"
+      ? `<img src="${escHtml(v.src)}" alt="${escHtml(l.label)}" loading="lazy">`
+      : "";
+  if (!body) return "";
   return `<section class="lib-view" id="lib-view">
 <details>
-<summary>View <strong>${label}</strong> <span class="note">${v.view === "pdf" ? "source PDF" : "source image"}</span></summary>
-<p class="note"><a href="${href}">Open it full page</a></p>
+<summary>View <strong>${escHtml(l.label)}</strong> <span class="note">${v.kind === "pdf" ? "source PDF" : "source image"}</span></summary>
 ${body}
 </details>
 </section>`;

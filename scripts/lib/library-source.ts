@@ -136,13 +136,20 @@ export function viewKindOf(name: string): ViewKind | undefined {
   return undefined;
 }
 
+/** What the view panel needs: the kind, the bytes, and for a PDF the pdf.js viewer's page-relative href. */
+export interface ViewSource {
+  kind: ViewKind;
+  src: string;
+  viewer?: string;
+}
+
 /** One link on an entry page's sources list. */
 export interface RepoLink {
   label: string;
   href: string;
   what: string;
   /** Set on the link to the entry's primary asset when a viewer shows it — the page draws it in its view panel. */
-  view?: ViewKind;
+  view?: ViewSource;
 }
 
 /**
@@ -175,10 +182,10 @@ export function entryRepoLinks(o: {
     const raw = rawUrl(src);
     const kind = viewKindOf(name);
     if (kind === "pdf") {
-      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})`, view: "pdf" });
+      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})`, view: { kind, src: raw, viewer: o.viewerHref } });
       out.push({ label: `${name} (raw)`, href: raw, what: "source PDF, the file itself" });
     } else if (kind === "image") {
-      out.push({ label: name, href: raw, what: `source image (${src.repo})`, view: "image" });
+      out.push({ label: name, href: raw, what: `source image (${src.repo})`, view: { kind, src: raw } });
     } else {
       out.push({ label: name, href: raw, what: `source file (${src.repo})` });
     }
