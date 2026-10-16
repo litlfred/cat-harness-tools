@@ -47,12 +47,18 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { defaultGraphTypologies, graphTypologyLayer, isPublishedGraphTypology, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {
+  contentLayerInstance,
+  declaringInstanceOf,
+  defaultGraphTypologies,
+  graphTypologyLayer,
+  isPublishedGraphTypology,
+  ownPrefixTable,
+  repoRootFor,
+} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import "@litlfred/cat-harness/schemas/glossary-graph-typology.js";
 import {
   LEGACY_FOLIO_NS,
-  NS_PREFIXES,
   namespaceForLayer,
   prefixForLayer,
   replacementIri,
@@ -76,6 +82,12 @@ import {
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
+// The instance that declares the `core` term layer's kinds — the content layer
+// above the harness — read from where those kinds were declared, so this layer
+// does not carry its name (folio-assistant#2598). `undefined` when none is
+// composed, as when the tools stand alone.
+const CONTENT = contentLayerInstance();
+const CORE_INSTANCE: string | undefined = CONTENT?.prefix;
 const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
 const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const OWL = "http://www.w3.org/2002/07/owl#";
@@ -125,7 +137,7 @@ export function vocabularyIri(): string {
 export function findPlatformRoot(start: string = ROOT): string {
   let curr = resolve(start);
   while (curr !== dirname(curr)) {
-    if (existsSync(join(curr, "folio-assistant-core"))) return curr;
+    if (CORE_INSTANCE !== undefined && existsSync(join(curr, CORE_INSTANCE))) return curr;
     curr = dirname(curr);
   }
   return repoRootFor(start);
@@ -135,7 +147,10 @@ export function findPlatformRoot(start: string = ROOT): string {
 export function namespaceForPrefixOrLayer(target: string): string {
   if (target === "bootstrap") return namespaceForLayer("bootstrap");
   if (target === "harness" || target === "cat-harness") return namespaceForLayer("harness");
-  if (target === "core" || target === "folio-assistant-core") return namespaceForLayer("core");
+  if (target === "core" || (CORE_INSTANCE !== undefined && target === CORE_INSTANCE)) {
+    if (CONTENT === undefined) throw new Error("ns-export: no content layer is composed, so the core layer has no namespace here");
+    return CONTENT.namespace;
+  }
   const prefixes = defaultInstancePrefixes();
   const ns = prefixes.get(target);
   if (ns) return ns;
@@ -234,14 +249,29 @@ export function mintedTermsFromSource(root = ROOT): Set<string> {
  * stamped on a directory as its `@type` beside the individual it `holdsGraph`
  * — two ways to say one fact. Owner (bean `3r47`): "Drop per-kind classes".
  */
-export function graphTypologyIndividuals(): Array<{ name: string; layer: TermLayer; gloss: string }> {
+export function graphTypologyIndividuals(): Array<{ name: string; layer: TermLayer; prefix: string; gloss: string }> {
   return defaultGraphTypologies
     .names()
     .filter(isPublishedGraphTypology)
     .map((name) => ({ name, def: defaultGraphTypologies.get(name)! }))
     .filter(({ name, def }) => graphTypologyLayer(name, def) !== "bootstrap" && def.summary)
-    .map(({ name, def }) => ({ name, layer: graphTypologyLayer(name, def) as TermLayer, gloss: def.summary! }))
+    .map(({ name, def }) => {
+      const layer = graphTypologyLayer(name, def) as TermLayer;
+      return { name, layer, prefix: typologyPrefix(name, layer, def), gloss: def.summary! };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The prefix a kind's individual is written with: its layer's, or — for a
+ * `core` kind — the prefix of the instance that declared it, which is the one
+ * whose namespace `graphTypologyIri` names it in.
+ */
+function typologyPrefix(name: string, layer: TermLayer, def: object): string {
+  if (layer !== "core") return prefixForLayer(layer);
+  const by = declaringInstanceOf(def);
+  if (by === undefined) throw new Error(`ns-export: core kind "${name}" has no declaring instance`);
+  return by.prefix;
 }
 
 export interface VocabularyReport {
@@ -314,7 +344,7 @@ export function buildVocabulary(
     ? (target as TermLayer)
     : target === "cat-harness"
       ? "harness"
-      : target === "folio-assistant-core"
+      : target !== undefined && target === CORE_INSTANCE
         ? "core"
         : undefined;
 
@@ -385,7 +415,7 @@ export function buildVocabulary(
   for (const [name, g] of Object.entries(CLASS_GLOSSES)) emit(name, "class", g);
   for (const k of kinds) {
     if (!inSlice({ gloss: k.gloss, layer: k.layer })) continue;
-    const id = `${prefixForLayer(k.layer)}:graphTypology/${k.name}`;
+    const id = `${k.prefix}:graphTypology/${k.name}`;
     nodes.push({
       "@id": id,
       "@type": ["bootstrap:GraphTypology", "skos:Concept"],
@@ -414,10 +444,10 @@ export function buildVocabulary(
     let inBlockSlice = false;
     if (target === undefined) {
       inBlockSlice = publishingInstances.has(prefix);
-    } else if (target === prefix || (target === "core" && prefix === "folio-assistant-core")) {
+    } else if (target === prefix || (target === "core" && prefix === CORE_INSTANCE)) {
       inBlockSlice = true;
     } else if (!exact) {
-      if ((targetLayer === "core" || target === "core") && prefix === "folio-assistant-core") {
+      if ((targetLayer === "core" || target === "core") && prefix === CORE_INSTANCE) {
         inBlockSlice = true;
       }
     }
@@ -435,7 +465,7 @@ export function buildVocabulary(
     defined.add(bk.folioType);
 
     const scheme = conceptSchemeIriFor(prefix);
-    const bkLayer = prefix === "folio-assistant-core" ? "core" : prefix;
+    const bkLayer = prefix === CORE_INSTANCE ? "core" : prefix;
 
     nodes.push({
       "@id": bk.folioType,
@@ -489,7 +519,7 @@ export function buildVocabulary(
         }
       }
       if (name === "cat-harness") name = "harness";
-      if (name === "folio-assistant-core") name = "core";
+      if (name === CORE_INSTANCE) name = "core";
       return {
         "@id": iri,
         "@type": "skos:ConceptScheme",
@@ -538,7 +568,7 @@ export function buildVocabulary(
       owl: OWL,
       skos: SKOS,
       dcterms: DCTERMS,
-      ...NS_PREFIXES,
+      ...ownPrefixTable(),
       ...extraPrefixes,
       label: "rdfs:label",
       comment: "rdfs:comment",

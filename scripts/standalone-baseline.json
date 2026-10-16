@@ -291,7 +291,7 @@
         "test/coordinator/init-folio-checkout.test.ts > what gets written > the adapter path is normalised, and a non-default link path is honoured",
         "test/coordinator/init-folio-checkout.test.ts > what gets written > the config selects the adapter matching the content type",
         "test/coordinator/instance-repositories-checkout.test.ts > instance repositories — this checkout (bean 6rmv) > every livesAt names the instance's OWN repository as its home",
-        "test/coordinator/instance-repositories-checkout.test.ts > the owner/repo → namespace map is derived and agrees with the list (bean 6rmv, phase 3) > own-namespaces folio-assistant-core is what litlfred/folio-assistant-core's declaration derives",
+        "test/coordinator/instance-repositories-checkout.test.ts > the owner/repo → namespace map is derived and agrees with the list (bean 6rmv, phase 3) > the content layer's namespace is what its own declaration derives",
         "test/coordinator/jsonld-label-resolution-checkout.test.ts > contributed label prefixes > the real registry supplies them",
         "test/coordinator/kg-audit-call-activity-parent.test.ts > kg-audit: call-activity-resolves across repository instances (bean `t5j5`) > a call activity whose target resolves from the parent root is a PASS with hosting instance evidence",
         "test/coordinator/kg-audit-call-activity-parent.test.ts > kg-audit: call-activity-resolves across repository instances (bean `t5j5`) > a call activity whose target resolves nowhere is a FAIL naming the missing process",
