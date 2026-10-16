@@ -59,7 +59,7 @@ import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH } from "./pdf-viewer.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink } from "./lib/library-source.ts";
+import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink, type ViewKind } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -232,6 +232,11 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .badge { border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:.82rem; background:var(--panel); }
 .lib-page .badge b { font-variant-numeric:tabular-nums; }
 .lib-page .badge.q b { color:var(--warn); }
+/* The view panel (viewPanelHtml): the entry's primary asset, under the head. */
+.lib-page .lib-view { padding:10px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-view summary { cursor:pointer; font-size:1rem; }
+.lib-page .lib-view iframe { display:block; width:100%; height:80vh; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
+.lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -927,6 +932,8 @@ export interface SourceLink {
   href: string;
   /** What the file is, in a reader's words — e.g. `JSON-LD`, `projection (JSON)`. */
   what: string;
+  /** The entry's primary asset, shown in the page's view panel — {@link viewPanelHtml}. */
+  view?: ViewKind;
 }
 
 /** One instance's library, as the whole-library page lists it. */
@@ -1100,20 +1107,52 @@ ${list}${table}
 </section>`;
 }
 
+/**
+ * THE VIEW PANEL — owner, 2026-10-16: *"library pages … should have a panel to
+ * open and view item towards the top of the page. sometimes accessible at
+ * bottom under sources (like PDF), but primary asset should have a view panel
+ * (if that asset kind has a viewer)"*.
+ *
+ * The first source marked `view` is the primary asset. The panel is a closed
+ * `<details>` under the page heading, so it costs nothing until opened: a lazy
+ * `<iframe>` or `<img>` inside closed content is not fetched until it is shown,
+ * with no script. An entry with no viewable source held gets no panel — its
+ * sources list already says what is published.
+ */
+export function viewPanelHtml(links: readonly SourceLink[]): string {
+  const v = links.find((l) => l.view);
+  if (!v) return "";
+  const href = escHtml(v.href);
+  const label = escHtml(v.label);
+  const body = v.view === "pdf"
+    ? `<iframe src="${href}" title="${label}" loading="lazy"></iframe>`
+    : `<img src="${href}" alt="${label}" loading="lazy">`;
+  return `<section class="lib-view" id="lib-view">
+<details>
+<summary>View <strong>${label}</strong> <span class="note">${v.view === "pdf" ? "source PDF" : "source image"}</span></summary>
+<p class="note"><a href="${href}">Open it full page</a></p>
+${body}
+</details>
+</section>`;
+}
+
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
 export const LIBRARY_CONFIG_ID = "fa-library-config";
 
 /**
- * The skeleton {@link VIEWER_JS} fills — the same on the handler's page, an
+ * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
+ * there is one, then {@link VIEWER_BODY}: the same on the handler's page, an
  * instance's page and every entry page, since the script decides from the
  * config and the page's own path what to draw into it.
  */
-const VIEWER_BODY = `<div class="lib-head">
+const VIEWER_HEAD = `<div class="lib-head">
   <h1 id="lib-title">Library — the L1 corpus</h1>
   <p class="empty" id="status" style="padding:0">loading…</p>
   <div class="badges" id="badges"></div>
-</div>
-<div class="toolbar">
+</div>`;
+
+/** The rest of the skeleton, below the head and the view panel. */
+const VIEWER_BODY = `<div class="toolbar">
   <input id="q" type="search" placeholder="Search entries…" aria-label="Search entries">
   <span class="seg" role="group" aria-label="View">
     <button type="button" id="vList" aria-pressed="true">Listing</button>
@@ -1150,6 +1189,8 @@ interface LibraryPage {
   searchExclude?: boolean;
   /** The visible source list, as HTML — {@link sourcesHtml}. */
   sources?: string;
+  /** The primary asset's view panel, as HTML — {@link viewPanelHtml}. Drawn under the head. */
+  view?: string;
 }
 
 /**
@@ -1188,7 +1229,8 @@ function libraryPageHtml(p: LibraryPage): string {
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="lib-page" data-fa-no-filter>
-${VIEWER_BODY}
+${VIEWER_HEAD}
+${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
@@ -1253,6 +1295,7 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     }`,
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     sources: sourcesHtml(entry.sources ?? []),
+    view: viewPanelHtml(entry.sources ?? []),
     searchExclude: true,
   });
 }

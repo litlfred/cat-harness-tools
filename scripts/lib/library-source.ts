@@ -120,11 +120,29 @@ export function sourceFileOf(repoRoot: string, e: SourceEntry, uploads: readonly
   return undefined;
 }
 
+/**
+ * The kinds of source a page can show inline, and so put in its view panel —
+ * owner, 2026-10-16: *"primary asset should have a view panel (if that asset
+ * kind has a viewer)"*. A PDF opens in the site's pdf.js viewer; an image is
+ * drawn as itself. Anything else (a .docx, a spreadsheet) has no viewer, so
+ * it is only linked.
+ */
+export type ViewKind = "pdf" | "image";
+
+/** The {@link ViewKind} of a file, by its name; `undefined` when no viewer shows it. */
+export function viewKindOf(name: string): ViewKind | undefined {
+  if (/\.pdf$/i.test(name)) return "pdf";
+  if (/\.(png|jpe?g|gif|webp|svg)$/i.test(name)) return "image";
+  return undefined;
+}
+
 /** One link on an entry page's sources list. */
 export interface RepoLink {
   label: string;
   href: string;
   what: string;
+  /** Set on the link to the entry's primary asset when a viewer shows it — the page draws it in its view panel. */
+  view?: ViewKind;
 }
 
 /**
@@ -155,9 +173,12 @@ export function entryRepoLinks(o: {
   if (src && o.source) {
     const name = basename(o.source);
     const raw = rawUrl(src);
-    if (/\.pdf$/i.test(name)) {
-      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})` });
+    const kind = viewKindOf(name);
+    if (kind === "pdf") {
+      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})`, view: "pdf" });
       out.push({ label: `${name} (raw)`, href: raw, what: "source PDF, the file itself" });
+    } else if (kind === "image") {
+      out.push({ label: name, href: raw, what: `source image (${src.repo})`, view: "image" });
     } else {
       out.push({ label: name, href: raw, what: `source file (${src.repo})` });
     }
