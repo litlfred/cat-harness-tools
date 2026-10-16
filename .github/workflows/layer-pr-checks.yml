@@ -23,6 +23,8 @@
 #     2026-10-14: "A harnessed repo should run not just core but all of the
 #     checks in the dependency harness"), on main and on the PR; fails only
 #     on a gate the PR newly breaks (`run-gates.py`).
+# And one report that never blocks: the caller's directory READMEs, stale or
+# current, as a QA warning (owner, 2026-10-16: "QA report, but not gate").
 #
 # Two modes, because a harnessed repository is one of two shapes:
 #   - `layer`: a layer the folio-assistant index mounts (cat-harness, a base
@@ -274,6 +276,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: src
+      - name: Keep the caller's git checkout aside, for the README report
+        # The swap below drops the caller's `.git`, and `subgraph-readmes.ts
+        # --repo` lists only what git tracks.
+        if: inputs.mode == 'layer'
+        run: cp -a src "$RUNNER_TEMP/own"
       - &lower-layers-main
         name: Take the lower layers at main
         if: steps.base-cache.outputs.cache-hit != 'true'
@@ -330,6 +337,38 @@ jobs:
         working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
         run: |
           if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+      - name: Directory READMEs (QA report, never a gate)
+        # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
+        # told when its directory READMEs are stale, as a warning and in the
+        # step summary; it is never failed for it. The post-merge regen
+        # (`layer-post-merge-regen.yml`) is what repairs them. Run from `fa`,
+        # so the graph typologies are the composed set, over the caller's own
+        # git checkout. A locked cat-harness-tools older than `--repo` reports
+        # that it could not judge, rather than a finding.
+        if: inputs.mode == 'layer'
+        continue-on-error: true
+        working-directory: fa
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          set -uo pipefail
+          own="$RUNNER_TEMP/own/${SUBDIR:-.}"
+          out="$(bun cat-harness-tools/scripts/subgraph-readmes.ts --check --repo "$own" 2>&1)"
+          code=$?
+          echo "$out"
+          {
+            echo "### Directory READMEs (QA, does not block)"
+            case "$code" in
+              0) echo "Every directory README is current." ;;
+              1) echo "Stale READMEs; the post-merge regen opens a repair PR for them after merge:"
+                 echo '```'; echo "$out" | grep '✗' || true; echo '```' ;;
+              *) echo "Could not judge (exit $code): the locked cat-harness-tools may predate \`--repo\`." ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" = 1 ]; then
+            echo "::warning title=Directory READMEs (QA)::$(echo "$out" | grep -c '✗') stale directory README(s); not a gate, repaired after merge"
+          fi
+          exit 0
 
   # Each side is `gate-shards` jobs, on separate machines with separate
   # checkouts (bean lpcs, step 3). The ~300 gates ran one at a time, ~2500 s a
