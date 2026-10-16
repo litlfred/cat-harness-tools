@@ -280,8 +280,11 @@ describe("checkout-relative markers and damaged mounts (bean 1ple)", () => {
     rmSync(join(root, "todos/c.md"));
 
     const r = mountState({ repoRoot: root, store });
-    expect(r.graphs[0]?.state).toBe("stale");
-    expect(r.graphs[0]?.damaged).toBe(true);
+    const g = r.graphs[0];
+    expect(g?.state).toBe("stale");
+    if (g?.state === "stale") {
+      expect(g.damaged).toBe(true);
+    }
     const text = report(r);
     expect(text).toContain("damaged?");
     expect(text).not.toContain("push them with `bun run cat state:push`");
