@@ -659,13 +659,11 @@ export class TreeStore {
         .map((l) => l.split("\t")[1]?.trim().replace(/^refs\/heads\//, ""))
         .filter((b): b is string => Boolean(b)),
     );
-    const pins = pinnedTips(this.remote);
-    const found = this.candidates.find((c) => (pins ? pins[c] !== undefined : present.has(c)));
+    const found = this.candidates.find((c) => present.has(c));
     this.branch = found ?? this.candidates[0]!;
     if (!found) return { state: "absent", branch: this.branch };
     const ref = this.privateRef("tip");
-    const want = pins ? pins[found]! : `refs/heads/${found}`;
-    const f = this.git(["fetch", "-q", "--no-tags", "--depth=1", "--filter=blob:none", "origin", `+${want}:${ref}`]);
+    const f = this.git(["fetch", "-q", "--no-tags", "--depth=1", "--filter=blob:none", "origin", `+refs/heads/${found}:${ref}`]);
     if (f.status !== 0) return { state: "unknown", branch: found, reason: `fetch of ${found} failed: ${f.stderr.trim()}` };
     const tip = this.must(["rev-parse", ref]).trim();
     this.git(["update-ref", "-d", ref]);
@@ -1341,29 +1339,6 @@ export function migrateMarkerInto(repoRoot: string, m: MountMarker): MountMarker
   const next = { ...m, into: resolved.rel };
   writeMarker(repoRoot, next);
   return next;
-}
-
-/**
- * The tips a run pinned for `remote`'s branches, or `undefined` to read them
- * live. `BRANCH_STORE_PIN_FILE` names a JSON file `{ "owner/repo": { branch:
- * sha } }`, written once per CI run from one `ls-remote`, so every job of the
- * run mounts a graph at the same commit. Without it, layer-pr-checks' base and
- * head sides read `cat/cat-harness/beans` minutes apart, and a bean pushed in
- * between was charged to the PR (smart-base#107, run 38884159693). A remote
- * the file names is read ONLY at its pins: a branch it does not list did not
- * exist when the run was pinned, so it is absent on every side. It is for
- * readers: a run that WRITES a branch must not set it.
- */
-export function pinnedTips(remote: string, file = process.env.BRANCH_STORE_PIN_FILE): Record<string, string> | undefined {
-  if (!file) return undefined;
-  let pins: Record<string, Record<string, string>>;
-  try {
-    pins = JSON.parse(readFileSync(file, "utf-8"));
-  } catch {
-    return undefined;
-  }
-  const repo = remote.replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).slice(-2).join("/");
-  return pins[repo];
 }
 
 /**
