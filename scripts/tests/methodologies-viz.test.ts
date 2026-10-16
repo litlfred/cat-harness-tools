@@ -41,6 +41,9 @@ import {
   instanceOf,
   methodologyRows,
   page,
+  nodePage,
+  nodePageRel,
+  bodyOf,
 } from "../gen-methodologies-viz.js";
 import {
   type EvidenceReport,
@@ -192,6 +195,42 @@ describe("ingested sources link what resolves (qgjh)", () => {
     expect(line).toBe(
       "- [`library/known-item`](../cat-harness/library/cat-harness/#known-item) · [item page](https://host/README.md) · [source](https://arxiv.org/abs/1)",
     );
+  });
+
+  it("links the entry's own page as [view] when it has one (owner, 2026-10-16)", () => {
+    const withEntry = { links: () => ({ viewer: "cat-harness/library/cat-harness/#k", entry: "cat-harness/library/cat-harness/k/" }) };
+    expect(evidenceLine("library/k", withEntry, "methodologies/index.md")).toBe(
+      "- [`library/k`](../cat-harness/library/cat-harness/#k) · [view](../cat-harness/library/cat-harness/k/)",
+    );
+  });
+
+  const row = { name: "m", title: "M", origin: "o", appliesWhen: "a", instance: "cat-harness", evidence: [], state: "cited-only" as const, path: "cat-harness/methodologies/m.md" };
+  const report = { undetermined: false, nodes: 1, invalid: [], unresolved: [], noEvidence: [], untagged: [], resolved: [] };
+
+  it("links each node's extracted method, the body the page does not draw (owner, 2026-10-16)", () => {
+    const md = page([row], report, undefined, "", (p) => `https://github.com/o/r/blob/main/${p}`);
+    expect(md).toContain("**The method, as extracted:** [read it](cat-harness/m/)");
+    expect(page([row], report)).not.toContain("The method, as extracted");
+  });
+
+  it("gives each node its own page at <route>/<instance>/<name>/, the library's pattern", () => {
+    expect(nodePageRel("en/cat-harness/methodologies/index.md", row)).toBe("en/cat-harness/methodologies/cat-harness/m/index.md");
+    const text = "---\n$schema: folio-methodology/v1\nname: m\n---\n\n# M\n\nSee [the skill](../skills/s.md#how) and [W3C](https://w3.org/x) and [below](#here).\n";
+    const body = bodyOf(text);
+    expect(body.startsWith("# M")).toBe(true);
+    const md = nodePage(row, body, undefined, "en/cat-harness/methodologies/cat-harness/m/index.md", (p) => `https://github.com/o/r/blob/main/${p}`);
+    expect(md).toContain('title: "M"');
+    expect(md).toContain("**Node file:** [m.md](https://github.com/o/r/blob/main/cat-harness/methodologies/m.md)");
+    expect(md).toContain("[the skill](https://github.com/o/r/blob/main/cat-harness/skills/s.md#how)");
+    expect(md).toContain("[W3C](https://w3.org/x)");
+    expect(md).toContain("[below](#here)");
+    expect(md).toContain("[&larr; All methodologies](../../)");
+  });
+
+  it("lists the skills whose uses-methodology names it (owner, 2026-10-16)", () => {
+    const md = nodePage(row, "# M\n", undefined, "", undefined, [{ skill: "s1", href: "https://h/s1.md" }, { skill: "s2" }]);
+    expect(md).toContain("**Applied by skills:**\n\n- [`s1`](https://h/s1.md)\n- `s2`");
+    expect(nodePage(row, "# M\n")).not.toContain("Applied by skills");
   });
 
   it("leaves an unknown item, or no resolver, as code", () => {
