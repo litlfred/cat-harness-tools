@@ -37,8 +37,10 @@ Each gate's wall time is recorded as `seconds`.
 whose position in the SORTED derived set is `i-1` modulo `N`. The slice is a
 function of the gate names alone, so the N shards of one side are disjoint and
 their union is the whole set; unset, or `1/1`, is the whole set, as before.
-The workflow gives each shard its own machine and checkout, so gates that
-write never race (the reason `GATE_JOBS` stays 1). The skipped gates and the
+The workflow gives each shard its own machine and checkout, so shards never
+race; within a shard, `GATE_JOBS` > 1 runs gates side by side, and a gate whose
+script runs `publish-check.ts` (it hashes the whole tree around its writer) runs
+alone after the pool drains, so a neighbour's write is never blamed on it. The skipped gates and the
 `--record`ed results go in shard 1 only, so a merged side holds each once.
 Beside <out.json> the run writes `gates-shard.json` -- the shard, `N`, the size
 of the whole set, and the names it ran -- from which the compare job proves
@@ -329,6 +331,23 @@ def shard_names(names, i, n):
     return [x for x in names if x in mine]
 
 
+def tree_snapshotting(root):
+    """Gate names whose script runs `publish-check.ts`, which hashes every file
+    of every instance before and after its writer and calls any committed file
+    that moved stale. Under `GATE_JOBS` > 1 a neighbour gate that writes a
+    committed file inside that window (`check:avatar-coverage` rewrites
+    `avatar-coverage.qa-results.json`) is blamed on the writer, so the verdict
+    depends on scheduling (smart-immunizations#61, run 38824729436: head red,
+    base green, same pins). These run alone, after the pool drains."""
+    out = set()
+    for n, p in instances_in(root).items():
+        pkg = read_json(os.path.join(root, p, "package.json")) or {}
+        for s, body in {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}.items():
+            if "publish-check" in str(body):
+                out.add(f"{n}:{s}")
+    return out
+
+
 def run(root, name, command):
     start = time.monotonic()
     try:
@@ -427,12 +446,17 @@ def main():
 
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
+    alone = tree_snapshotting(root)
+    pooled = [kv for kv in gates.items() if kv[0] not in alone]
+    serial = [kv for kv in gates.items() if kv[0] in alone]
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        for name, command, code, text, seconds in pool.map(lambda kv: run(root, kv[0], kv[1]), gates.items()):
-            print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
-            print(text[-4000:], flush=True)
-            print("::endgroup::", flush=True)
-            results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
+        outcomes = list(pool.map(lambda kv: run(root, kv[0], kv[1]), pooled))
+    outcomes += [run(root, k, v) for k, v in serial]
+    for name, command, code, text, seconds in outcomes:
+        print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
+        print(text[-4000:], flush=True)
+        print("::endgroup::", flush=True)
+        results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
     ran = list(results)
     for name, entry in skipped.items():
         print(f"{name}: skipped ({entry['skipped']}) — {entry['command']}", flush=True)
