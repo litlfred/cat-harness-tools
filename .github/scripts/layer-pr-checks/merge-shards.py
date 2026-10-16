@@ -15,7 +15,11 @@ A missing shard is never a pass. It exits 2 ("could not determine") when:
   - a shard says it is another shard, or of another N;
   - the shards disagree on the size of the whole gate set;
   - two shards ran the same gate, or together they ran fewer gates than the set;
-  - a gate a shard says it ran has no exit code in its `gates.json`.
+  - a gate a shard says it ran has no exit code in its `gates.json`;
+  - a gate a shard says the CI cone skipped as unchanged (`unchanged` in
+    `gates-shard.json`, cat-harness-tools#398) has no `unchanged` record sha.
+A cone-skipped gate counts toward covering the set: it was asked, and its
+answer is "SKIPPED, inputs unchanged since <sha>", never a pass.
 Each of those would let a gate the PR breaks go unjudged, which the compare
 step would then read as green. Writes the ten slowest gates of the side to
 $GITHUB_STEP_SUMMARY when set (bean `lpcs`: the times feed a balanced split).
@@ -61,6 +65,12 @@ def merge(results_dir, side, shards):
             if "exit" not in got.get(name, {}):
                 raise Undetermined(f"shard {i} of the {side} side says it ran {name}, and its gates.json has no exit for it")
             owner[name] = i
+        for name in meta.get("unchanged", []):
+            if name in owner:
+                raise Undetermined(f"gate {name} is claimed by shards {owner[name]} and {i} of the {side} side: the slices overlap")
+            if not got.get(name, {}).get("unchanged") or "exit" in got.get(name, {}):
+                raise Undetermined(f"shard {i} of the {side} side says the cone skipped {name}, and its gates.json has no unchanged record for it")
+            owner[name] = i
         for name, entry in got.items():
             if name in gates:
                 raise Undetermined(f"{name} is reported by two {side} shards")
@@ -73,7 +83,7 @@ def merge(results_dir, side, shards):
         tests += int(root.get("tests", 0) or 0)
         suites.extend(list(root) if root.tag == "testsuites" else [root])
     if not isinstance(total, int) or len(owner) != total:
-        raise Undetermined(f"the {side} shards ran {len(owner)} gate(s) of a set of {total}")
+        raise Undetermined(f"the {side} shards ran or skipped as unchanged {len(owner)} gate(s) of a set of {total}")
     junit = ET.Element("testsuites", {"tests": str(tests)})
     junit.extend(suites)
     return gates, junit
