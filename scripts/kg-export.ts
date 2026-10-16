@@ -287,7 +287,7 @@ function namingTable(id: string): VocabMapping {
  * Four things here are load-bearing rather than decorative:
  *
  * **`{"@type": "@id"}` is what makes this a graph.** Without it every edge —
- * `implementedBy`, `performedBy`, `partOf` — is a *string literal* to any
+ * `requires`, `performedBy`, `partOf` — is a *string literal* to any
  * JSON-LD processor, and the document is a list of records that merely looks
  * linked to a human reading the JSON. Declaring those terms `@id`-typed is the
  * difference between 500 records and a traversable graph, and it costs one
@@ -325,7 +325,7 @@ export function buildContext(): Record<string, unknown> {
     // `rdfs:label`/`rdfs:comment` (owner, 2026-09-30, bean `xsqm`:
     // "emphasize preexisting standards … now align"). The edges below that
     // restate a standard — `partOf`, `holdsGraph`, `from`/`to`,
-    // `implementedBy`, … — resolve through `propertyIri`, which reads each
+    // `bindsRole`, … — resolve through `propertyIri`, which reads each
     // retired term's `replacedBy` in the vocabulary; the JSON keys are
     // unchanged, so a plain-JSON reader sees no difference and an RDF reader
     // sees the standard property.
@@ -362,7 +362,15 @@ export function buildContext(): Record<string, unknown> {
     // unresolvable way of naming a node that is right there. As a link the
     // viewer's subgraph facet and the declaration hierarchy are the same edge.
     inSubgraph: { "@id": propertyIri("inSubgraph"), ...link },
-    implementedBy: { "@id": propertyIri("implementedBy"), ...link },
+    // Task → Skill. `dcterms:requires` — "a related resource that is
+    // required by the described resource to support its function" — read as
+    // the task, the DEPENDENT node, naming what it needs; the skill names no
+    // task. Owner, 2026-10-16 (thread "BPMN lane, role and skill modelling",
+    // implementation spec §2): this replaces `implementedBy`, because a skill
+    // does not implement a task, and a general standard is preferred over
+    // minting `completedUsing`. Through `propertyIri`, like every replaced
+    // term: the vocabulary's `requires` is `replacedBy: dcterms:requires`.
+    requires: { "@id": propertyIri("requires"), ...link },
     performedBy: { "@id": termIri("performedBy"), ...link },
     declaresSkill: { "@id": termIri("declaresSkill"), ...link },
     inPackage: { "@id": termIri("inPackage"), ...link },
@@ -481,12 +489,10 @@ export function buildContext(): Record<string, unknown> {
     // It is also NOT the deployment's `network`, although the vocabulary is
     // shared: that one describes a population, this one a participant.
     reach: termIri("reach"),
-    // The two declared exemptions, and they are NOT one flag with two names.
-    // `actedUpon` says the role never acts, so `role-has-actor` is `n/a`;
-    // `judgementOnly` says it acts but no procedure yields its answer, so
-    // `activity-names-skill` is. A consumer that collapsed them would give a
-    // store an actor or a stakeholder a skill.
-    actedUpon: { "@id": termIri("actedUpon"), "@type": `${XSD}boolean` },
+    // The declared exemption: `judgementOnly` says the role acts but no
+    // procedure yields its answer, so `activity-names-skill` is `n/a`. Its
+    // sibling `actedUpon` ("never acts") was retired on 2026-10-16 (owner): a
+    // role a machine plays is a real role whose skills are its contract.
     judgementOnly: { "@id": termIri("judgementOnly"), "@type": `${XSD}boolean` },
 
     // ---- BPMN, as it comes off a diagram -----------------------------------
@@ -586,7 +592,7 @@ export function buildContext(): Record<string, unknown> {
     // asset's role is a free string naming what the FILE is for —
     // `agent-instructions`, `instance-readme`, `landing-operations` — and it is
     // a different vocabulary from the actor/swimlane Role, which is a node
-    // with an id, skills and `actedUpon`. Spelling both `role` would make a
+    // with an id, skills and actor kinds. Spelling both `role` would make a
     // consumer that resolves the term get a bare string where it expects a
     // Role node, and the two would be indistinguishable in the graph.
     //
@@ -1910,9 +1916,8 @@ async function collectProcesses(
       // whose name happened to equal a role id silently merged into it.
       //
       // Read from the DECLARED lane set, not from the lanes flow nodes happen
-      // to name. An `actedUpon` lane holds no activities by construction — it
-      // is written to and never acts — so deriving lanes from node references
-      // drops exactly the lanes whose emptiness is the point.
+      // to name. A lane that holds no activities is still a lane that names a
+      // role, so deriving lanes from node references would drop it.
       for (const lane of m.lanes) {
         nodes.push({
           "@id": makeIri(doc, "process", `${m.id}/lane/${lane.id}`),
@@ -1943,7 +1948,8 @@ async function collectProcesses(
           // performs in. `inLane` is the lane.
           performedBy: n.roleRef === undefined ? undefined : makeIri(doc, "role", n.roleRef),
           inLane: n.laneId === undefined ? undefined : makeIri(doc, "process", `${m.id}/lane/${n.laneId}`),
-          implementedBy: n.skills.map((k) => makeIri(doc, "skill", k)),
+          // `requires` (dcterms), was `implementedBy` — see `buildContext`.
+          requires: n.skills.map((k) => makeIri(doc, "skill", k)),
           touchesWorkPlan: n.touchesWorkPlan,
           workPlanOp: n.workPlanOp,
           relaxable: n.relaxable,
@@ -2361,13 +2367,13 @@ function linkSchemas(graph: Node[], root: string = ROOT): void {
  * **Role nodes used to come only from BPMN lane names**, and that left the
  * role model itself out of the graph. Measured 2026-09-19: 65 of 66 Role
  * nodes carried `sourceKind: "bpmn-lane"`, so what a role IS — which actor
- * kinds may fill it, which skills it carries, whether it is `actedUpon` —
+ * kinds may fill it, which skills it carries —
  * was nowhere in the published KG. `roles.json` is the declaration and was
  * not a source at all.
  *
  * The gap bites hardest on exactly the roles the lane heuristic cannot see.
- * An `actedUpon` role is written to and never acts, so its lane carries no
- * flow node, so no node names it, so it was never emitted: `corpus` and
+ * A store's role whose lane carried no flow node was named by no node, so
+ * it was never emitted: `corpus` and
  * `log` were both absent while `work-plan` happened to be present only
  * because some other diagram gave its lane an activity.
  *
@@ -2422,7 +2428,6 @@ function collectDeclaredRoles(
     description: r.description,
     sourceKind: "role-registry",
     actorKinds: r.actorKinds,
-    actedUpon: r.actedUpon,
     judgementOnly: r.judgementOnly,
     // Links, so a consumer can walk role -> skill without string surgery.
     hasSkill: (r.skills ?? []).map((n) =>
@@ -2607,7 +2612,7 @@ export function committedFileCount(dir: string): number | undefined {
 
 /** Every term in the context that is declared `{"@type": "@id"}`. */
 const LINK_TERMS = [
-  "partOf", "implementedBy", "performedBy", "declaresSkill", "inPackage", "inSubgraph",
+  "partOf", "requires", "performedBy", "declaresSkill", "inPackage", "inSubgraph",
   "providesCapability", "requiresCapability", "holdsGraph", "startNode",
   "incoming", "outgoing", "from", "to", "satisfies", "hasCapability",
   "hasSkill", "bindsRole", "inLane",

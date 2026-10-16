@@ -235,7 +235,13 @@ export function readLanes(instanceRoot: string, repoRoot: string): LaneOccurrenc
           laneId,
           laneName: /name="([^"]+)"/.exec(attrs)?.[1] ?? null,
           documentation: doc !== undefined && doc.length > 0 ? doc : null,
-          roleRef: ownElementPattern(xml, "role", String.raw`[^>]*\bref="([^"]+)"`, "").exec(body)?.[1],
+          // The Role the lane NAMES: standard BPMN `partitionElementRef`
+          // first, the legacy `<bootstrap.processes:role ref>` only when it is
+          // absent (owner, 2026-10-16 — the precedence `laneRoleBinding` in
+          // `process-model.ts` applies to the parsed model).
+          roleRef:
+            /\bpartitionElementRef="([^"]+)"/.exec(attrs)?.[1] ??
+            ownElementPattern(xml, "role", String.raw`[^>]*\bref="([^"]+)"`, "").exec(body)?.[1],
           performerVaries: ownElementPattern(xml, "role", String.raw`[^>]*\bvariable="true"`, "").test(body),
           activities: [...members].filter((x) => acts.has(x)).length,
         });
@@ -535,16 +541,11 @@ export function buildGlossary(opts: {
       // The NAME, from the row kg-export reads for the same IRI: prefLabel,
       // a derived dcterms:title (the `sl9u` precedent), and the id as notation.
       ...applyVocabMapping(roleNaming, { title: r.title, id: r.id }),
-      // `actedUpon` is not decoration: `Work plan — beans`, `Corpus` and
-      // `Publish — GitHub Pages` are lanes because tasks act ON them, not
-      // because anybody performs them (`audienceProblem` in `role-graph.ts`).
-      // A reader looking up "Corpus" must not be told it is a persona.
       ...applyVocabMapping(roleMap, {
         description: r.description,
         altLabels,
         hiddenLabels,
         scheme: schemeIri,
-        actedUpon: r.actedUpon,
         usages: ls.map(usageIri),
       }),
     });
@@ -691,7 +692,6 @@ export function buildGlossary(opts: {
       usage: { "@id": termIri("hasLaneUsage"), "@type": "@id" },
       ofConcept: { "@id": termIri("ofConcept"), "@type": "@id" },
       inProcess: { "@id": termIri("inProcess"), "@type": "@id" },
-      actedUpon: termIri("actedUpon"),
       performerVaries: termIri("performerVaries"),
     },
     "@id": schemeIri,

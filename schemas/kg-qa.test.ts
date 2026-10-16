@@ -41,7 +41,8 @@ describe("the criteria registry", () => {
     expect(KG_CRITERIA_BY_ID["skill-ref-resolves"]!.severity).toBe("critical");
     // `activity-names-skill` was `minor` while it could not tell a legitimate
     // human step from a real gap. Now that every legitimate case is declared
-    // — `actedUpon`, `judgementOnly`, `<folio:no-skill reason>` — what is left
+    // — `judgementOnly`, `<folio:no-skill reason>` (and `actedUpon`, until it
+    // was retired on 2026-10-16) — what is left
     // is a missing join. Still not `critical`: nothing dangles.
     expect(KG_CRITERIA_BY_ID["activity-names-skill"]!.severity).toBe("major");
   });
