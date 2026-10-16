@@ -100,7 +100,7 @@ describe("a cancelled or unfinished run is not an error (#1854)", () => {
 
   test("the other outcomes keep their texts", () => {
     const log = [
-      "  ✓ cat-harness/docs/folio-assistant-core/glossary/index.md  [glossary: take-base]",
+      "  ✓ cat-harness/docs/en/folio-assistant-core/glossary/index.md  [glossary: take-base]",
       "  ✓ cat-harness/docs/cat-harness/lsi/x.md  [glossary: take-base]",
       "  ✓ a.qa-results.json  [qa-results: take-base]",
       "  ✗ beans/defs/x.md  [beans: refuse] — authored",

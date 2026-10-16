@@ -44,6 +44,8 @@ describe("every class links to its glossary definition", () => {
   test("a term's page is its owning instance's glossary page", () => {
     expect(termPageRoute("cat-harness--platform--actor")).toMatch(/\/instance\/cat-harness\/$/);
     expect(termPageRoute("bootstrap--terms--task")).toMatch(/\/instance\/bootstrap\/$/);
+    // Under the page locale like every visualiser's page (owner, 2026-10-16, "c").
+    expect(termPageRoute("bootstrap--terms--task")).toMatch(/^en\/[\w-]+\/[\w-]+\/instance\/bootstrap\/$/);
   });
 
   test("a class whose term the page lacks is reported, and no page is could-not-determine", () => {
