@@ -87,7 +87,7 @@ import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
-import { chromeLayers } from "./compose-docs.ts";
+import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
@@ -802,6 +802,14 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${JSON.stringify(docs)} --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // The forwarding pages at the old addresses (folio-assistant#2527). The
+    // chrome step composes with `--shell`, which writes none, so a visualiser
+    // that moved under its locale lost its old address on every instance site
+    // and the parity guard refused the publish (smart-base, 2026-10-16: the
+    // glossary under `en/`). Written last, on the built site, so they forward
+    // to the pages as published and never replace one.
+    const fwd = writeForwardingPages(site, root);
+    console.log(`forwarding: ${fwd.written.length} page(s) at old addresses${fwd.superseded.length ? `; ${fwd.superseded.length} left as published pages` : ""}`);
   } finally {
     restoreHarnessData();
   }
