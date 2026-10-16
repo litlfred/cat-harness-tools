@@ -690,8 +690,20 @@ export function beanFindings(beans: BeanNode[]): Array<{
       // blocker for `blocking:`, the blocked for `blocked_by:` — since that is
       // the file whose author asserted the block. For a `blocking:`-only edge
       // this is exactly the pre-`vhqq` check.
+      //
+      // Two edges are NOT abandoned-looking blocks, and reporting them made
+      // the page's "No expiry" list mostly noise (owner review 2026-10-16,
+      // 25 reported, 11 + 14 of them these two shapes):
+      //
+      // - the BLOCKED bean is already closed. The block holds nothing up; it
+      //   is a stale edge, not a block that might be abandoned.
+      // - blocker and blocked share one PARENT. That is ordering inside one
+      //   plan ("stage 1b before 1c"), and the parent's own liveness is what
+      //   says whether the plan is moving. The owner ruled that sequencing
+      //   needs no expiry.
       const declarers = e.declaredOn.map((d) => (d === "blocking" ? b : t));
-      if (isOpen(b) && !declarers.some(hasExpiry)) {
+      const sequencing = !!b.parent && b.parent === t.parent;
+      if (isOpen(b) && canBeHeldUp(t) && !sequencing && !declarers.some(hasExpiry)) {
         out.push({
           kind: "blocked-without-expiry",
           bean: b.id,
