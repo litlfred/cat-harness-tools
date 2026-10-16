@@ -183,7 +183,10 @@ describe("what is published", () => {
         const file = join(SITE, iri.slice(DOCS_SITE_BASE.length));
         expect(existsSync(file)).toBe(true);
         const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-        expect(doc["@context"]).toEqual([...SITE_DOCUMENT_CONTEXT]);
+        // The site form: the shared context, or since bean `63q4` the
+        // owning instance's own, always with the site as `@base`.
+        expect(ContentContextSchema.safeParse(doc["@context"]).success).toBe(true);
+        expect((doc["@context"] as unknown[])[1]).toEqual(SITE_DOCUMENT_CONTEXT[1]);
         expect(doc["@id"]).toBe(siteIri(page, node));
       });
     }
