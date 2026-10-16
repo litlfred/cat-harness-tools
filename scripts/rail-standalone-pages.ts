@@ -90,7 +90,8 @@ function main(): number {
       `${r.alreadyNavigated} already navigated, ${r.redirects} redirect stub(s) left bare, ` +
       `${r.declined} declined in their own markup (folio-navbar: none), ` +
       `${r.replacedThemeSidebar} theme side bar(s) replaced by the rail, ` +
-      `${routes.length} mount route(s) left to the mount pass`,
+      `${routes.length} mount route(s) left to the mount pass, ` +
+      `${r.finished} railed page(s) there finished (theme side bar, first-paint snippet)`,
   );
   if (r.pinned) {
     // Owner, 2026-10-15, "pinned copy per site": what the railed pages link is shipped beside them.

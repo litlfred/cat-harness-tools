@@ -71,4 +71,23 @@ describe("the first-paint scheme — stored, else the OS, else light", () => {
     expect(tag).toBe(firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme"));
     expect(withSavedScheme(page)).toBe(page);
   });
+  test("a page carrying an OUTDATED marked snippet is brought up to the current rule, in place", () => {
+    // Measured on the live root, 2026-10-16: slices/search.html shipped the
+    // stored-choice-only rule, and the mark made this function a no-op.
+    const stale = `<script data-folio-saved-scheme>try{var s=localStorage.getItem("fa-color-scheme");if(s==="light"||s==="dark")document.documentElement.setAttribute("data-fa-scheme",s)}catch(e){}</script>`;
+    const page = `<!doctype html><html lang="en"><head>${stale}<meta charset="utf-8"><title>x</title></head><body></body></html>`;
+    const current = firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme");
+    const out = withSavedScheme(page);
+    expect(out).toBe(page.replace(stale, current));
+    expect(withSavedScheme(out)).toBe(out);
+  });
+  test("a second marked snippet is dropped, so one rule decides", () => {
+    const once = withSavedScheme("<!doctype html><html><head><title>x</title></head><body></body></html>");
+    const twice = once.replace("<title>", `<script data-folio-saved-scheme>old()</script><title>`);
+    expect(withSavedScheme(twice).match(/data-folio-saved-scheme/g)).toHaveLength(1);
+  });
+  test("the mark named in prose is not a snippet: the page still gets one", () => {
+    const out = withSavedScheme("<!doctype html><html><head><title>x</title></head><body><code>data-folio-saved-scheme</code></body></html>");
+    expect(out).toContain(firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme"));
+  });
 });
