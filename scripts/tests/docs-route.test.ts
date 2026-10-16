@@ -49,8 +49,8 @@ const LOCALES = ["ar", "es", "fr", "ru", "zh"];
  * A platform visualiser's page, site-relative: under the page locale, or — on
  * a site not yet regenerated since folio-assistant#2527 — at its old address.
  */
-const visualiserPage = (visualiser: string): string => {
-  const parts = { harness: "cat-harness", visualiser };
+const visualiserPage = (visualiser: string, harness = "cat-harness"): string => {
+  const parts = { harness, visualiser };
   const dir = existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
   return `${relative(SITE, dir).split(sep).join("/")}/index.md`;
 };
@@ -130,8 +130,7 @@ describe("what moves and what stays — read off the real tree", () => {
     for (const rel of [
       // Visualisers at their DECLARED routes (owner, 2026-10-09).
       visualiserPage("processes"),
-      "en/folio-assistant-core/glossary/index.md",
-      "folio-assistant-core/glossary/index.md",
+      visualiserPage("glossary", "folio-assistant-core"),
       "proposals/index.md",
       "requirements/index.md",
       visualiserPage("methodologies"),

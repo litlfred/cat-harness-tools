@@ -48,6 +48,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
+import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
@@ -167,14 +168,26 @@ if (import.meta.main) {
     console.log(`publish:check ${writer}: no builtAtPublish entry names it — its own --check, against committed bytes`);
     process.exit(run(`${scripts[writer]} --check`));
   }
-  const roots = readInstances(REPO_ROOT).map((i) => i.root);
-  // Under ANY instance's declared path, not only this writer's: a writer may
-  // also refresh another publish-time artefact, and that is not a commit moving.
+  const instances = readInstances(REPO_ROOT);
+  const roots = instances.map((i) => i.root);
+  // Under ANY instance's declared publish-time path or branch-stored directory
+  // (e.g. `test/results/` on `qa-reports`), not only this writer's: a writer may
+  // also refresh another publish-time or branch-stored artefact, and that is not
+  // a commit moving.
   const declared = declaredPlan(REPO_ROOT);
-  const under = (p: string) => declared.some((a) => {
-    const abs = resolve(REPO_ROOT, p);
-    return a.path.endsWith("/") ? (abs + sep).startsWith(resolve(a.abs) + sep) : abs === resolve(a.abs);
+  const storedDirs = instances.flatMap((i) => {
+    const decl = readDeclaration(i.root) as { directories?: Array<{ path: string; storage?: unknown }> } | undefined;
+    return (decl?.directories ?? [])
+      .filter((d) => d.storage !== undefined)
+      .map((d) => resolve(i.root, d.path));
   });
+  const under = (p: string) => {
+    const abs = resolve(REPO_ROOT, p);
+    return (
+      declared.some((a) => (a.path.endsWith("/") ? (abs + sep).startsWith(resolve(a.abs) + sep) : abs === resolve(a.abs))) ||
+      storedDirs.some((d) => (abs + sep).startsWith(d + sep) || abs === d)
+    );
+  };
   const before = snapshot(roots);
 
   if (run(`bun run cat ${writer}`) !== 0) {
@@ -185,7 +198,7 @@ if (import.meta.main) {
     console.error(`✗ publish:check: \`${writer}\`'s own --check fails against the output it just wrote — not a fixed point, or a refusal above`);
     process.exit(1);
   }
-  const empty = mine.filter((a) => !built(a));
+  const empty = mine.filter((a) => a.writer.at(-1) === writer && !built(a));
   for (const a of empty) console.error(`✗ publish:check: ${a.instance}/${a.path} is declared built by \`${writer}\` and is missing or empty`);
 
   const changed = moved(before, snapshot(roots)).filter((p) => !under(p));
