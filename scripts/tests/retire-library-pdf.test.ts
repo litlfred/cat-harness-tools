@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDocumentNodes } from "../../content/pipeline/gen-library-jsonld.ts";
+import { buildDocumentNodes } from "../../pipeline/gen-library-jsonld.ts";
 
 const SCRIPT = join(new URL("..", import.meta.url).pathname, "retire-library-pdf.py");
 const made: string[] = [];
@@ -29,6 +29,8 @@ interface Opts {
   sections?: boolean;
   recordedSha?: string;
   git?: boolean;
+  /** What the fsh-guts branch keeps for the PDF: the same bytes (default), other bytes, or nothing. */
+  copy?: "same" | "other" | "none";
 }
 
 /** A library entry as the PDF rung leaves it; optionally inside a git repo with the PDF committed. */
@@ -52,6 +54,15 @@ function entry(o: Opts = {}): { root: string; dir: string } {
     };
     sh("git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init");
     sh("git remote add origin https://github.com/litlfred/qou.git");
+    const copy = o.copy ?? "same";
+    if (copy !== "none") {
+      // The deprecation branch keeps the file under fsh-guts/retired-pdfs/<path on main>.
+      const kept = "fsh-guts/retired-pdfs/library/arxiv-0705.1468v1";
+      sh("git switch -q -c cat/cat-harness/fsh-guts && git rm -rq library");
+      mkdirSync(join(root, kept), { recursive: true });
+      writeFileSync(join(root, kept, "0705.1468v1.pdf"), copy === "same" ? PDF : PDF + "changed");
+      sh("git add -A && git commit -qm copy && git switch -q -");
+    }
   }
   return { root, dir };
 }
@@ -85,10 +96,11 @@ describe("retire-library-pdf", () => {
     expect(r.provenance.upstream).toBe("https://arxiv.org/pdf/0705.1468v1");
     // arXiv may rebuild the PDF: the record must not imply the bytes match.
     expect(r.provenance.upstreamFixity).toContain("not promised to match");
-    // The commit that still holds the exact bytes.
+    // The fsh-guts copy of the exact bytes, pinned to that branch's commit, not a commit of main.
     expect(r.provenance.retiredCopy.url).toMatch(
-      /^https:\/\/github\.com\/litlfred\/qou\/blob\/[0-9a-f]{40}\/library\/arxiv-0705\.1468v1\/0705\.1468v1\.pdf$/,
+      /^https:\/\/github\.com\/litlfred\/qou\/blob\/[0-9a-f]{40}\/fsh-guts\/retired-pdfs\/library\/arxiv-0705\.1468v1\/0705\.1468v1\.pdf$/,
     );
+    expect(r.provenance.retiredCopy.ref).toBe("cat/cat-harness/fsh-guts");
   });
 
   test("a second run reports already-retired and touches nothing", () => {
@@ -123,14 +135,22 @@ describe("retire-library-pdf", () => {
     run(none.dir, "--allow-history", "--apply");
     const r = record(none.dir);
     expect(r.provenance.upstream).toBeUndefined();
-    expect(r.provenance.retiredCopy.path).toBe("library/arxiv-0705.1468v1/0705.1468v1.pdf");
+    expect(r.provenance.retiredCopy.path).toBe("fsh-guts/retired-pdfs/library/arxiv-0705.1468v1/0705.1468v1.pdf");
   });
 
-  test("history-only needs a commit that actually holds the file", () => {
+  test("history-only needs an fsh-guts copy of the same bytes", () => {
     // Not in git: there is no retired copy, so nothing to point at.
-    const { dir } = entry({ arxiv: false });
-    expect(run(dir, "--allow-history", "--apply").out.entries[0]?.result).toBe("skipped");
-    expect(existsSync(join(dir, "0705.1468v1.pdf"))).toBe(true);
+    for (const o of [{ arxiv: false }, { arxiv: false, git: true, copy: "none" as const }, { arxiv: false, git: true, copy: "other" as const }]) {
+      const { dir } = entry(o);
+      expect(run(dir, "--allow-history", "--apply").out.entries[0]?.result).toBe("skipped");
+      expect(existsSync(join(dir, "0705.1468v1.pdf"))).toBe(true);
+    }
+  });
+
+  test("a copy holding other bytes is never named, even when arXiv is the upstream", () => {
+    const { dir } = entry({ git: true, copy: "other" });
+    run(dir, "--apply");
+    expect(record(dir).provenance).not.toHaveProperty("retiredCopy");
   });
 });
 
@@ -140,7 +160,7 @@ describe("the manifest carries the record", () => {
     const m = { $schema: "folio-materialization/v1", state: "referenced", provenance: { upstream: "https://arxiv.org/pdf/x" } };
     const meta = (files: Array<{ path: string; content: string }>) =>
       JSON.parse(files.find((f) => f.path === "manifest.jsonld")!.content).meta;
-    expect(meta(buildDocumentNodes("d", structure, undefined, () => false, undefined, undefined, undefined, undefined, m)).source_materialization).toEqual(m);
+    expect(meta(buildDocumentNodes("d", structure, undefined, () => false, undefined, undefined, undefined, undefined, undefined, m)).source_materialization).toEqual(m);
     expect(meta(buildDocumentNodes("d", structure, undefined, () => false))).not.toHaveProperty("source_materialization");
   });
 });

@@ -12,7 +12,7 @@ For each library entry it is given, the PDF named in `structure.json`
   - the file's sha256 equals `source.sha256`, so the record about to say
     "these bytes" names the bytes actually being removed;
   - there is a place to point at: an arXiv id (always), a DOI (with
-    `--allow-doi`), or only the commit that still holds it (`--allow-history`).
+    `--allow-doi`), or only the fsh-guts copy (`--allow-history`).
 
 In the PDF's place it writes `source.materialization.json`, a
 `folio-materialization/v1` record in state `referenced`:
@@ -23,9 +23,13 @@ In the PDF's place it writes `source.materialization.json`, a
     the SAME VERSION, or the DOI. arXiv may rebuild a version's PDF from its
     source, so a re-download is the same paper but not promised to be the
     same bytes — `upstreamFixity` says so rather than implying a match;
-  - `provenance.retiredCopy` is the GitHub URL of the file at the commit that
-    still held it. Removing a file does not remove it from history, so this
-    always resolves to the exact bytes `fixity` names.
+  - `provenance.retiredCopy` is the GitHub URL of the copy kept on the
+    deprecation branch `cat/cat-harness/fsh-guts`, under
+    `fsh-guts/retired-pdfs/<path on main>`, pinned to that branch's commit.
+    Owner, 2026-10-10: retired PDFs go to fsh-guts with a QA report, and the
+    record points there rather than at a commit of main. It is written only
+    when the copy's git blob equals the file's own, so it is the exact bytes
+    `fixity` names.
 
 `gen-library-jsonld.ts` reads that record into the entry's manifest. Nothing
 derived is touched: `structure.json`, `sections/`, `blocks/`, `candidates.json`,
@@ -85,8 +89,21 @@ def arxiv_url(meta: dict) -> str | None:
     return None
 
 
-def plan(entry: Path, *, allow_doi: bool, allow_history: bool, repo_url: str | None, commit: str | None,
-         repo_root: Path | None) -> dict:
+DEFAULT_COPY_REF = "cat/cat-harness/fsh-guts"
+DEFAULT_COPY_PREFIX = "fsh-guts/retired-pdfs"
+
+
+def resolve_copy_ref(repo_root: Path, name: str) -> str | None:
+    """The commit of the copy branch: the remote-tracking ref first, then a local one."""
+    for ref in (f"refs/remotes/origin/{name}", f"refs/heads/{name}", name):
+        sha = git(repo_root, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}")
+        if sha:
+            return sha
+    return None
+
+
+def plan(entry: Path, *, allow_doi: bool, allow_history: bool, repo_url: str | None, copy_commit: str | None,
+         copy_ref: str, copy_prefix: str, repo_root: Path | None) -> dict:
     out: dict = {"entry": entry.name}
     try:
         s = json.loads((entry / "structure.json").read_text(encoding="utf-8"))
@@ -112,10 +129,13 @@ def plan(entry: Path, *, allow_doi: bool, allow_history: bool, repo_url: str | N
     if not upstream and allow_doi and meta.get("doi"):
         upstream, kind = f"https://doi.org/{meta['doi']}", "doi"
     retired_copy = None
-    if repo_url and commit and repo_root:
+    if repo_url and copy_commit and repo_root:
         rel = pdf.resolve().relative_to(repo_root.resolve()).as_posix()
-        if git(repo_root, "cat-file", "-e", f"{commit}:{rel}") is not None:
-            retired_copy = {"url": f"{repo_url}/blob/{commit}/{rel}", "path": rel, "commit": commit}
+        kept = f"{copy_prefix.strip('/')}/{rel}"
+        held = git(repo_root, "rev-parse", "--verify", "-q", f"{copy_commit}:{kept}")
+        if held and held == git(repo_root, "hash-object", str(pdf.resolve())):
+            retired_copy = {"url": f"{repo_url}/blob/{copy_commit}/{kept}", "path": kept,
+                            "ref": copy_ref, "commit": copy_commit}
     if not upstream and not (allow_history and retired_copy):
         why = "no arXiv id" + ("" if allow_doi else " (DOI not allowed)") + ("" if allow_history else "; history-only not allowed")
         return {**out, "result": "skipped", "reason": why}
@@ -158,8 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--library", type=Path, help="every entry directory under this library root")
     ap.add_argument("--allow-doi", action="store_true", help="retire an entry whose only public locator is a DOI")
     ap.add_argument("--allow-history", action="store_true",
-                    help="retire an entry with no public locator, pointing only at the commit that holds it")
-    ap.add_argument("--commit", help="the commit that still holds the files (default: HEAD)")
+                    help="retire an entry with no public locator, pointing only at its fsh-guts copy")
+    ap.add_argument("--copy-ref", default=DEFAULT_COPY_REF,
+                    help=f"the branch that keeps the retired copies (default: {DEFAULT_COPY_REF})")
+    ap.add_argument("--copy-prefix", default=DEFAULT_COPY_PREFIX,
+                    help=f"where on that branch a file's path on main is kept (default: {DEFAULT_COPY_PREFIX})")
     ap.add_argument("--repo-url", help="https://github.com/<owner>/<repo> (default: from origin)")
     ap.add_argument("--apply", action="store_true", help="write records and remove files (default: dry run)")
     ap.add_argument("--json", action="store_true")
@@ -172,13 +195,14 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("give entry directories or --library")
     top = git(entries[0], "rev-parse", "--show-toplevel")
     repo_root = Path(top) if top else None
-    commit = a.commit or (git(repo_root, "rev-parse", "HEAD") if repo_root else None)
+    copy_commit = resolve_copy_ref(repo_root, a.copy_ref) if repo_root else None
     repo_url = a.repo_url or (github_base(git(repo_root, "remote", "get-url", "origin")) if repo_root else None)
 
     report = []
     for e in entries:
         p = plan(e, allow_doi=a.allow_doi, allow_history=a.allow_history,
-                 repo_url=repo_url, commit=commit, repo_root=repo_root)
+                 repo_url=repo_url, copy_commit=copy_commit, copy_ref=a.copy_ref,
+                 copy_prefix=a.copy_prefix, repo_root=repo_root)
         if p["result"] == "retire" and a.apply:
             apply(e, p, repo_root)
             p["result"] = "retired"
@@ -188,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     for r in report:
         counts[r["result"]] = counts.get(r["result"], 0) + 1
     if a.json:
-        print(json.dumps({"apply": a.apply, "commit": commit, "counts": counts, "entries": report}, indent=2))
+        print(json.dumps({"apply": a.apply, "copy_ref": a.copy_ref, "copy_commit": copy_commit, "counts": counts, "entries": report}, indent=2))
     else:
         for r in report:
             print(f"{r['result']:15} {r['entry']}  {r.get('reason') or r.get('upstream') or ''}")
