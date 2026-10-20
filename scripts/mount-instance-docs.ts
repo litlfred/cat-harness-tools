@@ -742,6 +742,9 @@ function foreignScope(platformBase: string, instance?: string): ForeignScope {
 /** The attribute marking the platform UI a foreign page loads, so a second pass adds none. */
 export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
 
+/** A `<script>` that loads `docs-ui.js`, at any base and with any query string. */
+const LOADS_DOCS_UI = /<script\b[^>]*\bsrc="[^"]*\/assets\/js\/docs-ui\.js(?:\?[^"]*)?"/i;
+
 /**
  * Load the platform's `docs-ui` stylesheet and script into a FOLIO's page.
  *
@@ -756,6 +759,10 @@ export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
  */
 export function withPlatformUi(html: string, chromeRoot: string, platformBase?: string): string {
   if (html.includes(PLATFORM_UI_ATTR)) return html;
+  // A page whose own layout already loads docs-ui.js (a theme page the rail
+  // pass reaches with `themeSource`) gets no second copy: two copies each draw
+  // the language and QA badge bar under the title, so the page showed it twice.
+  if (LOADS_DOCS_UI.test(html)) return withSavedScheme(html);
   const head = headEndTag(html)?.index ?? -1;
   if (head < 0) return html;
   const tags =
