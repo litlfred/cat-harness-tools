@@ -33,6 +33,10 @@ const STATUS = {
     {
       locale: "fr", templates: 4, catalogues: 4, entries: 200, translated: 150, fuzzy: 10, untranslated: 40, unreadable: [],
       officiality: { state: "official", signedOffBy: "Dr. A", signedOffAt: "2026-10-01", officialCatalogues: 4, findings: 0 },
+      files: [
+        { path: "index.po", entries: 120, translated: 100, fuzzy: 5, untranslated: 15, official: "yes" },
+        { path: "guides/onboarding.po", entries: 80, translated: 50, fuzzy: 5, untranslated: 25, official: "yes" },
+      ],
     },
     {
       locale: "ar", templates: 4, catalogues: 2, entries: 100, translated: 20, fuzzy: 0, untranslated: 80, unreadable: [],
@@ -182,6 +186,31 @@ for (const scheme of ["dark", "light"] as const) {
       // ...and it reaches the page drawer.
       await sec.locator(".fa-translation-warning__details").click();
       await expect(page.locator(".fa-tr-drawer:not(.fa-qa-panel-warn):not(.fa-qa-panel-pass)").filter({ has: page.locator(".fa-tr-drawer__site") })).toHaveCount(1);
+    });
+
+    test("the status page's rows each open the catalogues behind their numbers", async ({ page }) => {
+      // The row shape gen-translation-status.ts draws: `.ts-page` table rows
+      // carrying `data-fa-tr-locale`, the locale in the row's `th`.
+      const table =
+        `<div class="ts-page"><table><tbody>` +
+        `<tr data-fa-tr-locale="fr"><th scope="row"><code>fr</code></th><td>4 / 4</td></tr>` +
+        `<tr data-fa-tr-locale="zh"><th scope="row"><code>zh</code></th><td>1 / 4</td></tr>` +
+        `</tbody></table></div>`;
+      await serve(page, scheme, { code: 200, body: STATUS }, { ...META, translationStatus: "" }, table);
+      const fr = page.locator('tr[data-fa-tr-locale="fr"] .fa-tr-row-toggle');
+      await fr.click();
+      const drawerRow = page.locator('tr[data-fa-tr-locale="fr"] + tr.fa-tr-row-drawer');
+      await expect(drawerRow).toBeVisible();
+      await expect(drawerRow).toContainText("official, signed off by Dr. A");
+      await expect(drawerRow).toContainText("guides/onboarding.po");
+      await expect(drawerRow).toContainText("50 / 80 (63%)");
+      // An older projection without per-catalogue rows says so instead of drawing an empty table.
+      await page.locator('tr[data-fa-tr-locale="zh"] .fa-tr-row-toggle').click();
+      await expect(page.locator('tr[data-fa-tr-locale="zh"] + tr.fa-tr-row-drawer')).toContainText("predates per-catalogue detail");
+      // And it closes again.
+      await fr.click();
+      await expect(page.locator('tr[data-fa-tr-locale="fr"] + tr.fa-tr-row-drawer')).toHaveCount(0);
+      await expect(fr).toHaveAttribute("aria-expanded", "false");
     });
 
     test("a server error is NOT reported as 'publishes none'", async ({ page }) => {

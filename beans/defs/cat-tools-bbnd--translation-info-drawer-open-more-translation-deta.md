@@ -104,9 +104,10 @@ Done-when:
   landing included, opens the same instance-wide site section. The locale
   scope is the site table's rows. All of it is mounted by JS from a data
   hook.
-- [ ] Integrated on content blocks, document pages and the instance landing.
-  The translation-status visualiser has the signed-off column but no per-row
-  drawer yet: that needs per-catalogue rows in the projection.
+- [x] Integrated on content blocks, document pages, the instance landing and
+  the translation-status visualiser. Each row has a Details drawer listing its
+  catalogues with counts and `X-Folio-Official`, from the projection's new
+  per-locale `files`.
 - [x] Officiality is read from both the PO headers and `status.json`, and
   `check:translation-officiality` fails when they disagree (#102).
 - [x] A stale translation says so in the drawer: the block scope, from witness
