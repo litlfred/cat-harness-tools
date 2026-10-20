@@ -1633,10 +1633,12 @@ function writePublishContext(s: Scaffold, enclosing: string | null): void {
   result.notes.push(
     o.iriBase === undefined
       ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
-          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          "will skip with a warning until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
           `${instanceDeclarationFilename(o.slug)}.`
       : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
-          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "every push to main, but only once this instance holds at least one .jsonld document: the context binds the " +
+          "prefixes its documents use, so with none every run skips with a warning and creates no gh-pages. A new " +
+          "instance holds none yet. After the first run that publishes, switch GitHub Pages on once: " +
           "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
   );
 }
