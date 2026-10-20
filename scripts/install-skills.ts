@@ -6,7 +6,7 @@
  * @module cat-harness-tools/scripts/install-skills
  *
  * ```sh
- * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity] [--into <dir>] [--check]
+ * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity|gemini|cursor|copilot] [--into <dir>] [--check]
  * ```
  *
  * ## The owner's ruling, 2026-10-10
@@ -33,13 +33,28 @@
  *
  * Each skill becomes `<host dir>/<prefix>-<name>/SKILL.md`: the source front
  * matter with `name` replaced by the prefixed name, a provenance line, and the
- * body unchanged. The two hosts written today share that layout, verified
- * against their documentation:
+ * body unchanged. Every host here reads that layout natively, as an Agent
+ * Skill with a required `name` and `description` (bean `cat-tools-0nxe`,
+ * vendor docs read 2026-10-20):
  *
- * | host | directory |
- * |---|---|
- * | Claude Code | `.claude/skills/` |
- * | Antigravity | `.agents/skills/` |
+ * | host | directory | source |
+ * |---|---|---|
+ * | Claude Code | `.claude/skills/` | Claude Code docs |
+ * | Antigravity | `.agents/skills/` | Antigravity docs |
+ * | Gemini CLI | `.gemini/skills/` | https://geminicli.com/docs/cli/skills/ |
+ * | Cursor | `.cursor/skills/` | https://cursor.com/docs/skills |
+ * | Copilot | `.github/skills/` | https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/create-skills |
+ *
+ * `.agents/skills/` is also read by Gemini CLI (an alias that takes precedence
+ * over `.gemini/skills/`), Cursor and Copilot, so `--host antigravity` alone
+ * reaches all four of those; the per-host directories are for a checkout that
+ * wants one host's tree only. Copilot reads skills in the cloud agent, code
+ * review, the CLI, the app and VS Code agent mode.
+ *
+ * Cursor requires `name` to be lowercase letters, digits and hyphens, and to
+ * match the folder. That holds for every installed name (prefix, hyphen,
+ * name), and a name that breaks it is skipped with the reason rather than
+ * written where a host would refuse it.
  *
  * ## Process checklists, installed as skills (bean `folio-assistant-cy4p`)
  *
@@ -56,10 +71,6 @@
  * copy is a rendering of a rendering and still never an authority. An agent
  * with the MCP server uses `bpmn-engine`, which refuses a wrong turn; one
  * without walks the checklist.
- *
- * Gemini CLI, Cursor and Copilot are not written yet: their formats differ
- * (rules files, instructions files) and were not verified here. Writing a guess
- * would produce files a host silently ignores.
  *
  * ## Owned output only
  *
@@ -80,7 +91,13 @@ import { isSkillMd, workflowDirs } from "./known-skills.ts";
 export const HOSTS = {
   claude: ".claude/skills",
   antigravity: ".agents/skills",
+  gemini: ".gemini/skills",
+  cursor: ".cursor/skills",
+  copilot: ".github/skills",
 } as const;
+
+/** An Agent Skill name every host accepts: Cursor's rule, the strictest of the five. */
+export const SKILL_NAME = /^[a-z0-9-]+$/;
 export type Host = keyof typeof HOSTS;
 
 /** The line that marks a `SKILL.md` as this script's output, and so its to replace or remove. */
@@ -229,6 +246,10 @@ export function planInstall(root: string, skills: readonly SourceSkill[] = colle
       continue;
     }
     const installed = `${prefix}-${s.name}`;
+    if (!SKILL_NAME.test(installed)) {
+      skipped.push({ file: rel, reason: `"${installed}" is not lowercase letters, digits and hyphens, which Cursor requires` });
+      continue;
+    }
     if (from.has(installed)) collisions.push({ name: installed, lost: from.get(installed)!, won: rel });
     from.set(installed, rel);
     files.set(installed, renderInstalled(s.text ?? readFileSync(s.file, "utf-8"), installed, rel));

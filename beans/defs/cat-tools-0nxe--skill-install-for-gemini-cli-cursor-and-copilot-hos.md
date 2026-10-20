@@ -1,14 +1,14 @@
 ---
 # cat-tools-0nxe
 title: 'Skill install for Gemini CLI, Cursor and Copilot hosts (x4mt follow-up) — verify formats first'
-status: draft
+status: completed
 type: task
 priority: normal
 tags:
     - x4mt
     - skills
 created_at: 2026-10-12T15:45:25Z
-updated_at: 2026-10-12T15:45:25Z
+updated_at: 2026-10-20T09:50:00Z
 ---
 
 Follow-up to x4mt (tools#143, `scripts/install-skills.ts`). That PR installs each
@@ -31,10 +31,10 @@ carries the trigger description, whether a body may reference sibling files,
 and a size limit if there is one. Record the doc URL and date read.
 
 ## Steps (once the owner says build)
-- [ ] Verify the table above against vendor docs; correct it in this bean
-- [ ] Add each host to `HOSTS` in `scripts/install-skills.ts` with its own `render` (front-matter mapping) where SKILL.md is not native
-- [ ] `ownedInstalls` keeps working per host: the installed marker must survive each format (an MDC/TOML comment where Markdown comments do not apply)
-- [ ] Tests in `scripts/tests/install-skills.test.ts` per host: path, front matter, marker, `--check`
+- [x] Verify the table above against vendor docs; correct it in this bean
+- [x] Add each host to `HOSTS` in `scripts/install-skills.ts` with its own `render` (front-matter mapping) where SKILL.md is not native
+- [x] `ownedInstalls` keeps working per host: the installed marker must survive each format (an MDC/TOML comment where Markdown comments do not apply)
+- [x] Tests in `scripts/tests/install-skills.test.ts` per host: path, front matter, marker, `--check`
 
 ## Done when
 1. The table is verified, with sources and dates.
@@ -51,3 +51,19 @@ Asked 2026-10-12 by lane C. x4mt shipped Claude and Antigravity only.
 4. Leave it: Claude and Antigravity are enough for now.
 
 Default if unanswered: **1**.
+
+## Verified 2026-10-20 (owner: build, thread "BPMN engine status", "1-3 as recommended")
+
+All three read Agent Skills natively: a `<name>/SKILL.md` folder whose front matter carries `name` and `description`, with `description` as the trigger. So no format mapping is needed, and the installed marker (a Markdown comment) survives unchanged.
+
+| Host | Project directory | Also reads | Source (read 2026-10-20) |
+|---|---|---|---|
+| Gemini CLI | `.gemini/skills/` | `.agents/skills/` (alias, takes precedence) | https://geminicli.com/docs/cli/skills/ , https://geminicli.com/docs/cli/creating-skills/ |
+| Cursor | `.cursor/skills/` | `.agents/skills/`, `.claude/skills/`, `.codex/skills/`; nested folders anywhere in the repo | https://cursor.com/docs/skills |
+| Copilot | `.github/skills/` | `.claude/skills/`, `.agents/skills/` | https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/create-skills |
+
+Copilot surfaces: cloud agent, code review, CLI, the app, and VS Code agent mode. Cursor's `name` rule (lowercase letters, digits and hyphens, matching the folder) is the strictest, so `skills:install` now skips a name that breaks it, with the reason. None does today: 309 installed from `--root cat-harness`, 0 skipped for the name.
+
+## Summary of Changes
+
+`HOSTS` gains `gemini`, `cursor` and `copilot`, plus the name guard and tests. The PR is stacked on cat-harness-tools#441. Since `.agents/skills/` is read by Antigravity, Gemini CLI, Cursor and Copilot, `--host antigravity` alone reaches four hosts. Session https://claude.ai/code/session_01WisJFefMYG4g6iFhtgCUYG.
