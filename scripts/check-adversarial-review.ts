@@ -33,6 +33,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { detectAgentProvenance, type AgentProvenanceResult } from "./agent-provenance.ts";
+import { graphReadPath } from "./graph-read.ts";
 import {
   evaluateMergeReviewGateState,
   evaluateReviewGateState,
@@ -48,6 +49,9 @@ import {
 } from "@litlfred/cat-harness/schemas/red-flag.ts";
 import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { attestationsHomeFor } from "@litlfred/cat-harness/schemas/qa-attestations.js";
+
+/** The declared state graph that holds one `merge-review/v1` verdict per PR head. */
+export const MERGE_REVIEWS_GRAPH = "merge-reviews";
 
 export type AdversarialGateState =
   | "clean"
@@ -180,9 +184,16 @@ export function loadVerdictFromFile(filePath: string): MergeReview | Adversarial
  */
 export function findVerdictFile(headSha: string, verdictDir?: string, cwd?: string): string | null {
   const root = cwd ?? process.cwd();
+  // The `merge-reviews` state graph first: where a verdict belongs, by the
+  // owner's ruling of 2026-10-20 ("State branch", bean w8jq). A verdict
+  // committed INTO the pull request moves the head it names, so it can only
+  // ever be found stale. Resolved by its declared id, never spelled, and
+  // skipped when this checkout does not declare or cannot reach it.
+  const reviews = graphReadPath(MERGE_REVIEWS_GRAPH, root);
   const searchDirs = verdictDir
     ? [verdictDir]
     : [
+        ...(reviews.state === "ok" ? [reviews.at] : []),
         // The declared `qa` tree and `attestations` store (`kgQaHomeFor`,
         // `attestationsHomeFor`), never spelled: a moved tree moves the search.
         join(kgQaHomeFor(root).root, "qa-review"),
