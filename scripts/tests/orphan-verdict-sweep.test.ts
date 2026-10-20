@@ -103,7 +103,7 @@ describe("orphanVerdicts", () => {
 });
 
 describe("check:orphan-verdicts, the CLI", () => {
-  const CLI = join(import.meta.dir, "..", "..", "content", "pipeline", "orphan-verdict-sweep.ts");
+  const CLI = join(import.meta.dir, "..", "..", "pipeline", "orphan-verdict-sweep.ts");
   const run = (cwd: string) => Bun.spawnSync(["bun", "run", CLI], { cwd, stdout: "pipe", stderr: "pipe" });
 
   it("refuses with exit 2 over an absent results tree, and prints no pass", () => {
