@@ -319,6 +319,7 @@ function recordedRenderer(text: string): string | undefined {
 /** Forget what {@link declaredVisualisers} read — for a test that rewrites a declaration mid-process. */
 export function clearDeclaredVisualisers(): void {
   declaredCache.clear();
+  heldCache.clear();
 }
 
 /** The visualisers one Tool is declared to draw. */
@@ -405,7 +406,15 @@ export interface HeldVisualiserPage {
   route: string;
 }
 
+const heldCache = new Map<string, HeldVisualiserPage[]>();
+
 export function heldVisualiserPages(repoRoot: string): HeldVisualiserPage[] {
+  // Cached beside `declaredVisualisers` and cleared with it: `viewersOf` asks
+  // for every directory and sub-graph it resolves, and a whole-checkout audit
+  // makes thousands of such calls.
+  const key = resolve(repoRoot);
+  const hit = heldCache.get(key);
+  if (hit !== undefined) return hit;
   const site = resolve(siteOwnerDir(repoRoot));
   const out: HeldVisualiserPage[] = [];
   for (const v of declaredVisualisers(repoRoot)) {
@@ -421,6 +430,7 @@ export function heldVisualiserPages(repoRoot: string): HeldVisualiserPage[] {
     if (index === undefined || renderedByOf(readFileSync(index, "utf-8")) !== v.renderedBy) continue;
     out.push({ visualiser: v, dir, page: index, route: visualiserRoute(forwardingParts({ harness: v.harness, visualiser: v.id })) });
   }
+  heldCache.set(key, out);
   return out;
 }
 

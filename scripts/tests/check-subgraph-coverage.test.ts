@@ -595,10 +595,14 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
     // README, so docs is a strict subset. They stay separate for the reason
     // that survives: "can a reader enter" and "is there anything to read once
     // inside" are different questions.
-    const report = formatReport(auditAll(resolve(".")));
+    // The shared audit, with the corpus budget: this test ran its own
+    // `auditAll` under bun's 5 s default, the coin-flip `lpcs` removed from
+    // the others (it went red on cat-harness-tools#451, which made the audit a
+    // little slower).
+    const report = formatReport(realAuditAll(resolve(".")));
     expect(report).toContain("no `docs/` OF THEIR OWN");
     expect(report).toContain("advisory, not gated");
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 
