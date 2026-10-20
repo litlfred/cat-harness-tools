@@ -31,7 +31,10 @@ import {
   CENSUS_FAMILY,
   CHECK_FAIL_ON_NEW,
   declaresTranslationMirror,
+  DATED_PROPOSAL_INDEX_ROW,
   DATED_PROPOSAL_RECORD,
+  declaresSubgraphIndex,
+  SUBGRAPH_INDEX_BEGIN,
   DEFINITION_NAMES_IMPLEMENTATION,
   DEFINITION_POINTS_TO_IMPLEMENTATION_JSON,
   DEFINITION_POINTS_TO_IMPLEMENTATION_MD,
@@ -1131,6 +1134,72 @@ describe("X5 — a dated proposal record may name the layers it was written abou
     expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.ts")).toBe("wrong-direction");
   });
 });
+
+// ── Item 6a (2026-10-16): the generated index of the records ─────
+
+describe("X5 index — a generated index's row for a dated record is read as the record (owner, 2026-10-16, item 6a)", () => {
+  const INDEX = (rows: string) =>
+    `${SUBGRAPH_INDEX_BEGIN}\n# proposals\n\nSee the high layer for more.\n\n| file | what it is | used by |\n|---|---|---|\n${rows}<!-- kg:subgraph:end -->\n`;
+  const DATED_ROW = "| [`high-split-2026-10-01.md`](high-split-2026-10-01.md) | Split plan for high |  |\n";
+  const UNDATED_ROW = "| [`high-notes.md`](high-notes.md) | Notes on high |  |\n";
+
+  test("a row listing a dated record is exempt, carrying the index reason", () => {
+    const r = analyse(tree({ "low/docs/proposals/README.md": INDEX(DATED_ROW) }));
+    const rows = r.classified.filter((c) => c.occurrence.text.startsWith("|"));
+    expect(rows.map((c) => c.verdict.verdict)).toEqual(["exempt"]);
+    expect(JSON.stringify(rows[0]!.verdict)).toContain("X5 applied to the generated INDEX");
+  });
+
+  test("FAILS for the page's prose and for a row listing an undated proposal", () => {
+    const r = analyse(tree({ "low/docs/proposals/README.md": INDEX(UNDATED_ROW) }));
+    expect(r.classified.map((c) => c.verdict.verdict)).toEqual(["wrong-direction", "wrong-direction"]);
+  });
+
+  test("FAILS when the file does not declare itself the generator's index — the same row, hand-written", () => {
+    const body = INDEX(DATED_ROW).replace(SUBGRAPH_INDEX_BEGIN, "");
+    const root = tree({ "low/docs/proposals/README.md": body });
+    expect(declaresSubgraphIndex(join(root, "low/docs/proposals/README.md"))).toBe(false);
+    expect(verdicts(root).every((v) => v.endsWith("wrong-direction"))).toBe(true);
+  });
+
+  test("FAILS for a generated index outside the records' directory", () => {
+    const root = tree({ "low/docs/requirements/README.md": INDEX(DATED_ROW) });
+    expect(declaresSubgraphIndex(join(root, "low/docs/requirements/README.md"))).toBe(true);
+    expect(verdicts(root).every((v) => v.endsWith("wrong-direction"))).toBe(true);
+  });
+
+  test("the row must link the dated name to itself, in the generator's shape", () => {
+    const v = (text: string, file = "cat-harness/docs/proposals/README.md") =>
+      classifyReference(occ("cat-harness", "smart-base", text, file), LAYER_RULE_X5I, never, [DATED_PROPOSAL_INDEX_ROW]).verdict;
+    expect(v("| [`dak-kinds-contribution-2026-10-02.md`](dak-kinds-contribution-2026-10-02.md) | DAK block kinds as a smart-base contribution |  |")).toBe("exempt");
+    expect(v("| [`dth-candidates-2026-10-02.json`](dth-candidates-2026-10-02.json) | data about smart-base |  |")).toBe("exempt");
+    // Linked elsewhere, not a record row.
+    expect(v("| [`dak-kinds-contribution-2026-10-02.md`](../smart-base/x.md) | smart-base |  |")).toBe("wrong-direction");
+    // A sub-directory of docs/proposals/ is not X5's directory.
+    expect(v("| [`a-2026-10-02.md`](a-2026-10-02.md) | smart-base |  |", "cat-harness/docs/proposals/old/README.md")).toBe("wrong-direction");
+    // Prose quoting a row's first cell mid-line.
+    expect(v("see | [`a-2026-10-02.md`](a-2026-10-02.md) | smart-base")).toBe("wrong-direction");
+  });
+
+  test("it is counted on its own line", () => {
+    const counts = exemptionCounts([{ verdict: { verdict: "exempt" as const, basis: "", exemption: DATED_PROPOSAL_INDEX_ROW } }]);
+    expect(counts.get(DATED_PROPOSAL_INDEX_ROW.reason)).toBe(1);
+    expect(counts.size).toBe(EXEMPTIONS_DECLARED);
+  });
+});
+
+const LAYER_RULE_X5I: LayerRule = (() => {
+  const layers = new Map<string, readonly string[]>([
+    ["cat-harness", []],
+    ["smart-base", ["cat-harness"]],
+  ]);
+  return {
+    allowed: allowedFromNeeds(
+      layers,
+      ancestorsOf(flattenDependencies([...layers].map(([id, needs]) => ({ id, needs: [...needs], fatal: false }))).order),
+    ),
+  };
+})();
 
 // ── Ruling 3a (2026-10-15): a workflow `uses:` names an address ──
 
