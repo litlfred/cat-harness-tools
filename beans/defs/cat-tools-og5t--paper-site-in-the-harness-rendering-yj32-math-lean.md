@@ -1,12 +1,12 @@
 ---
 # cat-tools-og5t
 title: 'PAPER SITE in the harness rendering (yj32): math, Lean links and notation macros, blocking qou''s legacy-render retirement'
-status: todo
+status: in-progress
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T18:22:18Z
+updated_at: 2026-10-20T19:01:54Z
 parent: folio-assistant-yj32
 ---
 
@@ -127,3 +127,5 @@ So, under the owner's option 1 (HTML parity), the done-when above reads:
 - [ ] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T19:01:54Z_ — Claimed by feat/og5t-lean-source-link — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
