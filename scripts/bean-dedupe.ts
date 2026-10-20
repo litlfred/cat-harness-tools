@@ -35,6 +35,9 @@
  * only when the answer is mechanical:
  *
  * - both sides changed only `updated_at` → the later one;
+ *
+ * The bean's home copy is folded in first, so where a hunk cannot be resolved,
+ * the home copy's text is the one kept.
  * - the base had nothing there (both sides appended, typically a dated note) →
  *   keep both, ours first.
  *
@@ -271,6 +274,15 @@ function readStore(s: StoreSpec, cache: string): { copies: Map<string, Copy>; co
   return { copies, commit };
 }
 
+function summarise(cs: Conflict[]): string {
+  const n = new Map<string, number>();
+  for (const c of cs) {
+    const k = c.otherStore === "-" ? c.where : `${c.where === "(three-way hunk)" ? "hunk" : c.where} vs ${c.otherStore}`;
+    n.set(k, (n.get(k) ?? 0) + 1);
+  }
+  return [...n].map(([k, v]) => (v > 1 ? `${v}× ${k}` : k)).join("; ").replace(/\|/g, "\\|");
+}
+
 /** The common ancestor of the two branch stores, and its copy of every bean. */
 function readBase(stores: StoreSpec[], cache: string): { commit: string; subject: string; copies: Map<string, string> } {
   const [a, b] = stores.filter((s) => s.branch.startsWith("cat/"));
@@ -320,11 +332,17 @@ function main() {
     let kind: string;
     if (identical) kind = "identical copies";
     else if (baseText !== undefined) {
-      const m3 = merge3(copies, baseText);
+      // The home copy goes first, so a conflict keeps the home's text.
+      const ordered = [...copies].sort((x, y) => (x.store === home ? -1 : y.store === home ? 1 : 0));
+      const m3 = merge3(ordered, baseText);
       merged.conflicts = m3.conflicts;
       merged.text = m3.text;
+      merged.chosen = ordered[0].store;
       kind = m3.conflicts.length ? "conflict (three-way)" : m3.resolved ? "merged three-way, mechanical fixes" : "merged three-way, clean";
-      if (!headerOk(m3.text)) kind = "conflict (merged header invalid)";
+      if (!headerOk(m3.text)) {
+        kind = "conflict (merged header invalid)";
+        merged.conflicts.push({ where: "(merged header does not parse, or repeats a key)", kept: "", other: "", otherStore: "-" });
+      }
     } else
       kind = merged.conflicts.length
         ? "conflict (no base)"
@@ -357,17 +375,18 @@ function main() {
   }
   const statusSplits = rows.filter((r) => r.merged?.fieldDiffs.some((d) => d.field === "status"));
   if (statusSplits.length) {
-    lines.push("", "## Copies that disagree on status", "", "The header with the latest `updated_at` wins; check these.", "", "| Bean | Status per store | Kept from |", "|---|---|---|");
+    lines.push("", "## Copies that disagree on status", "", "Check these: the merged status is what the apply step would write.", "", "| Bean | Status per store | Merged status |", "|---|---|---|");
     for (const r of statusSplits) {
       const d = r.merged!.fieldDiffs.find((x) => x.field === "status")!;
-      lines.push(`| ${r.id} | ${Object.entries(d.values).map(([s, v]) => `${s}: ${v}`).join("; ")} | ${r.merged!.chosen} |`);
+      const after = String(parse(r.merged!.text).fm.status ?? "?");
+      lines.push(`| ${r.id} | ${Object.entries(d.values).map(([s, v]) => `${s}: ${v}`).join("; ")} | ${after} |`);
     }
   }
   const conflicts = rows.filter((r) => r.kind.startsWith("conflict"));
   if (conflicts.length) {
-    lines.push("", "## Text conflicts", "", "The kept copy's text stays; the other is listed in `plan.json` under `conflicts`.", "", "| Bean | Kept from | Sections in conflict |", "|---|---|---|");
+    lines.push("", "## Text conflicts", "", "The kept copy's text stays; the other is listed in `plan.json` under `conflicts`.", "", "| Bean | Home copy (text kept) | Conflicts |", "|---|---|---|");
     for (const r of conflicts)
-      lines.push(`| ${r.id} | ${r.merged!.chosen} | ${r.merged!.conflicts.map((c) => `${c.where.replace(/\|/g, "\\|")} (vs ${c.otherStore})`).join("; ")} |`);
+      lines.push(`| ${r.id} | ${r.merged!.chosen} | ${summarise(r.merged!.conflicts)} |`);
   }
   const report = lines.join("\n") + "\n";
 
