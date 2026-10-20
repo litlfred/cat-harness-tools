@@ -55,6 +55,7 @@ import { tmpdir } from "node:os";
 
 export type StoreSpec = { name: string; repo: string; branch: string; path: string };
 
+// declared-path-literal: these name folders in OTHER repositories' trees, read over git; no declaration in this checkout answers them.
 export const DEFAULT_STORES: StoreSpec[] = [
   { name: "folio-assistant", repo: "litlfred/folio-assistant", branch: "cat/cat-harness/beans", path: "beans/defs" },
   { name: "cat-harness", repo: "litlfred/cat-harness", branch: "cat/cat-harness/beans", path: "beans/defs" },
