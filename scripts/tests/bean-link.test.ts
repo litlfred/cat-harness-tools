@@ -8,7 +8,8 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { applyWorkPlanOp, findBean, listBeans } from "../../src/workflow/bean-link";
+import { applyWorkPlanOp, findBean, listBeans, onlyArchiveLeft } from "../../src/workflow/bean-link";
+import type { InstanceState } from "../../src/workflow/instance";
 import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-model";
 
 /**
@@ -192,5 +193,52 @@ describe("the diagrams declare which operation each step performs", () => {
     await expect(loadProcessModel(join(dir, "bad.bpmn"))).rejects.toThrow(UnsupportedBpmn);
     await expect(loadProcessModel(join(dir, "bad.bpmn"))).rejects.toThrow(/obliterate/);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("resolve before a closing archive step", () => {
+  // S → Work → Resolve → [Archive] → E, with the archive step optionally followed by more work.
+  const diagram = (afterArchive: boolean): string => `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/0.1.0/processes/ns#"
+                  id="D" targetNamespace="urn:x">
+  <bpmn:process id="Process_A" name="A" isExecutable="false">
+    <bpmn:startEvent id="S"/>
+    <bpmn:task id="Work" name="Work"/>
+    <bpmn:task id="Resolve" name="Resolve"><bpmn:extensionElements><cat-harness.processes:bean op="resolve"/></bpmn:extensionElements></bpmn:task>
+    <bpmn:task id="Archive" name="Archive"><bpmn:extensionElements><cat-harness.processes:bean op="archive"/></bpmn:extensionElements></bpmn:task>
+    ${afterArchive ? '<bpmn:task id="More" name="More"/>' : ""}
+    <bpmn:endEvent id="E"/>
+    <bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="Work"/>
+    <bpmn:sequenceFlow id="F2" sourceRef="Work" targetRef="Resolve"/>
+    <bpmn:sequenceFlow id="F3" sourceRef="Resolve" targetRef="Archive"/>
+    ${afterArchive
+      ? '<bpmn:sequenceFlow id="F4" sourceRef="Archive" targetRef="More"/><bpmn:sequenceFlow id="F5" sourceRef="More" targetRef="E"/>'
+      : '<bpmn:sequenceFlow id="F4" sourceRef="Archive" targetRef="E"/>'}
+  </bpmn:process>
+</bpmn:definitions>
+`;
+  const state = (tokens: string[], status: "running" | "completed" = "running"): InstanceState => ({
+    id: "i", processId: "Process_A", source: "a.bpmn", subject: "s", tokens, arrivals: {}, history: [],
+    status, startedAt: "", updatedAt: "",
+  });
+  const load = async (afterArchive: boolean) => {
+    const dir = mkdtempSync(join(tmpdir(), "bean-archive-"));
+    writeFileSync(join(dir, "a.bpmn"), diagram(afterArchive));
+    const model = await loadProcessModel(join(dir, "a.bpmn"));
+    rmSync(dir, { recursive: true, force: true });
+    return model;
+  };
+
+  test("a token on a closing archive step counts as finished; one on earlier work does not", async () => {
+    const model = await load(false);
+    expect(onlyArchiveLeft(model, state(["Archive"]))).toBe(true);
+    expect(onlyArchiveLeft(model, state(["Resolve"]))).toBe(false);
+    expect(onlyArchiveLeft(model, state([], "completed"))).toBe(true);
+  });
+
+  test("an archive step with work after it does not let resolve fire early", async () => {
+    const model = await load(true);
+    expect(onlyArchiveLeft(model, state(["Archive"]))).toBe(false);
   });
 });

@@ -23,6 +23,10 @@
  * not taken on the caller's say-so: the bean completes only when the instance
  * it tracks has itself completed, which is a fact derived from the process
  * rather than an assertion. A still-running instance gets a note instead.
+ * One exception: a diagram that ends in an `archive` step resolves the step
+ * before it, so "finished" there means nothing is left but archive steps that
+ * run straight to an end ({@link onlyArchiveLeft}). Without it, adding the
+ * archive step would turn the resolve before it into a note.
  *
  * `archive` is the per-activity disposition of bean `folio-assistant-m8gz`
  * (owner, 2026-10-20: "a step op", not a call into `Process_BeanLifecycle`).
@@ -45,6 +49,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFile
 import { basename, dirname, join } from "node:path";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { resolveBeanDefs } from "../../scripts/beans.ts";
+import type { InstanceState } from "./instance.js";
+import type { ProcessModel } from "./process-model.js";
 
 export type WorkPlanOp = "claim" | "note" | "resolve" | "archive";
 
@@ -223,6 +229,44 @@ export function applyWorkPlanOp(
     }
   }
   return { summary: `bean ${beanId}: ${bean.status} → ${status}`, bean };
+}
+
+/**
+ * Whether the work an instance tracks is finished, for `resolve`: the instance
+ * completed, or every token waits on an `archive` step (or on a phase whose
+ * own tokens do) and nothing but archive steps lies between it and an end.
+ *
+ * A token anywhere else means work remains, so the answer is false. That
+ * includes an archive step placed mid-flow: it does not let a resolve fire
+ * while later steps are still to come.
+ */
+export function onlyArchiveLeft(model: ProcessModel, state: InstanceState): boolean {
+  if (state.status === "completed") return true;
+  if (state.tokens.length === 0) return false;
+  return state.tokens.every((t) => {
+    const node = model.nodes.get(t);
+    if (!node || !finishesAfter(model, t, new Set())) return false;
+    if (node.workPlanOp === "archive") return true;
+    const child = state.children?.[t];
+    const childModel = model.children.get(t);
+    return child !== undefined && childModel !== undefined && onlyArchiveLeft(childModel, child);
+  });
+}
+
+/** Every path out of `nodeId` reaches an end through archive steps only. */
+function finishesAfter(model: ProcessModel, nodeId: string, seen: Set<string>): boolean {
+  if (seen.has(nodeId)) return false;
+  seen.add(nodeId);
+  const out = model.nodes.get(nodeId)?.outgoing ?? [];
+  return (
+    out.length > 0 &&
+    out.every((f) => {
+      const to = model.nodes.get(model.flows.get(f)?.to ?? "");
+      if (!to) return false;
+      if (to.kind === "end") return true;
+      return to.workPlanOp === "archive" && finishesAfter(model, to.id, seen);
+    })
+  );
 }
 
 /**
