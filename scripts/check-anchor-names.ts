@@ -183,8 +183,8 @@ export function instanceDirs(repo: string): string[] {
 /**
  * Every `.ts` under `dir`, NOT following symbolic links. An ascent is resolved
  * against the path the file was reached by, so a file read through a link
- * (cat-harness-tools' transitional `content/pipeline -> ../pipeline`, bean
- * `rnfl`) has its `..` counted from the link and lands one level off: a
+ * (as cat-harness-tools' transitional `content/pipeline -> ../pipeline` was,
+ * bean `rnfl`) has its `..` counted from the link and lands one level off: a
  * finding about a path no code runs from. The link's target is walked at its
  * real path anyway.
  */
