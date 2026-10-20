@@ -25,6 +25,8 @@ import {
   beansSubjectPage,
   beanStorePartsSection,
   BEAN_STORE_KINDS,
+  todoBoardPage,
+  todoStorePartsSection,
   instanceSubjectPage,
   instanceSubjectsOf,
   PER_INSTANCE_KINDS,
@@ -804,7 +806,15 @@ describe("per-instance beans pages (bean folio-assistant-1nu0)", () => {
 
 describe("a bean store's notes and workflow instances (bean folio-assistant-750a)", () => {
   test("the store's parts are the kinds its page draws", () => {
-    expect([...BEAN_STORE_KINDS].sort()).toEqual(["bean-defs", "bean-notes", "beans", "merge-queue", "workflow-state"]);
+    expect([...BEAN_STORE_KINDS].sort()).toEqual([
+      "bean-defs",
+      "bean-notes",
+      "beans",
+      "merge-queue",
+      "session-survey",
+      "sweep-marks",
+      "workflow-state",
+    ]);
   });
 
   test("lists the merge steward's decisions, links each PR, and keeps a bad entry visible (bean folio-assistant-30jr)", () => {
@@ -891,6 +901,144 @@ describe("a bean store's notes and workflow instances (bean folio-assistant-750a
       expect(html).toContain("Bean notes — 0");
       expect(html).toContain("Workflow instances — 0");
       expect(html).toContain("No merge-queue decision recorded in this store.");
+      expect(html).toContain("No session survey recorded in this store.");
+      expect(html).toContain("No sweep mark recorded in this store.");
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
+  });
+
+  test("lists session surveys and sweep marks, and keeps a bad entry visible (bean folio-assistant-750a)", () => {
+    const store = mkdtempSync(join(tmpdir(), "bean-store-"));
+    try {
+      writeFileSync(
+        join(store, "beans.json"),
+        JSON.stringify({
+          name: "x",
+          directories: [
+            { id: "surveys", path: "surveys", graphTypologies: ["session-survey"] },
+            { id: "marks", path: "marks", graphTypologies: ["sweep-marks"] },
+          ],
+        }),
+      );
+      mkdirSync(join(store, "surveys"));
+      writeFileSync(join(store, "surveys", "README.md"), "index\n");
+      writeFileSync(
+        join(store, "surveys", "aaaa.json"),
+        JSON.stringify({
+          $schema: "folio-session-survey/v1",
+          from: "a".repeat(40),
+          to: "b".repeat(40),
+          branch: "origin/main",
+          takenAt: "2026-10-20T09:00:00Z",
+          by: "session <x>",
+          commits: 12,
+          axes: [
+            { axis: "beans", covered: true, finding: "ok" },
+            { axis: "ci", covered: false, finding: "not looked at" },
+          ],
+        }),
+      );
+      // A ref for an edge: refused by the schema, and still listed.
+      writeFileSync(
+        join(store, "surveys", "bbbb.json"),
+        JSON.stringify({ $schema: "folio-session-survey/v1", from: "origin/main" }),
+      );
+      mkdirSync(join(store, "marks"));
+      writeFileSync(
+        join(store, "marks", "session-staleness.json"),
+        JSON.stringify({ $schema: "folio-sweep-mark/v1", check: "session-staleness", checkedAt: "2026-10-20T09:00:00Z", read: 4, findings: 1 }),
+      );
+      writeFileSync(join(store, "marks", "broken.json"), "{");
+      const html = beanStorePartsSection(store);
+      expect(html).toContain("Session surveys — 1 survey(s), 1 unreadable");
+      expect(html).toContain(`<code>${"a".repeat(12)}..${"b".repeat(12)}</code></td><td>origin/main</td><td>12</td><td>1 of 2</td>`);
+      expect(html).toContain("session &lt;x&gt;");
+      expect(html).toContain("<code>bbbb.json</code>");
+      expect(html).toContain("not a valid entry — from:");
+      expect(html).toContain("Sweep marks — 1 mark(s), 1 unreadable");
+      expect(html).toContain("<td><code>session-staleness</code></td><td>2026-10-20T09:00:00Z</td><td></td><td>4</td><td>1</td>");
+      expect(html).toContain("<code>broken.json</code></td><td colspan=\"4\">not readable JSON");
+      expect(html).not.toContain("README");
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the todo graph's feedback and boards (bean folio-assistant-750a)", () => {
+  const graph = (store: string) =>
+    writeFileSync(
+      join(store, "todos.json"),
+      JSON.stringify({
+        name: "x",
+        directories: [
+          { id: "items", path: "items", graphTypologies: ["todo-items"] },
+          { id: "feedback", path: "feedback", graphTypologies: ["todo-feedback"] },
+          { id: "boards", path: "boards", graphTypologies: ["boards"] },
+          { id: "positions", path: "boards", graphTypologies: ["board-positions"] },
+        ],
+      }),
+    );
+
+  test("lists each feedback todo's block, submitter and status, and each board's filter and placed notes", () => {
+    const store = mkdtempSync(join(tmpdir(), "todo-graph-"));
+    try {
+      graph(store);
+      mkdirSync(join(store, "feedback"));
+      writeFileSync(
+        join(store, "feedback", "fix-the-lemma.md"),
+        "---\n$schema: todo/1.0.0\nid: fix-the-lemma\nsummary: \"The lemma <is> wrong\"\nstatus: open\npriority: high\n" +
+          "origin: review\ncreatedAt: 2026-10-20\ntargetLabel: sec:ch1-lemma-2\nidentities:\n  - github:reviewer\n---\nBody.\n",
+      );
+      // Declares no todo tag: listed with the reason, not dropped.
+      writeFileSync(join(store, "feedback", "stray.md"), "---\nid: stray\n---\n");
+      writeFileSync(join(store, "feedback", "README.md"), "index\n");
+      mkdirSync(join(store, "boards"));
+      writeFileSync(join(store, "boards", "whole.json"), JSON.stringify({ $schema: "folio-board/v1", id: "whole", title: "Whole" }));
+      writeFileSync(
+        join(store, "boards", "ch1.json"),
+        JSON.stringify({ $schema: "folio-board/v1", id: "ch1", title: "Chapter 1", filter: { pages: ["ch1"], kinds: ["lemma"] } }),
+      );
+      // An empty filter is refused by BoardFilterSchema, and still listed.
+      writeFileSync(join(store, "boards", "bad.json"), JSON.stringify({ $schema: "folio-board/v1", id: "bad", title: "Bad", filter: {} }));
+      writeFileSync(
+        join(store, "boards", "board-positions.json"),
+        JSON.stringify({ $schema: "folio-board-positions/v1", boards: { ch1: { "fix-the-lemma": { x: 1, y: 2 }, other: { x: 3, y: 4 } } } }),
+      );
+      const html = todoStorePartsSection(store);
+      expect(html).toContain("Feedback — 1 todo(s), 1 unreadable");
+      expect(html).toContain(
+        "<td><code>fix-the-lemma</code><br>The lemma &lt;is&gt; wrong</td><td><code>sec:ch1-lemma-2</code></td><td>github:reviewer</td><td>open</td>",
+      );
+      expect(html).toContain("<code>stray.md</code></td><td colspan=\"3\">carries no");
+      expect(html).toContain("Boards — 2 board(s), 1 unreadable");
+      expect(html).toContain("<td><code>ch1</code></td><td>Chapter 1</td><td>pages: ch1; kinds: lemma</td><td>2</td>");
+      expect(html).toContain("<td><code>whole</code></td><td>Whole</td><td>the whole folio</td><td>0</td>");
+      expect(html).toContain("<code>bad.json</code>");
+      // The positions file is a part of its own, not a board.
+      expect(html).not.toContain("<code>board-positions.json</code></td>");
+      expect(html).not.toContain("README");
+      expect(html.startsWith("{% raw %}")).toBe(true);
+      // And the todos page carries it below the board.
+      const page = todoBoardPage({ description: "Todos." }, store);
+      expect(page).toContain("{% include landing.html open=true %}");
+      expect(page).toContain('id="todo-feedback"');
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
+  });
+
+  test("an empty graph says so, part by part", () => {
+    const store = mkdtempSync(join(tmpdir(), "todo-graph-"));
+    try {
+      graph(store);
+      mkdirSync(join(store, "feedback"));
+      mkdirSync(join(store, "boards"));
+      const html = todoStorePartsSection(store);
+      expect(html).toContain("No feedback todo recorded in this graph.");
+      expect(html).toContain("No board recorded in this graph.");
+      expect(html).toContain("no note has been placed on any board");
     } finally {
       rmSync(store, { recursive: true, force: true });
     }
