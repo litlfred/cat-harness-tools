@@ -8,13 +8,14 @@
  * *about* the work plan, it **is** the work-plan operation, so doing one does
  * the other.
  *
- * Three operations, and the difference between them is who may decide:
+ * Four operations, and the difference between them is who may decide:
  *
  * | op        | effect                                                |
  * |-----------|-------------------------------------------------------|
  * | `claim`   | status → `in-progress`. Safe and idempotent.          |
  * | `note`    | append a line to the bean body.                       |
  * | `resolve` | status → `completed`, **only if the process finished** |
+ * | `archive` | move the bean into the archive, **only if the process finished and the bean is terminal** |
  *
  * `resolve` is the careful one. `AGENTS.md` is explicit that a bean is not
  * closed on someone else's judgement, and "Resolve **or re-open** the bean" is
@@ -23,6 +24,16 @@
  * it tracks has itself completed, which is a fact derived from the process
  * rather than an assertion. A still-running instance gets a note instead.
  *
+ * `archive` is the per-activity disposition of bean `folio-assistant-m8gz`
+ * (owner, 2026-10-20: "a step op", not a call into `Process_BeanLifecycle`).
+ * Archiving is a VIEW, not a terminal state (bean `e8m3`): the bean keeps its
+ * status and moves to the store's `archive/`, and `check:bean-archive` holds
+ * that everything there is terminal. So the op refuses to move a bean that is
+ * not `completed` or `scrapped`, or one whose process is still running, and
+ * notes why instead. It records WHY in the bean, which is the one thing the
+ * periodic sweep (`beans archive`) cannot: the sweep stays the floor, the op is
+ * the exception (`todo-manager` § Archiving).
+ *
  * Only ever `state.bean` — the bean whoever started the instance nominated.
  * This never touches a bean it was not handed.
  *
@@ -30,13 +41,17 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { resolveBeanDefs } from "../../scripts/beans.ts";
 
-export type WorkPlanOp = "claim" | "note" | "resolve";
+export type WorkPlanOp = "claim" | "note" | "resolve" | "archive";
 
-export const WORK_PLAN_OPS = new Set<string>(["claim", "note", "resolve"]);
+export const WORK_PLAN_OPS = new Set<string>(["claim", "note", "resolve", "archive"]);
+
+/** The statuses `check:bean-archive` allows in the archive. */
+const TERMINAL = new Set(["completed", "scrapped"]);
 
 export interface BeanRef {
   id: string;
@@ -46,6 +61,30 @@ export interface BeanRef {
 }
 
 const BEANS_DIR = "beans";
+/** The archive, inside the defs directory, where `beans archive` moves a bean (`beans/beans.json`: `defs/archive`). */
+const ARCHIVE_DIR = "archive";
+
+/**
+ * Where to look for a bean: the store's declared `defs` directory and its
+ * `archive/`, then the flat `beans/` this module was written against.
+ *
+ * The flat layout alone found nothing once the store moved to `beans/defs/`:
+ * every claim, note and resolve then reported "not in beans/" and recorded
+ * nothing. The declaration is read through `resolveBeanDefs`, the one answer
+ * every bean reader shares; an unreachable store falls through to the legacy
+ * directory rather than throwing out of a workflow step.
+ */
+function beanDirs(repoRoot: string): string[] {
+  let defs: string | null = null;
+  try {
+    defs = resolveBeanDefs(repoRoot).dir;
+  } catch {
+    defs = null;
+  }
+  const dirs = defs ? [defs, join(defs, ARCHIVE_DIR)] : [];
+  dirs.push(join(repoRoot, BEANS_DIR));
+  return [...new Set(dirs)].filter((d) => existsSync(d));
+}
 
 /** Run the beans CLI; `undefined` when it is not installed or the call fails. */
 function cli(repoRoot: string, args: string[]): string | undefined {
@@ -70,11 +109,15 @@ function cli(repoRoot: string, args: string[]): string | undefined {
  * `fq0b` also matching a hypothetical `fq0bx`.
  */
 export function findBean(repoRoot: string, id: string): BeanRef | undefined {
-  const dir = join(repoRoot, BEANS_DIR);
-  if (!existsSync(dir)) return undefined;
-  const file = readdirSync(dir).find((f) => f.startsWith(`${id}--`) && f.endsWith(".md"));
-  if (!file) return undefined;
-  const path = join(dir, file);
+  let path: string | undefined;
+  for (const dir of beanDirs(repoRoot)) {
+    const file = readdirSync(dir).find((f) => f.startsWith(`${id}--`) && f.endsWith(".md"));
+    if (file) {
+      path = join(dir, file);
+      break;
+    }
+  }
+  if (!path) return undefined;
   const body = readFileSync(path, "utf8");
   return {
     id,
@@ -85,10 +128,10 @@ export function findBean(repoRoot: string, id: string): BeanRef | undefined {
 }
 
 export function listBeans(repoRoot: string): BeanRef[] {
-  const dir = join(repoRoot, BEANS_DIR);
-  if (!existsSync(dir)) return [];
+  const dir = beanDirs(repoRoot)[0];
+  if (!dir) return [];
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith(".md") && f.includes("--"))
     .map((f) => f.split("--")[0])
     .map((id) => findBean(repoRoot, id))
     .filter((b): b is BeanRef => b !== undefined);
@@ -150,6 +193,8 @@ export function applyWorkPlanOp(
 
   const note = opts.note?.trim();
 
+  if (op === "archive") return archiveBean(bean, note, opts.instanceCompleted === true);
+
   if (op === "note" || (op === "resolve" && !opts.instanceCompleted)) {
     const text = note ?? `Workflow step reached (${op}).`;
     if (cli(repoRoot, ["update", beanId, "--body-append", text]) === undefined) {
@@ -178,4 +223,30 @@ export function applyWorkPlanOp(
     }
   }
   return { summary: `bean ${beanId}: ${bean.status} → ${status}`, bean };
+}
+
+/**
+ * The `archive` op: move a terminal bean into the store's `archive/`, with the
+ * reason, once the process it tracks has finished. Anything short of that is
+ * noted, never forced: an archived non-terminal bean is open work hidden from
+ * every count, the invariant `check:bean-archive` exists for.
+ */
+function archiveBean(bean: BeanRef, note: string | undefined, instanceCompleted: boolean): WorkPlanResult {
+  const dir = dirname(bean.path);
+  if (basename(dir) === ARCHIVE_DIR) return { summary: `bean ${bean.id} already archived`, bean };
+  const archive = join(dir, ARCHIVE_DIR);
+  const why = !instanceCompleted
+    ? "the process it tracks is still running"
+    : !TERMINAL.has(bean.status)
+      ? `it is ${bean.status}, and only a completed or scrapped bean may be archived`
+      : undefined;
+  if (why) {
+    appendToFile(bean, `${note ? `${note} ` : ""}Archive step reached, bean not archived: ${why}.`);
+    return { summary: `bean ${bean.id} left in place: ${why} — noted instead of archived`, bean };
+  }
+  appendToFile(bean, note ?? "Archived by the process that completed it (workflow `archive` step).");
+  mkdirSync(archive, { recursive: true });
+  const to = join(archive, basename(bean.path));
+  renameSync(bean.path, to);
+  return { summary: `bean ${bean.id} archived (${bean.status}) to ${ARCHIVE_DIR}/`, bean: { ...bean, path: to } };
 }

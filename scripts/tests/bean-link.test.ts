@@ -5,7 +5,7 @@
  * has none of it.
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { applyWorkPlanOp, findBean, listBeans } from "../../src/workflow/bean-link";
@@ -113,6 +113,54 @@ describe("an instance with no bean", () => {
 
   test("a bean id that is not in the store is reported, not invented", () => {
     expect(applyWorkPlanOp(repo, "zzzz", "claim").summary).toContain("not in beans/");
+  });
+});
+
+describe("the store as it is laid out now: beans/defs/ (bean folio-assistant-m8gz)", () => {
+  // The flat beans/ above is the layout this module was written against. The
+  // store moved to beans/defs/, and a lookup in beans/ alone then found
+  // nothing, so every engine claim, note and resolve recorded nothing.
+  const defsBean = (id: string, status: string, sub = ""): string => {
+    const dir = join(repo, "beans", "defs", sub);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `${id}--work.md`);
+    writeFileSync(path, `---\n# ${id}\ntitle: Work\nstatus: ${status}\ntype: task\nupdated_at: 2026-01-01T00:00:00Z\n---\n\nBody.\n`);
+    return path;
+  };
+
+  test("a bean in beans/defs/ is found, and so is one already in its archive/", () => {
+    defsBean("dddd", "todo");
+    defsBean("eeee", "completed", "archive");
+    expect(findBean(repo, "dddd")?.path).toBe(join(repo, "beans", "defs", "dddd--work.md"));
+    expect(findBean(repo, "eeee")?.path).toBe(join(repo, "beans", "defs", "archive", "eeee--work.md"));
+    expect(applyWorkPlanOp(repo, "dddd", "claim").summary).toBe("bean dddd: todo → in-progress");
+  });
+
+  test("archive moves a completed bean into archive/, keeping its status and recording why", () => {
+    const from = defsBean("ffff", "completed");
+    const r = applyWorkPlanOp(repo, "ffff", "archive", { instanceCompleted: true, note: "Archived: the CRDM close signed it off." });
+    const to = join(repo, "beans", "defs", "archive", "ffff--work.md");
+    expect(r.summary).toBe("bean ffff archived (completed) to archive/");
+    expect(existsSync(from)).toBe(false);
+    const body = readFileSync(to, "utf8");
+    expect(body).toContain("status: completed");
+    expect(body).toContain("Archived: the CRDM close signed it off.");
+    expect(applyWorkPlanOp(repo, "ffff", "archive", { instanceCompleted: true }).summary).toBe("bean ffff already archived");
+  });
+
+  test("archive refuses a bean that is not terminal, and notes why (check:bean-archive's invariant)", () => {
+    const path = defsBean("gggg", "in-progress");
+    const r = applyWorkPlanOp(repo, "gggg", "archive", { instanceCompleted: true });
+    expect(r.summary).toContain("left in place");
+    expect(existsSync(path)).toBe(true);
+    expect(readFileSync(path, "utf8")).toContain("only a completed or scrapped bean may be archived");
+  });
+
+  test("archive refuses while the process it tracks is still running", () => {
+    const path = defsBean("hhhh", "completed");
+    const r = applyWorkPlanOp(repo, "hhhh", "archive", { instanceCompleted: false });
+    expect(r.summary).toContain("still running");
+    expect(existsSync(path)).toBe(true);
   });
 });
 
