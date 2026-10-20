@@ -1,10 +1,10 @@
 ---
 # cat-tools-5jij
 title: 'qa-axis-summary reads a JSON shape qa-sweep never emits, so every axis reports "criteria run: 0"'
-status: todo
+status: in-progress
 type: bug
 created_at: 2026-10-20T15:58:00Z
-updated_at: 2026-10-20T15:58:00Z
+updated_at: 2026-10-20T19:08:43Z
 ---
 
 Found on folio-test run 39451297602 (folio-test#9, 2026-10-20) and filed on lane A's request. The fix is held until this is triaged.
@@ -36,3 +36,5 @@ a missing key into a silent zero.
 - [ ] A missing key is an error (non-zero exit), never a `.get` default that reads as zero.
 - [ ] A test pipes real `qa-sweep --json` output for a fixture with a known failure through the
       summary, and asserts a non-zero criteria count and the failing criterion.
+
+_2026-10-20T19:08:43Z_ — Claimed by fix/5jij-qa-axis-summary-shape — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
