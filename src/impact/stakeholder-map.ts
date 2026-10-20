@@ -18,7 +18,8 @@
  *      "editors and authoring agents", "publication manager", "clinical SMEs".
  *   2. Each reached lane RESOLVES to a declared role, through
  *      `roleForLane` against `scenarios/roles.json` — the lane's own
- *      `<bootstrap.processes:role ref>` where it has one, the lane-name table otherwise.
+ *      `partitionElementRef` (owner, 2026-10-16: a lane names a Role), or the
+ *      legacy `<bootstrap.processes:role ref>` when that is absent.
  *
  * ## The source this used to read, and why it went
  *
@@ -63,7 +64,7 @@ export interface SkillImpact { name: string; path: string }
 export interface LaneImpact {
   process: string;
   lane: string;
-  /** The lane's own `<bootstrap.processes:role ref>`: how it binds a role (#1168). */
+  /** The Role the lane names: its `partitionElementRef`, else the legacy `<bootstrap.processes:role ref>` (#1168; owner, 2026-10-16). */
   roleRef?: string;
   activities: string[];
   viaSkills: string[];

@@ -403,6 +403,8 @@ describe("the vocabulary-mapping tables agree with the document's @context", () 
         }
       }
     }
-    expect(checked).toBe(28);
+    // 27: `glossary-role-concept` lost its `actedUpon` row when the flag was
+    // retired (owner, 2026-10-16; cat-harness `vocab-mappings/`).
+    expect(checked).toBe(27);
   });
 });

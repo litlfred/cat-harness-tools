@@ -48,11 +48,10 @@ const GRAPH: RoleGraph = {
       id: "corpus",
       title: "Corpus",
       description: "c",
-      // Nobody performs it — a lane tasks act ON. Zero skills here is n/a
-      // rather than a gap, which is what `actedUpon` exists to say.
-      actorKinds: [],
+      // A store: a role a machine plays (owner, 2026-10-16), whose skills
+      // are its contract. None declared here, which the viewer shows as is.
+      actorKinds: ["system"],
       skills: [],
-      actedUpon: true,
     },
   ],
 };

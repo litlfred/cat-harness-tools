@@ -92,6 +92,22 @@ import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js"
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg, sitePageAt } from "./lib/site-target.ts";
+import {
+  autoDocsRowId,
+  diagramBlock,
+  diagramBounds,
+  markersFor,
+  methodologyPageDir,
+  svgViewBox,
+  type Marker,
+  type PanelData,
+  type PanelLink,
+  type PanelTask,
+} from "./lib/task-panel.ts";
+import { skillEdgeIndex } from "./lib/skill-edges.ts";
+import { methodologyNodes } from "./check-methodology-evidence.js";
+import { instanceOf, pageRelPath as methodologiesPageRel } from "./gen-methodologies-viz.js";
+import { declaredRoute } from "./viewer-declarations.js";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "processes-viewer";
@@ -116,7 +132,11 @@ export interface ProcessRow {
   id: string;
   name: string;
   lanes: string[];
-  /** `<bootstrap.processes:role ref>` on a lane — the join that does not depend on spelling. */
+  /**
+   * The Roles the lanes NAME — `partitionElementRef`, or the legacy
+   * `<bootstrap.processes:role ref>` when that is absent: the join that does
+   * not depend on spelling. A lane names a Role; it is not one (owner, 2026-10-16).
+   */
   roles: string[];
   skills: string[];
   beanOps: string[];
@@ -140,6 +160,12 @@ export interface ProcessRow {
   activitiesWithoutSkill: { id: string; lane: string; type: string; roleRef?: string }[];
   /** The rendered SVG, site-relative — or absent, which is reported rather than hidden. */
   svg?: string;
+  /**
+   * The ⓘ markers, one per task the drawn diagram has a shape for, in percent
+   * of the diagram (`lib/task-panel.ts`). Absent when there is no SVG to put
+   * them on, or no task with a shape.
+   */
+  markers?: Marker[];
   /** Set when the diagram would not load at all. Reported, never silently dropped. */
   loadError?: string;
   /** Basename without `.bpmn` — the page name and the SVG name. */
@@ -321,6 +347,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
       const m = await loadProcessModel(abs);
       const nodes = [...m.nodes.values()];
       const acts = nodes.filter(isActivity);
+      const markers = svg ? await taskMarkers(xml, readFileSync(svgRel, "utf-8"), acts) : [];
       rows.push({
         file,
         group,
@@ -343,6 +370,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
           }))
           .sort((a, b) => a.id.localeCompare(b.id, "en")),
         ...(svg ? { svg } : {}),
+        ...(markers.length > 0 ? { markers } : {}),
         stem: basename(abs, ".bpmn"),
         ...(m.documentation ? { documentation: m.documentation } : {}),
         laneDetails: m.lanes.map((l) => laneDetail(l, acts, roleGraph)),
@@ -462,6 +490,132 @@ export function laneDetail(
   };
 }
 
+/**
+ * The ⓘ markers for one diagram: each task's DI shape mapped through the
+ * rendered SVG's `viewBox` (`lib/task-panel.ts`). Empty when the SVG has no
+ * viewBox or the diagram no DI — never a marker placed by guesswork.
+ */
+async function taskMarkers(xml: string, svgText: string, acts: readonly { id: string; name: string }[]): Promise<Marker[]> {
+  const vb = svgViewBox(svgText);
+  if (!vb) return [];
+  try {
+    return markersFor(
+      acts.map((a) => ({ id: a.id, name: a.name.replace(/\s+/g, " ").trim() || a.id })),
+      await diagramBounds(xml),
+      vb,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** The sidecar a process page fetches when a marker is first opened: `<stem>.tasks.json`, beside the page. */
+export function panelFile(stem: string): string {
+  return `${stem}.tasks.json`;
+}
+
+/**
+ * What the ⓘ panel links to, resolved once per run. Every href is relative to
+ * a process page; a name with no page has no href and is shown as code.
+ */
+export interface PanelContext {
+  skillHref: (skill: string) => string | undefined;
+  methodologyHref: (name: string) => string | undefined;
+  roleHref: (roleId: string) => string | undefined;
+  roleTitle: (roleId: string) => string | undefined;
+  /** skill → its `uses-methodology`, when its front matter says it. */
+  usesMethodology: (skill: string) => readonly string[] | undefined;
+}
+
+/**
+ * The links, from the declarations that own them:
+ *
+ * - skills: the instruction pages that exist (`skillPagesOf`), as the step
+ *   table already links them;
+ * - methodologies: `<methodologies route>/<instance>/<name>/`, the per-node
+ *   pages of cat-harness-tools #422, from the declared `methodologies-viewer`
+ *   route and the methodology graph's own nodes — a name no node declares
+ *   gets no link;
+ * - roles: the row on the auto-docs Roles index, from the declared
+ *   `auto-docs-viewer` route and the `roles.json` that declares the role.
+ */
+export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skillPagesOf(repo)): PanelContext {
+  const root = up(repo);
+  const harness = join(repo, "cat-harness");
+  const methPage = methodologiesPageRel(repo);
+  const methInstance = new Map<string, string>();
+  try {
+    for (const n of methodologyNodes(harness)) {
+      if (n.front && !methInstance.has(n.front.name)) methInstance.set(n.front.name, instanceOf(n.node, harness, repo));
+    }
+  } catch {
+    // No methodology graph declared: every methodology stays code.
+  }
+  const autoDocs = declaredRoute(harness, "auto-docs-viewer");
+  const roleAt = new Map<string, { path: string; title: string }>();
+  for (const inst of instanceRoots(repo)) {
+    for (const kg of kgRoots(inst)) {
+      for (const r of readRoleGraph(kg)?.roles ?? []) {
+        if (!roleAt.has(r.id)) roleAt.set(r.id, { path: `${relative(repo, kg).split("\\").join("/")}/roles.json#${r.id}`, title: r.title });
+      }
+    }
+  }
+  const edges = skillEdgeIndex(instanceRoots(repo));
+  return {
+    skillHref: (s) => (skillPages.has(s) ? `${root}reference/skill-instructions/${s}.html` : undefined),
+    methodologyHref: (name) => {
+      const inst = methInstance.get(name);
+      return inst && methPage ? `${root}${dirname(methPage)}/${methodologyPageDir(inst, name)}` : undefined;
+    },
+    roleHref: (id) => {
+      const at = roleAt.get(id);
+      return at && autoDocs ? `${root}${autoDocs}/index/roles/index.html#${autoDocsRowId(at.path)}` : undefined;
+    },
+    roleTitle: (id) => roleAt.get(id)?.title,
+    usesMethodology: (s) => edges.get(s)?.usesMethodology,
+  };
+}
+
+/**
+ * One process's panel data: task → skills → methodologies, and the lane's
+ * Role → its skills. Pure over the row and the context, so the join is
+ * testable without a site.
+ */
+export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx: PanelContext): PanelData {
+  const link = (name: string, href: string | undefined): PanelLink => (href ? { name, href } : { name });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const laneByName = new Map(row.laneDetails.map((l) => [l.name, l]));
+  const tasks: Record<string, PanelTask> = {};
+  for (const st of row.steps) {
+    const lane = laneByName.get(st.lane);
+    const roleId = lane?.roleId;
+    const called = st.calledElement ? byId.get(st.calledElement) : undefined;
+    tasks[st.id] = {
+      id: st.id,
+      name: st.name,
+      type: st.type,
+      ...(st.lane ? { lane: st.lane } : {}),
+      skills: st.skills.map((s) => {
+        const ms = ctx.usesMethodology(s);
+        return { ...link(s, ctx.skillHref(s)), ...(ms ? { methodologies: ms.map((m) => link(m, ctx.methodologyHref(m))) } : {}) };
+      }),
+      ...(st.calledElement ? { calls: called ? { name: called.name, href: `${called.stem}.html` } : { name: st.calledElement } } : {}),
+      ...(roleId
+        ? {
+            role: {
+              ...link(roleId, ctx.roleHref(roleId)),
+              ...(ctx.roleTitle(roleId) ? { title: ctx.roleTitle(roleId) } : {}),
+              skills: lane!.roleSkills.map((p) => ({ ...link(p.skill, ctx.skillHref(p.skill)), ...(p.via !== roleId ? { via: p.via } : {}) })),
+            },
+          }
+        : lane
+          ? { binding: lane.binding }
+          : {}),
+    };
+  }
+  return { $schema: "process-task-panel/v1", process: row.id, tasks };
+}
+
 /** skill → the diagrams that run it. The join nothing else exposes. */
 export function skillToProcesses(rows: readonly ProcessRow[]): Map<string, string[]> {
   const m = new Map<string, string[]>();
@@ -557,9 +711,10 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("## Who appears in a process?");
   L.push("");
   L.push(
-    "A lane IS a role. The NAME is free text — `process-model.ts` notes that sixty lanes " +
-      "spell two dozen positions — so `<bootstrap.processes:role ref>` is the join that does not depend " +
-      "on spelling, and it is reported separately below rather than merged into the name.",
+    "A lane NAMES the Role its tasks are performed in; it is not itself a Role. The NAME is free text — " +
+      "`process-model.ts` notes that sixty lanes spell two dozen positions — so the lane's " +
+      "`partitionElementRef` (or the legacy `<bootstrap.processes:role ref>`) is the join that does not " +
+      "depend on spelling, and it is reported separately below rather than merged into the name.",
   );
   L.push("");
   L.push(`**${lanes.size}** distinct lane name(s).`);
@@ -653,7 +808,7 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
       "**No verdict is offered on which of these is a gap**, and that is the honest state rather " +
         "than a hedge: distinguishing a person's judgement step from an agent step somebody " +
         "forgot needs the lane's actor KIND, which a free-text lane name does not give — " +
-        "`process-model.ts` notes sixty lanes spell two dozen positions. `<bootstrap.processes:role ref>` is " +
+        "`process-model.ts` notes sixty lanes spell two dozen positions. The lane's `partitionElementRef` is " +
         `the join that would answer it, and it is present on **${rest.filter((a) => a.roleRef).length}** ` +
         `of these **${rest.length}** steps — which is the measurement, not an impression. ` +
         "An earlier draft of this sentence said *few of these* and was counting whether the lane " +
@@ -739,7 +894,17 @@ export function processPage(
   L.push(row.documentation ?? "_This process carries no `<bpmn:documentation>`._");
   L.push("");
   if (row.svg) {
-    L.push(`<img src="${up()}assets/img/workflows/${row.stem}.svg" alt="BPMN diagram: ${esc(row.name).replace(/"/g, "&quot;")}" style="max-width:100%">`);
+    // With markers, the diagram carries the ⓘ task panel (owner, 2026-10-16:
+    // an info icon on each task opens a small UML object view). Without, the
+    // plain image it always was.
+    L.push(
+      ...diagramBlock({
+        img: `${up()}assets/img/workflows/${row.stem}.svg`,
+        alt: `BPMN diagram: ${row.name}`,
+        markers: row.markers ?? [],
+        panelHref: panelFile(row.stem),
+      }),
+    );
   } else {
     L.push("_No rendered diagram — run `bun run cat render:bpmn`._");
   }
@@ -892,8 +1057,11 @@ if (import.meta.main) {
     }
   }
   const pages = new Map<string, string>([[out, html]]);
+  const ctx = panelContext(REPO, skillPages);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file)));
+    // The ⓘ panel's data, fetched by the page only when a marker is opened.
+    if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx), null, 1)}\n`);
   }
   // A page whose diagram is gone is REPORTED, never deleted — the
   // deletion-requires-confirmation rule, applied to generated output too.
