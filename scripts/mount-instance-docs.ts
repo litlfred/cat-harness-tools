@@ -113,7 +113,7 @@ import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { withSavedScheme } from "./lib/scheme-css.js";
-import { viewersOf } from "./viewer-declarations.js";
+import { heldVisualiserPaths, viewersOf } from "./viewer-declarations.js";
 import { translationMetaBlock, withTranslationMeta } from "./lib/translation-meta.ts";
 import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.ts";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
@@ -2236,7 +2236,12 @@ async function main(): Promise<number> {
     const withheld = withheldPaths(m.dir);
     // `realpathSync`: a subscribed directory is a link to its held tree, and copying a link copies a link.
     const src = realpathSync(m.dir);
-    cpSync(src, join(siteAbs, m.route), { recursive: true, filter: withheldFilter(src, withheld) });
+    // A visualiser page the instance holds in this directory is published at
+    // its declared route by compose-docs, through Jekyll; copied here too it
+    // would go out a second time, raw (`heldVisualiserPaths`).
+    const held = heldVisualiserPaths(REPO, m.dir);
+    cpSync(src, join(siteAbs, m.route), { recursive: true, filter: withheldFilter(src, [...withheld, ...held]) });
+    if (held.length) console.log(`  /${m.route}/: left out ${held.join(", ")} — a visualiser page published at its declared route`);
     if (withheld.length) {
       console.log(`  /${m.route}/: withheld ${withheld.length} path(s) named by its ${WITHHELD_FILE}: ${withheld.join(", ")}`);
     }
