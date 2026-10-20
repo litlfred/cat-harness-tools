@@ -63,6 +63,7 @@ import {
   TabularRecordsSchema,
   isTabularMimetype,
 } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/vector-labels.ts";
 import {
@@ -298,6 +299,9 @@ export function heldSources(dir: string, sidecars: Iterable<string>): Set<string
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
   ["tabular", "tabular.jsonld"],
+  // The CSVW record that replaces v1 for delimited and workbook sources, and
+  // carries the same `source` block (bean `urat`, owner ruling 2026-10-20).
+  ["tabular", TABULAR_CSVW_FILENAME],
   ["archive", "contents.jsonld"],
   // Recorded, text withheld by licence — `referenced-source.py`, bean `scfh`.
   ["referenced", "referenced.json"],
@@ -860,13 +864,41 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     // re-running would not have helped.
     const src = sourceBlockOf(dir);
     const mime = src?.mimetype_sniffed;
-    if (!has("tabular.jsonld")) {
+    if (has(TABULAR_CSVW_FILENAME)) {
+      // The CSVW record (bean `urat`). It must carry the `source` the rest of
+      // this check reads, or the entry has no technical metadata at all.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(join(dir, TABULAR_CSVW_FILENAME), "utf-8"));
+      } catch (e) {
+        parsed = undefined;
+        out.push({ name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} unparseable: ${String(e)}` });
+      }
+      if (parsed !== undefined) {
+        const r = TabularCsvwSchema.safeParse(parsed);
+        out.push(
+          !r.success
+            ? {
+                name: "tabular-records",
+                state: "unmet",
+                detail: `${TABULAR_CSVW_FILENAME} is not ${TABULAR_CSVW_SCHEMA_ID}: ${r.error.issues[0]?.message ?? "invalid"}`,
+              }
+            : !r.data.source
+              ? { name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} carries no source block — re-run the tabular rung` }
+              : {
+                  name: "tabular-records",
+                  state: "met",
+                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative?.state ?? "absent"}`,
+                },
+        );
+      }
+    } else if (!has("tabular.jsonld")) {
       out.push(
         isTabularMimetype(mime)
           ? {
               name: "tabular-records",
               state: "unmet",
-              detail: `declares ${mime} but no tabular.jsonld — run scripts/tabular-records.py`,
+              detail: `declares ${mime} but no tabular record (${TABULAR_CSVW_FILENAME}; tabular.jsonld for ODS) — re-run the ingest's tabular rung`,
             }
           : {
               name: "tabular-records",
