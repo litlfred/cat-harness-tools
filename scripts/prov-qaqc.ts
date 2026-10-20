@@ -59,7 +59,7 @@ import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/role-
 import { accessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
 import type { HistoryEntry, InstanceState } from "../src/workflow/instance.js";
-import { isActivity, isDecision, loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
+import { isActivity, isDecision, loadProcessModel, processDiagrams, type ProcessModel } from "../src/workflow/process-model.js";
 import { listInstances } from "../src/workflow/store.js";
 import { roleGraphFor, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -291,7 +291,7 @@ export async function buildReport(
   const ctx = opts.ctx ?? accessContext(HARNESS);
   const graph = "graph" in opts ? opts.graph : roleGraphFor(HARNESS);
   let diagrams: string[] | undefined = opts.diagrams;
-  const candidates = () => (diagrams ??= workflowFiles(HARNESS, corpusScopeFor(HARNESS)).filter((f) => f.endsWith(".bpmn")));
+  const candidates = () => (diagrams ??= processDiagrams(workflowFiles(HARNESS, corpusScopeFor(HARNESS))));
   const models = new Map<string, Promise<ProcessModel>>();
   const model = (p: string) => {
     if (!models.has(p)) models.set(p, loadProcessModel(p));

@@ -169,7 +169,7 @@ describe("a diagram the resolver cannot reach", () => {
     const { rows, ambiguous } = await processReach(REPO, bpmn);
     expect(rows).toHaveLength(bpmn.length);
     for (const r of rows) {
-      expect(["reachable", "shadowed", "unloadable"]).toContain(r.state);
+      expect(["reachable", "shadowed", "unloadable", "shared"]).toContain(r.state);
       if (r.state !== "reachable") expect(r.why).toBeTruthy();
       else expect(r.process).toBeTruthy();
     }

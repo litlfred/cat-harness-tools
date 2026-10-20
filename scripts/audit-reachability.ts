@@ -165,7 +165,7 @@ import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { corpusScopeFor, workflowFiles } from "./known-skills.js";
 import { processFiles } from "../src/workflow/process-files.js";
-import { loadProcessModel } from "../src/workflow/process-model.js";
+import { isGlobalTasksFile, loadGlobalTasks, loadProcessModel } from "../src/workflow/process-model.js";
 import {
   listDecisions,
   loadDecisionTable,
@@ -357,8 +357,12 @@ export interface ProcessReach {
   file: string;
   /** The `bpmn:process` id, when the diagram loads. */
   process?: string;
-  /** `reachable` · `shadowed` · `unloadable` */
-  state: "reachable" | "shadowed" | "unloadable";
+  /**
+   * `reachable` · `shadowed` · `unloadable` · `shared` — a layer's global-tasks
+   * file (owner, 2026-10-20, "a1"): it holds no process to start, and is
+   * reached through the processes whose call activities name its tasks.
+   */
+  state: "reachable" | "shadowed" | "unloadable" | "shared";
   /** The file that claimed this one's stem, when `shadowed`. */
   shadowedBy?: string;
   /** The loader's own message, when `unloadable`. */
@@ -393,6 +397,15 @@ export async function processReach(
     let id: string | undefined;
     let why: string | undefined;
     try {
+      if (isGlobalTasksFile(readFileSync(abs, "utf-8"))) {
+        const defs = await loadGlobalTasks(abs);
+        rows.push({
+          file,
+          state: "shared",
+          why: `holds ${defs.length} global task(s) and no process; reached through the call activities that name them`,
+        });
+        continue;
+      }
       const model = await loadProcessModel(abs);
       id = model.id;
       byId.set(id, [...(byId.get(id) ?? []), abs]);
@@ -744,7 +757,9 @@ async function main(): Promise<number> {
   line(
     shadowed.length + brokenProcesses.length + ambiguous.length > 0 ? "✗" : "✓",
     "diagrams reachable",
-    `${processes.filter((p) => p.state === "reachable").length} of ${bpmn.length} resolve through \`processFiles\`; ${ambiguous.length} name clash(es)`,
+    `${processes.filter((p) => p.state === "reachable").length} of ${bpmn.length} resolve through \`processFiles\`` +
+      `${processes.some((p) => p.state === "shared") ? `, ${processes.filter((p) => p.state === "shared").length} hold shared global tasks` : ""}` +
+      `; ${ambiguous.length} name clash(es)`,
   );
   line(
     orphans.length > 0 ? "~" : "✓",

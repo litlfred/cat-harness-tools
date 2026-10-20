@@ -151,7 +151,7 @@ import {
   type Judgement,
   type QaResult,
 } from "./qa-results.js";
-import { loadProcessModel } from "../src/workflow/process-model.js";
+import { isGlobalTasksFile, loadGlobalTasks, loadProcessModel } from "../src/workflow/process-model.js";
 import { listDecisions } from "../src/workflow/decision-table.js";
 import {
   checkoutRootFor,
@@ -1871,6 +1871,24 @@ async function collectProcesses(
   for (const path of diagramFiles(dir)) {
     if (!path.endsWith(".bpmn")) continue;
     try {
+      // A layer's shared global-tasks file holds no process (owner,
+      // 2026-10-20, "a1"): each global task is a Task node that requires its
+      // Skill, and each call to one links to it as its `calledElement`.
+      if (isGlobalTasksFile(readFileSync(path, "utf-8"))) {
+        for (const g of await loadGlobalTasks(path)) {
+          nodes.push({
+            "@id": makeIri(doc, "globalTask", g.id),
+            "@type": termIri("Task"),
+            name: g.name,
+            ...publishableDocumentation(g.documentation),
+            bpmnType: g.type,
+            requires: g.skills.map((k) => makeIri(doc, "skill", k)),
+            sourcePath: relative(root, g.source),
+            sourceUrl: forgeOf(g.source),
+          });
+        }
+        continue;
+      }
       const m = await loadProcessModel(path);
       nodes.push({
         "@id": makeIri(doc, "process", m.id),
@@ -1961,7 +1979,12 @@ async function collectProcesses(
           // link is absent because the table was not found.
           decidedBy: decidedBy(m.source, n.decisionRef),
           // Pruned below when the called process is not in this graph.
-          calledElement: n.calledElement === undefined ? undefined : makeIri(doc, "process", n.calledElement),
+          calledElement:
+            n.globalTask !== undefined
+              ? makeIri(doc, "globalTask", n.globalTask.id)
+              : n.calledElement === undefined
+                ? undefined
+                : makeIri(doc, "process", n.calledElement),
           incoming: n.incoming.map((f) => makeIri(doc, "process", `${m.id}/flow/${f}`)),
           outgoing: n.outgoing.map((f) => makeIri(doc, "process", `${m.id}/flow/${f}`)),
         });
@@ -1975,7 +1998,7 @@ async function collectProcesses(
   // becoming a dangling link — `Process_MergeRefusal`, called and defined
   // nowhere, is the live case. Resolved after every diagram is read, because a
   // call may name a process in a file read later.
-  const processIris = new Set(nodes.filter((n) => n["@type"] === termIri("Process")).map((n) => n["@id"]));
+  const processIris = new Set(nodes.filter((n) => n["@type"] === termIri("Process") || n["@type"] === termIri("Task")).map((n) => n["@id"]));
   for (const n of nodes) {
     if (typeof n.calledElement === "string" && !processIris.has(n.calledElement)) delete (n as Record<string, unknown>).calledElement;
   }

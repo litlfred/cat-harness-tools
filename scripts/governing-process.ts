@@ -39,6 +39,7 @@ import {
   siteDirFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { workflowFiles } from "./known-skills.js";
+import { GLOBAL_TASK_ELEMENT, isGlobalTasksFile } from "../src/workflow/process-model.js";
 
 /** One call activity the high-level diagram hands off to. */
 export interface SubProcess {
@@ -95,6 +96,11 @@ export interface ProcessIndex {
   repoRoot: string;
   /** The site `workflows/` directories a render could have written into. */
   svgDirs: string[];
+  /**
+   * Every global task id any instance declares. A call to one is a step the
+   * layer shares, not a sub-process, so it is left out of `subprocesses`.
+   */
+  globalTaskIds?: Set<string>;
 }
 
 /**
@@ -109,6 +115,7 @@ export function processIndex(repoRoot: string): ProcessIndex {
   const byName = new Map<string, Diagram>();
   const byProcessId = new Map<string, Diagram>();
   const svgDirs: string[] = [];
+  const globalTaskIds = new Set<string>();
   for (const inst of instanceRootsIn(repoRoot)) {
     let site: string | undefined;
     try {
@@ -121,16 +128,18 @@ export function processIndex(repoRoot: string): ProcessIndex {
     if (site !== undefined) svgDirs.push(join(inst, site, "assets/img/workflows"));
     for (const file of workflowFiles(inst)) {
       if (!file.endsWith(".bpmn")) continue;
+      const xml = readFileSync(file, "utf-8");
+      for (const g of xml.matchAll(new RegExp(GLOBAL_TASK_ELEMENT.source, "g"))) globalTaskIds.add(g[1]!);
+      if (isGlobalTasksFile(xml)) continue;
       const name = basename(file, ".bpmn");
       if (byName.has(name)) continue; // render-bpmn refuses a clash outright; here the first wins
-      const xml = readFileSync(file, "utf-8");
       const processIds = [...xml.matchAll(/<bpmn:process\s+id="([^"]+)"/g)].map((m) => m[1]!);
       const d: Diagram = { file, processIds };
       byName.set(name, d);
       for (const id of processIds) if (!byProcessId.has(id)) byProcessId.set(id, d);
     }
   }
-  return { byName, byProcessId, repoRoot, svgDirs };
+  return { byName, byProcessId, repoRoot, svgDirs, globalTaskIds };
 }
 
 /**
@@ -230,6 +239,7 @@ export function resolveProcess(idx: ProcessIndex, name: string): GoverningProces
     const calls = attr(head, "calledElement");
     if (id === undefined || calls === undefined) continue;
     const called = idx.byProcessId.get(calls);
+    if (called === undefined && idx.globalTaskIds?.has(calls)) continue;
     const skill = /:skill\s+ref="([^"]+)"/.exec(body)?.[1];
     const svg = called ? renderedSvg(idx, called.file) : undefined;
     subprocesses.push({

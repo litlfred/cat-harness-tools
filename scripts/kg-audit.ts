@@ -130,7 +130,8 @@ import {
 } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { ANYONE, ODRL_ACTIONS, readPolicies, readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
-import { loadProcessModel, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
+import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
+import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
 import { raciBreaches, raciRowsOf, type RaciBreachKind } from "./raci-chart.js";
 import { loadDecisionTable, possibleOutcomes } from "../src/workflow/decision-table.js";
@@ -464,12 +465,22 @@ interface LoadedProcess {
   error?: string;
 }
 
+/** The shared global-tasks files `loadProcesses` passed by, for `global-task-shared`. */
+const globalTaskFiles: string[] = [];
+
 async function loadProcesses(): Promise<LoadedProcess[]> {
   // Every declared knowledge-graph directory, via the same helper the other
   // consumers use, so none of them can disagree about where diagrams live.
   const files = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
   const out: LoadedProcess[] = [];
   for (const file of files) {
+    // A layer's shared global-tasks file holds no process (owner, 2026-10-20,
+    // "a1"); its tasks are audited through the calls to them, and
+    // `global-task-shared` asks whether each is actually shared.
+    if (isGlobalTasksFile(readFileSync(file, "utf-8"))) {
+      globalTaskFiles.push(file);
+      continue;
+    }
     try {
       out.push({ file, model: await loadProcessModel(file) });
     } catch (e) {
@@ -2220,6 +2231,7 @@ function auditGraph(
   skills: Set<string>,
   stories: UserStoryGraph | undefined,
   badSatisfies: KgFinding[],
+  unsharedGlobalTasks: KgFinding[],
 ): KgQaReport {
   const reachable = manifestSkills();
   for (const s of servableSkills()) reachable.add(s);
@@ -2369,6 +2381,9 @@ function auditGraph(
     null,
     {
       "skill-has-entry-point": entry(orphans),
+      // A report entry (`minor`): the spec's rule for global tasks, asked of
+      // the files that hold them. `n/a` for a graph that declares none.
+      "global-task-shared": entry(unsharedGlobalTasks, globalTaskFiles.length > 0),
       // `unknown` when there is no role graph: with no roles declared, every
       // skill looks unmodelled and the count would be the whole corpus — a
       // number that says nothing about the corpus and everything about the
@@ -2839,7 +2854,7 @@ const requirements = readRequirements();
 const satisfiers = readSatisfiers();
 reports.push(...auditRequirements(requirements, actors, satisfiers));
 reports.push(...auditSkills());
-reports.push(auditGraph(graph, processes, actors, skills, stories, danglingSatisfies(requirements, satisfiers)));
+reports.push(auditGraph(graph, processes, actors, skills, stories, danglingSatisfies(requirements, satisfiers), globalTaskSharedFindings(await Promise.all(globalTaskFiles.map(loadGlobalTasks)), processes, root)));
 reports.push(...auditTools(INSTANCE_RUN ? root : undefined));
 reports.push(...auditFolioBlocks(root));
 

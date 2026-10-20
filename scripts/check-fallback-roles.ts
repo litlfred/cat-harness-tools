@@ -58,7 +58,7 @@ import { basename, join, relative, resolve } from "node:path";
 
 import { workflowFiles, corpusScopeFor, roleGraphFor } from "./known-skills.js";
 import { fulfilmentKindsForBpmnType } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { isActivity, loadProcessModel } from "../src/workflow/process-model.js";
+import { isActivity, loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
 import { capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -277,7 +277,7 @@ export async function fallbackRoleFor(root: string, skill: string): Promise<stri
  */
 export async function fallbackRolesBySkill(root: string): Promise<Map<string, string[]>> {
   const bySkill = new Map<string, Set<string>>();
-  for (const f of workflowFiles(root, corpusScopeFor(root)).filter((x) => x.endsWith(".bpmn"))) {
+  for (const f of processDiagrams(workflowFiles(root, corpusScopeFor(root)))) {
     const model = await loadProcessModel(f);
     for (const n of [...model.nodes.values()].filter(isActivity)) {
       const kinds = fulfilmentKindsForBpmnType(n.type);

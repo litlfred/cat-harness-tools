@@ -18,7 +18,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { ConventionSchema, conventionsInForce } from "@litlfred/cat-harness/schemas/convention.ts";
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { conventionsDir } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
@@ -117,7 +117,7 @@ describe("every bound ref resolves to a convention that exists", () => {
     );
     const dangling: string[] = [];
     let bound = 0;
-    for (const f of workflowFiles(HARNESS).filter((f) => f.endsWith(".bpmn")).map((p) => relative(HARNESS, p))) {
+    for (const f of processDiagrams(workflowFiles(HARNESS)).map((p) => relative(HARNESS, p))) {
       const m = await loadProcessModel(join(HARNESS, f));
       for (const n of m.nodes.values()) {
         for (const c of n.conventions) {
