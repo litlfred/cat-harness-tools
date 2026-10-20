@@ -67,14 +67,17 @@ describe("viewer/index.html", () => {
 
 describe("the viewer's Lean helpers read both shapes", () => {
   // Evaluated from the page, so this tests what ships.
-  const src = ["hasLean", "leanDeclName"].map((name) => {
+  const src = ["hasLean", "leanDeclName", "leanSourceHref"].map((name) => {
     const m = PAGE.match(new RegExp(`function ${name}\\(l\\) \\{[\\s\\S]*?\\n    \\}|function ${name}\\(l\\) \\{[^\\n]*\\}`));
     if (!m) throw new Error(`viewer/index.html no longer defines ${name}(l)`);
     return m[0];
   });
-  const { hasLean, leanDeclName } = new Function(`${src.join("\n")}; return { hasLean, leanDeclName };`)() as {
+  const { hasLean, leanDeclName, leanSourceHref } = new Function(
+    `${src.join("\n")}; return { hasLean, leanDeclName, leanSourceHref };`,
+  )() as {
     hasLean: (l: unknown) => boolean;
     leanDeclName: (l: unknown) => string;
+    leanSourceHref: (l: unknown) => string;
   };
 
   test("a ref-only block has Lean, named by its declaration without the package", () => {
@@ -92,5 +95,18 @@ describe("the viewer's Lean helpers read both shapes", () => {
     expect(hasLean({ validation: "ok" })).toBe(false);
     expect(hasLean(undefined)).toBe(false);
     expect(leanDeclName(undefined)).toBe("");
+  });
+
+  test("the GitHub source link is used only in the shape the server builds (og5t, ruling A)", () => {
+    const ok = "https://github.com/litlfred/qou/blob/77e7f0e/folio/q/lean/QOU/A.lean#L7";
+    expect(leanSourceHref({ ref: "qou:QOU.A.x", sourceUrl: ok })).toBe(ok);
+    for (const bad of [
+      "javascript:alert(1)",
+      "https://evil.example/litlfred/qou/blob/77e7f0e/a.lean",
+      "https://github.com/litlfred/qou/blob/main/a.lean",
+      'https://github.com/o/r/blob/77e7f0e/a.lean" onmouseover="x',
+    ]) expect(leanSourceHref({ sourceUrl: bad })).toBe("");
+    expect(leanSourceHref({ ref: "qou:QOU.A.x" })).toBe("");
+    expect(leanSourceHref(undefined)).toBe("");
   });
 });

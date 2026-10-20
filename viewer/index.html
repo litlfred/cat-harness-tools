@@ -2251,6 +2251,13 @@
       if (l.ref) return String(l.ref).replace(/^[^:]*:/, '');
       return l.file || '';
     }
+    // The declaration's source on GitHub, at the commit the server read it from
+    // (owner ruling 2026-10-20, bean `cat-tools-og5t`, option A). Accepted only
+    // in the exact shape the server builds, so nothing else reaches an href.
+    function leanSourceHref(l) {
+      const u = l && l.sourceUrl;
+      return typeof u === 'string' && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{7,40}\/[^\s"'<>]+$/.test(u) ? u : '';
+    }
 
     function buildKatexMacros(paperMacros) {
       const m = {
@@ -3939,6 +3946,14 @@
       const wrap = mk('div','lean-src');
       const hdr = mk('div','lean-src-hdr');
       hdr.innerHTML = `<span>${esc(block.lean.file || leanDeclName(block.lean))}</span>`;
+      const href = leanSourceHref(block.lean);
+      if (href) {
+        const a = document.createElement('a');
+        a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = 'source on GitHub ↗';
+        a.title = `${leanDeclName(block.lean)} at the commit this page was read from`;
+        hdr.appendChild(a);
+      }
       wrap.appendChild(hdr);
       const pre = document.createElement('pre');
       pre.style.margin = '0';
