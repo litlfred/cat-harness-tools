@@ -582,7 +582,10 @@ test.describe("an asset's address is its own path IRI", () => {
     const key = await row.getAttribute("data-fa-library-item");
     await row.locator(".fa-pullout").click();
     await page.locator(".fa-glass-handle").click();
-    await expect(page.locator(`.fa-glass-asset[data-fa-asset="${key}"] a`)).toHaveCount(1);
+    // The card's NAME link, not every link on it: a card whose source has a
+    // viewer also carries the eye (`[data-fa-control="view"]`, cat-harness
+    // a949b6d0), which is a second `<a>` to the same entry's view panel.
+    await expect(page.locator(`.fa-glass-asset[data-fa-asset="${key}"] a.fa-glass-asset-name`)).toHaveCount(1);
   });
 
   test("arriving at a LEGACY anchor SELECTS the row, at its path IRI", async ({ page }) => {

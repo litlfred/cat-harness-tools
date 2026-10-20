@@ -230,7 +230,7 @@ import { BUILDING_ENV } from "./qa-working-copy.ts";
 /**
  * The instance being worked on — `resolveWorkingInstanceRoot` in
  * `lib/roots.ts`: the harness in its own repository and in an index checkout,
- * the separated instance that MOUNTS it otherwise (bean `j3ls`: from who-iris
+ * the separated instance that MOUNTS it otherwise (bean `j3ls`: from a separated content instance
  * this audited the mount and wrote its sidecar into a gitignored tree).
  *
  * NOT `process.cwd()`, and that is a correction rather than a preference.

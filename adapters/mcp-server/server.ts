@@ -44,6 +44,7 @@ import { GitHelper } from "../../src/core/git.js";
 import { leanStatusBucket } from "@litlfred/cat-harness/schemas/types.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { REPO_ROOT, BUILD_DIR, FEEDBACK_DIR, FEEDBACK_WORKTREE, MAIN_TEX, FOLIO_PORT, LIBRARY_DIRS, UPLOADS_DIR } from "./paths.js";
 import { safeSegment, joinSegments, realPathWithin, writableWithin } from "../../src/core/safe-path.js";
 
@@ -1293,8 +1294,11 @@ function computePaperDiff(
 
 // ── Viewer content serving ───────────────────────────────────────
 
-const VIEWER_DIR = resolve(REPO_ROOT, "folio-assistant/viewer");
-const ASSISTANT_DIR = resolve(REPO_ROOT, "folio-assistant/ui");
+// This layer's own `viewer/` and `ui/`, wherever it is mounted: the old
+// `folio-assistant/<dir>` path assumed the pre-separation submodule layout
+// (fresh-clone QA, bean w1gy).
+const VIEWER_DIR = resolve(TOOLS_ROOT, "viewer");
+const ASSISTANT_DIR = resolve(TOOLS_ROOT, "ui");
 const VIEWER_BUILD_DIR = resolve(BUILD_DIR, "viewer");
 
 const MIME: Record<string, string> = {

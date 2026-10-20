@@ -1,12 +1,12 @@
 ---
 # cat-tools-sthf
 title: 'URL SPACE: rendered assets mirror the instantiation structure — <baseurl>/ for the root, <baseurl>/<instance>/<path> for every enabled harness'
-status: todo
+status: in-progress
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-20T17:23:49Z
+updated_at: 2026-10-20T18:55:43Z
 parent: folio-assistant-yj32
 ---
 
@@ -511,3 +511,5 @@ differs is a visible decision and not a silent move (`blv9`).
 
 Released to `todo`: the two open boxes are in other repositories.
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T18:55:43Z_ — Claimed by claude/sthf-mount-instance-docs — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).

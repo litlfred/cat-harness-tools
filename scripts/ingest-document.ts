@@ -101,7 +101,7 @@ import { COVER_FILENAME } from "./library-graph.ts";
  *
  * Without it this is the instance being worked on — cat-harness, unless a
  * separated instance's repository MOUNTS the harness, when it is that instance
- * (`resolveWorkingInstanceRoot`, bean `j3ls`: from who-iris the staging tree
+ * (`resolveWorkingInstanceRoot`, bean `j3ls`: from a separated content instance the staging tree
  * landed inside the mounted harness). With it, the
  * staging tree and the destination library are resolved against `<dir>`, which
  * must hold an instance declaration (`<name>.json`). This is the case of a

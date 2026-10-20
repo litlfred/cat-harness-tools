@@ -1,12 +1,12 @@
 ---
 # cat-tools-bbnd
 title: 'Translation info drawer: open more translation detail from every translation warning — blocks, pages, (sub)graphs, locales'
-status: in-progress
+status: completed
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T17:26:18Z
-updated_at: 2026-10-20T15:32:16Z
+updated_at: 2026-10-20T17:20:00Z
 ---
 
 Owner, 2026-10-10: *"i want to see in the translations warning somewhere the ability to open panel w/ more translation info. needs to be integrated in a few places … see it on content blocks, on a harnessed (sub)graph, etc."* Analysed the same day (folio-assistant-core lane C session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco).
@@ -125,3 +125,17 @@ Done-when:
   and no `docs-ui.js`. A drawer there needs those pages themed first. That is
   a change to how the library site is rendered, tracked on
   `folio-core-shsz`, not a data hook.
+
+## Completed 2026-10-20 (lane C)
+
+All five done-whens are ticked, and every PR that delivered them has merged:
+cat-harness#377 (the drawer), cat-harness-tools#466 (the officiality projection)
+and #467 (the e2e).
+
+**Library pages are out of scope by construction, not left open.**
+`build-library-site.ts` writes its pages under `en/` only. A library entry is a
+frozen source document, and nothing translates it, so a library page carries no
+translation and no translation warning for a drawer to open from. Theming those
+pages would give the drawer nothing to show. If the library is ever translated,
+that becomes its own bean, and the page would pick up the drawer through the
+theme the way document pages already do. `folio-core-shsz` closes with this.

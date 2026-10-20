@@ -6,7 +6,7 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T18:08:05Z
+updated_at: 2026-10-20T18:22:18Z
 parent: folio-assistant-yj32
 ---
 
@@ -104,5 +104,33 @@ Answered directly in the cat-harness-tools drain session ("1 ok"). The harness
 rendering replaces qou's legacy **HTML** (math with the folio's macros, Lean
 links, every paper block kind). The PDF stays on its LaTeX path as a folio
 asset. The proposed done-when above stands as this bean's done-when.
+
+## Correction 2026-10-20: the viewer already does more than the scoping said
+
+The scoping above searched `src/`, `scripts/` and `pipeline/` and missed
+`viewer/index.html`, so two of its "what exists" claims were wrong:
+
+- **Math with the folio's macros: present.** The viewer renders inline and
+  display math with KaTeX and passes the paper's own table
+  (`katexMacros = buildKatexMacros(p.macros)`, each `{ tex }` as `\name`,
+  plus two built-in fallbacks) to every `katex.render` and to
+  `renderMathInElement`.
+- **Lean per block: present, as status and source, not as a link.** Each
+  block gets a badge from its `lean` record: verified, `sorry`, `err`,
+  `stub`, or **"no lean"** when there is no Lean file, so a miss is already
+  reported rather than silently unlinked. The Lean source renders inline
+  (`.lean-src`). `lean-ref` is a citation link for a `sorry`, **not** a link
+  to the declaration. What is missing is a hyperlink from a block to its
+  Lean declaration.
+
+So, under the owner's option 1 (HTML parity), the done-when above reads:
+
+- [~] math with the folio's macros: done **in the viewer**. Open: whether the
+      HTML qou would publish is the viewer, or a static render that must do
+      the same (to be measured against `blueprint-html`)
+- [~] Lean: status and misses done in the viewer; a **link to the
+      declaration** is the open part
+- [ ] every paper block kind qou uses renders: inventory not yet measured
+- [ ] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
