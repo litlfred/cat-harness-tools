@@ -126,7 +126,7 @@ import { loadSpecs } from "./external-schemas.js";
 import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
 import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
-import { declaresOwnCanonical, publishesInstanceSchema } from "./instance-exports.js";
+import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,
   buildInstanceSchemas,
@@ -3054,7 +3054,7 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // to be here was written out in seven places, five of them minting an `$id`.
   // An empty base still yields a document-RELATIVE IRI, deliberately — see
   // `makeIri`'s note on links that look dereferenceable.
-  // ── WHERE A FOREIGN INSTANCE'S DOCUMENT LIVES — `<base>/<stub>/<stub>.jsonld`
+  // ── WHERE A FOREIGN INSTANCE'S DOCUMENT LIVES — `<base>/<name>/<stub>.jsonld`
   //
   // The owner's URL-space rule (bean `x0hj`): the base IS one instance's
   // rendering, and **everything else is
@@ -3073,7 +3073,11 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // Appending the foreign segment there doubled it: the FHIR IG harness minted
   // `…/<stub>/<stub>/<stub>.jsonld` (issue #1548, measured
   // 2026-09-30). `bootstrap` declares no base and is unchanged.
-  const docPath = foreignInstance && !ownCanonical ? `${stub}/${stub}.jsonld` : `${stub}.jsonld`;
+  //
+  // The segment is the instance's NAME, through the one resolver
+  // (`instanceDocPath`, bean `cat-tools-sthf`); `stub` names the file. They
+  // are equal for every instance declared today, so this moved no address.
+  const docPath = foreignInstance && !ownCanonical ? instanceDocPath({ name: decl?.name ?? stub, stub }) : `${stub}.jsonld`;
   const docIri = renderingPath(base, docPath);
   const canonicalIri = canonicalBase ? renderingPath(canonicalBase, docPath) : undefined;
   return {
