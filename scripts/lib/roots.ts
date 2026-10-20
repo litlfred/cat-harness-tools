@@ -231,7 +231,7 @@ export function instanceFlag(argv: readonly string[]): string | undefined {
  * right in the harness's own repository and in an index checkout, and wrong
  * in a separated instance's repository that remote-mounts the harness: there
  * the harness is somebody else's tree at a pin, gitignored, and a report
- * written into it is lost (bean `j3ls`, measured from who-iris). In order:
+ * written into it is lost (bean `j3ls`, measured from a separated content instance). In order:
  *
  * 1. `--instance <dir>` — the caller said so.
  * 2. `$CAT_INSTANCE_ROOT` — the environment said so.
