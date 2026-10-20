@@ -80,6 +80,7 @@ import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-struc
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { COVER_FILENAME } from "./library-graph.ts";
 
 /**
  * This module's own instance root — where its `harness.json` is.
@@ -468,6 +469,12 @@ export function withDerivedArms(
       // anybody has looked at the images, and `image-descriptions` is the gate
       // that refuses the promotion, not this.
       ["bun", "run", tsHelper("apply-image-verdicts.ts"), "--staging", staging, "--library", library],
+      // THE COVER — owner, 2026-10-16: a card's picture was the first figure,
+      // and for one paper that was a black game screenshot from page 11. Page
+      // 1, rendered by `pdf-cover.py`, is the determined answer (its header
+      // says why), and `avatarOf` takes `cover.png` before any figure. Last,
+      // because nothing here reads it.
+      ["python3", pyHelper("pdf-cover.py"), pdf, "-o", join(staging, COVER_FILENAME), "--width", "300"],
     ],
   };
 }
