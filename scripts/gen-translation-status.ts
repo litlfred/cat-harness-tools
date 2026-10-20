@@ -61,6 +61,8 @@ import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
 import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
+import { poHeader } from "./kg-viewer-strings.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -105,8 +107,64 @@ export interface CatalogueCounts {
   untranslated: number;
 }
 
+/**
+ * Whether a person signed this locale off (issue #206), as the translation
+ * drawer shows it — bean `cat-tools-bbnd`, owner ruling 2026-10-10: officiality
+ * is read from BOTH the PO headers (`X-Folio-Official`) and the locale's
+ * `status.json`, and the reader is told when they disagree rather than shown
+ * one of the two. Computed by `check-translation-officiality.ts`'s own reader,
+ * so the drawer and the gate cannot answer differently.
+ */
+export interface LocaleOfficiality {
+  /**
+   * `official`: status.json says so, names who and when, and every catalogue
+   * agrees. `unofficial`: neither side claims it — today's state everywhere.
+   * `disagree`: the two records say different things. `unreadable`: status.json
+   * will not parse, so this run cannot say.
+   */
+  state: "official" | "unofficial" | "disagree" | "unreadable";
+  signedOffBy?: string;
+  signedOffAt?: string;
+  /** Catalogues whose header says `X-Folio-Official: yes`. */
+  officialCatalogues: number;
+  /** How many disagreements the officiality check reports for this locale. */
+  findings: number;
+}
+
+/** {@link LocaleOfficiality} for one locale directory. */
+export function localeOfficiality(dir: string): LocaleOfficiality {
+  const l = readLocale(dir);
+  const findings = officialityFindings(l);
+  const officialCatalogues = l.catalogues.filter((c) => c.official === "yes").length;
+  if (l.status === null) return { state: "unreadable", officialCatalogues, findings: findings.length };
+  const by = typeof l.status?.signedOffBy === "string" ? l.status.signedOffBy : undefined;
+  const at = typeof l.status?.signedOffAt === "string" ? l.status.signedOffAt : undefined;
+  const signed = { ...(by ? { signedOffBy: by } : {}), ...(at ? { signedOffAt: at } : {}) };
+  if (findings.length > 0) return { state: "disagree", ...signed, officialCatalogues, findings: findings.length };
+  return { state: l.status?.official === true ? "official" : "unofficial", ...signed, officialCatalogues, findings: 0 };
+}
+
+/** One catalogue in a locale, as the status page's per-row drawer lists it. */
+export interface CatalogueRow extends CatalogueCounts {
+  /** Relative to the locale directory. */
+  path: string;
+  /** The PO header `X-Folio-Official`, lower-cased; absent when unset. */
+  official?: string;
+}
+
 export interface LocaleStatus extends CatalogueCounts {
   locale: string;
+  /**
+   * Each catalogue's counts and header, for the per-row drawer (bean
+   * `cat-tools-bbnd`). Optional for the same reason as `officiality`.
+   */
+  files?: CatalogueRow[];
+  /**
+   * Who signed it off, from both records (bean `cat-tools-bbnd`). Optional
+   * because a projection written before the field existed has none, and
+   * "not recorded" is what the table then says, not "unofficial".
+   */
+  officiality?: LocaleOfficiality;
   /** `.pot` templates visible for this locale — what COULD be translated. */
   templates: number;
   /** `.po` catalogues present — what somebody started. */
@@ -191,7 +249,7 @@ export function countCatalogue(text: string): CatalogueCounts {
 function filesUnder(dir: string, exts: readonly string[]): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...filesUnder(p, exts));
     else if (exts.some((e) => name.endsWith(e))) out.push(p);
@@ -232,6 +290,8 @@ export function localeStatuses(translationsDir: string): LocaleStatus[] {
 
     const status: LocaleStatus = {
       locale,
+      officiality: localeOfficiality(dir),
+      files: [],
       templates: filesUnder(dir, [".pot"]).length,
       catalogues: 0,
       entries: 0,
@@ -256,6 +316,8 @@ export function localeStatuses(translationsDir: string): LocaleStatus[] {
         continue;
       }
       const c = countCatalogue(text);
+      const official = poHeader(text, "X-Folio-Official")?.toLowerCase();
+      status.files!.push({ path: relative(dir, po), ...c, ...(official ? { official } : {}) });
       status.entries += c.entries;
       status.translated += c.translated;
       status.fuzzy += c.fuzzy;
@@ -362,6 +424,14 @@ export function otherInstances(repoRoot: string, except: string): InstanceStatus
   return out.sort((a, b) => a.instance.localeCompare(b.instance, "en"));
 }
 
+/** One line on who signed a locale off — the visualiser's cell and the drawer's. */
+export function officialityLabel(o: LocaleOfficiality): string {
+  if (o.state === "official") return `official, signed off by ${o.signedOffBy ?? "?"} on ${o.signedOffAt ?? "?"}`;
+  if (o.state === "disagree") return `records disagree (${o.findings}); run check:translation-officiality`;
+  if (o.state === "unreadable") return "status.json unreadable: could not determine";
+  return "not signed off (machine or agent translation)";
+}
+
 function localeTable(locales: LocaleStatus[], idPrefix: string, scope?: string): string {
   const rows = locales
     .map((l) => {
@@ -375,13 +445,14 @@ function localeTable(locales: LocaleStatus[], idPrefix: string, scope?: string):
       const fileLink = scope
         ? ` · <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(scope)}/${esc(l.locale)}" class="ts-files-link">view files &rarr;</a>`
         : "";
-      return `<tr id="${esc(idPrefix)}locale-${esc(l.locale)}">
+      return `<tr id="${esc(idPrefix)}locale-${esc(l.locale)}" data-fa-tr-locale="${esc(l.locale)}">
   <th scope="row" class="ts-col-locale"><code>${esc(l.locale)}</code>${langLabel}</th>
   <td class="ts-col-catalogues">${l.catalogues} / ${l.templates}<br><span class="ts-dim">${pct(share(l.catalogues, l.templates))}</span>${fileLink}</td>
   <td class="ts-col-strings">${l.entries}</td>
   <td class="ts-col-strings">${l.translated}<br><span class="ts-dim">${pct(share(l.translated, l.entries))}</span></td>
   <td class="ts-col-strings">${l.fuzzy}</td>
   <td class="ts-col-strings">${l.untranslated}${unread}</td>
+  <td class="ts-col-official" data-fa-tr-officiality="${esc(l.officiality?.state ?? "absent")}">${esc(l.officiality ? officialityLabel(l.officiality) : "not recorded")}</td>
 </tr>`;
     })
     .join("\n");
@@ -396,6 +467,7 @@ function localeTable(locales: LocaleStatus[], idPrefix: string, scope?: string):
   <th scope="col" class="ts-col-strings">translated</th>
   <th scope="col" class="ts-col-strings">fuzzy</th>
   <th scope="col" class="ts-col-strings">untranslated</th>
+  <th scope="col" class="ts-col-official">official<br><span class="ts-col-badge">Q3: signed off</span></th>
 </tr>
 </thead>
 <tbody>
@@ -497,6 +569,8 @@ ${localeTable(i.locales, `${i.instance}-`, i.scope)}`,
 .ts-page .ts-col-badge { display: inline-block; font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.1rem 0.35rem; border-radius: 3px; background: rgba(127,127,127,.15); color: var(--ts-dim); margin-top: 0.2rem; }
 .ts-page .ts-questions-legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.82rem; color: var(--ts-dim); margin: 0.5rem 0 1rem; padding: 0.4rem 0.6rem; border-left: 3px solid var(--ts-line-distinct); background: var(--ts-col-bg); }
 .ts-page .ts-dim { color: var(--ts-dim); font-size: 0.8rem; }
+.ts-page td.ts-col-official { text-align: left; font-size: 0.82rem; }
+.ts-page td.ts-col-official[data-fa-tr-officiality="disagree"], .ts-page td.ts-col-official[data-fa-tr-officiality="unreadable"] { color: var(--ts-warn); }
 .ts-page .ts-none { color: var(--ts-dim); font-style: italic; }
 .ts-page .ts-warn { color: var(--ts-warn); font-size: 0.8rem; text-align: left; margin-top: 0.3rem; }
 .ts-page .ts-note { color: var(--ts-dim); font-size: 0.85rem; margin-top: 1.5rem; }
@@ -541,6 +615,7 @@ numbers last <strong>changed</strong> on ${esc(doc.changedAt)}.</p>
 <div class="ts-questions-legend">
   <div><strong>Question 1 (Availability):</strong> Are there <code>.po</code> catalogues for extractable <code>.pot</code> templates?</div>
   <div><strong>Question 2 (Completeness):</strong> Of the catalogues that exist, how many strings are translated?</div>
+  <div><strong>Question 3 (Officiality):</strong> Has a person signed this locale off? Read from the PO headers and <code>status.json</code>, which must agree.</div>
 </div>
 
 ${localeTable(doc.locales, "", doc.scope)}
@@ -594,6 +669,10 @@ function main(): void {
   const instances = otherInstances(REPO_ROOT, ROOT);
   const site = siteTarget(localSiteDir(ROOT) ?? join(ROOT, siteDirFor(ROOT)));
 
+  // The route cat-harness DECLARES for this Tool's visualiser — never chosen
+  // here (owner, 2026-10-09: `<base>/<harness>/<visualizer>`).
+  const sitePath = visualiserSitePath(ROOT, VIEWER_TOOL);
+
   // The projection first, the page second: the page is a rendering OF the
   // projection, and writing them the other way round invites a page whose
   // numbers no file backs.
@@ -624,14 +703,14 @@ function main(): void {
     ...tileCounts({
       "translation-sources": [locales.length, locales.length === 1 ? "locale" : "locales"],
     }),
+    // WHERE THE PAGE IS, so the translation drawer on any page can link to it
+    // without composing a route (bean `cat-tools-bbnd`).
+    page: sitePath.rel,
     locales,
     instances,
   };
 
   const assetDir = join(site, "assets", "translation-status");
-  // The route cat-harness DECLARES for this Tool's visualiser — never chosen
-  // here (owner, 2026-10-09: `<base>/<harness>/<visualizer>`).
-  const sitePath = visualiserSitePath(ROOT, VIEWER_TOOL);
   const pageDir = join(site, dirname(sitePath.rel));
   const assetPath = join(assetDir, "index.json");
   const pagePath = join(pageDir, "index.html");
