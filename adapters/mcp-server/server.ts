@@ -67,8 +67,10 @@ import { executeGraphTool } from "./tools/graph.js";
 import {
   currentBranch, listBranches, fetchOrigin, isCurrentBranch,
   readFileBranch, fileExistsBranch, importTsBranch, listDirBranch,
-  mergeBase, gitLogFiles, gitShowBinaryAt, gitShowAt,
+  mergeBase, gitLogFiles, gitShowBinaryAt, gitShowAt, commitOf,
 } from "./git.js";
+import { detectRepoUrl } from "../../src/core/git-refs.js";
+import { declarationLine, leanSourceUrl } from "../../src/core/lean-source-link.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
@@ -336,12 +338,18 @@ import {
   isSectionRef, sectionBlockNames,
 } from "../manifest-entries.js";
 
+/** A block's Lean source and the repository-relative path it was read from. */
+interface LeanFile {
+  source: string;
+  path: string;
+}
+
 /**
  * Resolve the Lean source for a block across branch-backed storage.
  * Mirrors the logic in `folio-assistant/adapters/paper/resolver.ts`
  * but operates against the MCP server's git helpers.
  */
-function resolveLeanSource(
+function resolveLeanFile(
   blk: Block,
   chRel: string,
   rootName: string,
@@ -349,7 +357,7 @@ function resolveLeanSource(
   // and both call sites, where `br` is the optional `?branch=` query param.
   // Declaring it `string` was simply narrower than every party involved.
   branch: string | undefined,
-): string | undefined {
+): LeanFile | undefined {
   const blkLean = bLean(blk);
   if (!blkLean) return undefined;
   // Steps 2 and 3 were built here from `leanPackageByName` and a decl-prefix
@@ -363,14 +371,15 @@ function resolveLeanSource(
   const res = resolveFormalRef(blkLean.ref);
 
   // 1. sibling .lean file
-  let leanSource = readFileBranch(branch, `${chRel}/${rootName}.lean`) ?? undefined;
-  if (leanSource) return leanSource;
+  const sibling = `${chRel}/${rootName}.lean`;
+  const siblingSource = readFileBranch(branch, sibling);
+  if (siblingSource) return { source: siblingSource, path: sibling };
 
   // 2. the layer's candidate paths, in its own priority order
   if (res) {
     for (const candidate of res.candidatePaths) {
-      leanSource = readFileBranch(branch, candidate) ?? undefined;
-      if (leanSource) return leanSource;
+      const source = readFileBranch(branch, candidate);
+      if (source) return { source, path: candidate };
     }
   }
 
@@ -382,7 +391,7 @@ function resolveLeanSource(
         const result = Bun.spawnSync(["grep", "-rl", res.declName, leanSrcDir]);
         const files = result.stdout.toString().trim().split("\n").filter(Boolean);
         if (files.length > 0 && existsSync(files[0])) {
-          return readFileSync(files[0], "utf-8");
+          return { source: readFileSync(files[0], "utf-8"), path: relative(REPO_ROOT, files[0]) };
         }
       }
     } catch {}
@@ -433,10 +442,28 @@ const blockStatus = (b: Block) => leanStatusBucket(bLean(b));
  */
 function withSource(
   lean: ReturnType<typeof bLean>,
-  source: string | undefined,
+  file: LeanFile | undefined,
+  branch: string | undefined,
 ): ResolvedBlock["lean"] {
   if (!lean) return undefined;
-  return { ...lean, ref: lean.ref, source };
+  return { ...lean, ref: lean.ref, source: file?.source, sourceUrl: leanDeclarationUrl(lean.ref, file, branch) };
+}
+
+/** This content repository's web URL, read once: `origin` does not move while the server runs. */
+let repoUrlMemo: { url: string | undefined } | undefined;
+const contentRepoUrl = () => (repoUrlMemo ??= { url: detectRepoUrl(REPO_ROOT) }).url;
+
+/**
+ * The block's Lean declaration on GitHub, at the commit the source was read
+ * from (owner ruling 2026-10-20, bean `og5t`, option A). `undefined` when the
+ * file was not found, the repository is not on GitHub, or the commit does not
+ * resolve; the link is then simply not drawn. Without a line (the name is not
+ * declared in a form `declarationLine` recognises) it points at the file.
+ */
+function leanDeclarationUrl(ref: string, file: LeanFile | undefined, branch: string | undefined): string | undefined {
+  if (!file) return undefined;
+  const declName = resolveFormalRef(ref)?.declName ?? ref.replace(/^[^:]*:/, "");
+  return leanSourceUrl(contentRepoUrl(), commitOf(branch), file.path, declarationLine(file.source, declName));
 }
 
 interface ResolvedBlock {
@@ -452,7 +479,7 @@ interface ResolvedBlock {
    *  over the `validation` enum. The `...bLean(blk)` spreads below carry it;
    *  omitting it here made it invisible to every consumer and unreadable at
    *  the one site that tried. */
-  lean?: { ref: string; file?: string; validation?: string; sorryFree?: boolean; source?: string };
+  lean?: { ref: string; file?: string; validation?: string; sorryFree?: boolean; source?: string; sourceUrl?: string };
   status?: string;
   tex?: string;
   caption?: string;
@@ -627,7 +654,7 @@ async function resolvePaper(id: string, branch?: string): Promise<(ResolvedPaper
             const md = readFileBranch(br, blkMdRel) || "";
             const feedback = readFeedback(id, rootName);
             const blockTodos = feedback.length ? [...feedback] : undefined;
-            const leanSource = resolveLeanSource(blk, chRel, rootName, br);
+            const leanFile = resolveLeanFile(blk, chRel, rootName, br);
             const rendered = blk.rendered?.map(
               (r: RenderedAsset) => ({ ...r, url: `/api/content-asset/${id}/${chRef.dir}/${r.url}` })
             );
@@ -639,7 +666,7 @@ async function resolvePaper(id: string, branch?: string): Promise<(ResolvedPaper
             }] : undefined;
             res.push({
               rootName, kind: blk.kind, label: blk.label, title: blk.title, uses: blk.uses,
-              examples: bExamples(blk), proofs: bProofs(blk), lean: withSource(bLean(blk), leanSource),
+              examples: bExamples(blk), proofs: bProofs(blk), lean: withSource(bLean(blk), leanFile, br),
               status: blockStatus(blk), tex: bTex(blk), caption: bCaption(blk), tags: blk.tags, rendered: rendered || figRendered,
               md, todos: blockTodos
             });
@@ -954,7 +981,7 @@ async function resolveSection(
       const feedback = readFeedback(paperId, rootName);
       const blockTodos = feedback.length ? [...feedback] : undefined;
 
-      const leanSource = resolveLeanSource(blk, chRel, rootName, br);
+      const leanFile = resolveLeanFile(blk, chRel, rootName, br);
 
       const rendered: ResolvedRenderedAsset[] | undefined = blk.rendered?.map(
         (r: { mime: string; url: string; blockIndex: number; hash?: string }) => ({
@@ -984,7 +1011,7 @@ async function resolveSection(
         uses: blk.uses,
         examples: bExamples(blk),
         proofs: bProofs(blk),
-        lean: withSource(bLean(blk), leanSource),
+        lean: withSource(bLean(blk), leanFile, br),
         status: blockStatus(blk),
         tex: bTex(blk),
         caption: bCaption(blk),
