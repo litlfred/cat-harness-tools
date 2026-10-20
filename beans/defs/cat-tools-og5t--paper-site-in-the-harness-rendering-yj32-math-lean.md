@@ -6,7 +6,7 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T17:49:46Z
+updated_at: 2026-10-20T18:08:05Z
 parent: folio-assistant-yj32
 ---
 
@@ -94,5 +94,15 @@ What must the harness rendering do before qou's legacy renderer retires?
    adapter's wholesale move, then do option 1 there.
 
 **Default if no answer:** option 1.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+
+## Owner ruling 2026-10-20: option 1, HTML parity only
+
+Answered directly in the cat-harness-tools drain session ("1 ok"). The harness
+rendering replaces qou's legacy **HTML** (math with the folio's macros, Lean
+links, every paper block kind). The PDF stays on its LaTeX path as a folio
+asset. The proposed done-when above stands as this bean's done-when.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.

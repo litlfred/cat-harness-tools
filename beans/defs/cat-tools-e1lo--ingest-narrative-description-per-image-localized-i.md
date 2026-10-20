@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T15:15:39Z
+updated_at: 2026-10-20T18:08:05Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -328,3 +328,14 @@ cat-harness-tools drain lane; the change lands in cat-harness's
 **Default if no answer:** option 1.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Owner ruling 2026-10-20: option 1, a `lang` per narrative
+
+Answered directly in the cat-harness-tools drain session ("2y"). Each
+`Narrative` carries a BCP 47 `lang`, and the `narrative` slot becomes a list
+with one entry per language, each with its own author, model version and review
+state. Order of work: the schema change in cat-harness (`schemas/narrative.ts`)
+first, then `narrativesIn` and the queue here follow it.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
