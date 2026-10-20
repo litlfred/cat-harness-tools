@@ -329,6 +329,17 @@ cat-harness-tools drain lane; the change lands in cat-harness's
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
 
+
+## Owner ruling 2026-10-20: option 1, a `lang` per narrative
+
+Answered directly in the cat-harness-tools drain session ("2y"). Each
+`Narrative` carries a BCP 47 `lang`, and the `narrative` slot becomes a list
+with one entry per language, each with its own author, model version and review
+state. Order of work: the schema change in cat-harness (`schemas/narrative.ts`)
+first, then `narrativesIn` and the queue here follow it.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
 _2026-10-20T18:14:45Z_ — Claimed by feat/e1lo-narrative-lang — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
 
 
