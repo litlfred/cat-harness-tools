@@ -21,6 +21,7 @@ import { basename, join } from "node:path";
 
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
+import { processDiagrams } from "../../src/workflow/process-model.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** One activity carrying whatever extension XML the case needs. */
@@ -235,7 +236,7 @@ describe("absence stays absence", () => {
     // fixtures above.
     const { loadProcessModel: load } = await import("../../src/workflow/process-model.js");
     const diagram = (n: string): string => workflowFile(join(HARNESS_ROOT), n);
-    const files = workflowFiles(join(HARNESS_ROOT)).filter((f) => f.endsWith(".bpmn")).map((x) => basename(x));
+    const files = processDiagrams(workflowFiles(join(HARNESS_ROOT))).map((x) => basename(x));
     expect(files.length, "no diagrams found — this assertion would be vacuous").toBeGreaterThan(5);
     for (const f of files) await load(diagram(f));
     // Loads every diagram of the real corpus, which took 5.1 s on a CI runner

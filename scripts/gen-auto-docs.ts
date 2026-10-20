@@ -803,7 +803,10 @@ export const TYPES: AutoDocType[] = [
               path: relative(REPO, f).split("\\").join("/"),
               name: `Shared steps (${basename(f, ".bpmn")})`,
               summary: `${defs.size} global task(s) that this layer's processes call by id.`,
-              facts: { "global tasks": String(defs.size), ...(shared.length ? { skills: shared.join(", ") } : {}) },
+              // `activities: 0` because that is true of it — no process, so no
+              // activity in one — and because every row of this index carries
+              // the fact: absent would read as unmeasured.
+              facts: { activities: "0", "global tasks": String(defs.size), ...(shared.length ? { skills: shared.join(", ") } : {}) },
             });
             continue;
           }
