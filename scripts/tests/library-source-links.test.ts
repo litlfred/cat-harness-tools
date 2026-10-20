@@ -27,12 +27,14 @@ import {
   instanceSources,
   sourcesHtml,
   viewerHtml,
+  notHeldHtml,
+  VIEWER_JS,
   viewPanelHtml,
 } from "../gen-library-viz.ts";
 import { entryGraphSitePath } from "../lib/library-entry-graphs.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import type { LibraryGraph } from "../library-graph.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, viewKindOf } from "../lib/library-source.ts";
+import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, viewKindOf } from "../lib/library-source.ts";
 import { readEntryDocument } from "../lib/library-document.ts";
 import { MARKER as PDF_MARKER, VIEWER_PATH } from "../pdf-viewer.ts";
 
@@ -272,6 +274,40 @@ describe("the primary asset has a view panel near the top (owner, 2026-10-16)", 
     expect(viewPanelHtml(rest)).toBe("");
     expect(entryPageHtml("i.json", "inst", "../../", { id: "e1", sources: rest })).not.toContain('id="lib-view"');
     expect(viewerHtml("i.json", "inst")).not.toContain('id="lib-view"');
+  });
+
+  test("the index's viewable is the panel's condition: held, linkable, a viewer's kind, not withheld", () => {
+    const repo = mkdtempSync(join(tmpdir(), "lib-viewable-"));
+    mkdirSync(join(repo, "uploads"), { recursive: true });
+    writeFileSync(join(repo, "uploads", "e1.pdf"), "%PDF");
+    writeFileSync(join(repo, "uploads", "e2.docx"), "x");
+    const up = (id: string, path: string) => [{ kind: "file" as const, path, ingestedBy: id, docId: id }];
+    const e = (id: string, sourceFile: string) => ({ id, dir: `lib/${id}`, sourceFile, sourceSha256: "" });
+    expect(viewableOf(repo, e("e1", "e1.pdf"), up("e1", "uploads/e1.pdf"), "o/host")).toBe("pdf");
+    expect(viewableOf(repo, { ...e("e1", "e1.pdf"), withheld: true }, up("e1", "uploads/e1.pdf"), "o/host")).toBeUndefined();
+    expect(viewableOf(repo, e("e1", "e1.pdf"), up("e1", "uploads/e1.pdf"), undefined)).toBeUndefined();
+    expect(viewableOf(repo, e("e2", "e2.docx"), up("e2", "uploads/e2.docx"), "o/host")).toBeUndefined();
+    expect(viewableOf(repo, e("e3", "e3.pdf"), [], "o/host")).toBeUndefined(); // not held
+  });
+
+  test("arriving at #lib-view opens the panel — the folio glass's eye links there", () => {
+    expect(VIEWER_JS).toContain('location.hash !== "#lib-view"');
+    expect(VIEWER_JS).toContain("d.open = true");
+  });
+
+  test("a source not held is said so where the panel would be, linking out — never into the viewer", () => {
+    expect(elsewhereLinks({ doi: "10.1145/nnnnnnn", arxiv: "2404.04834v4" })).toEqual([
+      { label: "arXiv:2404.04834v4", href: "https://arxiv.org/abs/2404.04834v4" },
+    ]);
+    expect(elsewhereLinks({ doi: "10.1016/j.ejor.2020.01.001" })[0]?.href).toBe("https://doi.org/10.1016/j.ejor.2020.01.001");
+    expect(elsewhereLinks({ doi: "", arxiv: "" })).toEqual([]);
+    const page = entryPageHtml("i.json", "inst", "../../", { id: "e1", sources: rest, notHeld: { file: "w.pdf", elsewhere: elsewhereLinks({ arxiv: "2404.04834" }) } });
+    expect(page).toContain("is not held on this site");
+    expect(page).toContain('href="https://arxiv.org/abs/2404.04834" target="_blank" rel="noopener noreferrer"');
+    expect(page).not.toContain(PDF_MARKER);
+    expect(notHeldHtml({ file: "w.pdf", elsewhere: [] })).toContain("No public link is recorded");
+    // A held, viewable source wins: the panel, not the note.
+    expect(entryPageHtml("i.json", "inst", "../../", { id: "e1", sources: [pdf], notHeld: { file: "w.pdf", elsewhere: [] } })).not.toContain("not held");
   });
 
   test("an image is drawn as itself", () => {
