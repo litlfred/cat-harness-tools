@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-10T17:01:51Z
+updated_at: 2026-10-20T15:45:00Z
 parent: folio-assistant-nok9
 ---
 
@@ -88,3 +88,20 @@ Design: `merge-gate-2026-10-02.md` §1.1 and §5.1 (rows G3/G4). Tracking bean:
 - [~] **Sidecar and required check:** the verdict shape (`merge-review/v1`, `adversarial_reviews[]`) is done (abmq), and `check:adversarial-review` (`scripts/check-adversarial-review.ts`) reads it. **Not wired:** no folio-assistant workflow runs it as a check, so nothing reads the verdict on a PR. That wiring belongs to folio-assistant.
 - [ ] **Merge-train composition:** not verified here.
 - [ ] **BPMN:** `code-change-review.bpmn` `Task_Review` documents the adversarial review but its `skill ref` is `code-node-review`, and no `prepare-merge` step checks the verdict. Those edits belong to cat-harness (process definitions).
+
+
+## Re-measured 2026-10-20 — status `todo` is correct; two items landed since 10-10, two remain
+
+- [x] **Required check wired:** folio-assistant `code-quality-gates.yml` runs
+  `bun run cat check:adversarial-review` (warn-only), wired 2026-10-14.
+- [x] **`prepare-merge` checks the verdict:** step "Check the adversarial review
+  verdict" in cat-harness `skills/sdlc/sdlc-core/prepare-merge.md`.
+- [ ] **BPMN:** cat-harness `processes/sdlc/code-change-review.bpmn`
+  `Task_Review` still has `skill ref="code-node-review"` (plus `staging-review`).
+  Its documentation mentions the adversarial review, but no adversarial-review
+  skill exists in cat-harness `skills/` to reference. Belongs to cat-harness.
+- [ ] **Merge-train composition:** `merge-train.bpmn` does not mention the
+  adversarial review, and nothing states that the train re-checks only the
+  compile gates. Still unverified.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).

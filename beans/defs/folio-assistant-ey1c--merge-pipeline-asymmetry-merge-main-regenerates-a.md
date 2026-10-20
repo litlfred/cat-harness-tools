@@ -5,7 +5,7 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-03T01:05:37Z
-updated_at: 2026-10-11T06:16:33Z
+updated_at: 2026-10-20T15:45:00Z
 parent: folio-assistant-hfag
 ---
 
@@ -101,3 +101,15 @@ How should post-merge regeneration run?
 ## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1:** a folio-assistant workflow on `push: main` runs `post-merge-regen.ts` and opens the repair PR. That workflow file belongs to folio-assistant, so lane A takes it. cat-harness already carries its own `post-merge-regen.yml` as a model.
+
+
+## Re-measured 2026-10-20 — status `todo` is correct; the owner's option 1 is not wired yet
+
+The ruling (option 1, 2026-10-11) is half landed. This repository has the reusable
+`.github/workflows/layer-post-merge-regen.yml`, whose header shows the caller to add.
+But no workflow in litlfred/folio-assistant (`main`, measured today) mentions
+`post-merge-regen` or calls the reusable workflow, so `main` going stale is
+still only reported. Missing: that caller in folio-assistant (lane A's per the
+ruling), then the done-when boxes, observed on a real merge.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
