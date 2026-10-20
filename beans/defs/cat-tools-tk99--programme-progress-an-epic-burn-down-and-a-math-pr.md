@@ -6,7 +6,7 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-10T16:33:42Z
+updated_at: 2026-10-20T15:30:00Z
 parent: folio-assistant-6lb8
 ---
 
@@ -28,3 +28,17 @@ the harness owns the harness") puts it outside this store's reach.
 3. Scrap it. The finding no longer matters after the separation.
 
 **Default if no answer:** option 1.
+
+
+## Owner decision above — resolved
+
+The rehome question (option 1) was settled by the owner's ruling of 2026-10-10: this bean IS the rehomed copy, so the question above is closed and must not be re-asked. Kept for history.
+
+## Re-measured 2026-10-20 — blocked on beans outside this store
+
+The body names two prerequisites, WORK TRACEABILITY and CONJECTURE REGISTER
+(`ckej`). Neither has a bean in this store (`beans/defs` at `3420b76`), so the
+dependency cannot be expressed as `blocked_by` here. Left `todo`; not
+claimable until those land in whichever store holds them.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).

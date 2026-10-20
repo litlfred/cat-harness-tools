@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-10T16:33:42Z
+updated_at: 2026-10-20T15:30:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -65,3 +65,17 @@ the harness owns the harness") puts it outside this store's reach.
 3. Scrap it. The finding no longer matters after the separation.
 
 **Default if no answer:** option 1.
+
+
+## Owner decision above — resolved
+
+The rehome question (option 1) was settled by the owner's ruling of 2026-10-10: this bean IS the rehomed copy, so the question above is closed and must not be re-asked. Kept for history.
+
+## Re-measured 2026-10-20 — still blocked on its first box
+
+At cat-harness-tools `3420b76`, `state.jsonld` and `kg-dynamic` occur only in
+`scripts/render-pipeline.ts` (the step, writing to scratch). No viewer, script
+or test reads a dynamic-state document, so no filename is minted. Left `todo`;
+re-measure when a dynamic-state visualiser opens a PR.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).

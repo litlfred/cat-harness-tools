@@ -6,8 +6,10 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-10T16:33:43Z
+updated_at: 2026-10-20T16:00:00Z
 parent: folio-assistant-yj32
+blocked_by:
+    - folio-assistant-nbal
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-o7eq`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -442,3 +444,26 @@ What remains is harness work in cat-harness-tools and cat-harness:
 
 By the owner's ruling on the rehome decision, the bean is re-filed in the
 cat-harness-tools store, and this copy stays as a pointer.
+
+
+## Re-measured 2026-10-20 — every remaining item starts outside this repository
+
+All questions are answered (ruling 2026-10-10 above). Of the four remaining
+items, measured at cat-harness `main` and cat-harness-tools `3420b76`:
+
+- the `enabled` field: absent from `schemas/cat-harness.ts` in **cat-harness**;
+- the one resolver: there is `artefactStub`/`artefactStubFor` in
+  **cat-harness**, but no function that composes an instance's published URL.
+  Consumers here (`scripts/root-index.ts`, `scripts/kg-export.ts`,
+  `scripts/sync-docs-harness.ts`) each compose their own;
+- the workflow layout: `docs-site.yml` / `feature-staging.yml` are in
+  **folio-assistant**, not here;
+- the bootstrap `.jsonld` path: follows the resolver.
+
+So the first two land in cat-harness, and only then does this repo switch its
+consumers to the resolver. Left `todo` here; this bean is the consumer half,
+and the field and resolver should be filed (or found) in the cat-harness store.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+_2026-10-20T16:00:00Z_ — Blocked by `folio-assistant-nbal` (cat-harness graph store), which files and builds the prerequisite: litlfred/cat-harness#376 (commit `1ef09a59`) adds `schemas/url-space.ts` with `publishedPath({case: "root" | "instance" | "viewer", …}, base)` and `isPublished({enabled})`, and `enabled?: boolean` on the declaration. The consumer switch here starts once #376 is on this repository's pin. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.

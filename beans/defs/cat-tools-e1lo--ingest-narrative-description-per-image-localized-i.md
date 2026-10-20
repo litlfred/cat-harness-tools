@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-10T16:33:42Z
+updated_at: 2026-10-20T15:30:00Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -295,3 +295,36 @@ the harness owns the harness") puts it outside this store's reach.
 3. Scrap it. The finding no longer matters after the separation.
 
 **Default if no answer:** option 1.
+
+
+## Owner decision above — resolved
+
+The rehome question (option 1) was settled by the owner's ruling of 2026-10-10: this bean IS the rehomed copy, so the question above is closed and must not be re-asked. Kept for history.
+
+## Re-measured 2026-10-20 — the next step is a schema change in cat-harness
+
+`scripts/narratives.ts` (here) queues narratives, but the schema it validates
+against, `@litlfred/cat-harness/schemas/narrative.ts`, has **no language
+field at all**. "A narrative per language" cannot be stored, let alone queued,
+until that schema says how. The remaining human-confirmation half is the
+owner's, through `bun run cat narratives`.
+
+## Owner decision
+
+How does a narrative carry its language? (Asked 2026-10-20 by the
+cat-harness-tools drain lane; the change lands in cat-harness's
+`schemas/narrative.ts`, then `narrativesIn` here follows it.)
+
+1. **(Recommended) A `lang` (BCP 47) field on each `Narrative`, and the
+   `narrative` slot becomes a list, one per language.** Each language has its own
+   author, model version and review state, which is what the review queue
+   decides on; a missing language is visibly absent.
+2. A map keyed by language (`narrative: { en: …, fr: … }`). Compact, but a
+   reviewer confirms each entry separately anyway, so the queue path needs the
+   key as well.
+3. Keep one narrative and translate it at render time. No per-language review,
+   so it gives up the human confirmation the 2026-10-06 ruling asked for.
+
+**Default if no answer:** option 1.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
