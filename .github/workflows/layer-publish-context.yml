@@ -31,7 +31,8 @@
 #   4. Build ONLY this instance's context, judged on ITS findings only
 #      (`publish-instance-context.ts build`): another instance's unresolved
 #      prefix is that repository's to fix, and must not stop this publish.
-#      No `iriBase`, or no `.jsonld` documents, is a skip with a notice.
+#      No `iriBase`, or no `.jsonld` documents, is a skip with a WARNING, so a
+#      run that published nothing is not mistaken for one that did.
 #   5. Put the context, at the path the build reported, on the caller's `gh-pages` with the caller's
 #      GITHUB_TOKEN (contents API, one path, skipped when unchanged, nothing
 #      else on the branch touched). No `gh-pages` yet: an orphan one is created

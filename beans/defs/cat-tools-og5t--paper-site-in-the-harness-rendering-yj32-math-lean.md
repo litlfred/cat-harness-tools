@@ -1,12 +1,12 @@
 ---
 # cat-tools-og5t
 title: 'PAPER SITE in the harness rendering (yj32): math, Lean links and notation macros, blocking qou''s legacy-render retirement'
-status: todo
+status: in-progress
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T18:42:21Z
+updated_at: 2026-10-20T19:03:04Z
 parent: folio-assistant-yj32
 ---
 
@@ -98,6 +98,38 @@ What must the harness rendering do before qou's legacy renderer retires?
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
 
 
+## Correction 2026-10-20: the viewer already does more than the scoping said
+
+The scoping above searched `src/`, `scripts/` and `pipeline/` and missed
+`viewer/index.html`, so two of its "what exists" claims were wrong:
+
+- **Math with the folio's macros: present.** The viewer renders inline and
+  display math with KaTeX and passes the paper's own table
+  (`katexMacros = buildKatexMacros(p.macros)`, each `{ tex }` as `\name`,
+  plus two built-in fallbacks) to every `katex.render` and to
+  `renderMathInElement`.
+- **Lean per block: present, as status and source, not as a link.** Each
+  block gets a badge from its `lean` record: verified, `sorry`, `err`,
+  `stub`, or **"no lean"** when there is no Lean file, so a miss is already
+  reported rather than silently unlinked. The Lean source renders inline
+  (`.lean-src`). `lean-ref` is a citation link for a `sorry`, **not** a link
+  to the declaration. What is missing is a hyperlink from a block to its
+  Lean declaration.
+
+So, under the owner's option 1 (HTML parity), the done-when above reads:
+
+- [~] math with the folio's macros: done **in the viewer**. Open: whether the
+      HTML qou would publish is the viewer, or a static render that must do
+      the same (to be measured against `blueprint-html`)
+- [~] Lean: status and misses done in the viewer; a **link to the
+      declaration** is the open part
+- [ ] every paper block kind qou uses renders: inventory not yet measured
+- [ ] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T19:01:54Z_ — Claimed by feat/og5t-lean-source-link — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
 ## Measured 2026-10-20: block-kind inventory, viewer fixes, and what the qou deprecation changes
 
 **Block-kind inventory (done-when item 3), measured on qou `main` @ `77e7f0e`**:
@@ -149,3 +181,13 @@ doc-gen4 pages? (Asked 2026-10-20 by the cat-harness-tools drain lane.)
 **Default if no answer:** option 1.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Owner ruling 2026-10-20: option 1, the declaration's source on GitHub
+
+Asked in the drain coordinator's session (structured question,
+https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6) and relayed to this
+lane: the owner chose **"GitHub source"**. A block's Lean declaration link goes
+to the declaration's line in its `.lean` file on GitHub, resolved from the
+block's `lean.ref` at the pinned commit. Not doc-gen4, and not no link.
+
+Built in litlfred/cat-harness-tools#494 (`feat/og5t-lean-source-link`).
