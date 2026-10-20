@@ -192,7 +192,7 @@ function platformDir(assistant: string): string {
 }
 
 /**
- * Where the platform's CODE sits: `src/`, `content/pipeline/`, `scripts/`,
+ * Where the platform's CODE sits: `src/`, `pipeline/`, `scripts/`,
  * `viewer/`. It moved from `cat-harness/` to this layer in 70lx, and a folio
  * scaffolded afterwards still ran it from `cat-harness/`, where nothing is
  * any more (bean `cat-tools-yylt`). `platformDir` stays for what cat-harness
@@ -744,8 +744,8 @@ todos/                    people's outstanding items (mounted likewise)
 \`\`\`sh
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
-bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
-bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
+bun run ${toolsDir(assistant)}/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
 
 Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
