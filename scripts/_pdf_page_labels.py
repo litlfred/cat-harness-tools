@@ -134,6 +134,33 @@ def _candidates(page_lines: list[Line]) -> list[tuple[str, int]]:
     return out
 
 
+# A scanned page has no layout: its OCR text keeps the line order but not where
+# a line sat. The first and last lines of the text are where a running head and
+# a folio print, so they stand in for the margins. The run fit below is what
+# keeps this honest: a number counts only when it fits a run of three or more
+# pages, so a short last line of body text ("12 countries") does not become a
+# page label. Measured on who-iris `who-pub-tps-931` (121 scanned pages): the
+# last line of page 20 is "15", of page 50 "45", of page 100 "95".
+OCR_EDGE_LINES = 2
+
+
+def text_margin_lines(pages: list[str], edge: int = OCR_EDGE_LINES) -> list[Line]:
+    """Margin stand-ins for pages read as plain text (OCR): the first and last
+    `edge` non-empty lines of each page, placed at its top and bottom edge."""
+    out: list[Line] = []
+    for i, text in enumerate(pages, start=1):
+        rows = [t.strip() for t in (text or "").splitlines() if t.strip()]
+        if not rows:
+            continue
+        head = rows[:edge]
+        tail = rows[-edge:] if len(rows) > edge else []
+        for t, y in [(t, 0.0) for t in head] + [(t, 1.0) for t in tail]:
+            out.append(Line(page=i, text=t, size=0.0, bold=False, italic=False, caps=False,
+                            font="", uniform=1.0, x0=0.0, y0=y, x1=1.0, y1=y,
+                            page_height=1.0, page_width=1.0))
+    return out
+
+
 class Run(NamedTuple):
     kind: str
     offset: int        # physical - printed
@@ -231,10 +258,14 @@ def _norm(lab: str | None) -> str | None:
     return re.sub(r"^(?:p\.|pp\.|page)\s*", "", lab.strip(), flags=re.I).lower() or None
 
 
-def page_labels(lines: list[Line], n_pages: int, pdf: dict[int, str] | None = None) -> list[PageLabel]:
-    """One `PageLabel` per physical page, from every source available."""
+def page_labels(lines: list[Line], n_pages: int, pdf: dict[int, str] | None = None,
+                contents: bool = True) -> list[PageLabel]:
+    """One `PageLabel` per physical page, from every source available.
+
+    `contents=False` when `lines` are margin stand-ins (`text_margin_lines`):
+    they hold no contents page to read."""
     direct, interp = printed_labels(lines)
-    toc = contents_labels(lines)
+    toc = contents_labels(lines) if contents else {}
     pdf = pdf or {}
     out: list[PageLabel] = []
     for p in range(1, n_pages + 1):
@@ -260,11 +291,12 @@ def page_labels(lines: list[Line], n_pages: int, pdf: dict[int, str] | None = No
     return out
 
 
-def label_conflicts(lines: list[Line], n_pages: int, pdf: dict[int, str] | None, limit: int = 50) -> dict:
+def label_conflicts(lines: list[Line], n_pages: int, pdf: dict[int, str] | None, limit: int = 50,
+                    contents: bool = True) -> dict:
     """Pages where two sources give different labels — a printed folio that
     disagrees with /PageLabels is the common draft defect."""
     direct, _ = printed_labels(lines)
-    toc = contents_labels(lines)
+    toc = contents_labels(lines) if contents else {}
     pdf = pdf or {}
     items = []
     for p in range(1, n_pages + 1):
