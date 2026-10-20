@@ -249,7 +249,7 @@ export function countCatalogue(text: string): CatalogueCounts {
 function filesUnder(dir: string, exts: readonly string[]): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...filesUnder(p, exts));
     else if (exts.some((e) => name.endsWith(e))) out.push(p);
