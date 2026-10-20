@@ -6,7 +6,7 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-10T16:33:43Z
+updated_at: 2026-10-20T15:30:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -442,3 +442,24 @@ What remains is harness work in cat-harness-tools and cat-harness:
 
 By the owner's ruling on the rehome decision, the bean is re-filed in the
 cat-harness-tools store, and this copy stays as a pointer.
+
+
+## Re-measured 2026-10-20 — every remaining item starts outside this repository
+
+All questions are answered (ruling 2026-10-10 above). Of the four remaining
+items, measured at cat-harness `main` and cat-harness-tools `3420b76`:
+
+- the `enabled` field: absent from `schemas/cat-harness.ts` in **cat-harness**;
+- the one resolver: there is `artefactStub`/`artefactStubFor` in
+  **cat-harness**, but no function that composes an instance's published URL.
+  Consumers here (`scripts/root-index.ts`, `scripts/kg-export.ts`,
+  `scripts/sync-docs-harness.ts`) each compose their own;
+- the workflow layout: `docs-site.yml` / `feature-staging.yml` are in
+  **folio-assistant**, not here;
+- the bootstrap `.jsonld` path: follows the resolver.
+
+So the first two land in cat-harness, and only then does this repo switch its
+consumers to the resolver. Left `todo` here; this bean is the consumer half,
+and the field and resolver should be filed (or found) in the cat-harness store.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
