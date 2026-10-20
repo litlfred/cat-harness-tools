@@ -407,6 +407,7 @@
     "gen:jsonld:check": "bun run cat-harness-tools/scripts/gen-jsonld-context.ts --check && bun run cat-harness-tools/pipeline/gen-block-jsonld.ts --check && bun run cat-harness-tools/pipeline/gen-library-jsonld.ts --check && bun run cat-harness-tools/pipeline/gen-site-jsonld.ts --check",
     "jsonld:contexts": "bun run cat-harness-tools/scripts/gen-instance-contexts.ts",
     "jsonld:contexts:check": "bun run cat-harness-tools/scripts/gen-instance-contexts.ts --check",
+    "github:resolve-thread": "bun run cat-harness-tools/scripts/github-resolve-thread.ts",
     "glossary:check": "bun run cat-harness-tools/scripts/publish-check.ts glossary:export",
     "glossary:check:bootstrap": "bun run cat-harness-tools/scripts/glossary-export.ts --check --instance ./bootstrap",
     "glossary:export": "bun run cat-harness-tools/scripts/glossary-export.ts",
