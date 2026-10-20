@@ -333,6 +333,7 @@
     "beans:fallback": "bun run cat-harness-tools/scripts/beans-fallback.ts",
     "beans:landed": "bun run cat-harness-tools/scripts/beans-landed.ts",
     "beans:query": "bun run cat-harness-tools/scripts/beans-query.ts",
+    "beans:dedupe": "bun run cat-harness-tools/scripts/bean-dedupe.ts",
     "boards:default": "bun run cat-harness-tools/scripts/gen-default-boards.ts",
     "boards:default:check": "bun run cat-harness-tools/scripts/gen-default-boards.ts --check",
     "check:adversarial-review": "bun run cat-harness-tools/scripts/check-adversarial-review.ts",
