@@ -319,6 +319,7 @@ function recordedRenderer(text: string): string | undefined {
 /** Forget what {@link declaredVisualisers} read — for a test that rewrites a declaration mid-process. */
 export function clearDeclaredVisualisers(): void {
   declaredCache.clear();
+  heldCache.clear();
 }
 
 /** The visualisers one Tool is declared to draw. */
@@ -371,6 +372,91 @@ export function siteOwnerDir(repoRoot: string): string {
     const name = basename(root);
     return join(root, siteDir({ name, stub: name }));
   }
+}
+
+/**
+ * A visualiser page its OWN harness commits, in that harness's site
+ * directory, rather than in the site owner's.
+ *
+ * Every visualiser page used to be written into {@link siteOwnerDir}, so a
+ * page drawn by a content layer above the platform sat in the platform's
+ * tree and the platform named that layer (`check:reference-direction`). A
+ * harness may instead commit the page in its own site directory at
+ * `<site>/<visualiser>/` — the declared route with its own name dropped,
+ * which is also where the page lands on that harness's OWN site, whose root is
+ * the harness itself (wrong-direction move M1, 2026-10-20).
+ *
+ * Only the page its declared Tool drew counts: the index page there must say
+ * `rendered-by: <renderedBy>`. Anything else at that path is the harness's own
+ * docs, and `check:visualiser-routes` reports it as a collision.
+ *
+ * `route` is the UNLOCALISED address `<harness>/<visualiser>/`: the page is
+ * drawn for that depth (its relative links say so), and it is the address
+ * such a page was published at while it sat in the site owner's tree, so the
+ * URL does not change. `compose-docs.ts` lays the directory there; the mount
+ * of the harness's docs leaves it out ({@link heldVisualiserPaths}).
+ */
+export interface HeldVisualiserPage {
+  visualiser: DeclaredVisualiser;
+  /** The directory holding the page, absolute. */
+  dir: string;
+  /** Its index page, `index.html` or `index.md`, absolute. */
+  page: string;
+  /** Where the site publishes it, site-relative with a trailing slash. */
+  route: string;
+}
+
+const heldCache = new Map<string, HeldVisualiserPage[]>();
+
+export function heldVisualiserPages(repoRoot: string): HeldVisualiserPage[] {
+  // Cached beside `declaredVisualisers` and cleared with it: `viewersOf` asks
+  // for every directory and sub-graph it resolves, and a whole-checkout audit
+  // makes thousands of such calls.
+  const key = resolve(repoRoot);
+  const hit = heldCache.get(key);
+  if (hit !== undefined) return hit;
+  const site = resolve(siteOwnerDir(repoRoot));
+  const out: HeldVisualiserPage[] = [];
+  for (const v of declaredVisualisers(repoRoot)) {
+    let own: string;
+    try {
+      own = resolve(v.harnessRoot, siteDirFor(v.harnessRoot));
+    } catch {
+      continue;
+    }
+    if (own === site) continue;
+    const dir = join(own, v.id);
+    const index = ["index.html", "index.md"].map((f) => join(dir, f)).find((p) => existsSync(p));
+    if (index === undefined || renderedByOf(readFileSync(index, "utf-8")) !== v.renderedBy) continue;
+    out.push({ visualiser: v, dir, page: index, route: visualiserRoute(forwardingParts({ harness: v.harness, visualiser: v.id })) });
+  }
+  heldCache.set(key, out);
+  return out;
+}
+
+/**
+ * The held page a visualiser's ref is published FROM, repository-relative, as
+ * a one-file `writer`: the page is not on disk at its route until compose lays
+ * it there, and a tile that read that absence as "no viewer" would grey a page
+ * the site serves — the same reasoning as a page built at publish.
+ */
+function heldPageWriter(repoRoot: string, v: DeclaredVisualiser): string[] | undefined {
+  const h = heldVisualiserPages(repoRoot).find((x) => x.visualiser.harness === v.harness && x.visualiser.id === v.id);
+  return h === undefined ? undefined : [renderedPath(repoRoot, h.page)];
+}
+
+/**
+ * The paths, relative to `mountedDir`, of the held visualiser pages inside it
+ * — what a mount of that directory leaves out, because the site publishes them
+ * at their declared route instead ({@link heldVisualiserPages}). Without this
+ * the same page would also go out raw, front matter and all, under the docs
+ * mount, which copies after Jekyll and renders nothing.
+ */
+export function heldVisualiserPaths(repoRoot: string, mountedDir: string): string[] {
+  const base = resolve(mountedDir);
+  return heldVisualiserPages(repoRoot)
+    .map((h) => relative(base, h.dir).split(sep).join("/"))
+    .filter((rel) => rel !== "" && !rel.startsWith(".."));
 }
 
 // ── Where a page is ───────────────────────────────────────────────────────
@@ -433,6 +519,13 @@ export function existingPageDir(site: string, parts: VisualiserRouteParts): stri
  * ({@link existingPageDir}).
  */
 export function visualiserPageRef(repoRoot: string, parts: VisualiserRouteParts, site: string = siteOwnerDir(repoRoot)): string {
+  // A page its own harness holds is published where compose lays it, at its
+  // held route under this site: that is the ref, so the URL a reader is given
+  // is read off it like any other. `viewersOf` names the held file as its writer.
+  const held = parts.subgraph === undefined && existingPageDir(site, parts) === undefined
+    ? heldVisualiserPages(repoRoot).find((h) => h.visualiser.harness === parts.harness && h.visualiser.id === parts.visualiser)
+    : undefined;
+  if (held !== undefined) return renderedPath(repoRoot, join(site, ...held.route.split("/").filter(Boolean), basename(held.page)));
   const dir = existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
   const file = existsSync(join(dir, "index.md")) && !existsSync(join(dir, "index.html")) ? "index.md" : "index.html";
   return renderedPath(repoRoot, join(dir, file));
@@ -637,7 +730,7 @@ export function viewersOf(
     // ...where it is IMPLEMENTED: the harness's scripts live in cat-harness-tools (bean 70lx).
     const writer =
       v.writer?.map((w) => renderedPath(repoRoot, join(implementingRootFor(v.harnessRoot, w), w))) ??
-      (existsSync(join(repoRoot, ref)) ? undefined : builtAtPublishWriter(repoRoot, v.harnessRoot, ref));
+      (existsSync(join(repoRoot, ref)) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
     // The directory's tile is the DEFAULT dress; what the visualiser declares
     // about itself wins, since a directory drawn twice needs two names.
     out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: v.title ?? d.tile?.title ?? d.id });

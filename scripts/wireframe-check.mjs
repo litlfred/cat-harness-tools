@@ -10,7 +10,8 @@
 // `wireframe-check` declares them so that its `satisfies` edge is true, and this
 // script USES each of them (owner, 2026-10-14):
 //   --topic   scopes WHICH wireframes are checked. It names the asset directory:
-//             `docs/wireframes/<topic>/` for as-is use, `docs/proposals/<topic>/
+//             `wireframes/<topic>/` under an instance's declared `docs` directory
+//             (`docs/wireframes/<topic>/` for most) for as-is use, `docs/proposals/<topic>/
 //             wireframes/` for design use (or `docs/wireframes/<topic>/`, where
 //             older design work sits). With no candidates given, every `.html`
 //             in that directory is checked; a candidate given outside it is
@@ -73,9 +74,15 @@ export function parseArgs(argv) {
   return { flags, files };
 }
 
-/** The directories a topic's candidates may sit in, for a use, in order of preference. Repo-relative suffixes. */
+/**
+ * The directories a topic's candidates may sit in, for a use, in order of
+ * preference. Path suffixes. An as-is wireframe sits in `wireframes/<topic>/`
+ * under any `docs` directory an instance declares — its site directory, or a
+ * second one when its site directory is built at publish — which is the set
+ * `check:wireframes` reads (`wireframeSources`).
+ */
 export function assetDirSuffixes(use, topic) {
-  const asIs = join("docs", "wireframes", topic);
+  const asIs = join("wireframes", topic);
   return use === "design" ? [join("docs", "proposals", topic, "wireframes"), asIs] : [asIs];
 }
 
@@ -84,11 +91,23 @@ const inTopicDir = (dir, suffixes) => suffixes.some((s) => dir === s || dir.ends
 
 /**
  * Where a topic's wireframes are when no candidate is given: the first existing
- * `<suffix>` directly under the root, or under one of its top-level directories
- * (an index checkout holds each instance in its own directory).
+ * `<suffix>` directly under the root, or under a directory one or two levels
+ * below it (an index checkout holds each instance in its own directory, and an
+ * instance holds its `docs` directories at its own top level).
  */
 export function findAssetDir(root, suffixes) {
-  const tops = [root, ...readdirSync(root).filter((d) => !d.startsWith(".") && d !== "node_modules").map((d) => join(root, d))];
+  const below = (dir) => {
+    try {
+      return readdirSync(dir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules")
+        .map((d) => join(dir, d.name))
+        .sort();
+    } catch {
+      return [];
+    }
+  };
+  const first = below(root);
+  const tops = [root, ...first, ...first.flatMap(below)];
   for (const s of suffixes)
     for (const t of tops) {
       const p = join(t, s);

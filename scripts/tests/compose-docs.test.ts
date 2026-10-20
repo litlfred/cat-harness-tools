@@ -225,7 +225,9 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     const prefixes = report.composed.map((c) => `${c.under}/`);
     // So is a FORWARDING page at an old visualiser address (folio-assistant#2527),
     // written only where nothing the layers carry already stands.
-    const stubs = new Set([...report.aliases.written, ...report.forwards.written]);
+    // And so is a visualiser page a harness holds in its own site directory,
+    // laid at its declared route (wrong-direction move M1): named in `held`.
+    const stubs = new Set([...report.aliases.written, ...report.forwards.written, ...report.held.written]);
     const strays = [...after.keys()].filter(
       (p) => !before.has(p) && !prefixes.some((pre) => p.startsWith(pre)) && !stubs.has(p),
     );
