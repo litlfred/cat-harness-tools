@@ -2239,6 +2239,19 @@
 
     // ── KaTeX ────────────────────────────────────────────
     let katexMacros = {};
+    // A block's Lean link, in either shape. Manifests carry `lean.ref`
+    // ("<package>:<Decl.Name>") since the lean.ref migration, and the resolver
+    // passes it through unchanged; older blocks carry `decl` / `file`. Reading
+    // only `file` showed every ref-only block as "no lean", and reading only
+    // `decl` printed "undefined" (bean `cat-tools-og5t`).
+    function hasLean(l) { return !!(l && (l.file || l.ref || l.decl)); }
+    function leanDeclName(l) {
+      if (!l) return '';
+      if (l.decl) return l.decl;
+      if (l.ref) return String(l.ref).replace(/^[^:]*:/, '');
+      return l.file || '';
+    }
+
     function buildKatexMacros(paperMacros) {
       const m = {
         // Built-in fallbacks for common macros not in KaTeX
@@ -2562,7 +2575,7 @@
       for (const {block: b} of blockData) {
         if (b.lean?.source) {
           const loc = blockChSec.get(b.label);
-          leanEntries.push({ label: b.label, title: b.title, kind: b.kind, decl: b.lean.decl, file: b.lean.file, source: b.lean.source, chNum: loc?.chNum, chTitle: loc?.chTitle, secTitle: loc?.secTitle });
+          leanEntries.push({ label: b.label, title: b.title, kind: b.kind, decl: leanDeclName(b.lean), file: b.lean.file, source: b.lean.source, chNum: loc?.chNum, chTitle: loc?.chTitle, secTitle: loc?.secTitle });
         }
       }
       if (leanEntries.length) {
@@ -2887,10 +2900,10 @@
         const plainTitle = block.title ? stripTex(block.title) : label;
         t2.textContent = plainTitle.substring(0, 22) + (plainTitle.length > 22 ? '…' : '');
         g.appendChild(t2);
-        if (block.lean?.decl) {
+        if (leanDeclName(block.lean)) {
           const t3 = document.createElementNS(DEP_NS, 'text');
           t3.setAttribute('class', 'node-lean'); t3.setAttribute('x', '8'); t3.setAttribute('y', '44');
-          t3.textContent = esc(block.lean.decl).substring(0, 24); g.appendChild(t3);
+          t3.textContent = esc(leanDeclName(block.lean)).substring(0, 24); g.appendChild(t3);
         }
         g.addEventListener('mouseenter', () => depShowPreview(label));
         g.addEventListener('mouseleave', () => g.classList.remove('dep-hovered'));
@@ -3258,7 +3271,7 @@
         let stubLean = '';
         if (block.lean) {
           const v = block.lean.validation || 'not_checked';
-          stubLean = ` <span style="font-family:var(--f-mono);font-size:.5rem;color:var(--fg-d)">${leanIcon(v, block.lean)}${esc(block.lean.decl)}</span>`;
+          stubLean = ` <span style="font-family:var(--f-mono);font-size:.5rem;color:var(--fg-d)">${leanIcon(v, block.lean)}${esc(leanDeclName(block.lean))}</span>`;
         }
         stub.innerHTML = `<span class="stub-kind">proof</span> ${block.title ? inl(block.title) : (block.label || '')}${stubLean}`;
         renderMath(stub);
@@ -3279,7 +3292,7 @@
           if (icon) {
             const badge = mk('span',`lb ${block.status || 'not_started'}`);
             badge.innerHTML = icon;
-            badge.title = `${block.lean.decl} — click to show Lean source`;
+            badge.title = `${leanDeclName(block.lean)} — click to show Lean source`;
             badge.style.cursor = 'pointer';
             badge.onclick = (e) => {
               e.stopPropagation();
@@ -3439,7 +3452,7 @@
             leanBadge.className = 'ind-badge miss';
             leanBadge.textContent = s === 'not_started' ? 'stub' : s;
           }
-          leanInd.title = `${block.lean.decl} — click to show Lean source`;
+          leanInd.title = `${leanDeclName(block.lean)} — click to show Lean source`;
         }
         leanInd.appendChild(leanBadge);
 
@@ -3628,7 +3641,7 @@
                 if (prfBlock.title) prfHd += `<span class="bt">${inl(prfBlock.title)}</span>`;
                 if (prfBlock.lean) {
                   const v = prfBlock.lean.validation || 'not_checked';
-                  prfHd += `<span class="prf-lean">${leanIcon(v, prfBlock.lean)}${esc(prfBlock.lean.decl)}</span>`;
+                  prfHd += `<span class="prf-lean">${leanIcon(v, prfBlock.lean)}${esc(leanDeclName(prfBlock.lean))}</span>`;
                 }
                 prfDiv.innerHTML = `<div class="bh">${prfHd}</div><div class="bb">${ph}<div class="qed"></div></div>`;
                 fillTex(prfDiv, ptx, prfBlock.rendered);
@@ -3925,7 +3938,7 @@
       if (!block.lean?.source) return null;
       const wrap = mk('div','lean-src');
       const hdr = mk('div','lean-src-hdr');
-      hdr.innerHTML = `<span>${esc(block.lean.file || block.lean.decl)}</span>`;
+      hdr.innerHTML = `<span>${esc(block.lean.file || leanDeclName(block.lean))}</span>`;
       wrap.appendChild(hdr);
       const pre = document.createElement('pre');
       pre.style.margin = '0';
@@ -4063,24 +4076,25 @@
       // Index blocks that are already loaded (non-lazy path or already fetched)
       for (const ch of p.chapters) for (const s of ch.sections) {
         for (const b of s.blocks) {
-        if (b.label) bix.set(b.label, b);
-        if (b.examples) for (const ex of b.examples) childBlocks.add(ex);
-        if (b.proofs) for (const prf of b.proofs) childBlocks.add(prf);
-        if (b.uses) for (const dep of b.uses) {
-          if (!usedByIndex.has(dep)) usedByIndex.set(dep, []);
-          usedByIndex.get(dep).push({ label: b.label, kind: b.kind, title: b.title, rootName: b.rootName });
+          if (b.label) bix.set(b.label, b);
+          if (b.examples) for (const ex of b.examples) childBlocks.add(ex);
+          if (b.proofs) for (const prf of b.proofs) childBlocks.add(prf);
+          if (b.uses) for (const dep of b.uses) {
+            if (!usedByIndex.has(dep)) usedByIndex.set(dep, []);
+            usedByIndex.get(dep).push({ label: b.label, kind: b.kind, title: b.title, rootName: b.rootName });
+          }
         }
         if (s.subsections) {
-          for (const sub of s.subsections) for (const b of s.blocks) {
-        if (b.label) bix.set(b.label, b);
-        if (b.examples) for (const ex of b.examples) childBlocks.add(ex);
-        if (b.proofs) for (const prf of b.proofs) childBlocks.add(prf);
-        if (b.uses) for (const dep of b.uses) {
-          if (!usedByIndex.has(dep)) usedByIndex.set(dep, []);
-          usedByIndex.get(dep).push({ label: b.label, kind: b.kind, title: b.title, rootName: b.rootName });
+          for (const sub of s.subsections) for (const b of sub.blocks) {
+            if (b.label) bix.set(b.label, b);
+            if (b.examples) for (const ex of b.examples) childBlocks.add(ex);
+            if (b.proofs) for (const prf of b.proofs) childBlocks.add(prf);
+            if (b.uses) for (const dep of b.uses) {
+              if (!usedByIndex.has(dep)) usedByIndex.set(dep, []);
+              usedByIndex.get(dep).push({ label: b.label, kind: b.kind, title: b.title, rootName: b.rootName });
+            }
+          }
         }
-        }
-      }
       }
 
       const isLazy = !!paperOutline; // true when using lazy-load path
@@ -4246,7 +4260,7 @@
                 for (const bs of secDetail.blockStubs || []) {
                   secTodos += bs.todoCount || 0;
                   const nl = ['definition','theorem','lemma','proposition','corollary'].includes(bs.kind);
-                  if (nl && (!bs.lean || !bs.lean.file)) secLeanMiss++;
+                  if (nl && !hasLean(bs.lean)) secLeanMiss++;
                   if (nl && bs.lean && ((bs.lean.validation === 'error') || bs.status === 'has_sorry')) secLeanErr++;
                 }
                 const badges = [];
@@ -4279,7 +4293,7 @@
                       const lb = mk('span','sb-badge');
                       const s = bs.status || 'not_started';
                       const v = bs.lean?.validation || 'not_checked';
-                      if (!bs.lean || !bs.lean.file) { lb.className = 'sb-badge lean-miss'; lb.textContent = 'no lean'; }
+                      if (!hasLean(bs.lean)) { lb.className = 'sb-badge lean-miss'; lb.textContent = 'no lean'; }
                       else if (s === 'stub' || s === 'not_started') { lb.className = 'sb-badge lean-warn'; lb.textContent = 'stub'; }
                       else if (v === 'error' || s === 'has_sorry') { lb.className = 'sb-badge lean-err'; lb.textContent = v === 'error' ? 'err' : 'sorry'; }
                       else if (v === 'ok' || v === 'leanok' || v === 'validated' || s === 'proved') { lb.className = 'sb-badge lean-ok'; lb.textContent = '\u2713'; }
@@ -4432,7 +4446,7 @@
             const checkBadges = (b) => {
               secTodos += (b.todos || []).filter(t => t.status === 'open').length;
               const nl = ['definition','theorem','lemma','proposition','corollary'].includes(b.kind);
-              if (nl && (!b.lean || !b.lean.file)) secLeanMiss++;
+              if (nl && !hasLean(b.lean)) secLeanMiss++;
               if (nl && b.lean && ((b.lean.validation === 'error') || b.status === 'has_sorry')) secLeanErr++;
             }
             for (const b of sec.blocks) checkBadges(b);
@@ -4488,7 +4502,7 @@
                 const lb = mk('span','sb-badge');
                 const s = b.status || 'not_started';
                 const v = b.lean?.validation || 'not_checked';
-                if (!b.lean || !b.lean.file) { lb.className = 'sb-badge lean-miss'; lb.textContent = 'no lean'; lb.setAttribute('data-tip', 'No Lean formalization file'); }
+                if (!hasLean(b.lean)) { lb.className = 'sb-badge lean-miss'; lb.textContent = 'no lean'; lb.setAttribute('data-tip', 'No Lean declaration'); }
                 else if (s === 'stub' || s === 'not_started') { lb.className = 'sb-badge lean-warn'; lb.textContent = 'stub'; lb.setAttribute('data-tip', 'Lean file exists but proof not started'); }
                 else if (v === 'error' || s === 'has_sorry') { lb.className = 'sb-badge lean-err'; lb.textContent = v === 'error' ? 'err' : 'sorry'; lb.setAttribute('data-tip', v === 'error' ? 'Lean validation error' : 'Proof contains sorry'); }
                 else if (v === 'ok' || v === 'leanok' || v === 'validated' || s === 'proved') { lb.className = 'sb-badge lean-ok'; lb.textContent = '\u2713'; lb.setAttribute('data-tip', 'Lean proof verified'); }
@@ -4507,9 +4521,6 @@
                     bEl.appendChild(rb);
                   }
                 }
-            for (const b of sec.blocks) addSidebarBlock(b);
-            if (sec.subsections) for (const sub of sec.subsections) for (const b of sub.blocks) addSidebarBlock(b);
-          }
               }
 
               bEl.onclick = () => {
@@ -4529,7 +4540,9 @@
                 });
               };
               blkInner.appendChild(bEl);
-            }
+            };
+            for (const b of sec.blocks) addSidebarBlock(b);
+            if (sec.subsections) for (const sub of sec.subsections) for (const b of sub.blocks) addSidebarBlock(b);
           }
           // Lazy: block list populated by loadChapterDetail callback
 
@@ -4676,18 +4689,19 @@
         const refCitedBy = new Map();
         for (const ch of p.chapters) for (const s of ch.sections) {
           for (const b of s.blocks) {
-          if (b.cites) for (const k of b.cites) {
-            if (!refCitedBy.has(k)) refCitedBy.set(k, []);
-            refCitedBy.get(k).push({ label: b.label, kind: b.kind, title: b.title, chapter: chKey(ch) });
+            if (b.cites) for (const k of b.cites) {
+              if (!refCitedBy.has(k)) refCitedBy.set(k, []);
+              refCitedBy.get(k).push({ label: b.label, kind: b.kind, title: b.title, chapter: chKey(ch) });
+            }
           }
           if (s.subsections) {
             for (const sub of s.subsections) for (const b of sub.blocks) {
-          if (b.cites) for (const k of b.cites) {
-            if (!refCitedBy.has(k)) refCitedBy.set(k, []);
-            refCitedBy.get(k).push({ label: b.label, kind: b.kind, title: b.title, chapter: chKey(ch) });
+              if (b.cites) for (const k of b.cites) {
+                if (!refCitedBy.has(k)) refCitedBy.set(k, []);
+                refCitedBy.get(k).push({ label: b.label, kind: b.kind, title: b.title, chapter: chKey(ch) });
+              }
+            }
           }
-          }
-        }
         }
 
         // QA report
@@ -4838,7 +4852,7 @@
               labelSpan.style.cssText = 'font-family:var(--f-mono);font-size:.5rem;color:var(--fg-d)';
               labelSpan.textContent = b.label || '';
               stub.appendChild(labelSpan);
-              if (b.lean?.file || b.lean?.decl) {
+              if (hasLean(b.lean)) {
                 const lBadge = mk('span','');
                 lBadge.style.cssText = 'font-size:.5rem;padding:0 .2rem;border-radius:2px;background:rgba(42,170,70,.15);color:#2aaa46';
                 lBadge.textContent = 'lean';
@@ -6382,7 +6396,7 @@
       if (block.lean) {
         const leanInfo = mk('div','');
         leanInfo.style.cssText = 'font-family:var(--f-mono);font-size:.65rem;color:var(--fg-d);margin-bottom:.3rem;display:flex;align-items:center;gap:.4rem';
-        leanInfo.innerHTML = `${leanIcon(block.lean.validation || 'not_checked', block.lean)} <span>${esc(block.lean.decl)}</span>`;
+        leanInfo.innerHTML = `${leanIcon(block.lean.validation || 'not_checked', block.lean)} <span>${esc(leanDeclName(block.lean))}</span>`;
         if (block.status) {
           const badge = mk('span','');
           badge.style.cssText = 'padding:.1rem .4rem;border-radius:3px;font-size:.6rem;border:1px solid var(--brd)';
@@ -6507,7 +6521,7 @@
       if (block.lean?.source) {
         const leanSection = mk('div','lean-src');
         const leanHdr = mk('div','lean-src-hdr');
-        leanHdr.innerHTML = `<span>${esc(block.lean.file || block.lean.decl)}</span>`;
+        leanHdr.innerHTML = `<span>${esc(block.lean.file || leanDeclName(block.lean))}</span>`;
         leanSection.appendChild(leanHdr);
         const pre = document.createElement('pre');
         const code = document.createElement('code');
@@ -7175,7 +7189,7 @@
             lines.push(`<span style="color:var(--fg-d)">kind:</span> <strong>${esc(src.kind || bd.kind)}</strong>`);
             if (bd.label) lines.push(`<span style="color:var(--fg-d)">label:</span> ${esc(bd.label)}`);
             if (src.title) lines.push(`<span style="color:var(--fg-d)">title:</span> ${esc(src.title)}`);
-            if (src.lean?.decl) lines.push(`<span style="color:var(--fg-d)">lean:</span> ${esc(src.lean.decl)}`);
+            if (leanDeclName(src.lean)) lines.push(`<span style="color:var(--fg-d)">lean:</span> ${esc(leanDeclName(src.lean))}`);
             if (src.lean?.file) lines.push(`<span style="color:var(--fg-d)">lean file:</span> ${esc(src.lean.file)}`);
             if (src.uses?.length) {
               lines.push(`<span style="color:var(--fg-d)">uses:</span>`);
