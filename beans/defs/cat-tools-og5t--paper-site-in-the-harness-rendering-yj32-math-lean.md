@@ -98,6 +98,13 @@ What must the harness rendering do before qou's legacy renderer retires?
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
 
 
+## Owner ruling 2026-10-20: option 1, HTML parity only
+
+Answered directly in the cat-harness-tools drain session ("1 ok"). The harness
+rendering replaces qou's legacy **HTML** (math with the folio's macros, Lean
+links, every paper block kind). The PDF stays on its LaTeX path as a folio
+asset. The proposed done-when above stands as this bean's done-when.
+
 ## Correction 2026-10-20: the viewer already does more than the scoping said
 
 The scoping above searched `src/`, `scripts/` and `pipeline/` and missed

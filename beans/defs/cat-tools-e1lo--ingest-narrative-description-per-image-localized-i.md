@@ -1,12 +1,12 @@
 ---
 # cat-tools-e1lo
 title: 'INGEST: narrative description per image, localized, including images extracted from PDFs'
-status: in-progress
+status: todo
 type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T18:14:45Z
+updated_at: 2026-10-20T18:19:09Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -329,4 +329,42 @@ cat-harness-tools drain lane; the change lands in cat-harness's
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
 
+
+## Owner ruling 2026-10-20: option 1, a `lang` per narrative
+
+Answered directly in the cat-harness-tools drain session ("2y"). Each
+`Narrative` carries a BCP 47 `lang`, and the `narrative` slot becomes a list
+with one entry per language, each with its own author, model version and review
+state. Order of work: the schema change in cat-harness (`schemas/narrative.ts`)
+first, then `narrativesIn` and the queue here follow it.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
 _2026-10-20T18:14:45Z_ — Claimed by feat/e1lo-narrative-lang — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+
+## Stages 1 and 2 of the language ruling — 2026-10-20
+
+The ruling lands in four stages, so no stored narrative is invalid at any point:
+
+- [x] **1, cat-harness** (litlfred/cat-harness#384): `Narrative.lang` (BCP 47,
+      optional for now); `NarrativeSlotSchema` accepts one narrative or a list
+      in which every entry names its `lang` and none repeats; `narrativesOfSlot`
+      reads either.
+- [x] **2, this repository**: `narrativesIn` reads every slot (flat, images,
+      summaries) through `narrativesOfSlot`. A list yields one queue item per
+      language at `[..., "narrative", j]`, the queue shows `[lang]`, and
+      `decide` writes the one entry the reviewer saw. Tests in
+      `scripts/tests/narratives.test.ts`, mutation-checked.
+- [ ] **3**: the six slot schemas in cat-harness (`document-image`,
+      `block-summary`, `tabular-records`, `vector-figure`,
+      `figure-description`, `tabular-csvw`) switch to `NarrativeSlotSchema`,
+      and the stored narratives (274 per the count above, across the
+      cat-harness, core, sci and who-iris libraries) migrate to lists with
+      their source `lang`.
+- [ ] **4**: the single form goes, and `lang` becomes required.
+- [ ] then the bean's own work: an agent drafts each configured language, and
+      each draft goes to the queue for a person.
+
+Released to `todo`: stage 3 touches four content repositories' stored data.
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
