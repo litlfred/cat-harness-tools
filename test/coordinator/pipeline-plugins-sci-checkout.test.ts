@@ -25,7 +25,9 @@ import {
 afterEach(() => usePipelinePluginRegistry(undefined));
 
 describe("this repository", () => {
-  it("folio-assistant-sci fills every slot, loaded lazily from the running folio", () => {
+  // folio-assistant-sci fills most slots and folio-assistant-core fills
+  // `tabular-csvw` (bean `urat`); between them the running checkout fills all.
+  it("the running checkout fills every slot, loaded lazily from the running folio", () => {
     usePipelinePluginRegistry(undefined);
     for (const kind of PIPELINE_PLUGIN_KINDS) {
       expect(() => pipelinePlugin(kind)).not.toThrow();
