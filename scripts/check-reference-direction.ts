@@ -763,24 +763,20 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * naming three, is `gen-methodologies-viz.ts`'s, and left when that generator
  * — with `gen-tools-viz.ts` and `gen-lsi-viz.ts` — began writing `generated:`
  * (D1 aftermath, 2026-10-15). `cat-harness/docs/cat-harness/published-graphs.md`
- * left the same day: nothing in it names a layer above any more.
+ * left the same day: nothing in it names a layer above any more. The six
+ * fhir-harness entries left on 2026-10-20: fhir-harness#118 moved its module
+ * paths under `pipeline/`, and none of the six names a layer above any more.
  */
 const PENDING: readonly { file: string; names: number }[] = [
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
   { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
   // declared-path-literal: a FINDING's location, recorded repo-root-relative because that is
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
   { file: "smart-base/smart-base.json", names: 2 },
   { file: "smart-base/README.md", names: 2 },
   { file: "smart-base/AGENTS.md", names: 2 },
-  { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
-  { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
-  { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
 ];
 
 /**

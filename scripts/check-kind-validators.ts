@@ -245,7 +245,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   const checkoutBuilt: string[] = [];
   for (const inst of instanceRootsIn(join(root, ".."))) {
     for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
-      if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path) + (b.path.endsWith("/") ? "/" : ""));
+      if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path).replace(/\/+$/, "") + (b.path.endsWith("/") ? "/" : ""));
     }
     for (const e of readDeclaration(inst)?.directories ?? []) {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
