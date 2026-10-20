@@ -62,6 +62,7 @@ import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
 import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
+import { poHeader } from "./kg-viewer-strings.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -143,8 +144,21 @@ export function localeOfficiality(dir: string): LocaleOfficiality {
   return { state: l.status?.official === true ? "official" : "unofficial", ...signed, officialCatalogues, findings: 0 };
 }
 
+/** One catalogue in a locale, as the status page's per-row drawer lists it. */
+export interface CatalogueRow extends CatalogueCounts {
+  /** Relative to the locale directory. */
+  path: string;
+  /** The PO header `X-Folio-Official`, lower-cased; absent when unset. */
+  official?: string;
+}
+
 export interface LocaleStatus extends CatalogueCounts {
   locale: string;
+  /**
+   * Each catalogue's counts and header, for the per-row drawer (bean
+   * `cat-tools-bbnd`). Optional for the same reason as `officiality`.
+   */
+  files?: CatalogueRow[];
   /**
    * Who signed it off, from both records (bean `cat-tools-bbnd`). Optional
    * because a projection written before the field existed has none, and
@@ -277,6 +291,7 @@ export function localeStatuses(translationsDir: string): LocaleStatus[] {
     const status: LocaleStatus = {
       locale,
       officiality: localeOfficiality(dir),
+      files: [],
       templates: filesUnder(dir, [".pot"]).length,
       catalogues: 0,
       entries: 0,
@@ -301,6 +316,8 @@ export function localeStatuses(translationsDir: string): LocaleStatus[] {
         continue;
       }
       const c = countCatalogue(text);
+      const official = poHeader(text, "X-Folio-Official")?.toLowerCase();
+      status.files!.push({ path: relative(dir, po), ...c, ...(official ? { official } : {}) });
       status.entries += c.entries;
       status.translated += c.translated;
       status.fuzzy += c.fuzzy;

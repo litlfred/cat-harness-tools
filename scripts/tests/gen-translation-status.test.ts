@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { countCatalogue, languageName, localeOfficiality, officialityLabel, otherInstances, share, statusPage } from "../gen-translation-status.ts";
+import { countCatalogue, languageName, localeOfficiality, localeStatuses, officialityLabel, otherInstances, share, statusPage } from "../gen-translation-status.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 
 /** A minimal catalogue header — every real `.po` opens with one. */
@@ -363,6 +363,15 @@ describe("officiality per locale, from BOTH records (bean cat-tools-bbnd)", () =
     expect(o.state).toBe("disagree");
     expect(o.findings).toBe(1);
     expect(officialityLabel(o)).toContain("records disagree");
+  });
+
+  test("each catalogue is listed with its counts and its own header, for the per-row drawer", () => {
+    const root = mkdtempSync(join(tmpdir(), "tr-files-"));
+    mkdirSync(join(root, "fr"));
+    writeFileSync(join(root, "fr", "a.po"), po("yes"));
+    writeFileSync(join(root, "fr", "b.po"), po());
+    const [fr] = localeStatuses(root);
+    expect(fr!.files!.map((f) => [f.path, f.translated, f.official ?? null])).toEqual([["a.po", 1, "yes"], ["b.po", 1, null]]);
   });
 
   test("an unreadable status.json is could-not-determine, not unofficial", () => {
