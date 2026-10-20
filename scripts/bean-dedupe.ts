@@ -46,7 +46,7 @@
  * falls back to a section merge: split at `## ` headings, carry over sections
  * only one copy has, keep the longer of two texts where one contains the other.
  *
- *   bun run scripts/bean-dedupe.ts [--out <dir>] [--stores <file.json>]
+ *   bun run cat-harness-tools/scripts/bean-dedupe.ts [--out <dir>] [--stores <file.json>]
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
