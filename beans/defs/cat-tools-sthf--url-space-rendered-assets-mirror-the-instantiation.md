@@ -513,3 +513,14 @@ Released to `todo`: the two open boxes are in other repositories.
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
 
 _2026-10-20T18:55:43Z_ — Claimed by claude/sthf-mount-instance-docs — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+## mount-instance-docs through the resolver — 2026-10-20
+
+litlfred/cat-harness-tools#493 (merge `5045230`) completes the consumer half in this repository. `mount-instance-docs.ts`, the last consumer here that composed an instance's route by hand, now builds the instance-as-itself and served-directory routes through `publishedPath` (via `instance-exports`' `instanceSitePath`). It also skips `"enabled": false` instances in `declaredEntries` and in the subscription walk. A test lays out three instances: two published, one of them with a stub that differs from its name, and one disabled.
+
+### What remains, all in folio-assistant (the index half)
+- [ ] `docs-site.yml` and `feature-staging.yml` compose paths through `publishedPath`/`isPublished` and skip `enabled: false` (o7eq note, 2026-10-20: `docs-site.yml` :613-617, :661-664, :682, :708; `feature-staging.yml` :1291-1311, :1415-1416, :1446)
+- [ ] the `cat-harness` stub / KG-viewer collision: `_site/cat-harness/index.html` takes case 2's `<base>/cat-harness/`. This is a placement question, to go to the owner if it needs a call.
+- [ ] the bootstrap `.jsonld`/`.json` resolves at its instance path from the resolver
+
+Kept in progress: this session takes the index half after litlfred/folio-assistant#2612 (session https://claude.ai/code/session_016heucWhrncLm4uy52csBcz).
