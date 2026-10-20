@@ -5,7 +5,7 @@
  * slot, written to `<library>/<slug>/tabular.csvw.json`. Bean `urat`.
  *
  * ```sh
- * bun run scripts/tabular-csvw.ts -o <library> <file>
+ * bun run cat-harness-tools/scripts/tabular-csvw.ts -o <library> <file>
  * ```
  *
  * The owner ruled on 2026-10-20 that this step moves up into core, next to its
