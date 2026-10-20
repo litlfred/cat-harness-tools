@@ -41,7 +41,7 @@
  *
  * @module scripts/lib/roots
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -148,3 +148,135 @@ export const HARNESS_ROOT_SOURCE: HarnessRootSource = resolved.source;
 
 /** The checkout holding both layers; `undefined` when this layer is standalone. */
 export const REPO_ROOT: string | undefined = repoRootFor(TOOLS_ROOT, HARNESS_ROOT);
+
+// ── The instance being worked on (bean `j3ls`) ──────────────────────────────
+
+/**
+ * The machine name `dir` declares, read the way {@link isHarnessRoot} reads the
+ * harness's: a `<name>.json` in `dir` whose own `name` is `<name>`. Anything
+ * else at that level — `package.json`, `index.config.json`, a lock — names
+ * something other than itself and is not a declaration.
+ */
+export function declaredInstanceName(dir: string): string | undefined {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  for (const f of entries.sort()) {
+    if (!f.endsWith(".json")) continue;
+    const stem = f.slice(0, -".json".length);
+    try {
+      if ((JSON.parse(readFileSync(join(dir, f), "utf8")) as { name?: unknown }).name === stem) return stem;
+    } catch {
+      // Not a declaration; keep looking.
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The checkout a MOUNTED harness sits in, when that checkout's root declares
+ * an instance of its own — else `undefined`.
+ *
+ * A remote mount is a directory inside somebody's checkout with no `.git` of
+ * its own, so the nearest `.git` above the harness is that checkout. A harness
+ * that is its own repository (`cat-harness/.git`), a harness beside rather than
+ * inside the checkout (the standalone tools repository with a sibling clone),
+ * and an index whose root declares nothing all answer `undefined`, and the
+ * caller keeps the harness.
+ */
+export function mountingInstanceRoot(harnessRoot: string): string | undefined {
+  let dir = resolve(harnessRoot);
+  for (;;) {
+    if (existsSync(join(dir, ".git"))) {
+      if (dir === resolve(harnessRoot)) return undefined;
+      const name = declaredInstanceName(dir);
+      return name !== undefined && name !== HARNESS_NAME ? dir : undefined;
+    }
+    const up = dirname(dir);
+    if (up === dir) return undefined;
+    dir = up;
+  }
+}
+
+/** Where the working instance came from — reported, as {@link HarnessRootSource} is. */
+export type InstanceRootSource = "flag" | "env" | "mount" | "harness";
+
+export interface InstanceRootInputs {
+  /** Command-line arguments to scan for `--instance`. Defaults to `process.argv`. */
+  argv?: readonly string[];
+  /** Environment to read `CAT_INSTANCE_ROOT` from. Defaults to `process.env`. */
+  env?: Readonly<Record<string, string | undefined>>;
+  /** The harness the tool serves. Defaults to {@link HARNESS_ROOT}. */
+  harnessRoot?: string;
+}
+
+/** `--instance <dir>` or `--instance=<dir>`; the last one wins. */
+export function instanceFlag(argv: readonly string[]): string | undefined {
+  let found: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--instance" && i + 1 < argv.length) found = argv[++i];
+    else if (a.startsWith("--instance=")) found = a.slice("--instance=".length);
+  }
+  return found === "" ? undefined : found;
+}
+
+/**
+ * The instance a tool is working ON — not the one it was loaded FROM.
+ *
+ * Every tool here used to answer "this instance" with the harness, which is
+ * right in the harness's own repository and in an index checkout, and wrong
+ * in a separated instance's repository that remote-mounts the harness: there
+ * the harness is somebody else's tree at a pin, gitignored, and a report
+ * written into it is lost (bean `j3ls`, measured from who-iris). In order:
+ *
+ * 1. `--instance <dir>` — the caller said so.
+ * 2. `$CAT_INSTANCE_ROOT` — the environment said so.
+ * 3. The checkout the harness is MOUNTED in, when its root declares an
+ *    instance ({@link mountingInstanceRoot}).
+ * 4. The harness — every layout this resolver did not change.
+ *
+ * An explicit root must hold a declaration; a typo throws where it is made
+ * rather than reading as an empty instance three calls later.
+ *
+ * A function, not a constant: `--instance` is parsed here, and a module-level
+ * parse would throw in every importer whose own `--instance` means a NAME.
+ */
+export function resolveWorkingInstanceRoot(inputs: InstanceRootInputs = {}): { root: string; source: InstanceRootSource } {
+  const argv = inputs.argv ?? process.argv;
+  // input-site: env-unset CAT_INSTANCE_ROOT #861163c1 — names the instance being worked on; unset, it is the instance mounting the harness, else the harness
+  const env = inputs.env ?? process.env;
+  const harnessRoot = resolve(inputs.harnessRoot ?? HARNESS_ROOT);
+
+  const explicit: Array<[InstanceRootSource, string | undefined]> = [
+    ["flag", instanceFlag(argv)],
+    ["env", env.CAT_INSTANCE_ROOT || undefined],
+  ];
+  for (const [source, dir] of explicit) {
+    if (dir === undefined) continue;
+    const root = resolve(dir);
+    if (declaredInstanceName(root) === undefined) {
+      throw new Error(
+        `${source === "flag" ? "--instance" : "$CAT_INSTANCE_ROOT"} names ${root}, which holds no ` +
+          "instance declaration (a `<name>.json` whose `name` is `<name>`).",
+      );
+    }
+    return { root, source };
+  }
+
+  const mounting = mountingInstanceRoot(harnessRoot);
+  if (mounting !== undefined) return { root: mounting, source: "mount" };
+  return { root: harnessRoot, source: "harness" };
+}
+
+/**
+ * The directory `bun run cat` resolves from: the checkout holding this layer
+ * and the harness side by side, else the harness's parent — the one answer
+ * every caller gave before {@link REPO_ROOT} existed.
+ */
+export function runnerRootFor(harnessRoot: string, repoRoot: string | undefined): string {
+  return repoRoot ?? resolve(harnessRoot, "..");
+}

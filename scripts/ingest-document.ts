@@ -79,7 +79,7 @@ import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 
 /**
@@ -99,7 +99,10 @@ import { COVER_FILENAME } from "./library-graph.ts";
  *
  * ## `--instance <dir>`: ingest into a CONTENT instance's library
  *
- * Without it this is cat-harness, and that is still the default. With it, the
+ * Without it this is the instance being worked on — cat-harness, unless a
+ * separated instance's repository MOUNTS the harness, when it is that instance
+ * (`resolveWorkingInstanceRoot`, bean `j3ls`: from who-iris the staging tree
+ * landed inside the mounted harness). With it, the
  * staging tree and the destination library are resolved against `<dir>`, which
  * must hold an instance declaration (`<name>.json`). This is the case of a
  * content folio such as `litlfred/qou`, checked out beside the harness: before
@@ -115,8 +118,11 @@ import { COVER_FILENAME } from "./library-graph.ts";
  */
 const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
 
-/** `--instance <dir>` or `--instance=<dir>`, else the harness. Exported for tests. */
-export function resolveInstanceRoot(argv: readonly string[], fallback: string = HARNESS_ROOT): string {
+/** `--instance <dir>` or `--instance=<dir>`, else the working instance. Exported for tests. */
+export function resolveInstanceRoot(
+  argv: readonly string[],
+  fallback: string = resolveWorkingInstanceRoot({ argv: [] }).root,
+): string {
   let chosen: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
