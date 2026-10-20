@@ -142,13 +142,20 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
-          set -uo pipefail
+          # `+e`: Actions runs this as `bash -e`, so a non-zero regen (stale or
+          # unrepaired, which is its verdict, not a crash) ended the step before
+          # `code=$?` and skipped every step after it, the repair PR included:
+          # cat-harness's READMEs went unrepaired on every push (bean ey1c).
+          set +e -uo pipefail
           args=(--json)
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
           bun run cat post-merge:regen "${args[@]}" > "$RUNNER_TEMP/regen.json"
           code=$?
           cat "$RUNNER_TEMP/regen.json"
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          # The verdict step at the end exits with this code, after the repair
+          # PR has been opened (step 8 above).
+          exit 0
       - name: Copy the caller's directory back over its checkout
         env:
           SUBDIR: ${{ inputs.path-in-repo }}
@@ -160,7 +167,9 @@ jobs:
           DRY_RUN: ${{ inputs.dry-run }}
           OWN: ${{ github.workspace }}/src
         run: |
-          set -uo pipefail
+          # `+e`, as above: `--check` exits 1 for a stale README, which is
+          # what this step judges, not a reason to stop it.
+          set +e -uo pipefail
           script=cat-harness-tools/scripts/subgraph-readmes.ts
           if [ "$DRY_RUN" = "true" ]; then
             bun "$script" --check --repo "$OWN"
