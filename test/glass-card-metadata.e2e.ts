@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { resolveChromium } from "../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { ensureThemesCss } from "./support/themes-css.ts";
 
 /**
  * A CARD ON THE GLASS SAYS WHAT IT IS — owner, 2026-10-01 (issue #1780):
@@ -38,7 +39,7 @@ test.use({
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const THEMES = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/themes.css")), "utf8");
+const THEMES = readFileSync(ensureThemesCss(ROOT), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const ART_PATH = "/assets/img/harness/landing-library-card.webp";
