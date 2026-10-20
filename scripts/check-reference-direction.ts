@@ -866,6 +866,7 @@ function instances(repoRoot: string): Instance[] {
       name?: string;
       needs?: string[];
       directories?: { path?: string; graphTypologies?: string[]; scope?: "instance" | "repository" }[];
+      builtAtPublish?: { path?: string }[];
     };
     // `rootForScope`, NEVER `join(root, path)`. A directory entry may carry
     // `scope: "repository"`, and it then resolves against the REPO ROOT
@@ -878,7 +879,19 @@ function instances(repoRoot: string): Instance[] {
     // in it was read as authored prose. Measured cost below.
     const machineWritten = (decl.directories ?? [])
       .filter((d) => d.path !== undefined && declaresMachineWritten(d.graphTypologies))
-      .map((d) => join(rootForScope(root, d.scope), d.path!));
+      .map((d) => join(rootForScope(root, d.scope), d.path!))
+      // A `builtAtPublish` path is machine-written by declaration too: each
+      // entry names the `writer` that builds it at publish, and nothing there
+      // is committed or authored. The checkout-built ones project OTHER
+      // instances by design — `docs/assets/library/` holds byte copies of
+      // sub-graphs declared inside another instance's entry (bean `8pzh`) — so
+      // a name they carry is the projected instance's, not this one reaching up
+      // (folio-assistant#2611: 27 findings once the pages were restored).
+      .concat(
+        (decl.builtAtPublish ?? [])
+          .filter((b) => typeof b.path === "string" && b.path !== "")
+          .map((b) => join(root, b.path!)),
+      );
     // A declaration with no `name` cannot be a reference TARGET (nothing to
     // match) and cannot own files by name either, so it is skipped rather
     // than given a fallback that would invent an instance.

@@ -133,6 +133,13 @@ export interface FamilySweep {
   counts: Record<string, { nodes: number; checked: number; parsed: number; state: string }>;
   /** A tag on disk the map does not name — the map claimed completeness. */
   unmapped: { tag: string; example: string }[];
+  /**
+   * A tag the map does not name, met ONLY inside a checkout-built
+   * `builtAtPublish` path: a projection of another instance's graph (the byte
+   * copies under `docs/assets/library/jsonld/`, bean `8pzh`), whose nodes are
+   * judged where their source is declared. Reported, never a failure.
+   */
+  projected?: { tag: string; example: string }[];
   /** A family whose reference does not resolve. */
   unresolvable: { tag: string; reason: string }[];
   /** A node that fails its family's Zod schema. */
@@ -232,7 +239,14 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   // and the library map must not call that kind's run contexts and work lists
   // "unmapped" (folio-assistant#2529).
   const declaredDirs: { abs: string; kinds: readonly string[] }[] = [];
+  // The checkout-built `builtAtPublish` paths of every instance: what they
+  // hold is computed over OTHER instances, so a family met only there is the
+  // projected instance's (see `FamilySweep.projected`).
+  const checkoutBuilt: string[] = [];
   for (const inst of instanceRootsIn(join(root, ".."))) {
+    for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
+      if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path) + (b.path.endsWith("/") ? "/" : ""));
+    }
     for (const e of readDeclaration(inst)?.directories ?? []) {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
@@ -259,9 +273,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
     if (!def.nodeSchemas) continue;
     const fams = await resolveNodeSchemas(kind, root);
     const byTag = new Map(fams.map((f) => [f.tag, f]));
-    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [] };
+    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
+    const inProjection = (file: string): boolean => checkoutBuilt.some((d) => file === d || (d.endsWith("/") && file.startsWith(d)));
     // WHERE TO READ, not where the declaration points. A graph kept at a branch
     // tip is read at its mount, and when nothing is mounted there is no
     // directory to read at all — which is a different answer from an empty one.
@@ -342,6 +357,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
         const rel = relative(join(root, ".."), file);
+        if (!fam && inProjection(file)) {
+          if (!s.projected!.some((u) => u.tag === tag)) s.projected!.push({ tag, example: rel });
+          continue;
+        }
         if (!fam) {
           if (!s.unmapped.some((u) => u.tag === tag)) s.unmapped.push({ tag, example: rel });
           continue;
@@ -423,6 +442,8 @@ async function main(): Promise<number> {
       console.log(`  ✗ EXAMINED NOTHING — ${f.kind} declares nodeSchemas and no node was found`);
       familyFail = true;
     }
+    for (const u of f.projected ?? [])
+      console.log(`  · ${u.tag}: another instance's node in a checkout-built projection (e.g. ${u.example}), judged where its source is declared`);
     for (const u of f.unmapped) console.log(`  ✗ unmapped family ${u.tag} (e.g. ${u.example})`);
     for (const u of f.unresolvable) console.log(`  ✗ ${u.tag}: ${u.reason}`);
     if (f.unmapped.length || f.unresolvable.length) familyFail = true;
