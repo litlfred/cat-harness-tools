@@ -17,7 +17,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, basename } from "node:path";
-import { loadProcessModel, isActivity } from "../../src/workflow/process-model.ts";
+import { loadProcessModel, isActivity, processDiagrams } from "../../src/workflow/process-model.ts";
 import { knownSkills as canonicalKnownSkills, workflowFile, workflowFiles } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -82,7 +82,7 @@ describe("workflow skill refs resolve", () => {
     const skills = knownSkills();
     const dangling: string[] = [];
 
-    for (const file of workflowFiles(ROOT).filter((f) => f.endsWith(".bpmn")).map((p) => basename(p)).sort()) {
+    for (const file of processDiagrams(workflowFiles(ROOT)).map((p) => basename(p)).sort()) {
       const model = await loadProcessModel(workflowFile(ROOT, file));
       for (const node of [...model.nodes.values()].filter(isActivity)) {
         for (const ref of node.skills ?? []) {

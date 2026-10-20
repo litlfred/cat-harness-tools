@@ -26,7 +26,7 @@ import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/t
 import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../scripts/todos.js";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { workflowFiles } from "../../scripts/known-skills.js";
-import { loadProcessModel } from "../../src/workflow/process-model.js";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 
 describe("the declaration and the directory agree", () => {
   test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {
@@ -154,7 +154,7 @@ describe("the published process hierarchy", () => {
     // real parser: it is async and pulls in bpmn-moddle, which is exactly why
     // the GENERATOR does not use it and why a test can.
     const expected: Record<string, string[]> = {};
-    for (const f of workflowFiles(ROOT, "checkout").filter((x) => x.endsWith(".bpmn"))) {
+    for (const f of processDiagrams(workflowFiles(ROOT, "checkout"))) {
       const m = await loadProcessModel(f);
       const calls = new Set<string>();
       for (const n of m.nodes.values()) if (n.calledElement) calls.add(n.calledElement);
@@ -199,7 +199,7 @@ describe("the published process hierarchy", () => {
     // so `Process_Translation` was missing from BOTH sides and the assertion
     // passed over a hole. Deriving from the same SOURCE is the rule; deriving
     // from the same IMPLEMENTATION is how a test blesses a bug.
-    const bpmn = workflowFiles(ROOT, "checkout").filter((f) => f.endsWith(".bpmn"));
+    const bpmn = processDiagrams(workflowFiles(ROOT, "checkout"));
     const expected: string[] = [];
     for (const f of bpmn) expected.push((await loadProcessModel(f)).id);
     expect(expected.length).toBeGreaterThan(5);

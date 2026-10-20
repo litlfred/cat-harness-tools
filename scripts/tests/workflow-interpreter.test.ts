@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, relative, resolve } from "path";
-import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-model";
+import { isGlobalTasksFile, loadGlobalTasks, loadProcessModel, UnsupportedBpmn, processDiagrams } from "../../src/workflow/process-model";
 import { loadInstance, saveInstance } from "../../src/workflow/store";
 import { workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -28,7 +28,7 @@ const HARNESS = resolve(HARNESS_ROOT);
  */
 
 describe("every shipped diagram is interpretable", () => {
-  const files = workflowFiles(HARNESS).filter((f) => f.endsWith(".bpmn")).map((p) => relative(HARNESS, p));
+  const files = processDiagrams(workflowFiles(HARNESS)).map((p) => relative(HARNESS, p));
 
   test("there are diagrams to interpret", () => {
     expect(files.length).toBeGreaterThan(0);
@@ -48,6 +48,23 @@ describe("every shipped diagram is interpretable", () => {
       for (const n of model.nodes.values()) {
         if (n.kind === "activity") expect(n.lane).toBeDefined();
       }
+    });
+  }
+});
+
+describe("a layer's shared global-tasks file is read, not interpreted", () => {
+  // It holds no process, so the loop above leaves it out; it is still read
+  // here, so a broken one is not silently skipped (owner, 2026-10-20, "a1").
+  const shared = workflowFiles(HARNESS)
+    .filter((f) => f.endsWith(".bpmn") && isGlobalTasksFile(readFileSync(f, "utf-8")))
+    .map((p) => relative(HARNESS, p));
+
+  for (const f of shared) {
+    test(`${f} defines global tasks, each naming a skill`, async () => {
+      const defs = await loadGlobalTasks(join(HARNESS, f));
+      expect(defs.length).toBeGreaterThan(0);
+      for (const d of defs) expect(d.skills.length, d.id).toBeGreaterThan(0);
+      await expect(loadProcessModel(join(HARNESS, f))).rejects.toBeInstanceOf(UnsupportedBpmn);
     });
   }
 });

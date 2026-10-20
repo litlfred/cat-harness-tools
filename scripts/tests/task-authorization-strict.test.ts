@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { basename } from "node:path";
 
-import { isActivity, loadProcessModel } from "../../src/workflow/process-model.js";
+import { isActivity, loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 import { authorizeTask } from "../../src/workflow/authorize.js";
 import { loadAccessContext, principalFromEnv } from "../../src/core/access.js";
 import { githubPrincipalFor } from "../../src/core/github-auth.js";
@@ -35,7 +35,7 @@ function everyStep() {
 
 async function collectSteps() {
   const out: { process: string; task: string; role?: string }[] = [];
-  for (const f of workflowFiles(ROOT).filter((f) => f.endsWith(".bpmn")).map((p) => basename(p))) {
+  for (const f of processDiagrams(workflowFiles(ROOT)).map((p) => basename(p))) {
     const m = await loadProcessModel(workflowFile(ROOT, f));
     for (const n of m.nodes.values()) {
       if (isActivity(n) || n.kind === "exclusive") out.push({ process: m.id, task: n.id, role: n.roleRef });

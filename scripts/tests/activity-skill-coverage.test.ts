@@ -46,7 +46,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, relative, resolve } from "node:path";
 
-import { loadProcessModel, isActivity } from "../../src/workflow/process-model.js";
+import { loadProcessModel, isActivity, processDiagrams } from "../../src/workflow/process-model.js";
 import { readRoleGraph, roleForLane } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -61,7 +61,7 @@ describe("every activity names a skill or declares why it has none", () => {
     // Without this, renaming `processes/` turns the assertion below
     // into a vacuous pass over an empty list, which is the defect being
     // guarded against wearing a green tick.
-    const files = workflowFiles(HARNESS).filter((f) => f.endsWith(".bpmn")).map((p) => relative(HARNESS, p));
+    const files = processDiagrams(workflowFiles(HARNESS)).map((p) => relative(HARNESS, p));
     expect(files.length).toBeGreaterThan(10);
   });
 
@@ -74,7 +74,7 @@ describe("every activity names a skill or declares why it has none", () => {
     expect(graph, "no role graph — the lane exemptions cannot be resolved").toBeDefined();
     const bare: string[] = [];
 
-    for (const file of workflowFiles(HARNESS).filter((f) => f.endsWith(".bpmn")).map((p) => relative(HARNESS, p))) {
+    for (const file of processDiagrams(workflowFiles(HARNESS)).map((p) => relative(HARNESS, p))) {
       const m = await loadProcessModel(join(HARNESS, file));
 
       const exemptLanes = new Set(

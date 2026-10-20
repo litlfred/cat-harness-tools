@@ -1385,11 +1385,13 @@ describe("DMN decisions are nodes, linked to their gateways and to DMN 1.3", () 
     expect(String(review.depiction)).toMatch(/\/assets\/img\/workflows\/review-task\.svg$/);
   });
 
-  test("a call activity's calledElement links to a Process in this graph, never to one it lacks", () => {
-    const procIds = new Set(byType("Process").map((p) => p["@id"]));
+  test("a call activity's calledElement links to a Process, or a shared global Task, in this graph — never to one it lacks", () => {
+    // A call to a layer's global task (owner, 2026-10-20, "a1"/"b1") links to
+    // that Task node; every other call links to a Process.
+    const procIds = new Set([...byType("Process"), ...byType("Task")].map((p) => p["@id"]));
     const calls = byType("ProcessNode").filter((n) => n.calledElement !== undefined);
     expect(calls.length).toBeGreaterThan(0);
-    for (const c of calls) expect(procIds.has(c.calledElement as string)).toBe(true);
+    for (const c of calls) expect(procIds.has(c.calledElement as string), String(c.calledElement)).toBe(true);
     // `review-task` calls `review-narrative` — an edge between two of
     // cat-harness's own diagrams, so it is there standalone too (bean `ho66`).
     const review = byType("Process").find((p) => String(p.sourcePath).endsWith("content/review-task.bpmn"))!;

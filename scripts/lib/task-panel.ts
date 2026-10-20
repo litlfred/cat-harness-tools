@@ -92,6 +92,12 @@ export interface PanelTask {
   skills: PanelSkill[];
   /** For a call activity: the process it descends into. */
   calls?: PanelLink;
+  /**
+   * For a call to a GLOBAL TASK: the step this layer shares, its BPMN kind,
+   * and the values this call gives its inputs. The task's skills are the
+   * global task's (owner, 2026-10-20, "a1 b1 c1").
+   */
+  shared?: { id: string; type: string; inputs?: Record<string, string> };
   /** The Role the lane names, with its skills — absent when the lane names none. */
   role?: PanelLink & { title?: string; skills: (PanelLink & { via?: string })[] };
   /** Why there is no role: the lane's binding verdict, when it is not `bound`. */
@@ -208,6 +214,12 @@ export const PANEL_SCRIPT = `(function () {
     if (t.lane) task.appendChild(el("div", "pt-attr", "lane = " + t.lane));
     panel.appendChild(task);
     if (t.calls) { panel.appendChild(edge("calls")); panel.appendChild(obj("Process", link(t.calls), "proc")); }
+    if (t.shared) {
+      panel.appendChild(edge("calls"));
+      var gt = obj(t.shared.type.replace(/^bpmn:/, ""), t.shared.id, "proc");
+      Object.keys(t.shared.inputs || {}).forEach(function (k) { gt.appendChild(el("div", "pt-attr", k + " = " + t.shared.inputs[k])); });
+      panel.appendChild(gt);
+    }
     t.skills.forEach(function (s) {
       panel.appendChild(edge("requires"));
       var sk = obj("Skill", link(s), "skill");

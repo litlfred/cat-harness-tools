@@ -129,6 +129,10 @@ function decodeLabel(raw: string): string {
 const NAMED_COPY = new RegExp(
   "<(?:bpmn:)?(?:process|lane|task|serviceTask|userTask|manualTask|scriptTask|" +
     "sendTask|receiveTask|businessRuleTask|callActivity|subProcess|" +
+    // BPMN 2.0's global tasks, which the real extractor reads (owner,
+    // 2026-10-20, "a1"): a copy without them reports a shared step's name as
+    // not extracted while the translator sees it.
+    "globalTask|globalUserTask|globalScriptTask|globalManualTask|globalBusinessRuleTask|" +
     "startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|" +
     "exclusiveGateway|parallelGateway|inclusiveGateway|eventBasedGateway|" +
     "sequenceFlow|participant|collaboration)\\b[^>]*?\\sname=\"([^\"]*)\"",

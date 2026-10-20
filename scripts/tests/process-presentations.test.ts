@@ -12,6 +12,7 @@ import { dirname, join, relative, resolve, basename, sep } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { workflowFiles, workflowFile } from "../known-skills.js";
+import { processDiagrams } from "../../src/workflow/process-model.js";
 import { processPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -67,8 +68,7 @@ describe("this repository, right now", () => {
     // `oqdr`), so a finding in one would be about a stale file, not about how
     // links are derived — reported there rather than silently filtered here.
     const rendered = new Set(
-      workflowFiles(ROOT)
-        .filter((f) => f.endsWith(".bpmn"))
+      processDiagrams(workflowFiles(ROOT))
         .map((f) => `${f.split("/").pop()!.slice(0, -5)}.svg`),
     );
     const links = readdirSync(SVG_DIR)

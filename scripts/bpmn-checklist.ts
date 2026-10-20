@@ -61,7 +61,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { loadProcessModel, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
+import { loadProcessModel, processDiagrams, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
 import { belowOf } from "./declarations-retag.ts";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -141,6 +141,12 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
       if (n.skills.length > 0) out.push(`- Skill: ${n.skills.map((s) => `\`${s}\``).join(", ")}.`);
       const d = firstSentence(n.documentation);
       if (d) out.push(`- What: ${d}`);
+      if (n.globalTask) {
+        // A call to one of this layer's shared steps (owner, 2026-10-20): name
+        // the step it shares and the values this call gives it.
+        const given = Object.entries(n.inputs ?? {}).map(([k, v]) => `\`${k}\` = \`${v}\``);
+        out.push(`- Shared step \`${n.globalTask.id}\`${given.length > 0 ? `, with ${given.join(", ")}` : ""}.`);
+      }
       if (n.calledElement) {
         out.push(`- A subprocess (\`${n.calledElement}\`): \`workflow_next\` reports its own steps; complete those — this call activity itself is not completable.`);
       } else {
@@ -183,7 +189,7 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
 /** Every `.bpmn` in every instance of the repository, by its declared knowledge-graph directories. */
 export function bpmnSources(root: string = HARNESS_ROOT): string[] {
   const all = new Set<string>();
-  for (const inst of instanceRootsIn(repoRootFor(root))) for (const f of workflowFiles(inst)) if (f.endsWith(".bpmn")) all.add(f);
+  for (const inst of instanceRootsIn(repoRootFor(root))) for (const f of processDiagrams(workflowFiles(inst))) all.add(f);
   return [...all].sort();
 }
 

@@ -222,6 +222,16 @@ export interface EnabledActivity {
   documentation?: string;
   calledElement?: string;
   /**
+   * The global task this step runs, when it is a call to one: the step its
+   * layer shares between processes (spec §7; owner, 2026-10-20, "a1 b1 c1").
+   * The step is an ordinary one — enabled, performed and completed here —
+   * and this names what it shares, so an agent can see the same step in
+   * every process that calls it.
+   */
+  globalTask?: string;
+  /** The values this call gives the global task's declared inputs, by name. */
+  inputs?: Record<string, string>;
+  /**
    * The chain of call activities this step sits inside, outermost first, as
    * their names read on the parent diagram. Absent at the top level.
    *
@@ -659,6 +669,8 @@ export function enabled(
       touchesWorkPlan: node.touchesWorkPlan,
       documentation: node.documentation,
       calledElement: node.calledElement,
+      ...(node.globalTask ? { globalTask: node.globalTask.id } : {}),
+      ...(node.inputs ? { inputs: node.inputs } : {}),
       context: taskContext,
     }];
   });
@@ -959,6 +971,8 @@ export function describe(model: ProcessModel, state: InstanceState, roles?: Role
             ? [`        carried beans: ${e.context.carriedBeans.join(", ")}`]
             : []),
           ...(e.calledElement ? [`        expands into: ${e.calledElement}`] : []),
+          ...(e.globalTask ? [`        shared step: ${e.globalTask}`] : []),
+          ...(e.inputs ? [`        inputs: ${Object.entries(e.inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`] : []),
         );
       }
     }

@@ -35,6 +35,7 @@
 import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
+import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix } from "node:path";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
 import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
@@ -1274,6 +1275,7 @@ function beanFile(id: string): string | undefined {
  */
 function processHierarchy(): Record<string, string[]> {
   const out: Record<string, string[]> = {};
+  const globalTasks = new Set<string>();
   // SORTED, and it is load-bearing rather than tidy — `workflowFiles` sorts,
   // and that guarantee is why this reads it rather than a directory.
   // `readdirSync` under Bun returns RAW DIRECTORY ORDER: on ext4 that is a
@@ -1302,6 +1304,9 @@ function processHierarchy(): Record<string, string[]> {
     // `\bid=` rather than a fixed position, because attribute order is the
     // author's choice: this file writes `id` first and `isExecutable` last,
     // another may not.
+    // A layer's global tasks (owner, 2026-10-20, "a1"): a call to one is a
+    // shared STEP, not a sub-process, so it is no edge of this hierarchy.
+    for (const g of xml.matchAll(GLOBAL_TASK_ELEMENT)) globalTasks.add(g[1]!);
     const id = /<(?:\w+:)?process\b[^>]*\bid="([^"]+)"/.exec(xml)?.[1];
     if (!id) continue;
     const calls = new Set<string>();
@@ -1329,6 +1334,7 @@ function processHierarchy(): Record<string, string[]> {
     }
     out[id] = [...calls].sort();
   }
+  for (const id of Object.keys(out)) out[id] = out[id]!.filter((c) => !globalTasks.has(c));
   return out;
 }
 

@@ -77,7 +77,7 @@ import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { workflowFiles, kgRoots } from "./known-skills.js";
-import { loadProcessModel, isActivity, isDecision, branchesOf } from "../src/workflow/process-model.js";
+import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile } from "../src/workflow/process-model.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -268,6 +268,8 @@ export interface ProcessStep {
   skills: string[];
   /** For a call activity: the process id it descends into. */
   calledElement?: string;
+  /** For a call to a global task: the shared step's id and kind, and the values this call gives its inputs. */
+  globalTask?: { id: string; type: string; inputs?: Record<string, string> };
   documentation?: string;
 }
 
@@ -342,6 +344,9 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
     // presence check, not a second reading of what the policy means — and a
     // presence check on the value, not on the element. See the module doc.
     const xml = readFileSync(abs, "utf-8");
+    // A layer's shared global tasks hold no process (owner, 2026-10-20,
+    // "a1"): no row of their own, and each shows in the steps that call it.
+    if (isGlobalTasksFile(xml)) continue;
     const declared = ownElementPattern(xml, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(xml);
     try {
       const m = await loadProcessModel(abs);
@@ -381,6 +386,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
           type: n.type,
           skills: n.skills,
           ...(n.calledElement ? { calledElement: n.calledElement } : {}),
+          ...(n.globalTask ? { globalTask: { id: n.globalTask.id, type: n.globalTask.type, ...(n.inputs ? { inputs: n.inputs } : {}) } } : {}),
           ...(n.documentation ? { documentation: n.documentation } : {}),
         })),
         decisions: [...m.nodes.values()].filter(isDecision).map((n) => ({
@@ -600,6 +606,7 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
         return { ...link(s, ctx.skillHref(s)), ...(ms ? { methodologies: ms.map((m) => link(m, ctx.methodologyHref(m))) } : {}) };
       }),
       ...(st.calledElement ? { calls: called ? { name: called.name, href: `${called.stem}.html` } : { name: st.calledElement } } : {}),
+      ...(st.globalTask ? { shared: st.globalTask } : {}),
       ...(roleId
         ? {
             role: {
@@ -959,7 +966,9 @@ export function processPage(
   for (const st of row.steps) {
     const target = st.calledElement
       ? `calls ${byId.get(st.calledElement) ? proc(byId.get(st.calledElement)!) : `\`${st.calledElement}\``}`
-      : "";
+      : st.globalTask
+        ? `shared step \`${st.globalTask.id}\`${st.globalTask.inputs ? ` (${Object.entries(st.globalTask.inputs).map(([k, v]) => `${k} = \`${v}\``).join(", ")})` : ""}`
+        : "";
     const how = [target, ...st.skills.map(skill)].filter(Boolean).join("<br>") || "—";
     L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${cell(st.documentation)} |`);
   }
