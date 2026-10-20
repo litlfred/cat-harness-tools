@@ -331,7 +331,7 @@
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > base: `smart-base` is declared under that name",
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > core: `folio-assistant-core` is declared under that name",
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > sci: `folio-assistant-sci` is declared under that name",
-        "test/coordinator/pipeline-plugins-sci-checkout.test.ts > this repository > folio-assistant-sci fills every slot, loaded lazily from the running folio",
+        "test/coordinator/pipeline-plugins-sci-checkout.test.ts > this repository > the running checkout fills every slot, loaded lazily from the running folio",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: content-type packages are held by their owner > each moved package sits in a concern group of its owning instance",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: content-type packages are held by their owner > the harness alone knows none of their skills; the checkout knows all of them",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: role edges point down > cat-harness/scenarios/roles.json names no skill a moved package holds",
