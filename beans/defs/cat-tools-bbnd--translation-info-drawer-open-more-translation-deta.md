@@ -114,7 +114,13 @@ Done-when:
 - [x] e2e: opening the drawer on a block and on a page shows its facts in both
   colour schemes.
 
-Not done: core's `build-document-site.ts` and `build-library-site.ts` (the
-folio-assistant-core pointer `folio-core-shsz`) still emit no
-`fa-translation-meta`, so folio document and library pages carry no drawer
-yet.
+**Folio pages, measured on core main.**
+- `build-document-site.ts` writes themed pages (`layout: default`), so the
+  theme's `head_custom.html` already emits `fa-translation-meta` and
+  `docs-ui.js`. Folio document pages get the drawer with no core change. Their
+  site section reads "publishes no translation status" until the folio runs
+  `gen-translation-status`.
+- `build-library-site.ts` writes standalone HTML with no theme, no badge row
+  and no `docs-ui.js`. A drawer there needs those pages themed first. That is
+  a change to how the library site is rendered, tracked on
+  `folio-core-shsz`, not a data hook.
