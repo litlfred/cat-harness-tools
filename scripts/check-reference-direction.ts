@@ -768,15 +768,10 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * paths under `pipeline/`, and none of the six names a layer above any more.
  */
 const PENDING: readonly { file: string; names: number }[] = [
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
   // declared-path-literal: a FINDING's location, recorded repo-root-relative because that is
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "smart-base/smart-base.json", names: 2 },
-  { file: "smart-base/README.md", names: 2 },
-  { file: "smart-base/AGENTS.md", names: 2 },
 ];
 
 /**
