@@ -1,15 +1,13 @@
 ---
 # cat-tools-sthf
 title: 'URL SPACE: rendered assets mirror the instantiation structure — <baseurl>/ for the root, <baseurl>/<instance>/<path> for every enabled harness'
-status: in-progress
+status: todo
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-20T17:13:17Z
+updated_at: 2026-10-20T17:23:49Z
 parent: folio-assistant-yj32
-blocked_by:
-    - folio-assistant-nbal
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-o7eq`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -474,3 +472,42 @@ Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-too
 _2026-10-20T15:24:28Z_ — Blocked by `folio-assistant-nbal` (cat-harness graph store), which files and builds the prerequisite: litlfred/cat-harness#376 (commit `1ef09a59`) adds `schemas/url-space.ts` with `publishedPath({case: "root" | "instance" | "viewer", …}, base)` and `isPublished({enabled})`, and `enabled?: boolean` on the declaration. The consumer switch here starts once #376 is on this repository's pin. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
 
 _2026-10-20T17:13:17Z_ — Claimed by feat/sthf-url-space-consumers — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+
+## Consumer half landed — 2026-10-20
+
+`nbal` (cat-harness#376) is on cat-harness `main`, which this repository's CI
+mounts, so the blocker is lifted. In this repository every writer and reader
+of a foreign instance's published files now goes through cat-harness's
+`publishedPath` (`case: "instance"`), via one helper,
+`instanceSitePath` / `instanceDocPath` in `scripts/instance-exports.ts`:
+
+- `instance-exports.ts`: the document at `<name>/<stub>.jsonld` and its
+  `<name>/schema/`; the plan leaves out an instance that declares
+  `"enabled": false` (`isPublished`);
+- `kg-export.ts`: a foreign instance's `docPath`, hence its `@id`;
+- `root-index.ts`: where the index looks for each export, and it skips a
+  disabled instance instead of reporting it missing;
+- `kg-changed-assets.ts`: where it reads each built document.
+
+**No published address moved.** The segment is now the instance's NAME, as the
+2026-09-20 ruling says, where it used to be the stub. Every instance declared
+today has name = stub, and a test pins that, so a future instance whose stub
+differs is a visible decision and not a silent move (`blv9`).
+
+### Done when, now
+
+- [x] the root instance's exception: settled by the rulings above
+- [x] `enabled` is a declared field defaulting to enabled (`nbal`), and the
+      plan and the root index honour it
+- [x] one resolver composes an instance's published URL, and every consumer in
+      this repository goes through it (the repository-wide artefacts stay at
+      the root, as the 2026-10-10 exception declares: `site-links.ts`)
+- [ ] `docs-site.yml` / `feature-staging.yml` publish each enabled instance:
+      **folio-assistant's workflows**, not this repository
+- [ ] the bootstrap `.jsonld` resolves at its instance path: bootstrap is
+      published by bootstrap-tools' `export-graph.ts` (`PUBLISHED_ELSEWHERE`),
+      so the check belongs there
+
+Released to `todo`: the two open boxes are in other repositories.
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
