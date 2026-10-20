@@ -1020,6 +1020,24 @@ export function qaPanelsOf(
 }
 
 /**
+ * The harness's one-node-per-file graphs that are neither state nor a
+ * registry of `folio-…/v1` nodes, and had no viewer (bean `folio-assistant-6gme`,
+ * owner 2026-10-20: "every kind gets a viewer"). Each is drawn as a registry
+ * is — a page per instance holding the kind, listing every node by id and
+ * title — because that is what their files are: `scenarios` (actors and
+ * capabilities, which carry no `$schema`), `policies` (ODRL, `.jsonld`),
+ * `test-plan`, `tool-release`, `vocab-mapping` and `substrate-snapshot`
+ * (`<id>.substrate.json`, written by `kg:subscribe` and not committed).
+ */
+export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot"];
+
+/**
+ * The file endings a listed node is read from: JSON, and JSON-LD, which is
+ * what an ODRL policy is written in (`policies/*.jsonld`).
+ */
+export const NODE_EXTENSIONS: readonly string[] = [".json", ".jsonld"];
+
+/**
  * The kinds a `subgraphs: "instance"` visualiser can draw one page per
  * instance for: those whose documents are self-describing JSON (a `$schema`
  * tag), which the family reader (`readQaGraph`) counts without knowing the
@@ -1045,6 +1063,8 @@ export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
   // by layers above this one (cat-harness-tools#386).
   "pipeline-plugins",
   "editor-checkers",
+  // The other one-node-per-file graphs (bean `folio-assistant-6gme`).
+  ...LISTED_KINDS,
 ]);
 
 /**
@@ -1064,6 +1084,7 @@ export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
   "code-list",
   "pipeline-plugins",
   "editor-checkers",
+  ...LISTED_KINDS,
 ]);
 
 /** One registry node, as an instance page lists it. */
@@ -1082,11 +1103,11 @@ export interface RegistryRow {
 /** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
 export function registryRowsOf(absPath: string): RegistryRow[] {
   const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
-  return jsonFilesIn(absPath)
+  return jsonFilesIn(absPath, NODE_EXTENSIONS)
     .map((p) => relative(absPath, p).split(sep).join("/"))
     .sort()
     .map((file): RegistryRow => {
-      const stem = basename(file, ".json");
+      const stem = basename(file).replace(/\.json(ld)?$/, "");
       let doc: unknown;
       try {
         doc = JSON.parse(readFileSync(join(absPath, file), "utf-8"));
@@ -1721,6 +1742,8 @@ export function projectInstanceSubject(s: InstanceSubject, kinds: readonly strin
     s.absPath,
     existsSync(s.absPath),
     `\`${s.path}\` of ${s.name} is not in this build (it is not committed here, or was not fetched), so it was not counted`,
+    // A listed kind's census counts the same files its node table lists.
+    kinds.some((k) => LISTED_KINDS.includes(k)) ? { extensions: NODE_EXTENSIONS } : undefined,
   );
 }
 

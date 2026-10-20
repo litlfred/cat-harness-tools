@@ -29,6 +29,7 @@ import {
   todoStorePartsSection,
   instanceSubjectPage,
   instanceSubjectsOf,
+  LISTED_KINDS,
   PER_INSTANCE_KINDS,
   projectInstanceSubject,
   REGISTRY_KINDS,
@@ -1136,6 +1137,28 @@ describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
       expect(html).toContain("Nodes — 3");
       expect(html).toContain("<code>b-check</code>");
       expect(html).toContain("Checks {{ b }}");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("the listed kinds draw per instance as registries do, JSON-LD included (bean folio-assistant-6gme)", () => {
+    for (const k of ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot"]) {
+      expect(LISTED_KINDS).toContain(k);
+      expect(REGISTRY_KINDS.has(k)).toBe(true);
+      expect(PER_INSTANCE_KINDS.has(k)).toBe(true);
+    }
+    const root = mkdtempSync(join(tmpdir(), "sv-listed-"));
+    const at = join(root, "policies");
+    mkdirSync(at, { recursive: true });
+    writeFileSync(join(at, "defaults.jsonld"), JSON.stringify({ "@type": "Set", description: "the floor" }));
+    try {
+      expect(registryRowsOf(at).map((r) => [r.id, r.text])).toEqual([["defaults", "the floor"]]);
+      const [s] = instanceSubjectsOf([{ id: "policies", path: "policies/", absPath: at, declaredBy: "x", graphTypologies: ["policies"] }], ["policies"]);
+      const html = instanceSubjectPage({ id: "policies", title: "Policies", coversKinds: ["policies"] }, s!, [s!]);
+      // The census counts the file the table lists, rather than "0 documents" over one node.
+      expect(html).toContain("over 1 document(s)");
+      expect(html).toContain("Nodes — 1");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
