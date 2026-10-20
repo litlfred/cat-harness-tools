@@ -1,12 +1,12 @@
 ---
 # cat-tools-sthf
 title: 'URL SPACE: rendered assets mirror the instantiation structure — <baseurl>/ for the root, <baseurl>/<instance>/<path> for every enabled harness'
-status: todo
+status: in-progress
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-20T15:24:28Z
+updated_at: 2026-10-20T17:13:17Z
 parent: folio-assistant-yj32
 blocked_by:
     - folio-assistant-nbal
@@ -472,3 +472,5 @@ and the field and resolver should be filed (or found) in the cat-harness store.
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
 
 _2026-10-20T15:24:28Z_ — Blocked by `folio-assistant-nbal` (cat-harness graph store), which files and builds the prerequisite: litlfred/cat-harness#376 (commit `1ef09a59`) adds `schemas/url-space.ts` with `publishedPath({case: "root" | "instance" | "viewer", …}, base)` and `isPublished({enabled})`, and `enabled?: boolean` on the declaration. The consumer switch here starts once #376 is on this repository's pin. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T17:13:17Z_ — Claimed by feat/sthf-url-space-consumers — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
