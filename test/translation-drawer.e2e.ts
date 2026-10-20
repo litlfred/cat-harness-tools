@@ -55,20 +55,42 @@ const META = {
   statusSrc: STATUS_URL,
 };
 
-function harness(meta: object, scheme: "light" | "dark"): string {
+/** A block's TR badge, as `gen-docs-pages.ts` emits it, pointing at a projection. */
+const BLOCK_SRC = "/assets/qa/harness/overview.translation.json";
+const BLOCK_BADGE =
+  `<p>A block. <button type="button" class="fa-qa-badge fa-qa-fam-translation" lang="en" dir="ltr" ` +
+  `data-qa-family="translation" data-qa-key="overview" data-qa-label="Translation QA" ` +
+  `data-qa-src="${BLOCK_SRC}" aria-expanded="false" aria-label="Translation QA: 1 warn">` +
+  `<span class="fa-qa-tag">TR</span></button></p>`;
+const witness = (freshness: string) => ({ kind: "script", id: "translation-block-qa.ts", version: "v1", freshness });
+const BLOCK_PROJECTION = {
+  $schema: "qa-witness/v1",
+  family: "translation",
+  subject: "overview — translations",
+  state: "warn",
+  counts: { fail: 0, warn: 1, pass: 2, na: 0, unknown: 0 },
+  criteria: [
+    { id: "translation-coverage", result: "pass", locale: "fr", witnesses: [witness("fresh")] },
+    { id: "translation-not-echo", result: "pass", locale: "fr", witnesses: [witness("fresh")] },
+    { id: "translation-coverage", result: "warn", locale: "ar", witnesses: [witness("stale")] },
+  ],
+};
+
+function harness(meta: object, scheme: "light" | "dark", body = "<p>Body.</p>"): string {
   return (
     `<!doctype html><html lang="fr" data-fa-scheme="${scheme}"><head><meta charset="utf-8">` +
     `<style>body{background:${scheme === "light" ? "#fff" : "#27262b"}}${CSS}</style>` +
     `<script type="application/json" id="fa-translation-meta">${JSON.stringify(meta)}<\/script>` +
-    `</head><body><div class="main-content" id="main-content"><h1>Page</h1><p>Body.</p></div>` +
+    `</head><body><div class="main-content" id="main-content"><h1>Page</h1>${body}</div>` +
     `<script>${JS}<\/script></body></html>`
   );
 }
 
-async function serve(page: Page, scheme: "light" | "dark", status: { code: number; body?: unknown }, meta: object = META) {
+async function serve(page: Page, scheme: "light" | "dark", status: { code: number; body?: unknown }, meta: object = META, body?: string) {
   await page.route("http://tr.test/**", (route) => {
     const url = route.request().url();
-    if (url.endsWith("/page.html")) return route.fulfill({ contentType: "text/html", body: harness(meta, scheme) });
+    if (url.endsWith("/page.html")) return route.fulfill({ contentType: "text/html", body: harness(meta, scheme, body) });
+    if (url.endsWith(BLOCK_SRC)) return route.fulfill({ contentType: "application/json", body: JSON.stringify(BLOCK_PROJECTION) });
     if (url.endsWith(STATUS_URL)) {
       return status.code === 200
         ? route.fulfill({ contentType: "application/json", body: JSON.stringify(status.body) })
@@ -145,6 +167,21 @@ for (const scheme of ["dark", "light"] as const) {
       // Pressed again, it does not open a second drawer.
       await page.locator(".fa-translation-warning__details").click();
       await expect(drawer(page)).toHaveCount(1);
+    });
+
+    test("a block's TR panel is the drawer's block scope: stale vs current, and signed-off, per locale", async ({ page }) => {
+      await serve(page, scheme, { code: 200, body: STATUS }, META, BLOCK_BADGE);
+      await page.locator('.fa-qa-badge[data-qa-key="overview"]').click();
+      const sec = page.locator(".fa-qa-panel .fa-tr-drawer__block");
+      await expect(sec).toBeVisible();
+      await expect(sec.locator('dd[data-fa-tr-locale="fr"] .fa-tr-drawer__fresh')).toHaveAttribute("data-fa-tr-fresh", "fresh");
+      await expect(sec.locator('dd[data-fa-tr-locale="ar"] .fa-tr-drawer__fresh')).toHaveAttribute("data-fa-tr-fresh", "stale");
+      await expect(sec.locator('dd[data-fa-tr-locale="ar"]')).toContainText("the source changed after 1 of 1 verdict(s)");
+      await expect(sec.locator('dd[data-fa-tr-locale="fr"]')).toContainText("signed off: official, signed off by Dr. A");
+      await expect(sec.locator('dd[data-fa-tr-locale="ar"] .fa-tr-drawer__official')).toHaveAttribute("data-fa-tr-officiality", "disagree");
+      // ...and it reaches the page drawer.
+      await sec.locator(".fa-translation-warning__details").click();
+      await expect(page.locator(".fa-tr-drawer:not(.fa-qa-panel-warn):not(.fa-qa-panel-pass)").filter({ has: page.locator(".fa-tr-drawer__site") })).toHaveCount(1);
     });
 
     test("a server error is NOT reported as 'publishes none'", async ({ page }) => {
