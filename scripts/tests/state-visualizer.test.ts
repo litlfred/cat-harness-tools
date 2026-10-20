@@ -804,7 +804,48 @@ describe("per-instance beans pages (bean folio-assistant-1nu0)", () => {
 
 describe("a bean store's notes and workflow instances (bean folio-assistant-750a)", () => {
   test("the store's parts are the kinds its page draws", () => {
-    expect([...BEAN_STORE_KINDS].sort()).toEqual(["bean-defs", "bean-notes", "beans", "workflow-state"]);
+    expect([...BEAN_STORE_KINDS].sort()).toEqual(["bean-defs", "bean-notes", "beans", "merge-queue", "workflow-state"]);
+  });
+
+  test("lists the merge steward's decisions, links each PR, and keeps a bad entry visible (bean folio-assistant-30jr)", () => {
+    const store = mkdtempSync(join(tmpdir(), "bean-store-"));
+    try {
+      writeFileSync(
+        join(store, "beans.json"),
+        JSON.stringify({ name: "x", directories: [{ id: "queue", path: "queue", graphTypologies: ["merge-queue"] }] }),
+      );
+      mkdirSync(join(store, "queue"));
+      writeFileSync(join(store, "queue", "README.md"), "index\n");
+      writeFileSync(
+        join(store, "queue", "o--r--7.json"),
+        JSON.stringify({
+          $schema: "folio-merge-queue-entry/v1",
+          repository: "o/r",
+          pr: 7,
+          placement: { kind: "override", position: 1, reason: "owner named it first" },
+          reason: "owner: <first>",
+          decidedBy: "owner",
+          decidedAt: "2026-10-04T13:50:00Z",
+          hold: { waitsOn: "o/r#6", since: "2026-10-04T13:50:00Z", expires: "2026-10-05T13:50:00Z", handoff: "steward" },
+          status: "blocked",
+        }),
+      );
+      // A GitHub fact on an entry: refused by name, and still listed.
+      writeFileSync(
+        join(store, "queue", "o--r--8.json"),
+        JSON.stringify({ $schema: "folio-merge-queue-entry/v1", repository: "o/r", pr: 8, headSha: "a".repeat(40) }),
+      );
+      const html = beanStorePartsSection(store);
+      expect(html).toContain("Merge queue — 1 decision(s), 1 unreadable");
+      expect(html).toContain('<a href="https://github.com/o/r/pull/7">o/r#7</a>');
+      expect(html).toContain("<td>blocked</td><td>override, position 1</td><td>on o/r#6 until 2026-10-05T13:50:00Z</td>");
+      expect(html).toContain("owner: &lt;first&gt;");
+      expect(html).toContain("<code>o--r--8.json</code>");
+      expect(html).toContain("headSha: `headSha` is a fact GitHub owns");
+      expect(html).not.toContain("README");
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
   });
 
   test("lists the notes and the instances its beans.json declares, read from disk", () => {
@@ -849,6 +890,7 @@ describe("a bean store's notes and workflow instances (bean folio-assistant-750a
       const html = beanStorePartsSection(store);
       expect(html).toContain("Bean notes — 0");
       expect(html).toContain("Workflow instances — 0");
+      expect(html).toContain("No merge-queue decision recorded in this store.");
     } finally {
       rmSync(store, { recursive: true, force: true });
     }

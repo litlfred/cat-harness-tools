@@ -150,6 +150,7 @@ import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
+import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
@@ -1285,11 +1286,12 @@ export function memorySubjectPage(
 
 /**
  * The kinds that make up ONE bean store: the store (`beans`) and the parts its
- * `beans.json` declares from within — work items, PR addenda and running BPMN
- * instances (bean `folio-assistant-750a`). A visualiser covering any of them
- * draws the store's page, which lists all three; see {@link beanStorePartsSection}.
+ * `beans.json` declares from within — work items, PR addenda, running BPMN
+ * instances (bean `folio-assistant-750a`) and the merge steward's decisions
+ * (bean `folio-assistant-30jr`). A visualiser covering any of them draws the
+ * store's page, which lists them all; see {@link beanStorePartsSection}.
  */
-export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set(["beans", "bean-defs", "bean-notes", "workflow-state"]);
+export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set(["beans", "bean-defs", "bean-notes", "workflow-state", "merge-queue"]);
 
 /** One bean-store part's directories, read from the store's own `beans.json`. */
 function storePartDirs(storeAbs: string, kind: string): string[] {
@@ -1347,6 +1349,7 @@ export function beanStorePartsSection(storeAbs: string): string {
       );
     })
     .join("");
+  const queue = mergeQueueSection(filesIn(storePartDirs(storeAbs, "merge-queue"), ".json"));
   // In a raw block: the page is Liquid-rendered, and branch names, ids and
   // token names are data nobody screened for `{{`.
   return wrapRaw(
@@ -1357,8 +1360,70 @@ export function beanStorePartsSection(storeAbs: string): string {
     `<h2 class="sv-h2" id="workflow-state">Workflow instances — ${flows.length}</h2>` +
     (flows.length === 0
       ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
-      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`),
+      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`) +
+    queue,
   ).join("\n");
+}
+
+/**
+ * The merge steward's recorded DECISIONS (`merge-queue`,
+ * `folio-merge-queue-entry/v1`), one row per entry: bean
+ * `folio-assistant-30jr`, the harness tile `hfag` asked for.
+ *
+ * Decisions only, as the kind requires: placement, triage status, hold,
+ * who decided and when, and why. Not one GitHub fact. CI, mergeability,
+ * labels and the head are GitHub's to answer, and a copy committed into a
+ * page is stale on the next push, so each row LINKS the pull request and the
+ * reader gets the live answer from the place that owns it.
+ *
+ * Every entry is parsed with the schema the steward's writer uses. One that
+ * fails is listed with the reason rather than dropped: it is a decision a
+ * steward believes it recorded (the same rule as `merge-queue-store.ts`).
+ */
+export function mergeQueueSection(files: readonly string[]): string {
+  const rows: string[] = [];
+  let bad = 0;
+  for (const f of files) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(f, "utf-8"));
+    } catch {
+      bad++;
+      rows.push(`<tr><td><code>${esc(basename(f))}</code></td><td colspan="5">not readable JSON</td></tr>`);
+      continue;
+    }
+    const r = MergeQueueEntrySchema.safeParse(raw);
+    if (!r.success) {
+      bad++;
+      const i = r.error.issues[0];
+      rows.push(
+        `<tr><td><code>${esc(basename(f))}</code></td>` +
+          `<td colspan="5">not a valid entry — ${esc(i?.path.join(".") || "(root)")}: ${esc(i?.message ?? "")}</td></tr>`,
+      );
+      continue;
+    }
+    const e = r.data;
+    const pr = `<a href="https://github.com/${esc(e.repository)}/pull/${e.pr}">${esc(e.repository)}#${e.pr}</a>`;
+    const placed =
+      e.placement.kind === "computed"
+        ? `${esc(e.placement.class)}, rank ${e.placement.rank}`
+        : `override, position ${e.placement.position}`;
+    const hold = e.hold ? `on ${esc(e.hold.waitsOn)} until ${esc(e.hold.expires)}` : "";
+    rows.push(
+      `<tr><td>${pr}</td><td>${esc(e.status ?? "")}</td><td>${placed}</td><td>${hold}</td>` +
+        `<td>${esc(e.decidedAt)}<br>${esc(e.decidedBy)}</td><td>${esc(e.reason)}</td></tr>`,
+    );
+  }
+  return (
+    `<h2 class="sv-h2" id="merge-queue">Merge queue — ${files.length - bad} decision(s)` +
+    `${bad > 0 ? `, ${bad} unreadable` : ""}</h2>` +
+    (files.length === 0
+      ? `<p class="sv-sub">No merge-queue decision recorded in this store.</p>`
+      : `<p class="sv-sub">What the merge steward decided, and why. CI, mergeability and the head are GitHub's facts: ` +
+        `open the pull request for them.</p>` +
+        `<table><thead><tr><th>pull request</th><th>status</th><th>placement</th><th>hold</th><th>decided</th>` +
+        `<th>reason</th></tr></thead><tbody>${rows.join("")}</tbody></table>`)
+  );
 }
 
 /**
@@ -1415,7 +1480,7 @@ export function instanceSubjectsOf(
  * writer and the orphan keep-set both depend on it — the keep-set test held a
  * hand-written list and missed the seven hubs #294 added.
  *
- * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are drawn
+ * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`, `merge-queue`) are drawn
  * on the store's own page, so the subjects are the stores (bean
  * `folio-assistant-750a`). A directory the visualiser ALSO names by id
  * (`covers`) is drawn on its full view, and `viewersOf` opens that view for
