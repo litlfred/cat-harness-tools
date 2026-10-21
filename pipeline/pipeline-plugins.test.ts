@@ -31,6 +31,8 @@ import {
   UnregisteredPipelinePluginError,
   optionalPipelinePlugin,
   pipelinePlugin,
+  PIPELINE_PLUGIN_KINDS,
+  extractTabularCsvw,
   slotDeclaredBy,
   stripLeanComments,
   usePipelinePluginRegistry,
@@ -209,6 +211,39 @@ describe("an unregistered kind", () => {
   it("is undefined from the optional accessor, for callers with their own could-not-determine state", () => {
     usePipelinePluginRegistry(new ContributionRegistry());
     expect(optionalPipelinePlugin("lean-coverage")).toBeUndefined();
+  });
+});
+
+describe("the tabular-csvw slot (bean urat)", () => {
+  it("is a declared kind, and its delegate passes the source and options through", () => {
+    expect(PIPELINE_PLUGIN_KINDS).toContain("tabular-csvw");
+    const seen: unknown[] = [];
+    const reg = new ContributionRegistry();
+    reg.register({
+      name: "dep-core",
+      pipelinePlugins: [
+        {
+          kind: "tabular-csvw",
+          implementation: {
+            extract: (source: Buffer, opts: { url: string; docId: string; mimetype: string | null }) => {
+              seen.push(source.toString("utf-8"), opts);
+              return null;
+            },
+          },
+        },
+      ],
+    });
+    usePipelinePluginRegistry(reg);
+    const opts = { url: "a.csv", docId: "a", mimetype: null };
+    expect(extractTabularCsvw(Buffer.from("x,y"), opts)).toBeNull();
+    expect(seen).toEqual(["x,y", opts]);
+  });
+
+  it("unfilled, it refuses with the slot error rather than falling back to v1", () => {
+    usePipelinePluginRegistry(new ContributionRegistry());
+    expect(() => extractTabularCsvw(Buffer.from("x,y"), { url: "a.csv", docId: "a", mimetype: null })).toThrow(
+      UnregisteredPipelinePluginError,
+    );
   });
 });
 
