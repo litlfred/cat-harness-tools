@@ -26,3 +26,15 @@ Measured on litlfred/smart-immunizations#66 (771314f, cat-harness ac96988, cat-h
 - `derive:publish` skips a writer whose input graph is `absent` (reported, not exit 2), so the other publish-time pages are still built.
 - `skill:register`'s missing manifests are explained, and fixed or classified.
 - smart-immunizations#66's "No new failures" goes green without changing smart-immunizations.
+
+## Proposed design (2026-10-21, session_016heucWhrncLm4uy52csBcz)
+
+`absent` is decided only at mount time (`state-mount.ts` `fanOut`, which asks the remote whether it carries the namespace). Readers run offline and cannot decide it again, so today they see the same "not mounted" whether the graph is absent or never mounted.
+
+1. **Record it.** When `fanOut` reports `absent`, write `<git-dir>/branch-mounts/<key>.absent.json` with `{id, path, declaredBy, reason}`. A later `mounted` clears it. The record lives beside the mount markers and in the worktree only, never committed.
+2. **Answer it.** Add `absent` as a state of `contentAt` (branch-store.ts) and `graphReadPath` (graph-read.ts), answered from the record, and only where a record exists. With no record, the answer stays `not-mounted`/`refused` as today, so "never mounted" still reads as could-not-determine.
+3. **Decide per consumer** (the bean's point):
+   - `exitUnlessMounted`: `absent` is not applicable. Exit 0 with the reason, write nothing, and let `derive:publish` continue, so the document-kinds pages are built.
+   - `sweep:mark:check` (via `resolveBeanGraphNode`): `absent` gives judgement `ok` with "not applicable: …".
+   - Every other caller of the two resolvers keeps treating `absent` as it treats `refused` until someone decides otherwise. That is the safe default: no reader turns an absent graph into an empty pass.
+4. `skill:register`'s "no package manifests" is investigated separately; it does not look like the same cause.
