@@ -85,7 +85,7 @@ jobs:
       contents: write
     steps:
       - name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ inputs.index-ref }}
@@ -121,7 +121,7 @@ jobs:
           echo "::error::no mount-from-lock replayer at the cat-harness-tools or cat-harness commit fa/index.lock.json pins"
           exit 2
       - name: Check out the caller
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - name: Put the caller in place of its locked mount
