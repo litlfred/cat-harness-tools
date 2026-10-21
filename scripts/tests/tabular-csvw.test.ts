@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   CsvwTableSchema,
-  TabularCsvwSchema,
+  TabularCsvwTablesSchema,
   CSVW_CONTEXT,
   CSVW_KEYS,
   TABULAR_CSVW_FILENAME,
@@ -47,7 +47,7 @@ describe("CSVW is annotated, never replaced", () => {
     // Bean `792y`. The helper this replaced stripped our keys and called the
     // rest CSVW, but never added the context, so a CSVW parser would have
     // rejected every document it produced. The context is what makes it CSVW.
-    const doc = TabularCsvwSchema.parse({ $schema: TABULAR_CSVW_SCHEMA_ID, doc_id: "d", tables: [table()] });
+    const doc = TabularCsvwTablesSchema.parse({ $schema: TABULAR_CSVW_SCHEMA_ID, doc_id: "d", tables: [table()] });
     const csvw = toCsvw(doc);
     expect(csvw["@context"]).toBe(CSVW_CONTEXT);
     expect(CSVW_CONTEXT).toBe("http://www.w3.org/ns/csvw");
@@ -59,7 +59,7 @@ describe("CSVW is annotated, never replaced", () => {
   test("…and it carries NO key of ours, at ANY level", () => {
     // `csvwOnly` stripped `fac:` keys at the table level and left
     // `datatypeSource` on every column. So the check walks the whole tree.
-    const doc = TabularCsvwSchema.parse({
+    const doc = TabularCsvwTablesSchema.parse({
       $schema: TABULAR_CSVW_SCHEMA_ID,
       doc_id: "d",
       tables: [table(), table({ tableSchema: { columns: [] }, "fac:stub": { tool: "t", reason: "r", since: "2026-09-23" } })],
@@ -152,7 +152,7 @@ describe("a stub cannot be mistaken for a result", () => {
   });
 
   test("`stubsIn` finds them", () => {
-    const doc = TabularCsvwSchema.parse({
+    const doc = TabularCsvwTablesSchema.parse({
       $schema: "folio-tabular-csvw/v1",
       doc_id: "x",
       tables: [table({ tableSchema: { columns: [] }, "fac:stub": stub }), table()],
@@ -168,6 +168,9 @@ describe("the QA catches ABSENCE — and can actually fail", () => {
       $schema: "folio-tabular-csvw/v1",
       doc_id: "x",
       tables: [{ ...table({ tableSchema: { columns: [] }, "fac:stub": stub }), ...over }],
+      // A committed record, as the ingest runner writes it (bean `urat`).
+      source: { file: "x.xlsx" },
+      narrative: { text: null, state: "not-authored" },
     });
 
   test("an outstanding stub is REPORTED, and does not block", () => {
