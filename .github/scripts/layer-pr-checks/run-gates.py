@@ -65,7 +65,8 @@ and one whose prerequisite file is absent at the root (`PREREQUISITE_FILES`).
 
 A gate whose input this runner DOES have is given it instead
 (`SUPPLIED_INPUTS`): `check:corpus-gate` gets `--since $GATE_DIFF_BASE`, the
-PR's diff base, and `check:test-budgets` the junit report at `$GATE_JUNIT`
+PR's diff base, `translation:catalogue:check` gets `--base` the same commit,
+and `check:test-budgets` the junit report at `$GATE_JUNIT`
 that the tests step wrote. Either is skipped, with its reason, only on a side
 that holds no such input.
 
@@ -221,6 +222,18 @@ def corpus_gate_input(env):
     return ["--since", base], None
 
 
+def catalogue_input(env):
+    # `--base`, two dots, never the script's `origin/main...HEAD` default: the
+    # root is checked out at depth 1-2, and a three-dot range needs a merge base
+    # that clone does not have, so the bare gate exited 2 ("could not
+    # determine") on every layer PR (smart-immunizations#66, run 39619275196).
+    base = env.get("GATE_DIFF_BASE", "").strip()
+    if not base:
+        return None, ("needs --base <sha>, and this run has no PR diff in the root's own history "
+                      "(layer mode swaps the caller in without its .git; GATE_DIFF_BASE is unset)")
+    return ["--base", base], None
+
+
 def junit_cases(path):
     """The number of <testcase> elements in a junit report, or None when it will not read."""
     import xml.etree.ElementTree as ET
@@ -247,6 +260,7 @@ def test_budgets_input(env):
 SUPPLIED_INPUTS = {
     "check:corpus-gate": corpus_gate_input,
     "check:test-budgets": test_budgets_input,
+    "translation:catalogue:check": catalogue_input,
 }
 
 
