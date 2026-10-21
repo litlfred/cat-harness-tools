@@ -790,10 +790,14 @@ export function planFor(
   // itself via `[Content_Types].xml` or ODF's `mimetype` member. Bean `p67i`;
   // the defect was introduced by `twqe`'s routing and caught before it shipped.
   if (mime !== null && (TABULAR_MIMETYPES as readonly string[]).includes(mime)) {
+    // An xlsx is read as CSVW through the `tabular-csvw` slot, which core
+    // fills (bean `urat`, owner 2026-10-20). An ODS stays on v1 for now:
+    // core has no CSVW reader for it, and an unread ODS is not better.
+    const ods = mime === "application/vnd.oasis.opendocument.spreadsheet";
     return {
       rung: "tabular",
-      why: `the package declares ${mime} — a workbook, read for its sheets and headers`,
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      why: `the package declares ${mime} — a workbook, read for its sheets and headers${ods ? " (v1: no CSVW reader for ODS yet)" : ""}`,
+      steps: [ods ? ["python3", pyHelper("tabular-records.py"), "-o", lib, pdf] : ["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -819,7 +823,7 @@ export function planFor(
     return {
       rung: "tabular",
       why: "no magic bytes, but the rows split consistently — delimited text",
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      steps: [["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 

@@ -259,10 +259,10 @@ function entryFor(mimetype: string | null, tabular?: unknown): string {
 const tabState = (d: string) => checkEntry(d).requirements.find((r) => r.name === "tabular-records");
 
 describe("the gate fires on a workbook with no record", () => {
-  test("a workbook entry with no tabular.jsonld is UNMET", () => {
+  test("a workbook entry with no tabular record is UNMET", () => {
     const r = tabState(entryFor(XLSX));
     expect(r?.state).toBe("unmet");
-    expect(r?.detail).toContain("no tabular.jsonld");
+    expect(r?.detail).toContain("no tabular record");
   });
 
   test("a valid record is MET and names the narrative state", () => {

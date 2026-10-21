@@ -33,6 +33,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
+import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { entryItems } from "./summaries.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -50,6 +51,9 @@ const ROOT = resolve(HARNESS_ROOT);
  */
 export const NARRATIVE_BEARING = [
   "tabular.jsonld",
+  // Its CSVW successor for delimited and workbook sources, carrying the same
+  // top-level narrative (bean `urat`, owner ruling 2026-10-20).
+  TABULAR_CSVW_FILENAME,
   "contents.jsonld",
   "manifest.jsonld",
   "images.json",
