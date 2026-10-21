@@ -5,7 +5,7 @@ status: todo
 type: bug
 priority: normal
 created_at: 2026-10-03T01:05:37Z
-updated_at: 2026-10-20T15:45:00Z
+updated_at: 2026-10-20T15:20:36Z
 parent: folio-assistant-hfag
 ---
 

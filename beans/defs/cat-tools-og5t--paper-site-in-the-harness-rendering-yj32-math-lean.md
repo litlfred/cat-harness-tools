@@ -1,12 +1,12 @@
 ---
 # cat-tools-og5t
 title: 'PAPER SITE in the harness rendering (yj32): math, Lean links and notation macros, blocking qou''s legacy-render retirement'
-status: todo
+status: in-progress
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T15:30:00Z
+updated_at: 2026-10-20T19:03:04Z
 parent: folio-assistant-yj32
 ---
 
@@ -42,3 +42,159 @@ KaTeX/MathJax the harness rendering commits to. Left `todo` for whoever takes
 the qou legacy-render retirement.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Scoped 2026-10-20 — measured, so the bean can be claimed
+
+**What "legacy render" is.** qou (`main` @ `77e7f0e`) builds through
+`.github/workflows/build.yml` → `litlfred/folio-assistant/.github/workflows/publish.yml@0fba270`,
+the pre-separation platform. That workflow is an 8-job DAG whose paper output
+is **LaTeX → PDF**: the content pipeline emits `main.tex`
+(`content/pipeline/build.ts`), then `latexmk -pdf` runs in a folio-supplied TeX
+builder image, plus appendix PDFs and a folio-supplied `blueprint-html`.
+Retiring it means qou's build stops calling that pinned platform workflow.
+
+**What the harness rendering already has.**
+- KaTeX is declared as a viewer dependency of the `equation` and `simulator`
+  block kinds (`src/blocks/registry.ts:96,98`).
+- A generic `MacroDef` (`{ tex, unicode? }`) exists on `ResolvedDocument`
+  (`src/content-types.ts`), so macros can reach a renderer. Whether any
+  renderer feeds them to KaTeX's `macros` option is unmeasured.
+- The paper-specific rendering knowledge (`folio-paper-adapter` skills
+  `rendering-fixes`, `rendering-auditor`, and `editor-checkers/paper-latex.json`)
+  is in **folio-assistant-sci**, not here.
+- **Nothing** links a block to a Lean declaration in this repository.
+
+So most of this bean's code lands in folio-assistant-sci (the paper adapter
+renders its own content: AGENTS.md, "a content package's own server half lives
+with that package"). This repository supplies the mechanism: the KaTeX
+dependency, the macro channel, and a link slot on a block.
+
+### Proposed done-when (for option 1 below)
+- [ ] a paper block renders its math with KaTeX using the folio's notation
+      macros, pinned by a rendered-output test on a qou block that uses a macro
+- [ ] a block with a Lean counterpart links to the declaration, and a block
+      whose declaration is missing is reported, never silently unlinked
+- [ ] every paper block kind qou uses renders: an inventory is measured first
+- [ ] qou's HTML comes from the harness rendering, and its `build.yml` no
+      longer needs `publish.yml@0fba270` for HTML
+
+## Owner decision
+
+What must the harness rendering do before qou's legacy renderer retires?
+(Asked 2026-10-20 by the cat-harness-tools drain lane.)
+
+1. **(Recommended) HTML parity only.** The harness rendering replaces the
+   legacy HTML (math with macros, Lean links, every block kind). The PDF stays
+   on its LaTeX path as a folio asset (qou's own TeX builder image), so only
+   the HTML half moves now.
+2. **Full retirement, PDF included.** The harness also owns the LaTeX→PDF
+   build. This is much larger: the TeX image and `latexmk` gates move too.
+3. **Defer until the sci layer move (`zmdo`/`wggr`).** Wait for the paper
+   adapter's wholesale move, then do option 1 there.
+
+**Default if no answer:** option 1.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+
+## Owner ruling 2026-10-20: option 1, HTML parity only
+
+Answered directly in the cat-harness-tools drain session ("1 ok"). The harness
+rendering replaces qou's legacy **HTML** (math with the folio's macros, Lean
+links, every paper block kind). The PDF stays on its LaTeX path as a folio
+asset. The proposed done-when above stands as this bean's done-when.
+
+## Correction 2026-10-20: the viewer already does more than the scoping said
+
+The scoping above searched `src/`, `scripts/` and `pipeline/` and missed
+`viewer/index.html`, so two of its "what exists" claims were wrong:
+
+- **Math with the folio's macros: present.** The viewer renders inline and
+  display math with KaTeX and passes the paper's own table
+  (`katexMacros = buildKatexMacros(p.macros)`, each `{ tex }` as `\name`,
+  plus two built-in fallbacks) to every `katex.render` and to
+  `renderMathInElement`.
+- **Lean per block: present, as status and source, not as a link.** Each
+  block gets a badge from its `lean` record: verified, `sorry`, `err`,
+  `stub`, or **"no lean"** when there is no Lean file, so a miss is already
+  reported rather than silently unlinked. The Lean source renders inline
+  (`.lean-src`). `lean-ref` is a citation link for a `sorry`, **not** a link
+  to the declaration. What is missing is a hyperlink from a block to its
+  Lean declaration.
+
+So, under the owner's option 1 (HTML parity), the done-when above reads:
+
+- [~] math with the folio's macros: done **in the viewer**. Open: whether the
+      HTML qou would publish is the viewer, or a static render that must do
+      the same (to be measured against `blueprint-html`)
+- [~] Lean: status and misses done in the viewer; a **link to the
+      declaration** is the open part
+- [ ] every paper block kind qou uses renders: inventory not yet measured
+- [ ] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T19:01:54Z_ — Claimed by feat/og5t-lean-source-link — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+## Measured 2026-10-20: block-kind inventory, viewer fixes, and what the qou deprecation changes
+
+**Block-kind inventory (done-when item 3), measured on qou `main` @ `77e7f0e`**:
+3,663 block files under `folio/quantum-observable-universe/` use 16 builders —
+remark 1019, proposition 628, table 443, proof 441, prose 390, definition 267,
+conjecture 184, example 102, theorem 55, lemma 49, chapter 36, corollary 17,
+algorithm 16, simulator 11, diagram 2, paper 1. Against
+`src/blocks/registry.ts` (18 kinds), only `chapter` and `paper` are absent, and
+those are structural containers rather than blocks a page renders as one. So
+every block kind qou uses has a registry entry; whether each renders
+*correctly* is the rendering check, not this inventory.
+
+**Viewer, fixed in litlfred/cat-harness-tools#487**:
+- `viewer/index.html`'s module script did not parse on `main` (Chromium:
+  "Unexpected end of input"), so none of the viewer ran. Fixed, with a test.
+- 1,269 of qou's blocks carry `lean.ref` (`"qou:QOU.X.y"`), and the viewer read
+  only `lean.file`/`lean.decl`, so they showed "no lean". It now reads both.
+
+**The owner deprecated qou's rendered GitHub Pages site on 2026-09-27** (qou
+`AGENTS.md`, "Build output (gh-pages)"). The `gh-pages` branch stays as a file
+store, and the platform's `publish.yml` (which builds the PDFs) stays live on
+dispatch. And qou has **no doc-gen4 workflow**: measured, no `doc-gen4`
+workflow file exists anywhere in qou's tree, and its Lake `require` is commented
+out (bean `qou-mfst`). Two consequences for this bean:
+
+1. Done-when item 4 ("qou's HTML comes from the harness rendering, not
+   `publish.yml@0fba270`") has no static HTML site left to replace. Under the
+   owner's option 1 (HTML parity), the HTML that qou readers get **is the
+   viewer**, and #487 is what made it run.
+2. Done-when item 2's open part, "a link to the Lean declaration", has **no
+   hosted declaration page** to point at.
+
+## Owner decision
+
+Where should a block's Lean declaration link point, now that qou publishes no
+doc-gen4 pages? (Asked 2026-10-20 by the cat-harness-tools drain lane.)
+
+1. **(Recommended) The declaration's source on GitHub.** Resolve `lean.ref`
+   (`<package>:<Decl.Name>`) through the Lake package registry to the file and
+   line, and link to it at the commit the viewer serves. This needs no doc
+   hosting, never goes stale against a separate build, and the viewer already
+   shows the source inline, so the link is a "view in context" for it.
+2. **Revive doc-gen4 hosting** (a workflow plus a publish target) and link to
+   its declaration pages. The richest view, but it brings back a build and a
+   hosted site that qou's 2026-09-27 ruling has just retired.
+3. **No link.** The status badge plus inline source already show what a reader
+   needs. Close item 2 as done.
+
+**Default if no answer:** option 1.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Owner ruling 2026-10-20: option 1, the declaration's source on GitHub
+
+Asked in the drain coordinator's session (structured question,
+https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6) and relayed to this
+lane: the owner chose **"GitHub source"**. A block's Lean declaration link goes
+to the declaration's line in its `.lean` file on GitHub, resolved from the
+block's `lean.ref` at the pinned commit. Not doc-gen4, and not no link.
+
+Built in litlfred/cat-harness-tools#494 (`feat/og5t-lean-source-link`).

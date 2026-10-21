@@ -255,6 +255,9 @@ export interface LatexSource {
 
 export const LATEX_SOURCE_RECORD = "source/source.json";
 
+/** Written by `retire-library-pdf.py` when it removes a processed PDF. */
+export const SOURCE_MATERIALIZATION_RECORD = "source.materialization.json";
+
 /**
  * The LaTeX source as its own `SourceDocument`, `partOf` the paper's manifest.
  *
@@ -381,6 +384,7 @@ export function buildDocumentNodes(
   titled?: ManifestTitle,
   instance?: string,
   subgraphStart: string = findContentRepoRoot(),
+  sourceMaterialization?: unknown,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -570,6 +574,11 @@ export function buildDocumentNodes(
         source_file: structure.source?.file,
         source_sha256: structure.source?.sha256,
         pages: structure.source?.pages,
+        // The PDF's own state once `retire-library-pdf.py` has removed it:
+        // `referenced`, with the sha256 of the removed bytes and the two
+        // places to get them back (the arXiv version or DOI, and the commit
+        // that still holds the file). Absent while the PDF is here.
+        source_materialization: sourceMaterialization ?? undefined,
         arxiv: structure.metadata?.arxiv ?? null,
         doi: structure.metadata?.doi ?? null,
         document_class: candidates?.document_class ?? null,
@@ -864,6 +873,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       titled,
       instance,
       subgraphStart,
+      readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
