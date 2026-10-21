@@ -52,7 +52,7 @@ import { join, resolve } from "node:path";
 import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import type { TabularCsvw } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import type { TabularCsvwTables } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -127,11 +127,13 @@ export interface LeanCoveragePlugin {
  */
 export interface TabularCsvwPlugin {
   /**
-   * The `folio-tabular-csvw/v1` record for a source, or `null` when the
-   * source is not a table this reader takes. `mimetype` is the sniffed one
+   * The `folio-tabular-csvw/v1` tables for a source, or `null` when the
+   * source is not a table this reader takes. The ingest runner adds `source`
+   * and `narrative`; a reader never sees them (bean `urat`, step 5).
+   * `mimetype` is the sniffed one
    * (`null` for text with no magic bytes, as a CSV is).
    */
-  extract(source: Buffer, opts: { url: string; docId: string; mimetype: string | null }): TabularCsvw | null;
+  extract(source: Buffer, opts: { url: string; docId: string; mimetype: string | null }): TabularCsvwTables | null;
 }
 
 /** Every slot, keyed by the kind string a contributor registers under. */
@@ -343,6 +345,6 @@ export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin[
 export function extractTabularCsvw(
   source: Buffer,
   opts: { url: string; docId: string; mimetype: string | null },
-): TabularCsvw | null {
+): TabularCsvwTables | null {
   return pipelinePlugin("tabular-csvw").extract(source, opts);
 }
