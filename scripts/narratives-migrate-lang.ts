@@ -65,10 +65,31 @@ function serializerFor(raw: string, doc: unknown, indent: number | string, trail
   return undefined;
 }
 
+/**
+ * Parse `raw`, keeping every number exactly as it is written.
+ *
+ * The library's Python producers write a float such as `338.0` or `1e-05`,
+ * which `JSON.parse` reads as `338` and `0.00001` and `JSON.stringify` then
+ * writes as `338` and `0.00001`. A file holding one did not round-trip and was
+ * refused: 9 files across cat-harness and smart-base on 2026-10-21, so their
+ * narratives could not be migrated. A number whose source is not what
+ * `JSON.stringify` would write is kept as that source (`JSON.rawJSON`), so it
+ * is written back character for character.
+ */
+function parseKeepingNumbers(raw: string): Record<string, unknown> {
+  // `JSON.rawJSON` (ES2025) is in Bun but not yet in TypeScript's lib.
+  const { rawJSON } = JSON as JSON & { rawJSON(text: string): unknown };
+  return JSON.parse(raw, (_key: string, value: unknown, context?: { source?: string }) =>
+    typeof value === "number" && context?.source !== undefined && context.source !== JSON.stringify(value)
+      ? rawJSON(context.source)
+      : value,
+  ) as Record<string, unknown>;
+}
+
 /** Migrate one file's text. Pure: returns the new text (or the same) and what happened. */
 export function migrateText(raw: string, lang: string): { text: string; result: Omit<FileResult, "file"> } {
   const result = { converted: 0, skippedNotAuthored: 0, alreadyList: 0 };
-  const doc = JSON.parse(raw) as Record<string, unknown>;
+  const doc = parseKeepingNumbers(raw);
   const indent = indentOf(raw);
   const trailing = raw.endsWith("\n") ? "\n" : "";
   const write = serializerFor(raw, doc, indent, trailing);
