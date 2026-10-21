@@ -34,6 +34,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import { VECTOR_FIGURES_FILE } from "@litlfred/cat-harness/schemas/vector-figure.ts";
+import { FIGURE_DESCRIPTIONS_FILE } from "@litlfred/cat-harness/schemas/figure-description.ts";
 import { entryItems } from "./summaries.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -61,7 +63,22 @@ export const NARRATIVE_BEARING = [
   // `summaries[i].narrative`, like `images.json` — and like it, useless here
   // without the matching branch in {@link narrativesIn}.
   SUMMARIES_FILE,
+  // Drafted descriptions of the vector arm's figure renders, MANY per file at
+  // `figures[i].narrative` (bean `ay3x`). Missing until 2026-10-21, so the
+  // queue never offered one to a person, and the e1lo language migration,
+  // which walks this list, left all 37 in cat-harness in the single form.
+  VECTOR_FIGURES_FILE,
 ] as const;
+
+/**
+ * Files at the top of a LIBRARY, not inside an entry, that carry narratives.
+ *
+ * `figure-descriptions.json` (bean `a8wy`) holds what someone concluded a
+ * drawn figure shows, keyed by document: `descriptions[<doc>][i].narrative`.
+ * Its own schema says nothing in it is settled until a person confirms it,
+ * and until 2026-10-21 no review path read it.
+ */
+export const LIBRARY_NARRATIVE_BEARING = [FIGURE_DESCRIPTIONS_FILE] as const;
 
 /** Where a narrative sits inside its document, so `decide` can write it back. */
 export type NarrativePath = readonly (string | number)[];
@@ -108,8 +125,8 @@ export interface QueueItem {
  */
 export function narrativesIn(
   doc: Record<string, unknown>,
-): { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string }[] {
-  const out: { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string }[] = [];
+): { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string; slug?: string }[] {
+  const out: { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string; slug?: string }[] = [];
 
   out.push(...inSlot(doc.narrative, ["narrative"]));
 
@@ -124,6 +141,33 @@ export function narrativesIn(
       const subject = typeof rec.id === "string" ? rec.id : undefined;
       for (const n of inSlot(rec.narrative, ["images", i, "narrative"])) out.push({ ...n, subject });
     });
+  }
+
+  // Vector figures (`vector-figures.json`): one narrative per rendered figure.
+  const figures = doc.figures;
+  if (Array.isArray(figures)) {
+    figures.forEach((fig, i) => {
+      if (typeof fig !== "object" || fig === null) return;
+      const rec = fig as Record<string, unknown>;
+      const subject = typeof rec.id === "string" ? rec.id : undefined;
+      for (const n of inSlot(rec.narrative, ["figures", i, "narrative"])) out.push({ ...n, subject });
+    });
+  }
+
+  // Figure descriptions (`figure-descriptions.json`, library level), keyed by
+  // the document they describe. The document is the item's slug, so the
+  // reviewer sees which entry a description belongs to.
+  const descriptions = doc.descriptions;
+  if (typeof descriptions === "object" && descriptions !== null && !Array.isArray(descriptions)) {
+    for (const [docId, recs] of Object.entries(descriptions as Record<string, unknown>)) {
+      if (!Array.isArray(recs)) continue;
+      recs.forEach((rec, i) => {
+        if (typeof rec !== "object" || rec === null) return;
+        const r = rec as Record<string, unknown>;
+        const subject = typeof r.figure === "string" ? r.figure : undefined;
+        for (const n of inSlot(r.narrative, ["descriptions", docId, i, "narrative"])) out.push({ ...n, subject, slug: docId });
+      });
+    }
   }
 
   // Block summaries (`summaries.json`). The subject is the block's own name,
@@ -189,35 +233,40 @@ export function queue(root = ROOT): QueueItem[] {
   const libs = corpusDirectoriesForGraph(root, "library").filter((d) => existsSync(d));
   if (libs.length === 0) return [];
   const out: QueueItem[] = [];
-  for (const lib of libs) for (const slug of readdirSync(lib).sort()) {
-    for (const name of NARRATIVE_BEARING) {
-      const f = join(lib, slug, name);
-      if (!existsSync(f)) continue;
-      let doc: Record<string, unknown>;
+  // Every entry's bearing files, then the library-level ones, per library.
+  const files: { f: string; dir: string; slug: string; name: string }[] = [];
+  for (const lib of libs) {
+    for (const slug of readdirSync(lib).sort()) {
+      for (const name of NARRATIVE_BEARING) files.push({ f: join(lib, slug, name), dir: join(lib, slug), slug, name });
+    }
+    for (const name of LIBRARY_NARRATIVE_BEARING) files.push({ f: join(lib, name), dir: lib, slug: "", name });
+  }
+  for (const { f, dir, slug, name } of files) {
+    if (!existsSync(f)) continue;
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(readFileSync(f, "utf-8")) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    // Which summaries are stale, asked of the drain's own reader — one
+    // definition of "the text changed", not a second one here.
+    let stale = new Set<number>();
+    if (name === SUMMARIES_FILE) {
       try {
-        doc = JSON.parse(readFileSync(f, "utf-8")) as Record<string, unknown>;
+        const status = new Map(entryItems(dir).map((it) => [it.block, it.status]));
+        const recs = Array.isArray(doc.summaries) ? (doc.summaries as { block?: unknown }[]) : [];
+        stale = new Set(recs.flatMap((r, i) => (status.get(String(r?.block)) === "stale" ? [i] : [])));
       } catch {
-        continue;
+        // An invalid sidecar is `check:l1-complete`'s finding. Its drafts are
+        // still shown; `decide` re-asks before a confirmation is written, and
+        // refuses when it cannot tell.
       }
-      // Which summaries are stale, asked of the drain's own reader — one
-      // definition of "the text changed", not a second one here.
-      let stale = new Set<number>();
-      if (name === SUMMARIES_FILE) {
-        try {
-          const status = new Map(entryItems(join(lib, slug)).map((it) => [it.block, it.status]));
-          const recs = Array.isArray(doc.summaries) ? (doc.summaries as { block?: unknown }[]) : [];
-          stale = new Set(recs.flatMap((r, i) => (status.get(String(r?.block)) === "stale" ? [i] : [])));
-        } catch {
-          // An invalid sidecar is `check:l1-complete`'s finding. Its drafts are
-          // still shown; `decide` re-asks before a confirmation is written, and
-          // refuses when it cannot tell.
-        }
-      }
-      for (const { path, narrative, subject, lang } of narrativesIn(doc)) {
-        if (narrative.state !== "draft") continue;
-        const isStale = path[0] === "summaries" && stale.has(path[1] as number);
-        out.push({ file: relative(root, f), slug, path, subject, ...(lang ? { lang } : {}), narrative, ...(isStale ? { stale: true } : {}) });
-      }
+    }
+    for (const { path, narrative, subject, lang, slug: own } of narrativesIn(doc)) {
+      if (narrative.state !== "draft") continue;
+      const isStale = path[0] === "summaries" && stale.has(path[1] as number);
+      out.push({ file: relative(root, f), slug: own ?? slug, path, subject, ...(lang ? { lang } : {}), narrative, ...(isStale ? { stale: true } : {}) });
     }
   }
   return out;
