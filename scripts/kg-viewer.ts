@@ -87,6 +87,7 @@ import {
 } from "./kg-viewer-strings.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteArg } from "./lib/site-target.ts";
 import { pageParts } from "./viewer-declarations.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -1255,7 +1256,7 @@ if (import.meta.main) {
   // fine locally.
   // `--site <dir>`: the published layout, the viewer at its route and a
   // forwarding page at its old address. `--out`: one file, the graph its parent.
-  const site = arg("--site");
+  const site = siteArg();
   if (site !== undefined) {
     const { page, forwarded } = writeViewer(site, stub);
     console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${stub}.jsonld`);
