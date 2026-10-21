@@ -87,7 +87,7 @@ export function withSavedScheme(html: string): string {
   // day after the rule changed, because the mark alone made this a no-op.
   if (html.includes(SCHEME_MARK)) {
     let first = true;
-    const out = html.replace(MARKED, (m) => {
+    const out = html.replace(MARKED, () => {
       if (!first) return "";
       first = false;
       return script;
