@@ -29,7 +29,7 @@ export const TRANSLATION_META_ID = "fa-translation-meta";
  *
  * A mount is finished HTML that Jekyll never lays out, so `head_custom.html`
  * never writes this block on it, and without it `docs-ui.js` draws no band
- * globe. Issue #2219: the owner asked why `/who-iris/` had no translations,
+ * globe. Issue #2219: the owner asked why the IRIS replica's root had no translations,
  * and chose *"USE THE SAME CHROME AS FOLIO-ASSISTANT. THIS IS ALREADY
  * DEFINED"*. So this is the include's block with the include's defaults, not
  * a new format: `lang` and `supportedLocales` come from the instance's own

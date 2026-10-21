@@ -32,11 +32,10 @@
 
 // The REGISTRY, not BASE_GRAPH_TYPOLOGIES: since bean dmx1 a harness DECLARES its
 // kinds in a typologies/ graph, and a sweep over the code list alone stopped checking
-// every kind that moved (fhir-harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
+// every kind that moved (the FHIR IG harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
 import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import { GLOSSARY_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/glossary-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
 import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/declared-nodes.js";
 import { typedBlockKinds } from "@litlfred/cat-harness/schemas/constraints.js";
@@ -85,7 +84,7 @@ export const FOREIGN_REPOSITORY_PREFIXES: readonly string[] = ["bootstrap-tools:
 
 /**
  * Every validator string a kind's AUTHORED definition still carries: the code
- * list, the kinds/ nodes and core's two code-registered kinds, read BEFORE the
+ * list, the kinds/ nodes and the code-registered `folio` kind, read BEFORE the
  * registry joins validator nodes on, which is what tells a string an author
  * wrote from one the registry filled in.
  */
@@ -100,7 +99,6 @@ export function authoredValidatorStrings(): { kind: string; family?: string; ref
   };
   for (const [k, d] of Object.entries(BASE_GRAPH_TYPOLOGIES)) add(k, d);
   add("folio", FOLIO_GRAPH_TYPOLOGY);
-  add("glossary", GLOSSARY_GRAPH_TYPOLOGY);
   for (const { node } of declaredKindNodes(join(import.meta.dir, "..", ".."))) add(node.kind, node);
   return out;
 }
@@ -135,6 +133,13 @@ export interface FamilySweep {
   counts: Record<string, { nodes: number; checked: number; parsed: number; state: string }>;
   /** A tag on disk the map does not name — the map claimed completeness. */
   unmapped: { tag: string; example: string }[];
+  /**
+   * A tag the map does not name, met ONLY inside a checkout-built
+   * `builtAtPublish` path: a projection of another instance's graph (the byte
+   * copies under `docs/assets/library/jsonld/`, bean `8pzh`), whose nodes are
+   * judged where their source is declared. Reported, never a failure.
+   */
+  projected?: { tag: string; example: string }[];
   /** A family whose reference does not resolve. */
   unresolvable: { tag: string; reason: string }[];
   /** A node that fails its family's Zod schema. */
@@ -229,12 +234,19 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   const out: FamilySweep[] = [];
   // Every directory the checkout declares, with the kinds it carries. A node
   // under a MORE SPECIFIC declared directory belongs to that directory's
-  // kinds, not to an enclosing one's: smart-base declares
+  // kinds, not to an enclosing one's: the DAK base layer declares
   // `library/<entry>/l1-extraction/` as `l1-extraction` inside its `library/`,
   // and the library map must not call that kind's run contexts and work lists
   // "unmapped" (folio-assistant#2529).
   const declaredDirs: { abs: string; kinds: readonly string[] }[] = [];
+  // The checkout-built `builtAtPublish` paths of every instance: what they
+  // hold is computed over OTHER instances, so a family met only there is the
+  // projected instance's (see `FamilySweep.projected`).
+  const checkoutBuilt: string[] = [];
   for (const inst of instanceRootsIn(join(root, ".."))) {
+    for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
+      if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path).replace(/\/+$/, "") + (b.path.endsWith("/") ? "/" : ""));
+    }
     for (const e of readDeclaration(inst)?.directories ?? []) {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
@@ -261,9 +273,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
     if (!def.nodeSchemas) continue;
     const fams = await resolveNodeSchemas(kind, root);
     const byTag = new Map(fams.map((f) => [f.tag, f]));
-    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [] };
+    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
+    const inProjection = (file: string): boolean => checkoutBuilt.some((d) => file === d || (d.endsWith("/") && file.startsWith(d)));
     // WHERE TO READ, not where the declaration points. A graph kept at a branch
     // tip is read at its mount, and when nothing is mounted there is no
     // directory to read at all — which is a different answer from an empty one.
@@ -344,6 +357,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
         const rel = relative(join(root, ".."), file);
+        if (!fam && inProjection(file)) {
+          if (!s.projected!.some((u) => u.tag === tag)) s.projected!.push({ tag, example: rel });
+          continue;
+        }
         if (!fam) {
           if (!s.unmapped.some((u) => u.tag === tag)) s.unmapped.push({ tag, example: rel });
           continue;
@@ -425,6 +442,8 @@ async function main(): Promise<number> {
       console.log(`  ✗ EXAMINED NOTHING — ${f.kind} declares nodeSchemas and no node was found`);
       familyFail = true;
     }
+    for (const u of f.projected ?? [])
+      console.log(`  · ${u.tag}: another instance's node in a checkout-built projection (e.g. ${u.example}), judged where its source is declared`);
     for (const u of f.unmapped) console.log(`  ✗ unmapped family ${u.tag} (e.g. ${u.example})`);
     for (const u of f.unresolvable) console.log(`  ✗ ${u.tag}: ${u.reason}`);
     if (f.unmapped.length || f.unresolvable.length) familyFail = true;

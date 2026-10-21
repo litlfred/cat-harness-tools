@@ -55,17 +55,23 @@
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, posix } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
 import {
   checkMethodologyEvidence,
+  frontMatterOf,
   methodologyNodes,
+  methodologyUses,
   type EvidenceReport,
   type MethodologyNode,
 } from "./check-methodology-evidence.js";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
+import { blobUrl, forgeAt } from "./lib/library-source.ts";
+import { repoOf } from "../src/core/edit-links.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -97,7 +103,7 @@ export interface MethodologyRow {
   readonly origin: string;
   readonly appliesWhen: string;
   /**
-   * WHICH instance declared it — `cat-harness`, `smart-base`, `folio-assistant-core`.
+   * WHICH instance declared it — `cat-harness`, or a layer above it such as a DAK base layer.
    *
    * The graph spans all three, and a page that did not say which would make
    * `grade` read as this instance's own adoption when it is the WHO material's.
@@ -106,6 +112,8 @@ export interface MethodologyRow {
   readonly instance: string;
   readonly evidence: readonly string[];
   readonly state: "ingested" | "cited-only" | "dangling";
+  /** The node's file, relative to the repository root — where its full method is written. */
+  readonly path?: string;
 }
 
 /**
@@ -113,7 +121,7 @@ export interface MethodologyRow {
  *
  * RESOLVED, not split. `methodologyNodes` spells every path relative to the
  * INSTANCE root, so a sibling instance's node arrives as
- * `../smart-base/methodologies/diig.md` — and taking the first segment of that
+ * `../<instance>/methodologies/diig.md` — and taking the first segment of that
  * gives `..`, which is what the first version of this page printed in the
  * "declared by" column for two of its nine rows, and what made its instance
  * count say 2 where the graph spans 3. Found by reading the rendered page, not
@@ -176,6 +184,7 @@ export function methodologyRows(
         instance: instanceOf(n.node, instanceRoot, repoRoot),
         evidence: f.evidence ?? [],
         state,
+        path: relative(repoRoot, resolve(instanceRoot, n.node)).split("\\").join("/"),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -295,9 +304,139 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
     const rel = posix.relative(posix.dirname(fromPage), path!) || ".";
     parts.push(`[\`${cell(e)}\`](${rel}/#${hash})`);
   } else parts.push(`\`${cell(e)}\``);
+  // The entry's own page: its document, and its held source in the view panel.
+  if (l.entry !== undefined) parts.push(`[view](${posix.relative(posix.dirname(fromPage), l.entry) || "."}/)`);
   if (l.readme !== undefined) parts.push(`[item page](${l.readme})`);
   if (l.source !== undefined) parts.push(`[source](${l.source})`);
   return `- ${parts.join(" · ")}`;
+}
+
+/**
+ * Where a node's full method is read: the file on its repository host, through
+ * the same mount-aware `forgeAt` the library's source links use. The page draws
+ * only each node's front matter; the method an agent extracted from the source
+ * is the body (owner, 2026-10-16: *"i thought the methodologies were extracted
+ * into derived content"*), and it was linked from nowhere.
+ */
+export function nodeHrefResolver(repoRoot = REPO): (path: string) => string | undefined {
+  // The checkout's origin, else the harness's declared repository — gen-library-viz's `LINK_REPO` fallback.
+  const d = readDeclaration(INSTANCE_ROOT) as { livesAt?: { repository?: string }; repository?: string } | undefined;
+  const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || d?.livesAt?.repository || d?.repository;
+  return (path) => {
+    const at = forgeAt(repoRoot, path, checkoutRepo);
+    return at ? blobUrl(at) : undefined;
+  };
+}
+
+/**
+ * ONE PAGE PER METHODOLOGY (owner, 2026-10-16: *"use same URL pattern as other
+ * viewers"*): `<route>/<instance>/<name>/`, the library's
+ * `<route>/<instance>/<id>/`. The list page is `<route>/index.md`; a node's
+ * page is this directory under it.
+ */
+export function nodePageDir(r: Pick<MethodologyRow, "instance" | "name">): string {
+  return `${encodeURIComponent(r.instance)}/${encodeURIComponent(r.name)}/`;
+}
+
+/** The node page's path, relative to the site, from the list page's. */
+export function nodePageRel(listPage: string, r: Pick<MethodologyRow, "instance" | "name">): string {
+  return posix.join(posix.dirname(listPage), r.instance, r.name, "index.md");
+}
+
+/** A node file's text with its front matter removed — the extracted method. */
+export function bodyOf(text: string): string {
+  const fm = frontMatterOf(text);
+  if (fm === undefined) return text;
+  const end = text.indexOf("\n---", 3);
+  return text.slice(text.indexOf("\n", end + 4) + 1).replace(/^\s*\n/, "");
+}
+
+/**
+ * A link in a node's body that is relative to the node FILE (`../skills/x.md`)
+ * would resolve against the page's URL instead and 404. Each is rewritten to
+ * the file on its repository host; absolute URLs, anchors and site-rooted
+ * paths are left alone, and one `nodeHref` cannot place stays as written.
+ */
+export function rebaseLinks(body: string, nodePath: string, nodeHref: (path: string) => string | undefined): string {
+  return body.replace(/\]\(([^)\s]+)\)/g, (all, target: string) => {
+    if (/^([a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) return all;
+    const [path, hash] = target.split("#");
+    const href = nodeHref(posix.normalize(posix.join(posix.dirname(nodePath), path!)));
+    return href ? `](${href}${hash !== undefined ? `#${hash}` : ""})` : all;
+  });
+}
+
+/** A skill that applies a methodology, as its page lists it. */
+export interface AppliedBy {
+  skill: string;
+  href?: string;
+}
+
+/**
+ * Which skills apply each methodology, by name: every skill in the checkout's
+ * instances that declares `uses-methodology` (cat-harness `schemas/methodology.ts`).
+ * The edge is the skill's; the methodology's page reads it back.
+ */
+export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
+  const out = new Map<string, AppliedBy[]>();
+  for (const root of instanceRootsIn(repoRoot)) {
+    for (const u of methodologyUses(root)) {
+      const href = nodeHref?.(relative(repoRoot, join(root, u.file)).split("\\").join("/"));
+      for (const n of u.names) out.set(n, [...(out.get(n) ?? []), { skill: u.skill, ...(href ? { href } : {}) }]);
+    }
+  }
+  for (const v of out.values()) v.sort((a, b) => a.skill.localeCompare(b.skill, "en"));
+  return out;
+}
+
+/** A methodology's own page: what the list says of it, its sources, the skills that apply it, then the method itself. */
+export function nodePage(
+  r: MethodologyRow,
+  body: string,
+  links?: LibraryResolver,
+  fromPage = "",
+  nodeHref?: (path: string) => string | undefined,
+  appliedBy: readonly AppliedBy[] = [],
+): string {
+  const q = (v: string): string => JSON.stringify(cell(v));
+  const file = r.path && nodeHref ? nodeHref(r.path) : undefined;
+  const b: string[] = [
+    "---",
+    `title: ${q(r.title)}`,
+    `description: ${q(short(r.appliesWhen, 200))}`,
+    "nav_exclude: true",
+    GENERATED_FM,
+    "---",
+    `<style>${CSS}</style>`,
+    "",
+    "[&larr; All methodologies](../../)",
+    "",
+    `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
+    "",
+    `**Applies when.** ${cell(r.appliesWhen)}`,
+    "",
+    `**Origin.** ${cell(r.origin)}`,
+    "",
+  ];
+  if (r.evidence.length > 0) {
+    b.push(
+      r.state === "dangling" ? "**Cited sources — at least one does not resolve:**" : "**Ingested sources:**",
+      "",
+      ...r.evidence.map((e) => evidenceLine(e, links, fromPage)),
+      "",
+    );
+  }
+  if (appliedBy.length > 0) {
+    b.push(
+      "**Applied by skills:**",
+      "",
+      ...appliedBy.map((a) => (a.href ? `- [\`${cell(a.skill)}\`](${a.href})` : `- \`${cell(a.skill)}\``)),
+      "",
+    );
+  }
+  if (file) b.push(`**Node file:** [${cell(posix.basename(r.path!))}](${file})`, "");
+  b.push("---", "", r.path && nodeHref ? rebaseLinks(body, r.path, nodeHref) : body);
+  return b.join("\n").trimEnd() + "\n";
 }
 
 export function page(
@@ -305,6 +444,7 @@ export function page(
   report: EvidenceReport,
   links?: LibraryResolver,
   fromPage = "",
+  nodeHref?: (path: string) => string | undefined,
 ): string {
   const byState = (s: MethodologyRow["state"]): number => rows.filter((r) => r.state === s).length;
   const instances = [...new Set(rows.map((r) => r.instance))].sort();
@@ -382,6 +522,7 @@ export function page(
       `**Origin.** ${cleanOrigin}`,
       "",
     );
+    if (r.path && nodeHref) b.push(`**The method, as extracted:** [read it](${nodePageDir(r)})`, "");
     if (r.evidence.length > 0) {
       b.push(
         r.state === "dangling"
@@ -463,7 +604,7 @@ if (import.meta.main) {
   }
 
   const rendered = withRenderedByFrontMatter(
-    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE),
+    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE, nodeHrefResolver(REPO)),
     VIEWER_TOOL,
   );
   const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
@@ -486,11 +627,39 @@ if (import.meta.main) {
       console.error(`::error::gen-methodologies-viz: ${PAGE} is stale — run \`bun run cat methodologies:viz\``);
       process.exit(1);
     }
+    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const hrefOf = nodeHrefResolver(REPO);
+    const applied = appliedByIndex(REPO, hrefOf);
+    for (const r of rows) {
+      if (!r.path) continue;
+      const rel = nodePageRel(PAGE, r);
+      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL);
+      const dest = join(docsBase, rel);
+      if ((existsSync(dest) ? readFileSync(dest, "utf-8") : "") !== want) {
+        console.error(`::error::gen-methodologies-viz: ${rel} is stale — run \`bun run cat methodologies:viz\``);
+        process.exit(1);
+      }
+    }
     console.log(`✓ methodologies viewer is current — ${rows.length} methodolog(ies)`);
   } else {
     mkdirSync(join(out, ".."), { recursive: true });
     writeFileSync(out, rendered);
-    console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}`);
+    // One page per node under the list page. Each instance's directory is
+    // this writer's alone, so it is cleared first: a node renamed or removed
+    // leaves no page behind.
+    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const hrefOf = nodeHrefResolver(REPO);
+    const applied = appliedByIndex(REPO, hrefOf);
+    for (const inst of new Set(rows.map((r) => r.instance))) rmSync(join(out, "..", inst), { recursive: true, force: true });
+    for (const r of rows) {
+      if (!r.path) continue;
+      const rel = nodePageRel(PAGE, r);
+      const dest = join(docsBase, rel);
+      mkdirSync(join(dest, ".."), { recursive: true });
+      const body = bodyOf(readFileSync(join(REPO, r.path), "utf-8"));
+      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL));
+    }
+    console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}, and one page each under it`);
     console.log(
       `  ${rows.filter((r) => r.state === "ingested").length} with the source held, ` +
         `${rows.filter((r) => r.state === "cited-only").length} cited only, ` +

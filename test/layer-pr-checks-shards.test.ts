@@ -111,6 +111,40 @@ describe("run-gates.py GATE_SHARD", () => {
   }
 });
 
+describe("run-gates.py GATE_TIMINGS (cat-harness-tools#397)", () => {
+  const root = fixtureRoot();
+  const names = Object.keys(list(root).gates);
+  // One slow gate, the rest fast: a count split would put it beside others.
+  const timings = Object.fromEntries(names.map((g, k) => [g, { exit: 0, seconds: g === "a:check:g07" ? 1000 : 10 + k }]));
+  const file = join(mkdtempSync(join(tmpdir(), "gate-timings-")), "gates.json");
+  writeFileSync(file, JSON.stringify(timings));
+  const timed = (shard: string, path = file) => {
+    const { GATE_SHARD: _s, GATE_TIMINGS: _t, ...rest } = process.env;
+    const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: { ...rest, GATE_SHARD: shard, GATE_TIMINGS: path } });
+    if (r.status !== 0) throw new Error(`--list exited ${r.status}: ${r.stderr}`);
+    return Object.keys(JSON.parse(r.stdout).gates);
+  };
+
+  test("shards split by recorded seconds stay disjoint and cover the set", () => {
+    const seen = [1, 2, 3, 4].flatMap((i) => timed(`${i}/4`));
+    expect(new Set(seen).size).toBe(seen.length);
+    expect([...seen].sort()).toEqual([...names].sort());
+  });
+
+  test("the slowest gate gets a shard to itself", () => {
+    const withSlow = [1, 2, 3, 4].map((i) => timed(`${i}/4`)).find((s) => s.includes("a:check:g07"));
+    expect(withSlow).toEqual(["a:check:g07"]);
+  });
+
+  test("the split is the same on every call", () => {
+    expect(timed("3/4")).toEqual(timed("3/4"));
+  });
+
+  test("an absent timings file falls back to the count split", () => {
+    expect(timed("2/4", join(tmpdir(), "no-such-gates.json"))).toEqual(Object.keys(list(root, "2/4").gates));
+  });
+});
+
 describe("merge-shards.py", () => {
   const root = fixtureRoot();
   const unsharded = mkdtempSync(join(tmpdir(), "gate-whole-"));
@@ -167,5 +201,71 @@ describe("merge-shards.py", () => {
     const m = merge(partial, "head", 4);
     expect(m.status).toBe(2);
     expect(m.stdout).toContain("of a set of");
+  });
+});
+
+describe("snapshot.py (cat-harness-tools#397)", () => {
+  const SNAPSHOT = join(DIR, "snapshot.py");
+  const py = (...a: string[]) => {
+    const r = spawnSync("python3", [SNAPSHOT, ...a], { encoding: "utf-8" });
+    expect(r.status).toBe(0);
+  };
+
+  test("a shard that applies the snapshot holds the prepared tree, a moved-in caller included", () => {
+    const work = mkdtempSync(join(tmpdir(), "snapshot-"));
+    const prep = join(work, "prep");
+    // The mount: what every shard also mounts for itself.
+    mkdirSync(join(prep, "caller"), { recursive: true });
+    writeFileSync(join(prep, "caller", "a.ts"), "mounted\n");
+    writeFileSync(join(prep, "caller", "gone.ts"), "mounted\n");
+    writeFileSync(join(prep, "kept.ts"), "mounted\n");
+    const shard = join(work, "shard");
+    cpSync(prep, shard, { recursive: true });
+    // The caller's checkout, made BEFORE the mark: `mv` keeps its older mtimes.
+    const src = join(work, "src");
+    mkdirSync(src);
+    writeFileSync(join(src, "a.ts"), "the PR\n");
+    writeFileSync(join(src, "new.ts"), "the PR\n");
+    const list = join(work, "mounted.txt");
+    py("mark", prep, list);
+    rmSync(join(prep, "caller"), { recursive: true });
+    spawnSync("mv", [src, join(prep, "caller")]);
+    writeFileSync(join(prep, "derived.json"), "{}\n");
+    // A graph's mount marker, which branch-store files in the git directory.
+    mkdirSync(join(prep, ".git", "branch-mounts"), { recursive: true });
+    writeFileSync(join(prep, ".git", "branch-mounts", "beans.json"), "{}\n");
+    writeFileSync(join(prep, ".git", "HEAD"), "not carried\n");
+    py("save", prep, list, join(work, "root"));
+    py("apply", shard, join(work, "root"));
+    expect(readFileSync(join(shard, "caller", "a.ts"), "utf-8")).toBe("the PR\n");
+    expect(readFileSync(join(shard, "caller", "new.ts"), "utf-8")).toBe("the PR\n");
+    expect(existsSync(join(shard, "caller", "gone.ts"))).toBe(false);
+    expect(existsSync(join(shard, "derived.json"))).toBe(true);
+    expect(readFileSync(join(shard, "kept.ts"), "utf-8")).toBe("mounted\n");
+    expect(existsSync(join(shard, ".git", "branch-mounts", "beans.json"))).toBe(true);
+    expect(existsSync(join(shard, ".git", "HEAD"))).toBe(false);
+    rmSync(work, { recursive: true, force: true });
+  });
+
+  test("a directory the PR emptied is gone from the shard, not left empty (cat-harness#390)", () => {
+    const work = mkdtempSync(join(tmpdir(), "snapshot-"));
+    const prep = join(work, "prep");
+    mkdirSync(join(prep, "caller", "tools", "github"), { recursive: true });
+    writeFileSync(join(prep, "caller", "tools", "github", "github.ts"), "mounted\n");
+    writeFileSync(join(prep, "caller", "kept.ts"), "mounted\n");
+    const shard = join(work, "shard");
+    cpSync(prep, shard, { recursive: true });
+    const src = join(work, "src");
+    mkdirSync(join(src, "tools"), { recursive: true });
+    writeFileSync(join(src, "kept.ts"), "the PR\n");
+    const list = join(work, "mounted.txt");
+    py("mark", prep, list);
+    rmSync(join(prep, "caller"), { recursive: true });
+    spawnSync("mv", [src, join(prep, "caller")]);
+    py("save", prep, list, join(work, "root"));
+    py("apply", shard, join(work, "root"));
+    expect(existsSync(join(shard, "caller", "tools", "github"))).toBe(false);
+    expect(readFileSync(join(shard, "caller", "kept.ts"), "utf-8")).toBe("the PR\n");
+    rmSync(work, { recursive: true, force: true });
   });
 });

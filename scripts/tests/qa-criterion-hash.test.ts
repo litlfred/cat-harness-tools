@@ -8,7 +8,7 @@ import {
 } from "../../pipeline/qa-criterion-hash";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const VOICE_CHECKERS = join(TOOLS_ROOT, "content", "pipeline", "qa-checkers-voice.ts");
+const VOICE_CHECKERS = join(TOOLS_ROOT, "pipeline", "qa-checkers-voice.ts");
 
 // Each case writes a throwaway checker module. Hashes are memoized by absolute
 // path, so every fixture gets a fresh temp dir as well as a cache reset.

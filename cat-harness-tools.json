@@ -25,7 +25,7 @@
     {
       "id": "cat-harness-tools-schemas",
       "path": "schemas/",
-      "description": "Tests of cat-harness's schemas that exercise tools code: the sixteen `cat-harness/schemas/*.test.ts` files that imported `scripts/`, `src/`, `pipeline/` or `test/support/`, moved first (bean `70lx`, batch B0) so that no later batch of the code move leaves a harness file importing into this layer. The Zod sources they test stay in cat-harness and follow in stage 1b (bean `8lcl`). `code`, not `schemas`: nothing here is a schema definition.",
+      "description": "Tests of cat-harness's schemas that exercise tools code: the sixteen `cat-harness/schemas/*.test.ts` files that imported `scripts/`, `src/`, `pipeline/` or `test/support/`, moved first (bean `70lx`, batch B0) so that no later batch of the code move leaves a harness file importing into this layer. The Zod sources they test stay in cat-harness and follow in stage 1b (bean `8lcl`). `code`, not `schemas`: nothing here is a schema definition but one, `verdict-record.schema.json`, the record the `judge-tree` Tool writes (cat-harness-tools#399), kept beside the dependency-free validator in `scripts/lib/judge-tree.ts` that implements it until its Zod source joins the others in cat-harness.",
       "graphTypologies": [
         "code"
       ]
@@ -44,7 +44,7 @@
     {
       "id": "cat-harness-tools-id-lookup",
       "path": "id-lookup/",
-      "description": "The identifier-lookup CLIENT a reader's browser runs: `lookup.js` (plain ES module, no dependencies) with its hand-written `lookup.d.ts`, and a one-form `index.html` told which index to open by `?index=<directory>`. The indexes themselves are generated output hosted by the instance each is about (`who-iris/id-lookup/`), never here. JavaScript, so it never sits under the plain docs pipeline. Moved from large-datasets (bean `j7ql`).",
+      "description": "The identifier-lookup CLIENT a reader's browser runs: `lookup.js` (plain ES module, no dependencies) with its hand-written `lookup.d.ts`, and a one-form `index.html` told which index to open by `?index=<directory>`. The indexes themselves are generated output hosted by the instance each is about (its own `id-lookup/`), never here. JavaScript, so it never sits under the plain docs pipeline. Moved from large-datasets (bean `j7ql`).",
       "graphTypologies": [
         "code"
       ],
@@ -71,7 +71,7 @@
     {
       "id": "cat-harness-tools-tools",
       "path": "tools/",
-      "description": "`discover.ts`, the reader that finds every declared `tools` graph's Tool nodes by asking the declarations (bean `p0za`), and `index.ts`, this layer's own `tools` graph: the Tool nodes whose in-process module is code here (`bpmn-engine`), declared beside that code so the module path is instance-relative (owner, 2026-10-14: \"Move the node to tools\"). Every other Tool node, the shell-invoked ones included, stays declared in `cat-harness/tools/`. Undeclared until 2026-10-14, so a remote mount (which lays down declared directories only) left it out and `folio-assistant-core`'s `glossary-extract.ts`, which imports it, had nothing to import; declared now as a named `code` subgraph, which is also what exports it by package name (`scripts/package-exports.ts`, bean `7pvn`).",
+      "description": "`discover.ts`, the reader that finds every declared `tools` graph's Tool nodes by asking the declarations (bean `p0za`), and `index.ts`, this layer's own `tools` graph: the Tool nodes whose in-process module is code here (`bpmn-engine`), declared beside that code so the module path is instance-relative (owner, 2026-10-14: \"Move the node to tools\"). Every other Tool node, the shell-invoked ones included, stays declared in `cat-harness/tools/`. Undeclared until 2026-10-14, so a remote mount (which lays down declared directories only) left it out and the content core's `glossary-extract.ts`, which imports it, had nothing to import; declared now as a named `code` subgraph, which is also what exports it by package name (`scripts/package-exports.ts`, bean `7pvn`).",
       "graphTypologies": ["tools", "code"]
     },
     {
@@ -94,14 +94,6 @@
       "id": "cat-harness-tools-pipeline",
       "path": "pipeline/",
       "description": "The content pipeline — build, render, QA checkers and generators over a folio's content graph — moved here from `cat-harness/content/pipeline/` by bean `70lx` (stage 1a). Its QA script sidecars stayed in the harness, under `test/results/script-sidecars/`, because they are the harness's QA state.",
-      "graphTypologies": [
-        "code"
-      ]
-    },
-    {
-      "id": "cat-harness-tools-content-pipeline-link",
-      "path": "content/",
-      "description": "TRANSITIONAL, and holds no file of its own: one symlink, `content/pipeline -> ../pipeline`, left by bean `rnfl` PR 1 (#146, 2026-10-12) when the content pipeline moved up to `pipeline/`, so that the other repositories' commands that still name `cat-harness-tools/content/pipeline/...` (smart-ra's AGENTS.md `qa-sweep`, and the scaffold `folio_init` writes until a folio repins) keep resolving. Declared because a remote mount lays down DECLARED directories only: undeclared, a downstream that mounts this layer by its defaults got `pipeline/` but no `content/`, and every one of those commands failed there while passing in this checkout (task #10, gap a). It exists, so this is not the `dh4f` shape. The symlink is not hashed by the mount digest (a link is not content), so the directory locks as zero files; that is correct. Remove this entry in the same change that removes the symlink, once no repository names the old path.",
       "graphTypologies": [
         "code"
       ]

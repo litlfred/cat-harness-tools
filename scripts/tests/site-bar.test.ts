@@ -139,7 +139,7 @@ describe("the rail pass with --theme-source: one rail on every page (option A)",
 
 describe("every railed page is FINISHED: one rail, the current first-paint snippet (2026-10-16)", () => {
   // Measured on the live root: 56 railed pages without the snippet (the mount
-  // routes, and who-iris's replica pages railed by their own generator), and
+  // routes, and the IRIS replica's pages railed by their own generator), and
   // two theme pages whose side bar survived beside the rail.
   const source = mkdtempSync(join(tmpdir(), "finish-src-"));
   put(source, { "index.md": fm({ title: "Home", nav_order: 1 }) });
@@ -189,6 +189,30 @@ describe("every railed page is FINISHED: one rail, the current first-paint snipp
     expect(again.injected).toBe(0);
     expect(again.finished).toBe(0);
     expect(["reference/verification.html", "who-iris/catalogue/index.html", "who-iris/item.html", "guide/both.html"].map(read)).toEqual(before);
+  });
+});
+
+describe("a theme page whose prose QUOTES the theme's nav is still railed", () => {
+  // reference/skill-instructions/rendered-verification, 2026-10-16: its text
+  // quotes `<nav class="fa-nav"` and `id="site-nav"` in code spans, and
+  // substring tests called the page navigated (or railed), so it kept the
+  // theme's side bar and got no rail.
+  const source = mkdtempSync(join(tmpdir(), "theme-src-"));
+  put(source, { "index.md": fm({ title: "Home", nav_order: 1 }) });
+  const site = mkdtempSync(join(tmpdir(), "theme-site-"));
+  put(site, {
+    "index.html": THEME_PAGE("Home").replace("<p>x</p>", `<p>The one that held was <code>&lt;nav class="fa-nav"</code> OR <code>id="site-nav"</code>.</p>`),
+  });
+  const r = railStandalonePages(site, "cat-harness", "cat-harness", [], undefined, { themeSource: source });
+
+  test("its side bar is replaced by the rail", () => {
+    expect(r.alreadyNavigated).toBe(0);
+    expect(r.replacedThemeSidebar).toBe(1);
+    const html = readFileSync(join(site, "index.html"), "utf-8");
+    expect(hasThemeSidebar(html)).toBe(false);
+    expect(html).toContain('<nav class="fa-nav"');
+    expect(html).toContain(`<code>id="site-nav"</code>`);
+    expect(html).toContain(`<code>&lt;nav class="fa-nav"</code>`);
   });
 });
 

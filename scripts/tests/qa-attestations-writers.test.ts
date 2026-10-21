@@ -44,7 +44,7 @@ import {
 import { mergeWithAttestations } from "../../pipeline/translation-block-qa";
 import { writeDeclaration } from "../../test/support/instance-fixture";
 
-const PIPELINE = resolve(import.meta.dir, "..", "..", "content", "pipeline");
+const PIPELINE = resolve(import.meta.dir, "..", "..", "pipeline");
 const SRC = resolve(import.meta.dir, "..", "..", "src");
 
 /** A spawn is ~1.5 s cold; three per test at most. */

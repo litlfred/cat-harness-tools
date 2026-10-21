@@ -73,6 +73,12 @@ describe("run-gates.py gate inputs", () => {
   test("the supplied gates are no longer in the never-supplied list", () => {
     expect(py("run-gates.py", `sorted(set(m.SUPPLIED_INPUTS) & set(m.NEEDS_INPUT_SCRIPTS))`)).toEqual([]);
   });
+
+  test("post-merge:regen:check is skipped as live-state so it does not run the gates inside the gates (bean lpcs)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "post-merge:regen:check")`) as [string, string];
+    expect(kind).toBe("live-state");
+    expect(why).toContain("live state");
+  });
 });
 
 describe("root-cat-script.py", () => {

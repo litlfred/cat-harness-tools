@@ -12,7 +12,7 @@
  *   `schemas/` (`toJsonSchema` in `schemas/to-json-schema.ts`, Zod 4's native
  *   converter — the route every generator here takes).
  * - `«ext: …»` — a schema this repository does not own: the WHO SMART DAK's
- *   own JSON Schema for User Story (read from `smart-base/`), the beans CLI's
+ *   own JSON Schema for User Story (read from a DAK base layer), the beans CLI's
  *   GraphQL schema for Bean, OMG BPMN 2.0 for Process.
  *
  * Relationships are declared below, but each one names the schema path that
@@ -59,7 +59,8 @@ import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { declaredRoute } from "./viewer-declarations.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 /** Colours from `uml.css`, the one place they are declared. */
@@ -81,20 +82,32 @@ const BPMN_RECORD = join(
  * The rendered glossary page, whose `<dt id>` entries are the anchors a class
  * links to. Read from the PAGE rather than from the glossary documents: the
  * page is this instance's own output, while the documents sit in
- * folio-assistant-core, which cat-harness does not depend on.
+ * the content core, which cat-harness does not depend on.
  */
 const OWN = readDeclaration(HARNESS);
 if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find the glossary page in`);
-// The page sits at the ROUTE folio-assistant-core declares for its glossary visualiser
-// (`folio-assistant-core.json` `visualisers`, computed by `visualiserRoute`), inside this
+// The page sits at the ROUTE the content core declares for its glossary visualiser
+// (its declaration's `visualisers`, computed by `visualiserRoute`), inside this
 // harness's site: cat-harness f999d7f6 moved it from `glossary/` to that route, and the
 // bare `/glossary/` is now only its declared alias. Read from the sibling mount when it is
 // there; the fallback is the route core declares today, the same one glossary-page.ts uses.
-const GLOSSARY_ROUTE = declaredRoute(resolve(HARNESS, "..", "folio-assistant-core"), "glossary-page") ?? "folio-assistant-core/glossary";
-const GLOSSARY_PAGE = join(HARNESS, siteDir(OWN), ...GLOSSARY_ROUTE.split("/"), "index.md");
+// Under the page locale since 2026-10-16 (owner, "c"), `en/<harness>/<visualiser>`,
+// like every other visualiser's page; the page is read at its old address too
+// until the site holding it is regenerated, and the link always goes to the new one.
+// The instance that owns the glossary is the one declaring the `core` layer's
+// kinds — `glossary` among them — read from where they were declared, not
+// spelt here (folio-assistant#2598). With no content layer composed there is
+// no glossary page to link, and the bare alias stands in.
+const CONTENT = contentLayerInstance();
+const CORE_ROOT = CONTENT?.root ?? resolve(HARNESS, "..");
+const GLOSSARY_FALLBACK = CONTENT ? `${CONTENT.name}/glossary` : "glossary";
+const GLOSSARY_ROUTE = (CONTENT && declaredPageRoute(CORE_ROOT, "glossary-page")) ?? `${PAGE_LOCALE}/${GLOSSARY_FALLBACK}`;
+const GLOSSARY_LEGACY_ROUTE = (CONTENT && declaredRoute(CORE_ROOT, "glossary-page")) ?? GLOSSARY_FALLBACK;
+const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
+const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(p)) ?? glossaryPageAt(GLOSSARY_ROUTE);
 /**
  * Where a term's entry is: on the page of the instance that owns its scheme,
- * `<route>/instance/<instance>/` (folio-assistant-core, owner 2026-10-15: the
+ * `<route>/instance/<instance>/` (the content core, owner 2026-10-15: the
  * authored terms left the glossary index for one page per owning instance).
  * The instance is the anchor's first segment, `<instance>--<scheme>--<id>`.
  */

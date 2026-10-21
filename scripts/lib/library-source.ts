@@ -120,11 +120,71 @@ export function sourceFileOf(repoRoot: string, e: SourceEntry, uploads: readonly
   return undefined;
 }
 
+/**
+ * The kinds of source a page can show inline, and so put in its view panel —
+ * owner, 2026-10-16: *"primary asset should have a view panel (if that asset
+ * kind has a viewer)"*. A PDF opens in the site's pdf.js viewer; an image is
+ * drawn as itself. Anything else (a .docx, a spreadsheet) has no viewer, so
+ * it is only linked.
+ */
+export type ViewKind = "pdf" | "image";
+
+/** The {@link ViewKind} of a file, by its name; `undefined` when no viewer shows it. */
+export function viewKindOf(name: string): ViewKind | undefined {
+  if (/\.pdf$/i.test(name)) return "pdf";
+  if (/\.(png|jpe?g|gif|webp|svg)$/i.test(name)) return "image";
+  return undefined;
+}
+
+/**
+ * The {@link ViewKind} of an entry's held source when its page will draw a view
+ * panel for it — the condition {@link entryRepoLinks} sets `view` under: not
+ * withheld, a source on disk ({@link sourceFileOf}), in a repository a link
+ * can name, of a kind a viewer shows.
+ */
+export function viewableOf(
+  repoRoot: string,
+  e: SourceEntry & { withheld?: unknown },
+  uploads: readonly SourceUpload[],
+  checkoutRepo: string | undefined,
+): ViewKind | undefined {
+  if (e.withheld) return undefined;
+  const source = sourceFileOf(repoRoot, e, uploads);
+  if (!source || !forgeAt(repoRoot, source, checkoutRepo)) return undefined;
+  return viewKindOf(basename(source));
+}
+
+/**
+ * Where a reader can find a source this site does NOT hold — its DOI and arXiv
+ * pages, from the entry's own identifiers. Owner, 2026-10-16: *"some of
+ * sources not held b/c IP issues (but in that case we cant use viewer on CDN
+ * b/c XSS)"* — so these are plain links out, never fed to the viewer. A DOI
+ * still carrying a template's placeholder suffix (`10.1145/nnnnnnn`) names
+ * nothing and is dropped.
+ */
+export function elsewhereLinks(e: { doi?: unknown; arxiv?: unknown }): { label: string; href: string }[] {
+  const out: { label: string; href: string }[] = [];
+  const doi = typeof e.doi === "string" ? e.doi.trim() : "";
+  if (/^10\.\d{4,9}\/\S+$/.test(doi) && !/\/n{3,}$/i.test(doi)) out.push({ label: `doi:${doi}`, href: `https://doi.org/${encodeURI(doi)}` });
+  const arxiv = typeof e.arxiv === "string" ? e.arxiv.trim() : "";
+  if (/^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/i.test(arxiv)) out.push({ label: `arXiv:${arxiv}`, href: `https://arxiv.org/abs/${arxiv}` });
+  return out;
+}
+
+/** What the view panel needs: the kind, the bytes, and for a PDF the pdf.js viewer's page-relative href. */
+export interface ViewSource {
+  kind: ViewKind;
+  src: string;
+  viewer?: string;
+}
+
 /** One link on an entry page's sources list. */
 export interface RepoLink {
   label: string;
   href: string;
   what: string;
+  /** Set on the link to the entry's primary asset when a viewer shows it — the page draws it in its view panel. */
+  view?: ViewSource;
 }
 
 /**
@@ -155,9 +215,12 @@ export function entryRepoLinks(o: {
   if (src && o.source) {
     const name = basename(o.source);
     const raw = rawUrl(src);
-    if (/\.pdf$/i.test(name)) {
-      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})` });
+    const kind = viewKindOf(name);
+    if (kind === "pdf") {
+      out.push({ label: name, href: pdfViewerHref(o.viewerHref, raw), what: `source PDF, in the PDF viewer (${src.repo})`, view: { kind, src: raw, viewer: o.viewerHref } });
       out.push({ label: `${name} (raw)`, href: raw, what: "source PDF, the file itself" });
+    } else if (kind === "image") {
+      out.push({ label: name, href: raw, what: `source image (${src.repo})`, view: { kind, src: raw } });
     } else {
       out.push({ label: name, href: raw, what: `source file (${src.repo})` });
     }

@@ -16,8 +16,9 @@
  *   `visualiserRoute` computes, without the base — never by a page path: a
  *   page path is where a generator happened to write, and the route is the
  *   declaration.
- * - **`cat-harness/docs/wireframes/index.json`.** Which wireframe covers
- *   which visualiser. A `covers` entry is a route key, or a route key and a
+ * - **`cat-harness/docs/wireframes/index.json`**, and the same file in the
+ *   `wireframes/` of every other instance's declared `docs` directories
+ *   ({@link wireframeSources}). Which wireframe covers which visualiser. A `covers` entry is a route key, or a route key and a
  *   sub-graph (`cat-harness/auto-docs/index/skills`) when the wireframe is of
  *   one sub-graph's view; either covers the visualiser. One wireframe may
  *   cover several, because one template renders several views.
@@ -102,7 +103,8 @@ export function coveredKey(entry: string, declared: readonly string[]): string |
 
 /**
  * Where the wireframes are: this harness's own `<site>/wireframes/`, and the
- * same directory in every OTHER instance of the checkout that has one.
+ * `wireframes/` directory of every declared `docs` directory of every OTHER
+ * instance of the checkout that has one.
  *
  * A wireframe belongs with the page it draws. While every wireframe sat here,
  * the harness's index named pages of layers ABOVE it — a catalogue page of a
@@ -113,20 +115,41 @@ export function coveredKey(entry: string, declared: readonly string[]): string |
  * names only refs it can see. This harness's wireframes keep their bare
  * names; another instance's are named `<instance>/<topic>`, since two layers
  * may each have a `catalogue`.
+ *
+ * WHICH directories is the declaration's: every directory the instance
+ * declares of the `docs` kind, its site directory among them. The site
+ * directory alone was not enough (wrong-direction move M3, 2026-10-20): an IG
+ * instance builds its site directory at publish and commits nothing there, so
+ * its authored pages sit in a second `docs` directory it declares for exactly
+ * that reason, and so do its wireframes.
  */
 export function wireframeSources(repoRoot: string = REPO_ROOT): { dir: string; prefix: string }[] {
   const own = resolve(WIREFRAMES);
   const out = [{ dir: own, prefix: "" }];
+  const seen = new Set([own]);
   for (const root of checkoutInstanceRoots(repoRoot)) {
-    let dir: string;
+    let decl: { name?: string; directories?: { path?: string; graphTypologies?: string[] }[] } | undefined;
     try {
-      dir = resolve(root, siteDirFor(root), "wireframes");
+      decl = readDeclaration(root) as typeof decl;
     } catch {
-      continue; // no readable declaration: `check:harness-dirs`' finding, not this one's
+      decl = undefined;
     }
-    if (dir === own || !existsSync(join(dir, "index.json"))) continue;
-    const name = readDeclaration(root)?.name ?? basename(root);
-    out.push({ dir, prefix: `${name}/` });
+    const docsDirs: string[] = [];
+    try {
+      docsDirs.push(resolve(root, siteDirFor(root)));
+    } catch {
+      // no readable declaration: `check:harness-dirs`' finding, not this one's
+    }
+    for (const d of decl?.directories ?? []) {
+      if (d.path && (d.graphTypologies ?? []).includes("docs")) docsDirs.push(resolve(root, d.path));
+    }
+    const name = decl?.name ?? basename(root);
+    for (const docs of docsDirs) {
+      const dir = join(docs, "wireframes");
+      if (seen.has(dir) || !existsSync(join(dir, "index.json"))) continue;
+      seen.add(dir);
+      out.push({ dir, prefix: `${name}/` });
+    }
   }
   return out;
 }

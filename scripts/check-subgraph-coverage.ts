@@ -328,10 +328,11 @@ export function assetRoleFinding(
  *
  * The owner, 2026-09-20, settling what a subject page under a handler means:
  *
- * > `<base>/cat-harness/docs/` is where all harness user documentation is… so
- * > documentation at `<base>/cat-harness/docs/who-iris/` is more documentation
- * > ABOUT iris, how it is ingested etc. **not the iris content**. source
- * > content is repo root `who-iris/docs`.
+ * (paraphrased) `<base>/cat-harness/docs/` is where all harness user
+ * documentation is, so documentation at `<base>/cat-harness/docs/<instance>/`
+ * is documentation ABOUT a content instance — how it is ingested and so on —
+ * **not that instance's content**, whose source is `<instance>/docs` at the
+ * repository root.
  *
  * Two different things, and an axis that conflated them would pass a
  * repository where half the documentation is missing. This asks only the

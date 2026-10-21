@@ -135,7 +135,16 @@ export function judge(probe: Probe, baseline: Baseline | undefined, layer?: stri
 const BASELINE_COMMENT =
   "Tests that fail when a layer runs alone beside its declared closure (bean `ho66`), keyed `<test file> > <test>`, with `bun test`'s own fail count, which also counts errors between tests. A RATCHET: a failure not listed here is red; a listed one that now passes is reported, with this command, so the list only goes down. WRITTEN by `bun run cat standalone:baseline`; a longer list is a diff somebody reviews. See the module header of cat-harness-tools/scripts/check-standalone.ts.";
 
+/**
+ * The file's own declaration that a tool wrote it — the top-level `_generated`
+ * key `check-reference-direction.ts` reads (`declaresGenerated`). Its keys
+ * name test files of every layer measured, higher ones included, which an
+ * authored file in this layer may not do.
+ */
+const BASELINE_GENERATED = "scripts/check-standalone.ts (`bun run cat standalone:baseline`) — do not hand-edit";
+
 interface BaselineFile {
+  _generated?: string;
   _comment: string;
   layers: Record<string, Baseline>;
 }
@@ -160,7 +169,7 @@ export function readBaseline(layer: string, path: string = BASELINE_PATH): Basel
 export function writeBaseline(layer: string, measured: Baseline, path: string = BASELINE_PATH): void {
   const layers = { ...(readBaselineFile(path)?.layers ?? {}), [layer]: { failed: measured.failed, failing: [...measured.failing].sort() } };
   const sorted = Object.fromEntries(Object.keys(layers).sort().map((k) => [k, layers[k]!]));
-  writeFileSync(path, JSON.stringify({ _comment: BASELINE_COMMENT, layers: sorted }, null, 2) + "\n");
+  writeFileSync(path, JSON.stringify({ _generated: BASELINE_GENERATED, _comment: BASELINE_COMMENT, layers: sorted }, null, 2) + "\n");
 }
 
 const arg = (name: string, argv: string[]): string | undefined => {

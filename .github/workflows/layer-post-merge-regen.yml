@@ -26,12 +26,20 @@
 #      tree. The script's own PR step is NOT used: the mounts are gitignored in
 #      the index, so it sees no changed file, and the repair belongs in the
 #      CALLER's repository, not folio-assistant.
-#   5. Copy the caller's directory back over `src`, and open the repair PR in
-#      the caller's repository with its GITHUB_TOKEN when, and only when, a
-#      file the caller tracks changed (the negative control). Another layer's
-#      changes are that layer's to repair.
-#   6. Exit with the script's own code: an unrepaired or writer-less check is
-#      a red run (principle 4), even when a repair PR was opened.
+#   5. Copy the caller's directory back over `src`.
+#   6. Regenerate the caller's directory READMEs IN `src`, its own git
+#      checkout (`subgraph-readmes.ts --repo`; owner, 2026-10-15). Step 4
+#      cannot: `readme:subgraphs` skips every remote mount, the caller's
+#      swapped-in copy included, and a run over that copy would list no files,
+#      because it has no `.git` and the index ignores its mounts. Run from
+#      `fa`, so the graph typologies are the composed set. Before this step a
+#      layer's READMEs had no writer at all (cat-harness: 12 stale, then 19).
+#   7. Open the repair PR in the caller's repository with its GITHUB_TOKEN
+#      when, and only when, a file the caller tracks changed (the negative
+#      control). Another layer's changes are that layer's to repair.
+#   8. Exit with the script's own code, or red when the READMEs could not be
+#      judged or did not reach a fixpoint: an unrepaired or writer-less check
+#      is a red run (principle 4), even when a repair PR was opened.
 
 name: Layer post-merge regen
 
@@ -80,7 +88,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ inputs.index-ref }}
@@ -91,7 +99,7 @@ jobs:
       - name: Mount every instance from the index's lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - name: Check out the caller
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - name: Put a copy of the caller in place of its locked mount
@@ -134,23 +142,68 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
-          set -uo pipefail
+          # `+e`: Actions runs this as `bash -e`, so a non-zero regen (stale or
+          # unrepaired, which is its verdict, not a crash) ended the step before
+          # `code=$?` and skipped every step after it, the repair PR included:
+          # cat-harness's READMEs went unrepaired on every push (bean ey1c).
+          set +e -uo pipefail
           args=(--json)
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
           bun run cat post-merge:regen "${args[@]}" > "$RUNNER_TEMP/regen.json"
           code=$?
           cat "$RUNNER_TEMP/regen.json"
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          # The verdict step at the end exits with this code, after the repair
+          # PR has been opened (step 8 above).
+          exit 0
+      - name: Copy the caller's directory back over its checkout
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: rsync -a --delete --exclude .git --exclude node_modules "fa/$INSTANCE/" "src/${SUBDIR}/"
+      - name: Regenerate the caller's directory READMEs in its own checkout
+        id: readmes
+        working-directory: fa
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          OWN: ${{ github.workspace }}/src
+        run: |
+          # `+e`, as above: `--check` exits 1 for a stale README, which is
+          # what this step judges, not a reason to stop it.
+          set +e -uo pipefail
+          script=cat-harness-tools/scripts/subgraph-readmes.ts
+          if [ "$DRY_RUN" = "true" ]; then
+            bun "$script" --check --repo "$OWN"
+            code=$?
+            # A stale README is what a dry run reports, not a defect of the run.
+            [ "$code" = 1 ] && code=0
+          else
+            # To a fixpoint, staging between passes: a README the first pass
+            # CREATES is untracked, and the writer lists only what git tracks,
+            # so its parent's table changes once it is staged (measured on
+            # cat-harness 2026-10-16: 19 written, then docs/README.md stale).
+            # The repair PR commits everything anyway.
+            code=1
+            for pass in 1 2 3; do
+              bun "$script" --repo "$OWN" || { code=2; break; }
+              git -C "$OWN" add -A -- '*README.md'
+              bun "$script" --check --repo "$OWN"
+              code=$?
+              [ "$code" = 1 ] || break
+              echo "pass $pass: staging what it wrote changed a listing; writing again"
+            done
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ -n "$(git -C "$OWN" status --porcelain -- '*README.md')" ] && echo "changed=true" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Open the repair PR in the caller's repository
         if: inputs.dry-run == false
         env:
           GH_TOKEN: ${{ github.token }}
-          SUBDIR: ${{ inputs.path-in-repo }}
           SHA: ${{ github.sha }}
           BASE: ${{ github.event.repository.default_branch }}
+          READMES_CHANGED: ${{ steps.readmes.outputs.changed }}
         run: |
           set -euo pipefail
-          rsync -a --delete --exclude .git --exclude node_modules "fa/$INSTANCE/" "src/${SUBDIR}/"
           cd src
           if [ -z "$(git status --porcelain)" ]; then
             echo "Negative control: no file $INSTANCE tracks changed; no repair PR."
@@ -161,7 +214,7 @@ jobs:
             echo "A repair PR for $branch is already open."
             exit 0
           fi
-          checks="$(bun -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf-8")); console.log([...(r.repairedChecks ?? []), ...(r.staleChecks ?? [])].filter((v, i, a) => a.indexOf(v) === i).join(", ") || "derived artefacts")' "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "derived artefacts")"
+          checks="$(bun -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf-8")); console.log([...(r.repairedChecks ?? []), ...(r.staleChecks ?? []), ...(process.env.READMES_CHANGED === "true" ? ["readme:subgraphs --repo (own checkout)"] : [])].filter((v, i, a) => a.indexOf(v) === i).join(", ") || "derived artefacts")' "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "derived artefacts")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -q -B "$branch"
@@ -181,11 +234,16 @@ jobs:
         if: always()
         env:
           CODE: ${{ steps.regen.outputs.code }}
+          READMES: ${{ steps.readmes.outputs.code }}
+          READMES_CHANGED: ${{ steps.readmes.outputs.changed }}
         run: |
           {
             echo "### post-merge regen: $INSTANCE"
             echo '```json'
             cat "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "(no report)"
             echo '```'
+            echo
+            echo "Directory READMEs in the caller's own checkout: exit ${READMES:-not run}, ${READMES_CHANGED:+changed}${READMES_CHANGED:-unchanged}."
           } >> "$GITHUB_STEP_SUMMARY"
-          exit "${CODE:-1}"
+          [ "${CODE:-1}" = 0 ] || exit "${CODE:-1}"
+          exit "${READMES:-1}"

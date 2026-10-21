@@ -11,7 +11,7 @@
  *
  * ## Why the existing checks did not catch it
  *
- * `fhir-harness/processes/content/l3-fhir-pipeline.bpmn` bound smart-base's
+ * The FHIR IG harness's `processes/content/l3-fhir-pipeline.bpmn` bound the DAK base layer's
  * `l2-dak-authoring` from inside the bare FHIR layer, and three checks were
  * green over it:
  *

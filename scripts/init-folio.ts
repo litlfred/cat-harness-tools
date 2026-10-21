@@ -49,6 +49,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
@@ -191,7 +192,7 @@ function platformDir(assistant: string): string {
 }
 
 /**
- * Where the platform's CODE sits: `src/`, `content/pipeline/`, `scripts/`,
+ * Where the platform's CODE sits: `src/`, `pipeline/`, `scripts/`,
  * `viewer/`. It moved from `cat-harness/` to this layer in 70lx, and a folio
  * scaffolded afterwards still ran it from `cat-harness/`, where nothing is
  * any more (bean `cat-tools-yylt`). `platformDir` stays for what cat-harness
@@ -213,7 +214,7 @@ function toolsDir(assistant: string): string {
  *
  * which assumed every adapter lives under the same instance. That stopped
  * being true on 2026-09-30, when `adapters/paper/` moved to
- * `folio-assistant-sci/` (bean `y5si`): one template cannot name two
+ * the formal-math (sci) layer (bean `y5si`): one template cannot name two
  * instances, so every paper folio scaffolded after the move would have got an
  * `adapterModule` pointing at a path that does not exist.
  *
@@ -271,7 +272,7 @@ function standsOn(assistant: string, contentType: InitFolioOptions["contentType"
   const declared = BUILTIN_ADAPTERS.find((a) => a.contentType === contentType);
   if (!declared) return harness;
   // The adapter's module is relative to the harness directory and passes
-  // through its instance's directory: `../folio-assistant-core/adapters/…`.
+  // through its instance's directory: `../<content-core>/adapters/…`.
   const segments = posixSegments(`${platformDir(assistant)}/${declared.module}`);
   const at = segments.lastIndexOf(declared.instance);
   return at < 0 ? harness : { name: declared.instance, path: segments.slice(0, at + 1).join("/") };
@@ -467,7 +468,7 @@ function instanceDeclaration(o: MaybeFolio): string {
       // than none. With a `version` beside it, always: `releaseIris` mints
       // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
       // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
-      // which is how the restored smart-trust and smart-immunizations
+      // which is how two restored DAK IG
       // declarations broke their IG publish on 2026-10-15.
       ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
       // A contentless instance declares no `folio` directory: declaring one it
@@ -743,8 +744,8 @@ todos/                    people's outstanding items (mounted likewise)
 \`\`\`sh
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
-bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
-bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
+bun run ${toolsDir(assistant)}/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
 
 Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
@@ -872,9 +873,9 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
  * gets no STAGING build, and a reviewer has no "after" to compare.
  *
  * **A document folio gets it ON**, building with
- * `folio-assistant-core/scripts/build-document-site.ts` (bean `fyu2`). That
+ * the content core's `scripts/build-document-site.ts` (bean `fyu2`). That
  * command was rehearsed end to end on a folio this function scaffolds: site,
- * ChangeSet and banner. The path is `folio-assistant-core/` rather than
+ * ChangeSet and banner. The path is under the content core rather than
  * `cat-harness/` as of bean `yj6r`, 2026-09-30: rendering a folio to a site is
  * CONTENT machinery, and the script reads core's `schemas/changeset.ts`. The
  * string here is the invocation a scaffolded folio's staging workflow carries,
@@ -887,10 +888,21 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
  * folio's to name. A guessed command would publish a preview built by
  * something the author never chose.
  */
+/**
+ * The layer that builds a document site: the content layer, the instance that
+ * declares the `core` layer's kinds, read from where they were declared rather
+ * than spelt here (folio-assistant#2598).
+ */
+function documentSiteLayer(): string {
+  const c = contentLayerInstance();
+  if (c === undefined) throw new Error("init-folio: a document folio needs the content layer, and none is composed");
+  return c.name;
+}
+
 function stagingWorkflow(assistant: string, contentType: InitFolioOptions["contentType"]): string {
   const on = contentType === "document";
   const build = on
-    ? `bun run ${assistant}/folio-assistant-core/scripts/build-document-site.ts --out _site`
+    ? `bun run ${assistant}/${documentSiteLayer()}/scripts/build-document-site.ts --out _site`
     : `echo "::error::set build_command in .github/workflows/staging.yml to build this folio''s site" && exit 1`;
   const header = on
     ? `# The site is built by the platform's build-document-site.ts: one page per
@@ -1621,10 +1633,12 @@ function writePublishContext(s: Scaffold, enclosing: string | null): void {
   result.notes.push(
     o.iriBase === undefined
       ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
-          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          "will skip with a warning until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
           `${instanceDeclarationFilename(o.slug)}.`
       : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
-          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "every push to main, but only once this instance holds at least one .jsonld document: the context binds the " +
+          "prefixes its documents use, so with none every run skips with a warning and creates no gh-pages. A new " +
+          "instance holds none yet. After the first run that publishes, switch GitHub Pages on once: " +
           "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
   );
 }

@@ -185,7 +185,7 @@ export function entryGraphSitePath(instance: string, docId: string, rel: string)
  * The directories directly inside the library `lib` that its instance
  * declares with kinds that do not include `library` — absolute, without a
  * trailing separator. They are other graphs kept in the library, not entries:
- * smart-immunizations keeps its L1 scenario worked example at
+ * a DAK IG keeps its L1 scenario worked example at
  * `library/l1-recommendation-scenarios/` as `l1-extraction`, and a reader that
  * walked it as an entry graded it for a manifest and sections it never had.
  */

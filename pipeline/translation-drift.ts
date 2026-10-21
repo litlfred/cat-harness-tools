@@ -45,7 +45,7 @@ import { buildTranslationIndex, siteRoot } from "./translation-index.ts";
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
-import { routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
+import { PAGE_LOCALE, routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 
 /** One heading, reduced to what can be compared ACROSS a translation. */
@@ -126,59 +126,18 @@ export interface UncatalogedTranslation {
  * {@link uncatalogedGlossaries}, must have a `.po`, so the gate fails on the
  * commit that publishes a new translation without one.
  */
-export const UNCATALOGED: UncatalogedTranslation[] = [
-  {
-    translation: "es/guides/agent-onboarding",
-    since: "2026-09-20",
-    reason:
-      "published with no `.po`; the page's structure matches its source, so it is current but untracked. A catalogue cannot be derived from a finished translation without inventing the segmentation",
-  },
-  {
-    translation: "zh/guides/agent-onboarding",
-    since: "2026-09-20",
-    reason: "same as `es/agent-onboarding` — published, structurally current, no catalogue",
-  },
-  // The six below are what `derive-po.ts` REFUSES, recorded on the owner's
-  // decision of 2026-09-26 after the page-discovery fix took this gate from 36
-  // findings to 6. Each is a real finding about the translation, not a tool
-  // limit, and each names WHAT differs rather than saying "drifted" — a reason
-  // that does not say what is wrong cannot tell the next reader whether it has
-  // been fixed.
-  //
-  // None is an agent's to clear: issue #206 reserves translation adjudication
-  // to a human, so re-translating any of these to make a catalogue derivable
-  // would manufacture exactly the sign-off that issue protects.
-  {
-    translation: "ar/concepts/architecture",
-    since: "2026-09-26",
-    reason:
-      "`count-differs` — the source has 60 translatable constructs and the translation has 61, so the translation carries something the source does not. `alignGrownSource` is sound only for constructs ADDED TO THE SOURCE; pairing a remainder the source lacks would invent an alignment rather than read one",
-  },
-  {
-    translation: "ar/concepts/skills",
-    since: "2026-09-26",
-    reason:
-      "`count-differs` — source 146 constructs, translation 147. Same shape as `ar/architecture`: longer than its source by one, so no positional alignment is sound",
-  },
-  {
-    translation: "ar/process/publication-workflow",
-    since: "2026-09-26",
-    reason:
-      '`msgid-conflict` — the source string "Editor / author" occurs more than once and is translated two different ways ("المحرر / المؤلف", and left untranslated at construct 298). A msgid-keyed `.po` cannot represent both, so this needs `msgctxt` rather than a derivation',
-  },
-  {
-    translation: "zh/process/publication-workflow",
-    since: "2026-09-26",
-    reason:
-      '`msgid-conflict` — "Editor / author" is translated "编辑 / 作者" and "Editor / author（编辑 / 作者）" at construct 298. Needs `msgctxt`; a msgid-keyed `.po` cannot hold both',
-  },
-  {
-    translation: "zh/concepts/skills",
-    since: "2026-09-26",
-    reason:
-      '`msgid-conflict` — "Skills" occurs more than once and is translated "技能" and "技能数" at construct 89. This is the guard added after bean `f6r1` found the same case masked by `count-differs`, now firing on genuinely new data. Needs `msgctxt`',
-  },
-];
+/*
+ * EMPTY as of 2026-10-20, and that is the goal state, not a lapse. It held
+ * seven entries — `es|zh/guides/agent-onboarding` (since 2026-09-20) and the
+ * five pages `derive-po.ts` refused on 2026-09-26: `ar/concepts/architecture`
+ * and `ar/concepts/skills` (`count-differs`), `ar|zh/process/publication-workflow`
+ * and `zh/concepts/skills` (`msgid-conflict`). The owner chose on 2026-10-20
+ * (bean `m4s1`): an agent writes each `.po` from the `.pot`, marked UNOFFICIAL
+ * until the owner signs off (issue #206). The catalogues agree with the `.pot`
+ * — the current source's segmentation — and take a published segment only where
+ * it aligned; the entries came out in the same change.
+ */
+export const UNCATALOGED: UncatalogedTranslation[] = [];
 
 /** A translation known to have drifted, recorded rather than passed over. */
 export interface KnownDrift {
@@ -316,13 +275,23 @@ export function uncatalogedGlossaries(repoRoot: string, site?: string): Uncatalo
       if (r.renderedBy === GLOSSARY_RENDERER) routes.set(`${r.harness}/${r.visualiser}`, r);
     }
   }
+  // A translation is keyed `<locale>/<its SOURCE page's path>`. The English
+  // glossary pages moved under the page locale (2026-10-16), so their
+  // translations key as `<locale>/en/<harness>/<visualiser>`; a site drawn
+  // before the move still keys them `<locale>/<harness>/<visualiser>`.
+  // Both are recorded, so the gate reads either site the same way.
   return [...routes.values()].flatMap((r) =>
-    GLOSSARY_LOCALES.map((locale) => ({
-      translation: visualiserRoute({ locale, harness: r.harness, visualiser: r.visualiser }).replace(/\/$/, ""),
-      since: "2026-10-09",
-      reason:
-        "generated by glossary-page.ts from the per-scheme catalogues under translations/<locale>/glossary/; the page never had a page catalogue — at its old path the terminology file glossary.po answered for it by name",
-    })),
+    GLOSSARY_LOCALES.flatMap((locale) =>
+      [
+        visualiserRoute({ locale, harness: r.harness, visualiser: r.visualiser }),
+        `${locale}/${visualiserRoute({ locale: PAGE_LOCALE, harness: r.harness, visualiser: r.visualiser })}`,
+      ].map((route) => ({
+        translation: route.replace(/\/$/, ""),
+        since: "2026-10-09",
+        reason:
+          "generated by glossary-page.ts from the per-scheme catalogues under translations/<locale>/glossary/; the page never had a page catalogue — at its old path the terminology file glossary.po answered for it by name",
+      })),
+    ),
   );
 }
 

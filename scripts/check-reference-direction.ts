@@ -165,6 +165,7 @@ import {
   type ReferenceExemption,
   type ReferenceVerdict,
 } from "@litlfred/cat-harness/schemas/reference-direction.js";
+import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
@@ -410,7 +411,8 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
  *  - **dated** — the file name must END in `-YYYY-MM-DD`. The undated pages
  *    beside them (`index.md`, `README.md`, a proposal still being argued
  *    without a date) are living documents, edited as the answer changes, and
- *    stay `wrong-direction`.
+ *    stay `wrong-direction` — except the generated index's ROW for a dated
+ *    record, which {@link DATED_PROPOSAL_INDEX_ROW} reads as the record.
  *  - **a proposal** — directly under `docs/proposals/` of an instance root,
  *    not in a sub-directory and not in any other `docs/` section.
  *
@@ -418,13 +420,62 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
  * the CLASS ("dated decision records"), not on three files: every dated record
  * written later is the same kind of thing for the same reason.
  */
-// declared-path-literal: the shape of a dated proposal record, repo-root-relative because that is how an occurrence's file is reported
-const DATED_PROPOSAL_RECORD_FILE = /^[a-z0-9][a-z0-9-]*\/docs\/proposals\/[a-z0-9][a-z0-9-]*-\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\.(?:md|json)$/;
+/** The FILE NAME of a dated record: `<topic>-YYYY-MM-DD.md`, or the `.json` measurement it carries. */
+const DATED_RECORD_NAME = String.raw`[a-z0-9][a-z0-9-]*-\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\.(?:md|json)`;
+// declared-path-literal: the directory dated proposal records sit in, repo-root-relative because that is how an occurrence's file is reported
+const PROPOSALS_DIR = String.raw`[a-z0-9][a-z0-9-]*\/docs\/proposals\/`;
+const DATED_PROPOSAL_RECORD_FILE = new RegExp(`^${PROPOSALS_DIR}${DATED_RECORD_NAME}$`);
 export const DATED_PROPOSAL_RECORD: ReferenceExemption = {
   file: DATED_PROPOSAL_RECORD_FILE,
   reason:
     "X5, a DATED DECISION RECORD (owner, 2026-10-14, Q1: \"Exempt as records\"): a proposal whose file name carries the date it was written records the layering, the options and the measurements as they stood that day, and the owner answered it as written. Rewording it to stop naming a higher layer would falsify the record. Dated files directly under an instance's `docs/proposals/` only; the undated index and living pages beside them are read",
 };
+
+/**
+ * X5, applied to the INDEX of the records (owner, 2026-10-16, item 6a of the
+ * folio-assistant#2598 wrong-direction triage: the generated index that lists
+ * the dated records gets the same records treatment as the records).
+ *
+ * The `README.md` beside the records is written by the bootstrap toolset's
+ * `subgraph-readmes.ts`, which lists every file of the directory as a table
+ * row: the file's name, linked to itself, then the title it carries. A row
+ * for a dated record therefore repeats the record — its file name and its
+ * title, both of which may name the layer the record was written about — and
+ * the only ways to stop the row naming that layer are to rename the record
+ * (breaking every link to it) or to reword its title (falsifying it), which
+ * is what X5 forbids.
+ *
+ * Narrow on three axes, each held by a test:
+ *
+ *  - **declared** — the FILE declares itself the generator's index: it carries
+ *    `subgraph-readmes.ts`'s own region marker ({@link SUBGRAPH_INDEX_BEGIN}).
+ *    Decided per file in {@link analyse}, like {@link TRANSLATION_MIRROR}, by
+ *    what the file says about itself rather than by its name; a hand-written
+ *    page beside the records is never consulted against this entry.
+ *  - **beside the records** — a Markdown file directly in a directory where
+ *    X5 applies, so the rows it lists are X5's records and nothing else.
+ *  - **a row for a dated record** — the line is a table row whose first cell
+ *    is a dated record's name linked to itself (`| [`<name>`](<name>) |`),
+ *    the shape the generator writes. The rows for undated, living proposals
+ *    and every line of prose on the page are read as before.
+ */
+export const SUBGRAPH_INDEX_BEGIN = SUBGRAPH_README_BEGIN;
+export const DATED_PROPOSAL_INDEX_ROW: ReferenceExemption = {
+  file: new RegExp(`^${PROPOSALS_DIR}[^/]+\\.md$`),
+  pattern: new RegExp(`^\\| \\[\`(${DATED_RECORD_NAME})\`\\]\\(\\1\\) \\|`),
+  reason:
+    "X5 applied to the generated INDEX of dated records (owner, 2026-10-16, item 6a): the file declares itself `subgraph-readmes.ts`'s index of the directory, and the row lists one dated record by its own file name and title. The row repeats the record, so it names what the record names; renaming the record would break its links and rewording its title would falsify it. Rows for undated proposals, and the page's prose, are read",
+};
+
+/** Does the file declare itself the bootstrap toolset's generated index of its directory? */
+export function declaresSubgraphIndex(abs: string): boolean {
+  if (!abs.endsWith(".md")) return false;
+  try {
+    return readFileSync(abs, "utf-8").includes(SUBGRAPH_INDEX_BEGIN);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 3a — a WORKFLOW `uses:` ADDRESS (owner, 2026-10-15, ruling "3a" of the
@@ -712,40 +763,15 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * naming three, is `gen-methodologies-viz.ts`'s, and left when that generator
  * — with `gen-tools-viz.ts` and `gen-lsi-viz.ts` — began writing `generated:`
  * (D1 aftermath, 2026-10-15). `cat-harness/docs/cat-harness/published-graphs.md`
- * left the same day: nothing in it names a layer above any more.
+ * left the same day: nothing in it names a layer above any more. The six
+ * fhir-harness entries left on 2026-10-20: fhir-harness#118 moved its module
+ * paths under `pipeline/`, and none of the six names a layer above any more.
  */
 const PENDING: readonly { file: string; names: number }[] = [
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/toolchain-ownership.md", names: 4 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
-  { file: "cat-harness/cat-harness.json", names: 2 },
-  { file: "fhir-harness/schemas/ig-chrome.ts", names: 5 },
-  { file: "cat-harness/schemas/cat-harness.ts", names: 2 },
-  { file: "smart-base/skills/content/authoring-who-smart-guidelines/dak-postprocessing.md", names: 5 },
-  { file: "cat-harness/skills/kg/kg-core/directory-conventions.md", names: 2 }, // declared-path-literal: a finding location, repo-root-relative as `analyse` reports it
   // declared-path-literal: a FINDING's location, recorded repo-root-relative because that is
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
-  { file: "fhir-harness/fhir-harness.json", names: 6 },
-  { file: "cat-harness/skills/kg/kg-core/kg-export.md", names: 2 },
-  { file: "cat-harness/schemas/graph-typology-registry.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/dak-pdf.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/external-schemas.ts", names: 3 },
-  { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-fork.md", names: 2 },
-  { file: "cat-harness/schemas/namespaces.ts", names: 2 },
-  { file: "cat-harness-tools/scripts/kg-export.ts", names: 2 },
-  { file: "cat-harness-tools/tools/discover.ts", names: 2 }, // moved by 70lx from cat-harness/tools/ (ruling (i), 2026-10-11)
-  { file: "cat-harness/skills/ui/ui-core/harness-tiles.md", names: 2 },
-  { file: "cat-harness/schemas/harness-config.ts", names: 3 },
-  { file: "cat-harness/docs/source/fhir-ig-publisher/what-it-cannot-be-asked-for.md", names: 2 },
-  { file: "cat-harness-tools/scripts/check-context-emission.ts", names: 3 },
-  { file: "cat-harness-tools/scripts/harness-schema-export.ts", names: 2 },
-  { file: "cat-harness/docs/wireframes/voices/intent.md", names: 2 },
-  { file: "smart-base/smart-base.json", names: 2 },
-  { file: "smart-base/README.md", names: 2 },
-  { file: "smart-base/AGENTS.md", names: 2 },
-  { file: "fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md", names: 2 },
-  { file: "fhir-harness/scripts/ingest-ig-chrome.ts", names: 2 },
-  { file: "fhir-harness/scripts/gen-ig-pages.ts", names: 3 },
 ];
 
 /**
@@ -771,8 +797,8 @@ const TRANSLATION_MIRROR: ReferenceExemption = {
     "X1, a TRANSLATION MIRROR (owner, Q-B 2026-10-01): the file's front matter declares a non-English `lang:` and a `translation_source:`, so every name in it is its source page's reference counted again — the reason `translations/` is skipped. Fixed in the source and re-translated, never in the copy",
 };
 
-/** How many exemptions this axis declares, each with a stated reason — {@link EXEMPTIONS} plus {@link TRANSLATION_MIRROR}. */
-export const EXEMPTIONS_DECLARED = EXEMPTIONS.length + 1;
+/** How many exemptions this axis declares, each with a stated reason — {@link EXEMPTIONS} plus the two applied per file, {@link TRANSLATION_MIRROR} and {@link DATED_PROPOSAL_INDEX_ROW}. */
+export const EXEMPTIONS_DECLARED = EXEMPTIONS.length + 2;
 
 /** Does the file declare itself a translation of another page, in its own front matter? */
 export function declaresTranslationMirror(abs: string): boolean {
@@ -831,6 +857,7 @@ function instances(repoRoot: string): Instance[] {
       name?: string;
       needs?: string[];
       directories?: { path?: string; graphTypologies?: string[]; scope?: "instance" | "repository" }[];
+      builtAtPublish?: { path?: string }[];
     };
     // `rootForScope`, NEVER `join(root, path)`. A directory entry may carry
     // `scope: "repository"`, and it then resolves against the REPO ROOT
@@ -843,7 +870,19 @@ function instances(repoRoot: string): Instance[] {
     // in it was read as authored prose. Measured cost below.
     const machineWritten = (decl.directories ?? [])
       .filter((d) => d.path !== undefined && declaresMachineWritten(d.graphTypologies))
-      .map((d) => join(rootForScope(root, d.scope), d.path!));
+      .map((d) => join(rootForScope(root, d.scope), d.path!))
+      // A `builtAtPublish` path is machine-written by declaration too: each
+      // entry names the `writer` that builds it at publish, and nothing there
+      // is committed or authored. The checkout-built ones project OTHER
+      // instances by design — `docs/assets/library/` holds byte copies of
+      // sub-graphs declared inside another instance's entry (bean `8pzh`) — so
+      // a name they carry is the projected instance's, not this one reaching up
+      // (folio-assistant#2611: 27 findings once the pages were restored).
+      .concat(
+        (decl.builtAtPublish ?? [])
+          .filter((b) => typeof b.path === "string" && b.path !== "")
+          .map((b) => join(root, b.path!)),
+      );
     // A declaration with no `name` cannot be a reference TARGET (nothing to
     // match) and cannot own files by name either, so it is skipped rather
     // than given a fallback that would invent an instance.
@@ -1011,7 +1050,12 @@ export function analyse(root = REPO_ROOT): ReferenceReport {
     const file = relative(root, abs).split(sep).join("/");
     // X1 is a property of the FILE, read once, and appended LAST so any other
     // exemption that also matches keeps its own reason.
-    const exemptions = declaresTranslationMirror(abs) ? [...EXEMPTIONS, TRANSLATION_MIRROR] : EXEMPTIONS;
+    // X5's index rows are likewise decided by what the FILE declares.
+    const exemptions = [
+      ...EXEMPTIONS,
+      ...(declaresSubgraphIndex(abs) ? [DATED_PROPOSAL_INDEX_ROW] : []),
+      ...(declaresTranslationMirror(abs) ? [TRANSLATION_MIRROR] : []),
+    ];
     for (const to of targets) {
       for (const hit of occurrencesOf(text, to)) {
         const occurrence: Occurrence = { file, line: hit.line, text: hit.text.trim(), from, to };
@@ -1453,7 +1497,7 @@ export const CHECK_FAIL_ON_NEW = ["wrong-direction", "pending-stale", "instances
  */
 export function exemptionCounts(exempt: readonly { verdict: ReferenceVerdict }[]): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const e of [...EXEMPTIONS, TRANSLATION_MIRROR]) counts.set(e.reason, 0);
+  for (const e of [...EXEMPTIONS, DATED_PROPOSAL_INDEX_ROW, TRANSLATION_MIRROR]) counts.set(e.reason, 0);
   for (const c of exempt) {
     if (c.verdict.verdict !== "exempt") continue;
     const { reason } = c.verdict.exemption;

@@ -90,4 +90,12 @@ describe("the first-paint scheme — stored, else the OS, else light", () => {
     const out = withSavedScheme("<!doctype html><html><head><title>x</title></head><body><code>data-folio-saved-scheme</code></body></html>");
     expect(out).toContain(firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme"));
   });
+  test("a page marked with an OLDER snippet gets the current one, once", () => {
+    // The stored-choice-only rule `slices/search.html` still shipped on 2026-10-16.
+    const old = `<script data-folio-saved-scheme>try{var s=localStorage.getItem("fa-color-scheme");if(s==="light"||s==="dark")document.documentElement.setAttribute("data-fa-scheme",s)}catch(e){}</script>`;
+    const page = withSavedScheme(`<!doctype html><html><head>\n${old}<title>x</title></head><body></body></html>`);
+    const tags = [...page.matchAll(/<script data-folio-saved-scheme>[\s\S]*?<\/script>/g)].map((m) => m[0]);
+    expect(tags).toEqual([firstPaintSchemeScript().replace(/^<script/, "<script data-folio-saved-scheme")]);
+    expect(withSavedScheme(page)).toBe(page);
+  });
 });

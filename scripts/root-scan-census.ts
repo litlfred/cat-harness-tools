@@ -195,7 +195,7 @@ export function census(dir: string, repo: string = REPO): ScanRow[] {
  *
  * This census used to scan `cat-harness/scripts/` only, because that is where
  * it lives. Every script the instance-boundary work moved UP into
- * `folio-assistant-core/` then left the measurement and was counted nowhere:
+ * the content core then left the measurement and was counted nowhere:
  * 68 → 67 → 65 enumerating scripts, each drop reading as an improvement. And
  * the headline family read **0 of 0** while the one script with its shape,
  * `check-artifact-index.ts`, sat in the instance it did not scan — the `dh4f`

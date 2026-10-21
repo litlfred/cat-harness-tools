@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import jsonld from "jsonld";
 
-import { NS_PREFIXES } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 import { applyVocabMapping, contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import { buildFshGutsExport } from "../fsh-guts-export.ts";
@@ -19,7 +19,7 @@ import { buildContext } from "../kg-export.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const prefixes = { ...STANDARD_PREFIXES, ...NS_PREFIXES };
+const prefixes = { ...STANDARD_PREFIXES, ...ownPrefixTable() };
 
 /** What `key` expands to under `context`, as a JSON-LD processor reads it. */
 async function predicateOf(context: unknown, key: string): Promise<string | undefined> {

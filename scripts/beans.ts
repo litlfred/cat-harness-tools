@@ -450,6 +450,23 @@ export function isOpen(b: BeanNode): boolean {
   return OPEN_STATUSES.has(b.status);
 }
 
+/** The statuses that mean a bean is finished, one way or the other. */
+const CLOSED_STATUSES = new Set(["completed", "scrapped"]);
+
+/**
+ * `true` when a block on this bean can still hold it up: it is open, or it is
+ * a `draft`.
+ *
+ * A draft is not work yet, so {@link OPEN_STATUSES} leaves it out, and that
+ * is right for counting work. It is wrong for blocks: a draft waiting on a
+ * finished blocker reads as waiting on something that already happened, the
+ * same as an open bean does. Measured 2026-10-16: `ygzh` (completed) still
+ * blocked `18p1` (draft), and `blocker-closed` did not report it.
+ */
+export function canBeHeldUp(b: BeanNode): boolean {
+  return isOpen(b) || b.status === "draft";
+}
+
 /** Which front-matter key declared an edge: the blocker's or the blocked's. */
 export type BlockDeclaration = "blocking" | "blocked_by";
 
@@ -654,7 +671,9 @@ export function beanFindings(beans: BeanNode[]): Array<{
       // and nobody lifted the block, so the blocked bean reads as waiting on
       // something that already happened — indistinguishable, from the blocked
       // end, from waiting on something that never will.
-      if (!isOpen(b) && isOpen(t)) {
+      // `CLOSED_STATUSES`, not `!isOpen`: a draft blocker is not closed, and
+      // a draft blocked bean is still held up ({@link canBeHeldUp}).
+      if (CLOSED_STATUSES.has(b.status) && canBeHeldUp(t)) {
         out.push({
           kind: "blocker-closed",
           bean: b.id,
@@ -671,8 +690,20 @@ export function beanFindings(beans: BeanNode[]): Array<{
       // blocker for `blocking:`, the blocked for `blocked_by:` — since that is
       // the file whose author asserted the block. For a `blocking:`-only edge
       // this is exactly the pre-`vhqq` check.
+      //
+      // Two edges are NOT abandoned-looking blocks, and reporting them made
+      // the page's "No expiry" list mostly noise (owner review 2026-10-16,
+      // 25 reported, 11 + 14 of them these two shapes):
+      //
+      // - the BLOCKED bean is already closed. The block holds nothing up; it
+      //   is a stale edge, not a block that might be abandoned.
+      // - blocker and blocked share one PARENT. That is ordering inside one
+      //   plan ("stage 1b before 1c"), and the parent's own liveness is what
+      //   says whether the plan is moving. The owner ruled that sequencing
+      //   needs no expiry.
       const declarers = e.declaredOn.map((d) => (d === "blocking" ? b : t));
-      if (isOpen(b) && !declarers.some(hasExpiry)) {
+      const sequencing = !!b.parent && b.parent === t.parent;
+      if (isOpen(b) && canBeHeldUp(t) && !sequencing && !declarers.some(hasExpiry)) {
         out.push({
           kind: "blocked-without-expiry",
           bean: b.id,

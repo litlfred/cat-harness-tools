@@ -36,7 +36,7 @@
  * than any of the three shapes `v1hw` proposed inventing. The badge follows,
  * counting documents and not plumbing (see {@link filesIn} on dotfiles):
  * `uploads/` **26 uningested of 28**, `cat-harness/uploads/` **0 of 1**,
- * `who-iris/uploads/` **1 of 4** — re-measured 2026-09-21, after bean `yl5w`
+ * the IRIS replica's `uploads/` **1 of 4** — re-measured 2026-09-21, after bean `yl5w`
  * moved the three WHO sources out of the harness queue and into the folio
  * beside their own intake records.
  *
@@ -44,7 +44,7 @@
  * six entries still report `upload=match` from a recomputed hash, across three
  * queues now instead of two: a name-matched relation would have broken the
  * moment the files changed directory, and this one did not notice. The one
- * uningested file under `who-iris/uploads/` is the IRIS home capture, which is
+ * uningested file under the IRIS replica's `uploads/` is the IRIS home capture, which is
  * a page grab rather than a document — uningested is the correct answer for it
  * rather than a backlog.
  *
@@ -183,7 +183,7 @@ export interface LibraryEntry {
    * whatever is associated to it if there is something"*.
    *
    * In order: the rendered COVER beside the entry (`<slug>-cover.png`, the
-   * file `folio-assistant-core/scripts/gen-covers.ts` writes, emblem already masked),
+   * file the content core's `scripts/gen-covers.ts` writes, emblem already masked),
    * then the first image `images.json` declares a `figure`. A logo is never
    * the avatar — it names who published the book, not the book.
    *
@@ -233,9 +233,16 @@ export interface LibraryEntry {
    */
   view?: string;
   /**
+   * The kind of viewer the entry's held source opens in — attached by the
+   * caller (`gen-library-viz`), set only when the page at {@link view} draws a
+   * view panel for it. The folio glass reads it to show its eye (owner,
+   * 2026-10-16). Absent means no viewer, or nobody derived it.
+   */
+  viewable?: "pdf" | "image";
+  /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
-   * the smart-trust IG is in smart-base's library as an EXTERNAL reference,
+   * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
    * so the row has nothing of its own to open and must say where the thing is.
    *
    * `href` is an absolute URL, or SITE-ROOT-relative with a leading `/` and no
@@ -275,6 +282,9 @@ export interface LibraryAvatar {
  * full-page scan). An avatar is a thumbnail's job, and the copy is committed,
  * so a picture over this has NO avatar rather than a megabyte in the site.
  */
+/** An entry's rendered first page, inside its own directory — what `avatarOf` takes before any figure. */
+export const COVER_FILENAME = "cover.png";
+
 export const AVATAR_MAX_BYTES = 128 * 1024;
 
 /**
@@ -306,6 +316,10 @@ export function avatarOf(
   };
   const cover = join(libDir, `${slug}-cover.png`);
   if (fits(cover)) return make(cover, "cover");
+  // Page 1 rendered at ingest (`ingest-document` cover arm, or a backfill by
+  // `library-covers.ts`), kept inside the entry so promotion carries it.
+  const rendered = join(libDir, slug, COVER_FILENAME);
+  if (fits(rendered)) return make(rendered, "cover");
   for (const raw of images?.images ?? []) {
     const img = raw as { file?: unknown; role?: unknown };
     if (img.role !== "figure" || typeof img.file !== "string") continue;
@@ -778,8 +792,8 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   // An instance that declares a library declares its own queue, and that
   // declaration does not always reach the roots passed in: measured
   // 2026-09-20, `directoriesForGraph(cat-harness, "library")` resolves
-  // `who-iris/library` while `…(cat-harness, "uploads")` does NOT resolve
-  // `who-iris/uploads`. Reading the entries of a queue this reader then
+  // the IRIS replica's `library` while `…(cat-harness, "uploads")` does NOT
+  // resolve its `uploads`. Reading the entries of a queue this reader then
   // omitted would report an instance's corpus as though it arrived from
   // nowhere. So each library's own instance root is asked for its queue.
   for (const lib of [...libDirs]) {
@@ -795,7 +809,7 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   // Declared-but-absent is REPORTED, not read (bean `95ir`; the owner's ruling
   // of 2026-09-23: fail in CI for the declaration, `check:declared-dirs`, and
   // never in a scanner). Reading one threw ENOENT and took the whole graph
-  // with it (smart-immunizations declares library/ and is mounted without it).
+  // with it (a DAK IG declares library/ and is mounted without it).
   const presence = splitDeclared([...libDirs]);
   noteAbsent(presence.absent, "a library");
   for (const libDir of presence.present.sort()) {

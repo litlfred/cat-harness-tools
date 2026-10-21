@@ -17,7 +17,7 @@
  * milestone release? what do we call it in publication and software?"*. The
  * answer this repository can actually act on is that **"MVP" is declared
  * nowhere in it** — measured the same day, `cat-harness/methodologies/` (20
- * files) and `folio-assistant-core/methodologies/` (2) contain zero hits for
+ * files) and the content core's `methodologies/` (2) contain zero hits for
  * MVP, agile, scrum, kanban or sprint, against a control of 19 files matching
  * `decision|provenance`. The declared methodology set is decision-analysis and
  * provenance; work sequencing is declared as BPMN plus CRDM.

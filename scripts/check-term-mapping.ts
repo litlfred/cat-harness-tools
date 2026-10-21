@@ -57,9 +57,17 @@ import {
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
+
+/** The content layer's name, or a refusal: this check judges that layer's glossary and has nothing to judge without it. */
+function contentLayerName(): string {
+  const c = contentLayerInstance();
+  if (c === undefined) throw new Error("check-term-mapping: no content layer is composed, so there is no glossary to check");
+  return c.name;
+}
 const STEM = "term-mapping";
 
 /** The pinned published IG the `fhir` half resolves against — owner, 2026-09-30. */
@@ -85,8 +93,8 @@ interface GlossScheme {
  * any instance in this checkout.
  *
  * Found through the declarations, not a literal path: this script lives in
- * cat-harness and the glossary is declared by folio-assistant-core, a layer
- * ABOVE it. A hard-coded `folio-assistant-core/glossary` was an upward path no
+ * cat-harness and the glossary is declared by the content core, a layer
+ * ABOVE it. A hard-coded path to that layer's `glossary` was an upward path no
  * import gate sees, and it would scan nothing — silently — the day cat-harness
  * stands alone (separation placement review, 2026-10-06, bean `0r7u` step 0).
  */
@@ -598,7 +606,9 @@ function main(): number {
     script: "cat-harness-tools/scripts/check-term-mapping.ts",
     scriptAbsPath: import.meta.path,
     // declared-path-literal: a QA subject ID (the glossary's declared route), recorded in the sidecar; nothing reads it as a filesystem path.
-    subject: { kind: "glossary", id: "folio-assistant-core/glossary" },
+    // The glossary's owner: the instance declaring the `core` layer's kinds,
+    // `glossary` among them (folio-assistant#2598).
+    subject: { kind: "glossary", id: `${contentLayerName()}/glossary` },
     families: Object.fromEntries(
       MAPPING_TARGETS.map((t) => [
         t,

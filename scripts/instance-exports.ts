@@ -11,8 +11,8 @@
  *
  * Measured on `main` 2026-10-04: fourteen directories declare an instance and
  * the site published three graphs — the host's, bootstrap's and the checkout
- * root's. The other eleven (`smart-base`, `who-iris`, `folio-assistant-core`,
- * …) had a declaration and no document, so nothing could fetch one harness on
+ * root's. The other eleven (the DAK base layer, the IRIS replica, the content
+ * core, …) had a declaration and no document, so nothing could fetch one harness on
  * its own. Each of them already exported cleanly with `kg-export --instance`
  * in one to three seconds; nothing ran the command.
  *
@@ -31,11 +31,16 @@
  * when a workflow that runs this script does not also run that command — so an
  * exemption cannot outlive its publisher and leave the instance with nothing.
  *
- * Each document lands at `<out-dir>/<stub>/<stub>.jsonld`, which is the
+ * Each document lands at `<out-dir>/<name>/<stub>.jsonld`, which is the
  * `docPath` `exportIdentity` gives a foreign instance (bean `dyd3`), with the
- * `.json` alias beside it because Pages serves `.jsonld` as octet-stream.
+ * `.json` alias beside it because Pages serves `.jsonld` as octet-stream. The
+ * `<name>/` segment is cat-harness's one URL-space resolver
+ * (`schemas/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
+ * segment is the instance's NAME, never its stub (owner, 2026-09-20, recorded
+ * on bean `cat-tools-sthf`). An instance declaring `"enabled": false` is not
+ * planned, so it is not published.
  *
- * Beside it, `<out-dir>/<stub>/schema/`: the instance's own skill I/O
+ * Beside it, `<out-dir>/<name>/schema/`: the instance's own skill I/O
  * contracts, its public Zod schemas under `zod/<module>/<Export>.schema.json`
  * (owner ruling 2026-10-05, option C: every exported Zod `*Schema` const), and
  * a `<stub>.schema.json` index (bean `4ak5` item 1, the "and a schema" half).
@@ -52,6 +57,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -89,16 +95,37 @@ export const PUBLISHED_ELSEWHERE: Readonly<Record<string, PublishedElsewhere>> =
 export interface PlannedExport {
   /** Repository-relative, as a workflow would spell it: `./<dir>`. */
   path: string;
+  /** The declared `name`: the instance's segment of the site ({@link instanceSitePath}). */
+  name: string;
   stub: string;
   /**
    * The instance declares its own `canonicalUrl`, so its document's `@id` is
    * minted against that and a `--base-url` is NOT passed: `exportIdentity`
    * puts a self-based instance at `<base>/<stub>.jsonld`, which under a
    * preview's base is a path nothing writes (measured 2026-10-04 for
-   * `cat-harness-tools`, `cat-openapi`, `fhir-harness` and `smart-base`).
+   * `cat-harness-tools`, `cat-openapi`, the FHIR IG harness and the DAK base layer).
    * Its own address is the honest one in every build.
    */
   ownCanonical: boolean;
+}
+
+/**
+ * Where `rel` is served inside an instance's own part of the site,
+ * site-relative with no leading slash: `<name>/<rel>`.
+ *
+ * Every consumer that writes or looks for a foreign instance's published
+ * files asks this, so the deploy, the identity `kg-export` mints and the root
+ * index cannot disagree about the segment. It is cat-harness's
+ * `publishedPath` (`case: "instance"`), not a template here: a second spelling
+ * of the rule is how two of them drift.
+ */
+export function instanceSitePath(name: string, rel: string): string {
+  return publishedPath({ case: "instance", instance: name, path: rel }).replace(/^\//, "");
+}
+
+/** Where a foreign instance's export document is served: `<name>/<stub>.jsonld`. */
+export function instanceDocPath(d: { name: string; stub: string }): string {
+  return instanceSitePath(d.name, `${d.stub}.jsonld`);
 }
 
 /**
@@ -145,11 +172,16 @@ export function declaredInstanceStubs(repo: string = REPO): Set<string> {
 export function instanceExportPlan(repo: string = REPO): PlannedExport[] {
   const out: PlannedExport[] = [];
   for (const abs of instanceRootsIn(repo)) {
+    let name: string;
     let stub: string;
     let ownCanonical: boolean;
     try {
       const d = readDeclaration(abs);
-      if (!d) continue;
+      // Not publishing is a declaration (`"enabled": false`), so leaving the
+      // instance out here is the answer, not a gap: `isPublished` is the one
+      // place that reads it.
+      if (!d || !isPublished(d)) continue;
+      name = d.name;
       stub = artefactStub(d);
       ownCanonical = declaresOwnCanonical(d);
     } catch {
@@ -157,7 +189,7 @@ export function instanceExportPlan(repo: string = REPO): PlannedExport[] {
     }
     if (stub in PUBLISHED_ELSEWHERE) continue;
     const rel = relative(repo, abs).replace(/\\/g, "/");
-    out.push({ path: rel === "" ? "." : `./${rel}`, stub, ownCanonical });
+    out.push({ path: rel === "" ? "." : `./${rel}`, name, stub, ownCanonical });
   }
   return out;
 }
@@ -196,8 +228,8 @@ if (import.meta.main) {
   let failed = 0;
   try {
     for (const p of plan) {
-      const doc = join(outDir, p.stub, `${p.stub}.jsonld`);
-      mkdirSync(join(outDir, p.stub), { recursive: true });
+      const doc = join(outDir, instanceDocPath(p));
+      mkdirSync(dirname(doc), { recursive: true });
       const args = ["run", join(TOOLS_ROOT, "scripts", "kg-export.ts"), "--instance", p.path, "--out", doc, "--qa-root", qaRoot];
       if (baseUrl && !p.ownCanonical) args.push("--base-url", baseUrl);
       const r = spawnSync("bun", args, { cwd: REPO, encoding: "utf-8" });
@@ -215,7 +247,7 @@ if (import.meta.main) {
       //
       // With its public Zod schemas under `schema/zod/` (part 2, owner ruling
       // 2026-10-05, option C: "every exported *Schema").
-      const schemaDir = join(outDir, p.stub, INSTANCE_SCHEMA_DIR);
+      const schemaDir = join(outDir, instanceSitePath(p.name, INSTANCE_SCHEMA_DIR));
       const built = await scannedInstanceSchemas(resolve(REPO, p.path), baseUrl);
       for (const [rel, body] of built.files) {
         const out = join(schemaDir, rel);

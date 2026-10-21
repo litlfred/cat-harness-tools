@@ -81,7 +81,8 @@ import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { NS_PREFIXES, propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
@@ -125,7 +126,7 @@ import { loadSpecs } from "./external-schemas.js";
 import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
 import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
-import { declaresOwnCanonical, publishesInstanceSchema } from "./instance-exports.js";
+import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,
   buildInstanceSchemas,
@@ -172,8 +173,8 @@ const ROOT = join(HARNESS_ROOT);
  * Three times now a hardcoded list has been the bug. First this module listed
  * six directories and missed `schemas/skills/`, reporting 11 BPMN refs as
  * dangling. Then, with that fixed, the same list still omitted
- * `smart-base/skills/content/authoring-who-smart-guidelines/` and its siblings, so
- * `smart-base-tools` — a file that plainly exists — came out as a dangling
+ * a DAK base layer's `skills/content/authoring-who-smart-guidelines/` and its
+ * siblings, so that layer's `-tools` package — a file that plainly exists — came out as a dangling
  * `declaresSkill` link. `knownSkills()` in `scripts/check-workflow-refs.ts`
  * carries a fourth, differently-wrong copy of the same list.
  *
@@ -257,7 +258,7 @@ export function graphTypologyId(kindName: string): string {
 
 /** A type IRI with whichever folio namespace it carries removed. */
 export function stripNamespace(iri: string): string {
-  for (const ns of Object.values(NS_PREFIXES)) if (iri.startsWith(ns)) return iri.slice(ns.length);
+  for (const ns of Object.values(ownPrefixTable())) if (iri.startsWith(ns)) return iri.slice(ns.length);
   return iri;
 }
 
@@ -280,13 +281,13 @@ function namingTable(id: string): VocabMapping {
 }
 
 /**
- * The active context, following `WorldHealthOrganization/smart-base`'s
+ * The active context, following the WHO DAK base IG's
  * `generate_jsonld_vocabularies.py`.
  *
  * Four things here are load-bearing rather than decorative:
  *
  * **`{"@type": "@id"}` is what makes this a graph.** Without it every edge —
- * `implementedBy`, `performedBy`, `partOf` — is a *string literal* to any
+ * `requires`, `performedBy`, `partOf` — is a *string literal* to any
  * JSON-LD processor, and the document is a list of records that merely looks
  * linked to a human reading the JSON. Declaring those terms `@id`-typed is the
  * difference between 500 records and a traversable graph, and it costs one
@@ -294,7 +295,7 @@ function namingTable(id: string): VocabMapping {
  *
  * **No `@vocab`.** Every term is declared with its full namespace IRI, so an
  * undeclared key stays undeclared rather than silently resolving against a
- * default namespace and minting an IRI nobody chose. smart-base's type-usage
+ * default namespace and minting an IRI nobody chose. That IG's type-usage
  * document calls this out explicitly and it is the right call.
  *
  * **`id` and `type` are aliased** to `@id` and `@type`, so the published JSON
@@ -306,7 +307,7 @@ function namingTable(id: string): VocabMapping {
  */
 export function buildContext(): Record<string, unknown> {
   const link = { "@type": "@id" } as const;
-  const prefixes = { ...NS_PREFIXES, prov: PROV, rdfs: RDFS, schema: SCHEMA, xsd: XSD };
+  const prefixes = { ...ownPrefixTable(), prov: PROV, rdfs: RDFS, schema: SCHEMA, xsd: XSD };
   return {
     "@version": 1.1,
     ...prefixes,
@@ -324,13 +325,13 @@ export function buildContext(): Record<string, unknown> {
     // `rdfs:label`/`rdfs:comment` (owner, 2026-09-30, bean `xsqm`:
     // "emphasize preexisting standards … now align"). The edges below that
     // restate a standard — `partOf`, `holdsGraph`, `from`/`to`,
-    // `implementedBy`, … — resolve through `propertyIri`, which reads each
+    // `bindsRole`, … — resolve through `propertyIri`, which reads each
     // retired term's `replacedBy` in the vocabulary; the JSON keys are
     // unchanged, so a plain-JSON reader sees no difference and an RDF reader
     // sees the standard property.
     ...contextBindings([namingTable("kg-node-naming"), namingTable("role-naming")], {
       inContext: prefixes,
-      prefixes: { ...STANDARD_PREFIXES, ...NS_PREFIXES },
+      prefixes: { ...STANDARD_PREFIXES, ...ownPrefixTable() },
     }),
     generatedAt: { "@id": `${PROV}generatedAtTime`, "@type": `${XSD}dateTime` },
     // Provenance of the SOURCE, as against provenance of the run above.
@@ -361,7 +362,15 @@ export function buildContext(): Record<string, unknown> {
     // unresolvable way of naming a node that is right there. As a link the
     // viewer's subgraph facet and the declaration hierarchy are the same edge.
     inSubgraph: { "@id": propertyIri("inSubgraph"), ...link },
-    implementedBy: { "@id": propertyIri("implementedBy"), ...link },
+    // Task → Skill. `dcterms:requires` — "a related resource that is
+    // required by the described resource to support its function" — read as
+    // the task, the DEPENDENT node, naming what it needs; the skill names no
+    // task. Owner, 2026-10-16 (thread "BPMN lane, role and skill modelling",
+    // implementation spec §2): this replaces `implementedBy`, because a skill
+    // does not implement a task, and a general standard is preferred over
+    // minting `completedUsing`. Through `propertyIri`, like every replaced
+    // term: the vocabulary's `requires` is `replacedBy: dcterms:requires`.
+    requires: { "@id": propertyIri("requires"), ...link },
     performedBy: { "@id": termIri("performedBy"), ...link },
     declaresSkill: { "@id": termIri("declaresSkill"), ...link },
     inPackage: { "@id": termIri("inPackage"), ...link },
@@ -480,12 +489,10 @@ export function buildContext(): Record<string, unknown> {
     // It is also NOT the deployment's `network`, although the vocabulary is
     // shared: that one describes a population, this one a participant.
     reach: termIri("reach"),
-    // The two declared exemptions, and they are NOT one flag with two names.
-    // `actedUpon` says the role never acts, so `role-has-actor` is `n/a`;
-    // `judgementOnly` says it acts but no procedure yields its answer, so
-    // `activity-names-skill` is. A consumer that collapsed them would give a
-    // store an actor or a stakeholder a skill.
-    actedUpon: { "@id": termIri("actedUpon"), "@type": `${XSD}boolean` },
+    // The declared exemption: `judgementOnly` says the role acts but no
+    // procedure yields its answer, so `activity-names-skill` is `n/a`. Its
+    // sibling `actedUpon` ("never acts") was retired on 2026-10-16 (owner): a
+    // role a machine plays is a real role whose skills are its contract.
     judgementOnly: { "@id": termIri("judgementOnly"), "@type": `${XSD}boolean` },
 
     // ---- BPMN, as it comes off a diagram -----------------------------------
@@ -585,7 +592,7 @@ export function buildContext(): Record<string, unknown> {
     // asset's role is a free string naming what the FILE is for —
     // `agent-instructions`, `instance-readme`, `landing-operations` — and it is
     // a different vocabulary from the actor/swimlane Role, which is a node
-    // with an id, skills and `actedUpon`. Spelling both `role` would make a
+    // with an id, skills and actor kinds. Spelling both `role` would make a
     // consumer that resolves the term get a bare string where it expects a
     // Role node, and the two would be indistinguishable in the graph.
     //
@@ -1567,7 +1574,7 @@ function stampSubgraph(graph: Node[], doc: string, instanceRoot: string = ROOT):
     .map((d) => ({ id: d.id, rel: relative(instanceRoot, d.absPath!).replace(/\\/g, "/").replace(/\/$/, "") }))
     // `..` is KEPT, and dropping it is what made this facet useless.
     //
-    // Every repository-scoped entry — `who-iris/`, `folio-assistant-core/`,
+    // Every repository-scoped entry — a content layer's directory,
     // `bootstrap/`, `detangle/`, `large-datasets/` —
     // resolves to `../<instance>/…` relative to this instance, so
     // `!startsWith("..")` excluded the entire set the facet exists to offer.
@@ -1580,7 +1587,7 @@ function stampSubgraph(graph: Node[], doc: string, instanceRoot: string = ROOT):
     // could not.
     //
     // A path that leaves the instance is still a path this graph carries —
-    // `schema-nodes.ts` mints `../folio-assistant-core/schemas/…` — so the
+    // `schema-nodes.ts` mints `../<content-core>/schemas/…` — so the
     // comparison below matches in the same space rather than excluding it.
     .filter((d) => d.rel.length > 0)
     .sort((a, b) => b.rel.length - a.rel.length);
@@ -1726,7 +1733,7 @@ async function collectProcesses(
   // found none, rather than passing over in silence" — but saying it and
   // FAILING the instance for it are different things, and only the first was
   // ever wanted. Three instances arrived at once (`kg-navigation`,
-  // `large-datasets`, `who-iris`), each holding one skill and no workflow,
+  // `large-datasets`, a library replica), each holding one skill and no workflow,
   // each rendering its nodes, each failed on this message alone. A skills
   // package with no process is an ordinary thing; requiring a diagram to stay
   // green is asking an instance to carry something it never claimed.
@@ -1739,7 +1746,7 @@ async function collectProcesses(
   // declaring a knowledge graph meant declaring PROCESSES. It does not. An
   // instance declaring `skills/` claims skills; a skills package with no
   // workflow is an ordinary thing and three arrived at once
-  // (`kg-navigation`, `large-datasets`, `who-iris`), each holding one skill,
+  // (`kg-navigation`, `large-datasets`, a library replica), each holding one skill,
   // each rendering its nodes, each failed on this message alone.
   //
   // That is the same shape the paragraph above rejects, one level in: asking
@@ -1909,9 +1916,8 @@ async function collectProcesses(
       // whose name happened to equal a role id silently merged into it.
       //
       // Read from the DECLARED lane set, not from the lanes flow nodes happen
-      // to name. An `actedUpon` lane holds no activities by construction — it
-      // is written to and never acts — so deriving lanes from node references
-      // drops exactly the lanes whose emptiness is the point.
+      // to name. A lane that holds no activities is still a lane that names a
+      // role, so deriving lanes from node references would drop it.
       for (const lane of m.lanes) {
         nodes.push({
           "@id": makeIri(doc, "process", `${m.id}/lane/${lane.id}`),
@@ -1942,7 +1948,8 @@ async function collectProcesses(
           // performs in. `inLane` is the lane.
           performedBy: n.roleRef === undefined ? undefined : makeIri(doc, "role", n.roleRef),
           inLane: n.laneId === undefined ? undefined : makeIri(doc, "process", `${m.id}/lane/${n.laneId}`),
-          implementedBy: n.skills.map((k) => makeIri(doc, "skill", k)),
+          // `requires` (dcterms), was `implementedBy` — see `buildContext`.
+          requires: n.skills.map((k) => makeIri(doc, "skill", k)),
           touchesWorkPlan: n.touchesWorkPlan,
           workPlanOp: n.workPlanOp,
           relaxable: n.relaxable,
@@ -2043,10 +2050,10 @@ const skillHomes = new Map<string, string>();
 
 /**
  * `ownRoot` is the instance whose document `ownDoc` IS. It was always `ROOT`
- * until instance exports began collecting Tools (bean `tdir`): smart-base's
- * `extract-dak` satisfies a skill smart-base declares, and asking cat-harness
+ * until instance exports began collecting Tools (bean `tdir`): a DAK base
+ * layer's `extract-dak` satisfies a skill that layer declares, and asking cat-harness
  * "do you have it?" first would either keep a cat-harness-only skill in
- * smart-base's document (a dangling link) or send smart-base's own skill to a
+ * that layer's document (a dangling link) or send its own skill to a
  * sibling's. So the "this document wins" test asks the instance being
  * exported, and every OTHER instance, the host included, is a sibling.
  */
@@ -2095,8 +2102,8 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
  * ## Why it takes the root (bean `tdir`)
  *
  * It read `toolsOf(ROOT)` and nothing called it outside the host's branch of
- * `buildExport`, so `kg-export --instance ./smart-base` published 0 of
- * smart-base's 11 Tools and `--instance ./fhir-harness` 0 of its 32 —
+ * `buildExport`, so `kg-export --instance` on the DAK base layer published 0
+ * of its 11 Tools and on the FHIR IG harness 0 of its 32 —
  * measured 2026-10-15, both exports otherwise complete and silent about it.
  * Discovery (`tools/discover.ts`, bean `p0za`) had already made the Tools of
  * every instance loadable; the export simply never asked for them.
@@ -2107,7 +2114,7 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
  *   `satisfies` resolve against it, as every other node's links do.
  * - `typeBase` is where the I/O type vocabulary is published, which is the
  *   HARNESS's base for every instance (`harnessBase` in `discover.ts`).
- *   Minting smart-base's port types against smart-base's canonical named
+ *   Minting a DAK base layer's port types against its canonical named
  *   `http://smart.who.int/base/tool-types/...`, a document WHO does not
  *   publish (bean `p0za`). `undefined` lets discovery use the harness's
  *   declared base; a preview passes its own `--base-url`.
@@ -2360,13 +2367,13 @@ function linkSchemas(graph: Node[], root: string = ROOT): void {
  * **Role nodes used to come only from BPMN lane names**, and that left the
  * role model itself out of the graph. Measured 2026-09-19: 65 of 66 Role
  * nodes carried `sourceKind: "bpmn-lane"`, so what a role IS — which actor
- * kinds may fill it, which skills it carries, whether it is `actedUpon` —
+ * kinds may fill it, which skills it carries —
  * was nowhere in the published KG. `roles.json` is the declaration and was
  * not a source at all.
  *
  * The gap bites hardest on exactly the roles the lane heuristic cannot see.
- * An `actedUpon` role is written to and never acts, so its lane carries no
- * flow node, so no node names it, so it was never emitted: `corpus` and
+ * A store's role whose lane carried no flow node was named by no node, so
+ * it was never emitted: `corpus` and
  * `log` were both absent while `work-plan` happened to be present only
  * because some other diagram gave its lane an activity.
  *
@@ -2421,7 +2428,6 @@ function collectDeclaredRoles(
     description: r.description,
     sourceKind: "role-registry",
     actorKinds: r.actorKinds,
-    actedUpon: r.actedUpon,
     judgementOnly: r.judgementOnly,
     // Links, so a consumer can walk role -> skill without string surgery.
     hasSkill: (r.skills ?? []).map((n) =>
@@ -2469,7 +2475,8 @@ function collectGraphTypologies(root: string = ROOT): Node[] {
     return {
       // The individual IS the kind — there is no class per kind (owner,
       // 2026-09-30, bean `3r47`). Its namespace is its layer's: `skills` is
-      // bootstrap's, `voices` core's. `graphTypologyIri` is the one answer, so a
+      // bootstrap's, `voices` the harness's, and a `core` kind the namespace of
+      // the instance that declared it. `graphTypologyIri` is the one answer, so a
       // directory's `holdsGraph` and this node cannot disagree.
       "@id": graphTypologyId(name),
       "@type": termIri("GraphTypology"),
@@ -2605,7 +2612,7 @@ export function committedFileCount(dir: string): number | undefined {
 
 /** Every term in the context that is declared `{"@type": "@id"}`. */
 const LINK_TERMS = [
-  "partOf", "implementedBy", "performedBy", "declaresSkill", "inPackage", "inSubgraph",
+  "partOf", "requires", "performedBy", "declaresSkill", "inPackage", "inSubgraph",
   "providesCapability", "requiresCapability", "holdsGraph", "startNode",
   "incoming", "outgoing", "from", "to", "satisfies", "hasCapability",
   "hasSkill", "bindsRole", "inLane",
@@ -2829,7 +2836,7 @@ export interface ExportOptions {
    * cat-harness's own declared directories, and every instance stacked on it
    * is in that instance's own document (`instance-exports.ts`). Measured the
    * day it landed: 825 of 3369 nodes were other instances' — 495 of them
-   * folio-assistant-core's — under `cat-harness.jsonld#…` fragments. Each
+   * the content core's — under `cat-harness.jsonld#…` fragments. Each
    * `@id` the checkout graph had and this one lacks is answered by a
    * tombstone ({@link tombstonesFor}), for one release.
    *
@@ -3047,7 +3054,7 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // to be here was written out in seven places, five of them minting an `$id`.
   // An empty base still yields a document-RELATIVE IRI, deliberately — see
   // `makeIri`'s note on links that look dereferenceable.
-  // ── WHERE A FOREIGN INSTANCE'S DOCUMENT LIVES — `<base>/<stub>/<stub>.jsonld`
+  // ── WHERE A FOREIGN INSTANCE'S DOCUMENT LIVES — `<base>/<name>/<stub>.jsonld`
   //
   // The owner's URL-space rule (bean `x0hj`): the base IS one instance's
   // rendering, and **everything else is
@@ -3063,10 +3070,14 @@ export function exportIdentity(opts: ExportOptions = {}): {
   //
   // UNLESS THE INSTANCE DECLARES ITS OWN `canonicalUrl`. Then the base is its
   // own site, where it is the host, so it sits at `<canonicalUrl>/<stub>.jsonld`.
-  // Appending the foreign segment there doubled it: `fhir-harness` minted
-  // `…/fhir-harness/fhir-harness/fhir-harness.jsonld` (issue #1548, measured
+  // Appending the foreign segment there doubled it: the FHIR IG harness minted
+  // `…/<stub>/<stub>/<stub>.jsonld` (issue #1548, measured
   // 2026-09-30). `bootstrap` declares no base and is unchanged.
-  const docPath = foreignInstance && !ownCanonical ? `${stub}/${stub}.jsonld` : `${stub}.jsonld`;
+  //
+  // The segment is the instance's NAME, through the one resolver
+  // (`instanceDocPath`, bean `cat-tools-sthf`); `stub` names the file. They
+  // are equal for every instance declared today, so this moved no address.
+  const docPath = foreignInstance && !ownCanonical ? instanceDocPath({ name: decl?.name ?? stub, stub }) : `${stub}.jsonld`;
   const docIri = renderingPath(base, docPath);
   const canonicalIri = canonicalBase ? renderingPath(canonicalBase, docPath) : undefined;
   return {
@@ -3091,7 +3102,7 @@ export function exportIdentity(opts: ExportOptions = {}): {
  * `@id`s are minted against that whatever site builds it. Anything here that
  * names a node in ANOTHER instance's document has to mint the same way, or it
  * names a document nobody writes: `skillHome` passed this site's base and got
- * `<site>/smart-base.jsonld`, which the deploy never writes (measured
+ * `<site>/<stub>.jsonld` for a DAK base layer, which the deploy never writes (measured
  * 2026-10-05, bean `4ak5` item 2).
  */
 export function publishedIdentity(instanceRoot: string, baseUrl?: string): ReturnType<typeof exportIdentity> {

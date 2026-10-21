@@ -45,7 +45,7 @@
  *   bun run cat ingest uploads/FILE.pdf --dry-run
  *   bun run cat ingest uploads/FILE.pdf --refresh-meta   # technical facts only
  *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title (w6fu)
- *   bun run cat ingest uploads/FILE.pdf --library who-iris
+ *   bun run cat ingest uploads/FILE.pdf --library <instance>
  *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
  *   bun run cat ingest uploads/FILE.md --text   # Markdown/MDX/XML: text has no magic bytes, so the caller says so
  *
@@ -79,7 +79,8 @@ import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
+import { COVER_FILENAME } from "./library-graph.ts";
 
 /**
  * This module's own instance root — where its `harness.json` is.
@@ -98,7 +99,10 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  *
  * ## `--instance <dir>`: ingest into a CONTENT instance's library
  *
- * Without it this is cat-harness, and that is still the default. With it, the
+ * Without it this is the instance being worked on — cat-harness, unless a
+ * separated instance's repository MOUNTS the harness, when it is that instance
+ * (`resolveWorkingInstanceRoot`, bean `j3ls`: from a separated content instance the staging tree
+ * landed inside the mounted harness). With it, the
  * staging tree and the destination library are resolved against `<dir>`, which
  * must hold an instance declaration (`<name>.json`). This is the case of a
  * content folio such as `litlfred/qou`, checked out beside the harness: before
@@ -114,8 +118,11 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  */
 const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
 
-/** `--instance <dir>` or `--instance=<dir>`, else the harness. Exported for tests. */
-export function resolveInstanceRoot(argv: readonly string[], fallback: string = HARNESS_ROOT): string {
+/** `--instance <dir>` or `--instance=<dir>`, else the working instance. Exported for tests. */
+export function resolveInstanceRoot(
+  argv: readonly string[],
+  fallback: string = resolveWorkingInstanceRoot({ argv: [] }).root,
+): string {
   let chosen: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -187,7 +194,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   // this document go", it is a coin toss that files it somewhere plausible.
   //
   // THREE states, and the middle one arrived with bean `frs5`, which moved the
-  // corpus into `who-iris/` and `folio-assistant-sci/`:
+  // corpus into the IRIS replica's and the formal-math layer's directories:
   //
   //   none declared   -> throw: ingesting into a guessed directory files the
   //                     document where nothing scans it
@@ -217,13 +224,13 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   }
 
   // Matched EXACTLY, on either spelling a caller would reasonably use: the
-  // relative path the declaration resolves to (`../who-iris/library`) or the
-  // instance directory holding it (`who-iris`). Both work and neither is a
+  // relative path the declaration resolves to (`../<instance>/library`) or the
+  // instance directory holding it (`<instance>`). Both work and neither is a
   // second vocabulary to learn.
   //
   // IT WAS A SUBSTRING MATCH, and that is a guess wearing the clothes of a
   // match. Measured 2026-09-20: `--library c` matched exactly one declared
-  // library — `../folio-assistant-sci/library` is the only one containing a `c`
+  // library — the formal-math layer's was the only one whose path contained a `c`
   // — so a one-character typo filed a document into the science corpus and
   // printed success. In the one function whose stated job is refusing to
   // guess a write target, and directly under a comment saying ambiguity
@@ -236,7 +243,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   const instanceOf = (d: string): string => {
     const rel = named(d);
     const parts = rel.split("/").filter((p) => p.length > 0 && p !== "..");
-    // `../who-iris/library` -> `who-iris`; a bare `library` is this instance's.
+    // `../<instance>/library` -> `<instance>`; a bare `library` is this instance's.
     return parts.length > 1 ? parts[parts.length - 2]! : ".";
   };
   const hits = declared.filter((d) => named(d) === choice || instanceOf(d) === choice);
@@ -468,6 +475,12 @@ export function withDerivedArms(
       // anybody has looked at the images, and `image-descriptions` is the gate
       // that refuses the promotion, not this.
       ["bun", "run", tsHelper("apply-image-verdicts.ts"), "--staging", staging, "--library", library],
+      // THE COVER — owner, 2026-10-16: a card's picture was the first figure,
+      // and for one paper that was a black game screenshot from page 11. Page
+      // 1, rendered by `pdf-cover.py`, is the determined answer (its header
+      // says why), and `avatarOf` takes `cover.png` before any figure. Last,
+      // because nothing here reads it.
+      ["python3", pyHelper("pdf-cover.py"), pdf, "-o", join(staging, COVER_FILENAME), "--width", "300"],
     ],
   };
 }
@@ -777,10 +790,14 @@ export function planFor(
   // itself via `[Content_Types].xml` or ODF's `mimetype` member. Bean `p67i`;
   // the defect was introduced by `twqe`'s routing and caught before it shipped.
   if (mime !== null && (TABULAR_MIMETYPES as readonly string[]).includes(mime)) {
+    // An xlsx is read as CSVW through the `tabular-csvw` slot, which core
+    // fills (bean `urat`, owner 2026-10-20). An ODS stays on v1 for now:
+    // core has no CSVW reader for it, and an unread ODS is not better.
+    const ods = mime === "application/vnd.oasis.opendocument.spreadsheet";
     return {
       rung: "tabular",
-      why: `the package declares ${mime} — a workbook, read for its sheets and headers`,
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      why: `the package declares ${mime} — a workbook, read for its sheets and headers${ods ? " (v1: no CSVW reader for ODS yet)" : ""}`,
+      steps: [ods ? ["python3", pyHelper("tabular-records.py"), "-o", lib, pdf] : ["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -806,7 +823,7 @@ export function planFor(
     return {
       rung: "tabular",
       why: "no magic bytes, but the rows split consistently — delimited text",
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      steps: [["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -1083,8 +1100,8 @@ if (import.meta.main) {
   const chosenLibrary = libraryChoice(argv);
   // The positional is the first argument that is neither a flag NOR a flag's
   // VALUE. `argv.find((a) => !a.startsWith("--"))` was enough while every flag
-  // was boolean; `--library who-iris` breaks it, because `who-iris` does not
-  // start with `--` and would be ingested as a filename — producing "who-iris:
+  // was boolean; `--library <instance>` breaks it, because `<instance>` does not
+  // start with `--` and would be ingested as a filename — producing "<instance>:
   // not there" while the real argument sat untouched two places along.
   const takesValue = new Set(["--library", "--reference", "--title", "--instance"]);
   let pdf: string | undefined;
@@ -1283,8 +1300,8 @@ if (import.meta.main) {
   // `libraryRoot` returns an INSTANCE-RELATIVE path — that is its contract, and
   // it is what every `-o` argument wants. `resolve()` with one argument
   // resolves against `process.cwd()`, so running this from the repository root
-  // (which is where `bun run` puts you) turned `../who-iris/library` into
-  // `/home/user/who-iris/library` — OUTSIDE THE CHECKOUT. It then copied the
+  // (which is where `bun run` puts you) turned `../<instance>/library` into
+  // `/home/user/<instance>/library` — OUTSIDE THE CHECKOUT. It then copied the
   // staged tree there, deleted the staging directory, and printed `✓ promoted`.
   //
   // Latent before bean `frs5` and load-bearing after it: while the only

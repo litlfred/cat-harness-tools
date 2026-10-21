@@ -117,7 +117,7 @@ import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { foreignScopeFor, isHostProjection, scopeHarnessData, scopeSiteConfig, scopeStickies } from "./lib/foreign-site-scope.ts";
 import { subscribedTrees } from "./subscribed-trees.ts";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
-import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
+import { declaredVisualisers, forwardingParts, heldVisualiserPages, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
@@ -227,7 +227,7 @@ function builtAtPublishIn(instanceRoot: string): Set<string> {
  * writes it. That is `derive:publish`'s question, which refuses an entry that
  * came out empty. It is said and left out, never refused: an IG's own site
  * build, which makes its pages from the AST, never runs that step
- * (smart-trust, 2026-10-15).
+ * (a DAK IG, 2026-10-15).
  */
 export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLayer[]; pending: DocsLayer[] } {
   const decl = JSON.parse(readFileSync(declarationPathIn(join(repo, "cat-harness"))!, "utf-8")) as {
@@ -308,7 +308,7 @@ export interface ComposedInstance {
  * is a different thing and is what leaves those pages with no layout at all.
  *
  * **Opt-in, read off `composed` on the directory.** A composed default would
- * silently restyle `who-iris/`, which is a replica of somebody else's site and
+ * silently restyle the IRIS replica instance, which is a replica of somebody else's site and
  * must not wear just-the-docs' chrome — the same reason `mount-instance-docs`
  * gives where it declines to run Jekyll over these.
  *
@@ -370,7 +370,7 @@ export interface CarryDecision {
 /**
  * Which composed instances a preview must carry, given the branch's own diff.
  *
- * Bean `ga8a`, following `tebu` one directory over. `smart-trust/docs/` is
+ * Bean `ga8a`, following `tebu` one directory over. A DAK IG's `docs/` is
  * **3.2 MB of markdown** in the checkout and **111.6 MB of HTML** in a
  * preview — 681 pages at ~164 KiB each, because just-the-docs inlines the
  * whole navigation into every page. Measured across `origin/gh-pages` on
@@ -378,15 +378,15 @@ export interface CarryDecision {
  * tree**, against a 1 GB Pages limit the main site shares. Every preview
  * carried it, whether or not its branch mentioned the instance.
  *
- * It does not deduplicate either. The `smart-trust` tree hash is DISTINCT in
+ * It does not deduplicate either. That IG's tree hash is DISTINCT in
  * all 13 previews, because the staging banner injects the slug into every
  * page — so unlike the dedup argument `tebu` rightly rejected for a
  * published-size threshold, this weighs on both budgets.
  *
  * ## The predicate is the INSTANCE, not its composed directory
  *
- * `smart-trust/docs/` is generated from `smart-trust/fhir-artifact-index/` by
- * `smart-trust/scripts/`, so a branch that changes the generator and
+ * That IG's `docs/` is generated from its `fhir-artifact-index/` by its own
+ * `scripts/`, so a branch that changes the generator and
  * regenerates in the same commit must still get the rebuilt pages. Matching
  * the instance root is the superset that covers all three, and a superset is
  * the right direction here for the reason below.
@@ -431,7 +431,7 @@ export function carriedInstances(
     }));
   }
   // Normalised because a path may reach here with a leading `./` from a diff
-  // tool, and `smart-trust/x` must not miss `./smart-trust/x`.
+  // tool, and `<instance>/x` must not miss `./<instance>/x`.
   const changed = files.map((f) => f.replace(/^\.\//, ""));
   return composed.map((instance) => {
     const prefix = `${instance.root}/`;
@@ -651,6 +651,44 @@ export function writeForwardingPages(
 }
 
 /**
+ * Lay every visualiser page a harness commits in its own site directory
+ * (`heldVisualiserPages`) into the composed tree at its declared route, where
+ * Jekyll renders it with the site's layout like any page drawn into the site
+ * owner's tree. Wrong-direction move M1 (2026-10-20): the page used to be
+ * committed in the platform's own tree, which then named the layer above it.
+ *
+ * REFUSED over a file already in the tree, file by file, and reported: the
+ * page stood in the platform's tree until the move, and a tree that still
+ * carries it (a platform pinned before the move) keeps its copy rather than
+ * having it silently replaced.
+ */
+export function writeHeldVisualiserPages(
+  out: string,
+  repo = REPO,
+  withheld: readonly string[] = [],
+  suppliedBy: Record<string, string> = {},
+): { written: string[]; collisions: string[] } {
+  const written: string[] = [];
+  const collisions: string[] = [];
+  for (const h of heldVisualiserPages(repo)) {
+    for (const rel of filesUnder(h.dir)) {
+      const at = `${h.route}${rel.split(sep).join("/")}`;
+      if (isWithheld(at, withheld)) continue;
+      const dest = join(out, at);
+      if (existsSync(dest)) {
+        collisions.push(`${at} — ${h.visualiser.harness}.visualisers[${h.visualiser.id}] is already in the tree (${suppliedBy[at] ?? "unknown layer"})`);
+        continue;
+      }
+      mkdirSync(join(dest, ".."), { recursive: true });
+      cpSync(join(h.dir, rel), dest);
+      suppliedBy[at] = h.visualiser.harness;
+      written.push(at);
+    }
+  }
+  return { written: written.sort(), collisions: collisions.sort() };
+}
+
+/**
  * A redirect page: no layout, no front matter, so Jekyll copies it verbatim.
  *
  * The script runs first and carries the `?query` and `#fragment` across
@@ -760,6 +798,12 @@ export interface ComposeReport {
    * the site carries still stands there (a site not yet regenerated).
    */
   readonly forwards: { written: string[]; superseded: string[] };
+  /**
+   * The visualiser pages a harness commits in its OWN site directory, laid at
+   * their declared route (`heldVisualiserPages`), and each file refused because
+   * a layer or composed instance already put one there.
+   */
+  readonly held: { written: string[]; collisions: string[] };
   /** The repository-scoped layers a platform-only shell left out (`platformOnly`), never silently. */
   readonly leftOut?: DocsLayer[];
 }
@@ -868,10 +912,10 @@ export interface ComposeOptions {
    * and reported in `leftOut`. Only with `shell`.
    *
    * An IG repository's own site (`ig-repo-site`) asks for this. Its shell was
-   * always composed in a folio-assistant checkout (fhir-harness's
+   * always composed in a folio-assistant checkout (the FHIR IG harness's
    * `templates/ig-repo-site/folio-site.yml`), whose root declares no docs
    * layer, so it carried the platform's chrome and nothing of the IG's. Run
-   * from the IG's own checkout, the root's `docs` entry (smart-trust's
+   * from the IG's own checkout, the root's `docs` entry (a DAK IG's
    * `docs/`, the IG's artefact pages and their `assets/`) became an overlay,
    * and its assets arrived twice: once here, once from `stage-ig-sites`, which
    * builds that directory into the IG site (`igSite`) and refuses a path the
@@ -934,7 +978,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       // THE HOST'S COUNT PROJECTIONS ARE NOT CHROME EITHER (#2263): the bean
       // and todo indexes, their `count.json`, the library and QA indexes. On
       // an IG's site the icon row fetched them as that site's own, and
-      // smart-trust showed folio-assistant's 537 open beans. Left out, they
+      // a DAK IG showed folio-assistant's 537 open beans. Left out, they
       // 404 there, which the badge reads as ABSENT -- not as zero. The same
       // goes for the host's translation sweep and index under `_data/`
       // (`HOST_DATA_PROJECTIONS`): "Swept 49/689" on a folio's page was the
@@ -972,8 +1016,8 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   }
 
   // Composed instances land UNDER THEIR OWN NAME, after the layers, so an
-  // instance cannot shadow a base page by accident: `who-iris/index.md` in a
-  // composed tree is `<out>/who-iris/index.md`, never `<out>/index.md`.
+  // instance cannot shadow a base page by accident: `<instance>/index.md` in a
+  // composed tree is `<out>/<instance>/index.md`, never `<out>/index.md`.
   const composedInst = opts.shell ? [] : composedInstances(repo);
   const carry = carriedInstances(
     composedInst,
@@ -1017,6 +1061,12 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     }
   }
 
+  // THE VISUALISER PAGES A HARNESS HOLDS ITSELF, at their declared route,
+  // after the layers and composed instances so a collision with either is
+  // seen. Not on a shell: a folio's own site publishes its own page at its own
+  // root, and the platform's routes are not its business.
+  const held = opts.shell ? { written: [], collisions: [] } : writeHeldVisualiserPages(out, repo, withheld, suppliedBy);
+
   // A SHELL IS A FOLIO'S SITE, so the harness data it carries is scoped to
   // that folio: its tiles, icon row, rail scopes and title (#2263). Done
   // after the layers so it scopes the merged result, once.
@@ -1040,7 +1090,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     // the folio's site lists a platform note, and the footer includes nothing.
     const todoListing = join(out, "_data", "todo_listing.json");
     if (existsSync(todoListing)) writeFileSync(todoListing, `${JSON.stringify(EMPTY_TODO_LISTING, null, 2)}\n`);
-    // The landing stickies' platform links, re-based the same way (who-iris's
+    // The landing stickies' platform links, re-based the same way (the IRIS replica's
     // own site, 2026-10-09: they resolved under the folio's baseurl and 404'd).
     const stickiesData = join(out, "_data", "stickies.json");
     if (existsSync(stickiesData)) {
@@ -1087,6 +1137,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     carried: carry,
     aliases,
     forwards,
+    held,
     ...(scoped ? { scoped } : {}),
     ...(opts.platformOnly ? { leftOut } : {}),
   };
@@ -1244,6 +1295,8 @@ if (import.meta.main) {
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +
       (r.forwards.superseded.length > 0 ? `, ${r.forwards.superseded.length} not written over a page still there` : ""),
   );
+  console.log(`  ${r.held.written.length} visualiser page file(s) laid from their own harness's site directory`);
+  for (const c of r.held.collisions) console.log(`  KEPT     ${c}`);
   for (const c of r.aliases.collisions) console.error(`::error::compose-docs: alias collision: ${c}`);
 
   if (r.missing.length > 0 || r.aliases.collisions.length > 0) process.exit(1);

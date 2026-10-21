@@ -45,7 +45,6 @@
     "scripts/partition/instance-rules.ts::schemas/front-matter.ts",
     "scripts/partition/instance-rules.ts::schemas/fsh-guts.ts",
     "scripts/partition/instance-rules.ts::schemas/git-corpus.ts",
-    "scripts/partition/instance-rules.ts::schemas/glossary-graph-typology.ts",
     "scripts/partition/instance-rules.ts::schemas/graph-typology-registry.ts",
     "scripts/partition/instance-rules.ts::schemas/harness-config.ts",
     "scripts/partition/instance-rules.ts::schemas/health-report.ts",

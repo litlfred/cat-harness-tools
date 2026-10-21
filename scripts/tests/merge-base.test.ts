@@ -144,6 +144,9 @@ describe("classify", () => {
     expect(classify("cat-harness/test/results/translation-qa/docs/installation.fr.translation-qa.json").pattern?.id).toBe("derived-results");
     expect(classify("cat-harness/test/results/translation-qa/docs/installation.fr.translation-qa.json").strategy).toBe("take-base");
     expect(classify("cat-harness/docs/cat-harness/auto-docs/index/index.html").pattern?.id).toBe("auto-docs");
+    // The English glossary under the page locale (2026-10-16), and at its old address.
+    expect(classify("cat-harness/docs/en/folio-assistant-core/glossary/index.md").pattern?.id).toBe("glossary");
+    expect(classify("cat-harness/docs/en/folio-assistant-core/glossary/instance/who-iris/index.md").pattern?.id).toBe("glossary");
     expect(classify("cat-harness/docs/folio-assistant-core/glossary/index.md").pattern?.id).toBe("glossary");
     expect(classify("beans/README.md").strategy).toBe("generated-regions");
   });
@@ -370,8 +373,8 @@ describe("classify", () => {
 
 describe("plan is all-or-nothing input", () => {
   test("one authored conflict among generated ones is reported as refused", () => {
-    const p = plan(["cat-harness/docs/folio-assistant-core/glossary/index.md", "cat-harness/scripts/merge-base.ts"]);
-    expect(p.resolvable.map((c) => c.path)).toEqual(["cat-harness/docs/folio-assistant-core/glossary/index.md"]);
+    const p = plan(["cat-harness/docs/en/folio-assistant-core/glossary/index.md", "cat-harness/scripts/merge-base.ts"]);
+    expect(p.resolvable.map((c) => c.path)).toEqual(["cat-harness/docs/en/folio-assistant-core/glossary/index.md"]);
     expect(p.refused.map((c) => c.path)).toEqual(["cat-harness/scripts/merge-base.ts"]);
   });
 });

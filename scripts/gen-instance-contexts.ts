@@ -40,12 +40,11 @@
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
  *   `<dir>/<dir>.json` — never by importing the layer above.
  * - An instance's OWN namespace (`<stub>` → `…/<stub>/0.1.0/ns#`) is implicit:
- *   it comes from cat-harness's `NS_PREFIXES` / `own-namespaces.json`, not from
+ *   it comes from cat-harness's `ownPrefixTable` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
- *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`, the
- *   same corpus `check:context-emission` reads, held apart from that check so
- *   this generator outlives it), each assigned to its innermost instance.
+ *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`), each
+ *   assigned to its innermost instance.
  *   EXCLUDED: a context document under `ns/` (a file whose only key is
  *   `@context`). The emission check counts those, so the published content
  *   context's own CURIE-valued term definitions were counted as documents
@@ -77,9 +76,11 @@
  * the prefix. A prefix met only as a literal string (`leanRef: "qou:QOU.x"`) is
  * REPORTED, never failed on — see `pipeline/jsonld-contexts.ts`.
  *
- * `check:context-emission` and its `FORWARD_DECLARED` stay for now: documents
- * still reference `ns/content/v1.jsonld`. Retiring both is the follow-up once
- * emitters write per-instance context URLs.
+ * The emitters write per-instance context URLs (cat-harness
+ * `atInstanceContext`), so `check:context-emission` and its `FORWARD_DECLARED`
+ * are retired: a context generated from use binds nothing unused, and the
+ * `--check` above fails on anything used and unbound. Its key and path halves
+ * live on in `check-content-keys.ts`.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-instance-contexts.ts
@@ -97,7 +98,8 @@ import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/sche
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
-import { NS_PREFIXES, ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 
@@ -111,11 +113,12 @@ import {
   type UsedPrefixes,
   type UsedTerms,
 } from "../pipeline/jsonld-contexts.ts";
+import { INSTANCE_CONTEXT_PATH as BOUNDARY_INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
 import { contentDocuments } from "./lib/jsonld-corpus.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** Instance-relative, and why it is this path: see the module note. */
-export const INSTANCE_CONTEXT_PATH = "ns/context/v1.jsonld";
+/** Instance-relative, and why it is this path: see the module note. Defined once, beside the write boundary. */
+export const INSTANCE_CONTEXT_PATH = BOUNDARY_INSTANCE_CONTEXT_PATH;
 
 /** The namespace DOCUMENT an instance may hold at its root, staged at the extensionless `ns`. */
 export const NS_DOCUMENT = "ns.jsonld";
@@ -139,6 +142,8 @@ export interface InstanceDecl {
   root: string;
   name: string;
   stub: string;
+  /** The declared `iriBase`: the instance's context is published at `<iriBase>ns/context/v1.jsonld`. */
+  iriBase?: string;
   needs: string[] | undefined;
   /** The declared table, or the error that made it unreadable. */
   prefixes: JsonldPrefixTable;
@@ -159,7 +164,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
   return instanceRootsIn(repoRoot).flatMap((root) => {
     const file = findDeclarationFile(root);
     if (file === undefined) return [];
-    let raw: { name?: unknown; stub?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };
+    let raw: { name?: unknown; stub?: unknown; iriBase?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };
     try {
       raw = JSON.parse(readFileSync(join(root, file), "utf-8"));
     } catch {
@@ -173,6 +178,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
         root,
         name: raw.name,
         stub: typeof raw.stub === "string" ? raw.stub : raw.name,
+        ...(typeof raw.iriBase === "string" ? { iriBase: raw.iriBase } : {}),
         needs: Array.isArray(raw.needs) ? raw.needs.filter((n): n is string => typeof n === "string") : undefined,
         prefixes: parsed?.success ? parsed.data : {},
         contextPath,
@@ -188,13 +194,14 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
 }
 
 /**
- * An instance's own namespace, if it has one: `NS_PREFIXES` first (the stub →
- * namespace table `check:context-emission` holds spellings to — it is how
- * `bootstrap` reaches `cat-bootstrap`'s namespace), then the `own-namespaces`
- * code list by code.
+ * An instance's own namespace, if it has one: the own-prefix table first
+ * (`ownPrefixTable`: the harness's stub spellings — it is how `bootstrap`
+ * reaches `cat-bootstrap`'s namespace — and the content layer's, derived from
+ * its declaration since folio-assistant#2598), then the `own-namespaces` code
+ * list by code.
  */
 export function defaultOwnNamespace(stub: string): string | undefined {
-  const known = (NS_PREFIXES as Readonly<Record<string, string>>)[stub];
+  const known = ownPrefixTable()[stub];
   if (known !== undefined) return known;
   try {
     return ownNamespace(stub);
@@ -310,6 +317,23 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
   const aliases = options.remoteContexts ?? platform!.aliases;
   const bindings = options.bindingContexts ?? platform!.bindings;
   const termSources = options.termSources ?? platform!.terms;
+  // A document already switched to its instance's OWN context (cat-harness
+  // `atInstanceContext`) names `<iriBase>ns/context/v1.jsonld`, not the
+  // content context. Its terms are still the content context's — the instance
+  // context is generated from them — so that URL reads as the content context
+  // here, and the generated file stays a FIXED POINT of what it generates:
+  // without this, switching the emitters would make the next run see no terms
+  // and drop them all. Only with the platform defaults; a caller passing its
+  // own contexts (a test) says exactly what is readable.
+  if (platform !== undefined) {
+    const content = CONTENT_CONTEXT as Record<string, unknown>;
+    for (const d of decls) {
+      if (d.iriBase === undefined) continue;
+      const url = instanceContextUrl(d.iriBase);
+      if (options.remoteContexts === undefined) (aliases as Map<string, Record<string, unknown>>).set(url, content);
+      if (options.termSources === undefined) (termSources as Map<string, TermSource>).set(url, { instance: "cat-harness", context: content });
+    }
+  }
 
   const tableOf = (d: InstanceDecl): DeclaredPrefixes => {
     const ns = own(d.stub);

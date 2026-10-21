@@ -1,12 +1,10 @@
 /**
- * The corpus of `.jsonld` documents in a checkout — shared by
- * `check-context-emission` and `gen-instance-contexts` (bean
+ * The corpus of `.jsonld` documents in a checkout — read by
+ * `gen-instance-contexts` and `check-content-keys` (bean
  * `folio-assistant-63q4`).
  *
- * It lived in `check-context-emission.ts`, and `gen-instance-contexts` imported
- * it from there. That check — and its `FORWARD_DECLARED` table — is what the
- * per-instance contexts replace, so the generator must not depend on it: the
- * day the check is deleted, the corpus both read stays here.
+ * It lived in `check-context-emission.ts`, which the per-instance contexts
+ * replaced and which is now retired; the corpus it read stays here.
  *
  * @module scripts/lib/jsonld-corpus
  * @covers schemas

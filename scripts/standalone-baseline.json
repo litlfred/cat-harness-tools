@@ -1,4 +1,5 @@
 {
+  "_generated": "scripts/check-standalone.ts (`bun run cat standalone:baseline`) — do not hand-edit",
   "_comment": "Tests that fail when a layer runs alone beside its declared closure (bean `ho66`), keyed `<test file> > <test>`, with `bun test`'s own fail count, which also counts errors between tests. A RATCHET: a failure not listed here is red; a listed one that now passes is reported, with this command, so the list only goes down. WRITTEN by `bun run cat standalone:baseline`; a longer list is a diff somebody reviews. See the module header of cat-harness-tools/scripts/check-standalone.ts.",
   "layers": {
     "cat-harness": {
@@ -6,7 +7,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 413,
+      "failed": 412,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -54,7 +55,6 @@
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > .github/actions/lake-cache-restore/action.yml: every lake-cache name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > fhir-harness/scripts/ig-cache.sh: every fhir-ast name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > ig-cache.sh's fallback list is newest first",
-        "scripts/tests/check-context-emission.test.ts > a prefix onto our own namespace is the declaring instance's stub > NS_PREFIXES: every key IS its namespace's stub, and a declared one",
         "scripts/tests/check-document-kind-sources.test.ts > the judgement > a declared graph id passes",
         "scripts/tests/check-document-kind-sources.test.ts > the judgement > the real corpus makes claims, and every one resolves",
         "scripts/tests/check-document-kind-sources.test.ts > what an instance can name > a graph only an instance ABOVE declares is not reachable: fhir-harness cannot name smart-base-findings",
@@ -138,7 +138,6 @@
         "scripts/tests/qa-reports-ci.test.ts > qa-reports-unretried > the repository's own workflows carry none",
         "scripts/tests/red-gate-is-last.test.ts > (load-time error) ENOENT: no such file or directory, open 'code-quality-gates.yml'",
         "scripts/tests/regen-after-merge.test.ts > (load-time error) GateSetUndetermined: the gate set of this root could not be derived: the root declares no own instance and mounts none from index.config.json. That is not an empty set; it is NOT a pass.",
-        "scripts/tests/remote-mount-gaps.test.ts > (a) the transitional content/ link is declared, so a mount lays it down > content/pipeline is a link to ../pipeline, and cat-harness-tools.json declares content/",
         "scripts/tests/resolution-across-needs.test.ts > role refs resolve across the `needs` chain > some instance resolves a role ONLY through its dependencies",
         "scripts/tests/resolution-across-needs.test.ts > role refs resolve across the `needs` chain > the audit's role SUBJECTS are the instance's own, not its closure's",
         "scripts/tests/resolution-across-needs.test.ts > skill refs resolve across the `needs` chain > some instance's closure is strictly wider than its own skills",
@@ -208,7 +207,7 @@
         "test/coordinator/bootstrap-graph-repo-root.test.ts > the document is published where it says it is > the site build actually writes it, at that path",
         "test/coordinator/check-bean-parents-repo-root.test.ts > every open bean belongs to an epic > the real corpus passes",
         "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > bootstrap — the content half of a real pair — passes",
-        "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > who-iris is a QA warning, naming its ten IRIS-specific code files",
+        "test/coordinator/content-holds-code-checkout.test.ts > contentInstanceCode — this checkout > who-iris is a QA warning, naming its eleven IRIS-specific code files",
         "test/coordinator/contributions-root-sci-checkout.test.ts > contributionsRoot > loading from contributionsRoot() registers both contributed cost checkers",
         "test/coordinator/directory-storage-checkout.test.ts > the real declarations (bean 5hox) > every declared qa directory is stored, and every stored working copy is ignored",
         "test/coordinator/dispatch-gates-can-pass.test.ts > the catalogue gate can pass on a non-pull_request event > a base that still cannot be found stays exit 2, never a pass",
@@ -291,7 +290,7 @@
         "test/coordinator/init-folio-checkout.test.ts > what gets written > the adapter path is normalised, and a non-default link path is honoured",
         "test/coordinator/init-folio-checkout.test.ts > what gets written > the config selects the adapter matching the content type",
         "test/coordinator/instance-repositories-checkout.test.ts > instance repositories — this checkout (bean 6rmv) > every livesAt names the instance's OWN repository as its home",
-        "test/coordinator/instance-repositories-checkout.test.ts > the owner/repo → namespace map is derived and agrees with the list (bean 6rmv, phase 3) > own-namespaces folio-assistant-core is what litlfred/folio-assistant-core's declaration derives",
+        "test/coordinator/instance-repositories-checkout.test.ts > the owner/repo → namespace map is derived and agrees with the list (bean 6rmv, phase 3) > the content layer's namespace is what its own declaration derives",
         "test/coordinator/jsonld-label-resolution-checkout.test.ts > contributed label prefixes > the real registry supplies them",
         "test/coordinator/kg-audit-call-activity-parent.test.ts > kg-audit: call-activity-resolves across repository instances (bean `t5j5`) > a call activity whose target resolves from the parent root is a PASS with hosting instance evidence",
         "test/coordinator/kg-audit-call-activity-parent.test.ts > kg-audit: call-activity-resolves across repository instances (bean `t5j5`) > a call activity whose target resolves nowhere is a FAIL naming the missing process",
@@ -331,7 +330,7 @@
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > base: `smart-base` is declared under that name",
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > core: `folio-assistant-core` is declared under that name",
         "test/coordinator/partition-names-checkout.test.ts > every staged target repo agrees with its instance's declaration > sci: `folio-assistant-sci` is declared under that name",
-        "test/coordinator/pipeline-plugins-sci-checkout.test.ts > this repository > folio-assistant-sci fills every slot, loaded lazily from the running folio",
+        "test/coordinator/pipeline-plugins-sci-checkout.test.ts > this repository > the running checkout fills every slot, loaded lazily from the running folio",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: content-type packages are held by their owner > each moved package sits in a concern group of its owning instance",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: content-type packages are held by their owner > the harness alone knows none of their skills; the checkout knows all of them",
         "test/coordinator/placement-pr1-content-up.test.ts > placement PR1: role edges point down > cat-harness/scenarios/roles.json names no skill a moved package holds",

@@ -213,7 +213,7 @@ function potPathFor(file: string, loc: string): string {
 /**
  * The instance that OWNS a diagram: the deepest instance root containing it.
  * `--instance`'s corpus reaches other instances' `processes/` graphs (core's,
- * sci's, fhir-harness's, smart-base's), and until 2026-10-04 every one of their
+ * sci's, the FHIR IG harness's, the DAK base layer's), and until 2026-10-04 every one of their
  * templates was written into THIS instance's tree because it had no other
  * home. Owner, that day: *"move things to semantically appropriate place"*
  * (bean riit) — a diagram's templates sit with the instance that draws it.

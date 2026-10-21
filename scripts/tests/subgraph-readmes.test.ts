@@ -18,12 +18,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { BEGIN, END, plan, TEMPLATES } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { harnessInstances, harnessPlan, isStored, subdirDescriptions } from "../subgraph-readmes.ts";
+import { harnessInstances, harnessPlan, isStored, repoArg, subdirDescriptions } from "../subgraph-readmes.ts";
 import { siteDir } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -357,4 +357,71 @@ describe("isStored (bean lehh)", () => {
     expect(isStored({ storage: { branch: "cat/cat-harness/beans", keyedBy: "tip" } })).toBe(true);
     expect(isStored({})).toBe(false);
   });
+});
+
+/**
+ * `--repo <checkout>` — a mounted layer's READMEs, written in its own checkout
+ * (owner, 2026-10-15). In an index the writer skips every mount, and in the
+ * layer's checkout alone it is not applicable, so before this nothing wrote
+ * them: cat-harness drifted by 12 and then 19. The fixture is a layer's own git
+ * checkout, declaration at its root, run through the real command line.
+ */
+describe("--repo: the READMEs of another checkout, and nothing else", () => {
+  const SCRIPT = resolve(import.meta.dir, "..", "subgraph-readmes.ts");
+  const run = (...args: string[]) => spawnSync("bun", [SCRIPT, ...args], { encoding: "utf-8", timeout: 120_000 });
+
+  test("the flag is read in both spellings, and a missing value is refused rather than ignored", () => {
+    expect(repoArg([])).toBeUndefined();
+    expect(repoArg(["--check", "--repo", "x/y"])).toBe(resolve("x/y"));
+    expect(repoArg(["--repo=x/y"])).toBe(resolve("x/y"));
+    expect(() => repoArg(["--repo"])).toThrow("--repo needs a directory");
+    expect(() => repoArg(["--repo", "--check"])).toThrow("--repo needs a directory");
+    expect(() => repoArg(["--repo="])).toThrow("--repo needs a directory");
+  });
+
+  test("a stale README fails --check, the writer repairs it in that checkout, and --check then passes", () => {
+    const own = mkdtempSync(join(tmpdir(), "subgraph-own-checkout-"));
+    try {
+      mkdirSync(join(own, "work"), { recursive: true });
+      writeFileSync(
+        join(own, "demo.json"),
+        JSON.stringify({
+          name: "demo",
+          title: "Demo",
+          directories: [{ id: "work", path: "work/", graphTypologies: ["beans"], title: "Work", description: "The work plan." }],
+        }),
+      );
+      writeFileSync(join(own, "README.md"), "# demo\n");
+      writeFileSync(join(own, "work", "plan.txt"), "x\n");
+      spawnSync("git", ["init", "-q"], { cwd: own });
+      spawnSync("git", ["add", "-A"], { cwd: own });
+
+      const before = run("--check", "--repo", own);
+      expect(before.status, before.stderr).toBe(1);
+      expect(before.stderr).toContain("work/README.md is stale");
+      expect(existsSync(join(own, "work", "README.md"))).toBe(false);
+
+      const write = run("--repo", own);
+      expect(write.status, write.stderr).toBe(0);
+      // Listed because git TRACKS it: the reason the run is in the layer's own
+      // checkout, not in the index's swapped-in copy, which git ignores.
+      expect(readFileSync(join(own, "work", "README.md"), "utf-8")).toContain("[`plan.txt`](plan.txt)");
+
+      const after = run("--check", "--repo", own);
+      expect(after.status, after.stderr + after.stdout).toBe(0);
+    } finally {
+      rmSync(own, { recursive: true, force: true });
+    }
+  }, 300_000);
+
+  test("a directory with no instance declaration is UNKNOWN (exit 2), never a clean run", () => {
+    const empty = mkdtempSync(join(tmpdir(), "subgraph-no-instance-"));
+    try {
+      const r = run("--check", "--repo", empty);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain("holds no instance declaration");
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

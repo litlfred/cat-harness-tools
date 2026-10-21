@@ -11,8 +11,9 @@
  * rule is only as good as something that notices it being broken, and until
  * 2026-09-30 nothing did for an instance that has no tools repository yet.
  *
- * Owner, 2026-09-30, on who-iris: *"dspace scripts generic in folio-assistant.
- * iris specific tools for now ok in who-iris/ but make sure fails QA finding"*.
+ * Owner, 2026-09-30, on the IRIS replica (paraphrased): generic DSpace scripts
+ * belong in the platform; tools specific to that repository are tolerated in
+ * its own content instance for now, but must fail as a QA finding.
  * So the generic code moved to core (bean `eayu`) and what is left is
  * tolerated — which is exactly why it must FAIL rather than be silent: a
  * tolerated violation nothing reports is indistinguishable from none.
@@ -21,7 +22,7 @@
  *
  * Two signals, both read from declarations:
  *
- *   1. `separation: "content"` on the instance itself (who-iris);
+ *   1. `separation: "content"` on the instance itself (the IRIS replica);
  *   2. a declared TOOLS instance names it in `supports` (bootstrap, supported
  *      by bootstrap-tools) — the pair exists, so this is its content half.
  *

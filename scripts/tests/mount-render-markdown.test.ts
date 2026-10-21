@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { renderMountedMarkdown } from "../mount-instance-docs.ts";
+import { generatedOnlyFrontMatter, renderMountedMarkdown } from "../mount-instance-docs.ts";
 import { siteDir } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 function site(files: Record<string, string>): string {
@@ -60,6 +60,40 @@ describe("renderMountedMarkdown", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  // bootstrap-tools#24 (owner, 2026-10-16, decision 4a): a README that
+  // `subgraph-readmes` writes wholly opens with a `generated:` key. That is a
+  // declaration, not a Jekyll page, so the README still gets its pages.
+  it("renders a page whose front matter is only `generated:`, with the block stripped", async () => {
+    const fm = '---\ngenerated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github.com/litlfred/bootstrap-tools) — do not edit; regenerate"\n---\n';
+    const dir = site({
+      "sub/README.md": `${fm}<!-- kg:subgraph:begin -->\n# Sub\n\n| a | b |\n|---|---|\n| 1 | 2 |\n<!-- kg:subgraph:end -->\n`,
+      "page.md": "---\ngenerated: x\ntitle: A Jekyll page\n---\n\n# Page\n",
+    });
+    try {
+      const { rendered } = await renderMountedMarkdown(dir);
+      expect(rendered).toEqual(["sub/README.html", "sub/index.html"]);
+      const html = readFileSync(join(dir, "sub", "README.html"), "utf-8");
+      expect(html).toContain("<title>Sub</title>");
+      expect(html).toContain("<table>");
+      expect(html).not.toContain("generated:");
+      expect(html).not.toContain("<hr");
+      // Any other key keeps it a Jekyll page, left alone as before.
+      expect(existsSync(join(dir, "page.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("generatedOnlyFrontMatter: one top-level `generated` key, nothing else", () => {
+    expect(generatedOnlyFrontMatter("---\ngenerated: x\n---\n# A\n")).toBe("---\ngenerated: x\n---\n");
+    expect(generatedOnlyFrontMatter("---\r\ngenerated: x\r\n---\r\n# A\n")).toBe("---\r\ngenerated: x\r\n---\r\n");
+    expect(generatedOnlyFrontMatter("---\n# why\ngenerated: >-\n  a long\n  value\n---\n")).toBeDefined();
+    expect(generatedOnlyFrontMatter("---\ngenerated: x\nlayout: default\n---\n")).toBeUndefined();
+    expect(generatedOnlyFrontMatter("---\ngenerated:\n---\n")).toBeUndefined();
+    expect(generatedOnlyFrontMatter("---\nlayout: default\n---\n")).toBeUndefined();
+    expect(generatedOnlyFrontMatter("# no front matter\n")).toBeUndefined();
   });
 
   it("a README becomes the directory's index when it has none, in subdirectories too", async () => {

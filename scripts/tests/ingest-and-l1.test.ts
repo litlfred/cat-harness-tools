@@ -639,7 +639,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // uploads/ -> library/ in two commands.
     const base = { rung: "pdf-pages" as const, why: "", steps: [["python3", "pdf-pages.py"]] };
     const armed = withDerivedArms(base, "/tmp/x.pdf", "/stage", "/stage/slug", "/lib");
-    expect(armed.steps).toHaveLength(7);
+    expect(armed.steps).toHaveLength(8);
     // The LaTeX overlay straight after the rung, so every arm that reads
     // `sections/` reads the overlaid text. It takes the ENTRY and the
     // destination LIBRARY, where a fetched `source/` lives.
@@ -683,6 +683,8 @@ describe("refuse to promote — the gate between the arms and the library", () =
       "--library",
       "/lib",
     ]);
+    // The cover arm (owner, 2026-10-16): page 1, into the entry, so `avatarOf` takes it before a figure.
+    expect(armed.steps[7]).toEqual(["python3", expect.stringContaining("pdf-cover.py"), "/tmp/x.pdf", "-o", "/stage/slug/cover.png", "--width", "300"]);
 
     // NOT for the other kinds, and this is stated rather than assumed.
     // `check-l1-complete`'s `PAGED_ONLY` list exists because not every

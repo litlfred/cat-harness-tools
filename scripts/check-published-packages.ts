@@ -59,7 +59,7 @@
  * **An empty set is a FINDING.** If the discovery finds nothing, this check
  * has examined nothing, and "no failures" would then be a statement about the
  * sweep rather than about the corpus — the vacuity rule `check:subgraphs` and
- * `check:context-emission` both keep. **A missing interpreter is a FINDING
+ * `check:content-keys` both keep. **A missing interpreter is a FINDING
  * too**, for the same reason: "python3 is not here" and "the Python half
  * passed" must never render identically.
  *

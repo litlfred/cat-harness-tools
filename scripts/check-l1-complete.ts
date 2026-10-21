@@ -63,6 +63,7 @@ import {
   TabularRecordsSchema,
   isTabularMimetype,
 } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/vector-labels.ts";
 import {
@@ -219,7 +220,7 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // PROV-JSONLD's, pinned by sha256 in schemas/prov.ts).
   "context.jsonld",
   // A smart-kg L1 graph document (publication → section → recommendation)
-  // DERIVED from this entry by smart-base/scripts/extract-smart-kg-l1.ts and
+  // DERIVED from this entry by a DAK base layer's scripts/extract-smart-kg-l1.ts and
   // kept beside it, owner default (bean `8pzh`); its --check keeps it current.
   // `.json`, not `.jsonld`: its @context is smart-kg's, not held here.
   "smart-kg-l1.json",
@@ -227,7 +228,7 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // specialisations of its library nodes (`l1-specialise.ts`), and a DAK's
   // Component 1 citations (`extract-dak-l1-references.ts`, no longer written
   // by default). Each has a --check. The first is `.jsonld`: its context is
-  // generated in litlfred/smart-base `kg/` and served offline by that
+  // generated in that DAK base layer's `kg/` and served offline by that
   // package's document loader, so it is linked data, not JSON shaped like it.
   "smart-kg-l1-library.jsonld",
   "smart-kg-l1-dak-references.json",
@@ -298,6 +299,9 @@ export function heldSources(dir: string, sidecars: Iterable<string>): Set<string
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
   ["tabular", "tabular.jsonld"],
+  // The CSVW record that replaces v1 for delimited and workbook sources, and
+  // carries the same `source` block (bean `urat`, owner ruling 2026-10-20).
+  ["tabular", TABULAR_CSVW_FILENAME],
   ["archive", "contents.jsonld"],
   // Recorded, text withheld by licence — `referenced-source.py`, bean `scfh`.
   ["referenced", "referenced.json"],
@@ -319,7 +323,7 @@ export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
  * frameworks, maturity models, taxonomies, process flows — are drawn in
  * VECTOR, so they are never extracted, and `image-descriptions` went on
  * reporting `met` over documents whose every figure was missing. Measured
- * 2026-09-22 across `smart-base/library/`:
+ * 2026-09-22 across a DAK base layer's `library/`:
  *
  *   9789240120747-eng   declares 6 captioned figures, places ZERO images,
  *                       and reported "0 image(s), 0 describable and all
@@ -541,7 +545,7 @@ export function entryKind(has: (file: string) => boolean): EntryKind {
  * still show it; it just does not set the exit code, so it cannot stop a
  * publish. `image-descriptions` is here because a document gains images the
  * moment it is ingested, while a narrative for each is written later by a
- * person or an agent: smart-immunizations' library stopped every publish on
+ * person or an agent: a DAK IG's library stopped every publish on
  * 42 undescribed figures (folio-assistant run 38801998160).
  */
 export const QA_ONLY: ReadonlySet<string> = new Set(["image-descriptions"]);
@@ -860,13 +864,41 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     // re-running would not have helped.
     const src = sourceBlockOf(dir);
     const mime = src?.mimetype_sniffed;
-    if (!has("tabular.jsonld")) {
+    if (has(TABULAR_CSVW_FILENAME)) {
+      // The CSVW record (bean `urat`). It must carry the `source` the rest of
+      // this check reads, or the entry has no technical metadata at all.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(join(dir, TABULAR_CSVW_FILENAME), "utf-8"));
+      } catch (e) {
+        parsed = undefined;
+        out.push({ name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} unparseable: ${String(e)}` });
+      }
+      if (parsed !== undefined) {
+        const r = TabularCsvwSchema.safeParse(parsed);
+        out.push(
+          !r.success
+            ? {
+                name: "tabular-records",
+                state: "unmet",
+                detail: `${TABULAR_CSVW_FILENAME} is not ${TABULAR_CSVW_SCHEMA_ID}: ${r.error.issues[0]?.message ?? "invalid"}`,
+              }
+            : !r.data.source
+              ? { name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} carries no source block — re-run the tabular rung` }
+              : {
+                  name: "tabular-records",
+                  state: "met",
+                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative?.state ?? "absent"}`,
+                },
+        );
+      }
+    } else if (!has("tabular.jsonld")) {
       out.push(
         isTabularMimetype(mime)
           ? {
               name: "tabular-records",
               state: "unmet",
-              detail: `declares ${mime} but no tabular.jsonld — run scripts/tabular-records.py`,
+              detail: `declares ${mime} but no tabular record (${TABULAR_CSVW_FILENAME}; tabular.jsonld for ODS) — re-run the ingest's tabular rung`,
             }
           : {
               name: "tabular-records",
@@ -1519,7 +1551,7 @@ export function sidecarFor(root: string, report: EntryReport): string {
  * library the entry sits in. In a standalone instance that is `root` itself.
  * In the index checkout `root` declares no instance (owner, 2026-10-08), and
  * writing under it put 79 sidecars in an undeclared `<index>/test/results/`
- * while the libraries sat in `who-iris/` and the others (measured 2026-10-09).
+ * while the libraries sat in the IRIS replica and the others (measured 2026-10-09).
  * An entry no declared library holds stays at `root`, as before.
  */
 export function sidecarRootFor(

@@ -7,8 +7,8 @@
  *
  * The owner's requirement is **consistency**, not quality:
  *
- * > who-iris, smart-* etc are content libraries a user is browsing and their
- * > "folio" from the cat-harness is consistent across them.
+ * (paraphrased) the content instances are libraries a user browses, and the
+ * "folio" the cat-harness gives them is consistent across them.
  *
  * `board-windows` states the test that follows from it — *"the test is not
  * 'is this folio good' but 'is this the same folio'"*. A reader moving
@@ -24,7 +24,7 @@
  *
  * The obvious gate — *every standalone HTML document in the repository* —
  * was measured before being rejected: **67 HTML files, 60 of them standalone,
- * spread over `cat-harness/docs` (38), `who-iris` (11+1), `cat-harness/ui`
+ * spread over `cat-harness/docs` (38), the IRIS replica (11+1), `cat-harness/ui`
  * (4), `_kg` fixtures (5), `cat-harness/viewer` (1)**. Most have no business
  * carrying a folio: a fixture, the viewer shell, and the generated
  * visualisation pages whose folio is a separate piece of work. A gate whose
@@ -53,7 +53,7 @@
  *
  * ## EXEMPTIONS CARRY REASONS, AND A STALE ONE FAILS
  *
- * `who-iris/uploads/` holds one captured IRIS page — the ingested source the
+ * The IRIS replica's `uploads/` holds one captured IRIS page — the ingested source the
  * replica is generated *from*. Injecting into it would corrupt the capture,
  * which is the artefact ingestion exists to preserve. So it is exempt **with
  * that reason printed on every clean run**, the shape `check-invocation-parity`
@@ -197,9 +197,14 @@ export function reportFor(repo: string, instance: string): InstanceReport {
   };
   if (!decl) return base;
 
+  // An exemption may sit inside a root (e.g. root `docs/`, exempt
+  // `docs/wireframes/`), so the root walk skips it rather than counting its
+  // pages as missing a mount.
+  const exemptDirs = (decl.exempt ?? []).map((ex) => join(repo, instance, ex.path));
+  const isExempt = (file: string) => exemptDirs.some((d) => !relative(d, file).startsWith(".."));
   for (const root of decl.roots) {
     for (const file of htmlUnder(join(repo, instance, root))) {
-      if (!isPage(file)) continue;
+      if (isExempt(file) || !isPage(file)) continue;
       const rel = relative(repo, file);
       const html = readFileSync(file, "utf-8");
       if (layoutMounts(html)) {

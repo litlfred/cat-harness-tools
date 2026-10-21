@@ -52,6 +52,9 @@ describe(".gitattributes exists and is read by git", () => {
   test("the three high-churn generated files are marked", () => {
     expect(existsSync(ATTRS)).toBe(true);
     for (const p of [
+      // The English glossary page under the page locale since 2026-10-16
+      // (owner, "c"), and at its old address for branches still carrying it.
+      "cat-harness/docs/en/folio-assistant-core/glossary/index.md",
       "cat-harness/docs/folio-assistant-core/glossary/index.md",
       "cat-harness/docs/cat-harness/auto-docs/index/index.html",
       "cat-harness/test/results/audit-coverage.qa-results.json",

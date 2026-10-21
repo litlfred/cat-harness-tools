@@ -43,6 +43,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { atInstanceContext } from "./instance-document-context.ts";
 import {
   DOCS_SITE_BASE,
   siteNodeSitePath,
@@ -69,7 +70,7 @@ const docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
 
 /**
  * `sourceDocument` as an ADDRESS, not a path — #1772. It is a link-type term
- * (`@id` in the content context), and `check:context-emission` refuses a file
+ * (`@id` in the content context), and `check:content-keys` refuses a file
  * path there: a reader resolving a relative path against the node's own IRI
  * lands somewhere that is not the file. The asset's `source` is relative to
  * this instance, and may now leave it (`../<instance>/processes/…`, since a
@@ -92,7 +93,8 @@ function serialise(doc: Record<string, unknown>): string {
 }
 
 function emit(path: string, doc: Record<string, unknown>): void {
-  const next = serialise(doc);
+  // Names the context of the instance `path` sits in (bean folio-assistant-63q4).
+  const next = serialise(atInstanceContext(doc, path));
   const prev = existsSync(path) ? readFileSync(path, "utf-8") : undefined;
   if (prev === next) {
     unchanged++;

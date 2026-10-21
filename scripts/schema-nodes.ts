@@ -64,7 +64,7 @@ import type { CorpusScope } from "./known-skills.js";
  *
  * It was `directoriesForGraph(...)[0]` — the FIRST one — until 2026-09-20, and by
  * then three directories declared the graph: `schemas/`,
- * `folio-assistant-core/schemas/` and `large-datasets/schemas/`. So the gate
+ * the content core's `schemas/` and `large-datasets/schemas/`. So the gate
  * that exists to stop a module being silently absent from the published graph
  * was itself silently absent from two thirds of it. Bean `xxxb` is the defect
  * this file was written for; this is that defect, in this file, one directory

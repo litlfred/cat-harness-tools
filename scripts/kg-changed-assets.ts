@@ -27,7 +27,7 @@
  *   could not be read. Could-not-determine is never "nothing changed": an
  *   empty `changedAssets` means the graphs were compared and agree.
  *
- * An instance that declares its own `canonicalUrl` (smart-base, fhir-harness)
+ * An instance that declares its own `canonicalUrl` (the DAK base layer, the FHIR IG harness)
  * is exported with no `--base-url` (`instance-exports.ts`), so its staged
  * document is not a preview and is skipped, said in the log: it has no
  * staging identity to link a node to.
@@ -345,16 +345,16 @@ if (import.meta.main) {
   // name where each instance's document is published (`exportIdentity`).
   const { exportIdentity } = await import("./kg-export.ts");
   const { HARNESS_ROOT } = await import("./lib/roots.ts");
-  const { instanceExportPlan } = await import("./instance-exports.ts");
+  const { instanceDocPath, instanceExportPlan } = await import("./instance-exports.ts");
   const { repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
   const repo = resolve(repoRootFor(HARNESS_ROOT));
   const render = docsRenderer(repo);
 
   // Where the deploy writes each document: the host's at its `docPath`
-  // (`feature-staging.yml`), every other instance's at `<stub>/<stub>.jsonld`
-  // (`instance-exports.ts`, from the same plan it exports by).
+  // (`feature-staging.yml`), every other instance's at `<name>/<stub>.jsonld`
+  // (`instanceDocPath`, from the same plan `instance-exports.ts` exports by).
   const docs: { at: string; instanceDir: string }[] = [{ at: exportIdentity({}).docPath, instanceDir: HARNESS_ROOT }];
-  for (const p of instanceExportPlan(repo)) docs.push({ at: `${p.stub}/${p.stub}.jsonld`, instanceDir: resolve(repo, p.path) });
+  for (const p of instanceExportPlan(repo)) docs.push({ at: instanceDocPath(p), instanceDir: resolve(repo, p.path) });
 
   let failed = 0;
   for (const { at, instanceDir } of docs) {

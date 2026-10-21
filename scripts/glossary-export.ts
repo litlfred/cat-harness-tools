@@ -128,7 +128,8 @@ import { tagCompatible } from "@litlfred/bootstrap-tools/schemas/release-iri.ts"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { NS_PREFIXES, ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
@@ -234,7 +235,13 @@ export function readLanes(instanceRoot: string, repoRoot: string): LaneOccurrenc
           laneId,
           laneName: /name="([^"]+)"/.exec(attrs)?.[1] ?? null,
           documentation: doc !== undefined && doc.length > 0 ? doc : null,
-          roleRef: ownElementPattern(xml, "role", String.raw`[^>]*\bref="([^"]+)"`, "").exec(body)?.[1],
+          // The Role the lane NAMES: standard BPMN `partitionElementRef`
+          // first, the legacy `<bootstrap.processes:role ref>` only when it is
+          // absent (owner, 2026-10-16 — the precedence `laneRoleBinding` in
+          // `process-model.ts` applies to the parsed model).
+          roleRef:
+            /\bpartitionElementRef="([^"]+)"/.exec(attrs)?.[1] ??
+            ownElementPattern(xml, "role", String.raw`[^>]*\bref="([^"]+)"`, "").exec(body)?.[1],
           performerVaries: ownElementPattern(xml, "role", String.raw`[^>]*\bvariable="true"`, "").test(body),
           activities: [...members].filter((x) => acts.has(x)).length,
         });
@@ -516,7 +523,7 @@ export function buildGlossary(opts: {
     // — omitting it would be `dh4f`, a glossary silently short of the
     // vocabulary it claims to index. It is reported in `undrawn` instead.
     // Alternative labels from two sources, merged: the names the role's lanes
-    // are drawn with, and the role's own authored `otherNames` (smart-base's
+    // are drawn with, and the role's own authored `otherNames` (the DAK base layer's
     // Generic Persona field, owner 2026-09-30). Retired names are NOT here —
     // `formerNames` become `hiddenLabel`: findable, never offered as current.
     const altLabels = [
@@ -534,16 +541,11 @@ export function buildGlossary(opts: {
       // The NAME, from the row kg-export reads for the same IRI: prefLabel,
       // a derived dcterms:title (the `sl9u` precedent), and the id as notation.
       ...applyVocabMapping(roleNaming, { title: r.title, id: r.id }),
-      // `actedUpon` is not decoration: `Work plan — beans`, `Corpus` and
-      // `Publish — GitHub Pages` are lanes because tasks act ON them, not
-      // because anybody performs them (`audienceProblem` in `role-graph.ts`).
-      // A reader looking up "Corpus" must not be told it is a persona.
       ...applyVocabMapping(roleMap, {
         description: r.description,
         altLabels,
         hiddenLabels,
         scheme: schemeIri,
-        actedUpon: r.actedUpon,
         usages: ls.map(usageIri),
       }),
     });
@@ -672,7 +674,7 @@ export function buildGlossary(opts: {
       dcterms: DCTERMS,
       owl: OWL,
       rdfs: RDFS,
-      ...NS_PREFIXES,
+      ...ownPrefixTable(),
       label: "rdfs:label",
       prefLabel: "skos:prefLabel",
       altLabel: "skos:altLabel",
@@ -690,7 +692,6 @@ export function buildGlossary(opts: {
       usage: { "@id": termIri("hasLaneUsage"), "@type": "@id" },
       ofConcept: { "@id": termIri("ofConcept"), "@type": "@id" },
       inProcess: { "@id": termIri("inProcess"), "@type": "@id" },
-      actedUpon: termIri("actedUpon"),
       performerVaries: termIri("performerVaries"),
     },
     "@id": schemeIri,

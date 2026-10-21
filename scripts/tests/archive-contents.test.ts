@@ -272,7 +272,7 @@ describe("the real corpus", () => {
 // ── The record is real JSON-LD — bean `yh6u` ───────────────────────────────
 
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { checkDeclaredKeys } from "../check-context-emission.ts";
+import { checkDeclaredKeys } from "../check-content-keys.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 describe("the archive record is JSON-LD a processor keeps whole", () => {

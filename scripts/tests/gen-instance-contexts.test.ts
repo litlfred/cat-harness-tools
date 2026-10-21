@@ -7,9 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { contentDocuments as checkCorpus } from "../check-context-emission.ts";
 import { contextPathFor, findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, render } from "../gen-instance-contexts.ts";
-import { contentDocuments } from "../lib/jsonld-corpus.ts";
 
 const root = mkdtempSync(join(tmpdir(), "gen-instance-contexts-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -185,8 +183,23 @@ describe("gen-instance-contexts — remote-context terms", () => {
   });
 });
 
-describe("the corpus lives in lib/jsonld-corpus.ts", () => {
-  test("check-context-emission re-exports the same function, so the check can be deleted without the generator noticing", () => {
-    expect(checkCorpus).toBe(contentDocuments);
+describe("gen-instance-contexts — a fixed point once the emitters switch", () => {
+  // A document naming its instance's OWN context (what the switched emitters
+  // write) must still yield that context's terms, or the next run drops them.
+  const froot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-fixed-"));
+  afterAll(() => rmSync(froot, { recursive: true, force: true }));
+  const fput = (rel: string, value: unknown): void => {
+    const p = join(froot, rel);
+    mkdirSync(join(p, ".."), { recursive: true });
+    writeFileSync(p, JSON.stringify(value));
+  };
+  fput("cat-harness/cat-harness.json", { name: "cat-harness", needs: [], jsonldPrefixes: { dcterms: "http://purl.org/dc/terms/" } });
+  fput("leaf/leaf.json", { name: "leaf", needs: ["cat-harness"], iriBase: "https://example.org/leaf/" });
+  fput("leaf/a.jsonld", { "@context": ["https://example.org/leaf/ns/context/v1.jsonld", { "@base": "https://x/" }], "@id": "a", title: "A" });
+
+  test("the instance URL reads as the content context: `title` is still defined", () => {
+    const r = generateInstanceContexts(froot, { ownNamespaceOf: () => undefined }).reports.find((x) => x.instance === "leaf")!;
+    expect(r.terms.map((t) => t.term)).toEqual(["title"]);
+    expect(JSON.parse(r.expected!)["@context"].title).toBe("dcterms:title");
   });
 });

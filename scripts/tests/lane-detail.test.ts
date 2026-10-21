@@ -48,11 +48,10 @@ const GRAPH: RoleGraph = {
       id: "corpus",
       title: "Corpus",
       description: "c",
-      // Nobody performs it — a lane tasks act ON. Zero skills here is n/a
-      // rather than a gap, which is what `actedUpon` exists to say.
-      actorKinds: [],
+      // A store: a role a machine plays (owner, 2026-10-16), whose skills
+      // are its contract. None declared here, which the viewer shows as is.
+      actorKinds: ["system"],
       skills: [],
-      actedUpon: true,
     },
   ],
 };
@@ -183,7 +182,9 @@ describe("the real corpus", () => {
     const bound = lanes.filter((l) => l.binding === "bound");
     expect(bound.length).toBeGreaterThan(0);
     for (const l of bound) expect(l.roleId, `${l.name} is bound but names no role`).toBeDefined();
-  });
+    // A sweep of every diagram in the checkout: 5174 ms on CI on 2026-10-20
+    // (folio-assistant#2611), over bun's 5 s default as the corpus grew.
+  }, 30_000);
 
   test("at least one real lane carries an INHERITED skill", async () => {
     // Pins that the closure matters in practice rather than only in the
@@ -192,5 +193,5 @@ describe("the real corpus", () => {
     const { processRows } = await import("../gen-processes-viz.js");
     const lanes = (await processRows()).flatMap((r) => r.laneDetails);
     expect(lanes.some((l) => l.roleSkills.some((s) => s.depth > 0))).toBe(true);
-  });
+  }, 30_000);
 });

@@ -170,9 +170,9 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
  * A writer run for one instance at a time (an `instance` input) is keyed on the
  * harness that DECLARES the visualiser, so by itself it draws that harness's
  * pages only. A visualiser with `subgraphs: "instance"` also owes a page to
- * every OTHER instance with entries of the kinds it covers: smart-base's
- * `artifact-index` owes `en/smart-base/artifact-index/smart-trust/` on
- * smart-trust's site (2026-10-15), and `ig-pages --instance <smart-base>`
+ * every OTHER instance with entries of the kinds it covers: the DAK base
+ * layer's `artifact-index` owes `en/<dak-base>/artifact-index/<dak-ig>/` on
+ * that DAK IG's site (2026-10-15), and `ig-pages --instance <dak-base>`
  * never drew it. So for each such owed page whose instance `rootOf` can place,
  * the writer runs once more, pointed at that instance.
  */

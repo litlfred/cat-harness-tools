@@ -16,7 +16,7 @@
  *
  * `vector-labels.json`. There a soft hyphen ends a POSITIONED label — the
  * word's other half is a separate label with its own box — so joining needs the
- * figure's geometry, not a text rule. Three such labels exist (smart-base),
+ * figure's geometry, not a text rule. Three such labels exist (in the DAK base layer),
  * and they are the vector arm's business, not this gate's.
  *
  *   bun run cat check:soft-hyphens

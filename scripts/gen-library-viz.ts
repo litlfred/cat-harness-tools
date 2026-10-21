@@ -58,8 +58,8 @@ import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
-import { VIEWER_PATH } from "./pdf-viewer.ts";
-import { entryRepoLinks, forgeAt, sourceFileOf, type RepoLink } from "./lib/library-source.ts";
+import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
+import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -232,6 +232,12 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .badge { border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:.82rem; background:var(--panel); }
 .lib-page .badge b { font-variant-numeric:tabular-nums; }
 .lib-page .badge.q b { color:var(--warn); }
+/* The view panel (viewPanelHtml): the entry's primary asset, under the head. */
+.lib-page .lib-view { padding:10px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-view summary { cursor:pointer; font-size:1rem; }
+.lib-page .lib-view .pdf-viewer { margin:.6rem 0 0 !important; }
+.lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
+.lib-page .lib-view-absent p { margin:0; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -384,6 +390,17 @@ var CONFIG = (function(){
   try { return JSON.parse(el ? el.textContent : "{}") || {}; } catch (_e) { return {}; }
 })();
 var DATA_HREF = new URL(String(CONFIG.data || ""), location.href).href;
+/* ARRIVING AT #lib-view OPENS THE VIEW PANEL -- the folio glass's eye links
+   here (owner, 2026-10-16: "there should be [eye] icon to look at it"), and a
+   reader who pressed it came to look, not to press a second toggle. Opening
+   the panel is what loads the viewer (pdf-viewer's toggle rule). */
+function openViewPanel(){
+  if (location.hash !== "#lib-view") return;
+  var d = document.querySelector("#lib-view details");
+  if (d && !d.open) d.open = true;
+}
+openViewPanel();
+window.addEventListener("hashchange", openViewPanel);
 /* The SUBJECT this page is scoped to, or "" for the handler's whole view.
    One projection serves both — a second JSON per subject would be the same
    facts written N+1 times, free to disagree the moment one is regenerated. */
@@ -481,8 +498,8 @@ function uploadState(e){
 
 var COLS = [
   /* THE SLUG OPENS THE ENTRY'S VISUALISER -- e.view, generated per entry by
-     the projection (owner, 2026-10-02: "click on smart-trust slug and open
-     up the visualizer"). A site-root path, composed like an avatar; an entry
+     the projection (owner, 2026-10-02, paraphrased: clicking an entry's slug
+     should open its visualiser). A site-root path, composed like an avatar; an entry
      whose projection carries none keeps a plain slug. */
   { k:"id",       t:"slug",     n:false, f:function(e){
       var v = typeof e.view === "string" && e.view.charAt(0) === "/" ? SITE_ROOT + e.view.slice(1) : "";
@@ -495,7 +512,7 @@ var COLS = [
   { k:"title",    t:"title",    n:false, c:"t-title", f:function(e){
       /* THE TITLE OPENS THE ENTRY'S OWN PAGE -- its path IRI (#1881). It
          used to open the item's README on GitHub, which a referenced entry
-         may not have (owner, 2026-10-02: the smart-trust title went to a
+         may not have (owner, 2026-10-02: a DAK IG's title went to a
          404). The README stays as a secondary link, only when one exists. */
       var t = '<a class="lib-title" href="'+esc(entryHref(e))+'">'+esc(e.title)+"</a>";
       var src = e.arxiv ? "https://arxiv.org/abs/"+encodeURIComponent(e.arxiv) : e.doi ? "https://doi.org/"+e.doi : "";
@@ -907,6 +924,8 @@ export interface ShellEntry {
   graphs?: { label: string; href: string }[];
   /** Every published file the page renders — {@link entrySources}. */
   sources?: SourceLink[];
+  /** Set when the entry names a source file this site does not hold — {@link notHeldHtml}. */
+  notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -927,6 +946,8 @@ export interface SourceLink {
   href: string;
   /** What the file is, in a reader's words — e.g. `JSON-LD`, `projection (JSON)`. */
   what: string;
+  /** The entry's primary asset, shown in the page's view panel — {@link viewPanelHtml}. */
+  view?: ViewSource;
 }
 
 /** One instance's library, as the whole-library page lists it. */
@@ -1100,20 +1121,73 @@ ${list}${table}
 </section>`;
 }
 
+/**
+ * THE VIEW PANEL — owner, 2026-10-16: *"library pages … should have a panel to
+ * open and view item towards the top of the page. sometimes accessible at
+ * bottom under sources (like PDF), but primary asset should have a view panel
+ * (if that asset kind has a viewer)"*.
+ *
+ * The first source marked `view` is the primary asset. The panel is a closed
+ * `<details>` under the page heading. A PDF is the site's shared pdf.js embed
+ * (`pdf-viewer.ts` `embed`, the one WHO-IRIS item pages use), whose client
+ * points the frame at the viewer only when the panel is opened, so a visitor
+ * who never opens it fetches none of pdf.js. An image is a lazy `<img>`, not
+ * fetched while the panel is closed. An entry with no viewable source held
+ * gets no panel — its sources list already says what is published.
+ */
+export function viewPanelHtml(links: readonly SourceLink[]): string {
+  const l = links.find((x) => x.view);
+  const v = l?.view;
+  if (!l || !v) return "";
+  const body = v.kind === "pdf" && v.viewer
+    ? pdfEmbed({ src: v.src, title: l.label, route: { viewer: v.viewer } })
+    : v.kind === "image"
+      ? `<img src="${escHtml(v.src)}" alt="${escHtml(l.label)}" loading="lazy">`
+      : "";
+  if (!body) return "";
+  return `<section class="lib-view" id="lib-view">
+<details>
+<summary>View <strong>${escHtml(l.label)}</strong> <span class="note">${v.kind === "pdf" ? "source PDF" : "source image"}</span></summary>
+${body}
+</details>
+</section>`;
+}
+
+/**
+ * Where the view panel would be, for a source this site does not hold — owner,
+ * 2026-10-16: some sources are not held for rights reasons, and the viewer may
+ * not load a file from another origin (XSS). So the page says so and links
+ * out, in a new tab, to wherever the entry's identifiers point
+ * ({@link elsewhereLinks}); with none recorded it says only that.
+ */
+export function notHeldHtml(n: { file: string; elsewhere: readonly { label: string; href: string }[] }): string {
+  const out = n.elsewhere.length
+    ? ` Find it at ${n.elsewhere
+        .map((l) => `<a href="${escHtml(l.href)}" target="_blank" rel="noopener noreferrer">${escHtml(l.label)}</a>`)
+        .join(" or ")}.`
+    : " No public link is recorded for it.";
+  return `<section class="lib-view lib-view-absent" id="lib-view">
+<p><strong>${escHtml(n.file)}</strong> is not held on this site.${out}</p>
+</section>`;
+}
+
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
 export const LIBRARY_CONFIG_ID = "fa-library-config";
 
 /**
- * The skeleton {@link VIEWER_JS} fills — the same on the handler's page, an
+ * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
+ * there is one, then {@link VIEWER_BODY}: the same on the handler's page, an
  * instance's page and every entry page, since the script decides from the
  * config and the page's own path what to draw into it.
  */
-const VIEWER_BODY = `<div class="lib-head">
+const VIEWER_HEAD = `<div class="lib-head">
   <h1 id="lib-title">Library — the L1 corpus</h1>
   <p class="empty" id="status" style="padding:0">loading…</p>
   <div class="badges" id="badges"></div>
-</div>
-<div class="toolbar">
+</div>`;
+
+/** The rest of the skeleton, below the head and the view panel. */
+const VIEWER_BODY = `<div class="toolbar">
   <input id="q" type="search" placeholder="Search entries…" aria-label="Search entries">
   <span class="seg" role="group" aria-label="View">
     <button type="button" id="vList" aria-pressed="true">Listing</button>
@@ -1150,6 +1224,8 @@ interface LibraryPage {
   searchExclude?: boolean;
   /** The visible source list, as HTML — {@link sourcesHtml}. */
   sources?: string;
+  /** The primary asset's view panel, as HTML — {@link viewPanelHtml}. Drawn under the head. */
+  view?: string;
 }
 
 /**
@@ -1188,7 +1264,8 @@ function libraryPageHtml(p: LibraryPage): string {
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="lib-page" data-fa-no-filter>
-${VIEWER_BODY}
+${VIEWER_HEAD}
+${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
@@ -1253,6 +1330,7 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     }`,
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     sources: sourcesHtml(entry.sources ?? []),
+    view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
     searchExclude: true,
   });
 }
@@ -1325,12 +1403,12 @@ export function instanceRootRoutes(repoRoot: string): Map<string, string> {
 /**
  * An entry's `view` — the site-root path of the page that RENDERS it.
  *
- * Owner, 2026-10-02: *"i also expected to be able to click on "smart-trust"
- * slug and open up the visualizer for smart-trust"*. Two cases:
+ * Owner, 2026-10-02 (paraphrased): clicking a referenced instance's slug
+ * should open that instance's visualiser. Two cases:
  *
  * - a REFERENCED entry whose record links a `site_path` that is another
  *   instance's DECLARED root route (`instanceRootRoutes`) is rendered there —
- *   smart-trust's IG viewer at `/smart-trust/`. The link chooses the
+ *   a DAK IG's viewer at its `/<instance>/` root. The link chooses the
  *   candidate; the declaration is what makes it a visualiser rather than a
  *   page that merely exists, so a link to anything else is not taken;
  * - every other entry is rendered by this viewer, at its own entry page.
@@ -1497,17 +1575,17 @@ if (import.meta.main) {
   //
   // Owner, 2026-09-20, reducing three cases to two:
   //
-  //   > i want two rules.... not three. one is cat-harness handling the
-  //   > library/ dir which has who-iris assets in it. one is who-iris handler
-  //   > to mock current iris website.
+  //   (paraphrased) two rules, not three: one is cat-harness handling the
+  //   library/ dir, which holds a content instance's assets; the other is that
+  //   instance's own handler, which replicates the source website.
   //
   // So the form is `<base>/<handler>/<kind>/<optional subject>` — which is the
-  // owner's own first example, `<base>/cat-harness/docs/who-iris/`. The
+  // owner's own first example, `<base>/cat-harness/docs/<instance>/`. The
   // handler is THIS instance (the machinery), the kind names what it renders,
   // and the subject scopes it to one instance's assets.
   //
   // **A subject page must NOT be published at `<base>/<subject>/<kind>/`.**
-  // That is rule 2's namespace — `<base>/who-iris/` is who-iris presenting
+  // That is rule 2's namespace — `<base>/<instance>/` is the IRIS replica presenting
   // ITSELF, mocking the IRIS website — and a viewer parked there would squat
   // on the instance's own site. An earlier draft of this file was about to do
   // exactly that.
@@ -1610,6 +1688,10 @@ if (import.meta.main) {
   const checkoutRepo = repoOf(detectRepoUrl(repoRoot), "") || LINK_REPO;
   for (const e of g.entries) {
     e.view = entryView(e, roots, relative(site, join(pageDir, e.instance, e.id)).split(sep).join("/"));
+    // The same test the entry page's view panel passes (`entryRepoLinks`): a
+    // held, published source whose kind has a viewer.
+    const kind = viewableOf(repoRoot, e, g.uploads, checkoutRepo);
+    if (kind) e.viewable = kind;
   }
 
   emit(join(dataDir, "index.json"), JSON.stringify(projection(g, scoped), null, 2) + "\n");
@@ -1800,6 +1882,13 @@ if (import.meta.main) {
           id: e.id,
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
+          ...(() => {
+            // No viewable source held, and the entry names one: say so where the panel would be.
+            const held = sourceFileOf(repoRoot, e, g.uploads);
+            return !held && e.sourceFile && e.provenance !== "referenced"
+              ? { notHeld: { file: e.sourceFile, elsewhere: elsewhereLinks(e) } }
+              : {};
+          })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
             repo: entryRepoLinks({

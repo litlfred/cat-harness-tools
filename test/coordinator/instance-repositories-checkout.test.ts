@@ -13,6 +13,7 @@ import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 import { instanceRepositories, locationMismatch, repositoryNamespaces, resolveInstance } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
 import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");
@@ -65,12 +66,20 @@ describe("the owner/repo → namespace map is derived and agrees with the list (
   // The code list still NAMES each vocabulary namespace, because code reads
   // them by code; what it may no longer do is SPELL one differently from the
   // declaration it belongs to. Code → the repository whose namespace it is.
+  // The content layer's row left the list in folio-assistant#2598: that layer
+  // derives its own, and the registry's answer must be its declaration's.
   const LISTED: Array<[code: string, repository: string]> = [
     ["cat-bootstrap", "litlfred/bootstrap"],
     ["cat-harness", "litlfred/cat-harness"],
-    ["folio-assistant-core", "litlfred/folio-assistant-core"],
   ];
   test.each(LISTED)("own-namespaces %s is what %s's declaration derives", (code, repository) => {
     expect(ns.get(repository)).toBe(ownNamespace(code));
+  });
+
+  test("the content layer's namespace is what its own declaration derives", () => {
+    const content = contentLayerInstance();
+    expect(content).toBeDefined();
+    const entry = instanceRepositories(CHECKOUT).byName.get(content!.name)!;
+    expect(ns.get(entry.repository)).toBe(content!.namespace);
   });
 });

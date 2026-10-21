@@ -80,8 +80,8 @@ const PROCESS_FILE = "document-ingestion.bpmn";
  *
  * `directoryForGraph` is the wrong call here and says so when you make it:
  * three directories declare this graph (`processes/`,
- * `smart-base/methodologies/processes/`,
- * `folio-assistant-core/processes/`), and picking the first silently is bean
+ * the DAK base layer's `methodologies/processes/`,
+ * the content core's `processes/`), and picking the first silently is bean
  * `wggr`, which resolved a graph to the wrong directory and wrote 37 sidecars
  * against the wrong subjects on a run that exited 0. So every declared
  * directory is searched, exactly one must hold the file, and both other

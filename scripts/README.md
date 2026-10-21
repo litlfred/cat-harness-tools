@@ -36,7 +36,7 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`check-code-accounting.ts`](check-code-accounting.ts) | a file |  |
 | [`check-command-paths.ts`](check-command-paths.ts) | a file |  |
 | [`check-concern-groups.ts`](check-concern-groups.ts) | a file |  |
-| [`check-context-emission.ts`](check-context-emission.ts) | a file |  |
+| [`check-content-keys.ts`](check-content-keys.ts) | a file |  |
 | [`check-corpus-gate.ts`](check-corpus-gate.ts) | a file |  |
 | [`check-declaration-claims.ts`](check-declaration-claims.ts) | a file |  |
 | [`check-declaration-filename.ts`](check-declaration-filename.ts) | a file |  |

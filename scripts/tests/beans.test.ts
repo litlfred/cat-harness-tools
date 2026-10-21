@@ -145,6 +145,30 @@ describe("findings", () => {
     expect(beanFindings(readBeans(root)!)).toEqual([]);
   });
 
+  test("a live block on a bean that is already CLOSED is not reported", () => {
+    // 11 of the 25 "No expiry" rows on 2026-10-16 were this: the blocked bean
+    // was completed or scrapped, so the block held nothing up.
+    const root = store({
+      a: bean("t-a", `title: blocker\nstatus: in-progress\ntype: task\nblocking:\n    - t-b`),
+      b: bean("t-b", `title: done\nstatus: completed\ntype: task`),
+    });
+    expect(beanFindings(readBeans(root)!)).toEqual([]);
+  });
+
+  test("a block between two beans under ONE parent is sequencing, and needs no expiry", () => {
+    // Owner ruling 2026-10-16: "stage 1b before 1c" is ordering inside one
+    // plan. A block across parents still needs one — the falsifying half.
+    const root = store({
+      e: bean("t-e", `title: epic\nstatus: in-progress\ntype: epic`),
+      f: bean("t-f", `title: other epic\nstatus: in-progress\ntype: epic`),
+      a: bean("t-a", `title: 1b\nstatus: todo\ntype: task\nparent: t-e\nblocking:\n    - t-b\n    - t-c`),
+      b: bean("t-b", `title: 1c\nstatus: todo\ntype: task\nparent: t-e`),
+      c: bean("t-c", `title: elsewhere\nstatus: todo\ntype: task\nparent: t-f`),
+    });
+    const f = beanFindings(readBeans(root)!);
+    expect(f.map((x) => [x.kind, x.bean, x.blocks])).toEqual([["blocked-without-expiry", "t-a", "t-c"]]);
+  });
+
   test("a CLOSED blocker holding an OPEN bean is the sharper finding, and only that one", () => {
     const root = store({
       a: bean("t-a", `title: done\nstatus: completed\ntype: task\nblocking:\n    - t-b`),
@@ -152,6 +176,28 @@ describe("findings", () => {
     });
     const f = beanFindings(readBeans(root)!);
     expect(f.map((x) => x.kind)).toEqual(["blocker-closed"]);
+  });
+
+  test("a CLOSED blocker holding a DRAFT bean is reported too", () => {
+    // `ygzh` (completed) → `18p1` (draft), 2026-10-16: a draft is not counted
+    // as open work, and the block on it went unreported for that reason.
+    const root = store({
+      a: bean("t-a", `title: done\nstatus: completed\ntype: task`),
+      b: bean("t-b", `title: drafted\nstatus: draft\ntype: task\nblocked_by:\n    - t-a`),
+    });
+    const f = beanFindings(readBeans(root)!);
+    expect(f.map((x) => [x.kind, x.bean, x.blocks])).toEqual([["blocker-closed", "t-a", "t-b"]]);
+    expect(f[0]!.detail).toContain("which is draft");
+  });
+
+  test("a DRAFT blocker is not a closed one", () => {
+    // The other half of the same mistake: `!isOpen` read a draft blocker as
+    // finished, and reported it as a block nobody lifted.
+    const root = store({
+      a: bean("t-a", `title: drafted\nstatus: draft\ntype: task\nblocking:\n    - t-b`, "**expires**: 2026-10-19."),
+      b: bean("t-b", `title: blocked\nstatus: todo\ntype: task`),
+    });
+    expect(beanFindings(readBeans(root)!).filter((x) => x.kind === "blocker-closed")).toEqual([]);
   });
 
   test("a closed blocker holding a CLOSED bean is nobody's problem", () => {
