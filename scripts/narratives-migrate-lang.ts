@@ -72,7 +72,7 @@ function serializerFor(raw: string, doc: unknown, indent: number | string, trail
  * The library's Python producers write a float such as `338.0` or `1e-05`,
  * which `JSON.parse` reads as `338` and `0.00001` and `JSON.stringify` then
  * writes as `338` and `0.00001`. A file holding one did not round-trip and was
- * refused: 9 files across cat-harness and smart-base on 2026-10-21, so their
+ * refused: 9 files across cat-harness and a content layer on 2026-10-21, so their
  * narratives could not be migrated. A number whose source is not what
  * `JSON.stringify` would write is kept as that source (`JSON.rawJSON`), so it
  * is written back character for character.
