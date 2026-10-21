@@ -1346,14 +1346,18 @@ function absencePath(repoRoot: string, key: string): string {
 }
 
 /**
- * The checkout's `origin`, normalised, or `""` when it has none. One remote
- * has several spellings: CI's state-mount step rewrites `origin` to its `.git`
- * form for the mount and puts it back after, so a record made during the
- * mount must still match the reader's origin. A trailing `.git` and `/` are
- * not part of which repository it is.
+ * The checkout's `origin` as configured, normalised, or `""` when it has
+ * none. One remote has several spellings: CI's state-mount step rewrites
+ * `origin` to its `.git` form for the mount and puts it back after, so a
+ * record made during the mount must still match the reader's origin. A
+ * trailing `.git` and `/` are not part of which repository it is.
  */
 export function originUrl(repoRoot: string): string {
-  const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd: repoRoot, encoding: "utf-8" });
+  // The CONFIGURED url, not `git remote get-url`: that applies `insteadOf`,
+  // and CI's mount runs under a rewrite of GitHub to local mirrors
+  // (layer-pr-checks' state-pin.sh), so the record would name a mirror path
+  // no reader outside that step ever sees.
+  const r = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: repoRoot, encoding: "utf-8" });
   return r.status === 0 ? normaliseOrigin(r.stdout) : "";
 }
 
