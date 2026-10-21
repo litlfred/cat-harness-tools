@@ -1345,10 +1345,21 @@ function absencePath(repoRoot: string, key: string): string {
   return markerPath(repoRoot, key).replace(/\.json$/, ".absent");
 }
 
-/** The checkout's `origin` URL, or `""` when it has none. */
+/**
+ * The checkout's `origin`, normalised, or `""` when it has none. One remote
+ * has several spellings: CI's state-mount step rewrites `origin` to its `.git`
+ * form for the mount and puts it back after, so a record made during the
+ * mount must still match the reader's origin. A trailing `.git` and `/` are
+ * not part of which repository it is.
+ */
 export function originUrl(repoRoot: string): string {
   const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd: repoRoot, encoding: "utf-8" });
-  return r.status === 0 ? r.stdout.trim() : "";
+  return r.status === 0 ? normaliseOrigin(r.stdout) : "";
+}
+
+/** `https://host/o/r.git/` and `https://host/o/r` are one remote. */
+export function normaliseOrigin(url: string): string {
+  return url.trim().replace(/\/+$/, "").replace(/\.git$/, "");
 }
 
 /** Record `loc` as determined absent from this checkout. */
@@ -1390,7 +1401,7 @@ export function absenceAt(repoRoot: string, path: string, id?: string): AbsenceR
     } catch {
       continue;
     }
-    if (rec.$schema !== ABSENCE_RECORD_SCHEMA || rec.origin !== origin) continue;
+    if (rec.$schema !== ABSENCE_RECORD_SCHEMA || normaliseOrigin(rec.origin) !== origin) continue;
     if (rec.path === want) return rec;
     if (id !== undefined && rec.id === id) byId ??= rec;
   }
