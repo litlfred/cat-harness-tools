@@ -31,7 +31,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { NarrativeSchema, REJECTION_REASONS, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { entryItems } from "./summaries.ts";
@@ -81,6 +81,12 @@ export interface QueueItem {
   path: NarrativePath;
   /** What this narrative is ABOUT, when the file holds more than one. */
   subject?: string;
+  /**
+   * The language it is written in, when it says (bean `cat-tools-e1lo`). A
+   * slot holding one narrative per language yields one item per language, so
+   * the reviewer is asked about each translation separately.
+   */
+  lang?: string;
   narrative: Narrative;
   /**
    * A block summary whose block's text has changed since it was drafted.
@@ -102,27 +108,21 @@ export interface QueueItem {
  */
 export function narrativesIn(
   doc: Record<string, unknown>,
-): { path: NarrativePath; narrative: Narrative; subject?: string }[] {
-  const out: { path: NarrativePath; narrative: Narrative; subject?: string }[] = [];
+): { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string }[] {
+  const out: { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string }[] = [];
 
-  const flat = NarrativeSchema.safeParse(doc.narrative);
-  if (flat.success) out.push({ path: ["narrative"], narrative: flat.data });
+  out.push(...inSlot(doc.narrative, ["narrative"]));
 
   const images = doc.images;
   if (Array.isArray(images)) {
     images.forEach((img, i) => {
       if (typeof img !== "object" || img === null) return;
       const rec = img as Record<string, unknown>;
-      const parsed = NarrativeSchema.safeParse(rec.narrative);
-      if (!parsed.success) return;
-      out.push({
-        path: ["images", i, "narrative"],
-        narrative: parsed.data,
-        // The reviewer is being asked about ONE picture among many. Without
-        // this the queue shows twenty-four entries distinguishable only by
-        // their text, which is the thing under review.
-        subject: typeof rec.id === "string" ? rec.id : undefined,
-      });
+      // The reviewer is being asked about ONE picture among many. Without
+      // this the queue shows twenty-four entries distinguishable only by
+      // their text, which is the thing under review.
+      const subject = typeof rec.id === "string" ? rec.id : undefined;
+      for (const n of inSlot(rec.narrative, ["images", i, "narrative"])) out.push({ ...n, subject });
     });
   }
 
@@ -133,16 +133,30 @@ export function narrativesIn(
     summaries.forEach((rec, i) => {
       if (typeof rec !== "object" || rec === null) return;
       const r = rec as Record<string, unknown>;
-      const parsed = NarrativeSchema.safeParse(r.narrative);
-      if (!parsed.success) return;
-      out.push({
-        path: ["summaries", i, "narrative"],
-        narrative: parsed.data,
-        subject: typeof r.block === "string" ? r.block.split("/").pop() : undefined,
-      });
+      const subject = typeof r.block === "string" ? r.block.split("/").pop() : undefined;
+      for (const n of inSlot(r.narrative, ["summaries", i, "narrative"])) out.push({ ...n, subject });
     });
   }
   return out;
+}
+
+/**
+ * The narratives in one slot, each with the path `decide` writes it back to.
+ *
+ * A slot holds one narrative or one per language (`NarrativeSlotSchema`,
+ * bean `cat-tools-e1lo`), and `narrativesOfSlot` is the one reader of either
+ * form. The single form keeps the path it always had; a list entry's path adds
+ * its index, so confirming the French translation writes the French one.
+ */
+function inSlot(value: unknown, at: NarrativePath): { path: NarrativePath; narrative: Narrative; lang?: string }[] {
+  const slot = NarrativeSlotSchema.safeParse(value);
+  if (!slot.success) return [];
+  const list = Array.isArray(slot.data);
+  return narrativesOfSlot(slot.data).map((narrative, j) => ({
+    path: list ? [...at, j] : at,
+    narrative,
+    ...(narrative.lang ? { lang: narrative.lang } : {}),
+  }));
 }
 
 /** Read a narrative's container so `decide` can replace exactly one. */
@@ -199,10 +213,10 @@ export function queue(root = ROOT): QueueItem[] {
           // refuses when it cannot tell.
         }
       }
-      for (const { path, narrative, subject } of narrativesIn(doc)) {
+      for (const { path, narrative, subject, lang } of narrativesIn(doc)) {
         if (narrative.state !== "draft") continue;
         const isStale = path[0] === "summaries" && stale.has(path[1] as number);
-        out.push({ file: relative(root, f), slug, path, subject, narrative, ...(isStale ? { stale: true } : {}) });
+        out.push({ file: relative(root, f), slug, path, subject, ...(lang ? { lang } : {}), narrative, ...(isStale ? { stale: true } : {}) });
       }
     }
   }
@@ -337,7 +351,7 @@ function list(items: QueueItem[]): void {
   items.forEach((it, i) => {
     const d = it.narrative.drafted_by;
     const who = d ? `${d.kind}${d.model ? ` ${d.model}` : ""} (${d.id})` : "unknown";
-    const what = it.subject ? `${it.slug}/${it.subject}` : it.slug;
+    const what = (it.subject ? `${it.slug}/${it.subject}` : it.slug) + (it.lang ? ` [${it.lang}]` : "");
     console.log(`  [${i + 1}] ${what}  — drafted by ${who}${it.stale ? "  STALE: source changed, cannot be confirmed" : ""}`);
     console.log(`      ${it.narrative.text}`);
     console.log(`      ${it.file}\n`);

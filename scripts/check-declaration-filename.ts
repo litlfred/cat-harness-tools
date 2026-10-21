@@ -36,11 +36,29 @@
  * Prose that happens to mention the file is never a whole-string literal; it
  * is a sentence.
  *
+ * ## What else FAILS: a user-visible string naming the retired file
+ *
+ * > The retired name, as a whole token, in a NON-comment line of a non-test
+ * > `.ts` file that is not a path (a log line, a thrown `Error`, a tool
+ * > description, any message string).
+ *
+ * Owner ruling, 2026-10-20 (bean `k8rc`, option 1). The `prose` exemption's
+ * argument, *"a rename REWORDS these"*, is right for a doc comment beside the
+ * code it describes and wrong for output: a log line or an error message is
+ * read by an operator who then goes and looks for the file it names. `k8rc`
+ * measured 40 of them pointing at a file that no longer exists, fixed them,
+ * and this class keeps the count at zero. It is not a constant-substitution
+ * rule: the fix is to name the file actually used (a computed path, or
+ * `<name>.config.json`), or the Jekyll file by its `_data/` path.
+ *
+ * Unlike a bypass, it fails OUTSIDE the owning instance too: a message needs
+ * no import to be right, so the boundary reason below does not apply to it.
+ *
  * ## Three classes are COUNTED and do not fail, each for a stated reason
  *
  * | class | today | why not a failure |
  * |---|---|---|
- * | prose — the name inside a human-readable message or a doc comment | see report | a rename REWORDS these; it does not substitute a constant into them. Flagging them would make the check demand that error text be assembled from constants, which nothing here asks for |
+ * | prose — the name inside a doc comment | see report | a rename REWORDS these; it does not substitute a constant into them |
  * | test fixtures | counted, see report | **a judgement, not a measurement.** A fixture writing `join(root, "harness.json")` is constructing the file the code under test looks for. Route it through the constant and the test passes vacuously after a rename — the fixture moves with the code and nobody learns the contract changed. Pinning is defensible; so is the hand-edit count being unacceptable. `jijc` carries the call as an open item rather than this check deciding it silently |
  * | template literals building a path | 0 on 2026-09-21 | measured, not assumed: every backtick occurrence in this corpus is message text. Implemented anyway and proven against a planted case, because "zero today" is not "impossible" |
  *
@@ -132,6 +150,15 @@ export interface Bypass {
   kind: "literal" | "template";
 }
 
+/** A user-visible string naming the retired declaration. These FAIL. */
+export interface UserVisibleRef {
+  /** Repo-relative path. */
+  file: string;
+  line: number;
+  /** The source line, trimmed. */
+  text: string;
+}
+
 /** One workflow line naming the retired declaration, with what it is. */
 export interface WorkflowRef {
   file: string;
@@ -144,6 +171,11 @@ export interface DeclarationFilenameReport {
   filesRead: number;
   /** Non-test call sites building the path from a literal. These FAIL. */
   bypasses: Bypass[];
+  /**
+   * Message strings, log lines, error text and tool descriptions naming the
+   * retired declaration, in any instance. These FAIL (bean `k8rc`).
+   */
+  userVisible: UserVisibleRef[];
   /** Counted, never failed — see the module header for each reason. */
   counted: { tests: number; prose: number };
   /**
@@ -499,6 +531,7 @@ export function checkDeclarationFilename(root = REPO_ROOT): DeclarationFilenameR
 
   const bypasses: Bypass[] = [];
   const crossInstance: Bypass[] = [];
+  const userVisible: UserVisibleRef[] = [];
   let tests = 0;
   let prose = 0;
 
@@ -508,7 +541,9 @@ export function checkDeclarationFilename(root = REPO_ROOT): DeclarationFilenameR
     const lines = readFileSync(abs, "utf8").split("\n");
 
     for (const [i, line] of lines.entries()) {
-      if (!line.includes(RETIRED_DECLARATION)) continue;
+      // A whole token: `cat-harness.json` CONTAINS the retired name and is the
+      // CURRENT declaration, the same collision the workflow side guards.
+      if (boundedIndexOf(line, RETIRED_DECLARATION) === -1) continue;
 
       if (isComment(line)) {
         prose++;
@@ -518,7 +553,12 @@ export function checkDeclarationFilename(root = REPO_ROOT): DeclarationFilenameR
       const literal = wholeStringLiteral(line, RETIRED_DECLARATION);
       const template = pathTemplate(line, RETIRED_DECLARATION);
       if (!literal && !template) {
-        prose++;
+        // Not a path and not a comment: text somebody reads at run time, which
+        // FAILS (bean `k8rc`). Three kinds stay counted prose, as before: this
+        // gate's own report (it names the retired file on purpose), the Jekyll
+        // data file `docs/_data/harness.json`, and a test's message strings.
+        if (isTest || rel === THIS_GATE || line.includes("_data")) prose++;
+        else userVisible.push({ file: rel, line: i + 1, text: line.trim() });
         continue;
       }
 
@@ -550,6 +590,7 @@ export function checkDeclarationFilename(root = REPO_ROOT): DeclarationFilenameR
     filesRead: files.length,
     bypasses,
     crossInstance,
+    userVisible,
     counted: { tests, prose },
     workflows: (() => {
       try {
@@ -615,6 +656,19 @@ function formatReport(r: DeclarationFilenameReport): string {
     out.push("      the split (`vke6`), not for this check — see the module header.");
   }
 
+  if (r.userVisible.length === 0) {
+    out.push("  ✓ no message, log line or description names the retired `harness.json`");
+  } else {
+    out.push("");
+    out.push(`  ✗ ${r.userVisible.length} user-visible string(s) name the retired declaration:`);
+    for (const u of r.userVisible) {
+      out.push(`      ${u.file}:${u.line}`);
+      out.push(`        ${u.text.slice(0, 120)}`);
+    }
+    out.push("      A reader acts on output (bean `k8rc`): name the file actually used, from the");
+    out.push("      path already in hand, or `<name>.config.json`; Jekyll's file is `_data/harness.json`.");
+  }
+
   const uses = workflowUses(r);
   if (uses.length > 0) {
     out.push("");
@@ -631,7 +685,7 @@ function formatReport(r: DeclarationFilenameReport): string {
   out.push("");
   out.push("  Counted, not failed — each for a reason in the module header:");
   out.push(`    test fixtures      ${c.tests}  (an open judgement on bean \`jijc\`, not a finding)`);
-  out.push(`    prose occurrences  ${c.prose}  (a rename REWORDS these)`);
+  out.push(`    prose occurrences  ${c.prose}  (doc comments: a rename REWORDS these)`);
 
   if (r.workflows === null) {
     out.push("    workflow lines     ? COULD NOT DETERMINE — not zero");
@@ -680,6 +734,7 @@ if (import.meta.main) {
   if (report.workflows === null || report.markdown === null) process.exit(2);
   process.exit(
     report.bypasses.length ||
+      report.userVisible.length ||
       workflowUses(report).length ||
       markdownUses(report).length ||
       report.filesRead === 0

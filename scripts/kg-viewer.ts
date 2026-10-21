@@ -72,9 +72,11 @@
  *
  * @module scripts/kg-viewer
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { redirectStub } from "./compose-docs.ts";
 import { exportIdentity } from "./kg-export.js";
 import {
   UI_STRINGS,
@@ -85,8 +87,47 @@ import {
 } from "./kg-viewer-strings.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteArg } from "./lib/site-target.ts";
+import { pageParts } from "./viewer-declarations.ts";
 
 const ROOT = join(HARNESS_ROOT);
+
+/**
+ * The viewer's id among the harness's visualisers: the page is a viewer of the
+ * whole graph, so it is published at a viewer's route,
+ * `<locale>/<stub>/kg/`, and `<stub>/` is left to the instance as itself.
+ * Owner, 2026-10-20, on the collision of the two at `<base>/<stub>/`:
+ * "move graph viewer so aligns" (folio-assistant bean `o7eq`).
+ */
+export const KG_VISUALISER = "kg";
+
+/** The site-relative directory the viewer is published in, `en/<stub>/kg/`. */
+export function kgViewerRoute(stub: string): string {
+  return visualiserRoute(pageParts({ harness: stub, visualiser: KG_VISUALISER }));
+}
+
+/** The relative way from a site-relative directory back to the site root: one `../` per segment. */
+export function upFrom(route: string): string {
+  return "../".repeat(route.split("/").filter(Boolean).length);
+}
+
+/**
+ * Write the viewer at its route under `site`, and a forwarding page at the
+ * address it had until 2026-10-20, `<stub>/` — unless a page is already there,
+ * which is the instance's own page and wins (the same refusal
+ * `writeForwardingPages` makes).
+ */
+export function writeViewer(site: string, stub: string, html = (up: string) => viewerHtml(stub, undefined, undefined, up)): { page: string; forwarded?: string } {
+  const route = kgViewerRoute(stub);
+  const page = join(site, route, "index.html");
+  mkdirSync(dirname(page), { recursive: true });
+  writeFileSync(page, html(upFrom(route)));
+  const old = join(site, stub, "index.html");
+  if (existsSync(old) || existsSync(join(site, stub, "index.md"))) return { page };
+  mkdirSync(dirname(old), { recursive: true });
+  writeFileSync(old, redirectStub(`${upFrom(`${stub}/`)}${route}`));
+  return { page, forwarded: old };
+}
 
 /**
  * JSON for a page that is ONE TEMPLATE LITERAL.
@@ -124,8 +165,9 @@ export function viewerHtml(
   stub: string,
   catalogues: LocaleCatalogue[] = loadCatalogues(ROOT),
   planned: PlannedLocale[] = plannedLocales(ROOT),
+  up = "../",
 ): string {
-  const doc = `../${stub}.jsonld`;
+  const doc = `${up}${stub}.jsonld`;
 
   // English is not a catalogue — it is the msgid, so every string is present
   // by definition and a lookup that misses falls back to it. It heads the
@@ -367,10 +409,9 @@ export function viewerHtml(
 <header>
   <!-- The way back (bean yhcq, finding 8). The page is reached from the docs
        navbar and carries none of its chrome, so returning depended on the
-       browser's Back button. "../" because the page is <site>/<stub>/ and
-       its graph document is the sibling "../<stub>.jsonld": the same relative
+       browser's Back button. The site root, reached relatively: the same
        reasoning as DOC, so it is right under STAGING/<slug>/ too. -->
-  <a class="crumb" id="home" href="../">&larr; <bdi id="home-t">Docs site</bdi></a>
+  <a class="crumb" id="home" href="${up}">&larr; <bdi id="home-t">Docs site</bdi></a>
   <h1 id="title">${stub} — knowledge graph</h1>
   <div class="meta" id="meta">loading <code>${doc}</code>…</div>
   <!-- One button per language that has a catalogue, plus a DISABLED one per
@@ -1213,8 +1254,17 @@ if (import.meta.main) {
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.
-const out = arg("--out") ?? join(repoRootFor(ROOT), "_kg", stub, "index.html");
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, viewerHtml(stub));
-  console.log(`KG viewer → ${relative(ROOT, out)}\n  reads  ../${stub}.jsonld  (parent, resolved at load)`);
+  // `--site <dir>`: the published layout, the viewer at its route and a
+  // forwarding page at its old address. `--out`: one file, the graph its parent.
+  const site = siteArg();
+  if (site !== undefined) {
+    const { page, forwarded } = writeViewer(site, stub);
+    console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${stub}.jsonld`);
+    console.log(forwarded ? `  forwards ${relative(ROOT, forwarded)}` : `  ${stub}/ holds a page already; no forwarding page`);
+  } else {
+    const out = arg("--out") ?? join(repoRootFor(ROOT), "_kg", stub, "index.html");
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, viewerHtml(stub));
+    console.log(`KG viewer → ${relative(ROOT, out)}\n  reads  ../${stub}.jsonld  (parent, resolved at load)`);
+  }
 }

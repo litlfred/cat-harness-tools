@@ -114,3 +114,21 @@ describe("the schema", () => {
     expect(frontMatterTitle(linesOf('---\ntitle: "Quoted"\n---\n# H\n'))).toBe("Quoted");
   });
 });
+
+describe("formatOf reads the extension before the content", () => {
+  const PY = "#!/usr/bin/env python3\n# Constants from the HCERT specification\nX = 1\n";
+  test("a Python file with # comments is verbatim, not markdown", () => {
+    expect(formatOf(PY, "input/scripts/generate_dvc_qr.py")).toBe("verbatim");
+  });
+  test("without a path, content still decides (unchanged behaviour)", () => {
+    expect(formatOf(PY)).toBe("markdown");
+  });
+  test("a .md file with headings is markdown", () => {
+    expect(formatOf("# Title\n\ntext\n", "docs/page.md")).toBe("markdown");
+  });
+  test("buildEntry keeps a .py file as one verbatim section", () => {
+    const e = buildEntry([{ path: "gen.py", bytes: Buffer.from(PY) }], "x");
+    expect(e.structure.sections).toHaveLength(1);
+  });
+});
+

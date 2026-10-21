@@ -17,6 +17,14 @@
 # cat-harness main committed then read as stale, and `library-readmes` failed
 # on main and on every PR for a reason no PR here could fix.
 #
+# folio-assistant-core and fhir-harness are put at main too. This repository's
+# main moves with theirs: a PR that drops the content/pipeline link
+# (cat-harness-tools#473) needs fhir-harness main, whose declaration names the
+# pipeline/ paths (fhir-harness#118), and a PR that declares a plugin slot
+# (#468) needs the core main that fills it (core#160). Under the index lock,
+# both failed as new failures until the index re-pinned, for a reason no PR
+# here could fix.
+#
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
 # PR newly breaks. The step summary lists every failure, old and new.
@@ -66,6 +74,8 @@ jobs:
       cat-harness: ${{ steps.pin.outputs.cat-harness }}
       bootstrap-tools: ${{ steps.pin.outputs.bootstrap-tools }}
       bootstrap: ${{ steps.pin.outputs.bootstrap }}
+      folio-assistant-core: ${{ steps.pin.outputs.folio-assistant-core }}
+      fhir-harness: ${{ steps.pin.outputs.fhir-harness }}
       index: ${{ steps.pin.outputs.index }}
     steps:
       - id: pin
@@ -74,6 +84,8 @@ jobs:
           echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "bootstrap-tools=$(git ls-remote https://github.com/litlfred/bootstrap-tools refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "bootstrap=$(git ls-remote https://github.com/litlfred/bootstrap refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "folio-assistant-core=$(git ls-remote https://github.com/litlfred/folio-assistant-core refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "fhir-harness=$(git ls-remote https://github.com/litlfred/fhir-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -85,7 +97,7 @@ jobs:
     steps:
       - &checkout-index
         name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ needs.pin.outputs.index }}
@@ -100,7 +112,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -113,17 +125,20 @@ jobs:
           CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
-        # cat-harness and the closure its main is generated with: all three at
-        # the commits the pin job read (see the header).
-        name: Use cat-harness, bootstrap-tools and bootstrap main, at the pinned commits
+        # cat-harness and the closure its main is generated with, and the two
+        # layers this repository's main moves with: all at the commits the pin
+        # job read (see the header).
+        name: Use cat-harness, bootstrap-tools, bootstrap, folio-assistant-core and fhir-harness main, at the pinned commits
         if: steps.base-cache.outputs.cache-hit != 'true'
         env:
           CAT_HARNESS: ${{ needs.pin.outputs.cat-harness }}
           BOOTSTRAP_TOOLS: ${{ needs.pin.outputs.bootstrap-tools }}
           BOOTSTRAP: ${{ needs.pin.outputs.bootstrap }}
+          CORE: ${{ needs.pin.outputs.folio-assistant-core }}
+          FHIR_HARNESS: ${{ needs.pin.outputs.fhir-harness }}
         run: |
           set -euo pipefail
-          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP"; do
+          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP" "folio-assistant-core:$CORE" "fhir-harness:$FHIR_HARNESS"; do
             name="${pair%%:*}" sha="${pair#*:}"
             test -n "$sha" || { echo "::error::no pinned commit for $name"; exit 1; }
             rm -rf "fa/$name"
@@ -133,7 +148,7 @@ jobs:
             rm -rf "fa/$name/.git"
           done
       - name: Check out the PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - &swap
@@ -168,7 +183,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -194,10 +209,10 @@ jobs:
       - name: Cache base junit report (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/junit.xml
-          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
+          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.folio-assistant-core }}-${{ needs.pin.outputs.fhir-harness }}-${{ needs.pin.outputs.index }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -231,7 +246,7 @@ jobs:
         run: |
           bun test ./cat-harness-tools --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
           test -s "$RUNNER_TEMP/junit.xml"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.side }}
           path: ${{ runner.temp }}/junit.xml
@@ -260,7 +275,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -269,7 +284,7 @@ jobs:
         # So a main that predates --measured-out is still measured. Only the
         # checker file is taken from the PR; the tree it measures is main's.
         if: matrix.side == 'base'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: pr-checker
           sparse-checkout: scripts/check-standalone.ts
@@ -277,10 +292,10 @@ jobs:
       - name: Cache base standalone measurement (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/standalone.json
-          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
+          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.folio-assistant-core }}-${{ needs.pin.outputs.fhir-harness }}-${{ needs.pin.outputs.index }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -299,7 +314,7 @@ jobs:
         run: |
           bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
           test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: standalone-${{ matrix.side }}
           path: ${{ runner.temp }}/standalone.json
@@ -309,12 +324,12 @@ jobs:
     needs: standalone-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: standalone
       - name: Judge the PR against main and the baseline
@@ -327,10 +342,10 @@ jobs:
     needs: run-tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: junit
       - name: Compare PR failures with main

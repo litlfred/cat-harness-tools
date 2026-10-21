@@ -23,8 +23,12 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
+import { publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+
 import {
+  declaredEntries,
   igSiteRoots,
+  instanceRoute,
   mountable,
   servedDirectories,
   WITHHELD_FILE,
@@ -410,5 +414,43 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     expect(servedDirectories([entry("fhir-artifact-index/", true)])).toEqual([
       { name: "smart-trust", dir: "/repo/smart-trust/fhir-artifact-index/", route: "smart-trust/fhir-artifact-index" },
     ]);
+  });
+});
+
+describe("the URL space: several instances, each under its own name — bean cat-tools-sthf", () => {
+  // Three instances in one repository: two published, one declaring
+  // `"enabled": false`. The layout is the plan the mount walk would build.
+  const repo = mkdtempSync(join(tmpdir(), "url-space-"));
+  const instance = (name: string, decl: Record<string, unknown>, dirs: string[]) => {
+    for (const d of dirs) {
+      mkdirSync(join(repo, name, d), { recursive: true });
+      writeFileSync(join(repo, name, d, "index.html"), "<html><body></body></html>");
+    }
+    writeFileSync(join(repo, name, `${name}.json`), JSON.stringify({ name, ...decl }));
+  };
+  instance("alpha", { directories: [{ id: "alpha-docs", path: "docs/", graphTypologies: ["docs"], instanceRoot: true }] }, ["docs"]);
+  instance(
+    "beta",
+    {
+      stub: "beta-stub",
+      directories: [
+        { id: "beta-library", path: "library/", graphTypologies: ["library"] },
+        { id: "beta-index", path: "artifact-index/", graphTypologies: ["fhir-artifact-index"], served: true },
+      ],
+    },
+    ["library", "artifact-index"],
+  );
+  instance("gamma", { enabled: false, directories: [{ id: "gamma-docs", path: "docs/", graphTypologies: ["docs"] }] }, ["docs"]);
+
+  it("an instance route is publishedPath's instance case, with the slashes trimmed", () => {
+    expect(instanceRoute("alpha")).toBe(publishedPath({ case: "instance", instance: "alpha" }).replace(/^\/|\/$/g, ""));
+    expect(instanceRoute("beta", "artifact-index")).toBe(publishedPath({ case: "instance", instance: "beta", path: "artifact-index" }).slice(1));
+  });
+
+  it("lays out every enabled instance under its NAME, never its stub, and leaves the disabled one out", () => {
+    const found = mountable(repo);
+    expect([...new Set(found.map((m) => m.name))].sort()).toEqual(["alpha", "beta"]);
+    expect(withRoutes(found).candidates.map((c) => c.route).sort()).toEqual(["alpha", "beta", "docs/alpha", "fhir-artifact-index/beta", "library/beta"]);
+    expect(servedDirectories(declaredEntries(repo)).map((x) => x.route)).toEqual(["beta/artifact-index"]);
   });
 });

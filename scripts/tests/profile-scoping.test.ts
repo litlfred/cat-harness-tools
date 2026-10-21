@@ -45,7 +45,7 @@ import { initFolio } from "../init-folio";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const SWEEP = join(TOOLS_ROOT, "content", "pipeline", "qa-sweep.ts");
+const SWEEP = join(TOOLS_ROOT, "pipeline", "qa-sweep.ts");
 
 /** A criterion that opts out of the document profile, and one that does not. */
 const PAPER_ONLY = "voice-unicode-crash";
