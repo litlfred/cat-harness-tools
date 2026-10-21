@@ -85,7 +85,7 @@ jobs:
     steps:
       - &checkout-index
         name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ needs.pin.outputs.index }}
@@ -100,7 +100,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -133,7 +133,7 @@ jobs:
             rm -rf "fa/$name/.git"
           done
       - name: Check out the PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - &swap
@@ -168,7 +168,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -194,7 +194,7 @@ jobs:
       - name: Cache base junit report (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/junit.xml
           key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
@@ -231,7 +231,7 @@ jobs:
         run: |
           bun test ./cat-harness-tools --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
           test -s "$RUNNER_TEMP/junit.xml"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.side }}
           path: ${{ runner.temp }}/junit.xml
@@ -260,7 +260,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -269,7 +269,7 @@ jobs:
         # So a main that predates --measured-out is still measured. Only the
         # checker file is taken from the PR; the tree it measures is main's.
         if: matrix.side == 'base'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: pr-checker
           sparse-checkout: scripts/check-standalone.ts
@@ -277,7 +277,7 @@ jobs:
       - name: Cache base standalone measurement (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/standalone.json
           key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
@@ -299,7 +299,7 @@ jobs:
         run: |
           bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
           test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: standalone-${{ matrix.side }}
           path: ${{ runner.temp }}/standalone.json
@@ -309,12 +309,12 @@ jobs:
     needs: standalone-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: standalone
       - name: Judge the PR against main and the baseline
@@ -327,10 +327,10 @@ jobs:
     needs: run-tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: junit
       - name: Compare PR failures with main

@@ -88,7 +88,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ inputs.index-ref }}
@@ -99,7 +99,7 @@ jobs:
       - name: Mount every instance from the index's lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - name: Check out the caller
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - name: Put a copy of the caller in place of its locked mount

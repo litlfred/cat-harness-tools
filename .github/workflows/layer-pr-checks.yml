@@ -192,7 +192,7 @@ jobs:
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ inputs.tools-ref }}
@@ -209,7 +209,7 @@ jobs:
       # re-run is a new attempt and so a new time: it judges main as it is.
       - &pin-restore
         id: pin-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -250,13 +250,13 @@ jobs:
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - &pin-reread
         if: steps.pin-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -282,7 +282,7 @@ jobs:
           { echo "at=$at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           # Index mode: the PR's merge commit on both sides; the base side then
@@ -332,7 +332,7 @@ jobs:
       - &caller
         name: Check out the caller
         if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -386,7 +386,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -687,7 +687,7 @@ jobs:
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}
@@ -708,7 +708,7 @@ jobs:
       - &upload-prepared
         name: Upload this side's prepared root
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: prepared-${{ env.SIDE }}
           path: ${{ runner.temp }}/prepared
@@ -807,7 +807,7 @@ jobs:
           echo "cone=layer-pr-checks-cone-v1-${GITHUB_REPOSITORY}-$hash" >> "$GITHUB_OUTPUT"
       - name: Is main's answer already known?
         id: base-lookup
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
@@ -815,7 +815,7 @@ jobs:
       - name: Are this main's cone records already kept? (a push)
         id: cone-lookup
         if: github.event_name == 'push'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ steps.base-key.outputs.cone }}
@@ -891,14 +891,14 @@ jobs:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
       - name: The judging scripts, at the commit this run pinned
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - name: Check out the root, at the commit this run pinned
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
@@ -909,7 +909,7 @@ jobs:
       - *mount-cache
       - *mount
       - name: Fetch what this side's prepare job built
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: prepared-${{ matrix.side }}
           path: ${{ runner.temp }}/prepared
@@ -931,7 +931,7 @@ jobs:
       # as before the cone.
       - name: The CI cone's records from the caller's main
         id: cone-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/cone
           key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
@@ -1029,7 +1029,7 @@ jobs:
           fi
           export GATE_DIFF_BASE
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
           if-no-files-found: error
@@ -1093,20 +1093,20 @@ jobs:
             echo "::error::the two sides were pinned to different commits, or one was not prepared: could not determine"
             exit 2
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.pins-only.outputs.only != 'true'
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.pins-only.outputs.only != 'true'
         with:
           path: results
           pattern: results-*
       - name: Main's answer, cached (bean cis2)
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1146,7 +1146,7 @@ jobs:
       - name: Keep main's answer for the next run (bean cis2)
         if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1165,14 +1165,14 @@ jobs:
       - name: Keep the CI cone's records for the PRs (a push)
         if: steps.cone.outputs.kept == 'true'
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ needs.prepare-base.outputs.cone }}
       - name: Keep the gate seconds, to balance the next run's shards
         if: steps.join.outcome == 'success'
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
