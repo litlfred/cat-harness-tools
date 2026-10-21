@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-21T12:21:34Z
+updated_at: 2026-10-21T18:45:00Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -396,3 +396,55 @@ that no layer's typecheck breaks when the slot types widen:
       `lang`, in four content repositories.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Stage 3d done; stage 4 needs three owner decisions (2026-10-21)
+
+**Data (3d) merged** for cat-harness (#405, #407: 609), core (#173: 50), sci (#48: 50) and who-iris (#78: 418). Every one is a one-entry list naming `en`. smart-base and smart-immunizations are lane S's, run with the tool set on tools main.
+
+**Tools merged:**
+- #537: writers emit `[{…, lang}]`.
+- #539: the queue and the migration see vector figures and figure descriptions.
+- #540: the migrator keeps Python number spellings.
+
+Stage 4 makes `lang` required and removes the single form. Three places need a call first. Counts are measured across the composed index's libraries, plus qou's folio.
+
+### 1. What does an empty slot ("not-authored") look like?
+`NOT_AUTHORED = { text: null, state: "not-authored" }` marks "no description yet". Where it comes from:
+- written today by `tabular-csvw.ts` for every new CSVW record;
+- implied by `document-image.ts` for a describable image with no narrative;
+- stored once on disk: folio-assistant-sci `codata-2022/tabular.jsonld`.
+
+- **A. (recommended) Keep it as the one single-form value, with no `lang`.**
+  - Every authored narrative is a list entry with a required `lang`; "nothing written" stays `{ text: null, state: "not-authored" }`.
+  - Cost: one schema branch. No data changes.
+  - Risk: readers see two shapes, but they already go through `narrativesOfSlot`.
+  - Commits to: an empty slot claims no language, so adding a French draft later is plainly "the first narrative", not "French added while English is still missing".
+- **B. A one-entry list with `lang: "en"`.**
+  - One shape everywhere.
+  - Cost: change `NOT_AUTHORED` and migrate the 1 stored record.
+  - Risk: it asserts a language for text that does not exist, and a later `fr` draft beside it reads as "English is missing".
+- **C. An absent field means not-authored.**
+  - Remove `NOT_AUTHORED` altogether.
+  - Cost: `document-image` and `tabular-csvw` change, and the "absence is distinguishable from rejection" behaviour (document-image test) has to be re-argued.
+  - Risk: absent then means both "not looked at" and "looked at, nothing written".
+- **If you say nothing:** stage 4 waits, nothing breaks, and new narratives are already written with `lang` (#537).
+
+### 2. `superseded` history in block summaries
+`superseded` is a plain `Narrative[]` with `lang` optional. **0 entries exist** in any library today.
+
+- **A. (recommended) Require `lang` there too.**
+  - Free now: nothing to migrate, and new entries are copies of slot entries, which already carry `lang`.
+- **B. Leave it optional** as historical record.
+  - Costs nothing now, but keeps a second rule for "a narrative" in the schema.
+- **If you say nothing:** it stays optional, which is harmless while it is empty.
+
+### 3. `FigureSchema.narrative` (authored paper figure blocks, cat-harness `constraints.ts`)
+It is still the single `NarrativeSchema`, not a slot. **0 authored figure blocks carry a narrative**, in qou's folio or anywhere else in the index.
+
+- **A. (recommended) Make it a slot like every other**, and require `lang` with the rest.
+  - One line, nothing to migrate.
+- **B. Remove the field.**
+  - Nobody uses it, but library figure blocks (`blocks/figure-*.jsonld`) do carry narratives, so authored figures losing the field would be an odd asymmetry.
+- **If you say nothing:** it remains the last single-form schema, and stage 4 cannot remove the single form.
+
+Recommendation, as my judgement: 1A, 2A, 3A. That gives stage 4 one rule — every written narrative names its language — with one explicit exception: "nothing written yet".
