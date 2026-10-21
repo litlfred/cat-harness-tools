@@ -123,8 +123,10 @@ describe("runStaging — what it writes", () => {
     const out = JSON.parse(readFileSync(f.path, "utf-8"));
     expect(out.images[0].role).toBe("logo");
     expect(out.images[0].basis.method).toBe("inspection");
-    expect(out.images[0].narrative.state).toBe("draft");
-    expect(out.images[0].narrative.text).toBe(LOGO.draft);
+    expect(out.images[0].narrative).toHaveLength(1);
+    expect(out.images[0].narrative[0].state).toBe("draft");
+    expect(out.images[0].narrative[0].lang).toBe("en");
+    expect(out.images[0].narrative[0].text).toBe(LOGO.draft);
   });
 
   test("the geometry basis is REPLACED by an inspection basis", () => {

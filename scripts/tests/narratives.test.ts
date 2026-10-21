@@ -327,7 +327,9 @@ describe("the queue shows exactly what is waiting on a person", () => {
     // Not the number: a count in a test is a claim that goes stale, and 24 is
     // a property of today's corpus rather than of the queue.
     expect(q.length).toBeGreaterThan(0);
-  });
+    // It walks every JSON file of every declared library: under 1 s alone,
+    // 5.8 s measured beside the other corpus tests, so not the 5 s default.
+  }, 30_000);
 
   test("every draft in a multi-narrative file names its SUBJECT", () => {
     // A reviewer shown twenty-four entries labelled only `wpr-rdo-2020-003-eng`

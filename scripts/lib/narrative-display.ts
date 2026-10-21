@@ -13,6 +13,17 @@
  */
 import { NarrativeSlotSchema, narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
+/**
+ * The language a narrative is written in when its writer does not say.
+ *
+ * Owner ruling 2026-10-21 (bean `cat-tools-e1lo`, "en + one-entry list"): the
+ * stored narratives were migrated to one-entry lists naming `en`, and every
+ * writer stores a new narrative the same way, so the store does not drift back
+ * to the single form that stage 4 removes. A writer whose input names a
+ * language uses that one.
+ */
+export const DEFAULT_NARRATIVE_LANG = "en";
+
 /** The one narrative to show, as a plain record, or `undefined` when there is none. */
 export function displayNarrative(raw: unknown, lang?: string): Record<string, unknown> | undefined {
   if (Array.isArray(raw)) {
