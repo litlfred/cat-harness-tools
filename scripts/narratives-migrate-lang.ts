@@ -28,6 +28,7 @@ import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "
 import { join } from "node:path";
 import { LANGUAGE_TAG, NarrativeSlotSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { NARRATIVE_BEARING, narrativesIn, type NarrativePath } from "./narratives.ts";
+import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 
 export interface FileResult {
   file: string;
@@ -117,7 +118,7 @@ if (import.meta.main) {
   const argv = process.argv.slice(2);
   const apply = argv.includes("--apply");
   const li = argv.indexOf("--lang");
-  const lang = li >= 0 ? argv[li + 1]! : "en";
+  const lang = li >= 0 ? argv[li + 1]! : DEFAULT_NARRATIVE_LANG;
   const libs = argv.filter((a, i) => !a.startsWith("--") && !(li >= 0 && i === li + 1));
   if (libs.length === 0 || !LANGUAGE_TAG.test(lang)) {
     console.error("usage: bun run cat narratives:migrate-lang <library-dir>… [--lang <bcp47>] [--apply]");
