@@ -32,7 +32,7 @@ import { instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred
 import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import type { z } from "zod";
 
-import { resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -169,7 +169,7 @@ export async function validatePath(filePath: string, root: string, schemaRoot: s
   const families = await resolveNodeSchemas(kind, schemaRoot);
   let schema: z.ZodTypeAny;
   if (families.length) {
-    const tag = (data as { $schema?: unknown } | null)?.$schema;
+    const tag = nodeFamilyTag(data);
     const fam = families.find((f) => f.tag === tag);
     if (!fam) {
       return { path: filePath, state: "undetermined", kind, reason: `${kind} names no $schema family ${JSON.stringify(tag)}` };
@@ -189,7 +189,7 @@ export async function validatePath(filePath: string, root: string, schemaRoot: s
     }
     schema = v.schema;
   }
-  const parsed = schema.safeParse(stripAnnotations(data));
+  const parsed = schema.safeParse(families.length ? familyBody(data) : stripAnnotations(data));
   if (parsed.success) return { path: filePath, state: "valid", kind };
   return {
     path: filePath,
