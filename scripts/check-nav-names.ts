@@ -419,7 +419,7 @@ if (import.meta.main) {
   console.log(
     `navigation names: ${r.destinations} destination(s), ${r.sightings.length} sighting(s) — ` +
       `${r.read.railPages} railed page(s), include ${r.read.include ? "read" : "MISSING"}, ` +
-      `harness.json read, stickies ${r.read.stickies ? "read" : "not read"}, ${r.read.templates} template(s)`,
+      `_data/harness.json read, stickies ${r.read.stickies ? "read" : "not read"}, ${r.read.templates} template(s)`,
   );
   if (r.conflicts.length === 0 && r.templates.length === 0) {
     console.log("  ✓ every destination carries one name on every surface");

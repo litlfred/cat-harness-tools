@@ -5,10 +5,8 @@ status: completed
 type: task
 priority: normal
 created_at: 2026-09-26T11:26:16Z
-updated_at: 2026-09-27T09:37:00Z
+updated_at: 2026-10-20T17:47:11Z
 parent: folio-assistant-1xhc
-blocked_by:
-    - folio-assistant-xd1g
 ---
 
 Found 2026-09-26 while establishing whether `kg:detangle:check` was `hloc`'s
@@ -308,3 +306,4 @@ regeneration in that PR was done with the directory moved aside, so its six
 committed artefacts are what CI writes — verified by the two hard gates going
 green on the push.
 
+_2026-10-20T17:47:11Z_ — Removed `blocked_by: folio-assistant-xd1g`. xd1g exists only in the folio-assistant store (`cat/cat-harness/beans`), so `beans check` here reported a broken link. The edge was also spent: xd1g is `completed` there, and this bean is `completed`. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.

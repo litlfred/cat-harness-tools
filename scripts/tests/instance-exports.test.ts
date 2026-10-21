@@ -19,10 +19,15 @@ import {
 } from "../check-published-instance-exports.js";
 import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../kg-export.js";
 import { inAggregate } from "../../test/support/checkout.js";
+import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { artefactStub, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
 import {
   PUBLISHED_ELSEWHERE,
   declaredInstanceStubs,
+  instanceDocPath,
   instanceExportPlan,
+  instanceSitePath,
   publishesInstanceSchema,
   type PlannedExport,
 } from "../instance-exports.js";
@@ -47,9 +52,17 @@ describe("the plan is the declarations, partitioned", () => {
   const plan = instanceExportPlan(REPO);
   const declared = declaredInstanceStubs(REPO);
 
-  test("every declared instance is planned or published elsewhere, and never both", () => {
+  test("every declared instance is exactly one of: planned, published elsewhere, or declared not published", () => {
     const planned = new Set(plan.map((p) => p.stub));
-    for (const s of declared) expect(planned.has(s) !== s in PUBLISHED_ELSEWHERE).toBe(true);
+    const disabled = new Set(
+      instanceRootsIn(REPO)
+        .map((r) => readDeclaration(r))
+        .filter((d) => d !== undefined && !isPublished(d))
+        .map((d) => artefactStub(d!)),
+    );
+    for (const s of declared) {
+      expect({ s, legs: [planned.has(s), s in PUBLISHED_ELSEWHERE, disabled.has(s)].filter(Boolean).length }).toEqual({ s, legs: 1 });
+    }
   });
 
   test("the instances this bean found unpublished are in it", () => {
@@ -67,8 +80,8 @@ describe("the plan is the declarations, partitioned", () => {
 
 describe("a plan line expands to one invocation per planned instance", () => {
   const plan: PlannedExport[] = [
-    { path: "./a", stub: "a", ownCanonical: false },
-    { path: "./b", stub: "b", ownCanonical: true },
+    { path: "./a", name: "a", stub: "a", ownCanonical: false },
+    { path: "./b", name: "b", stub: "b", ownCanonical: true },
   ];
   test("without a base, nothing stands in", () => {
     const got = publishedInstances("bun run cat-harness/scripts/instance-exports.ts --out-dir ./_site", "w.yml", () => plan);
@@ -227,7 +240,7 @@ describe("an exported Zod *Schema the publisher would not write fails the gate",
   // The stub the publisher names the index by: this fixture declares nothing,
   // so it is whatever the identity falls back to — read, not assumed.
   const stub = publishedIdentity(root).stub;
-  const plan: PlannedExport[] = [{ path: root, stub, ownCanonical: false }];
+  const plan: PlannedExport[] = [{ path: root, name: stub, stub, ownCanonical: false }];
 
   test("the deploy's own publisher writes it: no finding, and the non-Zod BarSchema is not one", async () => {
     expect(await unpublishedZodSchemas(plan, (r) => scannedInstanceSchemas(r), REPO)).toEqual([]);
@@ -295,7 +308,7 @@ describe("a re-exported Zod *Schema is read from the text too", () => {
   );
   writeFileSync(join(root, "schemas", "star.ts"), 'export * from "./base.ts";\n');
   const stub = publishedIdentity(root).stub;
-  const plan: PlannedExport[] = [{ path: root, stub, ownCanonical: false }];
+  const plan: PlannedExport[] = [{ path: root, name: stub, stub, ownCanonical: false }];
   const starFinding =
     `${root}: schemas/star.ts has a bare \`export * from\`, so the gate cannot read from its text which *Schema ` +
     "names it re-exports — whether they are published could not be determined. Name them in an `export { … }` list";
@@ -335,5 +348,42 @@ describe.skipIf(!inAggregate())("every planned instance's exported Zod *Schema r
     for (const n of ["SignatureSchema", "SourceProvenanceSchema", "FixitySchema"]) {
       expect(written.has(`zod/materialization/${n}.schema.json`)).toBe(true);
     }
+  });
+});
+
+// ── The one URL-space resolver — bean `cat-tools-sthf` (consumer half of `nbal`) ──
+
+describe("an instance's published files are placed by cat-harness's resolver", () => {
+  test("the segment is the instance's NAME and the file is named by its stub", () => {
+    // Different on purpose: equal values could not tell which one was used.
+    expect(instanceDocPath({ name: "the-name", stub: "the-stub" })).toBe("the-name/the-stub.jsonld");
+    expect(instanceSitePath("the-name", "schema")).toBe("the-name/schema");
+  });
+
+  test("it is publishedPath's `instance` case, site-relative, not a second spelling of it", () => {
+    expect(`/${instanceDocPath({ name: "n", stub: "s" })}`).toBe(publishedPath({ case: "instance", instance: "n", path: "s.jsonld" }));
+  });
+
+  test("no published address moved: every planned instance's name is its stub today", () => {
+    // The switch from `<stub>/` to `<name>/` is safe only while they agree;
+    // an instance whose stub differs would move its `@id`s, which `blv9` gates.
+    for (const p of instanceExportPlan(REPO)) expect(instanceDocPath(p)).toBe(`${p.stub}/${p.stub}.jsonld`);
+  });
+});
+
+describe("an instance declaring `enabled: false` is not planned", () => {
+  const repo = mkdtempSync(join(tmpdir(), "instance-plan-enabled-"));
+  afterAll(() => rmSync(repo, { recursive: true, force: true }));
+  for (const n of ["on", "off"]) mkdirSync(join(repo, n), { recursive: true });
+  writeDeclaration(join(repo, "on"), { name: "on", directories: [] });
+
+  test("the default is published, and `false` leaves it out", () => {
+    writeDeclaration(join(repo, "off"), { name: "off", directories: [], enabled: false });
+    expect(instanceExportPlan(repo).map((p) => p.name)).toEqual(["on"]);
+  });
+
+  test("FALSIFIED: the same instance with `enabled: true` is planned again", () => {
+    writeDeclaration(join(repo, "off"), { name: "off", directories: [], enabled: true });
+    expect(instanceExportPlan(repo).map((p) => p.name)).toEqual(["off", "on"]);
   });
 });

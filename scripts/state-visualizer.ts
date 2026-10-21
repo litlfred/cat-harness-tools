@@ -150,6 +150,13 @@ import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
+import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/session-survey.ts";
+import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
+import { BoardSchema } from "@litlfred/cat-harness/schemas/board.ts";
+import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/board-positions.ts";
+import { parseTodoFile, TODO_ROOT } from "./todos.ts";
+import type { z } from "zod";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
@@ -780,7 +787,7 @@ function dashboardPage(g: StateGraph, graphs: StateGraph[]): string {
     });
   }
 
-  if (tag === TODO_INDEX_SCHEMA) return todoBoardPage(g);
+  if (tag === TODO_INDEX_SCHEMA) return todoBoardPage(g, TODO_ROOT());
 
   return beansBoardPage(g, graphs, src);
 }
@@ -867,8 +874,11 @@ ${registry(graphs, g.id)}`,
  * carries it in (`withRendersFrontMatter`), and the do-not-hand-edit sentence
  * stays in the body so `prunableDashboards` still recognises the page as ours.
  */
-export function todoBoardPage(g: Pick<StateGraph, "description">): string {
+export function todoBoardPage(g: Pick<StateGraph, "description">, storeAbs?: string): string {
   const lead = g.description ? g.description.split(/(?<=\.)\s/)[0]! : "";
+  // The graph's other parts, below the board (bean `folio-assistant-750a`):
+  // the board draws `items` only, the same split as the bean store's page.
+  const parts = storeAbs === undefined ? "" : `${todoStorePartsSection(storeAbs)}\n`;
   return `---
 layout: default
 title: Todos
@@ -882,7 +892,7 @@ fa_todo_listing: all
 -->
 <h1 id="todos">Todos</h1>
 ${lead ? `<p class="fs-5 fw-300">${describe(lead)}</p>\n` : ""}{% include landing.html open=true %}
-`;
+${parts}`;
 }
 
 /** The `$schema` a graph's published projection declares, or null. */
@@ -1010,6 +1020,24 @@ export function qaPanelsOf(
 }
 
 /**
+ * The harness's one-node-per-file graphs that are neither state nor a
+ * registry of `folio-…/v1` nodes, and had no viewer (bean `folio-assistant-6gme`,
+ * owner 2026-10-20: "every kind gets a viewer"). Each is drawn as a registry
+ * is — a page per instance holding the kind, listing every node by id and
+ * title — because that is what their files are: `scenarios` (actors and
+ * capabilities, which carry no `$schema`), `policies` (ODRL, `.jsonld`),
+ * `test-plan`, `tool-release`, `vocab-mapping` and `substrate-snapshot`
+ * (`<id>.substrate.json`, written by `kg:subscribe` and not committed).
+ */
+export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot"];
+
+/**
+ * The file endings a listed node is read from: JSON, and JSON-LD, which is
+ * what an ODRL policy is written in (`policies/*.jsonld`).
+ */
+export const NODE_EXTENSIONS: readonly string[] = [".json", ".jsonld"];
+
+/**
  * The kinds a `subgraphs: "instance"` visualiser can draw one page per
  * instance for: those whose documents are self-describing JSON (a `$schema`
  * tag), which the family reader (`readQaGraph`) counts without knowing the
@@ -1035,6 +1063,8 @@ export const PER_INSTANCE_KINDS: ReadonlySet<string> = new Set([
   // by layers above this one (cat-harness-tools#386).
   "pipeline-plugins",
   "editor-checkers",
+  // The other one-node-per-file graphs (bean `folio-assistant-6gme`).
+  ...LISTED_KINDS,
 ]);
 
 /**
@@ -1054,6 +1084,7 @@ export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
   "code-list",
   "pipeline-plugins",
   "editor-checkers",
+  ...LISTED_KINDS,
 ]);
 
 /** One registry node, as an instance page lists it. */
@@ -1072,11 +1103,11 @@ export interface RegistryRow {
 /** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
 export function registryRowsOf(absPath: string): RegistryRow[] {
   const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
-  return jsonFilesIn(absPath)
+  return jsonFilesIn(absPath, NODE_EXTENSIONS)
     .map((p) => relative(absPath, p).split(sep).join("/"))
     .sort()
     .map((file): RegistryRow => {
-      const stem = basename(file, ".json");
+      const stem = basename(file).replace(/\.json(ld)?$/, "");
       let doc: unknown;
       try {
         doc = JSON.parse(readFileSync(join(absPath, file), "utf-8"));
@@ -1285,17 +1316,30 @@ export function memorySubjectPage(
 
 /**
  * The kinds that make up ONE bean store: the store (`beans`) and the parts its
- * `beans.json` declares from within — work items, PR addenda and running BPMN
- * instances (bean `folio-assistant-750a`). A visualiser covering any of them
- * draws the store's page, which lists all three; see {@link beanStorePartsSection}.
+ * `beans.json` declares from within — work items, PR addenda, running BPMN
+ * instances (bean `folio-assistant-750a`), the merge steward's decisions
+ * (bean `folio-assistant-30jr`), published session surveys and sweep marks. A
+ * visualiser covering any of them draws the store's page, which lists them
+ * all; see {@link beanStorePartsSection}.
  */
-export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set(["beans", "bean-defs", "bean-notes", "workflow-state"]);
+export const BEAN_STORE_KINDS: ReadonlySet<string> = new Set([
+  "beans",
+  "bean-defs",
+  "bean-notes",
+  "workflow-state",
+  "merge-queue",
+  "session-survey",
+  "sweep-marks",
+]);
 
-/** One bean-store part's directories, read from the store's own `beans.json`. */
-function storePartDirs(storeAbs: string, kind: string): string[] {
+/**
+ * One store part's directories, read from the store's own declaration —
+ * `beans.json`, or `todos.json` for the todo graph's parts.
+ */
+function storePartDirs(storeAbs: string, kind: string, declFile = "beans.json"): string[] {
   let decl: { directories?: Array<{ path?: string; graphTypologies?: string[] }> };
   try {
-    decl = JSON.parse(readFileSync(join(storeAbs, "beans.json"), "utf-8"));
+    decl = JSON.parse(readFileSync(join(storeAbs, declFile), "utf-8"));
   } catch {
     return [];
   }
@@ -1347,6 +1391,9 @@ export function beanStorePartsSection(storeAbs: string): string {
       );
     })
     .join("");
+  const queue = mergeQueueSection(filesIn(storePartDirs(storeAbs, "merge-queue"), ".json"));
+  const surveys = sessionSurveySection(filesIn(storePartDirs(storeAbs, "session-survey"), ".json"));
+  const marks = sweepMarkSection(filesIn(storePartDirs(storeAbs, "sweep-marks"), ".json"));
   // In a raw block: the page is Liquid-rendered, and branch names, ids and
   // token names are data nobody screened for `{{`.
   return wrapRaw(
@@ -1357,7 +1404,235 @@ export function beanStorePartsSection(storeAbs: string): string {
     `<h2 class="sv-h2" id="workflow-state">Workflow instances — ${flows.length}</h2>` +
     (flows.length === 0
       ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
-      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`),
+      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`) +
+    queue +
+    surveys +
+    marks,
+  ).join("\n");
+}
+
+/**
+ * The merge steward's recorded DECISIONS (`merge-queue`,
+ * `folio-merge-queue-entry/v1`), one row per entry: bean
+ * `folio-assistant-30jr`, the harness tile `hfag` asked for.
+ *
+ * Decisions only, as the kind requires: placement, triage status, hold,
+ * who decided and when, and why. Not one GitHub fact. CI, mergeability,
+ * labels and the head are GitHub's to answer, and a copy committed into a
+ * page is stale on the next push, so each row LINKS the pull request and the
+ * reader gets the live answer from the place that owns it.
+ *
+ * Every entry is parsed with the schema the steward's writer uses. One that
+ * fails is listed with the reason rather than dropped: it is a decision a
+ * steward believes it recorded (the same rule as `merge-queue-store.ts`).
+ */
+export function mergeQueueSection(files: readonly string[]): string {
+  const rows: string[] = [];
+  let bad = 0;
+  for (const f of files) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(f, "utf-8"));
+    } catch {
+      bad++;
+      rows.push(`<tr><td><code>${esc(basename(f))}</code></td><td colspan="5">not readable JSON</td></tr>`);
+      continue;
+    }
+    const r = MergeQueueEntrySchema.safeParse(raw);
+    if (!r.success) {
+      bad++;
+      const i = r.error.issues[0];
+      rows.push(
+        `<tr><td><code>${esc(basename(f))}</code></td>` +
+          `<td colspan="5">not a valid entry — ${esc(i?.path.join(".") || "(root)")}: ${esc(i?.message ?? "")}</td></tr>`,
+      );
+      continue;
+    }
+    const e = r.data;
+    const pr = `<a href="https://github.com/${esc(e.repository)}/pull/${e.pr}">${esc(e.repository)}#${e.pr}</a>`;
+    const placed =
+      e.placement.kind === "computed"
+        ? `${esc(e.placement.class)}, rank ${e.placement.rank}`
+        : `override, position ${e.placement.position}`;
+    const hold = e.hold ? `on ${esc(e.hold.waitsOn)} until ${esc(e.hold.expires)}` : "";
+    rows.push(
+      `<tr><td>${pr}</td><td>${esc(e.status ?? "")}</td><td>${placed}</td><td>${hold}</td>` +
+        `<td>${esc(e.decidedAt)}<br>${esc(e.decidedBy)}</td><td>${esc(e.reason)}</td></tr>`,
+    );
+  }
+  return (
+    `<h2 class="sv-h2" id="merge-queue">Merge queue — ${files.length - bad} decision(s)` +
+    `${bad > 0 ? `, ${bad} unreadable` : ""}</h2>` +
+    (files.length === 0
+      ? `<p class="sv-sub">No merge-queue decision recorded in this store.</p>`
+      : `<p class="sv-sub">What the merge steward decided, and why. CI, mergeability and the head are GitHub's facts: ` +
+        `open the pull request for them.</p>` +
+        `<table><thead><tr><th>pull request</th><th>status</th><th>placement</th><th>hold</th><th>decided</th>` +
+        `<th>reason</th></tr></thead><tbody>${rows.join("")}</tbody></table>`)
+  );
+}
+
+/**
+ * Each JSON file of a store part, parsed with the kind's own schema; one that
+ * does not parse carries the reason instead. Never dropped: an entry somebody
+ * believes they recorded is shown as broken, not as absent (the rule
+ * {@link mergeQueueSection} follows).
+ */
+function parsedEntries<T>(files: readonly string[], schema: z.ZodType<T>): Array<{ file: string } & ({ data: T } | { bad: string })> {
+  return files.map((file) => {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(file, "utf-8"));
+    } catch {
+      return { file, bad: "not readable JSON" };
+    }
+    const r = schema.safeParse(raw);
+    if (r.success) return { file, data: r.data };
+    const i = r.error.issues[0];
+    return { file, bad: `not a valid entry — ${i?.path.join(".") || "(root)"}: ${i?.message ?? ""}` };
+  });
+}
+
+/** A part's heading: how many entries parsed, and how many did not. */
+function partHeading(id: string, title: string, total: number, bad: number, noun: string): string {
+  return `<h2 class="sv-h2" id="${id}">${title} — ${total - bad} ${noun}${bad > 0 ? `, ${bad} unreadable` : ""}</h2>`;
+}
+
+/**
+ * Published surveys of a commit window (`session-survey`,
+ * `folio-session-survey/v1`, bean `6ptx`): the window's two edge commits, the
+ * branch, who took it and when, and how many of its axes were actually
+ * covered. An axis NOT covered is counted apart, because a partial survey that
+ * read as complete is the defect the schema exists to stop.
+ */
+export function sessionSurveySection(files: readonly string[]): string {
+  const entries = parsedEntries(files, SessionSurveySchema);
+  const bad = entries.filter((e) => "bad" in e).length;
+  const rows = entries
+    .map((e) => {
+      if ("bad" in e) return `<tr><td><code>${esc(basename(e.file))}</code></td><td colspan="5">${esc(e.bad)}</td></tr>`;
+      const v = e.data;
+      const covered = v.axes.filter((a) => a.covered).length;
+      return (
+        `<tr><td><code>${esc(v.from.slice(0, 12))}..${esc(v.to.slice(0, 12))}</code></td><td>${esc(v.branch)}</td>` +
+        `<td>${v.commits}</td><td>${covered} of ${v.axes.length}</td><td>${esc(v.takenAt)}</td><td>${esc(v.by)}</td></tr>`
+      );
+    })
+    .join("");
+  return (
+    partHeading("session-survey", "Session surveys", files.length, bad, "survey(s)") +
+    (files.length === 0
+      ? `<p class="sv-sub">No session survey recorded in this store.</p>`
+      : `<table><thead><tr><th>window</th><th>branch</th><th>commits</th><th>axes covered</th><th>taken</th>` +
+        `<th>by</th></tr></thead><tbody>${rows}</tbody></table>`)
+  );
+}
+
+/**
+ * When each sweep last ran (`sweep-marks`, `folio-sweep-mark/v1`, bean
+ * `rq8s`): one row per check — when it read its input, who ran it, how much it
+ * read and what it found. A check with no row has no mark, which is the trace
+ * a skipped sweep leaves.
+ */
+export function sweepMarkSection(files: readonly string[]): string {
+  const entries = parsedEntries(files, SweepMarkSchema);
+  const bad = entries.filter((e) => "bad" in e).length;
+  const rows = entries
+    .map((e) => {
+      if ("bad" in e) return `<tr><td><code>${esc(basename(e.file))}</code></td><td colspan="4">${esc(e.bad)}</td></tr>`;
+      const m = e.data;
+      return (
+        `<tr><td><code>${esc(m.check)}</code></td><td>${esc(m.checkedAt)}</td><td>${esc(m.by ?? "")}</td>` +
+        `<td>${m.read}</td><td>${m.findings}</td></tr>`
+      );
+    })
+    .join("");
+  return (
+    partHeading("sweep-marks", "Sweep marks", files.length, bad, "mark(s)") +
+    (files.length === 0
+      ? `<p class="sv-sub">No sweep mark recorded in this store.</p>`
+      : `<table><thead><tr><th>check</th><th>checked</th><th>by</th><th>read</th><th>findings</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table>`)
+  );
+}
+
+/**
+ * The todo graph's parts the board does not draw (bean
+ * `folio-assistant-750a`): `todo-feedback` — each todo raised against a block,
+ * with that block and who raised it — and `boards`, each with what it shows and,
+ * from `board-positions`, how many notes are placed on it. `todo-items` are the
+ * board's own stickies and the no-JS listing, so they are not listed again.
+ * Read from the graph's own `todos.json`, in a raw block like the bean store's.
+ */
+export function todoStorePartsSection(storeAbs: string): string {
+  const feedback = filesIn(storePartDirs(storeAbs, "todo-feedback", "todos.json"), ".md");
+  let fbBad = 0;
+  const fbRows = feedback
+    .map((f) => {
+      let r: ReturnType<typeof parseTodoFile>;
+      let why: string | undefined;
+      try {
+        r = parseTodoFile(f);
+        const i = r?.success === false ? r.error.issues[0] : undefined;
+        if (r === undefined) why = "carries no `$schema: todo/1.0.0`";
+        else if (!r.success) why = `not a valid todo — ${i?.path.join(".") || "(root)"}: ${i?.message ?? ""}`;
+      } catch (e) {
+        why = `not readable — ${e instanceof Error ? e.message : String(e)}`;
+      }
+      if (why !== undefined || r === undefined || !r.success) {
+        fbBad++;
+        return `<tr><td><code>${esc(basename(f))}</code></td><td colspan="3">${esc(why ?? "")}</td></tr>`;
+      }
+      const t = r.data;
+      const who = t.tags.identities.map((i) => `${i.provider}:${i.id}`).join(", ");
+      return (
+        `<tr><td><code>${esc(t.id)}</code><br>${esc(t.summary)}</td><td>${t.targetLabel ? `<code>${esc(t.targetLabel)}</code>` : "no block"}</td>` +
+        `<td>${esc(who || "not recorded")}</td><td>${esc(t.status)}</td></tr>`
+      );
+    })
+    .join("");
+
+  const boards = parsedEntries(
+    filesIn(storePartDirs(storeAbs, "boards", "todos.json"), ".json").filter((f) => basename(f) !== BOARD_POSITIONS_FILE),
+    BoardSchema,
+  );
+  const posFiles = storePartDirs(storeAbs, "board-positions", "todos.json")
+    .map((d) => join(d, BOARD_POSITIONS_FILE))
+    .filter((f) => existsSync(f));
+  const positions = parsedEntries(posFiles, BoardPositionsSchema);
+  const posDoc = positions.find((p) => "data" in p);
+  const posBad = positions.filter((p) => "bad" in p);
+  // No positions file is a determined state — nothing has been placed; one
+  // that does not parse is not, so its counts are unknown rather than zero.
+  const placed = (id: string): string =>
+    posBad.length > 0 ? "unknown" : posDoc && "data" in posDoc ? String(positionsOn(posDoc.data, id).length) : "0";
+  const boardBad = boards.filter((b) => "bad" in b).length;
+  const boardRows = boards
+    .map((b) => {
+      if ("bad" in b) return `<tr><td><code>${esc(basename(b.file))}</code></td><td colspan="3">${esc(b.bad)}</td></tr>`;
+      const f = b.data.filter;
+      const shows =
+        f === undefined
+          ? "the whole folio"
+          : [f.pages ? `pages: ${f.pages.join(", ")}` : "", f.kinds ? `kinds: ${f.kinds.join(", ")}` : ""].filter(Boolean).join("; ");
+      return `<tr><td><code>${esc(b.data.id)}</code></td><td>${esc(b.data.title)}</td><td>${esc(shows)}</td><td>${placed(b.data.id)}</td></tr>`;
+    })
+    .join("");
+  const posNote =
+    posFiles.length === 0
+      ? `<p class="sv-sub">No <code>${BOARD_POSITIONS_FILE}</code> in this graph: no note has been placed on any board.</p>`
+      : posBad.map((p) => `<p class="sv-sub"><code>${esc(basename(p.file))}</code>: ${esc((p as { bad: string }).bad)}</p>`).join("");
+
+  return wrapRaw(
+    partHeading("todo-feedback", "Feedback", feedback.length, fbBad, "todo(s)") +
+      (feedback.length === 0
+        ? `<p class="sv-sub">No feedback todo recorded in this graph.</p>`
+        : `<table><thead><tr><th>todo</th><th>block</th><th>submitter</th><th>status</th></tr></thead><tbody>${fbRows}</tbody></table>`) +
+      partHeading("boards", "Boards", boards.length, boardBad, "board(s)") +
+      (boards.length === 0
+        ? `<p class="sv-sub">No board recorded in this graph.</p>`
+        : `<table><thead><tr><th>id</th><th>title</th><th>shows</th><th>notes placed</th></tr></thead><tbody>${boardRows}</tbody></table>`) +
+      posNote,
   ).join("\n");
 }
 
@@ -1415,7 +1690,7 @@ export function instanceSubjectsOf(
  * writer and the orphan keep-set both depend on it — the keep-set test held a
  * hand-written list and missed the seven hubs #294 added.
  *
- * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`) are drawn
+ * A bean store's parts (`bean-defs`, `bean-notes`, `workflow-state`, `merge-queue`) are drawn
  * on the store's own page, so the subjects are the stores (bean
  * `folio-assistant-750a`). A directory the visualiser ALSO names by id
  * (`covers`) is drawn on its full view, and `viewersOf` opens that view for
@@ -1467,6 +1742,8 @@ export function projectInstanceSubject(s: InstanceSubject, kinds: readonly strin
     s.absPath,
     existsSync(s.absPath),
     `\`${s.path}\` of ${s.name} is not in this build (it is not committed here, or was not fetched), so it was not counted`,
+    // A listed kind's census counts the same files its node table lists.
+    kinds.some((k) => LISTED_KINDS.includes(k)) ? { extensions: NODE_EXTENSIONS } : undefined,
   );
 }
 
