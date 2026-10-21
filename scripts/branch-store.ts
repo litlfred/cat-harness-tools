@@ -1371,7 +1371,14 @@ export function clearAbsence(repoRoot: string, loc: Pick<TipLocation, "id" | "ke
  * against another origin answers nothing: the question was about that remote.
  */
 export function absenceAt(repoRoot: string, path: string, id?: string): AbsenceRecord | undefined {
-  const dir = dirname(markerPath(repoRoot, "x"));
+  // No git directory (a standalone rehearsal's copy) means no mount has run
+  // here, so nothing was recorded: the reader's own not-mounted answer stands.
+  let dir: string;
+  try {
+    dir = dirname(markerPath(repoRoot, "x"));
+  } catch {
+    return undefined;
+  }
   if (!existsSync(dir)) return undefined;
   const want = path.replace(/^\/+|\/+$/g, "");
   const origin = originUrl(repoRoot);

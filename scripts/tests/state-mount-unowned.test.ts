@@ -211,3 +211,9 @@ describe("a reader is told the mount found a graph absent (bean x5e0)", () => {
     expect(mountedIds(f.work).some((k) => k.includes("absent"))).toBe(false);
   });
 });
+
+test("with no git directory there is no record, and no error: the reader's not-mounted stands (x5e0)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "no-git-"));
+  made.push(dir);
+  expect(absenceAt(dir, "issue-marks", "issue-marks")).toBeUndefined();
+});
