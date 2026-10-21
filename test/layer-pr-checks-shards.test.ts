@@ -234,6 +234,8 @@ describe("snapshot.py (cat-harness-tools#397)", () => {
     // A graph's mount marker, which branch-store files in the git directory.
     mkdirSync(join(prep, ".git", "branch-mounts"), { recursive: true });
     writeFileSync(join(prep, ".git", "branch-mounts", "beans.json"), "{}\n");
+    // And a graph the mount found absent (bean x5e0): every shard's gates read it.
+    writeFileSync(join(prep, ".git", "branch-mounts", "issue-marks.absent"), "{}\n");
     writeFileSync(join(prep, ".git", "HEAD"), "not carried\n");
     py("save", prep, list, join(work, "root"));
     py("apply", shard, join(work, "root"));
@@ -243,6 +245,7 @@ describe("snapshot.py (cat-harness-tools#397)", () => {
     expect(existsSync(join(shard, "derived.json"))).toBe(true);
     expect(readFileSync(join(shard, "kept.ts"), "utf-8")).toBe("mounted\n");
     expect(existsSync(join(shard, ".git", "branch-mounts", "beans.json"))).toBe(true);
+    expect(existsSync(join(shard, ".git", "branch-mounts", "issue-marks.absent"))).toBe(true);
     expect(existsSync(join(shard, ".git", "HEAD"))).toBe(false);
     rmSync(work, { recursive: true, force: true });
   });

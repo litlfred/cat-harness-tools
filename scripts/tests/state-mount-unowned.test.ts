@@ -31,7 +31,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { tipLocations } from "../branch-store.ts";
+import { absenceAt, contentAt, mountedIds, tipLocations } from "../branch-store.ts";
+import { graphReadPath } from "../graph-read.ts";
 import { mountState, report } from "../state-mount.ts";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
@@ -163,4 +164,56 @@ describe("a repository-scoped graph a mounted instance declares and the root doe
     expect(r.graphs.find((g) => g.id === "issue-marks")?.state).toBe("miss");
     expect(r.state).toBe("partial");
   });
+});
+
+/**
+ * Bean `x5e0`: the `absent` the mount determined is what a READER is told,
+ * and only while the mount's answer still holds. A reader runs offline and
+ * cannot ask the remote again, so without the record it reported an absent
+ * graph as "not mounted, could not determine", and a gate that reads it went
+ * UNKNOWN (or failed) in every content index outside folio-assistant.
+ */
+describe("a reader is told the mount found a graph absent (bean x5e0)", () => {
+  test("contentAt and graphReadPath say absent after the mount, and not-mounted before it", () => {
+    const f = index();
+    expect(contentAt("issue-marks", f.work).state).toBe("not-mounted");
+    expect(graphReadPath("issue-marks", f.work)).toMatchObject({ state: "refused" });
+    expect((graphReadPath("issue-marks", f.work) as { absent?: true }).absent).toBeUndefined();
+    mountState({ repoRoot: f.work });
+    expect(contentAt("issue-marks", f.work)).toMatchObject({ state: "absent" });
+    // Still a refusal, so a reader that has not decided what absence means keeps stopping.
+    expect(graphReadPath("issue-marks", f.work)).toMatchObject({ state: "refused", absent: true });
+  });
+
+  test("a later mount asks again: once the remote carries the branch, the record is gone", () => {
+    const f = index();
+    mountState({ repoRoot: f.work });
+    expect(contentAt("issue-marks", f.work).state).toBe("absent");
+    seed(f.base, f.origin, MARKS_BRANCH, { "manifest.json": MANIFEST, "issue-marks/1.json": "{}\n" });
+    mountState({ repoRoot: f.work });
+    expect(contentAt("issue-marks", f.work)).toMatchObject({ state: "present", via: "mount" });
+    expect(absenceAt(f.work, "issue-marks", "issue-marks")).toBeUndefined();
+  });
+
+  test("a record judged against another origin answers nothing", () => {
+    const f = index();
+    mountState({ repoRoot: f.work });
+    expect(absenceAt(f.work, "issue-marks")).toBeDefined();
+    git(f.work, "remote", "set-url", "origin", `file://${f.base}/elsewhere.git`);
+    expect(absenceAt(f.work, "issue-marks")).toBeUndefined();
+    expect(contentAt("issue-marks", f.work).state).toBe("not-mounted");
+  });
+
+  test("the record is not a mount: state:push never lists it", () => {
+    const f = index();
+    mountState({ repoRoot: f.work });
+    expect(mountedIds(f.work)).not.toContain("issue-marks.absent");
+    expect(mountedIds(f.work).some((k) => k.includes("absent"))).toBe(false);
+  });
+});
+
+test("with no git directory there is no record, and no error: the reader's not-mounted stands (x5e0)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "no-git-"));
+  made.push(dir);
+  expect(absenceAt(dir, "issue-marks", "issue-marks")).toBeUndefined();
 });

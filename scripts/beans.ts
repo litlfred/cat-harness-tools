@@ -242,6 +242,8 @@ export interface BeanDefsResolution {
    * correct — it is the checkout that is missing the content.
    */
   unreachable?: string;
+  /** With `unreachable`: a mount determined the graph absent from this checkout ({@link graphReadPath}'s `absent`). */
+  absent?: true;
 }
 
 /**
@@ -322,7 +324,7 @@ export function resolveBeanDefsAt(graphRoot: string): BeanDefsResolution {
  */
 export function resolveBeanGraphNode(root: string, kind: BeanNodeKind): BeanDefsResolution {
   const where = graphReadPath("beans", root);
-  if (where.state === "refused") return { dir: null, declared: true, unreachable: where.reason };
+  if (where.state === "refused") return { dir: null, declared: true, unreachable: where.reason, ...(where.absent ? { absent: true as const } : {}) };
   const graphRoot = where.state === "ok" ? where.at : join(root, DEFAULT_BEAN_GRAPH_ROOT);
   const file = join(graphRoot, BEAN_GRAPH_FILE);
   const declared = existsSync(file);
