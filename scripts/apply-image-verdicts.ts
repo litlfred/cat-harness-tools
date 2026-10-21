@@ -108,6 +108,7 @@ import {
   isVectorFigureId,
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -133,6 +134,11 @@ interface Verdict {
   role: ImageRole;
   saw: string;
   draft: string;
+  /**
+   * The language `draft` is written in, as a BCP 47 tag. Defaults to
+   * {@link DEFAULT_NARRATIVE_LANG} (bean `cat-tools-e1lo`).
+   */
+  lang?: string;
   /** Vector figures only: the declared figure numbers this render shows. */
   shows?: string[];
   /**
@@ -217,12 +223,15 @@ export function applyTo(
     const who = AttributionSchema.parse(v.inspected_by ?? by);
     const when = v.inspected_at ?? at;
     const narrative = DESCRIBABLE_ROLES.includes(v.role)
-      ? {
-          text: v.draft,
-          state: "draft" as const,
-          drafted_by: who,
-          drafted_at: when,
-        }
+      ? [
+          {
+            text: v.draft,
+            lang: v.lang ?? DEFAULT_NARRATIVE_LANG,
+            state: "draft" as const,
+            drafted_by: who,
+            drafted_at: when,
+          },
+        ]
       : undefined;
     return {
       ...img,
@@ -280,12 +289,15 @@ export function applyToVector(
       ...(v.shows && v.shows.length > 0 ? { shows: v.shows } : {}),
       ...(DESCRIBABLE_ROLES.includes(v.role)
         ? {
-            narrative: {
-              text: v.draft,
-              state: "draft" as const,
-              drafted_by: who,
-              drafted_at: when,
-            },
+            narrative: [
+              {
+                text: v.draft,
+                lang: v.lang ?? DEFAULT_NARRATIVE_LANG,
+                state: "draft" as const,
+                drafted_by: who,
+                drafted_at: when,
+              },
+            ],
           }
         : {}),
     };
