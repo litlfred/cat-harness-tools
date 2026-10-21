@@ -53,6 +53,16 @@ describe("narratives:migrate-lang (e1lo 3d)", () => {
     expect(JSON.parse(text).narrative[0].lang).toBe("en");
   });
 
+  test("every number Python's json writes survives: its repr, not JavaScript's", () => {
+    // Written by Python's `json.dumps(..., indent=2)`: `338.0`, `1e-05`,
+    // `-0.0`, `1e+20`, `1.5e-07`, `-2.0`, and an integer past 2**53.
+    const spellings = ["338.0", "1e-05", "-0.0", "0", "0.1", "1e+20", "1.5e-07", "12345678901234567890", "-2.0"];
+    const raw = `{\n  "v": [\n    ${spellings.join(",\n    ")}\n  ],\n  "narrative": ${JSON.stringify(draft("x"), null, 2).replace(/\n/g, "\n  ")}\n}\n`;
+    const { text, result } = migrateText(raw, "en");
+    expect(result.converted).toBe(1);
+    expect(text.slice(0, text.indexOf('"narrative"'))).toBe(raw.slice(0, raw.indexOf('"narrative"')));
+  });
+
   test("a file in neither JSON style is refused, unchanged", () => {
     const raw = '{"narrative": ' + JSON.stringify(draft("x")) + "}";
     const { text, result } = migrateText(raw, "en");
