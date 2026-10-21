@@ -43,6 +43,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { displayNarrative } from "./narrative-display.ts";
 
 /** How much of a section's text an extract carries. */
 export const EXTRACT_CHARS = 420;
@@ -162,7 +163,9 @@ interface RawKeyword { term: string; evidence?: string[] }
 interface RawKeywords { document?: RawKeyword[]; sections?: Record<string, RawKeyword[]> }
 const kw = (ks: RawKeyword[] | undefined): DocKeyword[] =>
   (ks ?? []).map((k) => ({ term: k.term, heading: (k.evidence ?? []).includes("heading") }));
-interface RawSummaries { summaries?: { source?: string; status?: string; narrative?: { text?: string; status?: string } }[] }
+// `narrative` is one narrative or one per language (bean `cat-tools-e1lo`); read
+// through `displayNarrative`, never by field.
+interface RawSummaries { summaries?: { source?: string; status?: string; narrative?: unknown }[] }
 
 function readJson<T>(path: string): T | undefined {
   try {
@@ -286,9 +289,10 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
   const sj = readJson<RawSummaries>(join(dir, "summaries.json"));
   for (const r of sj?.summaries ?? []) {
     const src = String(r.source ?? "").replace(/^sections\//, "").replace(/\.md$/, "");
-    const text = r.narrative?.text;
+    const nar = displayNarrative(r.narrative);
+    const text = nar?.text;
     if (src && typeof text === "string" && text.trim()) {
-      summaries.set(src, { text, status: String(r.narrative?.status ?? r.status ?? "draft") });
+      summaries.set(src, { text, status: String(nar?.status ?? r.status ?? "draft") });
     }
   }
 

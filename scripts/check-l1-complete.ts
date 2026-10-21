@@ -56,7 +56,7 @@ import {
   isArchiveMimetype,
 } from "@litlfred/cat-harness/schemas/archive-contents.ts";
 import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/attribution.ts";
-import { NarrativeSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import {
   TABULAR_RECORDS_SCHEMA_ID,
@@ -74,6 +74,16 @@ import {
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
+
+/**
+ * A slot's state(s) for a one-line detail: one state for the single form,
+ * `lang:state` per entry for a list (bean `cat-tools-e1lo`, stage 3).
+ */
+function slotStates(slot: NarrativeSlot): string {
+  return narrativesOfSlot(slot)
+    .map((n) => (n.lang ? `${n.lang}:${n.state}` : n.state))
+    .join(", ");
+}
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
@@ -477,7 +487,7 @@ export function vectorFigureReach(
   const rendered = figures.filter((x) => x.file !== null);
   const inspected = rendered.filter((x) => x.basis.method === "inspection");
   const shownSet = new Set(
-    inspected.filter((x) => x.narrative?.text).flatMap((x) => x.shows ?? []),
+    inspected.filter((x) => x.narrative !== undefined && narrativesOfSlot(x.narrative).some((n) => n.text)).flatMap((x) => x.shows ?? []),
   );
   const candidateSet = new Set(
     rendered.filter((x) => x.basis.method === "assembly").flatMap((x) => x.captionLabels),
@@ -794,7 +804,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
       // A `narrative` key that `narrativesIn` could not parse is a DEFECT,
       // not an absence — reported rather than skipped, which is what the
       // old `safeParse` branch was for and must not be lost in the move.
-      if ("narrative" in doc && !NarrativeSchema.safeParse(doc.narrative).success) {
+      if ("narrative" in doc && !NarrativeSlotSchema.safeParse(doc.narrative).success) {
         bad.push(`${name}: narrative will not parse`);
       }
     }
@@ -888,7 +898,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
               : {
                   name: "tabular-records",
                   state: "met",
-                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative?.state ?? "absent"}`,
+                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative ? slotStates(r.data.narrative) : "absent"}`,
                 },
         );
       }
@@ -920,7 +930,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           name: "tabular-records",
           state: r.success ? "met" : "unmet",
           detail: r.success
-            ? `${r.data.n_sheets} sheet(s), ${r.data.header_vocabulary.length} header(s), narrative ${r.data.narrative.state}`
+            ? `${r.data.n_sheets} sheet(s), ${r.data.header_vocabulary.length} header(s), narrative ${slotStates(r.data.narrative)}`
             : `tabular.jsonld is not ${TABULAR_RECORDS_SCHEMA_ID}: ${r.error.issues[0]?.message ?? "invalid"}`,
         });
       }
@@ -1192,7 +1202,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
         } else {
           const describable = parsed.images.filter((i) => DESCRIBABLE_ROLES.includes(i.role));
           const undescribed = describable.filter(
-            (i) => (i.narrative?.state ?? "not-authored") === "not-authored",
+            (i) => i.narrative === undefined || narrativesOfSlot(i.narrative).every((n) => n.state === "not-authored"),
           );
           // An `undetermined` ROLE is the third state one level down: nobody
           // has judged what this image is, so whether it needs describing is

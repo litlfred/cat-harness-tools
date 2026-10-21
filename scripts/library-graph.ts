@@ -100,6 +100,8 @@ import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harne
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
+import { displayNarrative } from "./lib/narrative-display.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -659,7 +661,9 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
     if (!d) continue;
     const id = typeof d["@id"] === "string" ? (d["@id"] as string) : f.replace(/\.jsonld$/, "");
     const t = d["@type"];
-    const nar = d.narrative as { state?: unknown; text?: unknown } | undefined;
+    // One entry per language is possible (bean `cat-tools-e1lo`); the graph shows
+    // the one `narrativeFor` picks — no locale at build time, so the first.
+    const nar = displayNarrative(d.narrative);
     // A figure's description is authored and short — carried whole. A prose
     // block's is the section file, excerpted. See `content` on the interface.
     let content: string | null = typeof nar?.text === "string" ? (nar.text as string) : null;
@@ -689,7 +693,7 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
       summary: (() => {
         const it = summaryOf.get(id);
         if (!it) return null;
-        const n = it.record?.narrative;
+        const n = it.record?.narrative ? narrativeFor(it.record.narrative) : undefined;
         const d = n?.drafted_by;
         return {
           status: it.status,

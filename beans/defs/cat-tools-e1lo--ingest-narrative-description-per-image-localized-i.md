@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T18:19:09Z
+updated_at: 2026-10-21T12:21:34Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -367,4 +367,32 @@ The ruling lands in four stages, so no stored narrative is invalid at any point:
       each draft goes to the queue for a person.
 
 Released to `todo`: stage 3 touches four content repositories' stored data.
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Owner ruling 2026-10-21: a display shows the reader's language, else the first
+
+Asked in the cat-harness-tools drain session (structured question): when a
+slot holds several languages, which entry does a single-text display show?
+The owner chose **"Locale match, else first"**. Stage 3 is therefore split, so
+that no layer's typecheck breaks when the slot types widen:
+
+- [ ] **3a**, cat-harness#396: `narrativeFor(slot, lang?)`. It matches the
+      exact `lang`, then the primary subtag, then falls back to the first
+      entry.
+- [ ] **3b**, this repository (`feat/e1lo-readers-slot-aware`):
+  - Counters read every entry: `check-l1-complete` (figures with text,
+    images still not-authored, and table detail lines as `lang:state`).
+  - The sidecar parse check uses `NarrativeSlotSchema`, so a valid list is
+    not reported as a defect.
+  - Displays use `narrativeFor`: `library-graph`, and `library-document`
+    through `scripts/lib/narrative-display.ts` for untyped JSON.
+  - Still to do: folio-assistant-core `scripts/lsi-blocks.ts:88`
+    (`block.narrative?.text`). It is another repository, handed to the
+    coordinator.
+- [ ] **3c**, cat-harness: the six slot schemas switch to
+      `NarrativeSlotSchema`, and `block-summary` / `figure-description`
+      read through it.
+- [ ] **3d**: the 274 stored narratives migrate to lists with their source
+      `lang`, in four content repositories.
+
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
