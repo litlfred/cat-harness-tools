@@ -85,6 +85,7 @@ import {
   type LocaleCatalogue,
   type PlannedLocale,
 } from "./kg-viewer-strings.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { pageParts } from "./viewer-declarations.ts";
@@ -1254,7 +1255,7 @@ if (import.meta.main) {
   // publish (`cat-harness.json` `builtAtPublish`).
   const out = arg("--out");
   if (out === undefined) {
-    const { page, forwarded } = writeViewer(siteTarget(join(ROOT, "docs")), stub);
+    const { page, forwarded } = writeViewer(siteTarget(join(ROOT, siteDirFor(ROOT))), stub);
     console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${stub}.jsonld`);
     console.log(forwarded ? `  forwards ${relative(ROOT, forwarded)}` : `  ${stub}/ holds a page already; no forwarding page`);
   } else {
