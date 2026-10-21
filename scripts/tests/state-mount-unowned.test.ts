@@ -227,3 +227,15 @@ test("the record survives CI's .git rewrite of origin during the mount (x5e0)", 
   expect(normaliseOrigin(`${plain}.git/`)).toBe(normaliseOrigin(plain));
   expect(absenceAt(f.work, "issue-marks")).toBeDefined();
 });
+
+test("the record names the configured origin, not an insteadOf rewrite of it (x5e0)", () => {
+  const f = index();
+  const configured = `file://${f.origin}`;
+  // As CI's state-pin.sh does around the mount: rewrite the remote to a mirror.
+  const mirror = join(f.base, "mirror.git");
+  git(f.base, "clone", "-q", "--bare", f.origin, mirror);
+  git(f.work, "config", `url.file://${mirror}.insteadOf`, configured);
+  mountState({ repoRoot: f.work });
+  git(f.work, "config", "--unset", `url.file://${mirror}.insteadOf`);
+  expect(absenceAt(f.work, "issue-marks")?.origin).toBe(normaliseOrigin(configured));
+});
