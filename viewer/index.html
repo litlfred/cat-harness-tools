@@ -4428,6 +4428,7 @@
       }
 
       for (const ch of p.chapters) {
+        const chId = chKey(ch);
         const chEl = mk('div','sb-ch');
         chEl.dataset.num = String(chId);
         chEl.innerHTML = `<span class="sb-arrow">&#9654;</span><span>${ch.number != null ? ch.number + '. ' : ''}${inl(ch.title)}</span>`;
@@ -4437,7 +4438,6 @@
         if (ch._dir) sidebarChapterBodies.set(ch._dir, chBodyInner);
 
         // Restore open/closed state from localStorage
-        const chId = chKey(ch);
         if (restoredChapters.has(String(chId))) {
           chEl.classList.add('open');
         }
