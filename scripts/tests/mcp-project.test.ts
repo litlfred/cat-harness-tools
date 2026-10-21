@@ -108,9 +108,17 @@ describe("mcp projection", () => {
   });
 
   test("a Tool reachable over MCP is omitted, with a reason", () => {
-    const { declarations, omissions } = project(tools(B).filter((x) => x.id === "github"));
-    // `github` has BOTH shell and mcp, so it projects on its shell arm.
-    expect(declarations.map((d) => d.name)).toContain("github");
+    // A fixture, not a corpus Tool: the umbrella `github` node this used to
+    // pick was retired (cat-harness#390), and a test of the projection should
+    // not depend on which Tools a layer happens to declare.
+    const both = defineTool({
+      id: "shellmcp", title: "x", description: "y",
+      install: { none: true }, invoke: { shell: "cmd", mcp: { tool: "mcp__x__*" } },
+      io: { inputs: [], outputs: [] }, satisfies: ["todo-manager"],
+    });
+    const { declarations, omissions } = project([both]);
+    // It has BOTH shell and mcp, so it projects on its shell arm.
+    expect(declarations.map((d) => d.name)).toContain("shellmcp");
     expect(omissions).toEqual([]);
   });
 
