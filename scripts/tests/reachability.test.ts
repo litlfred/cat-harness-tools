@@ -19,6 +19,9 @@ import { reachability } from "../../src/workflow/reachability.js";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
+const CORPUS_TIMEOUT = 60_000;
+
 /** A one-process diagram from the body given. */
 async function model(body: string) {
   const dir = mkdtempSync(join(tmpdir(), "reach-"));
@@ -161,5 +164,5 @@ describe("the real corpus", () => {
     // Pinned so that removing the pre-start case fails here rather than
     // quietly turning a correct diagram into a permanent finding.
     expect(gates, "feature-staging's H_Confirm").toBeGreaterThan(0);
-  });
+  }, CORPUS_TIMEOUT);
 });
