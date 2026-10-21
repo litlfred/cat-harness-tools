@@ -157,19 +157,31 @@ function draftsOnDisk(lib: string): number {
     for (const x of Object.values(rec)) visit(x);
   };
   if (!existsSync(lib)) return 0;
-  for (const slug of readdirSync(lib)) {
-    for (const name of NARRATIVE_BEARING) {
-      const f = join(lib, slug, name);
-      if (!existsSync(f)) continue;
-      // Unparseable is skipped, exactly as the queue skips it — otherwise the
-      // two counts would disagree over a broken file rather than over a bug.
-      try {
-        visit(JSON.parse(readFileSync(f, "utf-8")));
-      } catch {
-        continue;
+  // EVERY JSON file under the library, not `NARRATIVE_BEARING`: walking the
+  // queue's own list made this blind wherever the queue was. Until 2026-10-21
+  // neither saw `vector-figures.json` or `figure-descriptions.json`, and the
+  // two counts agreed.
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      const f = join(dir, name.name);
+      // `blocks/` holds the graph's projections: a figure block carries a COPY
+      // of its image's narrative (`derivedFrom`), which a person reviews in
+      // `images.json`, not here. Counting it would count each draft twice.
+      if (name.isDirectory()) {
+        if (name.name !== "blocks") walk(f);
+      }
+      else if (/\.jsonl?d?$/.test(name.name)) {
+        // Unparseable is skipped, exactly as the queue skips it — otherwise the
+        // two counts would disagree over a broken file rather than over a bug.
+        try {
+          visit(JSON.parse(readFileSync(f, "utf-8")));
+        } catch {
+          continue;
+        }
       }
     }
-  }
+  };
+  walk(lib);
   return n;
 }
 
@@ -228,6 +240,16 @@ describe("`narrativesIn` reads both shapes and says where each one sits", () => 
     expect(narrativesIn({ images: [null, "x", 3] })).toEqual([]);
   });
 
+  test("a vector-figures sidecar yields one per described figure, with its id", () => {
+    const got = narrativesIn({ figures: [{ id: "vfig-p003", narrative: [{ ...draft, lang: "en" }] }, { id: "vfig-p004" }] });
+    expect(got.map((g) => [g.path, g.subject, g.lang])).toEqual([[["figures", 0, "narrative", 0], "vfig-p003", "en"]]);
+  });
+
+  test("figure descriptions are keyed by document, which becomes the item's slug", () => {
+    const got = narrativesIn({ descriptions: { "doc-a": [{ figure: "Figure 2", narrative: draft }] } });
+    expect(got).toEqual([{ path: ["descriptions", "doc-a", 0, "narrative"], narrative: draft, subject: "Figure 2", slug: "doc-a" }]);
+  });
+
   test("`images.json` is in the bearing list — necessary, and on its own useless", () => {
     // Adding it here without {@link narrativesIn} found exactly nothing: the
     // file was opened, `doc.narrative` was read, and it has none.
@@ -245,6 +267,22 @@ describe("the queue shows exactly what is waiting on a person", () => {
     });
     const q = queue(root);
     expect(q.map((i) => i.slug)).toEqual(["adraft"]);
+  });
+
+  test("a library-level figure description is offered, under its document, and a decision lands on it", () => {
+    const root = repo({});
+    mkdirSync(join(root, "library"), { recursive: true });
+    const f = join(root, "library", "figure-descriptions.json");
+    writeFileSync(
+      f,
+      JSON.stringify({ $schema: "folio-figure-descriptions/v1", descriptions: { "doc-a": [{ figure: "Figure 2", narrative: draft }] } }, null, 2) + "\n",
+    );
+    const q = queue(root);
+    expect(q.map((i) => [i.slug, i.subject, i.file])).toEqual([["doc-a", "Figure 2", join("library", "figure-descriptions.json")]]);
+    decide(q[0]!, "confirm", { by: HUMAN, root });
+    const written = JSON.parse(readFileSync(f, "utf-8")).descriptions["doc-a"][0].narrative;
+    expect(written.state).toBe("confirmed");
+    expect(written.confirmed_by).toEqual(HUMAN);
   });
 
   test("a REJECTED draft is never re-offered", () => {
@@ -289,7 +327,9 @@ describe("the queue shows exactly what is waiting on a person", () => {
     // Not the number: a count in a test is a claim that goes stale, and 24 is
     // a property of today's corpus rather than of the queue.
     expect(q.length).toBeGreaterThan(0);
-  });
+    // It walks every JSON file of every declared library: under 1 s alone,
+    // 5.8 s measured beside the other corpus tests, so not the 5 s default.
+  }, 30_000);
 
   test("every draft in a multi-narrative file names its SUBJECT", () => {
     // A reviewer shown twenty-four entries labelled only `wpr-rdo-2020-003-eng`

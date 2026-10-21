@@ -27,7 +27,7 @@
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { LANGUAGE_TAG, NarrativeSlotSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
-import { NARRATIVE_BEARING, narrativesIn, type NarrativePath } from "./narratives.ts";
+import { LIBRARY_NARRATIVE_BEARING, NARRATIVE_BEARING, narrativesIn, type NarrativePath } from "./narratives.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 
 export interface FileResult {
@@ -131,6 +131,10 @@ export function libraryFiles(lib: string): string[] {
       const f = join(dir, name);
       if (existsSync(f)) out.push(f);
     }
+  }
+  for (const name of LIBRARY_NARRATIVE_BEARING) {
+    const f = join(lib, name);
+    if (existsSync(f)) out.push(f);
   }
   return out;
 }
