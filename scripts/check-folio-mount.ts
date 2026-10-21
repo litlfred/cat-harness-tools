@@ -197,7 +197,7 @@ export function reportFor(repo: string, instance: string): InstanceReport {
   };
   if (!decl) return base;
 
-  // An exemption may sit inside a root (who-iris: root `docs/`, exempt
+  // An exemption may sit inside a root (e.g. root `docs/`, exempt
   // `docs/wireframes/`), so the root walk skips it rather than counting its
   // pages as missing a mount.
   const exemptDirs = (decl.exempt ?? []).map((ex) => join(repo, instance, ex.path));
