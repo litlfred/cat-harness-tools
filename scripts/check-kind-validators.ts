@@ -200,7 +200,9 @@ export interface FamilySweep {
  * because a broken symlink is a fact about the tree and not a reason to stop.
  */
 function jsonFiles(dir: string): string[] {
-  const listed = gitCorpus(dir, ["*.json"]);
+  // `.jsonld` too: a library's manifest, sections and blocks are JSON-LD, and
+  // are routed by the class they instantiate (cat-harness's library-nodes.ts).
+  const listed = gitCorpus(dir, ["*.json", "*.jsonld"]);
   if (listed !== undefined) return listed;
 
   // Fallback for a directory git cannot answer about — a temp fixture, or a
@@ -220,7 +222,7 @@ function jsonFiles(dir: string): string[] {
     } catch {
       return []; // dangling symlink, or a race: not readable is not a crash
     }
-    return isDir ? jsonFiles(p) : p.endsWith(".json") ? [p] : [];
+    return isDir ? jsonFiles(p) : p.endsWith(".json") || p.endsWith(".jsonld") ? [p] : [];
   });
 }
 
@@ -348,12 +350,14 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         } catch {
           continue; // not a node; a malformed file is another check's finding
         }
-        // `nodeFamilyTag` also reads a `structure.json`'s `_schema`; that tag is
-        // routed only when this kind lists it, so a `_schema` elsewhere is
-        // skipped as before rather than becoming an unmapped family.
+        // `nodeFamilyTag` also reads a `structure.json`'s `_schema`, and a JSON-LD
+        // node's class. Either is routed only when this kind lists it, as is any
+        // tag of a `.jsonld` file, so what the sweep did not read before stays
+        // unread rather than becoming an unmapped family.
         const tag = nodeFamilyTag(node);
         if (typeof tag !== "string") continue;
-        if ((node as { $schema?: unknown }).$schema === undefined && !byTag.has(tag) && !nested.has(tag)) continue;
+        const optIn = (node as { $schema?: unknown }).$schema === undefined || file.endsWith(".jsonld");
+        if (optIn && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
         const inner = innermostKinds(file);
         if (inner !== undefined && !inner.includes(kind)) continue;
