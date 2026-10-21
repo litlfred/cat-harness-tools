@@ -45,7 +45,7 @@ import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.js";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -348,8 +348,12 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         } catch {
           continue; // not a node; a malformed file is another check's finding
         }
-        const tag = (node as { $schema?: unknown } | null)?.$schema;
+        // `nodeFamilyTag` also reads a `structure.json`'s `_schema`; that tag is
+        // routed only when this kind lists it, so a `_schema` elsewhere is
+        // skipped as before rather than becoming an unmapped family.
+        const tag = nodeFamilyTag(node);
         if (typeof tag !== "string") continue;
+        if ((node as { $schema?: unknown }).$schema === undefined && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
         const inner = innermostKinds(file);
         if (inner !== undefined && !inner.includes(kind)) continue;
@@ -370,7 +374,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         c.nodes++;
         if (fam.state !== "resolved") continue;
         c.checked++;
-        const r = fam.schema.safeParse(stripAnnotations(node));
+        const r = fam.schema.safeParse(familyBody(node));
         if (r.success) c.parsed++;
         else into.invalid.push({ file: rel, issue: `${r.error.issues[0]?.path.join(".")}: ${r.error.issues[0]?.message}` });
       }
