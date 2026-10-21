@@ -2,8 +2,8 @@
  * Three mount gaps observed 2026-10-12 (task #10), against FIXTURE
  * REPOSITORIES served over `file://` like `remote-mount.test.ts`:
  *
- * (a) `content/` — the transitional `content/pipeline` link — is declared, so
- *     a mount by declared directories lays it down.
+ * (a) was the transitional `content/pipeline` link being declared, so a mount
+ *     laid it down. The link is gone (bean `rnfl`, last step), and so is (a).
  * (b) A mounted layer with a `package.json` gets its dependencies installed,
  *     its code then RUNS, and `--check` still passes: `node_modules/` is not a
  *     pinned byte and the lockfile is left as it was.
@@ -11,7 +11,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -258,18 +258,5 @@ describe("(c) seeding a remote instance writes its consent", () => {
     const before = readFileSync(join(root, "index.config.json"), "utf-8");
     expect(() => seedRemote(root, [parseSeed(`lib=o/lib@${lib.sha}`)], { by: "test", evidence: "" })).toThrow();
     expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
-  });
-});
-
-describe("(a) the transitional content/ link is declared, so a mount lays it down", () => {
-  const TOOLS = join(import.meta.dir, "..", "..");
-  test("content/pipeline is a link to ../pipeline, and cat-harness-tools.json declares content/", () => {
-    const link = join(TOOLS, "content", "pipeline");
-    expect(lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(link)).toBe("../pipeline");
-    const d = JSON.parse(readFileSync(join(TOOLS, "cat-harness-tools.json"), "utf-8")) as { directories: Array<{ path: string; source?: unknown }> };
-    const entry = d.directories.find((x) => x.path === "content/");
-    expect(entry).toBeDefined();
-    expect(entry?.source).toBeUndefined(); // on the checkout, so a default mount includes it
   });
 });

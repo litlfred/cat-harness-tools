@@ -45,7 +45,6 @@ import datetime as _dt
 import hashlib
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 SCHEMA = "folio-materialization/v1"

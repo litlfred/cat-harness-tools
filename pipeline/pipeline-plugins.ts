@@ -52,6 +52,7 @@ import { join, resolve } from "node:path";
 import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import type { TabularCsvw } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -118,12 +119,29 @@ export interface LeanCoveragePlugin {
   computeStats(paperDir: string, contentRoot: string): unknown;
 }
 
+/**
+ * Delimited text and workbooks read as CSVW — implemented by
+ * folio-assistant-core (`scripts/tabular-csv.ts`, `scripts/tabular-xlsx.ts`),
+ * bean `urat`. The owner's ruling of 2026-10-20 moved this ingest step up into
+ * core, next to those extractors; tools may not name core, so ingest reaches
+ * them through this slot.
+ */
+export interface TabularCsvwPlugin {
+  /**
+   * The `folio-tabular-csvw/v1` record for a source, or `null` when the
+   * source is not a table this reader takes. `mimetype` is the sniffed one
+   * (`null` for text with no magic bytes, as a CSV is).
+   */
+  extract(source: Buffer, opts: { url: string; docId: string; mimetype: string | null }): TabularCsvw | null;
+}
+
 /** Every slot, keyed by the kind string a contributor registers under. */
 export interface PipelinePlugins {
   "lean-lexer": LeanLexerPlugin;
   "chapter-profile-defaults": ChapterProfileDefaultsPlugin;
   "latex-preflight": LatexPreflightPlugin;
   "lean-coverage": LeanCoveragePlugin;
+  "tabular-csvw": TabularCsvwPlugin;
 }
 
 export type PipelinePluginKind = keyof PipelinePlugins;
@@ -134,6 +152,7 @@ export const PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = [
   "chapter-profile-defaults",
   "latex-preflight",
   "lean-coverage",
+  "tabular-csvw",
 ];
 
 // ── The process registry ───────────────────────────────────────────
@@ -314,4 +333,17 @@ export function resolveLeanFile(tsPath: string, src: string, leanRoot: string): 
 /** `lean-coverage` slot: sorry-freedom and validation state of a `.lean` file. */
 export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin["leanFileStatus"]> {
   return pipelinePlugin("lean-coverage").leanFileStatus(leanPath);
+}
+
+/**
+ * `tabular-csvw` slot: a delimited-text or workbook source as CSVW, or `null`.
+ * Required, not optional: an ingest that reaches here with nothing filling the
+ * slot refuses with the slot's own error, which names what is missing — it
+ * never falls back to `folio-tabular-records/v1`.
+ */
+export function extractTabularCsvw(
+  source: Buffer,
+  opts: { url: string; docId: string; mimetype: string | null },
+): TabularCsvw | null {
+  return pipelinePlugin("tabular-csvw").extract(source, opts);
 }
