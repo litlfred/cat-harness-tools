@@ -337,7 +337,7 @@ describe("import + SSOT hygiene guards", () => {
 
   test("q-usage-audit carries no private resolver/walker (single source of truth)", () => {
     const src = readFileSync(
-      join(TOOLS_ROOT, "content", "pipeline", "q-usage-audit.ts"),
+      join(TOOLS_ROOT, "pipeline", "q-usage-audit.ts"),
       "utf-8",
     );
     expect(src).toContain('from "./qa-utils');

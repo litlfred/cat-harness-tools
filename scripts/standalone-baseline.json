@@ -7,7 +7,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 413,
+      "failed": 412,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -138,7 +138,6 @@
         "scripts/tests/qa-reports-ci.test.ts > qa-reports-unretried > the repository's own workflows carry none",
         "scripts/tests/red-gate-is-last.test.ts > (load-time error) ENOENT: no such file or directory, open 'code-quality-gates.yml'",
         "scripts/tests/regen-after-merge.test.ts > (load-time error) GateSetUndetermined: the gate set of this root could not be derived: the root declares no own instance and mounts none from index.config.json. That is not an empty set; it is NOT a pass.",
-        "scripts/tests/remote-mount-gaps.test.ts > (a) the transitional content/ link is declared, so a mount lays it down > content/pipeline is a link to ../pipeline, and cat-harness-tools.json declares content/",
         "scripts/tests/resolution-across-needs.test.ts > role refs resolve across the `needs` chain > some instance resolves a role ONLY through its dependencies",
         "scripts/tests/resolution-across-needs.test.ts > role refs resolve across the `needs` chain > the audit's role SUBJECTS are the instance's own, not its closure's",
         "scripts/tests/resolution-across-needs.test.ts > skill refs resolve across the `needs` chain > some instance's closure is strictly wider than its own skills",
