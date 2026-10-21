@@ -12,10 +12,10 @@
  * place a missing import hides (see `print-stub.ts`), so this is a script.
  *
  *   DIR=$(bun run cat-harness-tools/scripts/print-published-path.ts ./bootstrap)
- *   FILE=$(bun run cat-harness-tools/scripts/print-published-path.ts ./bootstrap processes/ns.jsonld)
+ *   FILE=$(bun run cat-harness-tools/scripts/print-published-path.ts ./bootstrap <path-in-instance>)
  *
- * Prints the site-relative path with no leading slash (`bootstrap/`,
- * `bootstrap/processes/ns.jsonld`) and nothing else, so `$(…)` captures it
+ * Prints the site-relative path with no leading slash (`bootstrap/`, or
+ * `bootstrap/` followed by the path given) and nothing else, so `$(…)` captures it
  * cleanly; a directory keeps its trailing slash, as `publishedPath` returns it.
  *
  * Exit 0 printed; 1 no declaration; 3 the instance declares `"enabled": false`
