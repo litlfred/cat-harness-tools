@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
-import { TABULAR_CSVW_FILENAME, type TabularCsvw } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import { TABULAR_CSVW_FILENAME, type TabularCsvwTables } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { UnregisteredPipelinePluginError, usePipelinePluginRegistry } from "../../pipeline/pipeline-plugins.ts";
 import { checkEntry, entryKind } from "../check-l1-complete.ts";
 import { planFor } from "../ingest-document.ts";
@@ -29,7 +29,7 @@ const tmp = () => {
   return d;
 };
 
-const table = (docId: string, url: string): TabularCsvw => ({
+const table = (docId: string, url: string): TabularCsvwTables => ({
   $schema: "folio-tabular-csvw/v1",
   doc_id: docId,
   tables: [
@@ -44,7 +44,7 @@ const table = (docId: string, url: string): TabularCsvw => ({
 });
 
 /** A registry whose `tabular-csvw` slot answers with `answer`. */
-function filled(answer: (url: string, docId: string) => TabularCsvw | null): void {
+function filled(answer: (url: string, docId: string) => TabularCsvwTables | null): void {
   const reg = new ContributionRegistry();
   reg.register({
     name: "fixture-core",
