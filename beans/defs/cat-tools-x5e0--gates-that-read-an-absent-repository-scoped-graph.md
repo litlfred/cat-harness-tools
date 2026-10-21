@@ -1,7 +1,7 @@
 ---
 # cat-tools-x5e0
 title: Gates that read an absent repository-scoped graph should say not-applicable, not fail (content indexes outside folio-assistant)
-status: todo
+status: in-progress
 type: bug
 priority: high
 tags:

@@ -97,6 +97,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  clearAbsence,
   locationKey,
   markerFor,
   migrateMarkerInto,
@@ -105,6 +106,7 @@ import {
   mountTip,
   namespaceCarried,
   pendingMountChanges,
+  recordAbsence,
   resolveMarkerInto,
   tipLocations,
   type BranchStoreOptions,
@@ -322,17 +324,22 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
           continue;
         }
       }
+      // Every attempt asks afresh (bean `x5e0`): a remote that has since gained
+      // the branch, or a changed origin, must not keep reading absent.
+      clearAbsence(root, loc);
       const r = mountTip(loc, { repoRoot: root, store });
       if (r.state === "mounted") {
         graphs.push({ ...base, state: "mounted", reason: `${r.files} file(s) at ${r.tip.slice(0, 12)}`, tip: r.tip, files: r.files });
       } else if (r.state === "miss" && loc.unownedBy !== undefined) {
         const ns = namespaceCarried(loc, root, store);
         if (ns.state === "not-carried") {
+          const reason = `declared for every checkout by ${loc.unownedBy}, not by this root, and this checkout's remote carries no ${ns.namespace}* branch; declare it at the root to keep it here`;
+          recordAbsence(root, loc, loc.unownedBy, reason);
           graphs.push({
             ...base,
             state: "absent",
             declaredBy: loc.unownedBy,
-            reason: `declared for every checkout by ${loc.unownedBy}, not by this root, and this checkout's remote carries no ${ns.namespace}* branch; declare it at the root to keep it here`,
+            reason,
           });
         } else if (ns.state === "carried") {
           graphs.push({ ...base, state: "miss", reason: `${r.reason}; this checkout's remote carries ${ns.branches.join(", ")}, so it keeps that namespace and the missing branch is a failure` });

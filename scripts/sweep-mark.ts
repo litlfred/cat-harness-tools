@@ -49,9 +49,9 @@ export type MarkRead =
 export type MarkWrite = { state: "written"; path: string } | { state: "not-written"; reason: string };
 
 /** The marks directory, or why there is none. */
-function marksDir(root: string): { dir: string } | { undeclared: true } | { unreachable: string } {
+function marksDir(root: string): { dir: string } | { undeclared: true } | { unreachable: string; absent?: true } {
   const r = resolveBeanGraphNode(root, "sweep-marks");
-  if (r.unreachable) return { unreachable: r.unreachable };
+  if (r.unreachable) return { unreachable: r.unreachable, ...(r.absent ? { absent: true as const } : {}) };
   if (!r.dir) return { undeclared: true };
   return { dir: r.dir };
 }
@@ -108,13 +108,15 @@ const FUTURE_SLACK_MS = 5 * 60_000;
 export type MarksVerdict =
   | { state: "judged"; dir: string; read: number; findings: { path: string; problem: string }[] }
   | { state: "undeclared" }
+  /** The bean graph is determinably not this checkout's (bean `x5e0`), so there are no marks to judge. */
+  | { state: "absent"; reason: string }
   | { state: "unreachable"; reason: string };
 
 /** Judge every mark in the store. Pure apart from reading it; writes nothing. */
 export function judgeSweepMarks(root: string, now: Date = new Date()): MarksVerdict {
   const where = marksDir(root);
   if ("undeclared" in where) return { state: "undeclared" };
-  if ("unreachable" in where) return { state: "unreachable", reason: where.unreachable };
+  if ("unreachable" in where) return where.absent ? { state: "absent", reason: where.unreachable } : { state: "unreachable", reason: where.unreachable };
   if (!existsSync(where.dir)) return { state: "judged", dir: where.dir, read: 0, findings: [] };
   const files = readdirSync(where.dir).filter((f) => f.endsWith(".json")).sort();
   const findings: { path: string; problem: string }[] = [];
@@ -164,6 +166,9 @@ if (import.meta.main) {
     const v = judgeSweepMarks(root);
     if (v.state === "undeclared") {
       process.exit(concludeJudgement({ gate: GATE, judgement: "ok", detail: "this store's bean graph declares no sweep-marks directory, so there is nothing to judge" }));
+    }
+    if (v.state === "absent") {
+      process.exit(concludeJudgement({ gate: GATE, judgement: "ok", detail: `not applicable: ${v.reason}` }));
     }
     if (v.state === "unreachable") process.exit(concludeJudgement({ gate: GATE, judgement: "unknown", detail: v.reason }));
     for (const f of v.findings) console.log(`  ✗ ${f.path}: ${f.problem}`);
