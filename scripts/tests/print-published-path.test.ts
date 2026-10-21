@@ -7,6 +7,7 @@ import { sitePathOf } from "../print-published-path.ts";
 describe("print-published-path — an instance's site path, by name (bean cat-tools-sthf)", () => {
   it("is publishedPath's instance case, without the leading slash", () => {
     expect(sitePathOf({ name: "bootstrap" })).toBe("bootstrap/");
+    // declared-path-literal: an input to a pure path function, not a file this test reads; it only has to look like a path under an instance.
     expect(sitePathOf({ name: "bootstrap" }, "processes/ns.jsonld")).toBe(publishedPath({ case: "instance", instance: "bootstrap", path: "processes/ns.jsonld" }).slice(1));
   });
 
