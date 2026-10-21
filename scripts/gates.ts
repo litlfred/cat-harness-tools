@@ -1419,14 +1419,6 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
-    script: "sweep:mark:check",
-    kind: "report",
-    reason:
-      "NOT YET WIRED, and only because of the layer order: the gate that judges the `sweep-marks` kind (bean `rq8s`) runs from " +
-      "folio-assistant's `code-quality-gates.yml`, which can only name it after a re-pin brings this script into the index. " +
-      "Until then no sweep may write a mark (rq8s). The change that adds the step removes this entry",
-  },
-  {
     script: "jsonld:contexts:check",
     kind: "report",
     reason:
