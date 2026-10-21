@@ -6,7 +6,7 @@ type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T19:03:04Z
+updated_at: 2026-10-21T14:30:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -198,3 +198,19 @@ to the declaration's line in its `.lean` file on GitHub, resolved from the
 block's `lean.ref` at the pinned commit. Not doc-gen4, and not no link.
 
 Built in litlfred/cat-harness-tools#494 (`feat/og5t-lean-source-link`).
+
+## Render check against qou in Chromium, 2026-10-21
+
+I loaded qou's paper in Chromium against a local `server.ts --http`, one deep link per block kind.
+
+**Two viewer bugs were found and fixed:**
+- **#527 (merged).** Every paper view died on `chId` before its declaration.
+- **#532.** A deep link to a table (`tbl:`) or an algorithm (`alg:`) showed "Could not load paper: 404". The route recogniser listed label prefixes by hand and missed both; that is 443 tables and 16 algorithms in qou. It now takes any `<letters>:` label.
+
+**Renders:** with both fixes, a block is found and has text for every kind sampled:
+- remark, proposition, example, definition, theorem, conjecture, corollary, lemma;
+- diagram, simulator, prose, proof, table, algorithm.
+
+**NOT established here:**
+- **Math typesetting.** This container's proxy refuses `cdn.jsdelivr.net`, so KaTeX never loads. "0 KaTeX errors" means nothing was typeset at all; it does not mean the math typeset correctly. This check needs a browser with CDN access.
+- **The Lean badge.** My selector (`.lb, .sb-badge`) found no badge on any block. It is unverified whether the selector is wrong or the badge is missing. The Lean helpers themselves are tested in `scripts/tests/viewer-script.test.ts`.
