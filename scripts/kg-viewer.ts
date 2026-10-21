@@ -85,9 +85,8 @@ import {
   type LocaleCatalogue,
   type PlannedLocale,
 } from "./kg-viewer-strings.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { siteArg } from "./lib/site-target.ts";
+import { siteTarget } from "./lib/site-target.ts";
 import { pageParts } from "./viewer-declarations.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -1247,22 +1246,18 @@ if (import.meta.main) {
     return i !== -1 ? process.argv[i + 1] : undefined;
   };
   const { stub } = exportIdentity({ baseUrl: arg("--base-url") ?? process.env.KG_BASE_URL });
-  // `_kg/` is a REPOSITORY build output — gitignored at the repository root,
-  // beside `node_modules/`, `_site/` and `test-results/`, and read from there
-  // by the e2e specs and `test-server.mjs`, both of which run at that root.
-  // `ROOT` became the INSTANCE root with the move (bean `wggr`), so this
-  // default started writing `cat-harness/_kg/` while every reader still looked
-  // one level up — and the stale pre-move copy at the old path made it look
-  // fine locally.
-  // `--site <dir>`: the published layout, the viewer at its route and a
-  // forwarding page at its old address. `--out`: one file, the graph its parent.
-  const site = siteArg();
-  if (site !== undefined) {
-    const { page, forwarded } = writeViewer(site, stub);
+  // `--out <file>`: one file, the graph its parent — what the e2e specs and the
+  // deploy's `_site/` take. Otherwise the published layout, the viewer at its
+  // route and a forwarding page at its old address, under `--site <dir>` or,
+  // like every other viewer writer, the harness's own docs: `derive:publish`
+  // runs this script bare, and the harness declares both pages built at
+  // publish (`cat-harness.json` `builtAtPublish`).
+  const out = arg("--out");
+  if (out === undefined) {
+    const { page, forwarded } = writeViewer(siteTarget(join(ROOT, "docs")), stub);
     console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${stub}.jsonld`);
     console.log(forwarded ? `  forwards ${relative(ROOT, forwarded)}` : `  ${stub}/ holds a page already; no forwarding page`);
   } else {
-    const out = arg("--out") ?? join(repoRootFor(ROOT), "_kg", stub, "index.html");
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, viewerHtml(stub));
     console.log(`KG viewer → ${relative(ROOT, out)}\n  reads  ../${stub}.jsonld  (parent, resolved at load)`);

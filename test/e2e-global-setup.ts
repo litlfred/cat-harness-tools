@@ -39,11 +39,11 @@ export default function globalSetup(): void {
   }
   // The same resolution both specs use: the instance directory above `test/`.
   const stub = artefactStubFor(join(HARNESS_ROOT));
-  for (const [file, script] of [
+  for (const [file, script, ...args] of [
     [`_kg/${stub}.jsonld`, "cat-harness-tools/scripts/kg-export.ts"],
-    [`_kg/${stub}/index.html`, "cat-harness-tools/scripts/kg-viewer.ts"],
+    [`_kg/${stub}/index.html`, "cat-harness-tools/scripts/kg-viewer.ts", "--out", `_kg/${stub}/index.html`],
   ] as const) {
-    if (!existsSync(file)) execFileSync("bun", ["run", script], { stdio: "inherit" });
+    if (!existsSync(file)) execFileSync("bun", ["run", script, ...args], { stdio: "inherit" });
   }
   // Unconditional, as it was: the fixture is cheap and must reflect the
   // generator in THIS tree, not one an earlier run left behind.
