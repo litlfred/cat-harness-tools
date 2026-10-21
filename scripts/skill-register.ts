@@ -220,7 +220,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { corpusScopeFor, kgDirectories } from "./known-skills.js";
+import { corpusScopeFor, declaredKgDirectories, kgDirectories } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
@@ -450,6 +450,26 @@ export interface Findings {
   dangling: Dangling[];
   packages: number;
   skills: number;
+}
+
+/**
+ * Why there is nothing for this command to judge in `instance`, or `undefined`
+ * when there is.
+ *
+ * An instance that declares no knowledge-graph directory holds no skill, so no
+ * skill of it can be unregistered and nothing the chain regenerates is staled
+ * by one. Since bean `j3ls` the instance judged is the one MOUNTING the harness
+ * (a content instance's own index, such as a FHIR IG's), and most of those
+ * declare no skills graph: before this they read as exit 2, "cannot tell",
+ * which is a question with no answer rather than one nobody could reach.
+ *
+ * Deliberately narrow, so `dh4f` stays shut: it is the DECLARATION that is
+ * asked, not the disk. An instance that declares a knowledge-graph directory
+ * and has no package manifests in it is still the third state.
+ */
+export function notApplicable(instance: string = INSTANCE_ROOT): string | undefined {
+  if (declaredKgDirectories(instance, corpusScopeFor(instance)).length > 0) return undefined;
+  return `${instance} declares no knowledge-graph directory, so it holds no skill to register`;
 }
 
 export function audit(instance: string = INSTANCE_ROOT): Findings {
@@ -871,6 +891,16 @@ async function main(): Promise<number> {
     // run the WRITER, and a residual that wrote would not be a residual.
     console.error("skill-register: --declarations-only is a --check form; it takes no --dry-run or --json.");
     return 2;
+  }
+
+  const na = notApplicable();
+  if (na !== undefined) {
+    // Not a pass and not a finding: nothing here is of the kind judged. Says
+    // so, writes nothing (no sidecar: there is no subject to record a verdict
+    // about), and exits 0 so a content index's gates are not red over it.
+    if (flags.json) console.log(JSON.stringify({ notApplicable: na }, null, 2));
+    else console.log(`skill-register: not applicable — ${na}. Nothing judged, nothing written.`);
+    return 0;
   }
 
   const f = audit();
