@@ -51,6 +51,14 @@ describe("run-gates.py gate inputs", () => {
     expect(why).toContain("--since");
   });
 
+  test("translation:catalogue:check is given --base the PR's diff base, not a three-dot default", () => {
+    const sha = "b".repeat(40);
+    expect(py("run-gates.py", `m.gate_args("translation:catalogue:check", {"GATE_DIFF_BASE": "${sha}"})`)).toEqual([["--base", sha], null]);
+    const [args, why] = py("run-gates.py", `m.gate_args("translation:catalogue:check", {})`) as [unknown, string];
+    expect(args).toBeNull();
+    expect(why).toContain("--base");
+  });
+
   test("test-budgets is given the junit report the tests step wrote", () => {
     const path = junit(3);
     expect(py("run-gates.py", `m.gate_args("check:test-budgets", {"GATE_JUNIT": ${JSON.stringify(path)}})`)).toEqual([[path], null]);
