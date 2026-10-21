@@ -6222,7 +6222,11 @@
     //   #/diff/paper-id                             → diff mode (current branch vs main)
     //   #/diff/paper-id@branch/name                 → diff mode on branch
     //   #label                                      → standalone block detail view
-    const LABEL_RE = /^(def|thm|lem|prop|cor|conj|ex|rem|prf|eq|fig|sec|chap|prose|sim|app):/;
+    // A block label is `<prefix>:<name>`; a paper id has no colon. The prefix
+    // is not listed by hand: a list here missed `tbl:` and `alg:`, so a deep
+    // link to any table or algorithm loaded "paper `tbl:…`" and showed a 404
+    // (bean og5t). `(?!\/)` keeps a URL scheme (`https://`) from reading as one.
+    const LABEL_RE = /^[a-z]+:(?!\/)/;
     let pendingScroll = null;
 
     /** Split "slug@branch/name" → { slug, branch } or { slug, branch: null }. */

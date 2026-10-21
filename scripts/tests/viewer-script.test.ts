@@ -136,3 +136,33 @@ describe("the viewer's Lean helpers read both shapes", () => {
     expect(leanSourceHref(undefined)).toBe("");
   });
 });
+
+describe("the viewer's route recogniser takes every block label, not a hand-kept list (og5t)", () => {
+  // Evaluated from the page, so this tests what ships.
+  const m = PAGE.match(/const LABEL_RE = (\/.*\/[a-z]*);/);
+  if (!m) throw new Error("viewer/index.html no longer defines LABEL_RE");
+  const LABEL_RE = new Function(`return ${m[1]};`)() as RegExp;
+
+  test("tables, algorithms and the other prefixes qou uses are labels", () => {
+    for (const label of [
+      "tbl:hecke-log-decomposition-table-data",
+      "alg:delta-lambda-closure",
+      "def:quantum-universe",
+      "ssec:foo",
+      "subsec:foo",
+      "viz:foo",
+      "proof:foo",
+      "prose:foo",
+    ]) expect(LABEL_RE.test(label)).toBe(true);
+  });
+
+  test("a paper id, a cross-paper reference, a route or a URL is not a label", () => {
+    for (const slug of [
+      "quantum-observable-universe",
+      "unital-groebner-bases:cor:pbw",
+      "/view/quantum-observable-universe",
+      "@claude/some-branch",
+      "https://folio.example.org/viewer/",
+    ]) expect(LABEL_RE.test(slug)).toBe(false);
+  });
+});
