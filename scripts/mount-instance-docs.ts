@@ -121,7 +121,7 @@ import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
-import { beforeHeadEnd, headEndTag } from "./lib/navbar.ts";
+import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
@@ -1074,18 +1074,24 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         emitRailData: railDataWriter(siteAbs),
       });
       if (railed === undefined) {
+        // Railed by its own generator (the IRIS replica's pages): its rail is
+        // its own, its first paint is the site's — it reaches this pass with
+        // no first-paint snippet, and the standalone pass never sees a mount
+        // route. Not a page that "took no rail", so it is not reported as one.
+        if (hasRail(before)) {
+          const finished = finishRailedPage(before, false);
+          if (finished !== read) writeFileSync(file, finished);
+          continue;
+        }
         skipped.push(file.slice(siteAbs.length + 1));
-        // Not railed here, but painted by the site's rule all the same: a page
-        // its generator railed (the IRIS replica's pages) reaches this pass
-        // with no first-paint snippet, and the standalone pass never sees a
-        // mount route.
+        // Not railed here, but painted by the site's rule all the same.
         const schemed = withSavedScheme(read);
         if (schemed !== read) writeFileSync(file, schemed);
         continue;
       }
-      const after = withSavedScheme(withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) }));
+      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) });
       // The docs pages' own locale chrome, on a page Jekyll never laid out (#2219).
-      writeFileSync(file, m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after);
+      writeFileSync(file, finishRailedPage(m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after, false));
       injected++;
     }
   }
@@ -1144,6 +1150,22 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
 // code span (reference/skill-instructions/rendered-verification) matched the
 // bare attribute, was counted as navigated, and kept its theme side bar.
 const NAVIGATED = /<nav class="fa-nav"|<nav\b[^>]*\bid="site-nav"/;
+
+/**
+ * What every railed page of a site carries, whichever pass or generator put
+ * the rail there: no theme sidebar beside it when the site's pages are railed
+ * from the theme source (owner, 2026-10-15, "one rail on every page"), and the
+ * site's CURRENT first-paint snippet (`withSavedScheme` upgrades a stale one).
+ * Idempotent, so it can run on a page any number of times.
+ *
+ * Measured on the live root, 2026-10-16: 56 railed pages with no snippet (the
+ * IRIS replica's pages and the mount routes, which the mount pass railed
+ * or found railed and never gave one), one with a stale snippet, and two
+ * with the theme's sidebar beside the rail.
+ */
+export function finishRailedPage(html: string, stripTheme: boolean): string {
+  return withSavedScheme(stripTheme ? stripThemeSidebar(html) : html);
+}
 
 /** A meta-refresh redirect stub, which {@link railStandalonePages} leaves bare. */
 const REDIRECT = /<meta\s+http-equiv="refresh"/i;
@@ -1368,7 +1390,7 @@ export function railStandalonePages(
   mountRoutes: readonly string[],
   foreign?: ForeignSiteRail,
   opts: RailPassOptions = {},
-): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; replacedThemeSidebar: number; pinned?: ReturnType<typeof pinPlatformChrome> } {
+): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; replacedThemeSidebar: number; finished: number; pinned?: ReturnType<typeof pinPlatformChrome> } {
   const skipped: string[] = [];
   let injected = 0;
   let alreadyNavigated = 0;
@@ -1403,6 +1425,7 @@ export function railStandalonePages(
       const rel = abs.slice(siteAbs.length + 1);
       if (e.isDirectory()) {
         if (!owned(rel)) walk(abs);
+        else if (mountRoutes.some((r) => rel === r || rel.startsWith(`${r}/`))) finish(abs);
         continue;
       }
       if (!e.name.endsWith(".html") || owned(rel)) continue;
@@ -1415,9 +1438,13 @@ export function railStandalonePages(
         // Its rail is its own, but its first paint is the site's rule: a page
         // a generator railed itself (the IRIS replica's pages, 2026-10-15)
         // carried no first-paint snippet, so it painted the static dark sheet
-        // and flipped once the rail's script ran. Idempotent.
-        const schemed = withSavedScheme(read);
-        if (schemed !== read) writeFileSync(abs, schemed);
+        // and flipped once the rail's script ran. And a railed page that also
+        // wears the theme's sidebar loses the sidebar: one rail. Idempotent.
+        const finished = finishRailedPage(before, false);
+        if (finished !== read) {
+          writeFileSync(abs, finished);
+          if (themed) replacedThemeSidebar++;
+        }
         continue;
       }
       // A REDIRECT STUB is not a page anybody stays on — the mount writes one
@@ -1500,12 +1527,34 @@ export function railStandalonePages(
       injected++;
     }
   };
+  // THE MOUNT ROUTES, FINISHED. Their pages are the mount pass's to rail, but
+  // what every railed page carries is this site's rule, checked here, last,
+  // after every generator: the mount pass ran before some of them, and a
+  // page it found railed by its own generator it used to leave as it was.
+  let finished = 0;
+  const finish = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith(".")) continue;
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) {
+        finish(abs);
+        continue;
+      }
+      if (!e.name.endsWith(".html")) continue;
+      const read = readFileSync(abs, "utf-8");
+      if (!hasRail(read)) continue;
+      const out = finishRailedPage(read, pageTree !== undefined);
+      if (out === read) continue;
+      writeFileSync(abs, out);
+      finished++;
+    }
+  };
   if (existsSync(siteAbs)) walk(siteAbs);
   // The files those pages now link, shipped with them — only when a page was railed.
   const pinned = foreign && injected > 0 ? pinPlatformChrome(siteAbs) : undefined;
   // The page layout the top bar is laid out by, beside the pages that link it.
   if (injected > 0) writePageLayout(siteAbs);
-  return { injected, alreadyNavigated, redirects, declined, skipped, replacedThemeSidebar, ...(pinned ? { pinned } : {}) };
+  return { injected, alreadyNavigated, redirects, declined, skipped, replacedThemeSidebar, finished, ...(pinned ? { pinned } : {}) };
 }
 
 /**
