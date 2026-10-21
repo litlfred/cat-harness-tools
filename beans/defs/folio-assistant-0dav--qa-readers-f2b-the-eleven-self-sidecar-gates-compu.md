@@ -5,7 +5,7 @@ status: todo
 type: task
 priority: high
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-16T06:30:00Z
+updated_at: 2026-10-20T15:20:36Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-oq1j
@@ -75,3 +75,18 @@ Re-run done-when #1 once oq1j and 2gst close.
 _2026-10-15T16:49Z_ — Block lifted: `16ei` is completed (qa-store landed via #1764, closed 2026-10-06 on re-measured evidence). The edge was the work plan's "Block never lifted" finding (owner, 2026-10-15). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
 
 _2026-10-16T06:30:00Z_ — The note above is mirrored from the folio-assistant store (commit 0b8d249), where this edge was lifted on 2026-10-15; lifted here too (Owner ruling 2026-10-16, item 9). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+
+## Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
+
+Checked against origin/main, prompted by the coordinator's sweep for "todo
+with a Summary of Changes". The 2026-10-01 summary records branch work; the
+2026-10-10 re-triage confirmed it is on main (`judgeQaResult` is used by
+`audit-coverage.ts`, `root-scan-census.ts`, `check-reference-direction.ts`,
+`check-term-mapping.ts` and others). Done-when #1 is still open and still
+blocked: `oq1j` and `2gst` are both `in-progress`. The folio-assistant root's
+`cat` script now points at `cat-harness-tools/scripts/run-script.ts`, so the
+`qa:refresh` cause named in the re-triage is gone. Re-run done-when #1 once
+the two blockers close.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).

@@ -14,7 +14,8 @@
  * instance declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -116,9 +117,23 @@ describe("the declaration and the directory agree", () => {
 });
 
 describe("the published process hierarchy", () => {
+  const INDEX = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
+  // The index is built at publish (cat-harness declares it `because: state`),
+  // so a checkout has it only after `docs:pages` has run. These tests used to
+  // pass only when another test file had already run the generator, so a
+  // change in file order failed them (cat-harness-tools#411). Write it here
+  // when it is missing, the way `gen-docs-pages-orphan-qa-checkout` does.
+  // A generator that cannot run here (a standalone layer has no checkout to
+  // publish) is not a failure of its own: the tests below then fail on the
+  // missing index under their own names, as they always did.
+  beforeAll(() => {
+    if (!existsSync(INDEX)) {
+      spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], { cwd: repoRootFor(ROOT), encoding: "utf-8" });
+    }
+  }, 180_000);
   const index = () =>
     JSON.parse(
-      readFileSync(join(ROOT, siteDirFor(ROOT), "assets/todos/index.json"), "utf8"),
+      readFileSync(INDEX, "utf8"),
     ) as { processes: Record<string, string[]>; items: Array<{ tags: { processes: string[] } }> };
 
   test("no PHANTOM edge — the real parser is the oracle for the generator's regex", async () => {

@@ -211,6 +211,6 @@ describe("coverage is a QA axis, not a promise", () => {
     // A per-kind trash criterion could never fail, because the state is
     // composed rather than drawn — and a criterion that cannot fail reads as
     // coverage while measuring nothing.
-    expect(trashDerivationPresent(ROOT)).toBe(true);
+    expect(trashDerivationPresent()).toBe(true);
   });
 });

@@ -27,7 +27,8 @@
  *  1. mount the closure `index.config.json` pins (`remote-mount.ts`), unless `--no-mount`.
  *     A build writes into its mounts (the harness's `_data/harness.json`, `node_modules`), and
  *     remote-mount rightly refuses to overwrite a mount that no longer hashes to its lock. So
- *     `--fresh` first removes exactly the paths the lock names, and only paths the checkout
+ *     `--fresh` has the mount script replace the mounts the build wrote into (`remote-mount.ts
+ *     --fresh`); with `--no-mount` it removes exactly the paths the lock names, and only paths the checkout
  *     itself does not track: an explicit choice, never a default
  *  2. `bun install --no-save` in the checkout and in every mounted instance
  *     with a package.json, so a mount still hashes to its lock and the next mount can verify it
@@ -716,19 +717,28 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const docs = join(out, "site-source");
   const site = join(out, "_site");
 
-  if (o.fresh) {
-    const lockPath = join(root, "index.lock.json");
-    const paths: string[] = existsSync(lockPath)
-      ? (JSON.parse(readFileSync(lockPath, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
-      : [];
-    for (const p of paths) {
-      if (p === "" || p === "." || p.startsWith("/") || p.split("/").includes("..")) throw new Error(`lock path ${JSON.stringify(p)} is not a subdirectory of the checkout`);
-      if (capture(`git ls-files -- ${JSON.stringify(p)} | head -1`, root) !== "") throw new Error(`${p} holds files the checkout tracks; --fresh removes only mounts`);
-      rmSync(join(root, p), { recursive: true, force: true });
+  if (o.fresh && o.mount) {
+    // The mount script replaces the edited mounts itself (`remote-mount.ts --fresh`), one at
+    // a time and after it has loaded. Removing them here first deleted the cat-harness-tools
+    // mount, and the workspace links into the others, before the script that re-lays them
+    // could start from it: "Module not found" for any downstream mounting cat-harness-tools
+    // at its root (litlfred/aai-programme, 2026-10-20).
+    run("mount the pinned closure, replacing edited mounts", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))} --fresh`, root);
+  } else {
+    if (o.fresh) {
+      const lockPath = join(root, "index.lock.json");
+      const paths: string[] = existsSync(lockPath)
+        ? (JSON.parse(readFileSync(lockPath, "utf-8")).instances ?? []).map((i: { path?: string }) => i.path).filter((p: unknown): p is string => typeof p === "string")
+        : [];
+      for (const p of paths) {
+        if (p === "" || p === "." || p.startsWith("/") || p.split("/").includes("..")) throw new Error(`lock path ${JSON.stringify(p)} is not a subdirectory of the checkout`);
+        if (capture(`git ls-files -- ${JSON.stringify(p)} | head -1`, root) !== "") throw new Error(`${p} holds files the checkout tracks; --fresh removes only mounts`);
+        rmSync(join(root, p), { recursive: true, force: true });
+      }
+      console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
     }
-    console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
+    if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
   }
-  if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
   const mounted = lockedMountPaths(root);
   const ownPackage = existsSync(join(root, "package.json"));
   run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);

@@ -150,8 +150,12 @@ export interface QaGraphIndex {
   unreadable: number;
 }
 
-/** Every `.json` under `dir`, recursively. */
-export function jsonFilesIn(dir: string): string[] {
+/**
+ * Every `.json` under `dir`, recursively — or every file ending in one of
+ * `extensions`, for a graph whose nodes are also JSON-LD (`policies`, ODRL
+ * `.jsonld`; bean `folio-assistant-6gme`).
+ */
+export function jsonFilesIn(dir: string, extensions: readonly string[] = [".json"]): string[] {
   const out: string[] = [];
   let entries: string[];
   try {
@@ -167,8 +171,8 @@ export function jsonFilesIn(dir: string): string[] {
     } catch {
       continue;
     }
-    if (s.isDirectory()) out.push(...jsonFilesIn(p));
-    else if (e.endsWith(".json")) out.push(p);
+    if (s.isDirectory()) out.push(...jsonFilesIn(p, extensions));
+    else if (extensions.some((x) => e.endsWith(x))) out.push(p);
   }
   return out;
 }
@@ -208,7 +212,7 @@ export function projectQaGraph(
   dir: string,
   corpusPresent: boolean,
   reason?: string,
-  opts?: { exclude?: ReadonlySet<string> },
+  opts?: { exclude?: ReadonlySet<string>; extensions?: readonly string[] },
 ): QaGraphProjection {
   if (!corpusPresent) {
     return {
@@ -229,13 +233,13 @@ export function isQaGraphUnknown(ix: QaGraphProjection): ix is QaGraphUnknown {
 }
 
 /** Read the `qa` graph under `dir` and project it. */
-export function readQaGraph(dir: string, opts?: { exclude?: ReadonlySet<string> }): QaGraphIndex {
+export function readQaGraph(dir: string, opts?: { exclude?: ReadonlySet<string>; extensions?: readonly string[] }): QaGraphIndex {
   const acc = new Map<string, { files: number; field: "totals" | "counts" | null; buckets: Record<string, number> }>();
   let unclassified = 0;
   let unreadable = 0;
   let files = 0;
 
-  for (const p of jsonFilesIn(dir)) {
+  for (const p of jsonFilesIn(dir, opts?.extensions)) {
     if (opts?.exclude?.has(p)) continue;
     files += 1;
     let doc: unknown;

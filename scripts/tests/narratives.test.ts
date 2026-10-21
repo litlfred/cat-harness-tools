@@ -496,3 +496,48 @@ describe("an agent cannot record itself as the human — the hole the tool itsel
     expect(readFileSync(join(root, queue(root)[0].file), "utf-8")).toBe(before);
   });
 });
+
+// ── One narrative per language — bean `cat-tools-e1lo`, stage 2 ──────────
+//
+// A slot may hold a list, one entry per `lang` (`NarrativeSlotSchema`). The
+// queue reads it through `narrativesOfSlot`, so each translation is its own
+// item with its own path, and a decision lands on that one entry.
+
+describe("a slot with one narrative per language", () => {
+  const en = { ...draft, lang: "en" };
+  const fr = { ...draft, text: "Nombre de cas par semaine et par pays.", lang: "fr" };
+
+  test("yields one item per language, each at its own index", () => {
+    expect(narrativesIn({ narrative: [en, fr] })).toEqual([
+      { path: ["narrative", 0], narrative: en, lang: "en" },
+      { path: ["narrative", 1], narrative: fr, lang: "fr" },
+    ]);
+  });
+
+  test("inside an images sidecar too, keeping the image's id", () => {
+    const got = narrativesIn({ images: [{ id: "fig-1", narrative: [en, fr] }] });
+    expect(got.map((g) => [g.path, g.subject, g.lang])).toEqual([
+      [["images", 0, "narrative", 0], "fig-1", "en"],
+      [["images", 0, "narrative", 1], "fig-1", "fr"],
+    ]);
+  });
+
+  test("a list that breaks the slot rules is skipped, not half-read", () => {
+    // Two `fr`: a reviewer would confirm one while the other is shown.
+    expect(narrativesIn({ narrative: [fr, { ...fr }] })).toEqual([]);
+  });
+
+  test("confirming the French one writes the French one, and the English draft is untouched", () => {
+    const root = repo({ alist: [en, fr] });
+    const q = queue(root);
+    expect(q.map((i) => i.lang)).toEqual(["en", "fr"]);
+    decide(q[1]!, "confirm", { by: HUMAN, now: new Date("2026-10-20T00:00:00Z"), root });
+    const stored = JSON.parse(readFileSync(join(root, "library", "alist", "tabular.jsonld"), "utf-8")) as {
+      narrative: { state: string; lang: string }[];
+    };
+    expect(stored.narrative.map((n) => [n.lang, n.state])).toEqual([
+      ["en", "draft"],
+      ["fr", "confirmed"],
+    ]);
+  });
+});

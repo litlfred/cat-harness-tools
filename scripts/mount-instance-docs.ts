@@ -113,7 +113,7 @@ import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { withSavedScheme } from "./lib/scheme-css.js";
-import { viewersOf } from "./viewer-declarations.js";
+import { heldVisualiserPaths, viewersOf } from "./viewer-declarations.js";
 import { translationMetaBlock, withTranslationMeta } from "./lib/translation-meta.ts";
 import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.ts";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
@@ -125,6 +125,17 @@ import { beforeHeadEnd, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
+import { instanceSitePath } from "./instance-exports.ts";
+
+/**
+ * An instance's route — `<instance>` or `<instance>/<path>`, no slash at
+ * either end — composed by cat-harness's `publishedPath` (`case: "instance"`),
+ * through the same helper `instance-exports.ts` uses, so the instance as
+ * itself and its served directories sit where the URL-space ruling puts them
+ * (bean `cat-tools-sthf`) and nowhere a hand-written path could drift to.
+ */
+export const instanceRoute = (name: string, path = ""): string => instanceSitePath(name, path).replace(/\/+$/, "");
 
 /** The platform's published site, no trailing slash: where a folio's own site links the platform's pages. */
 const PLATFORM_BASE = DOCS_SITE_BASE.replace(/\/$/, "");
@@ -261,7 +272,7 @@ export function withRoutes<T extends Mountable>(
     // kind comes first claim the route.
     if (declaredRoot.has(m.name) && !m.instanceRoot) return byKind;
     rooted.add(m.name);
-    return [...byKind, { ...m, route: m.name }];
+    return [...byKind, { ...m, route: instanceRoute(m.name) }];
   });
   return { candidates, undetermined };
 }
@@ -1545,7 +1556,7 @@ interface DeclaredEntry {
 }
 
 /** One declared directory, resolved — in-tree, or held from a subscription. */
-interface ResolvedEntry {
+export interface ResolvedEntry {
   name: string;
   instanceDir: string;
   entry: DeclaredEntry & { path: string };
@@ -1554,7 +1565,7 @@ interface ResolvedEntry {
   subscribed?: string;
 }
 
-type ParsedDeclaration = Record<string, unknown> & { name?: string; directories?: DeclaredEntry[] };
+type ParsedDeclaration = Record<string, unknown> & { name?: string; enabled?: boolean; directories?: DeclaredEntry[] };
 
 /** Every instance declaration at `repo`'s top level, parsed — an unparseable one is skipped, since `kg:schema:check` owns it. */
 function topLevelDeclarations(repo: string): { dirName: string; dir: string; decl: ParsedDeclaration }[] {
@@ -1649,7 +1660,7 @@ function readSubscribedMountEntries(repo: string): SubscribedRead {
   const inTree = new Set(decls.map((d) => d.decl.name ?? d.dirName));
   const trees = subscribedTrees(
     all
-      .filter((d) => Array.isArray(d.decl["subscriptions"]))
+      .filter((d) => isPublished(d.decl) && Array.isArray(d.decl["subscriptions"]))
       .map((d) => ({ dir: d.dir, decl: { ...d.decl, name: d.decl.name ?? d.dirName } as Parameters<typeof subscribedTrees>[0][number]["decl"] })),
   );
   const problems: string[] = [];
@@ -1688,9 +1699,12 @@ function readSubscribedMountEntries(repo: string): SubscribedRead {
  * instances exist or what a directory is called. Since bean `g8jp` it includes
  * the held directories of subscribed instances ({@link subscribedMountEntries}).
  */
-function declaredEntries(repo = REPO): ResolvedEntry[] {
+export function declaredEntries(repo = REPO): ResolvedEntry[] {
   const out: ResolvedEntry[] = [];
   for (const { dirName, dir, decl: d } of topLevelDeclarations(repo)) {
+    // Not publishing is a declaration (`"enabled": false`), so a disabled
+    // instance mounts nothing and redirects nothing; it is not a gap.
+    if (!isPublished(d)) continue;
     for (const entry of d.directories ?? []) {
       if (!entry.path) continue;
       out.push({
@@ -1731,7 +1745,7 @@ export interface Served {
 export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries()): Served[] {
   return entries
     .filter((x) => x.entry.served === true)
-    .map((x) => ({ name: x.name, dir: x.abs, route: `${x.name}/${x.entry.path.replace(/^\/+|\/+$/g, "")}` }));
+    .map((x) => ({ name: x.name, dir: x.abs, route: instanceRoute(x.name, x.entry.path.replace(/^\/+|\/+$/g, "")) }));
 }
 
 /** The directory's own declared viewer, repo-relative, or `undefined` (#1168 B7a-2b). */
@@ -2236,7 +2250,12 @@ async function main(): Promise<number> {
     const withheld = withheldPaths(m.dir);
     // `realpathSync`: a subscribed directory is a link to its held tree, and copying a link copies a link.
     const src = realpathSync(m.dir);
-    cpSync(src, join(siteAbs, m.route), { recursive: true, filter: withheldFilter(src, withheld) });
+    // A visualiser page the instance holds in this directory is published at
+    // its declared route by compose-docs, through Jekyll; copied here too it
+    // would go out a second time, raw (`heldVisualiserPaths`).
+    const held = heldVisualiserPaths(REPO, m.dir);
+    cpSync(src, join(siteAbs, m.route), { recursive: true, filter: withheldFilter(src, [...withheld, ...held]) });
+    if (held.length) console.log(`  /${m.route}/: left out ${held.join(", ")} — a visualiser page published at its declared route`);
     if (withheld.length) {
       console.log(`  /${m.route}/: withheld ${withheld.length} path(s) named by its ${WITHHELD_FILE}: ${withheld.join(", ")}`);
     }

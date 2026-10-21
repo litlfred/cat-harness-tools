@@ -136,6 +136,41 @@ export function viewKindOf(name: string): ViewKind | undefined {
   return undefined;
 }
 
+/**
+ * The {@link ViewKind} of an entry's held source when its page will draw a view
+ * panel for it — the condition {@link entryRepoLinks} sets `view` under: not
+ * withheld, a source on disk ({@link sourceFileOf}), in a repository a link
+ * can name, of a kind a viewer shows.
+ */
+export function viewableOf(
+  repoRoot: string,
+  e: SourceEntry & { withheld?: unknown },
+  uploads: readonly SourceUpload[],
+  checkoutRepo: string | undefined,
+): ViewKind | undefined {
+  if (e.withheld) return undefined;
+  const source = sourceFileOf(repoRoot, e, uploads);
+  if (!source || !forgeAt(repoRoot, source, checkoutRepo)) return undefined;
+  return viewKindOf(basename(source));
+}
+
+/**
+ * Where a reader can find a source this site does NOT hold — its DOI and arXiv
+ * pages, from the entry's own identifiers. Owner, 2026-10-16: *"some of
+ * sources not held b/c IP issues (but in that case we cant use viewer on CDN
+ * b/c XSS)"* — so these are plain links out, never fed to the viewer. A DOI
+ * still carrying a template's placeholder suffix (`10.1145/nnnnnnn`) names
+ * nothing and is dropped.
+ */
+export function elsewhereLinks(e: { doi?: unknown; arxiv?: unknown }): { label: string; href: string }[] {
+  const out: { label: string; href: string }[] = [];
+  const doi = typeof e.doi === "string" ? e.doi.trim() : "";
+  if (/^10\.\d{4,9}\/\S+$/.test(doi) && !/\/n{3,}$/i.test(doi)) out.push({ label: `doi:${doi}`, href: `https://doi.org/${encodeURI(doi)}` });
+  const arxiv = typeof e.arxiv === "string" ? e.arxiv.trim() : "";
+  if (/^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/i.test(arxiv)) out.push({ label: `arXiv:${arxiv}`, href: `https://arxiv.org/abs/${arxiv}` });
+  return out;
+}
+
 /** What the view panel needs: the kind, the bytes, and for a PDF the pdf.js viewer's page-relative href. */
 export interface ViewSource {
   kind: ViewKind;

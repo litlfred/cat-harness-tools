@@ -221,42 +221,53 @@ export function readTodoFiles(root: string = TODO_ROOT()): Array<{ todo: TodoNod
     for (const f of readdirSync(dir).sort()) {
       if (!f.endsWith(".md")) continue;
       const path = join(dir, f);
-      const { fm, body } = parseFrontMatter(readFileSync(path, "utf8"));
+      const parsed = parseTodoFile(path);
       // Declaration over location: a `.md` here without the tag is not a todo,
       // and is left alone rather than guessed at.
-      if (fm["$schema"] !== TODO_SCHEMA_TAG) continue;
-      const parsed = TodoNodeSchema.safeParse({
-        id: String(fm["id"] ?? basename(f, ".md")),
-        summary: String(fm["summary"] ?? ""),
-        comment: body.trim(),
-        createdAt: String(fm["createdAt"] ?? ""),
-        status: String(fm["status"] ?? ""),
-        priority: String(fm["priority"] ?? ""),
-        origin: String(fm["origin"] ?? ""),
-        // The block this todo is attached to. Page-QUALIFIED
-        // (`sec:<page>-<node>`), which is what makes it an address: the node
-        // id `what-is-not-built-yet` exists on two different pages, so a bare
-        // id would resolve to whichever one a consumer happened to look at
-        // first. Same lesson as `TaskRef` carrying its process.
-        targetLabel: typeof fm["targetLabel"] === "string" ? fm["targetLabel"] : undefined,
-        // The theme this todo's sticky renders with. ABSENT rather than
-        // defaulted here: the default belongs to the GRAPH (`defaultTheme` in
-        // `todos.json`), and folding it in at parse time would make "the
-        // author chose grumpy-cat" and "nobody chose" indistinguishable to
-        // every consumer downstream — including the one that has to show a
-        // reviewer what was actually decided. Bean `5y4b`.
-        theme: typeof fm["theme"] === "string" ? fm["theme"] : undefined,
-        // Which crop of the theme's art the sticky shows. Absent means the
-        // square `card` crop — the default is the renderer's, not the parser's.
-        layout: typeof fm["layout"] === "string" ? fm["layout"] : undefined,
-        tags: tagsFrom(fm),
-        $schema: TODO_SCHEMA_TAG,
-      });
+      if (parsed === undefined) continue;
       if (!parsed.success) throw new Error(`${path}: ${JSON.stringify(parsed.error.issues)}`);
       out.push({ todo: parsed.data, path: relative(ROOT, path) });
     }
   }
   return out;
+}
+
+/**
+ * One todo file, parsed: `undefined` when it does not declare itself a todo,
+ * else the schema's verdict. Split out of {@link readTodoFiles} so a reader
+ * that must LIST a bad file rather than throw (the state viewer's feedback
+ * section, bean `folio-assistant-750a`) parses it the same way.
+ */
+export function parseTodoFile(path: string): ReturnType<typeof TodoNodeSchema.safeParse> | undefined {
+  const { fm, body } = parseFrontMatter(readFileSync(path, "utf8"));
+  if (fm["$schema"] !== TODO_SCHEMA_TAG) return undefined;
+  return TodoNodeSchema.safeParse({
+    id: String(fm["id"] ?? basename(path, ".md")),
+    summary: String(fm["summary"] ?? ""),
+    comment: body.trim(),
+    createdAt: String(fm["createdAt"] ?? ""),
+    status: String(fm["status"] ?? ""),
+    priority: String(fm["priority"] ?? ""),
+    origin: String(fm["origin"] ?? ""),
+    // The block this todo is attached to. Page-QUALIFIED
+    // (`sec:<page>-<node>`), which is what makes it an address: the node
+    // id `what-is-not-built-yet` exists on two different pages, so a bare
+    // id would resolve to whichever one a consumer happened to look at
+    // first. Same lesson as `TaskRef` carrying its process.
+    targetLabel: typeof fm["targetLabel"] === "string" ? fm["targetLabel"] : undefined,
+    // The theme this todo's sticky renders with. ABSENT rather than
+    // defaulted here: the default belongs to the GRAPH (`defaultTheme` in
+    // `todos.json`), and folding it in at parse time would make "the
+    // author chose grumpy-cat" and "nobody chose" indistinguishable to
+    // every consumer downstream — including the one that has to show a
+    // reviewer what was actually decided. Bean `5y4b`.
+    theme: typeof fm["theme"] === "string" ? fm["theme"] : undefined,
+    // Which crop of the theme's art the sticky shows. Absent means the
+    // square `card` crop — the default is the renderer's, not the parser's.
+    layout: typeof fm["layout"] === "string" ? fm["layout"] : undefined,
+    tags: tagsFrom(fm),
+    $schema: TODO_SCHEMA_TAG,
+  });
 }
 
 if (import.meta.main) {

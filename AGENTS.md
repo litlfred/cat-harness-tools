@@ -35,9 +35,10 @@ package's own server half lives with that package.
 ## What is here
 
 `adapters/mcp-server/` — the standalone MCP server and its Dockerfile, moved
-in step 3a. `test/` — the tests of what is here. The HTTP server and the rest of
-`cat-harness/src/` arrive in step 3b; until then this declaration names only
-what exists, because a declared-but-absent directory is the `dh4f` defect.
+in step 3a. `src/` — the HTTP server and the rest of what was
+`cat-harness/src/`, moved in step 3b. `test/` — the tests of what is here. The
+declaration names only what exists, because a declared-but-absent directory is
+the `dh4f` defect.
 
 The layout mirrors `cat-harness/` on purpose: as `src/` moves here, imports
 between modules that move together stay the same.

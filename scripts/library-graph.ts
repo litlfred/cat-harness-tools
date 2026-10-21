@@ -233,6 +233,13 @@ export interface LibraryEntry {
    */
   view?: string;
   /**
+   * The kind of viewer the entry's held source opens in — attached by the
+   * caller (`gen-library-viz`), set only when the page at {@link view} draws a
+   * view panel for it. The folio glass reads it to show its eye (owner,
+   * 2026-10-16). Absent means no viewer, or nobody derived it.
+   */
+  viewable?: "pdf" | "image";
+  /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
@@ -275,6 +282,9 @@ export interface LibraryAvatar {
  * full-page scan). An avatar is a thumbnail's job, and the copy is committed,
  * so a picture over this has NO avatar rather than a megabyte in the site.
  */
+/** An entry's rendered first page, inside its own directory — what `avatarOf` takes before any figure. */
+export const COVER_FILENAME = "cover.png";
+
 export const AVATAR_MAX_BYTES = 128 * 1024;
 
 /**
@@ -306,6 +316,10 @@ export function avatarOf(
   };
   const cover = join(libDir, `${slug}-cover.png`);
   if (fits(cover)) return make(cover, "cover");
+  // Page 1 rendered at ingest (`ingest-document` cover arm, or a backfill by
+  // `library-covers.ts`), kept inside the entry so promotion carries it.
+  const rendered = join(libDir, slug, COVER_FILENAME);
+  if (fits(rendered)) return make(rendered, "cover");
   for (const raw of images?.images ?? []) {
     const img = raw as { file?: unknown; role?: unknown };
     if (img.role !== "figure" || typeof img.file !== "string") continue;

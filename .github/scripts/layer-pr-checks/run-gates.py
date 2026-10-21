@@ -66,13 +66,40 @@ A gate whose input this runner DOES have is given it instead
 PR's diff base, and `check:test-budgets` the junit report at `$GATE_JUNIT`
 that the tests step wrote. Either is skipped, with its reason, only on a side
 that holds no such input.
+
+`GATE_CONE` wires in the CI cone (`scripts/ci-cone.ts`, bean `4rbc`;
+cat-harness-tools#398). Unset, nothing changes. Every declared gate run as
+exactly `bun run cat <script>` is asked about, in one `ci-cone.ts decide-all`,
+before any gate runs:
+
+- `skip` (a pull request): a gate whose read set, recorded by a green traced
+  run on the caller's main, is unchanged here (every path's state, every
+  replayed git answer, and the script's `f017` fingerprint) is NOT run. It is
+  written with `skipped: "inputs unchanged since <sha> ..."` and
+  `unchanged: <sha>`, never an `exit`, so it can never read as a pass.
+- `record` (a push to the caller's main): the same, and then every candidate
+  that did not skip runs under `strace` by `ci-cone.ts run`, after every other
+  gate and one at a time, so no neighbour writes under its trace. The shard's
+  records go to `cone-records.json` beside <out.json>. A gate that skipped
+  keeps the record it matched, so main traces only what changed (bean `4rbc`,
+  "a cheaper record on main").
+
+Anything the cone cannot answer (no `ci-cone.ts` at this side's pin, no
+record, no `strace`, a runner other than `bun run cat`, an error) runs the
+gate, as without the cone. A skip also names the record's FOOTPRINT, the
+top-level entries of the root its read set lies in, derived from the record and never
+declared (owner, 2026-10-07: "derived is BEST"); a gate whose footprint is its
+own instance's directory alone is reported as own-tree (cat-harness-tools#398,
+2b). The footprint never skips a gate on its own: see `footprint`.
 """
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -403,6 +430,180 @@ def tree_snapshotting(root):
     return out
 
 
+# ── The CI cone (bean `4rbc`, cat-harness-tools#398) ─────────────────────
+#
+# The tracer, the record format and the exact-match decision are ci-cone.ts's
+# own, reused here, never copied. Not through gate-shell.sh, as bean `lpcs`
+# plan 3 first proposed: that wrapper answers a skip with exit 0, which this
+# runner would record as a pass, and it starts one process per gate (about
+# 0.48 s each, measured in bean `4rbc`); `decide-all` asks once.
+CONE_CLI = "cat-harness-tools/scripts/ci-cone.ts"
+CONE_RECORDS = os.path.join("build", "ci-cone", "records.json")
+# ci-cone.ts `RUNNER`: what it runs, traced or not. A gate whose command is
+# anything else is not the command a record was made from.
+CONE_RUNNER = "bun run cat"
+CONE_TIMEOUT_S = 900
+
+
+def cone_mode(env):
+    """(mode, note): mode is "", "skip" or "record". Anything else is off, and says so."""
+    v = (env.get("GATE_CONE") or "").strip()
+    if v in ("", "skip", "record"):
+        return v, None
+    return "", f"GATE_CONE={v!r} is neither skip nor record, so the cone is off and every gate runs"
+
+
+def cone_cli(root, env):
+    """The ci-cone.ts command line, or None when this side's pin has none. `GATE_CONE_CLI` replaces it (tests)."""
+    given = (env.get("GATE_CONE_CLI") or "").strip()
+    if given:
+        return shlex.split(given)
+    if not os.path.isfile(os.path.join(root, CONE_CLI)):
+        return None
+    return ["bun", CONE_CLI]
+
+
+def cone_scripts(gates, runner):
+    """gate name -> script, for the declared gates whose command is exactly `bun run cat <script>`."""
+    if runner != CONE_RUNNER:
+        return {}
+    out = {}
+    for name, command in gates.items():
+        if name.startswith("graph:") or ":" not in name:
+            continue
+        script = name.split(":", 1)[1]
+        if command == f"{CONE_RUNNER} {script}":
+            out[name] = script
+    return out
+
+
+def strace_works():
+    if shutil.which("strace") is None:
+        return False
+    try:
+        return subprocess.run(["strace", "-f", "-qq", "-o", os.devnull, "true"], capture_output=True, timeout=60).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def cone_decide(root, scripts, env):
+    """(script -> decision, None), or (None, why) when the cone could not answer at all."""
+    cli = cone_cli(root, env)
+    if cli is None:
+        return None, f"{CONE_CLI} is absent at this side's pin"
+    fd, out = tempfile.mkstemp(prefix="cone-decisions-", suffix=".json")
+    os.close(fd)
+    os.unlink(out)
+    try:
+        p = subprocess.run([*cli, "decide-all", out, *scripts], cwd=root, capture_output=True, text=True, timeout=CONE_TIMEOUT_S)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"ci-cone.ts decide-all did not finish ({e.__class__.__name__})"
+    got = read_json(out)
+    if os.path.exists(out):
+        os.unlink(out)
+    if p.returncode != 0 or not isinstance(got, dict) or not isinstance(got.get("decisions"), dict):
+        tail = (p.stdout + p.stderr).strip()[-300:]
+        return None, f"ci-cone.ts decide-all exited {p.returncode} without decisions: {tail}"
+    return got["decisions"], None
+
+
+def cone_skip(decision):
+    """The record's sha when `decision` is a well-formed skip, else None: anything malformed runs."""
+    if not isinstance(decision, dict) or decision.get("skip") is not True:
+        return None
+    sha = decision.get("sha")
+    return sha if isinstance(sha, str) and sha else None
+
+
+def read_records(root):
+    got = read_json(os.path.join(root, CONE_RECORDS))
+    return got if isinstance(got, dict) and isinstance(got.get("checks"), dict) else None
+
+
+def footprint(record):
+    """The top-level entries of the root that a ci-cone record's read set lies
+    in (an instance's directory, or a root-level file such as `package.json`;
+    `.` for the root itself), from its `reads` and the cwd of each replayed
+    git call.
+
+    DERIVED from the record, so it cannot drift from what the run read (2b,
+    cat-harness-tools#398). It is reported, and it never skips a gate by
+    itself: a trace covers only the path THAT run took, on that run's content
+    (bean `4rbc`, "the caveat"), so "read only cat-harness-tools/ on main" says
+    nothing about a run on other content. The exact match is what licenses a
+    skip, and once it holds, base and head agree for an own-tree gate. Nor do
+    the non-caller trees of a layer PR's two sides stay equal on their own:
+    `derive:publish` and the state mount write into them from the caller's
+    content."""
+    out = set()
+    paths = list((record or {}).get("reads", {}))
+    for key in (record or {}).get("git", {}):
+        try:
+            paths.append(json.loads(key)[0])
+        except (ValueError, TypeError, IndexError):
+            out.add("?")
+    for p in paths:
+        out.add(p.split("/", 1)[0] if p else ".")
+    return sorted(out)
+
+
+def own_tree(fp, instance_dir):
+    """Whether a footprint is one instance's own directory and nothing else."""
+    return instance_dir not in (".", "") and fp == [instance_dir]
+
+
+def prune_records(root, scripts):
+    """Forget the restored records of `scripts`: each is about to run again, and
+    only that run may record it. A stale record would outlive a red run."""
+    got = read_records(root)
+    if got is None:
+        return
+    for s in scripts:
+        got["checks"].pop(s, None)
+    with open(os.path.join(root, CONE_RECORDS), "w") as f:
+        json.dump(got, f, indent=1)
+
+
+def cone_plan(root, gates, runner, caller, env):
+    """Ask the cone about `gates` before any of them runs.
+
+    Returns (mode, note, cands, unchanged, traced): `cands` gate name -> script
+    asked about; `unchanged` gate name -> its SKIPPED entry; `traced` gate
+    name -> script to run under the tracer (record mode only)."""
+    mode, note = cone_mode(env)
+    cands = cone_scripts(gates, runner) if mode else {}
+    if mode and not cands:
+        return "", f"no gate here runs as `{CONE_RUNNER} <script>` (runner: {runner}), so the cone has nothing to ask", {}, {}, {}
+    tracer = mode == "record" and strace_works()
+    if mode == "record" and not tracer:
+        # Still decided: a gate whose record matches needs no new one.
+        note = "strace does not run here, so this run records nothing"
+    if not mode:
+        return "", note, {}, {}, {}
+    decisions, why = cone_decide(root, sorted(set(cands.values())), env)
+    if decisions is None:
+        return "", f"{why}; every gate runs", {}, {}, {}
+    records = (read_records(root) or {"checks": {}})["checks"]
+    known = instances_in(root)
+    caller_dir = known.get(caller, caller) if caller else None
+    unchanged, traced = {}, {}
+    for name, script in cands.items():
+        d = decisions.get(script)
+        sha = cone_skip(d)
+        if sha is not None:
+            fp = footprint(records.get(script))
+            owner = known.get(name.split(":", 1)[0], "")
+            why = d["why"] if isinstance(d.get("why"), str) and d["why"] else f"inputs unchanged since {sha}"
+            if own_tree(fp, owner):
+                why += f"; reads only {owner}/ (own tree{', not the caller' if caller_dir and owner != caller_dir else ''})"
+            unchanged[name] = {"command": gates[name], "skipped": why, "unchanged": sha, "footprint": fp}
+        elif tracer and isinstance(d, dict) and d.get("candidate") is True:
+            traced[name] = script
+    if mode == "record":
+        prune_records(root, [s for n, s in cands.items() if n not in unchanged])
+    return mode, note, cands, unchanged, traced
+
+
 def run(root, name, command):
     start = time.monotonic()
     try:
@@ -502,20 +703,41 @@ def main():
     split = "by recorded seconds" if timings and shards > 1 else "by count"
     print(f"shard {shard}/{shards}: {len(gates)} of {total} gate(s), split {split}", flush=True)
 
+    # The CI cone: asked once, before any gate runs or writes.
+    mode, note, cands, unchanged, traced = cone_plan(root, gates, runner, given[0] if given else None, os.environ)
+    for name in unchanged:
+        gates.pop(name)
+    if mode:
+        own_count = sum(1 for e in unchanged.values() if "(own tree" in e["skipped"])
+        print(f"ci cone ({mode}): {len(unchanged)} of {len(cands)} gate(s) asked are unchanged since their record"
+              f" ({own_count} own-tree)" + (f"; {len(traced)} to trace" if mode == "record" else ""), flush=True)
+    if note:
+        print(f"ci cone: {note}", flush=True)
+
     jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
     alone = tree_snapshotting(root)
-    pooled = [kv for kv in gates.items() if kv[0] not in alone]
-    serial = [kv for kv in gates.items() if kv[0] in alone]
+    pooled = [kv for kv in gates.items() if kv[0] not in alone and kv[0] not in traced]
+    serial = [kv for kv in gates.items() if kv[0] in alone and kv[0] not in traced]
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         outcomes = list(pool.map(lambda kv: run(root, kv[0], kv[1]), pooled))
     outcomes += [run(root, k, v) for k, v in serial]
+    # Traced last and one at a time, so no other gate writes under a trace: a
+    # record holds the state each path had when ITS run read it. ci-cone.ts
+    # `run` exits with the check's own status; a traced run that failed is
+    # re-run untraced, and that is the verdict (bean `4rbc`).
+    cli = cone_cli(root, os.environ) if traced else None
+    for name, script in traced.items():
+        n, _, code, text, seconds = run(root, name, shlex.join([*cli, "run", script]))
+        outcomes.append((n, gates[name], code, text, seconds))
     for name, command, code, text, seconds in outcomes:
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
         print("::endgroup::", flush=True)
         results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
     ran = list(results)
+    for name, entry in unchanged.items():
+        print(f"{name}: SKIPPED — {entry['skipped']} — {entry['command']}", flush=True)
     for name, entry in skipped.items():
         print(f"{name}: skipped ({entry['skipped']}) — {entry['command']}", flush=True)
     for path in records:
@@ -527,11 +749,22 @@ def main():
             (skipped if "skipped" in entry else results)[name] = entry
     green = sum(1 for r in results.values() if r["exit"] == 0)
     results.update(skipped)  # no `exit`: compare-gates.py reports these as skipped, never as a verdict
+    results.update(unchanged)  # no `exit` either: SKIPPED, inputs unchanged since <sha>, never "passed"
+    out_dir = os.path.dirname(os.path.abspath(out_path))
     with open(out_path, "w") as f:
         json.dump(results, f, indent=1)
-    with open(os.path.join(os.path.dirname(os.path.abspath(out_path)), "gates-shard.json"), "w") as f:
-        json.dump({"shard": shard, "of": shards, "total": total, "ran": ran}, f, indent=1)
-    print(f"{len(results) - len(skipped)} gate(s) run: {green} green; {len(skipped)} skipped", flush=True)
+    with open(os.path.join(out_dir, "gates-shard.json"), "w") as f:
+        json.dump({"shard": shard, "of": shards, "total": total, "ran": ran, "unchanged": sorted(unchanged)}, f, indent=1)
+    if mode == "record":
+        # This shard's records only: those its traced gates wrote and those its
+        # unchanged gates matched. merge-cone.py joins the shards.
+        got = read_records(root) or {}
+        mine = set(cands.values())
+        checks = {s: r for s, r in got.get("checks", {}).items() if s in mine}
+        with open(os.path.join(out_dir, "cone-records.json"), "w") as f:
+            json.dump({"version": got.get("version"), "recipe": got.get("recipe"), "checks": checks}, f, indent=1)
+        print(f"ci cone: {len(checks)} record(s) from this shard", flush=True)
+    print(f"{len(results) - len(skipped) - len(unchanged)} gate(s) run: {green} green; {len(skipped)} skipped; {len(unchanged)} unchanged since their record", flush=True)
 
 
 if __name__ == "__main__":

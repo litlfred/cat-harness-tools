@@ -23,7 +23,7 @@
  * repository's finding, and must not stop this one publishing. It writes the
  * context to `--out` and the outcome to `--report` (JSON) and exits:
  *
- *   0  built, or SKIPPED with a reason (no `iriBase`, or no `.jsonld`
+ *   0  built, or SKIPPED with a reason, printed as a warning (no `iriBase`, or no `.jsonld`
  *      documents — nothing to publish under, or nothing to publish);
  *   1  the instance's own findings (an unresolved or conflicting prefix, a
  *      malformed `jsonldPrefixes`), each named.
@@ -351,7 +351,10 @@ async function main(argv: readonly string[]): Promise<number> {
       writeFileSync(reportFile, `${JSON.stringify(rest, null, 2)}\n`);
     }
     if (outcome.kind === "skipped") {
-      console.log(`::notice::${outcome.reason}; nothing to publish`);
+      // A warning, not a notice: the caller's run is green either way, and a
+      // notice let an instance with nothing to publish look published
+      // (aai-programme, 2026-10-20). The reason says what to add.
+      console.log(`::warning::${outcome.reason}; nothing was published`);
       return 0;
     }
     if (outcome.kind === "failed") {
