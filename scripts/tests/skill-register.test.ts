@@ -45,6 +45,7 @@ import {
   dangling,
   frontMatterKeys,
   missingScripts,
+  notApplicable,
   retiredKeys,
   skillPackages,
   stepsToRun,
@@ -327,6 +328,40 @@ describe("the finders discriminate — falsified on a synthetic package", () => 
     } finally {
       rmSync(instance, { recursive: true, force: true });
     }
+  });
+});
+
+describe("an instance with no knowledge graph is not applicable, not the third state", () => {
+  const instanceWith = (directories: unknown[]): string => {
+    const instance = mkdtempSync(join(tmpdir(), "skill-register-na-"));
+    const name = "na-fixture";
+    writeFileSync(
+      join(instance, `${name}.json`),
+      JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name, version: "0.0.0", directories }),
+    );
+    return instance;
+  };
+
+  test("a content instance that declares only a library: nothing to judge, and it says why", () => {
+    const instance = instanceWith([{ id: "library", path: "library/", graphTypologies: ["library"] }]);
+    try {
+      expect(notApplicable(instance)).toContain("declares no knowledge-graph directory");
+    } finally {
+      rmSync(instance, { recursive: true, force: true });
+    }
+  });
+
+  test("a declared knowledge-graph directory that is MISSING stays the third state (dh4f)", () => {
+    const instance = instanceWith([{ id: "skills", path: "skills/", graphTypologies: ["skills"] }]);
+    try {
+      expect(notApplicable(instance)).toBeUndefined();
+    } finally {
+      rmSync(instance, { recursive: true, force: true });
+    }
+  });
+
+  test("the harness itself is never not-applicable", () => {
+    expect(notApplicable(join(ROOT, "cat-harness"))).toBeUndefined();
   });
 });
 
