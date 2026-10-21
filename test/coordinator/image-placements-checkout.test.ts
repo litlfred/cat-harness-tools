@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -62,7 +63,7 @@ describe("the real corpus is deduplicated, and stays that way", () => {
     );
     const logo = (s.images ?? []).find((i) => (i.placements?.length ?? 0) === 7);
     expect(logo, "the seven-placement entry").toBeDefined();
-    expect(logo!.narrative?.text).toContain("Principles for Digital Development");
+    expect(logo!.narrative && narrativeFor(logo!.narrative).text).toContain("Principles for Digital Development");
     const notes = logo!.placements!.filter((p) => p.note);
     expect(notes.length, "one per placement after the first").toBe(6);
     expect(notes.some((p) => p.note!.includes("Build for sustainability"))).toBe(true);

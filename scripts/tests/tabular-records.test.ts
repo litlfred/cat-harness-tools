@@ -154,8 +154,8 @@ describe("the narrative slot is declared empty, never invented", () => {
     // Headers are RIGHT THERE and a plausible summary could be assembled from
     // them. It is not, because shipping one as the answer is a claim nobody
     // made. Drafting one and SAYING SO is a different act — `state: "draft"`.
-    expect(r.data.narrative.text).toBeNull();
-    expect(r.data.narrative.state).toBe("not-authored");
+    expect(narrativeFor(r.data.narrative).text).toBeNull();
+    expect(narrativeFor(r.data.narrative).state).toBe("not-authored");
   });
 
   test("the schema refuses a record that says two things at once", () => {
@@ -328,6 +328,7 @@ describe("the real corpus", () => {
 import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-content-keys.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 describe("the tabular record is JSON-LD a processor keeps whole", () => {
   test("the arm emits the published content context", () => {

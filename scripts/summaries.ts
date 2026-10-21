@@ -56,7 +56,7 @@ import {
   type BlockSummary,
   type SummaryStatus,
 } from "@litlfred/cat-harness/schemas/block-summary.ts";
-import { NarrativeSchema, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NarrativeSchema, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { declarationPathIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -292,7 +292,11 @@ export function next(root = ROOT, opts: { n?: number; entry?: string } = {}): Ne
   return backlog(root, { entry: opts.entry })
     .slice(0, k)
     .map((it) => {
-      const nar = it.record?.narrative;
+      // The rejected entry, when the slot holds one per language (bean
+      // `cat-tools-e1lo`): its text and reason are what the redrafter needs.
+      const nar = it.record
+        ? (narrativesOfSlot(it.record.narrative).find((n) => n.state === "rejected") ?? narrativesOfSlot(it.record.narrative)[0])
+        : undefined;
       return {
         entry: it.entry,
         block: it.block,
@@ -378,7 +382,8 @@ export function record(file: DraftFile, root = ROOT): { written: string[]; block
     const nr = NarrativeSchema.safeParse(narrative);
     if (!nr.success) throw new Error(`${d.block}: ${nr.error.issues[0]?.message ?? "invalid narrative"}`);
     const prior = it.record;
-    const superseded = prior ? [...(prior.superseded ?? []), prior.narrative] : undefined;
+    // Every entry of the replaced slot is kept, one per language if it held several.
+    const superseded = prior ? [...(prior.superseded ?? []), ...narrativesOfSlot(prior.narrative)] : undefined;
     const rec: BlockSummary = {
       block: d.block,
       source: it.source,

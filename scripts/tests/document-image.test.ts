@@ -25,6 +25,7 @@ import {
   type DocumentImage,
 } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -107,7 +108,8 @@ describe("only a figure is worth describing", () => {
   });
 
   test("`withEmptyNarrative` gives a slot to figures and to nothing else", () => {
-    expect(withEmptyNarrative(FIGURE).narrative?.state).toBe("not-authored");
+    const emptied = withEmptyNarrative(FIGURE).narrative;
+    expect(emptied && narrativeFor(emptied).state).toBe("not-authored");
     const scan: DocumentImage = {
       ...FIGURE, role: "page-scan", basis: { method: "geometry" as const, coverage: 0.998, imagesOnPage: 1, page: 4 },
     };
