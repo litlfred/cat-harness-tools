@@ -17,13 +17,11 @@
 # cat-harness main committed then read as stale, and `library-readmes` failed
 # on main and on every PR for a reason no PR here could fix.
 #
-# folio-assistant-core and fhir-harness are put at main too. This repository's
-# main moves with theirs: a PR that drops the content/pipeline link
-# (cat-harness-tools#473) needs fhir-harness main, whose declaration names the
-# pipeline/ paths (fhir-harness#118), and a PR that declares a plugin slot
-# (#468) needs the core main that fills it (core#160). Under the index lock,
-# both failed as new failures until the index re-pinned, for a reason no PR
-# here could fix.
+# Two layers above this one are put at main too, because this repository's
+# main moves with theirs (#510). Which instances are taken at main is listed in
+# `test/pr-tests-mains.json`, with the reasons: test material may name a layer
+# above this one, and this workflow, which is not test material, names none
+# (check:reference-direction).
 #
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
@@ -71,21 +69,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      cat-harness: ${{ steps.pin.outputs.cat-harness }}
-      bootstrap-tools: ${{ steps.pin.outputs.bootstrap-tools }}
-      bootstrap: ${{ steps.pin.outputs.bootstrap }}
-      folio-assistant-core: ${{ steps.pin.outputs.folio-assistant-core }}
-      fhir-harness: ${{ steps.pin.outputs.fhir-harness }}
+      # `name:sha` pairs, space-separated, for every instance
+      # test/pr-tests-mains.json lists; `mains-key` is their digest, for the
+      # cache keys.
+      mains: ${{ steps.pin.outputs.mains }}
+      mains-key: ${{ steps.pin.outputs.mains-key }}
       index: ${{ steps.pin.outputs.index }}
     steps:
+      - name: Read which instances are taken at main
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: test/pr-tests-mains.json
+          sparse-checkout-cone-mode: false
       - id: pin
         run: |
           set -euo pipefail
-          echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "bootstrap-tools=$(git ls-remote https://github.com/litlfred/bootstrap-tools refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "bootstrap=$(git ls-remote https://github.com/litlfred/bootstrap refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "folio-assistant-core=$(git ls-remote https://github.com/litlfred/folio-assistant-core refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "fhir-harness=$(git ls-remote https://github.com/litlfred/fhir-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          mains=""
+          for name in $(python3 -c 'import json; print(" ".join(json.load(open("test/pr-tests-mains.json"))["mains"]))'); do
+            sha="$(git ls-remote "https://github.com/litlfred/$name" refs/heads/main | cut -f1)"
+            test -n "$sha" || { echo "::error::no main for $name"; exit 1; }
+            mains="$mains $name:$sha"
+          done
+          mains="${mains# }"
+          echo "mains=$mains" >> "$GITHUB_OUTPUT"
+          echo "mains-key=$(printf '%s' "$mains" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
           echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -128,17 +135,14 @@ jobs:
         # cat-harness and the closure its main is generated with, and the two
         # layers this repository's main moves with: all at the commits the pin
         # job read (see the header).
-        name: Use cat-harness, bootstrap-tools, bootstrap, folio-assistant-core and fhir-harness main, at the pinned commits
+        name: Use cat-harness main, and the instances it moves with, at the pinned commits
         if: steps.base-cache.outputs.cache-hit != 'true'
         env:
-          CAT_HARNESS: ${{ needs.pin.outputs.cat-harness }}
-          BOOTSTRAP_TOOLS: ${{ needs.pin.outputs.bootstrap-tools }}
-          BOOTSTRAP: ${{ needs.pin.outputs.bootstrap }}
-          CORE: ${{ needs.pin.outputs.folio-assistant-core }}
-          FHIR_HARNESS: ${{ needs.pin.outputs.fhir-harness }}
+          MAINS: ${{ needs.pin.outputs.mains }}
         run: |
           set -euo pipefail
-          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP" "folio-assistant-core:$CORE" "fhir-harness:$FHIR_HARNESS"; do
+          test -n "$MAINS" || { echo "::error::the pin job read no mains"; exit 1; }
+          for pair in $MAINS; do
             name="${pair%%:*}" sha="${pair#*:}"
             test -n "$sha" || { echo "::error::no pinned commit for $name"; exit 1; }
             rm -rf "fa/$name"
@@ -212,7 +216,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/junit.xml
-          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.folio-assistant-core }}-${{ needs.pin.outputs.fhir-harness }}-${{ needs.pin.outputs.index }}
+          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -295,7 +299,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/standalone.json
-          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.folio-assistant-core }}-${{ needs.pin.outputs.fhir-harness }}-${{ needs.pin.outputs.index }}
+          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}
       - *mount-cache
       - *mount
       - *cat-harness-main

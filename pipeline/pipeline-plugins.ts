@@ -120,11 +120,10 @@ export interface LeanCoveragePlugin {
 }
 
 /**
- * Delimited text and workbooks read as CSVW — implemented by
- * folio-assistant-core (`scripts/tabular-csv.ts`, `scripts/tabular-xlsx.ts`),
- * bean `urat`. The owner's ruling of 2026-10-20 moved this ingest step up into
- * core, next to those extractors; tools may not name core, so ingest reaches
- * them through this slot.
+ * Delimited text and workbooks read as CSVW — implemented by the content
+ * core, beside its CSV and xlsx extractors (bean `urat`). The owner's ruling
+ * of 2026-10-20 moved this ingest step up into that layer; this layer may not
+ * name it, so ingest reaches the extractors through this slot.
  */
 export interface TabularCsvwPlugin {
   /**
