@@ -25,7 +25,7 @@
  * `.git` as a foreign checkout, and `closureOf` (`seed-ready.ts`) skips a
  * missing need without a word. So cat-harness was laid out without bootstrap,
  * and its five `render-exemption.test.ts` tests failed in every index that runs
- * both gates in one shard (smart-immunizations' harness checks, 2026-10-20). It
+ * both gates in one shard (a content layer's harness checks, 2026-10-20). It
  * reproduced exactly: no failures as laid out, the five after `git init` in the
  * two mounts.
  *
