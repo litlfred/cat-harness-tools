@@ -63,6 +63,32 @@ describe("viewer/index.html", () => {
     }
     expect(errors).toEqual([]);
   });
+
+  // A script that PARSES can still die before it draws anything. On
+  // 2026-10-21 the paper view threw "Cannot access 'chId' before
+  // initialization": the sidebar loop read `chId` eight lines above its
+  // `const`. A parse cannot see that; TypeScript's checker can, on plain
+  // JavaScript, and only those diagnostics are asked for (a viewer is not
+  // type-annotated, so every other check would be noise).
+  test("no variable is used before its declaration", () => {
+    const BEFORE_DECLARATION = new Set([2448, 2449, 2450, 2454]);
+    const found: string[] = [];
+    scripts.forEach((s, n) => {
+      const name = `inline-${n}.js`;
+      const options = { allowJs: true, checkJs: true, noEmit: true, noLib: true, types: [] };
+      const host = ts.createCompilerHost(options);
+      const read = host.getSourceFile.bind(host);
+      host.getSourceFile = (f, lang) =>
+        f === name ? ts.createSourceFile(f, s.body, lang, true, ts.ScriptKind.JS) : read(f, lang);
+      const program = ts.createProgram([name], options, host);
+      for (const d of program.getSemanticDiagnostics(program.getSourceFile(name))) {
+        if (!BEFORE_DECLARATION.has(d.code) || d.file === undefined || d.start === undefined) continue;
+        const at = d.file.getLineAndCharacterOfPosition(d.start).line;
+        found.push(`page line ${s.line + at}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+      }
+    });
+    expect(found).toEqual([]);
+  });
 });
 
 describe("the viewer's Lean helpers read both shapes", () => {
