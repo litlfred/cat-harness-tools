@@ -31,7 +31,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { absenceAt, contentAt, mountedIds, tipLocations } from "../branch-store.ts";
+import { absenceAt, contentAt, mountedIds, normaliseOrigin, tipLocations } from "../branch-store.ts";
 import { graphReadPath } from "../graph-read.ts";
 import { mountState, report } from "../state-mount.ts";
 
@@ -216,4 +216,14 @@ test("with no git directory there is no record, and no error: the reader's not-m
   const dir = mkdtempSync(join(tmpdir(), "no-git-"));
   made.push(dir);
   expect(absenceAt(dir, "issue-marks", "issue-marks")).toBeUndefined();
+});
+
+test("the record survives CI's .git rewrite of origin during the mount (x5e0)", () => {
+  const f = index();
+  const plain = `file://${f.origin}`.replace(/\.git$/, "");
+  git(f.work, "remote", "set-url", "origin", `${plain}.git`);
+  mountState({ repoRoot: f.work });
+  git(f.work, "remote", "set-url", "origin", plain);
+  expect(normaliseOrigin(`${plain}.git/`)).toBe(normaliseOrigin(plain));
+  expect(absenceAt(f.work, "issue-marks")).toBeDefined();
 });
