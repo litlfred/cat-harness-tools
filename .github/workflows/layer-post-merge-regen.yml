@@ -120,6 +120,19 @@ jobs:
       - name: Install
         working-directory: fa
         run: bun install
+      - name: Install Chromium, for the checks that draw through a browser
+        # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
+        # bpmn-js in Chromium, as in layer-pr-checks.yml. Without it both were
+        # asked, failed, and were reported unrepaired on every post-merge run
+        # (cat-harness run 39786173033, 2026-10-22; bean ey1c). The index's own
+        # Playwright installs it, so the build is the one Playwright expects.
+        working-directory: fa
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the index: no browser installed"
+          fi
       - name: Mount the subgraphs kept on branches
         # Through `mountState` directly, as layer-pr-checks.yml does:
         # `state:mount` also re-lays the remote mounts against the lock, which
