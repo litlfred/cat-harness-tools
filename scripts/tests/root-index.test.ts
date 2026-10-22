@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { buildRootIndex } from "../root-index.ts";
 import { expandFindings, localLoader } from "../publish-verify.ts";
 import { exportIdentity } from "../kg-export.ts";
+import { instanceDocPath } from "../instance-exports.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
@@ -39,10 +40,9 @@ function site(skip: string[] = []): string {
   for (const inst of declared) {
     if (skip.includes(readDeclaration(inst)!.name)) continue;
     // Where the deploy writes it: the host at its docPath, every other
-    // instance at `<stub>/<stub>.jsonld` (instance-exports.ts).
+    // instance at `<name>/<stub>.jsonld` (`instanceDocPath`).
     const id = exportIdentity({ instanceRoot: inst });
-    const stub = id.stub;
-    const file = join(dir, id.foreignInstance ? `${stub}/${stub}.jsonld` : id.docPath);
+    const file = join(dir, id.foreignInstance ? instanceDocPath({ name: readDeclaration(inst)!.name, stub: id.stub }) : id.docPath);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify({ "@graph": [{ "@id": "a" }, { "@id": "b" }] }));
   }

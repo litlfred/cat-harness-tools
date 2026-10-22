@@ -65,6 +65,7 @@ import {
   checkoutInstanceRoots,
   declaredVisualisers,
   forwardingParts,
+  heldVisualiserPages,
   pageParts,
   renderedByOf,
   siteOwnerDir,
@@ -264,6 +265,7 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
     }
   }
 
+  const held = new Set(heldVisualiserPages(repoRoot).map((h) => resolve(h.dir)));
   // A harness's OWN docs are mounted at `/<harness>/` (mount-instance-docs);
   // a visualiser route beneath it must not be a path those docs already hold.
   // Which of its directories is served there is the declaration's: its `docs`
@@ -275,7 +277,11 @@ export function checkVisualiserRoutes(repoRoot: string): RouteReport {
       .map((x) => join(v.harnessRoot, x.path!));
     for (const dir of served) {
       if (resolve(siteOwnerDir(repoRoot)) === resolve(dir)) continue;
-      for (const p of [join(dir, v.id), `${join(dir, v.id)}.html`, `${join(dir, v.id)}.md`]) {
+      // The visualiser's OWN page, held by its harness at `<site>/<id>/` and
+      // published at this route (`heldVisualiserPages`), is not a collision:
+      // it is the page the route is for.
+      const heldHere = held.has(resolve(join(dir, v.id)));
+      for (const p of [...(heldHere ? [] : [join(dir, v.id)]), `${join(dir, v.id)}.html`, `${join(dir, v.id)}.md`]) {
         if (existsSync(p)) {
           findings.push({ kind: "harness-docs-collision", subject: label(v), detail: `${relative(repoRoot, p).split(sep).join("/")} is also published at /${v.harness}/${v.id}` });
         }

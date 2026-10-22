@@ -21,6 +21,9 @@ import { loadProcessModel, isActivity } from "../../src/workflow/process-model.t
 import { knownSkills as canonicalKnownSkills, workflowFile, workflowFiles } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
+const CORPUS_TIMEOUT = 60_000;
+
 const ROOT = join(HARNESS_ROOT);
 
 /**
@@ -88,5 +91,5 @@ describe("workflow skill refs resolve", () => {
       }
     }
     expect(dangling).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 });

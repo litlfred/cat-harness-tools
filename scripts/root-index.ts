@@ -46,6 +46,8 @@ import { join, resolve } from "node:path";
 
 import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { exportIdentity } from "./kg-export.js";
+import { instanceDocPath } from "./instance-exports.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
@@ -106,7 +108,9 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
   const siteBase = exportIdentity({ baseUrl: opts.baseUrl }).base;
   for (const inst of instanceRootsIn(repo)) {
     const decl = readDeclaration(inst);
-    if (!decl) continue;
+    // `"enabled": false` is a declaration that it is not published, so it has
+    // no entry — the same answer the deploy's plan gives (`isPublished`).
+    if (!decl || !isPublished(decl)) continue;
     const id = exportIdentity({ instanceRoot: inst, baseUrl: opts.baseUrl });
     // WHERE ON THIS SITE, which is not always `docPath`: an instance that
     // declares its own `canonicalUrl` mints `@id`s against that, so its
@@ -115,9 +119,10 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
     // 2026-10-04 for cat-harness-tools, cat-openapi, the FHIR IG harness, the DAK base layer).
     // Both are looked for, the foreign path first; the entry records which.
     const stub = artefactStub(decl);
-    const served = [`${stub}/${stub}.jsonld`, id.docPath].find((p) => existsSync(join(site, p)));
+    const foreign = instanceDocPath({ name: decl.name, stub });
+    const served = [foreign, id.docPath].find((p) => existsSync(join(site, p)));
     if (served === undefined) {
-      problems.push(`${decl.name}: no export at ${stub}/${stub}.jsonld or ${id.docPath} — the deploy did not publish it`);
+      problems.push(`${decl.name}: no export at ${foreign} or ${id.docPath} — the deploy did not publish it`);
       continue;
     }
     const file = join(site, served);

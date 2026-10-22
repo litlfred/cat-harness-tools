@@ -749,18 +749,28 @@ def layout_lines(path: str, ocr_used: bool) -> list | None:
         return None
 
 
-def infer_page_labels(path: str, lines: list | None, n_pages: int) -> tuple[list[dict[str, Any]], dict]:
-    """The printed label of every physical page, and where sources disagree."""
+def infer_page_labels(path: str, lines: list | None, n_pages: int,
+                      ocr_pages: list[str] | None = None) -> tuple[list[dict[str, Any]], dict]:
+    """The printed label of every physical page, and where sources disagree.
+
+    A scan has no layout, so `lines` is None; its OCR text (`ocr_pages`) still
+    carries the folio as a page's first or last line, and those stand in for
+    the margins (`_pdf_page_labels.text_margin_lines`, bean `turh`).
+    """
     try:
         pdf = _pdf_page_labels.pdf_labels(path)
     except Exception:                           # pypdf only: no /PageLabels read
         pdf = {}
+    contents = True
+    if not lines and ocr_pages:
+        lines = _pdf_page_labels.text_margin_lines(ocr_pages) or None
+        contents = False
     if not lines and not pdf:
         return [{"physical": p, "label": None, "source": None, "confidence": 0.0, "evidence": []}
                 for p in range(1, n_pages + 1)], {"count": 0, "items": []}
-    labels = _pdf_page_labels.page_labels(lines or [], n_pages, pdf=pdf)
+    labels = _pdf_page_labels.page_labels(lines or [], n_pages, pdf=pdf, contents=contents)
     rows = [pl._asdict() | {"evidence": list(pl.evidence)} for pl in labels]
-    return rows, _pdf_page_labels.label_conflicts(lines or [], n_pages, pdf)
+    return rows, _pdf_page_labels.label_conflicts(lines or [], n_pages, pdf, contents=contents)
 
 
 def infer_figures(path: str, lines: list | None) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1667,7 +1677,8 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     paged = not toc and bool(pages)
     sections = split_pages(pages) if paged else split_sections(pages, toc)
     figures, figure_gaps = infer_figures(path, lines)
-    page_rows, label_conflicts = infer_page_labels(path, lines, len(pages))
+    page_rows, label_conflicts = infer_page_labels(path, lines, len(pages),
+                                                   pages if ocr_used else None)
     label_of = {r["physical"]: r["label"] for r in page_rows if r["label"]}
     for e in toc:
         e.page_label = label_of.get(e.page) if e.page else None

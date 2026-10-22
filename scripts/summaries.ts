@@ -56,7 +56,8 @@ import {
   type BlockSummary,
   type SummaryStatus,
 } from "@litlfred/cat-harness/schemas/block-summary.ts";
-import { NarrativeSchema, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NarrativeSchema, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 import { declarationPathIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -292,7 +293,11 @@ export function next(root = ROOT, opts: { n?: number; entry?: string } = {}): Ne
   return backlog(root, { entry: opts.entry })
     .slice(0, k)
     .map((it) => {
-      const nar = it.record?.narrative;
+      // The rejected entry, when the slot holds one per language (bean
+      // `cat-tools-e1lo`): its text and reason are what the redrafter needs.
+      const nar = it.record
+        ? (narrativesOfSlot(it.record.narrative).find((n) => n.state === "rejected") ?? narrativesOfSlot(it.record.narrative)[0])
+        : undefined;
       return {
         entry: it.entry,
         block: it.block,
@@ -320,7 +325,12 @@ export interface DraftFile {
   drafted_by: Attribution;
   /** ISO date; defaults to today. */
   drafted_at?: string;
-  drafts: { block: string; source_hash: string; text: string; state?: string }[];
+  /**
+   * The language the drafts are written in, as a BCP 47 tag; one draft may
+   * name its own. Defaults to {@link DEFAULT_NARRATIVE_LANG} (bean `e1lo`).
+   */
+  lang?: string;
+  drafts: { block: string; source_hash: string; text: string; state?: string; lang?: string }[];
 }
 
 /**
@@ -374,16 +384,19 @@ export function record(file: DraftFile, root = ROOT): { written: string[]; block
     if (it.status === "draft" || it.status === "confirmed") {
       throw new Error(`${d.block}: already has a current ${it.status} summary — nothing to drain here`);
     }
-    const narrative: Narrative = { text: d.text.trim(), state: "draft", drafted_by: by.data, drafted_at: at };
+    const lang = d.lang ?? file.lang ?? DEFAULT_NARRATIVE_LANG;
+    const narrative: Narrative = { text: d.text.trim(), lang, state: "draft", drafted_by: by.data, drafted_at: at };
     const nr = NarrativeSchema.safeParse(narrative);
     if (!nr.success) throw new Error(`${d.block}: ${nr.error.issues[0]?.message ?? "invalid narrative"}`);
     const prior = it.record;
-    const superseded = prior ? [...(prior.superseded ?? []), prior.narrative] : undefined;
+    // Every entry of the replaced slot is kept, one per language if it held several.
+    const superseded = prior ? [...(prior.superseded ?? []), ...narrativesOfSlot(prior.narrative)] : undefined;
     const rec: BlockSummary = {
       block: d.block,
       source: it.source,
       source_hash: it.hash,
-      narrative: nr.data,
+      // A one-entry list naming its language, the form the store was migrated to.
+      narrative: [nr.data],
       ...(superseded ? { superseded } : {}),
     };
     const slot = byEntry.get(it.entry) ?? { dir: it.entryDir, recs: [] };

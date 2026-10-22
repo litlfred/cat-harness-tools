@@ -41,6 +41,15 @@
  * running `bun cat-harness/scripts/ci-cone.ts prepare`, and a save step on a
  * green push to main. `gate-shell.sh` already does the rest. Bean `4rbc`.
  *
+ * ## Wired into the layer PR checks (cat-harness-tools#398)
+ *
+ * `layer-pr-checks.yml` uses it without `gate-shell.sh`: its gates are run by
+ * `.github/scripts/layer-pr-checks/run-gates.py`, which asks
+ * {@link decideAll} once per shard (`decide-all`), records a cone skip as
+ * SKIPPED with its sha (never an exit code, so never a pass), and on a push
+ * to the caller's main runs each candidate that did not skip through `run`,
+ * one at a time. The records it keeps are this file's, unchanged in shape.
+ *
  * ## Why an exact match is enough
  *
  * The verdict and its read set come from the same run, so there is no
@@ -759,11 +768,68 @@ export function decideRun(o: Omit<ConeRunOpts, "sha" | "stdio" | "runner">): Con
   }
 }
 
+/**
+ * What {@link decideAll} says about one script: {@link ConeDecision}, and
+ * whether the script is a cone candidate at all (its cone fingerprint is
+ * determined). A candidate that does not skip is the one a recording run
+ * traces; a non-candidate is never traced, because nothing could be recorded.
+ */
+export type BatchDecision = ConeDecision & { candidate: boolean };
+
+/**
+ * {@link decideRun} for many scripts in ONE process, sharing one
+ * {@link FileDigests}, so a path several records name is hashed once
+ * (cat-harness-tools#398). Measured 2026-10-07 (bean `4rbc`): `decide` cost
+ * about 0.48 s a step as one process per check, 21.7 s for 45 checks; the
+ * layer PR checks ask about every declared gate of the dependency harness,
+ * about 150 candidates. Any error for one script is "run" for that script.
+ */
+export function decideAll(o: {
+  root: string;
+  scripts: Readonly<Record<string, string>>;
+  names: readonly string[];
+  ioOf: (script: string) => PairIO | undefined;
+  baseline: BaselineResolver | undefined;
+}): { records: string | null; decisions: Record<string, BatchDecision> } {
+  const digests = new FileDigests(o.root);
+  const records = loadRecords(o.root);
+  const decisions: Record<string, BatchDecision> = {};
+  for (const script of o.names) {
+    try {
+      const fp = coneFingerprint(o.root, o.scripts, script, o.ioOf(script), digests, o.baseline);
+      decisions[script] = { ...decideCone(records, script, fp, o.root, digests), candidate: !("undetermined" in fp) };
+    } catch (e) {
+      decisions[script] = { skip: false, why: `could not decide: ${(e as Error).message}`, candidate: false };
+    }
+  }
+  return { records: records?.sha ?? null, decisions };
+}
+
 function main(argv: readonly string[]): number {
   const [cmd, script] = argv;
   const root = process.cwd();
   const env = process.env;
   const scripts = scriptsOf(root);
+  if (cmd === "decide-all") {
+    // `decide-all <out.json> <script>...` (cat-harness-tools#398): every
+    // decision in one file, for `run-gates.py`. Exit 0 whenever the file was
+    // written, whatever it says; the caller treats a missing file as "run all".
+    const [, out, ...names] = argv;
+    if (out === undefined) {
+      console.error("usage: ci-cone.ts decide-all <out.json> <script>...");
+      return 2;
+    }
+    let taskIo: Readonly<Record<string, PairIO>> = {};
+    try {
+      taskIo = collectTaskIo(root);
+    } catch (e) {
+      console.log(`ci-cone: task-io could not be read (${(e as Error).message}), so no script is a candidate`);
+    }
+    const got = decideAll({ root, scripts, names, ioOf: (s) => taskIo[s], baseline: qaBaselineIdentity({ repoRoot: root }) });
+    mkdirSync(dirname(resolve(out)), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(got, null, 1)}\n`);
+    return 0;
+  }
   if (cmd === "prepare") {
     // Which mode this job's gate steps run in, through $GITHUB_ENV.
     const out = env.GITHUB_ENV;
@@ -789,7 +855,7 @@ function main(argv: readonly string[]): number {
     return 0;
   }
   if (script === undefined || (cmd !== "decide" && cmd !== "run")) {
-    console.error("usage: ci-cone.ts prepare | decide <script> | run <script>");
+    console.error("usage: ci-cone.ts prepare | decide <script> | run <script> | decide-all <out.json> <script>...");
     return 2;
   }
   let io: PairIO | undefined;

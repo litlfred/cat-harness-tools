@@ -107,8 +107,9 @@ async function main() {
   // the strict gate below tests `observed > budget`: with zero files every
   // `observed` is 0, no budget is ever exceeded, and the audit prints
   // "✓ All strict-gate budgets respected" having read no Lean at all.
-  // `witness-pipeline.yml` runs this as "baseline-strict" with the `|| true`
-  // mask deliberately dropped, so that pass is load-bearing.
+  // `witness-pipeline.yml` ran this as "baseline-strict" with the `|| true`
+  // mask deliberately dropped, so that pass was load-bearing (that workflow is
+  // retired to the `fsh-guts` state branch, bean `1l13`).
   if (files.length === 0) {
     console.error(
       `No .lean files found under ${REPO_ROOT} ` +

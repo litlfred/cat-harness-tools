@@ -27,9 +27,10 @@
  * repository and they are NOT merged behind a clever abstraction:
  *
  * - `folio-tabular-records/v1` (`tabular.jsonld`) — what `tabular-records.py`
- *   writes today, and the only one anything actually produces;
- * - `folio-tabular-csvw/v1` (`tabular.csvw.json` — JSON, not JSON-LD; bean `792y`) — CSVW, from `eief`, whose
- *   extractors are **stubbed on purpose**, so nothing writes it yet.
+ *   wrote until bean `urat` retired its writer (5c-ii); folios' committed
+ *   records are still read;
+ * - `folio-tabular-csvw/v1` (`tabular.csvw.json` — JSON, not JSON-LD; bean `792y`) — CSVW, from `eief`,
+ *   which core's extractors now write through the `tabular-csvw` slot.
  *
  * {@link tabularShapeOf} reduces either to the little that a manifest needs.
  * Reading only CSVW would make this emitter unable to fire — the vacuity this

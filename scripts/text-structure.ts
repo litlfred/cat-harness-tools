@@ -125,8 +125,26 @@ export function headingsOf(lines: string[]): Array<{ line: number; level: number
   return out;
 }
 
-/** Decided by content: an ATX heading outside fences, and not markup that opens with `<`. */
-export function formatOf(text: string): "markdown" | "verbatim" {
+/**
+ * Extensions of text formats that are never Markdown. A Python, shell or YAML
+ * file has lines that look like ATX headings (`# a comment`), so deciding by
+ * content alone cut generate_dvc_qr.py into 24 "sections" at its comments
+ * (observed 2026-10-20). A file with one of these is verbatim, whatever it holds.
+ */
+const NOT_MARKDOWN = new Set([
+  "py", "sh", "bash", "zsh", "ps1", "rb", "pl", "r", "yaml", "yml", "toml", "ini", "cfg", "conf",
+  "json", "jsonld", "xml", "html", "htm", "svg", "csv", "tsv", "pem", "crt", "cer", "txt",
+  "ts", "js", "mjs", "cjs", "kt", "kts", "java", "rs", "go", "c", "h", "cpp", "fsh", "cddl", "wit", "ttl", "sql",
+]);
+
+/**
+ * Decided by the file's extension when it names a non-Markdown format, and
+ * otherwise by content: an ATX heading outside fences, and not markup that
+ * opens with `<`.
+ */
+export function formatOf(text: string, path?: string): "markdown" | "verbatim" {
+  const ext = path?.match(/\.([A-Za-z0-9]+)$/)?.[1]?.toLowerCase();
+  if (ext !== undefined && NOT_MARKDOWN.has(ext)) return "verbatim";
   if (text.trimStart().startsWith("<")) return "verbatim";
   return headingsOf(linesOf(text)).length > 0 ? "markdown" : "verbatim";
 }
@@ -152,7 +170,7 @@ export function buildEntry(
       sha256: sha(f.bytes),
       bytes: f.bytes.length,
       lines: text === null ? null : linesOf(text).length,
-      format: f.image ? ("image" as const) : formatOf(text!),
+      format: f.image ? ("image" as const) : formatOf(text!, f.path),
       text,
     };
   });

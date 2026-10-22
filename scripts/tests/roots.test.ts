@@ -14,10 +14,15 @@ import {
   HARNESS_ROOT,
   REPO_ROOT,
   TOOLS_ROOT,
+  declaredInstanceName,
   harnessFlag,
+  instanceFlag,
   isHarnessRoot,
+  mountingInstanceRoot,
   repoRootFor,
   resolveHarnessRoot,
+  resolveWorkingInstanceRoot,
+  runnerRootFor,
 } from "../lib/roots.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "roots-test-"));
@@ -116,5 +121,80 @@ describe("harnessFlag", () => {
     expect(harnessFlag(["--harness="])).toBeUndefined();
     expect(harnessFlag(["--harness"])).toBeUndefined();
     expect(harnessFlag(["--harnessy", "/a"])).toBeUndefined();
+  });
+});
+
+/**
+ * The instance being worked on (bean `j3ls`). Each layout is a fixture whose
+ * `.git` is a plain directory: the resolver reads the marker, never git.
+ */
+describe("resolveWorkingInstanceRoot: the instance worked on, not the one loaded from", () => {
+  /** A separated instance's repository, `<scratch>/<dir>/`, declaring `name` and mounting the harness. */
+  function separated(dir: string, name = "who-iris"): { repo: string; harness: string; tools: string } {
+    const x = checkout(dir);
+    mkdirSync(join(x.repo, ".git"), { recursive: true });
+    writeFileSync(join(x.repo, `${name}.json`), JSON.stringify({ name }));
+    writeFileSync(join(x.repo, "package.json"), JSON.stringify({ name: `@litlfred/${name}` }));
+    return x;
+  }
+
+  test("a harness MOUNTED in a separated instance's checkout resolves to that instance", () => {
+    const x = separated("mounted");
+    expect(mountingInstanceRoot(x.harness)).toBe(x.repo);
+    expect(resolveWorkingInstanceRoot({ argv: [], env: {}, harnessRoot: x.harness })).toEqual({ root: x.repo, source: "mount" });
+  });
+
+  test("the declared name decides, never the folder: a clone named `wim/` is still who-iris", () => {
+    const x = separated("wim");
+    expect(declaredInstanceName(x.repo)).toBe("who-iris");
+  });
+
+  test("the harness in its own repository is the harness", () => {
+    const x = checkout("own-repo");
+    mkdirSync(join(x.harness, ".git"), { recursive: true });
+    expect(resolveWorkingInstanceRoot({ argv: [], env: {}, harnessRoot: x.harness })).toEqual({ root: x.harness, source: "harness" });
+  });
+
+  test("an index checkout whose root declares nothing keeps the harness", () => {
+    const x = checkout("index");
+    mkdirSync(join(x.repo, ".git"), { recursive: true });
+    writeFileSync(join(x.repo, "index.config.json"), JSON.stringify({ title: "an index" }));
+    writeFileSync(join(x.repo, "package.json"), JSON.stringify({ name: "@litlfred/folio-assistant-index" }));
+    expect(declaredInstanceName(x.repo)).toBeUndefined();
+    expect(resolveWorkingInstanceRoot({ argv: [], env: {}, harnessRoot: x.harness }).source).toBe("harness");
+  });
+
+  test("no `.git` anywhere keeps the harness", () => {
+    const x = checkout("no-git");
+    writeFileSync(join(x.repo, "who-iris.json"), JSON.stringify({ name: "who-iris" }));
+    // The scratch dir is under the OS tmpdir, which holds no `.git`.
+    expect(resolveWorkingInstanceRoot({ argv: [], env: {}, harnessRoot: x.harness }).source).toBe("harness");
+  });
+
+  test("--instance wins over the environment and the mount; a declaration-less root throws", () => {
+    const x = separated("flagged");
+    const other = separated("other", "smart-base");
+    expect(resolveWorkingInstanceRoot({ argv: ["--instance", other.repo], env: { CAT_INSTANCE_ROOT: x.repo }, harnessRoot: x.harness })).toEqual({
+      root: other.repo,
+      source: "flag",
+    });
+    expect(resolveWorkingInstanceRoot({ argv: [], env: { CAT_INSTANCE_ROOT: other.repo }, harnessRoot: x.harness }).source).toBe("env");
+    const empty = join(scratch, "declares-nothing");
+    mkdirSync(empty, { recursive: true });
+    expect(() => resolveWorkingInstanceRoot({ argv: [`--instance=${empty}`], env: {}, harnessRoot: x.harness })).toThrow(/--instance names/);
+    expect(() => resolveWorkingInstanceRoot({ argv: [], env: { CAT_INSTANCE_ROOT: empty }, harnessRoot: x.harness })).toThrow(
+      /\$CAT_INSTANCE_ROOT names/,
+    );
+  });
+
+  test("instanceFlag: the last flag wins, and an empty value is absent", () => {
+    expect(instanceFlag(["--instance", "/a", "--instance=/b"])).toBe("/b");
+    expect(instanceFlag(["--instance="])).toBeUndefined();
+  });
+
+  test("runnerRootFor: the checkout holding both layers, else the harness's parent", () => {
+    const x = separated("runner");
+    expect(runnerRootFor(x.harness, repoRootFor(x.tools, x.harness))).toBe(x.repo);
+    expect(runnerRootFor(x.harness, undefined)).toBe(x.repo);
   });
 });

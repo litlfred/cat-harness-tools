@@ -293,6 +293,13 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
     // in, a tag out — so the rule pairs it (owner, 2026-09-30).
     expect(pairs).toEqual([
       "beans-cli ~ beans-manual",
+      // One Tool node per forge operation (cat-harness#385, bean `4dbr` step
+      // 2): the GitHub and GitLab forms of each operation read and write the
+      // same things, and each carries a `selection` naming the forge.
+      "github-branches ~ gitlab-branches",
+      "github-pr-comment ~ gitlab-mr-comment",
+      "github-pr-list ~ gitlab-mr-list",
+      "github-pr-view ~ gitlab-mr-view",
       "ingest-extended ~ ingest-stdlib",
       "package-release-manual ~ release-please",
       // Two runtimes for one server (bean `0hi8`: "at least two tools satisfy

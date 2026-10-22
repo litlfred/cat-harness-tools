@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.js";
 import { builtDocsRoute, docsRouteFor } from "../docs-route.ts";
 import {
   pagePermalink,
@@ -114,7 +115,12 @@ describe("what moves and what stays — read off the real tree", () => {
   });
 
   test("no top-level page is left behind but the landing page", () => {
-    const pages = readdirSync(SITE).filter((f) => f.endsWith(".md") && /^---/.test(readFileSync(join(SITE, f), "utf-8")));
+    // The folder's own README is the repository view, which compose-docs does
+    // not publish (`filesUnder`); its `generated:` front matter (cat-harness#393)
+    // does not make it a page.
+    const pages = readdirSync(SITE).filter(
+      (f) => f.endsWith(".md") && !isDirectoryReadme(f) && /^---/.test(readFileSync(join(SITE, f), "utf-8")),
+    );
     for (const f of pages) {
       if (f === "index.md") expect(url(f)).toBe("/");
       else expect(url(f).startsWith(`/${ROUTE}/`), f).toBe(true);

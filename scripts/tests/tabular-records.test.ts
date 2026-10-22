@@ -1,20 +1,21 @@
 /**
- * CSV and spreadsheets — bean `p67i`.
+ * CSV and spreadsheets — bean `p67i`, and the v1 writer's retirement — bean `urat`.
  *
- * `uploads/` holds four PDFs and no datasets, so every claim is made against
- * files this module builds. The xlsx fixture is written by `zipfile` at test
- * time rather than committed, and deliberately mimics what a real writer
- * emits — including the package-root-absolute relationship Target that broke
- * the first draft.
+ * `tabular-records.py` no longer WRITES `folio-tabular-records/v1` (5c-ii,
+ * option 1): CSV and xlsx are read as CSVW through the `tabular-csvw` slot.
+ * What stays is what a folio's COMMITTED v1 records rely on: the schema still
+ * reads them, the gate still judges them, and their keys are still declared.
+ * So those tests run against a v1 record exactly as the writer last wrote one
+ * (`COMMITTED_V1`), not against a writer that no longer runs.
  *
- * No openpyxl, no pandas: this repository declares no Python dependencies and
- * CI installs only `ruff`, so a test needing one would pass locally and fail
- * there. The reader is stdlib and so is the fixture.
+ * The routing tests build an xlsx with `zipfile` at test time, mimicking what
+ * a real writer emits — including the package-root-absolute relationship
+ * Target that broke the first draft of the reader.
  *
- * @module scripts/tests/tabular-records
+ @module scripts/tests/tabular-records
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -82,88 +83,61 @@ function csv(dir: string, body: string, name = "data.csv"): string {
   return p;
 }
 
-function extract(file: string, out: string) {
-  const r = Bun.spawnSync(["python3", join(TOOLS_ROOT, "scripts/tabular-records.py"), "-o", out, file], { cwd: ROOT });
-  if (r.exitCode !== 0) throw new Error(new TextDecoder().decode(r.stderr));
-  const slug = file.endsWith(".xlsx") ? "book" : "data";
-  return TabularRecordsSchema.safeParse(JSON.parse(readFileSync(join(out, slug, "tabular.jsonld"), "utf-8")));
+/**
+ * A v1 record as `tabular-records.py` last wrote it, for `a,b\n1,2\n3,4\n`
+ * (captured 2026-10-22 from tools 00527df, the commit before retirement).
+ * Folios hold records like this; the schema must keep reading them.
+ */
+const COMMITTED_V1 = {
+  "@context": CONTENT_CONTEXT_URL,
+  $schema: "folio-tabular-records/v1",
+  "@id": "library/data/tabular",
+  source: {
+    file: "data.csv",
+    sha256: "b9485148546419a0f6a85e8d708c923557c15d7f3c7d078ef1fa7f7c0f57d5a5",
+    bytes: 12,
+    mtime: "2026-10-22T15:38:01Z",
+    mimetype_sniffed: null,
+    mimetype_source: "unrecognised",
+  },
+  format: "csv",
+  sheets: [
+    { name: "data", headers: ["a", "b"], rows: 3, columns: 2, shape_source: "counted", delimiter: ",", delimiter_source: "sniffed" },
+  ],
+  n_sheets: 1,
+  header_vocabulary: ["a", "b"],
+  narrative: { text: null, state: "not-authored" },
+};
+
+/** The committed record, parsed by today's schema. */
+function committed() {
+  return TabularRecordsSchema.safeParse(structuredClone(COMMITTED_V1));
 }
 
-describe("a workbook is read for its sheets, headers and shape", () => {
-  test("sheet names, headers and shape all come through", () => {
-    const d = tmp();
-    const r = extract(xlsx(d), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    expect(r.data.sheets.map((s) => s.name)).toEqual(["Cases", "Deaths"]);
-    expect(r.data.sheets[0].headers).toEqual(["country", "year", "cases"]);
-    expect(r.data.sheets[1].headers).toEqual(["country", "year", "deaths"]);
-    expect(r.data.sheets.map((s) => [s.rows, s.columns])).toEqual([[3, 3], [2, 3]]);
-    for (const s of r.data.sheets) expect(s.shape_source).toBe("dimension");
-  });
+/** The committed record written into a library at `<out>/data/tabular.jsonld`. */
+function commitInto(out: string): void {
+  mkdirSync(join(out, "data"), { recursive: true });
+  writeFileSync(join(out, "data", "tabular.jsonld"), JSON.stringify(COMMITTED_V1, null, 2) + "\n");
+}
 
-  test("an ABSOLUTE relationship Target resolves — the defect that looked plausible", () => {
-    // The names were right and everything else was empty, which is the worst
-    // shape a bug can take: the output reads as a successfully ingested
-    // workbook that simply had no headers.
+describe("the v1 writer is retired", () => {
+  test("run as a command it refuses, writes nothing, and names the CSVW rung", () => {
     const d = tmp();
-    const r = extract(xlsx(d), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    expect(r.data.sheets.every((s) => s.headers.length > 0)).toBe(true);
-    expect(r.data.sheets.every((s) => s.shape_source !== "undetermined")).toBe(true);
-  });
-
-  test("the header vocabulary is the union across sheets, deduplicated", () => {
-    const d = tmp();
-    const r = extract(xlsx(d), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    // `country` and `year` appear on both sheets and once here: this field is
-    // what a grep for a column name lands in.
-    expect(r.data.header_vocabulary).toEqual(["cases", "country", "deaths", "year"]);
+    const out = join(d, "lib");
+    const r = Bun.spawnSync(["python3", join(TOOLS_ROOT, "scripts/tabular-records.py"), "-o", out, csv(d, "a,b\n1,2\n3,4\n")], { cwd: ROOT });
+    expect(r.exitCode).toBe(1);
+    expect(new TextDecoder().decode(r.stderr)).toContain("tabular-csvw.ts");
+    expect(existsSync(out)).toBe(false);
   });
 });
 
-describe("a CSV is read without guessing", () => {
-  test("headers, row count and a sniffed delimiter", () => {
-    const d = tmp();
-    const r = extract(csv(d, "country,year,cases\nMWI,2024,17\nZMB,2024,42\n"), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    expect(r.data.sheets[0].headers).toEqual(["country", "year", "cases"]);
-    expect(r.data.sheets[0].rows).toBe(3);
-    expect(r.data.sheets[0].delimiter).toBe(",");
-  });
-
-  test("a semicolon file is not split on commas", () => {
-    const d = tmp();
-    const r = extract(csv(d, "a;b;c\n1;2;3\n4;5;6\n"), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    expect(r.data.sheets[0].headers).toEqual(["a", "b", "c"]);
-  });
-});
-
-describe("the narrative slot is declared empty, never invented", () => {
-  test("a fresh record is `not-authored` with no text", () => {
-    const d = tmp();
-    const r = extract(csv(d, "a,b\n1,2\n3,4\n"), join(d, "lib"));
-    expect(r.success).toBe(true);
-    if (!r.success) return;
-    // Headers are RIGHT THERE and a plausible summary could be assembled from
-    // them. It is not, because shipping one as the answer is a claim nobody
-    // made. Drafting one and SAYING SO is a different act — `state: "draft"`.
-    expect(r.data.narrative.text).toBeNull();
-    expect(r.data.narrative.state).toBe("not-authored");
-  });
-
+describe("the narrative slot of a committed record", () => {
   test("the schema refuses a record that says two things at once", () => {
-    const d = tmp();
-    const r = extract(csv(d, "a,b\n1,2\n3,4\n"), join(d, "lib"));
+    const r = committed();
     expect(r.success).toBe(true);
     if (!r.success) return;
-    const with_ = (n: unknown) => TabularRecordsSchema.safeParse({ ...r.data, narrative: n }).success;
+    // Each as the one-entry list a written narrative is stored in (e1lo).
+    const with_ = (n: object) => TabularRecordsSchema.safeParse({ ...r.data, narrative: [{ ...n, lang: "en" }] }).success;
     // Text without a state that admits it, and a state that claims text there
     // is none of, are both refused (bean `ju0u`).
     expect(with_({ text: "a summary", state: "not-authored" })).toBe(false);
@@ -259,15 +233,14 @@ function entryFor(mimetype: string | null, tabular?: unknown): string {
 const tabState = (d: string) => checkEntry(d).requirements.find((r) => r.name === "tabular-records");
 
 describe("the gate fires on a workbook with no record", () => {
-  test("a workbook entry with no tabular.jsonld is UNMET", () => {
+  test("a workbook entry with no tabular record is UNMET", () => {
     const r = tabState(entryFor(XLSX));
     expect(r?.state).toBe("unmet");
-    expect(r?.detail).toContain("no tabular.jsonld");
+    expect(r?.detail).toContain("no tabular record");
   });
 
   test("a valid record is MET and names the narrative state", () => {
-    const d = tmp();
-    const rec = extract(csv(d, "a,b\n1,2\n3,4\n"), join(d, "lib"));
+    const rec = committed();
     expect(rec.success).toBe(true);
     if (!rec.success) return;
     const r = tabState(entryFor(XLSX, rec.data));
@@ -284,8 +257,7 @@ describe("the gate fires on a workbook with no record", () => {
   test("a CSV entry is checked on its merits despite an unrecognised mimetype", () => {
     // A CSV has no magic bytes, so requiring a record of every unrecognised
     // entry would demand a dataset of every text file. Present means checked.
-    const d = tmp();
-    const rec = extract(csv(d, "a,b\n1,2\n3,4\n"), join(d, "lib"));
+    const rec = committed();
     expect(rec.success).toBe(true);
     if (!rec.success) return;
     expect(tabState(entryFor(null, rec.data))?.state).toBe("met");
@@ -329,19 +301,11 @@ import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkDeclaredKeys } from "../check-content-keys.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
-describe("the tabular record is JSON-LD a processor keeps whole", () => {
-  test("the arm emits the published content context", () => {
+describe("a committed tabular record is JSON-LD a processor keeps whole", () => {
+  test("every key a committed record carries is a declared term — nested data rides in `@json`", () => {
     const d = tmp();
     const out = join(d, "lib");
-    extract(xlsx(d), out);
-    const raw = JSON.parse(readFileSync(join(out, "book", "tabular.jsonld"), "utf-8"));
-    expect(raw["@context"]).toBe(CONTENT_CONTEXT_URL);
-  });
-
-  test("every key the arm writes is a declared term — nested data rides in `@json`", () => {
-    const d = tmp();
-    const out = join(d, "lib");
-    extract(xlsx(d), out);
+    commitInto(out);
     const k = checkDeclaredKeys(out);
     expect(k.documents).toBe(1); // not vacuous: the record was read as content
     expect(k.undeclared).toEqual([]);
@@ -354,10 +318,7 @@ describe("the tabular record is JSON-LD a processor keeps whole", () => {
 
   test("a record written before the arm emitted `@context` still validates", () => {
     // Folio repositories hold those. The field is optional for exactly that.
-    const d = tmp();
-    const out = join(d, "lib");
-    extract(xlsx(d), out);
-    const raw = JSON.parse(readFileSync(join(out, "book", "tabular.jsonld"), "utf-8"));
+    const raw: Record<string, unknown> = structuredClone(COMMITTED_V1);
     delete raw["@context"];
     expect(TabularRecordsSchema.safeParse(raw).success).toBe(true);
     expect(TabularRecordsSchema.safeParse({ ...raw, "@context": "https://elsewhere.example/ctx" }).success).toBe(false);

@@ -27,6 +27,9 @@ import {
 import { processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../gen-processes-viz.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
+const CORPUS_TIMEOUT = 60_000;
+
 const BPMN = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
@@ -157,5 +160,5 @@ describe("the real corpus", () => {
     const r = withMarkers[0]!;
     expect(r.markers!.every((m) => m.left >= 0 && m.left <= 100 && m.top >= 0 && m.top <= 100)).toBe(true);
     expect(processPage(r, rows, new Set())).toContain(`data-panel="${r.stem}.tasks.json"`);
-  });
+  }, CORPUS_TIMEOUT);
 });

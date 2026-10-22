@@ -323,7 +323,8 @@ const fullyCompliant = findings.filter((f) =>
   f.has_lean_class_hypothesis && f.has_md_conditional_banner);
 
 console.log(`§3b-cond conditional-class banner audit`);
-// `witness-pipeline.yml` runs this with `--strict`, so its exit code gates.
+// `witness-pipeline.yml` ran this with `--strict`, so its exit code gated (that
+// workflow is retired to the `fsh-guts` state branch, bean `1l13`).
 // Over an empty corpus it finds 0 labels beyond the baseline and exits 0 —
 // the same shape as `trivial-skeleton-audit` (bean `pzdv`): a gate that
 // passes for free because it read nothing. Auditing nothing is a failure.

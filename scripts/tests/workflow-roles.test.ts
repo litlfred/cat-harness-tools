@@ -17,6 +17,9 @@ import { readRoleGraph, resolveRoleSkills } from "@litlfred/cat-harness/schemas/
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
+const CORPUS_TIMEOUT = 60_000;
+
 const ROOT = join(HARNESS_ROOT);
 const graph = readRoleGraph(join(ROOT, "scenarios"));
 
@@ -81,5 +84,5 @@ describe("every activity in every diagram is performed by a declared role", () =
       }
     }
     expect(unbound).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 });
