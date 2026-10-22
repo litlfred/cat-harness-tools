@@ -20,7 +20,9 @@
  * someone states the reason it is exempt.
  */
 import { describe, expect, test } from "bun:test";
-import { CONSTRAINT_RULES } from "@litlfred/cat-harness/schemas/constraints.ts";
+// The rules validate.ts runs: cat-harness's, and each vocabulary module's
+// (the science layer carries the rules about its own kinds since 2026-10-22).
+import { allConstraintRules } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 
 /**
@@ -54,11 +56,14 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
       "asks whether a PROVABLE block should have been a conjecture, given " +
       "its Lean stub. The question is meaningless for any other kind.",
   },
+  "mathpaper-md-exists": {
+    kinds: ["definition", "theorem", "lemma", "proposition", "corollary", "conjecture"],
+    because:
+      "md-exists for the science layer's kinds, carried by its vocabulary " +
+      "module since 2026-10-22; the six it always covered (proof never was).",
+  },
   "md-exists": {
-    kinds: [
-      "definition", "theorem", "lemma", "proposition", "corollary",
-      "conjecture", "example", "remark", "simulator", "prose", "recommendation",
-    ],
+    kinds: ["example", "remark", "simulator", "prose", "recommendation"],
     because:
       // `recommendation` joined when cat-harness admitted the normative
       // statement kind: its body is prose, so it carries a companion .md.
@@ -69,7 +74,10 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
   },
 };
 
-const byId = new Map(CONSTRAINT_RULES.map((c) => [c.id, c]));
+const RULES = allConstraintRules();
+const byId = new Map(RULES.map((c) => [c.id, c]));
+/** A kind-specific entry about kinds no instance here declares (the science layer, unmounted) has no rule to find. */
+const inScope = (kinds: string[]): boolean => kinds.some((k) => (BLOCK_KINDS as readonly string[]).includes(k));
 
 describe("constraint appliesTo coverage", () => {
   test("every rule is either universal or listed as kind-specific", () => {
@@ -77,7 +85,7 @@ describe("constraint appliesTo coverage", () => {
     // block kind that some rule was not extended to, fails here rather
     // than quietly narrowing what gets validated.
     const unexplained: string[] = [];
-    for (const rule of CONSTRAINT_RULES) {
+    for (const rule of RULES) {
       const missing = BLOCK_KINDS.filter((k) => !rule.appliesTo.includes(k));
       if (missing.length === 0) continue;
       if (KIND_SPECIFIC[rule.id]) continue;
@@ -90,6 +98,7 @@ describe("constraint appliesTo coverage", () => {
     // Pins the narrowing itself, so widening or narrowing one of these
     // is a deliberate edit here rather than a silent change in coverage.
     for (const [id, { kinds }] of Object.entries(KIND_SPECIFIC)) {
+      if (!inScope(kinds)) continue;
       const rule = byId.get(id);
       expect({ id, found: rule !== undefined }).toEqual({ id, found: true });
       expect({ id, kinds: [...rule!.appliesTo].sort() }).toEqual({ id, kinds: [...kinds].sort() });
@@ -117,7 +126,7 @@ describe("constraint appliesTo coverage", () => {
     // The other direction of drift: a rule naming a kind that was
     // renamed or removed silently applies to nothing.
     const all = new Set<string>(BLOCK_KINDS);
-    for (const rule of CONSTRAINT_RULES) {
+    for (const rule of RULES) {
       const bogus = rule.appliesTo.filter((k) => !all.has(k));
       expect({ id: rule.id, bogus }).toEqual({ id: rule.id, bogus: [] });
     }

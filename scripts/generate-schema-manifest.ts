@@ -177,17 +177,12 @@ const qouSource = readFileSync(QOU_TYPES_FILE, "utf-8");
 const contentTypes = parseInterfaces(typesSource, "types.ts");
 const qouTypes = parseInterfaces(qouSource, "formalization-types.ts");
 
-// Map block kind → TypeDoc interface name
+// Map block kind → TypeDoc interface name: the kinds cat-harness's types.ts
+// declares. The science layer's (definition, theorem, …) are typed by its
+// vocabulary module since 2026-10-22, not here.
 const BLOCK_KIND_MAP: Record<string, string> = {
-  definition: "DefinitionBlock",
-  theorem: "TheoremBlock",
-  lemma: "LemmaBlock",
-  proposition: "PropositionBlock",
-  corollary: "CorollaryBlock",
-  conjecture: "ConjectureBlock",
   example: "ExampleBlock",
   remark: "RemarkBlock",
-  proof: "ProofBlock",
   prose: "ProseBlock",
   equation: "EquationBlock",
   diagram: "DiagramBlock",

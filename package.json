@@ -398,6 +398,8 @@
     "external-schemas:viz:check": "bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check",
     "folio:viz": "bun run cat-harness-tools/scripts/gen-folio-viz.ts",
     "folio:viz:check": "bun run cat-harness-tools/scripts/gen-folio-viz.ts --check",
+    "folio:shim": "bun run cat-harness-tools/scripts/folio-shim.ts",
+    "folio:shim:check": "bun run cat-harness-tools/scripts/folio-shim.ts --check",
     "fsh-guts:viz": "bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts",
     "staging-graph:viz": "bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts",
     "fsh-guts:viz:check": "bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts --check",
