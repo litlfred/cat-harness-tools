@@ -70,7 +70,8 @@ export interface WorkflowFinding {
     | "gh-pages-ungrouped"
     | "gh-pages-wipes-staging"
     | "qa-reports-unretried"
-    | "bean-gate-unmounted";
+    | "bean-gate-unmounted"
+    | "exit-status-swallowed";
   detail: string;
 }
 
@@ -525,6 +526,58 @@ export function beanGateUnmounted(text: string, file: string): WorkflowFinding[]
   return out;
 }
 
+/**
+ * A run body that reads `$?` on its own line, under Actions' `bash -e`.
+ *
+ * GitHub runs a `run:` step as `bash -e` (`bash -eo pipefail` when the step
+ * names `shell: bash`), so a failing command ends the step at once. A body
+ * written as a bare call, then `code=$?` on the next line, never reaches that
+ * line on the very exit codes it was written to handle: the report it meant to
+ * print, the summary, the output and the softened exit are all skipped. The
+ * step goes red with nothing said. Measured in the index on 2026-10-22: every
+ * `post-merge-regen.yml` run on `main` failed with only "exited with code 1"
+ * for that reason, and a QA step that was meant to be a warning went red with
+ * no output.
+ *
+ * The sanctioned forms are `code=0; cmd || code=$?` (as `merge-guard.yml`
+ * does) or a `set +e` earlier in the same body. Detected per `run: |` block:
+ * a line that is only `<name>=$?`, with no `set +e` before it in that block.
+ */
+export function exitStatusSwallowed(text: string, file: string): WorkflowFinding[] {
+  const out: WorkflowFinding[] = [];
+  const lines = text.split("\n");
+  let block: { indent: number; plusE: boolean } | undefined;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    const start = /^(\s*)(?:- )?run:\s*[|>][-+]?\s*$/.exec(l);
+    if (start !== null) {
+      block = { indent: start[1]!.length, plusE: false };
+      continue;
+    }
+    if (block === undefined) continue;
+    if (l.trim() === "") continue;
+    if (l.length - l.trimStart().length <= block.indent) {
+      block = undefined;
+      continue;
+    }
+    const body = l.trim();
+    if (body.startsWith("#")) continue;
+    if (/^set\b.*(?:\s\+[a-zA-Z]*e|\+o\s+errexit)/.test(body)) block.plusE = true;
+    const read = /^([A-Za-z_][A-Za-z0-9_]*)=\$\?\s*(?:#.*)?$/.exec(body);
+    if (read === null || block.plusE) continue;
+    out.push({
+      file,
+      line: i + 1,
+      kind: "exit-status-swallowed" as const,
+      detail:
+        `\`${read[1]}=$?\` on its own line. Actions runs this body as \`bash -e\`, so the command before it ` +
+        `ends the step on a non-zero exit and this line is never reached. Write \`${read[1]}=0\` before the ` +
+        `command and \`|| ${read[1]}=$?\` after it (as \`merge-guard.yml\` does), or \`set +e\` earlier in the body.`,
+    });
+  }
+  return out;
+}
+
 export function checkWorkflows(): WorkflowFinding[] {
   const out: WorkflowFinding[] = [];
   for (const f of readdirSync(DIR)) {
@@ -538,6 +591,7 @@ export function checkWorkflows(): WorkflowFinding[] {
       ...ghPagesWipesStaging(text, f),
       ...qaReportsUnretried(text, f),
       ...beanGateUnmounted(text, f),
+      ...exitStatusSwallowed(text, f),
     );
   }
   return out;
@@ -553,7 +607,8 @@ if (import.meta.main) {
         `every gh-pages push is protected by the \`${GH_PAGES_GROUP}\` queue or a retry; ` +
         `no full-replace publish drops the open PRs' \`${STAGING_PREFIX}/\` previews; ` +
         `every write to \`${QA_REPORTS_BRANCH}\` goes through qa-store; ` +
-        `every job that judges the bean store mounts it first`,
+        `every job that judges the bean store mounts it first; ` +
+        "no run body reads `$?` on a line `bash -e` never reaches",
     );
   } else {
     for (const f of findings) console.error(`  ✗ ${f.file}:${f.line}  [${f.kind}] ${f.detail}`);

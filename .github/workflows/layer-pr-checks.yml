@@ -668,8 +668,11 @@ jobs:
         run: |
           set -uo pipefail
           own="$RUNNER_TEMP/own/${SUBDIR:-.}"
-          out="$(bun cat-harness-tools/scripts/subgraph-readmes.ts --check --repo "$own" 2>&1)"
-          code=$?
+          # `|| code=$?`: under Actions' `bash -e` an assignment from a
+          # failing command substitution ends the step, so a stale README
+          # turned this QA report red with no output and no summary.
+          code=0
+          out="$(bun cat-harness-tools/scripts/subgraph-readmes.ts --check --repo "$own" 2>&1)" || code=$?
           echo "$out"
           {
             echo "### Directory READMEs (QA, does not block)"
