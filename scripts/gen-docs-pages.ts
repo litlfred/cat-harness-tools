@@ -238,7 +238,7 @@ let storedAbsent = 0;
  * than the checkout — bean `5o5c`, owner ruling C (2026-10-22).
  *
  * The page is generated inside whichever checkout mounts this instance — the
- * index, `smart-immunizations`, a bare clone — and `REPO_WEB` is that
+ * index, a content layer's own checkout, a bare clone — and `REPO_WEB` is that
  * checkout's `origin`. Stamping it as `data-repo` made the same block render
  * three ways, and the rendered line is a msgid in the translation catalogues,
  * so every foreign root saw the catalogue as obsolete. It was also wrong where
