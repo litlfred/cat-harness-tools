@@ -1139,9 +1139,20 @@ const warnedSidecars = new Set<string>();
 
 export function loadQaReport(path: string): BlockQaReport | undefined {
   if (!existsSync(path)) return undefined;
+  return parseQaReport(readFileSync(path, "utf-8"), path);
+}
+
+/**
+ * {@link loadQaReport} over text already in hand — a sidecar read from the
+ * qa-reports branch rather than off disk (bean `8wj1`). `label` names it in a
+ * warning; the shape rules are the same, so a branch read and a disk read of
+ * the same bytes give the same report.
+ */
+export function parseQaReport(text: string, label: string): BlockQaReport | undefined {
+  const path = label;
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, "utf-8"));
+    raw = JSON.parse(text);
   } catch (err) {
     // A corrupt sidecar used to return `undefined` — the same answer as a file
     // that does not exist. Callers treat that as "no QA has ever been done"
