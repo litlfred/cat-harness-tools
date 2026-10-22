@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-21T18:45:00Z
+updated_at: 2026-10-22T00:00:00Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -448,3 +448,18 @@ It is still the single `NarrativeSchema`, not a slot. **0 authored figure blocks
 - **If you say nothing:** it remains the last single-form schema, and stage 4 cannot remove the single form.
 
 Recommendation, as my judgement: 1A, 2A, 3A. That gives stage 4 one rule — every written narrative names its language — with one explicit exception: "nothing written yet".
+
+## Owner ruling 2026-10-22: 1A, 2A, 3A
+
+Given in this lane's session (https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr), in answer to the three options above: **"1A 2A 3A"**.
+
+1. An empty slot stays `{ text: null, state: "not-authored" }`: the one single-form value, with no `lang`.
+2. `superseded` entries require `lang`.
+3. `FigureSchema.narrative` becomes a slot like every other.
+
+Stage 4 therefore makes `lang` required on every written narrative. A slot is then either a list of entries that each name a distinct language, or the not-authored marker.
+
+Order, so no stored record is ever invalid:
+- smart-base and smart-immunizations are migrated first (lane S).
+- tools fixtures move to the list form.
+- Then the cat-harness schema change lands.
