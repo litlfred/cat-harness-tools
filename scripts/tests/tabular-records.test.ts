@@ -163,7 +163,8 @@ describe("the narrative slot is declared empty, never invented", () => {
     const r = extract(csv(d, "a,b\n1,2\n3,4\n"), join(d, "lib"));
     expect(r.success).toBe(true);
     if (!r.success) return;
-    const with_ = (n: unknown) => TabularRecordsSchema.safeParse({ ...r.data, narrative: n }).success;
+    // Each as the one-entry list a written narrative is stored in (e1lo).
+    const with_ = (n: object) => TabularRecordsSchema.safeParse({ ...r.data, narrative: [{ ...n, lang: "en" }] }).success;
     // Text without a state that admits it, and a state that claims text there
     // is none of, are both refused (bean `ju0u`).
     expect(with_({ text: "a summary", state: "not-authored" })).toBe(false);

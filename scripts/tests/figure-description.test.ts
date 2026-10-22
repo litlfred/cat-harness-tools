@@ -32,7 +32,7 @@ const base = (over: Record<string, unknown> = {}) => ({
   basis: "labels-and-render",
   described_by: agent,
   described_at: "2026-09-30",
-  narrative: { state: "draft", text: "A diagram.", drafted_by: agent, drafted_at: "2026-09-30" },
+  narrative: [{ state: "draft", lang: "en", text: "A diagram.", drafted_by: agent, drafted_at: "2026-09-30" }],
   ...over,
 });
 
@@ -71,14 +71,17 @@ describe("the narrative rules are the corpus's, not this file's", () => {
   test("an agent cannot confirm its own draft", () => {
     const r = FigureDescriptionSchema.safeParse(
       base({
-        narrative: {
-          state: "confirmed",
-          text: "A diagram.",
-          drafted_by: agent,
-          drafted_at: "2026-09-30",
-          confirmed_by: agent,
-          confirmed_at: "2026-09-30",
-        },
+        narrative: [
+          {
+            state: "confirmed",
+            lang: "en",
+            text: "A diagram.",
+            drafted_by: agent,
+            drafted_at: "2026-09-30",
+            confirmed_by: agent,
+            confirmed_at: "2026-09-30",
+          },
+        ],
       }),
     );
     expect(r.success).toBe(false);
@@ -103,8 +106,8 @@ describe("one description per (page, figure)", () => {
   // described: the second was refused as a duplicate of the first. A review
   // bot found it on #1633.
   test("TWO UNLABELLED figures on one page are both describable", () => {
-    const a = base({ figure: undefined, narrative: { state: "draft", text: "A flow chart.", drafted_by: agent, drafted_at: "2026-09-30" } });
-    const b = base({ figure: undefined, narrative: { state: "draft", text: "A bar chart.", drafted_by: agent, drafted_at: "2026-09-30" } });
+    const a = base({ figure: undefined, narrative: [{ state: "draft", lang: "en", text: "A flow chart.", drafted_by: agent, drafted_at: "2026-09-30" }] });
+    const b = base({ figure: undefined, narrative: [{ state: "draft", lang: "en", text: "A bar chart.", drafted_by: agent, drafted_at: "2026-09-30" }] });
     const r = FigureDescriptionsFileSchema.safeParse(file([a, b]));
     expect(r.success).toBe(true);
   });

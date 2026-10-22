@@ -92,7 +92,7 @@ describe("the sidecar validates, and refuses records that mean nothing", () => {
     block: "library/doc/blocks/prose-a",
     source: "sections/a.md",
     source_hash: "a".repeat(64),
-    narrative: { text: "x", state: "draft", drafted_by: AGENT },
+    narrative: [{ text: "x", lang: "en", state: "draft", drafted_by: AGENT }],
     ...over,
   });
   const doc = (summaries: unknown[]) => ({ $schema: "folio-block-summaries/v1", entry: "doc", summaries });
@@ -114,7 +114,7 @@ describe("the sidecar validates, and refuses records that mean nothing", () => {
   });
 
   test("an agent draft with no model is refused — inherited from the attribution schema", () => {
-    const n = { text: "x", state: "draft", drafted_by: { kind: "agent", id: "c" } };
+    const n = [{ text: "x", lang: "en", state: "draft", drafted_by: { kind: "agent", id: "c" } }];
     expect(BlockSummariesSidecarSchema.safeParse(doc([{ ...rec(), narrative: n }])).success).toBe(false);
   });
 

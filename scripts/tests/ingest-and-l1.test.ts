@@ -1111,11 +1111,14 @@ describe("a document's figures can be VECTOR, and the gate no longer passes over
           file: "images/i1.png",
           role: "figure",
           basis: { method: "geometry", coverage: 0.4, imagesOnPage: 1, page: 1 },
-          narrative: {
-            text: "A logo.",
-            state: "draft",
-            drafted_by: { kind: "agent", id: "a", model: "m" },
-          },
+          narrative: [
+            {
+              text: "A logo.",
+              lang: "en",
+              state: "draft",
+              drafted_by: { kind: "agent", id: "a", model: "m" },
+            },
+          ],
         },
       ],
     });

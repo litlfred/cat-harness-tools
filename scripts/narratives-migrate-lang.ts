@@ -27,7 +27,7 @@
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { LANGUAGE_TAG, NarrativeSlotSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
-import { LIBRARY_NARRATIVE_BEARING, NARRATIVE_BEARING, narrativesIn, type NarrativePath } from "./narratives.ts";
+import { LIBRARY_NARRATIVE_BEARING, NARRATIVE_BEARING, narrativesIn, slotsIn, type NarrativePath } from "./narratives.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 
 export interface FileResult {
@@ -97,26 +97,30 @@ export function migrateText(raw: string, lang: string): { text: string; result: 
   if (write === undefined) {
     return { text: raw, result: { ...result, refused: "does not round-trip through JSON byte-identically" } };
   }
-  const before = narrativesIn(doc);
-  for (const { path, narrative } of before) {
-    if (path[path.length - 1] !== "narrative") {
-      result.alreadyList++;
+  // Raw slots, not `narrativesIn`: from stage 4 the slot schema refuses a
+  // written single narrative, which is exactly what this converts.
+  for (const { at: path, value } of slotsIn(doc)) {
+    if (Array.isArray(value)) {
+      result.alreadyList += value.length;
       continue;
     }
-    if (narrative.state === "not-authored") {
+    if (typeof value !== "object" || value === null) continue;
+    const single = value as Record<string, unknown>;
+    if (single.state === "not-authored") {
       result.skippedNotAuthored++;
       continue;
     }
-    const { parent, key } = at(doc, path);
-    const single = (parent as Record<string | number, unknown>)[key] as Record<string, unknown>;
     const list = [{ ...single, lang }];
     const r = NarrativeSlotSchema.safeParse(list);
     if (!r.success) return { text: raw, result: { ...result, refused: `${path.join(".")}: ${r.error.issues[0]?.message}` } };
+    const { parent, key } = at(doc, path);
     (parent as Record<string | number, unknown>)[key] = list;
     result.converted++;
   }
-  if (narrativesIn(doc).length !== before.length) {
-    return { text: raw, result: { ...result, refused: "the narrative count changed" } };
+  // Every slot now reads through the schema: the converted ones, the lists
+  // already there, and the empty slots. Anything else was malformed already.
+  if (narrativesIn(doc).length !== result.converted + result.alreadyList + result.skippedNotAuthored) {
+    return { text: raw, result: { ...result, refused: "a narrative slot does not validate after conversion" } };
   }
   return { text: result.converted ? write(doc) : raw, result };
 }
