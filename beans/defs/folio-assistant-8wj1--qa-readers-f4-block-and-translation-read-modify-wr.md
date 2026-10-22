@@ -6,7 +6,7 @@ status: todo
 type: task
 priority: critical
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-22T16:44:30Z
+updated_at: 2026-10-22T17:01:31Z
 parent: folio-assistant-3fva
 ---
 
@@ -110,3 +110,20 @@ _2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Own
 - The holding branch named above (`claude/quirky-davinci-ixuymr`) was last touched on 2026-10-03.
 
 The claimed work is NOT all on main: the unticked Done-when boxes above are what remains, and the ticked ones are what landed. Back to todo so the claim does not mislead a sibling session. Nothing was deleted.
+
+
+*2026-10-22T17:10:00Z* — Progress, and a provisional ruling (lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). The third Done-when has three parts.
+
+- **translation:block-qa:check:** litlfred/cat-harness-tools#563.
+  - In a stored tree with `--against`, each prior is read from qa-reports instead of the working copy.
+  - Measured in the index at 1730012 against qa-reports main: inherited findings were 6 with `test/results/` present and 3 with it absent. They are now 6 both ways, with the same verdict.
+- **qa_staleness:** litlfred/cat-harness-tools#564 adds `qa-staleness --against <ref>`.
+  - On cat-harness `docs/source`, 172 blocks were all NO-QA with `test/results/` absent. Now the per-block results are identical both ways.
+  - A sidecar the branch cannot read is UNKNOWN, never NO-QA.
+  - The MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`. That is routed to lane C.
+- **qa_sweep, option (A), provisional:** taken by the coordinator; the owner may switch it to (B) or (C).
+  - A writer RECOMPOSES rather than judges. Its own criteria do not depend on the prior, and agent attestations come from the store (box 1).
+  - With `test/results/` absent, the entries other script writers left in the same sidecar are not carried. They are regenerated when those writers next run, so nothing is lost.
+  - (B) would give writers `--prior-from <ref>`. (C) would refuse to write with `test/results/` absent.
+
+Close this bean when #563 and #564 are merged, unless the owner overrides (A).

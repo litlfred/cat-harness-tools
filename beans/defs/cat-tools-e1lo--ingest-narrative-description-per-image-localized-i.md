@@ -2,13 +2,13 @@
 # cat-tools-e1lo
 $schema: bean/1.0.0
 title: 'INGEST: narrative description per image, localized, including images extracted from PDFs'
-status: todo
+status: completed
 type: task
 priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-22T16:34:33Z
+updated_at: 2026-10-22T17:01:31Z
 parent: folio-assistant-zzmr
 ---
 
@@ -451,3 +451,23 @@ It is still the single `NarrativeSchema`, not a slot. **0 authored figure blocks
 - **If you say nothing:** it remains the last single-form schema, and stage 4 cannot remove the single form.
 
 Recommendation, as my judgement: 1A, 2A, 3A. That gives stage 4 one rule — every written narrative names its language — with one explicit exception: "nothing written yet".
+
+
+## Summary of Changes
+
+*2026-10-22T17:10:00Z* — Done (lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Stage 4, the owner's ruling "1A 2A 3A", merged as litlfred/cat-harness#413 (`ee172f2`):
+- **1A:** a written narrative must name its `lang`, and the bare object is only the empty `not-authored` slot.
+- **2A:** `superseded` requires `lang`.
+- **3A:** `FigureSchema.narrative` is a `NarrativeSlotSchema`.
+
+The data had already been migrated in every layer:
+- cat-harness #405 and #407
+- core #173
+- sci #48
+- who-iris #78
+- smart-base #118
+- smart-immunizations #67
+
+The writers, the review queue and the migrator follow the list form (cat-harness-tools #537, #539, #540 and #548).
+
+The coordinator found 0 invalid records across every library under the stage-4 schema. Lane C carries ee172f2 into the next index re-pin. That is a pin bump, not work on this bean.
