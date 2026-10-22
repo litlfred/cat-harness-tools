@@ -115,20 +115,29 @@ export interface QueueItem {
   stale?: boolean;
 }
 
-/**
- * Every narrative in one parsed document, with its path.
- *
- * Two shapes, and the second is why this is a function rather than a field
- * read. A flat document carries `narrative`; an images sidecar carries a list
- * whose entries each may. Returns `[]` for a document with neither, which is a
- * determined answer — the caller cannot tell it from "not looked" otherwise.
- */
-export function narrativesIn(
-  doc: Record<string, unknown>,
-): { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string; slug?: string }[] {
-  const out: { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string; slug?: string }[] = [];
+/** Where a narrative slot sits in its document, before anything is validated. */
+export interface SlotAt {
+  /** The path of the slot itself, ending in `"narrative"`. */
+  at: NarrativePath;
+  /** What the slot holds, unvalidated: a list, the empty slot, or anything else. */
+  value: unknown;
+  /** What the narrative is ABOUT, when the file holds more than one. */
+  subject?: string;
+  /** The library entry it belongs to, when the file is library-level. */
+  slug?: string;
+}
 
-  out.push(...inSlot(doc.narrative, ["narrative"]));
+/**
+ * Every narrative SLOT in one parsed document, where it sits, unvalidated.
+ *
+ * The places a narrative may live, and nothing else: the queue reads them
+ * through {@link narrativesIn}, which validates, and `narratives:migrate-lang`
+ * reads them raw, because the records it exists to convert are exactly the
+ * ones the stage-4 slot schema refuses (bean `cat-tools-e1lo`).
+ */
+export function slotsIn(doc: Record<string, unknown>): SlotAt[] {
+  const out: SlotAt[] = [];
+  if ("narrative" in doc) out.push({ at: ["narrative"], value: doc.narrative });
 
   const images = doc.images;
   if (Array.isArray(images)) {
@@ -139,7 +148,7 @@ export function narrativesIn(
       // this the queue shows twenty-four entries distinguishable only by
       // their text, which is the thing under review.
       const subject = typeof rec.id === "string" ? rec.id : undefined;
-      for (const n of inSlot(rec.narrative, ["images", i, "narrative"])) out.push({ ...n, subject });
+      if ("narrative" in rec) out.push({ at: ["images", i, "narrative"], value: rec.narrative, subject });
     });
   }
 
@@ -150,7 +159,7 @@ export function narrativesIn(
       if (typeof fig !== "object" || fig === null) return;
       const rec = fig as Record<string, unknown>;
       const subject = typeof rec.id === "string" ? rec.id : undefined;
-      for (const n of inSlot(rec.narrative, ["figures", i, "narrative"])) out.push({ ...n, subject });
+      if ("narrative" in rec) out.push({ at: ["figures", i, "narrative"], value: rec.narrative, subject });
     });
   }
 
@@ -165,7 +174,7 @@ export function narrativesIn(
         if (typeof rec !== "object" || rec === null) return;
         const r = rec as Record<string, unknown>;
         const subject = typeof r.figure === "string" ? r.figure : undefined;
-        for (const n of inSlot(r.narrative, ["descriptions", docId, i, "narrative"])) out.push({ ...n, subject, slug: docId });
+        if ("narrative" in r) out.push({ at: ["descriptions", docId, i, "narrative"], value: r.narrative, subject, slug: docId });
       });
     }
   }
@@ -178,10 +187,25 @@ export function narrativesIn(
       if (typeof rec !== "object" || rec === null) return;
       const r = rec as Record<string, unknown>;
       const subject = typeof r.block === "string" ? r.block.split("/").pop() : undefined;
-      for (const n of inSlot(r.narrative, ["summaries", i, "narrative"])) out.push({ ...n, subject });
+      if ("narrative" in r) out.push({ at: ["summaries", i, "narrative"], value: r.narrative, subject });
     });
   }
   return out;
+}
+
+/**
+ * Every narrative in one parsed document, with its path.
+ *
+ * Read from {@link slotsIn}'s places, and validated: a slot the schema refuses
+ * yields nothing. Returns `[]` for a document with none, which is a
+ * determined answer — the caller cannot tell it from "not looked" otherwise.
+ */
+export function narrativesIn(
+  doc: Record<string, unknown>,
+): { path: NarrativePath; narrative: Narrative; subject?: string; lang?: string; slug?: string }[] {
+  return slotsIn(doc).flatMap(({ at, value, subject, slug }) =>
+    inSlot(value, at).map((n) => ({ ...n, ...(subject !== undefined ? { subject } : {}), ...(slug !== undefined ? { slug } : {}) })),
+  );
 }
 
 /**

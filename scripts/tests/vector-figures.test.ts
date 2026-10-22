@@ -86,7 +86,7 @@ describe("the extractor assigns no role — the schema refuses one", () => {
 
   test("`shows` and a narrative need somebody to have looked", () => {
     expect(VectorFigureSchema.safeParse({ ...rendered(3, ["1"]), shows: ["1"] }).success).toBe(false);
-    const narrative = { text: "x", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" };
+    const narrative = [{ text: "x", lang: "en", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" }];
     expect(VectorFigureSchema.safeParse({ ...rendered(3, ["1"]), narrative }).success).toBe(false);
   });
 
@@ -183,7 +183,7 @@ function inspected(page: number, shows: string[]) {
     role: "figure",
     basis: { method: "inspection", by: AGENT, at: "2026-10-03", saw: "a flow diagram", page },
     shows,
-    narrative: { text: "A flow.", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" },
+    narrative: [{ text: "A flow.", lang: "en", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" }],
   };
 }
 
