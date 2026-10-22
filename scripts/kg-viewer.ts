@@ -70,6 +70,7 @@
  * its frame and stayed silent about its contents would claim more than it did,
  * so the boundary is drawn on screen, in the reader's language.
  *
+ * @covers none — a page writer, not an audit of a declared graph
  * @module scripts/kg-viewer
  */
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
