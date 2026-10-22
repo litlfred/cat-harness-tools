@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { contentAt, resolveTipLocation, tipLocations } from "../branch-store.js";
-import { STATE_IGNORE_BEGIN, STATE_IGNORE_END, delegatedReport, delegatedStores, mountState, report, withStateIgnoreBlock } from "../state-mount.js";
+import { STATE_IGNORE_BEGIN, STATE_IGNORE_END, delegatedReport, delegatedStores, mountState, report, staleLayerMounts, withStateIgnoreBlock } from "../state-mount.js";
 import { cleanup, git, MANIFEST, stateFixture, TIP_SOURCE, BRANCH } from "./state-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -308,5 +308,25 @@ describe("checkout-relative markers and damaged mounts (bean 1ple)", () => {
     expect(text).toContain("damaged?");
     expect(text).not.toContain("push them with `bun run cat state:push`");
     expect(text).toContain("--allow-mass-delete");
+  });
+});
+
+describe("staleLayerMounts — `--id` rewrites the .gitignore block only over current layer mounts (bean 792f)", () => {
+  test("a checkout with no lock has nothing to be stale against", () => {
+    const root = mkdtempSync(join(tmpdir(), "stale-layers-"));
+    try {
+      expect(staleLayerMounts(root)).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("CORRUPTED: a layer mount that does not match the lock is stale, and says what to run", () => {
+    for (const state of ["missing", "could-not-determine"] as const) {
+      const why = staleLayerMounts("/nowhere", () => state);
+      expect(why).toContain(state);
+      expect(why).toContain("state:mount");
+    }
+    for (const state of ["mounted", "unverified-approver", "not-enabled"] as const) expect(staleLayerMounts("/nowhere", () => state)).toBeUndefined();
   });
 });
