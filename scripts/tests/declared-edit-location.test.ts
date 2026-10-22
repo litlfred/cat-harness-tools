@@ -6,6 +6,8 @@
  * foreign root read the catalogue as obsolete.
  */
 import { describe, expect, test } from "bun:test";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
 import { declaredEditLocation } from "../gen-docs-pages.ts";
@@ -15,7 +17,13 @@ describe("declaredEditLocation (bean 5o5c)", () => {
   test("a narrative block's link names the harness's declared repository, path unchanged", () => {
     const declared = readDeclaration(HARNESS_ROOT)?.repository;
     expect(declared).toBeDefined();
-    const target = "docs/source/process-publication-workflow/overview.md";
+    // A real narrative, found rather than named: a literal path would be a
+    // second record of the corpus for `declared-paths` to police.
+    const sourceDir = join(HARNESS_ROOT, "docs", "source");
+    const page = readdirSync(sourceDir).find((d) => readdirSync(join(sourceDir, d)).some((f) => f.endsWith(".md")));
+    expect(page).toBeDefined();
+    const block = readdirSync(join(sourceDir, page!)).find((f) => f.endsWith(".md"))!;
+    const target = `docs/source/${page}/${block}`;
     expect(declaredEditLocation(target)).toEqual({ source: target, repo: declared });
   });
 });
