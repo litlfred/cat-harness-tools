@@ -52,10 +52,21 @@
 #   compare joins the shards and judges, as before, and keeps main's answer
 #       and the gate seconds for the next run.
 #
+# The CI cone (bean `4rbc`, cat-harness-tools#398). On a PR, a declared gate
+# whose read set, recorded by a green traced run on the caller's main, is
+# unchanged on a side is not run there, and is reported "SKIPPED — inputs
+# unchanged since <sha>", never as passed (`run-gates.py` GATE_CONE=skip). The
+# records are made by a PUSH to the caller's main, which runs the base side
+# only, under `strace` (GATE_CONE=record), and judges nothing: it keeps main's
+# answer, the gate seconds and the records. A GitHub cache saved by a PR is
+# visible to that PR alone, and one saved on the default branch to every PR,
+# so only a push can make records the PRs share. A caller without the `push`
+# trigger records nothing, and every gate runs as before.
+#
 # A caller is the one `uses:` line and nothing else (owner, 2026-10-14:
 # "there shouldnt be copying of code"):
 #
-#   on: { pull_request: {}, workflow_dispatch: {} }
+#   on: { pull_request: {}, push: { branches: [main] }, workflow_dispatch: {} }
 #   permissions: { contents: read }
 #   jobs:
 #     checks:
@@ -149,7 +160,8 @@ jobs:
   # (trial run 38866215814: 67 of 200 work-minutes).
   prepare-head:
     name: Prepare the PR side (and typecheck)
-    if: github.event.action != 'closed'
+    # A push to main has no PR side: it records main's side (the CI cone).
+    if: github.event.action != 'closed' && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -165,7 +177,8 @@ jobs:
       # The shard matrix, [1..gate-shards], once, so `run` and `compare` agree
       # on it. A value that is not a whole number from 1 to 16 stops the run
       # here rather than becoming an empty matrix, which would judge nothing.
-      - id: shards
+      - &shards
+        id: shards
         env:
           N: ${{ inputs.gate-shards }}
         run: |
@@ -179,7 +192,7 @@ jobs:
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ inputs.tools-ref }}
@@ -196,7 +209,7 @@ jobs:
       # re-run is a new attempt and so a new time: it judges main as it is.
       - &pin-restore
         id: pin-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -237,13 +250,13 @@ jobs:
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - &pin-reread
         if: steps.pin-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -269,7 +282,7 @@ jobs:
           { echo "at=$at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           # Index mode: the PR's merge commit on both sides; the base side then
@@ -288,12 +301,15 @@ jobs:
           # Layer mode: the one commit `index-ref` named at this run's pin
           # time (the "Pin this run" step), never the ref itself, so every
           # job of the run mounts the same pins.
-          ref: ${{ inputs.mode == 'index' && github.ref || steps.pins.outputs.index }}
+          # A push (the CI cone's record run): the pushed commit itself.
+          ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || steps.pins.outputs.index }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
       - &base-root
         name: Base side of the root (index mode)
-        if: inputs.mode == 'index' && env.SIDE == 'base'
+        # Not on a push: the pushed commit IS main's side, and a merge
+        # commit's first parent would be the main before it.
+        if: inputs.mode == 'index' && env.SIDE == 'base' && github.event_name != 'push'
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DIR: fa
@@ -316,7 +332,7 @@ jobs:
       - &caller
         name: Check out the caller
         if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -342,7 +358,8 @@ jobs:
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
       - &caller-base
         name: Base side of the caller
-        if: inputs.mode == 'layer' && env.SIDE == 'base'
+        # Not on a push, for the same reason as the root's base side above.
+        if: inputs.mode == 'layer' && env.SIDE == 'base' && github.event_name != 'push'
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DIR: src
@@ -369,7 +386,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -670,7 +687,7 @@ jobs:
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}
@@ -691,7 +708,7 @@ jobs:
       - &upload-prepared
         name: Upload this side's prepared root
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: prepared-${{ env.SIDE }}
           path: ${{ runner.temp }}/prepared
@@ -712,7 +729,14 @@ jobs:
       tools: ${{ steps.pins.outputs.tools }}
       key: ${{ steps.base-key.outputs.key }}
       cached: ${{ steps.base-lookup.outputs.cache-hit }}
+      cone: ${{ steps.base-key.outputs.cone }}
+      shards: ${{ steps.shards.outputs.list }}
+      # Whether this job built main's side for its shards. The `run` job reads
+      # it on a push, where there is no PR side to wait for.
+      prepared: ${{ steps.skip-prep.outputs.hit != 'true' }}
     steps:
+      # The same matrix as prepare-head's; a push has no prepare-head.
+      - *shards
       - *judging-scripts
       - *pin-restore
       - *pin-write
@@ -774,14 +798,27 @@ jobs:
           done
           raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
           echo "main's answer is computed from: $raw"
-          key="layer-pr-checks-main-v3-${GITHUB_REPOSITORY}-$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
+          hash="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
+          key="layer-pr-checks-main-v3-${GITHUB_REPOSITORY}-$hash"
           echo "key=$key" >> "$GITHUB_OUTPUT"
+          # The CI cone's records of the same main (cat-harness-tools#398). A
+          # PR restores the newest under the prefix, not this exact key: a
+          # record is checked path by path, so an older main's still serves.
+          echo "cone=layer-pr-checks-cone-v1-${GITHUB_REPOSITORY}-$hash" >> "$GITHUB_OUTPUT"
       - name: Is main's answer already known?
         id: base-lookup
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
+          lookup-only: true
+      - name: Are this main's cone records already kept? (a push)
+        id: cone-lookup
+        if: github.event_name == 'push'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/cone
+          key: ${{ steps.base-key.outputs.cone }}
           lookup-only: true
       - name: Skip the base side when it is
         id: base-hit
@@ -789,9 +826,22 @@ jobs:
           hit="${{ steps.base-lookup.outputs.cache-hit == 'true' }}"
           echo "hit=$hit" >> "$GITHUB_OUTPUT"
           [ "$hit" = "true" ] && echo "main's answer is cached: the base side is not run again" || true
+      # A PR needs only main's answer. A push is run for the records, so it
+      # stops early only when it would make neither (both already kept).
       - name: Is there anything to prepare?
         id: skip-prep
-        run: echo "hit=${{ steps.lock-only.outputs.skip == 'true' || steps.base-lookup.outputs.cache-hit == 'true' }}" >> "$GITHUB_OUTPUT"
+        env:
+          PUSH: ${{ github.event_name == 'push' }}
+          PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
+          BASE_HIT: ${{ steps.base-lookup.outputs.cache-hit == 'true' }}
+          CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
+        run: |
+          hit=false
+          if [ "$PINS_ONLY" = "true" ]; then hit=true
+          elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
+          elif [ "$BASE_HIT" = "true" ]; then hit=true
+          fi
+          echo "hit=$hit" >> "$GITHUB_OUTPUT"
       - *mount-cache
       - *mount
       - *mark
@@ -819,14 +869,20 @@ jobs:
   run:
     name: ${{ matrix.side }} — tests and gates, shard ${{ matrix.shard }}/${{ inputs.gate-shards }}
     needs: [prepare-head, prepare-base]
-    if: needs.prepare-head.outputs.skip != 'true'
+    # A PR: both prepare jobs succeeded and the PR changes more than its pins.
+    # A push: main's side was prepared (prepare-head does not run, so the
+    # default `success()` would skip this job).
+    if: >-
+      !cancelled() && needs.prepare-base.result == 'success' && (
+        (github.event_name == 'push' && needs.prepare-base.outputs.prepared == 'true') ||
+        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
-        side: ${{ fromJSON(needs.prepare-base.outputs.cached == 'true' && '["head"]' || '["base","head"]') }}
-        shard: ${{ fromJSON(needs.prepare-head.outputs.shards) }}
+        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || (needs.prepare-base.outputs.cached == 'true' && '["head"]' || '["base","head"]')) }}
+        shard: ${{ fromJSON(needs.prepare-base.outputs.shards) }}
     env:
       SIDE: ${{ matrix.side }}
     steps:
@@ -835,17 +891,17 @@ jobs:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
       - name: The judging scripts, at the commit this run pinned
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - name: Check out the root, at the commit this run pinned
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
-          ref: ${{ inputs.mode == 'index' && github.ref || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
+          ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
       - *base-root
@@ -853,7 +909,7 @@ jobs:
       - *mount-cache
       - *mount
       - name: Fetch what this side's prepare job built
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: prepared-${{ matrix.side }}
           path: ${{ runner.temp }}/prepared
@@ -866,6 +922,39 @@ jobs:
           cp "$p/derive-publish.json" "$RUNNER_TEMP/derive-publish.json"
           # The same seconds in every shard of this side, so they agree on the split.
           if [ -f "$p/timings.json" ]; then echo "GATE_TIMINGS=$p/timings.json" >> "$GITHUB_ENV"; fi
+      # The CI cone's records (bean `4rbc`, cat-harness-tools#398): the newest
+      # a push to the caller's main kept. Never this run's own key, so it is
+      # always the prefix that matches. The path is the one the compare job
+      # saves (a cache restores only under the paths it was saved with);
+      # ci-cone.ts reads them where it writes them, `build/ci-cone/` in the
+      # root, which its read sets leave out. None restored: every gate runs,
+      # as before the cone.
+      - name: The CI cone's records from the caller's main
+        id: cone-restore
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/cone
+          key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
+          restore-keys: |
+            layer-pr-checks-cone-v1-${{ github.repository }}-
+      - name: Put them where ci-cone.ts reads them
+        if: steps.cone-restore.outputs.cache-matched-key != ''
+        env:
+          KEY: ${{ steps.cone-restore.outputs.cache-matched-key }}
+        run: |
+          set -euo pipefail
+          echo "CI cone records: $KEY"
+          mkdir -p fa/build/ci-cone
+          cp "$RUNNER_TEMP/cone/records.json" fa/build/ci-cone/records.json
+      - name: strace, for the records (a push)
+        # Measured in bean `4rbc`: `strace -f` costs a traced gate 3-10x, so
+        # it runs on main's pushes only, never on a PR's critical path. Not
+        # fatal: without it, run-gates.py says so and records nothing.
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          if command -v strace >/dev/null; then strace -V | head -1; exit 0; fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - *install
       - *chromium
       - name: bun test
@@ -914,7 +1003,12 @@ jobs:
         #                  reason rather than judging folio-assistant's history.
         #   GATE_SHARD     i/N: this job runs only its slice of the sorted
         #                  gate set (run-gates.py `shard_names`).
+        #   GATE_CONE      the CI cone (bean `4rbc`, cat-harness-tools#398):
+        #                  `skip` on a PR, both sides, so a gate whose recorded
+        #                  read set is unchanged on a side is SKIPPED there;
+        #                  `record` on a push, which traces the rest.
         env:
+          GATE_CONE: ${{ github.event_name == 'push' && 'record' || 'skip' }}
           GATE_JOBS: ${{ inputs.gate-jobs }}
           GATE_SHARD: ${{ matrix.shard }}/${{ inputs.gate-shards }}
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
@@ -935,7 +1029,7 @@ jobs:
           fi
           export GATE_DIFF_BASE
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
           if-no-files-found: error
@@ -943,11 +1037,16 @@ jobs:
             ${{ runner.temp }}/junit.xml
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
+            ${{ runner.temp }}/cone-records.json
 
   # `!cancelled()`, not the default `success()`: a shard or prepare job that
   # failed or timed out must make this job RED (its artefact is missing,
   # merge-shards.py exits 2), never skip it, which a required check reads as
   # a pass.
+  #
+  # On a push to main (the CI cone's record run) it judges nothing: there is no
+  # PR side. It joins main's shards, keeps main's answer, the gate seconds and
+  # the cone's records for the PRs, and is red only when that join fails.
   compare:
     name: No new failures (tests and gates)
     needs: [prepare-head, prepare-base, run]
@@ -958,8 +1057,19 @@ jobs:
         id: pins-only
         env:
           SKIP: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip == 'true' }}
+          PUSH: ${{ github.event_name == 'push' }}
+          PREPARED: ${{ needs.prepare-base.outputs.prepared }}
         run: |
-          if [ "$SKIP" = "true" ]; then
+          if [ "$PUSH" = "true" ]; then
+            if [ "$PREPARED" = "true" ]; then
+              echo "a push to main: main's side is joined and kept, with the CI cone's records; nothing is judged"
+              echo "only=false" >> "$GITHUB_OUTPUT"
+            else
+              msg="A push to main whose answer and CI cone records are already kept (or that changes only the caller's pins): nothing was run."
+              echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+              echo "only=true" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "$SKIP" = "true" ]; then
             msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
@@ -970,7 +1080,7 @@ jobs:
       # first to start writes it). Should both ever have written one, the two
       # sides may have judged different commits: could not determine.
       - name: Both sides judged the same commits
-        if: steps.pins-only.outputs.only != 'true'
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
         env:
           HEAD_INDEX: ${{ needs.prepare-head.outputs.index }}
           BASE_INDEX: ${{ needs.prepare-base.outputs.index }}
@@ -983,20 +1093,20 @@ jobs:
             echo "::error::the two sides were pinned to different commits, or one was not prepared: could not determine"
             exit 2
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.pins-only.outputs.only != 'true'
         with:
           repository: litlfred/cat-harness-tools
-          ref: ${{ needs.prepare-head.outputs.tools }}
+          ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.pins-only.outputs.only != 'true'
         with:
           path: results
           pattern: results-*
       - name: Main's answer, cached (bean cis2)
-        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true'
-        uses: actions/cache/restore@v4
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1008,10 +1118,13 @@ jobs:
         # cover the gate set exactly once: could not determine, never a pass.
         env:
           N: ${{ inputs.gate-shards }}
-          CACHED: ${{ needs.prepare-base.outputs.cached }}
+          # A push ran main's side whatever was cached: it was run for the records.
+          CACHED: ${{ needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push' }}
+          PUSH: ${{ github.event_name == 'push' }}
         run: |
           set -euo pipefail
           sides="base head"
+          [ "$PUSH" = "true" ] && sides="base"
           if [ "$CACHED" = "true" ]; then
             mkdir -p merged
             cp -r "$RUNNER_TEMP/base-results" merged/base
@@ -1025,34 +1138,57 @@ jobs:
             cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
           fi
           mkdir -p "$RUNNER_TEMP/timings"
-          cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
+          if [ "$PUSH" = "true" ]; then
+            cp merged/base/gates.json "$RUNNER_TEMP/timings/gates.json"
+          else
+            cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
+          fi
       - name: Keep main's answer for the next run (bean cis2)
         if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
+      # The cone's records, from main's shards (cat-harness-tools#398). Saved
+      # from a push, so on the default branch, where every PR can restore them.
+      - name: Join the CI cone's records (a push)
+        id: cone
+        if: steps.join.outcome == 'success' && github.event_name == 'push'
+        continue-on-error: true
+        env:
+          N: ${{ inputs.gate-shards }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/layer-pr-checks/merge-cone.py results base "$N" "$RUNNER_TEMP/cone/records.json" "$GITHUB_SHA"
+          if [ -f "$RUNNER_TEMP/cone/records.json" ]; then echo "kept=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Keep the CI cone's records for the PRs (a push)
+        if: steps.cone.outputs.kept == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/cone
+          key: ${{ needs.prepare-base.outputs.cone }}
       - name: Keep the gate seconds, to balance the next run's shards
         if: steps.join.outcome == 'success'
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Tests
         id: tests
-        if: steps.pins-only.outputs.only != 'true'
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-test-failures.py merged/base/junit.xml merged/head/junit.xml
       - name: Gates
         id: gates
-        if: steps.pins-only.outputs.only != 'true'
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-gates.py merged/base/gates.json merged/head/gates.json
       # The typecheck runs in the head side's prepare job; it is judged here.
       - name: Verdict
-        if: steps.pins-only.outputs.only != 'true' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1

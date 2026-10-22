@@ -156,6 +156,20 @@ export function kgDirectories(
   root: string,
   scope: CorpusScope = corpusScopeFor(root),
 ): Array<{ id: string; path: string; absPath: string }> {
+  return declaredKgDirectories(root, scope).filter((d) => existsSync(d.absPath));
+}
+
+/**
+ * The knowledge-graph directories `root` DECLARES, whether or not they are on
+ * disk. {@link kgDirectories} is this list with the absent ones dropped; the
+ * two differ exactly where "declares none" and "declares one that is missing"
+ * must not read alike — the first is a tree with nothing of this kind, the
+ * second is check:declared-dirs' finding and never a clean pass.
+ */
+export function declaredKgDirectories(
+  root: string,
+  scope: CorpusScope = corpusScopeFor(root),
+): Array<{ id: string; path: string; absPath: string }> {
   try {
     return (scope === "checkout" ? checkoutDirectories(root, { stackedOn: root }) : resolveDirectories([{ name: "(local)", root, own: true }]))
       // EXACTLY ONE knowledge-graph typology, not merely including one.
@@ -172,8 +186,7 @@ export function kgDirectories(
       // one kind can be scanned for it; one that holds several has to say
       // which file is which, and for `schemas/` that answer is `@graphNode`
       // on the `.ts`, not a guess about the `.md`.
-      .filter(isKgContentDirectory)
-      .filter((d) => existsSync(d.absPath));
+      .filter(isKgContentDirectory);
   } catch (err) {
     // NOT swallowed into an empty list, and the reason is measured.
     //

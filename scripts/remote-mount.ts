@@ -16,6 +16,7 @@
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
+ *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
  *   bun run cat mount:repin:standing [--dry-run]
@@ -81,7 +82,11 @@
  *
  * A mounted directory whose bytes no longer hash to the lock is left exactly
  * as it is and reported, never re-fetched over: somebody edited it, and those
- * edits are theirs to move upstream or drop. A path that holds anything this
+ * edits are theirs to move upstream or drop. `--fresh` is the one explicit
+ * exception, for a build that writes into its own mounts and wants them laid
+ * down again: it replaces an edited mount as if it were current, still only
+ * what the lock says this mount put there, never tracked bytes or a
+ * directory no lock names. A path that holds anything this
  * mount did not put there — a tracked file, an unlocked directory — is refused.
  */
 import { createHash } from "node:crypto";
@@ -271,6 +276,14 @@ export interface Plan {
 export interface RemoteMountOptions {
   /** The downstream instance root; defaults to the checkout's root instance. */
   instanceRoot?: string;
+  /**
+   * `--fresh`: replace a mount whose bytes no longer hash to the lock instead
+   * of leaving it untouched. Explicit only: the default never discards edits.
+   * It is how `build-instance-site.ts --fresh` re-lays mounts its own build
+   * wrote into, from the mount script itself, so the tools mount that runs
+   * it is replaced last-loaded rather than deleted before it can run.
+   */
+  discardEdits?: boolean;
   /** How `owner/repo` becomes a fetch URL — tests serve local bare repositories. */
   urlFor?: UrlFor;
   /**
@@ -760,7 +773,9 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
       try {
         if (before) {
           const changed = modifiedSince(plan.instanceRoot, before);
-          if (changed.length) {
+          if (changed.length && opts.discardEdits) {
+            console.error(`fresh: replacing ${p.path}/ (${changed.length} path(s) no longer hashed to the lock)`);
+          } else if (changed.length) {
             plan.outcomes.push({
               instance: p.instance,
               state: "missing",
@@ -1166,7 +1181,7 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
  * declaration cannot be read is could-not-determine for the whole fan-out:
  * it may be the one that declares mounts.
  */
-export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount"; install?: InstallMode | false } = {}): { state: CheckResult["state"]; text: string } {
+export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount"; install?: InstallMode | false; discardEdits?: boolean } = {}): { state: CheckResult["state"]; text: string } {
   const { roots, unreadable } = declaringInstances(checkout);
   const parts: string[] = [];
   const states: CheckResult["state"][] = [];
@@ -1179,8 +1194,14 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; urlFor?:
       const r = checkRemote({ instanceRoot: root });
       states.push(r.state);
       parts.push(reportOutcomes(`Remote mounts — ${root}`, r.state, r.reason, r.outcomes));
+    } else if (opts.plan) {
+      // `--plan` writes nothing: no fetch into the tree, no lock, no install.
+      const p = planRemote({ instanceRoot: root, urlFor: opts.urlFor });
+      const sum = summarise(p.outcomes);
+      states.push(sum.state);
+      parts.push(reportOutcomes(`Remote mounts — plan for ${root}`, sum.state, sum.reason, p.outcomes));
     } else {
-      const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install });
+      const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install, discardEdits: opts.discardEdits });
       const sum = summarise(r.plan.outcomes);
       states.push(sum.state);
       parts.push(reportOutcomes(`Remote mounts — ${root}`, sum.state, sum.reason, r.plan.outcomes));
@@ -1237,6 +1258,52 @@ export function afterMount(root: string, before: string | undefined, argv: strin
   return r.ok ? code : Math.max(code, 1);
 }
 
+/**
+ * Every flag this script reads, and which of them take a value. Anything else
+ * is refused before the script does anything: an unrecognised flag used to be
+ * ignored, so `mount:remote --help` (no such flag then) ran a full mount, and
+ * `mount:remote --plan` without `--instance` fetched and wrote the lock.
+ */
+export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new Map([
+  ["--help", "switch"],
+  ["-h", "switch"],
+  ["--plan", "switch"],
+  ["--check", "switch"],
+  ["--staging", "switch"],
+  ["--json", "switch"],
+  ["--no-install", "switch"],
+  ["--install-all", "switch"],
+  ["--no-agent-surface", "switch"],
+  ["--fresh", "switch"],
+  ["--whole", "switch"],
+  ["--instance", "value"],
+  ["--seed", "value"],
+  ["--consent-by", "value"],
+  ["--consent-on", "value"],
+  ["--evidence", "value"],
+]);
+
+/** What is wrong with `argv`, one line each; empty when every argument is a known flag or a known flag's value. */
+export function argvProblems(argv: readonly string[]): string[] {
+  const problems: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    const kind = MOUNT_REMOTE_FLAGS.get(a);
+    if (kind === "value") {
+      if (argv[i + 1] === undefined || MOUNT_REMOTE_FLAGS.has(argv[i + 1]!)) problems.push(`${a} needs a value`);
+      else i++;
+    } else if (kind === undefined) {
+      problems.push(a.startsWith("-") ? `unknown flag ${a}` : `unexpected argument ${a}`);
+    }
+  }
+  return problems;
+}
+
+/** The usage text: this file's header comment, as the other scripts here print it. */
+export function usageText(): string {
+  return readFileSync(import.meta.path, "utf-8").split("*/")[0]!;
+}
+
 /** `--no-install` lays bytes only; `--install-all` adds devDependencies; default `production`. */
 function installOf(argv: string[]): InstallMode | false {
   return argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production";
@@ -1244,6 +1311,15 @@ function installOf(argv: string[]): InstallMode | false {
 
 if (import.meta.main) {
   const argv = process.argv.slice(2);
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(usageText());
+    process.exit(0);
+  }
+  const problems = argvProblems(argv);
+  if (problems.length) {
+    console.error(`mount:remote: ${problems.join("; ")} — nothing was run. \`bun run cat mount:remote --help\` lists the flags.`);
+    process.exit(2);
+  }
   const at = argv.indexOf("--instance");
   if (argv.includes("--seed")) {
     const valueOf = (flag: string): string | undefined => {
@@ -1274,9 +1350,10 @@ if (import.meta.main) {
   }
   if (at === -1) {
     const root = checkoutRootFor(process.cwd());
-    const mounting = !argv.includes("--check") && !argv.includes("--staging");
+    const plan = argv.includes("--plan");
+    const mounting = !argv.includes("--check") && !argv.includes("--staging") && !plan;
     const before = lockBytes(root);
-    const r = remoteFanOut(root, { check: argv.includes("--check"), purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv) });
+    const r = remoteFanOut(root, { check: argv.includes("--check"), plan, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv), discardEdits: argv.includes("--fresh") });
     console.log(r.text);
     process.exit(mounting ? afterMount(root, before, argv, exitCode(r.state)) : exitCode(r.state));
   }
@@ -1292,7 +1369,7 @@ if (import.meta.main) {
     process.exit(exitCode(p.mounts.length ? summarise(p.outcomes).state : "not-enabled"));
   }
   const before = lockBytes(instanceRoot);
-  const r = mountRemote({ instanceRoot, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv) });
+  const r = mountRemote({ instanceRoot, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv), discardEdits: argv.includes("--fresh") });
   const state = r.plan.mounts.length ? summarise(r.plan.outcomes).state : "not-enabled";
   console.log(reportOutcomes("Remote mounts", state, state === "not-enabled" ? "no `remoteMounts` declared" : summarise(r.plan.outcomes).reason, r.plan.outcomes));
   if (r.excluded.length) console.log(`\nAdded to this worktree's info/exclude (not committed): ${r.excluded.map((p) => `\`${p}/\``).join(", ")}.`);

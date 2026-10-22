@@ -220,15 +220,18 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { corpusScopeFor, kgDirectories } from "./known-skills.js";
+import { corpusScopeFor, declaredKgDirectories, kgDirectories } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, REPO_ROOT, resolveWorkingInstanceRoot, runnerRootFor } from "./lib/roots.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 
 /**
- * This instance's root — `cat-harness/`, one level up from `scripts/`.
+ * The instance being worked on — `resolveWorkingInstanceRoot` in
+ * `lib/roots.ts`: the harness in its own repository and in an index checkout,
+ * the separated instance that MOUNTS it otherwise (bean `j3ls`: from a separated content instance
+ * this audited the mount and wrote its sidecar into a gitignored tree).
  *
  * NOT `process.cwd()`, and that is a correction rather than a preference.
  * `writeQaResult` composes `<root>/test/results/`, so a cwd-relative root puts
@@ -239,7 +242,14 @@ import { BUILDING_ENV } from "./qa-working-copy.ts";
  * (`check-layout-norms.ts`, `check-harness-state.ts`), so the sidecar goes to
  * the same place whoever runs the command and from wherever.
  */
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+const INSTANCE_ROOT = resolveWorkingInstanceRoot().root;
+
+/**
+ * Where `bun run cat` resolves the steps' scripts: the checkout holding the
+ * harness, not the instance's parent. Since bean `j3ls` the instance may be a
+ * separated repository that MOUNTS the harness, whose parent is outside it.
+ */
+const RUNNER_ROOT = runnerRootFor(HARNESS_ROOT, REPO_ROOT);
 
 /* ───────────────────────── the declarations, audited ───────────────────────── */
 
@@ -442,6 +452,26 @@ export interface Findings {
   skills: number;
 }
 
+/**
+ * Why there is nothing for this command to judge in `instance`, or `undefined`
+ * when there is.
+ *
+ * An instance that declares no knowledge-graph directory holds no skill, so no
+ * skill of it can be unregistered and nothing the chain regenerates is staled
+ * by one. Since bean `j3ls` the instance judged is the one MOUNTING the harness
+ * (a content instance's own index, such as a FHIR IG's), and most of those
+ * declare no skills graph: before this they read as exit 2, "cannot tell",
+ * which is a question with no answer rather than one nobody could reach.
+ *
+ * Deliberately narrow, so `dh4f` stays shut: it is the DECLARATION that is
+ * asked, not the disk. An instance that declares a knowledge-graph directory
+ * and has no package manifests in it is still the third state.
+ */
+export function notApplicable(instance: string = INSTANCE_ROOT): string | undefined {
+  if (declaredKgDirectories(instance, corpusScopeFor(instance)).length > 0) return undefined;
+  return `${instance} declares no knowledge-graph directory, so it holds no skill to register`;
+}
+
 export function audit(instance: string = INSTANCE_ROOT): Findings {
   const pkgs = skillPackages(instance);
   return {
@@ -600,7 +630,7 @@ export function stepsToRun(
 }
 
 /** Scripts named here that `package.json` does not declare. */
-export function missingScripts(instance: string = INSTANCE_ROOT): string[] {
+export function missingScripts(runner: string = RUNNER_ROOT): string[] {
   // A step's first argument is what `bun run` resolves; anything after it is a
   // flag. Only names are asserted against `package.json` — a step given as a
   // path (`v625`'s original shape, and still legal) is checked as a FILE, since
@@ -609,10 +639,10 @@ export function missingScripts(instance: string = INSTANCE_ROOT): string[] {
   const heads = STEPS.flatMap((s) => [s.write[0]!, s.verify[0]!]);
   const paths = heads.filter((h) => h.includes("/") || h.endsWith(".ts"));
   const named = heads.filter((h) => !paths.includes(h));
-  const absentPaths = paths.filter((p) => !existsSync(resolve(instance, "..", p)));
-  const pkgPath = join(resolve(instance, ".."), "package.json");
+  const absentPaths = paths.filter((p) => !existsSync(resolve(runner, p)));
+  const pkgPath = join(resolve(runner), "package.json");
   if (!existsSync(pkgPath)) return [...named, ...absentPaths];
-  const scripts = scriptsOf(resolve(instance, ".."));
+  const scripts = scriptsOf(resolve(runner));
   return [...named.filter((s) => !(s in scripts)), ...absentPaths];
 }
 
@@ -628,10 +658,10 @@ export function missingScripts(instance: string = INSTANCE_ROOT): string[] {
  * generator WROTE files.
  */
 function run(args: readonly string[]): number {
-  // input-site: scripts skill:commands:check,skills:docs:check,check:glossary,auto:docs:check,lsi:skills:check,lsi:viz:check,kg:audit:check,kg:detangle:check,uml:overview:check,subgraph:jsonld:check #ff528a47 — the verify half of every STEP (the write half runs only without --check, in the main block's write mode); input-sites.test.ts holds this list to STEPS
+  // input-site: scripts skill:commands:check,skills:docs:check,check:glossary,auto:docs:check,lsi:skills:check,lsi:viz:check,kg:audit:check,kg:detangle:check,uml:overview:check,subgraph:jsonld:check #6eb27c09 — the verify half of every STEP (the write half runs only without --check, in the main block's write mode); input-sites.test.ts holds this list to STEPS
   const r = spawnSync("bun", ["run", "cat", ...args], {
     stdio: "inherit",
-    cwd: resolve(INSTANCE_ROOT, ".."),
+    cwd: RUNNER_ROOT,
   });
   return r.status ?? 1;
 }
@@ -648,9 +678,9 @@ function run(args: readonly string[]): number {
  * the chain.
  */
 async function verifyQuietly(args: readonly string[]): Promise<number> {
-  // input-site: scripts skill:commands:check,skills:docs:check,check:glossary,auto:docs:check,lsi:skills:check,lsi:viz:check,kg:audit:check,kg:detangle:check,uml:overview:check,subgraph:jsonld:check #d06cb11d — the verify half of every STEP; input-sites.test.ts holds this list to STEPS
+  // input-site: scripts skill:commands:check,skills:docs:check,check:glossary,auto:docs:check,lsi:skills:check,lsi:viz:check,kg:audit:check,kg:detangle:check,uml:overview:check,subgraph:jsonld:check #2261f276 — the verify half of every STEP; input-sites.test.ts holds this list to STEPS
   const p = Bun.spawn(["bun", "run", "cat", ...args], {
-    cwd: resolve(INSTANCE_ROOT, ".."),
+    cwd: RUNNER_ROOT,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -863,6 +893,16 @@ async function main(): Promise<number> {
     return 2;
   }
 
+  const na = notApplicable();
+  if (na !== undefined) {
+    // Not a pass and not a finding: nothing here is of the kind judged. Says
+    // so, writes nothing (no sidecar: there is no subject to record a verdict
+    // about), and exits 0 so a content index's gates are not red over it.
+    if (flags.json) console.log(JSON.stringify({ notApplicable: na }, null, 2));
+    else console.log(`skill-register: not applicable — ${na}. Nothing judged, nothing written.`);
+    return 0;
+  }
+
   const f = audit();
 
   // Third state, all three directions. A run that found no packages, an empty
@@ -937,7 +977,7 @@ async function main(): Promise<number> {
   } else {
     const stripped = stripRetired();
     for (const s of stripped) {
-      console.log(`  stripped a retired key from  ${s.replace(`${resolve(INSTANCE_ROOT, "..")}/`, "")}`);
+      console.log(`  stripped a retired key from  ${s.replace(`${RUNNER_ROOT}/`, "")}`);
     }
 
     // Said on the performing path too. An author running this to fix one thing
@@ -983,7 +1023,7 @@ async function main(): Promise<number> {
   // pages mid-comparison, so every such check read red here while each passed
   // alone (folio-assistant#2529). The read-only ones still share the cores; the
   // writing ones run after them, one at a time, in STEPS order.
-  const table = scriptsOf(resolve(INSTANCE_ROOT, ".."));
+  const table = scriptsOf(RUNNER_ROOT);
   const writes = (s: Step): boolean => /publish-check\.ts/.test(table[s.verify[0]!] ?? "");
   const codes: number[] = new Array(active.length);
   await Promise.all(active.map(async (s, i) => (writes(s) ? undefined : (codes[i] = await verifyQuietly(s.verify)))));

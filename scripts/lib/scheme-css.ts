@@ -80,12 +80,21 @@ export function darkRules(rules: string): string {
  */
 export function withSavedScheme(html: string): string {
   const script = firstPaintSchemeScript().replace(/^<script\b/i, `<script ${SCHEME_MARK}`);
-  // A page that carries an OLDER copy of this snippet gets the current one in
-  // its place. Returning on the mark alone left `slices/search.html` on the
-  // stored-choice-only rule after the owner's "follow os else light"
-  // (2026-10-15): the page was marked, so it was never looked at again.
-  const marked = MARKED_SCRIPT.exec(html);
-  if (marked) return marked[0] === script ? html : html.slice(0, marked.index) + script + html.slice(marked.index + marked[0].length);
+  // A snippet THIS function put there earlier — or a page that copied one —
+  // is brought up to the current rule rather than trusted for carrying the
+  // mark: `slices/search.html` shipped the 2026-10-05 rule (the stored choice
+  // and nothing else, so the static dark sheet decided for everyone else) a
+  // day after the rule changed, because the mark alone made this a no-op.
+  if (html.includes(SCHEME_MARK)) {
+    let first = true;
+    const out = html.replace(MARKED, () => {
+      if (!first) return "";
+      first = false;
+      return script;
+    });
+    // A mark that is not on a <script> is prose, not a snippet: fall through.
+    if (!first) return out;
+  }
   // A themed page already carries the snippet itself, from head_custom.html.
   if (html.includes(firstPaintSchemeScript())) return html;
   const head = /<head\b[^>]*>/i.exec(html);
@@ -95,8 +104,8 @@ export function withSavedScheme(html: string): string {
 }
 
 const SCHEME_MARK = `data-folio-saved-scheme`;
-/** A snippet this function inserted, at whatever version it was then. */
-const MARKED_SCRIPT = new RegExp(`<script ${SCHEME_MARK}>[\\s\\S]*?</script>`);
+/** A marked snippet, whatever rule it carries. */
+const MARKED = new RegExp(`<script ${SCHEME_MARK}>[\\s\\S]*?</script>`, "g");
 
 /** The markers `head_custom.html` wraps its first-paint block in. */
 export const FIRST_PAINT_BEGIN = "<!-- fa-first-paint:begin -->";

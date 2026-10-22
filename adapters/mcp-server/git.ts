@@ -26,6 +26,25 @@ export function currentBranch(): string {
   return git("rev-parse", "--abbrev-ref", "HEAD") || "HEAD";
 }
 
+/**
+ * The commit `branch` points at (the current HEAD when absent), as a full SHA,
+ * or `undefined` when git cannot resolve it.
+ *
+ * Memoised for a few seconds: a page asks once per Lean block, and hundreds of
+ * `git rev-parse` calls for one page would cost more than the page. Short,
+ * because a branch moves, and a stale commit would pair a line number read
+ * from today's file with yesterday's text.
+ */
+const commitMemo = new Map<string, { sha: string | undefined; at: number }>();
+export function commitOf(branch: string | undefined): string | undefined {
+  const key = branch ?? "HEAD";
+  const hit = commitMemo.get(key);
+  if (hit && Date.now() - hit.at < 5000) return hit.sha;
+  const sha = git("rev-parse", "--verify", "--quiet", `${key}^{commit}`) ?? undefined;
+  commitMemo.set(key, { sha, at: Date.now() });
+  return sha;
+}
+
 /** Fetch from origin silently (best-effort, never blocks). */
 export function fetchOrigin(): void {
   try {

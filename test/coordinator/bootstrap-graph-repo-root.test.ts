@@ -23,6 +23,7 @@ import {
   readDeclaration,
   artefactStub,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { sitePathOf } from "../../scripts/print-published-path.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -66,18 +67,23 @@ function bootstrapGraphPublishers(workflowText: string): string[] {
  * Every `--out` path a workflow writes, with its shell variables expanded.
  *
  * The workflow captures stubs — `BOOT_STUB=$(… print-stub.ts ./bootstrap)` —
- * so a literal-text match cannot see the path at all. Expanding the capture
- * rather than hardcoding `bootstrap` keeps the assertion pointed at the
- * DECLARATION: rename the instance and both sides move together, which is the
- * whole reason the workflow captures it instead of spelling it out.
+ * and the instance's directory — `BOOT_DIR=$(… print-published-path.ts
+ * ./bootstrap)`, the resolver's `<name>/` (bean `sthf`) — so a literal-text
+ * match cannot see the path at all. Expanding the capture rather than
+ * hardcoding `bootstrap` keeps the assertion pointed at the DECLARATION: rename
+ * the instance and both sides move together, which is the whole reason the
+ * workflow captures it instead of spelling it out. A directory capture expands
+ * without its trailing slash, as the workflow writes `${BOOT_DIR}/`.
  */
 function siteOutputs(workflowText: string): string[] {
   const stubs = new Map<string, string>();
   for (const m of workflowText.matchAll(
-    /(\w+)=\$\(bun run cat-harness(?:-tools)?\/scripts\/print-stub\.ts\s+(\S+)\)/g,
+    /(\w+)=\$\(bun run cat-harness(?:-tools)?\/scripts\/(print-stub|print-published-path)\.ts\s+(\S+)\)/g,
   )) {
-    const decl = readDeclaration(join(repoRootFor(ROOT), m[2]!));
-    if (decl) stubs.set(m[1]!, artefactStub(decl));
+    const decl = readDeclaration(join(repoRootFor(ROOT), m[3]!));
+    if (!decl) continue;
+    const value = m[2] === "print-stub" ? artefactStub(decl) : sitePathOf(decl)?.replace(/\/$/, "");
+    if (value !== undefined) stubs.set(m[1]!, value);
   }
   const expand = (v: string): string =>
     v.replace(/\$\{(\w+)\}/g, (whole, name: string) => stubs.get(name) ?? whole);

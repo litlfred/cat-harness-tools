@@ -192,7 +192,7 @@ function platformDir(assistant: string): string {
 }
 
 /**
- * Where the platform's CODE sits: `src/`, `content/pipeline/`, `scripts/`,
+ * Where the platform's CODE sits: `src/`, `pipeline/`, `scripts/`,
  * `viewer/`. It moved from `cat-harness/` to this layer in 70lx, and a folio
  * scaffolded afterwards still ran it from `cat-harness/`, where nothing is
  * any more (bean `cat-tools-yylt`). `platformDir` stays for what cat-harness
@@ -744,8 +744,8 @@ todos/                    people's outstanding items (mounted likewise)
 \`\`\`sh
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
-bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
-bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
+bun run ${toolsDir(assistant)}/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
 
 Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
@@ -1633,10 +1633,12 @@ function writePublishContext(s: Scaffold, enclosing: string | null): void {
   result.notes.push(
     o.iriBase === undefined
       ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
-          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          "will skip with a warning until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
           `${instanceDeclarationFilename(o.slug)}.`
       : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
-          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "every push to main, but only once this instance holds at least one .jsonld document: the context binds the " +
+          "prefixes its documents use, so with none every run skips with a warning and creates no gh-pages. A new " +
+          "instance holds none yet. After the first run that publishes, switch GitHub Pages on once: " +
           "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
   );
 }

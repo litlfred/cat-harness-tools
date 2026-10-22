@@ -17,7 +17,8 @@ few seconds), then applies this snapshot, so it holds the same tree.
                                            new or changed since <list>) and
                                            <out>.deleted
   snapshot.py apply <root> <out>           in a shard: remove the deleted
-                                           paths, then unpack the tar
+                                           paths and the directories they
+                                           leave empty, then unpack the tar
 
 `node_modules` and `.git` are left out: a shard installs for itself, and the
 mounts carry no `.git`. The one exception is the root's `.git/branch-mounts`:
@@ -84,6 +85,14 @@ def apply(root, out):
         q = os.path.join(root, p)
         if os.path.lexists(q):
             os.remove(q)
+        # A directory the PR emptied goes too: the prepared tree never had it
+        # (the caller was swapped in whole), and a leftover empty folder is
+        # not nothing to a reader. `tools()` takes `tools/<id>/` for a Tool
+        # whose `<id>.ts` is missing (cat-harness#390).
+        d = os.path.dirname(q)
+        while os.path.abspath(d) != os.path.abspath(root) and os.path.isdir(d) and not os.listdir(d):
+            os.rmdir(d)
+            d = os.path.dirname(d)
     with tarfile.open(out + ".tar") as t:
         n = len(t.getnames())
         t.extractall(root, filter="tar")

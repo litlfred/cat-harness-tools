@@ -39,7 +39,6 @@
  * threw. Before `bo44`, `--check` ALSO wrote the sidecar, and no package
  * script or CI step ran it at all.
  */
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { allAvatars, AVATARS, GENERIC, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
@@ -49,7 +48,7 @@ import {
   isPublishedGraphTypology,
   readDeclaration,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { avatarsCssPath } from "./gen-avatars-css.js";
+import { renderAvatarsCss } from "./gen-avatars-css.js";
 import {
   buildQaResult,
   concludeJudgement,
@@ -133,11 +132,16 @@ export function coverage(root: string = ROOT): Coverage {
   return { required, missing, orphaned, declared };
 }
 
-/** Is the trash state actually derived, rather than silently absent? */
-export function trashDerivationPresent(root: string = ROOT): boolean {
-  const path = join(root, avatarsCssPath(root));
-  if (!existsSync(path)) return false;
-  const css = readFileSync(path, "utf8");
+/**
+ * Is the trash state actually derived, rather than silently absent?
+ *
+ * Judged on what the renderer emits, not on `avatars.css` in the checkout:
+ * the stylesheet is derived at publish time and ignored by git, so a gate
+ * job's checkout never holds it, and reading it there failed on every run
+ * with "the trash state is NOT derived". Whether the published copy matches
+ * the renderer is `avatars:css:check`'s question.
+ */
+export function trashDerivationPresent(css: string = renderAvatarsCss()): boolean {
   return css.includes('[data-fa-trash="true"]') && css.includes("--fa-avatar-glyph");
 }
 
@@ -195,7 +199,7 @@ if (import.meta.main) {
   let derived: boolean;
   try {
     c = coverage(ROOT);
-    derived = trashDerivationPresent(ROOT);
+    derived = trashDerivationPresent();
   } catch (e) {
     if (!check) throw e;
     process.exit(concludeJudgement({ gate: GATE, judgement: "error", detail: (e as Error).message }));

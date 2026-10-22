@@ -151,7 +151,7 @@ import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
 import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
-import { checkoutActors, checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { checkoutActors, checkoutRoleGraph, neededActors } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
@@ -2683,11 +2683,16 @@ const refUnjudgeable = (ref: string): boolean =>
   layeringUndetermined && !resolvableSkills.has(ref);
 // The CHECKOUT's actors on the platform's own run: a dependent may extend an
 // actor by id with the roles and capabilities it takes on there (placement
-// PR0b). `--instance` audits that instance alone, as before.
+// PR0b). On `--instance`, the actors THAT instance may name: the platform's,
+// every instance it needs, and its own. Reading the platform's alone reported
+// a downstream's own actors (the IHE ITI VHL Sharer, Receiver) as undeclared
+// on every requirement and role that names them.
 const actors =
   corpusScopeFor(root) === "checkout"
     ? checkoutActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
-    : readActors(ACTOR_DIR, readPolicyGrants(POLICY_DIR));
+    : INSTANCE_RUN
+      ? neededActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
+      : readActors(ACTOR_DIR, readPolicyGrants(POLICY_DIR));
 
 let graph: RoleGraph | undefined;
 let graphError: string | undefined;

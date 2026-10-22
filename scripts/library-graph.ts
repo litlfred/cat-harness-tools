@@ -100,6 +100,8 @@ import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harne
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
+import { displayNarrative } from "./lib/narrative-display.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -233,6 +235,13 @@ export interface LibraryEntry {
    */
   view?: string;
   /**
+   * The kind of viewer the entry's held source opens in — attached by the
+   * caller (`gen-library-viz`), set only when the page at {@link view} draws a
+   * view panel for it. The folio glass reads it to show its eye (owner,
+   * 2026-10-16). Absent means no viewer, or nobody derived it.
+   */
+  viewable?: "pdf" | "image";
+  /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
@@ -275,6 +284,9 @@ export interface LibraryAvatar {
  * full-page scan). An avatar is a thumbnail's job, and the copy is committed,
  * so a picture over this has NO avatar rather than a megabyte in the site.
  */
+/** An entry's rendered first page, inside its own directory — what `avatarOf` takes before any figure. */
+export const COVER_FILENAME = "cover.png";
+
 export const AVATAR_MAX_BYTES = 128 * 1024;
 
 /**
@@ -306,6 +318,10 @@ export function avatarOf(
   };
   const cover = join(libDir, `${slug}-cover.png`);
   if (fits(cover)) return make(cover, "cover");
+  // Page 1 rendered at ingest (`ingest-document` cover arm, or a backfill by
+  // `library-covers.ts`), kept inside the entry so promotion carries it.
+  const rendered = join(libDir, slug, COVER_FILENAME);
+  if (fits(rendered)) return make(rendered, "cover");
   for (const raw of images?.images ?? []) {
     const img = raw as { file?: unknown; role?: unknown };
     if (img.role !== "figure" || typeof img.file !== "string") continue;
@@ -645,7 +661,9 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
     if (!d) continue;
     const id = typeof d["@id"] === "string" ? (d["@id"] as string) : f.replace(/\.jsonld$/, "");
     const t = d["@type"];
-    const nar = d.narrative as { state?: unknown; text?: unknown } | undefined;
+    // One entry per language is possible (bean `cat-tools-e1lo`); the graph shows
+    // the one `narrativeFor` picks — no locale at build time, so the first.
+    const nar = displayNarrative(d.narrative);
     // A figure's description is authored and short — carried whole. A prose
     // block's is the section file, excerpted. See `content` on the interface.
     let content: string | null = typeof nar?.text === "string" ? (nar.text as string) : null;
@@ -675,7 +693,7 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
       summary: (() => {
         const it = summaryOf.get(id);
         if (!it) return null;
-        const n = it.record?.narrative;
+        const n = it.record?.narrative ? narrativeFor(it.record.narrative) : undefined;
         const d = n?.drafted_by;
         return {
           status: it.status,

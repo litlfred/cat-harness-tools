@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
 
-import { describeMark, readSweepMark, sessionId, writeSweepMark } from "../sweep-mark.ts";
+import { describeMark, judgeSweepMarks, readSweepMark, sessionId, writeSweepMark } from "../sweep-mark.ts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -86,5 +86,39 @@ describe("sweep marks", () => {
   test("the session id comes from the environment when it names one", () => {
     expect(sessionId({ CLAUDE_CODE_REMOTE_SESSION_ID: "session_a" })).toBe("session_a");
     expect(sessionId({})).toBeUndefined();
+  });
+});
+
+describe("sweep:mark:check — the gate that judges the kind (rq8s, 2026-10-20)", () => {
+  test("an empty store, and a store of valid marks, have nothing wrong", () => {
+    const root = store(true);
+    expect(judgeSweepMarks(root, T0)).toMatchObject({ state: "judged", read: 0, findings: [] });
+    writeSweepMark(root, { check: "session-staleness", read: 5, findings: 1 }, T0);
+    expect(judgeSweepMarks(root, T0)).toMatchObject({ state: "judged", read: 1, findings: [] });
+  });
+
+  test("CORRUPTED: an unparsable mark, a mark filed under another check's name, and a future date are each a finding", () => {
+    const root = store(true);
+    const dir = join(root, "beans", "marks");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "a.json"), "{ nope");
+    writeSweepMark(root, { check: "b", read: 1, findings: 0 }, T0);
+    writeFileSync(join(dir, "c.json"), readFileSync(join(dir, "b.json"), "utf8"));
+    writeSweepMark(root, { check: "d", read: 1, findings: 0 }, new Date("2026-10-13T09:00:00Z"));
+    const v = judgeSweepMarks(root, T0);
+    expect(v.state).toBe("judged");
+    if (v.state !== "judged") return;
+    expect(v.read).toBe(4);
+    expect(v.findings.map((f) => f.path.split("/").pop()).sort()).toEqual(["a.json", "c.json", "d.json"]);
+  });
+
+  test("a date within a few minutes of now is clock skew, not a finding", () => {
+    const root = store(true);
+    writeSweepMark(root, { check: "session-staleness", read: 1, findings: 0 }, new Date(T0.getTime() + 60_000));
+    expect(judgeSweepMarks(root, T0)).toMatchObject({ findings: [] });
+  });
+
+  test("a store with no marks node is UNDECLARED, not an empty pass of a store that exists", () => {
+    expect(judgeSweepMarks(store(false), T0).state).toBe("undeclared");
   });
 });

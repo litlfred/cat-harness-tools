@@ -55,7 +55,9 @@ afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-const draft = { text: "Weekly case counts by country.", state: "draft" as const, drafted_by: AGENT };
+const draft = { text: "Weekly case counts by country.", lang: "en", state: "draft" as const, drafted_by: AGENT };
+/** A slot as stored since e1lo stage 4: a written narrative in a one-entry list; the empty slot bare. */
+const slot = (n: { state: string }): unknown => (n.state === "not-authored" || Array.isArray(n) ? n : [n]);
 
 describe("the state machine refuses records that mean nothing", () => {
   test("only `not-authored` has no text", () => {
@@ -129,7 +131,7 @@ function repo(entries: Record<string, unknown>): string {
     mkdirSync(join(root, "library", slug), { recursive: true });
     writeFileSync(
       join(root, "library", slug, "tabular.jsonld"),
-      JSON.stringify({ $schema: "folio-tabular-records/v1", narrative }, null, 2) + "\n",
+      JSON.stringify({ $schema: "folio-tabular-records/v1", narrative: slot(narrative as { state: string }) }, null, 2) + "\n",
     );
   }
   return root;
@@ -157,38 +159,50 @@ function draftsOnDisk(lib: string): number {
     for (const x of Object.values(rec)) visit(x);
   };
   if (!existsSync(lib)) return 0;
-  for (const slug of readdirSync(lib)) {
-    for (const name of NARRATIVE_BEARING) {
-      const f = join(lib, slug, name);
-      if (!existsSync(f)) continue;
-      // Unparseable is skipped, exactly as the queue skips it — otherwise the
-      // two counts would disagree over a broken file rather than over a bug.
-      try {
-        visit(JSON.parse(readFileSync(f, "utf-8")));
-      } catch {
-        continue;
+  // EVERY JSON file under the library, not `NARRATIVE_BEARING`: walking the
+  // queue's own list made this blind wherever the queue was. Until 2026-10-21
+  // neither saw `vector-figures.json` or `figure-descriptions.json`, and the
+  // two counts agreed.
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      const f = join(dir, name.name);
+      // `blocks/` holds the graph's projections: a figure block carries a COPY
+      // of its image's narrative (`derivedFrom`), which a person reviews in
+      // `images.json`, not here. Counting it would count each draft twice.
+      if (name.isDirectory()) {
+        if (name.name !== "blocks") walk(f);
+      }
+      else if (/\.jsonl?d?$/.test(name.name)) {
+        // Unparseable is skipped, exactly as the queue skips it — otherwise the
+        // two counts would disagree over a broken file rather than over a bug.
+        try {
+          visit(JSON.parse(readFileSync(f, "utf-8")));
+        } catch {
+          continue;
+        }
       }
     }
-  }
+  };
+  walk(lib);
   return n;
 }
 
 describe("`narrativesIn` reads both shapes and says where each one sits", () => {
   test("a flat document yields one, at `narrative`", () => {
-    expect(narrativesIn({ narrative: draft })).toEqual([{ path: ["narrative"], narrative: draft }]);
+    expect(narrativesIn({ narrative: [draft] })).toEqual([{ path: ["narrative", 0], narrative: draft, lang: "en" }]);
   });
 
   test("an images sidecar yields one per DESCRIBED image, with its id", () => {
     const got = narrativesIn({
       images: [
-        { id: "a", role: "logo", narrative: draft },
+        { id: "a", role: "logo", narrative: [draft] },
         { id: "b", role: "page-scan" },
-        { id: "c", role: "figure", narrative: { ...draft, text: "something else" } },
+        { id: "c", role: "figure", narrative: [{ ...draft, text: "something else" }] },
       ],
     });
     expect(got.map((g) => g.path)).toEqual([
-      ["images", 0, "narrative"],
-      ["images", 2, "narrative"],
+      ["images", 0, "narrative", 0],
+      ["images", 2, "narrative", 0],
     ]);
     expect(got.map((g) => g.subject)).toEqual(["a", "c"]);
   });
@@ -197,10 +211,11 @@ describe("`narrativesIn` reads both shapes and says where each one sits", () => 
     // `images[2]` is the FIRST narrative here. Numbering by arrival would
     // write the reviewer's decision onto `images[0]` — a different picture,
     // silently, with both records still looking well-formed.
-    expect(narrativesIn({ images: [{ id: "a" }, { id: "b" }, { id: "c", narrative: draft }] })[0].path).toEqual([
+    expect(narrativesIn({ images: [{ id: "a" }, { id: "b" }, { id: "c", narrative: [draft] }] })[0].path).toEqual([
       "images",
       2,
       "narrative",
+      0,
     ]);
   });
 
@@ -208,9 +223,9 @@ describe("`narrativesIn` reads both shapes and says where each one sits", () => 
     // No file does this today. The function must not depend on that: a
     // container that silently drops one shape when the other is present is
     // the same blindness one layer down.
-    expect(narrativesIn({ narrative: draft, images: [{ id: "a", narrative: draft }] }).map((g) => g.path)).toEqual([
-      ["narrative"],
-      ["images", 0, "narrative"],
+    expect(narrativesIn({ narrative: [draft], images: [{ id: "a", narrative: [draft] }] }).map((g) => g.path)).toEqual([
+      ["narrative", 0],
+      ["images", 0, "narrative", 0],
     ]);
   });
 
@@ -226,6 +241,18 @@ describe("`narrativesIn` reads both shapes and says where each one sits", () => 
     expect(narrativesIn({ narrative: { state: "draft" } })).toEqual([]);
     expect(narrativesIn({ images: [{ id: "a", narrative: "words" }] })).toEqual([]);
     expect(narrativesIn({ images: [null, "x", 3] })).toEqual([]);
+  });
+
+  test("a vector-figures sidecar yields one per described figure, with its id", () => {
+    const got = narrativesIn({ figures: [{ id: "vfig-p003", narrative: [{ ...draft, lang: "en" }] }, { id: "vfig-p004" }] });
+    expect(got.map((g) => [g.path, g.subject, g.lang])).toEqual([[["figures", 0, "narrative", 0], "vfig-p003", "en"]]);
+  });
+
+  test("figure descriptions are keyed by document, which becomes the item's slug", () => {
+    const got = narrativesIn({ descriptions: { "doc-a": [{ figure: "Figure 2", narrative: [draft] }] } });
+    expect(got).toEqual([
+      { path: ["descriptions", "doc-a", 0, "narrative", 0], narrative: draft, lang: "en", subject: "Figure 2", slug: "doc-a" },
+    ]);
   });
 
   test("`images.json` is in the bearing list — necessary, and on its own useless", () => {
@@ -245,6 +272,22 @@ describe("the queue shows exactly what is waiting on a person", () => {
     });
     const q = queue(root);
     expect(q.map((i) => i.slug)).toEqual(["adraft"]);
+  });
+
+  test("a library-level figure description is offered, under its document, and a decision lands on it", () => {
+    const root = repo({});
+    mkdirSync(join(root, "library"), { recursive: true });
+    const f = join(root, "library", "figure-descriptions.json");
+    writeFileSync(
+      f,
+      JSON.stringify({ $schema: "folio-figure-descriptions/v1", descriptions: { "doc-a": [{ figure: "Figure 2", narrative: [draft] }] } }, null, 2) + "\n",
+    );
+    const q = queue(root);
+    expect(q.map((i) => [i.slug, i.subject, i.file])).toEqual([["doc-a", "Figure 2", join("library", "figure-descriptions.json")]]);
+    decide(q[0]!, "confirm", { by: HUMAN, root });
+    const [written] = JSON.parse(readFileSync(f, "utf-8")).descriptions["doc-a"][0].narrative;
+    expect(written.state).toBe("confirmed");
+    expect(written.confirmed_by).toEqual(HUMAN);
   });
 
   test("a REJECTED draft is never re-offered", () => {
@@ -289,7 +332,9 @@ describe("the queue shows exactly what is waiting on a person", () => {
     // Not the number: a count in a test is a claim that goes stale, and 24 is
     // a property of today's corpus rather than of the queue.
     expect(q.length).toBeGreaterThan(0);
-  });
+    // It walks every JSON file of every declared library: under 1 s alone,
+    // 5.8 s measured beside the other corpus tests, so not the 5 s default.
+  }, 30_000);
 
   test("every draft in a multi-narrative file names its SUBJECT", () => {
     // A reviewer shown twenty-four entries labelled only `wpr-rdo-2020-003-eng`
@@ -314,8 +359,8 @@ describe("deciding writes the file, and validates before it does", () => {
     // The draft attribution SURVIVES: who wrote it and who accepted it are
     // both still answerable afterwards.
     expect(out.drafted_by).toEqual(AGENT);
-    const onDisk = JSON.parse(readFileSync(join(root, q[0].file), "utf-8")) as { narrative: unknown };
-    expect(NarrativeSchema.safeParse(onDisk.narrative).success).toBe(true);
+    const onDisk = JSON.parse(readFileSync(join(root, q[0].file), "utf-8")) as { narrative: unknown[] };
+    expect(NarrativeSchema.safeParse(onDisk.narrative[0]).success).toBe(true);
     expect(queue(root)).toEqual([]);
   });
 
@@ -355,9 +400,9 @@ function imagesRepo(): string {
         $schema: "folio-document-images/v1",
         doc_id: "x",
         images: [
-          { id: "a", page: 1, role: "logo", narrative: draft },
+          { id: "a", page: 1, role: "logo", narrative: [draft] },
           { id: "b", page: 2, role: "page-scan" },
-          { id: "c", page: 3, role: "figure", narrative: { ...draft, text: "The other one." } },
+          { id: "c", page: 3, role: "figure", narrative: [{ ...draft, text: "The other one." }] },
         ],
       },
       null,
@@ -379,10 +424,10 @@ describe("a decision lands on the PICTURE the reviewer saw", () => {
 
     const doc = JSON.parse(readFileSync(join(root, "library", "x", "images.json"), "utf-8")) as {
       narrative?: unknown;
-      images: { id: string; role: string; narrative?: { state: string } }[];
+      images: { id: string; role: string; narrative?: { state: string }[] }[];
     };
-    expect(doc.images[2].narrative?.state).toBe("confirmed");
-    expect(doc.images[0].narrative?.state).toBe("draft");
+    expect(doc.images[2].narrative?.[0]?.state).toBe("confirmed");
+    expect(doc.images[0].narrative?.[0]?.state).toBe("draft");
     expect(doc.images[1].narrative).toBeUndefined();
     // And NO stray top-level record. `doc.narrative = …` — correct while every
     // bearing file held one narrative — would have written here, left all 24
@@ -416,7 +461,7 @@ describe("a decision lands on the PICTURE the reviewer saw", () => {
     // TypeError naming nothing useful. Either way the reviewer's decision is
     // recorded against no picture.
     const root = imagesRepo();
-    const item = { ...queue(root)[0], path: ["images", 9, "narrative"] as const };
+    const item = { ...queue(root)[0], path: ["images", 9, "narrative", 0] as const };
     expect(() => decide(item, "confirm", { by: HUMAN, now, root })).toThrow(/does not exist/);
     expect(queue(root).map((i) => i.subject)).toEqual(["a", "c"]);
   });
@@ -494,5 +539,50 @@ describe("an agent cannot record itself as the human — the hole the tool itsel
     const r = Bun.spawnSync(["bun", "run", join(TOOLS_ROOT, "scripts/narratives.ts"), "confirm", "1"], { cwd: ROOT });
     expect(r.exitCode).not.toBe(0);
     expect(readFileSync(join(root, queue(root)[0].file), "utf-8")).toBe(before);
+  });
+});
+
+// ── One narrative per language — bean `cat-tools-e1lo`, stage 2 ──────────
+//
+// A slot may hold a list, one entry per `lang` (`NarrativeSlotSchema`). The
+// queue reads it through `narrativesOfSlot`, so each translation is its own
+// item with its own path, and a decision lands on that one entry.
+
+describe("a slot with one narrative per language", () => {
+  const en = { ...draft, lang: "en" };
+  const fr = { ...draft, text: "Nombre de cas par semaine et par pays.", lang: "fr" };
+
+  test("yields one item per language, each at its own index", () => {
+    expect(narrativesIn({ narrative: [en, fr] })).toEqual([
+      { path: ["narrative", 0], narrative: en, lang: "en" },
+      { path: ["narrative", 1], narrative: fr, lang: "fr" },
+    ]);
+  });
+
+  test("inside an images sidecar too, keeping the image's id", () => {
+    const got = narrativesIn({ images: [{ id: "fig-1", narrative: [en, fr] }] });
+    expect(got.map((g) => [g.path, g.subject, g.lang])).toEqual([
+      [["images", 0, "narrative", 0], "fig-1", "en"],
+      [["images", 0, "narrative", 1], "fig-1", "fr"],
+    ]);
+  });
+
+  test("a list that breaks the slot rules is skipped, not half-read", () => {
+    // Two `fr`: a reviewer would confirm one while the other is shown.
+    expect(narrativesIn({ narrative: [fr, { ...fr }] })).toEqual([]);
+  });
+
+  test("confirming the French one writes the French one, and the English draft is untouched", () => {
+    const root = repo({ alist: [en, fr] });
+    const q = queue(root);
+    expect(q.map((i) => i.lang)).toEqual(["en", "fr"]);
+    decide(q[1]!, "confirm", { by: HUMAN, now: new Date("2026-10-20T00:00:00Z"), root });
+    const stored = JSON.parse(readFileSync(join(root, "library", "alist", "tabular.jsonld"), "utf-8")) as {
+      narrative: { state: string; lang: string }[];
+    };
+    expect(stored.narrative.map((n) => [n.lang, n.state])).toEqual([
+      ["en", "draft"],
+      ["fr", "confirmed"],
+    ]);
   });
 });

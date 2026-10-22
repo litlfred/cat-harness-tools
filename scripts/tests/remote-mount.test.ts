@@ -208,6 +208,16 @@ describe("mount:remote over fixture repositories", () => {
     expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).toContain("41");
   });
 
+  test("4b. --fresh replaces an edited mount, and only what the lock says this mount put there", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    writeFileSync(join(root, "base/schemas/util.ts"), "export const answer = 41;\n");
+    const again = mountRemote({ instanceRoot: root, urlFor, discardEdits: true });
+    expect(again.plan.outcomes.find((o) => o.instance === "base")!.detail ?? "").not.toContain("left untouched");
+    expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).not.toContain("41");
+    expect(checkRemote({ instanceRoot: root }).outcomes.find((o) => o.instance === "base")!.state).not.toBe("missing");
+  });
+
   test("5. a downstream overrides by id — path and directories — and the overlay still finds it", () => {
     const root = downstream({ overrides: { core: { path: "vendor/core", directories: ["core-docs"] } } });
     const r = mountRemote({ instanceRoot: root, urlFor });

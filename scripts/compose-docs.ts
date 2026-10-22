@@ -117,7 +117,7 @@ import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
 import { foreignScopeFor, isHostProjection, scopeHarnessData, scopeSiteConfig, scopeStickies } from "./lib/foreign-site-scope.ts";
 import { subscribedTrees } from "./subscribed-trees.ts";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
-import { declaredVisualisers, forwardingParts, pageParts } from "./viewer-declarations.ts";
+import { declaredVisualisers, forwardingParts, heldVisualiserPages, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
@@ -651,6 +651,44 @@ export function writeForwardingPages(
 }
 
 /**
+ * Lay every visualiser page a harness commits in its own site directory
+ * (`heldVisualiserPages`) into the composed tree at its declared route, where
+ * Jekyll renders it with the site's layout like any page drawn into the site
+ * owner's tree. Wrong-direction move M1 (2026-10-20): the page used to be
+ * committed in the platform's own tree, which then named the layer above it.
+ *
+ * REFUSED over a file already in the tree, file by file, and reported: the
+ * page stood in the platform's tree until the move, and a tree that still
+ * carries it (a platform pinned before the move) keeps its copy rather than
+ * having it silently replaced.
+ */
+export function writeHeldVisualiserPages(
+  out: string,
+  repo = REPO,
+  withheld: readonly string[] = [],
+  suppliedBy: Record<string, string> = {},
+): { written: string[]; collisions: string[] } {
+  const written: string[] = [];
+  const collisions: string[] = [];
+  for (const h of heldVisualiserPages(repo)) {
+    for (const rel of filesUnder(h.dir)) {
+      const at = `${h.route}${rel.split(sep).join("/")}`;
+      if (isWithheld(at, withheld)) continue;
+      const dest = join(out, at);
+      if (existsSync(dest)) {
+        collisions.push(`${at} — ${h.visualiser.harness}.visualisers[${h.visualiser.id}] is already in the tree (${suppliedBy[at] ?? "unknown layer"})`);
+        continue;
+      }
+      mkdirSync(join(dest, ".."), { recursive: true });
+      cpSync(join(h.dir, rel), dest);
+      suppliedBy[at] = h.visualiser.harness;
+      written.push(at);
+    }
+  }
+  return { written: written.sort(), collisions: collisions.sort() };
+}
+
+/**
  * A redirect page: no layout, no front matter, so Jekyll copies it verbatim.
  *
  * The script runs first and carries the `?query` and `#fragment` across
@@ -760,6 +798,12 @@ export interface ComposeReport {
    * the site carries still stands there (a site not yet regenerated).
    */
   readonly forwards: { written: string[]; superseded: string[] };
+  /**
+   * The visualiser pages a harness commits in its OWN site directory, laid at
+   * their declared route (`heldVisualiserPages`), and each file refused because
+   * a layer or composed instance already put one there.
+   */
+  readonly held: { written: string[]; collisions: string[] };
   /** The repository-scoped layers a platform-only shell left out (`platformOnly`), never silently. */
   readonly leftOut?: DocsLayer[];
 }
@@ -1017,6 +1061,12 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     }
   }
 
+  // THE VISUALISER PAGES A HARNESS HOLDS ITSELF, at their declared route,
+  // after the layers and composed instances so a collision with either is
+  // seen. Not on a shell: a folio's own site publishes its own page at its own
+  // root, and the platform's routes are not its business.
+  const held = opts.shell ? { written: [], collisions: [] } : writeHeldVisualiserPages(out, repo, withheld, suppliedBy);
+
   // A SHELL IS A FOLIO'S SITE, so the harness data it carries is scoped to
   // that folio: its tiles, icon row, rail scopes and title (#2263). Done
   // after the layers so it scopes the merged result, once.
@@ -1087,6 +1137,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     carried: carry,
     aliases,
     forwards,
+    held,
     ...(scoped ? { scoped } : {}),
     ...(opts.platformOnly ? { leftOut } : {}),
   };
@@ -1244,6 +1295,8 @@ if (import.meta.main) {
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +
       (r.forwards.superseded.length > 0 ? `, ${r.forwards.superseded.length} not written over a page still there` : ""),
   );
+  console.log(`  ${r.held.written.length} visualiser page file(s) laid from their own harness's site directory`);
+  for (const c of r.held.collisions) console.log(`  KEPT     ${c}`);
   for (const c of r.aliases.collisions) console.error(`::error::compose-docs: alias collision: ${c}`);
 
   if (r.missing.length > 0 || r.aliases.collisions.length > 0) process.exit(1);

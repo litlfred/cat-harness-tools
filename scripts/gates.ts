@@ -471,6 +471,19 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "Its shim, embed and install helpers are covered by pdf-viewer.test.ts in `bun test`",
   },
   {
+    // The knowledge-graph viewer's deploy step (o7eq). It writes the viewer at
+    // its declared route and a forwarding page at its old address into the
+    // BUILT `./_site` (`--site`), or one page (`--out`). Matched by script
+    // rather than by flag so the exemption holds across the switch from one
+    // spelling to the other. Its page and route are covered by
+    // `kg-viewer-route.test.ts` in `bun test` and by the `kg-viewer` e2e specs.
+    match: "scripts/kg-viewer.ts",
+    kind: "ci-only",
+    reason:
+      "a DEPLOY step, not a check: it writes the KG viewer page(s) into ./_site, which only exists " +
+      "inside the site-build job. Its route and page are covered by kg-viewer-route.test.ts",
+  },
+  {
     // Its sibling, and exempt for the same reason. `compose-docs.ts` lays the
     // declared `docs` layers into one tree for Jekyll to build — base
     // (`cat-harness/docs/`) then the repository root's overlay. It COPIES
@@ -702,38 +715,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     match: "latex-overfull-report.ts",
     kind: "no-folio",
     reason: "reads `main.log` from a folio's LaTeX run",
-  },
-  {
-    match: "scripts/audit-wiring.ts",
-    kind: "no-folio",
-    reason:
-      "the SCRIPT is the platform's (`cat-harness-tools/scripts/audit-wiring.ts`); " +
-      "what it needs and the platform lacks is a folio's witness tree. The " +
-      "earlier reason here — \"no such path in the platform\" — was false, " +
-      "and an exemption resting on a false reason is what this table exists " +
-      "to prevent (bean `52dz`)",
-  },
-  {
-    match: "scripts/section-story-audit.ts",
-    kind: "no-folio",
-    reason:
-      "as `audit-wiring.ts`: the script is the platform's, the section tree " +
-      "it audits is a folio's. Previous reason was false (bean `52dz`)",
-  },
-  {
-    match: "trivial-skeleton-audit.ts",
-    kind: "no-folio",
-    reason: "runs `--cwd content`, a root the convention has retired",
-  },
-  {
-    match: "conditional-class-banner-audit.ts",
-    kind: "no-folio",
-    reason: "audits block banners from the retired `content/` root; see `52dz`",
-  },
-  {
-    match: "codemod-leanval.ts",
-    kind: "no-folio",
-    reason: "a codemod over a folio's Lean blocks",
   },
   // ── Needs something a checkout does not have ────────────────────────
   {

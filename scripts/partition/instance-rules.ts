@@ -1070,6 +1070,7 @@ export const RULES: Rule[] = [
       "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kind-validator.ts",  // a graph typology's validator
+      "schemas/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
       "schemas/actor-reach.ts",     // which actors a declaration can reach
       // WHAT A REPOSITORY IS — the markers it carries. The word "content" in
       // the filename is what sends it to core by keyword, and it is a false

@@ -159,11 +159,16 @@ describe("a path to the declaration is built from the constant", () => {
   // ── False-positive guards. Each one closes a class that was MEASURED on the
   // real corpus, and each must keep passing if the rule is ever narrowed. ──
 
-  test("GUARD: prose in a message string is counted, never failed", () => {
+  test("a message string naming the retired file is not a bypass, but it FAILS as user-visible", () => {
+    // Was a guard that this is "counted, never failed". Owner ruling
+    // 2026-10-20 (bean `k8rc`, option 1): output is read by someone who then
+    // looks for the file, so a log line naming a file that is gone is wrong
+    // at run time, which a doc comment is not.
     const src = "console.error(`no harness.json at ${root}; nothing to resolve.`);\n";
     const r = checkDeclarationFilename(fixture("src/a.ts", src));
     expect(r.bypasses).toHaveLength(0);
-    expect(r.counted.prose).toBe(1);
+    expect(r.userVisible.map((u) => u.file)).toEqual(["cat-harness/src/a.ts"]);
+    expect(r.counted.prose).toBe(0);
   });
 
   test("GUARD: a STATIC path inside backticks is prose, not construction", () => {
@@ -173,6 +178,8 @@ describe("a path to the declaration is built from the constant", () => {
     const src = 'const d = "a repo carrying `cat-harness/harness.json` is not blank";\n';
     const r = checkDeclarationFilename(fixture("src/a.ts", src));
     expect(r.bypasses).toHaveLength(0);
+    // ...and that tool-description shape is exactly the user-visible class.
+    expect(r.userVisible).toHaveLength(1);
   });
 
   test("GUARD: `docs/_data/harness.json` is a DIFFERENT FILE and must not be reported", () => {
@@ -182,12 +189,37 @@ describe("a path to the declaration is built from the constant", () => {
     const src = "const msg = `docs/_data/harness.json is stale.`;\n";
     const r = checkDeclarationFilename(fixture("src/a.ts", src));
     expect(r.bypasses).toHaveLength(0);
+    expect(r.userVisible).toHaveLength(0);
   });
 
   test("GUARD: a doc comment naming the file is prose", () => {
     const r = checkDeclarationFilename(fixture("src/a.ts", " * An instance carries `harness.json`.\n"));
     expect(r.bypasses).toHaveLength(0);
+    expect(r.userVisible).toHaveLength(0);
     expect(r.counted.prose).toBe(1);
+  });
+
+  // ── The user-visible class (bean `k8rc`): its own guards ──
+
+  test("GUARD: the CURRENT declaration `cat-harness.json` in a message is not the retired name", () => {
+    const src = "throw new Error(`no cat-harness.json under ${root}`);\n";
+    const r = checkDeclarationFilename(fixture("src/a.ts", src));
+    expect(r.userVisible).toHaveLength(0);
+    expect(r.counted.prose).toBe(0);
+  });
+
+  test("GUARD: a test's own message string stays counted prose, as before", () => {
+    const src = "expect(msg).toContain(`no harness.json at`);\n";
+    const r = checkDeclarationFilename(fixture("src/a.test.ts", src));
+    expect(r.userVisible).toHaveLength(0);
+    expect(r.counted.prose).toBe(1);
+  });
+
+  test("OUTSIDE the owning instance it still fails: a message needs no import to be right", () => {
+    const src = 'log("init", "Loaded harness.json");\n';
+    const r = checkDeclarationFilename(fixture("schemas/a.ts", src, "folio-assistant-core"));
+    expect(r.crossInstance).toHaveLength(0);
+    expect(r.userVisible.map((u) => u.file)).toEqual(["folio-assistant-core/schemas/a.ts"]);
   });
 
   test("GUARD: a test fixture is counted and does NOT fail the gate", () => {
@@ -395,6 +427,17 @@ describe("the retired name is matched as a FILENAME, on both sides", () => {
     expect(md("open `harness.json` first")).toBe("use");
     expect(md("open `cat-harness/harness.json` first")).toBe("use");
   });
+});
+
+describe("the TypeScript corpus, on this repository", () => {
+  test(
+    "carries no user-visible string naming the retired declaration",
+    () => {
+      const r = corpus();
+      expect(r.userVisible.map((u) => `${u.file}:${u.line}`)).toEqual([]);
+    },
+    CORPUS_TIMEOUT,
+  );
 });
 
 describe("the markdown corpus, on this repository", () => {

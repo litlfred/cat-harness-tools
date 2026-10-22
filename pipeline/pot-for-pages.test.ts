@@ -26,13 +26,26 @@ import { tmpdir } from "node:os";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { needingCatalogue, owned, plan, sourceFor } from "./pot-for-pages.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
+
+// Every real-corpus question here runs `driftFor` over the whole checkout, at
+// about five seconds a call on a CI runner, and `owned` runs it again — two
+// tests timed out at bun's 5s default on folio-assistant#2614. The budget is
+// raised rather than the corpus narrowed, and each answer is computed once.
+setDefaultTimeout(60_000);
+const once = <T>(f: () => T): (() => T) => {
+  let v: { value: T } | undefined;
+  return () => (v ??= { value: f() }).value;
+};
+const NEEDING = once(() => needingCatalogue(INSTANCE));
+const OWNED = once(() => owned(INSTANCE));
+const PLAN = once(() => plan(INSTANCE));
 
 describe("the English source is resolved against the instance root", () => {
   test("sourceFor is ABSOLUTE and inside the instance", () => {
@@ -57,7 +70,7 @@ describe("the page set is derived, never written down", () => {
     // Guards the parse of the gate's `subject` field. A finding whose subject
     // failed to split would otherwise become a pair with an empty page and a
     // template written to `<locale>/.pot`.
-    for (const x of needingCatalogue(INSTANCE)) {
+    for (const x of NEEDING()) {
       expect(x.locale.length).toBeGreaterThan(0);
       expect(x.page.length).toBeGreaterThan(0);
       expect(x.page.endsWith(".pot")).toBe(false);
@@ -67,8 +80,8 @@ describe("the page set is derived, never written down", () => {
   test("the derived set is a SUBSET of what the module owns", () => {
     // The containment that makes clause 3 above true: a page the gate names is
     // always in scope, whether or not a template exists for it yet.
-    const own = new Set(owned(INSTANCE).map((x) => `${x.locale}/${x.page}`));
-    for (const x of needingCatalogue(INSTANCE)) {
+    const own = new Set(OWNED().map((x) => `${x.locale}/${x.page}`));
+    for (const x of NEEDING()) {
       expect(own.has(`${x.locale}/${x.page}`)).toBe(true);
     }
   });
@@ -77,11 +90,11 @@ describe("the page set is derived, never written down", () => {
     // Vacuity guard. If these were equal, clause 3 would be untested here and
     // the regression that shipped would be invisible again. Measured
     // 2026-09-26: 36 derived, 68 owned.
-    expect(owned(INSTANCE).length).toBeGreaterThan(needingCatalogue(INSTANCE).length);
+    expect(OWNED().length).toBeGreaterThan(NEEDING().length);
   });
 
   test("no pair is listed twice", () => {
-    const keys = owned(INSTANCE).map((x) => `${x.locale}/${x.page}`);
+    const keys = OWNED().map((x) => `${x.locale}/${x.page}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
@@ -95,14 +108,14 @@ describe("the ownership boundary with translate-bpmn", () => {
     // `not.toContain("/")` stood in for this while every page sat at the top
     // level; since the docs graph's named groups (bean `xka5`) a page may be
     // `concepts/architecture`, so the rule is stated as itself.
-    for (const x of owned(INSTANCE)) expect(x.page).not.toMatch(/^processes\//);
+    for (const x of OWNED()) expect(x.page).not.toMatch(/^processes\//);
   });
 
   test("and the real corpus has such templates to be wrong about", () => {
     // Without this the test above passes on an empty subdirectory. The other
     // module's templates must actually be there for the exclusion to mean
     // anything.
-    const bpmn = plan(INSTANCE).filter((p) => p.pot.includes(`${"processes"}/`));
+    const bpmn = PLAN().filter((p) => p.pot.includes(`${"processes"}/`));
     expect(bpmn).toHaveLength(0);
   });
 });
@@ -112,7 +125,7 @@ describe("a template whose source is gone is REPORTED", () => {
     // Not dropped, not deleted: `deletion-requires-confirmation`. The runner
     // prints these as `?` and writes nothing for them, so an orphan stays
     // visible until a person decides. Measured: `kg-viewer`, `agent-onboarding`.
-    const orphans = plan(INSTANCE).filter((p) => !p.sourceExists);
+    const orphans = PLAN().filter((p) => !p.sourceExists);
     expect(orphans.length).toBeGreaterThan(0);
     for (const o of orphans) expect(o.current).toBe(false);
   });

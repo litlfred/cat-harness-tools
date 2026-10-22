@@ -13,7 +13,8 @@
  *
  * Three green ticks, one line under "0 titles across 0 chapters".
  *
- * `trivial-skeleton-audit.ts` — `witness-pipeline.yml` runs it as
+ * `trivial-skeleton-audit.ts` — `witness-pipeline.yml` (retired to `fsh-guts`,
+ * bean `1l13`) ran it as
  * "baseline-strict" with per-pattern budgets pinned at the current counts and
  * the `|| true` mask deliberately dropped, so its exit code really gates. The
  * test is `observed > budget`; over an empty corpus every `observed` is 0, so

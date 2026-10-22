@@ -6,7 +6,7 @@ type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-10T16:33:42Z
+updated_at: 2026-10-21T18:45:00Z
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
@@ -295,3 +295,156 @@ the harness owns the harness") puts it outside this store's reach.
 3. Scrap it. The finding no longer matters after the separation.
 
 **Default if no answer:** option 1.
+
+
+## Owner decision above — resolved
+
+The rehome question (option 1) was settled by the owner's ruling of 2026-10-10: this bean IS the rehomed copy, so the question above is closed and must not be re-asked. Kept for history.
+
+## Re-measured 2026-10-20 — the next step is a schema change in cat-harness
+
+`scripts/narratives.ts` (here) queues narratives, but the schema it validates
+against, `@litlfred/cat-harness/schemas/narrative.ts`, has **no language
+field at all**. "A narrative per language" cannot be stored, let alone queued,
+until that schema says how. The remaining human-confirmation half is the
+owner's, through `bun run cat narratives`.
+
+## Owner decision
+
+How does a narrative carry its language? (Asked 2026-10-20 by the
+cat-harness-tools drain lane; the change lands in cat-harness's
+`schemas/narrative.ts`, then `narrativesIn` here follows it.)
+
+1. **(Recommended) A `lang` (BCP 47) field on each `Narrative`, and the
+   `narrative` slot becomes a list, one per language.** Each language has its own
+   author, model version and review state, which is what the review queue
+   decides on; a missing language is visibly absent.
+2. A map keyed by language (`narrative: { en: …, fr: … }`). Compact, but a
+   reviewer confirms each entry separately anyway, so the queue path needs the
+   key as well.
+3. Keep one narrative and translate it at render time. No per-language review,
+   so it gives up the human confirmation the 2026-10-06 ruling asked for.
+
+**Default if no answer:** option 1.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Owner ruling 2026-10-20: option 1, a `lang` per narrative
+
+Answered directly in the cat-harness-tools drain session ("2y"). Each
+`Narrative` carries a BCP 47 `lang`, and the `narrative` slot becomes a list
+with one entry per language, each with its own author, model version and review
+state. Order of work: the schema change in cat-harness (`schemas/narrative.ts`)
+first, then `narrativesIn` and the queue here follow it.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T18:14:45Z_ — Claimed by feat/e1lo-narrative-lang — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+
+## Stages 1 and 2 of the language ruling — 2026-10-20
+
+The ruling lands in four stages, so no stored narrative is invalid at any point:
+
+- [x] **1, cat-harness** (litlfred/cat-harness#384): `Narrative.lang` (BCP 47,
+      optional for now); `NarrativeSlotSchema` accepts one narrative or a list
+      in which every entry names its `lang` and none repeats; `narrativesOfSlot`
+      reads either.
+- [x] **2, this repository**: `narrativesIn` reads every slot (flat, images,
+      summaries) through `narrativesOfSlot`. A list yields one queue item per
+      language at `[..., "narrative", j]`, the queue shows `[lang]`, and
+      `decide` writes the one entry the reviewer saw. Tests in
+      `scripts/tests/narratives.test.ts`, mutation-checked.
+- [ ] **3**: the six slot schemas in cat-harness (`document-image`,
+      `block-summary`, `tabular-records`, `vector-figure`,
+      `figure-description`, `tabular-csvw`) switch to `NarrativeSlotSchema`,
+      and the stored narratives (274 per the count above, across the
+      cat-harness, core, sci and who-iris libraries) migrate to lists with
+      their source `lang`.
+- [ ] **4**: the single form goes, and `lang` becomes required.
+- [ ] then the bean's own work: an agent drafts each configured language, and
+      each draft goes to the queue for a person.
+
+Released to `todo`: stage 3 touches four content repositories' stored data.
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Owner ruling 2026-10-21: a display shows the reader's language, else the first
+
+Asked in the cat-harness-tools drain session (structured question): when a
+slot holds several languages, which entry does a single-text display show?
+The owner chose **"Locale match, else first"**. Stage 3 is therefore split, so
+that no layer's typecheck breaks when the slot types widen:
+
+- [ ] **3a**, cat-harness#396: `narrativeFor(slot, lang?)`. It matches the
+      exact `lang`, then the primary subtag, then falls back to the first
+      entry.
+- [ ] **3b**, this repository (`feat/e1lo-readers-slot-aware`):
+  - Counters read every entry: `check-l1-complete` (figures with text,
+    images still not-authored, and table detail lines as `lang:state`).
+  - The sidecar parse check uses `NarrativeSlotSchema`, so a valid list is
+    not reported as a defect.
+  - Displays use `narrativeFor`: `library-graph`, and `library-document`
+    through `scripts/lib/narrative-display.ts` for untyped JSON.
+  - Still to do: folio-assistant-core `scripts/lsi-blocks.ts:88`
+    (`block.narrative?.text`). It is another repository, handed to the
+    coordinator.
+- [ ] **3c**, cat-harness: the six slot schemas switch to
+      `NarrativeSlotSchema`, and `block-summary` / `figure-description`
+      read through it.
+- [ ] **3d**: the 274 stored narratives migrate to lists with their source
+      `lang`, in four content repositories.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+## Stage 3d done; stage 4 needs three owner decisions (2026-10-21)
+
+**Data (3d) merged** for cat-harness (#405, #407: 609), core (#173: 50), sci (#48: 50) and who-iris (#78: 418). Every one is a one-entry list naming `en`. smart-base and smart-immunizations are lane S's, run with the tool set on tools main.
+
+**Tools merged:**
+- #537: writers emit `[{…, lang}]`.
+- #539: the queue and the migration see vector figures and figure descriptions.
+- #540: the migrator keeps Python number spellings.
+
+Stage 4 makes `lang` required and removes the single form. Three places need a call first. Counts are measured across the composed index's libraries, plus qou's folio.
+
+### 1. What does an empty slot ("not-authored") look like?
+`NOT_AUTHORED = { text: null, state: "not-authored" }` marks "no description yet". Where it comes from:
+- written today by `tabular-csvw.ts` for every new CSVW record;
+- implied by `document-image.ts` for a describable image with no narrative;
+- stored once on disk: folio-assistant-sci `codata-2022/tabular.jsonld`.
+
+- **A. (recommended) Keep it as the one single-form value, with no `lang`.**
+  - Every authored narrative is a list entry with a required `lang`; "nothing written" stays `{ text: null, state: "not-authored" }`.
+  - Cost: one schema branch. No data changes.
+  - Risk: readers see two shapes, but they already go through `narrativesOfSlot`.
+  - Commits to: an empty slot claims no language, so adding a French draft later is plainly "the first narrative", not "French added while English is still missing".
+- **B. A one-entry list with `lang: "en"`.**
+  - One shape everywhere.
+  - Cost: change `NOT_AUTHORED` and migrate the 1 stored record.
+  - Risk: it asserts a language for text that does not exist, and a later `fr` draft beside it reads as "English is missing".
+- **C. An absent field means not-authored.**
+  - Remove `NOT_AUTHORED` altogether.
+  - Cost: `document-image` and `tabular-csvw` change, and the "absence is distinguishable from rejection" behaviour (document-image test) has to be re-argued.
+  - Risk: absent then means both "not looked at" and "looked at, nothing written".
+- **If you say nothing:** stage 4 waits, nothing breaks, and new narratives are already written with `lang` (#537).
+
+### 2. `superseded` history in block summaries
+`superseded` is a plain `Narrative[]` with `lang` optional. **0 entries exist** in any library today.
+
+- **A. (recommended) Require `lang` there too.**
+  - Free now: nothing to migrate, and new entries are copies of slot entries, which already carry `lang`.
+- **B. Leave it optional** as historical record.
+  - Costs nothing now, but keeps a second rule for "a narrative" in the schema.
+- **If you say nothing:** it stays optional, which is harmless while it is empty.
+
+### 3. `FigureSchema.narrative` (authored paper figure blocks, cat-harness `constraints.ts`)
+It is still the single `NarrativeSchema`, not a slot. **0 authored figure blocks carry a narrative**, in qou's folio or anywhere else in the index.
+
+- **A. (recommended) Make it a slot like every other**, and require `lang` with the rest.
+  - One line, nothing to migrate.
+- **B. Remove the field.**
+  - Nobody uses it, but library figure blocks (`blocks/figure-*.jsonld`) do carry narratives, so authored figures losing the field would be an odd asymmetry.
+- **If you say nothing:** it remains the last single-form schema, and stage 4 cannot remove the single form.
+
+Recommendation, as my judgement: 1A, 2A, 3A. That gives stage 4 one rule — every written narrative names its language — with one explicit exception: "nothing written yet".
