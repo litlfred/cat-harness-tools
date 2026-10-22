@@ -37,7 +37,10 @@
  */
 import { spawnSync } from "node:child_process";
 
+import { relative } from "node:path";
+
 import { CLOSED_STATUSES, OPEN_STATUSES, scalar } from "./bean-store-read.ts";
+import { beanDefsDir } from "./beans.ts";
 
 /** The four fields a burn-down needs from a bean. */
 export interface BeanState {
@@ -200,7 +203,8 @@ const HELP = `epic-burndown — an epic's open and closed beans, day by day, fro
 
   --ref    the commit history to read (default HEAD); a state branch such as
            origin/cat/cat-harness/beans for a store kept off main
-  --path   the store's defs directory within that history (default beans/defs)
+  --path   the store's defs directory within that history (default: the
+           store this checkout declares, relative to its repository)
   --days   how many of the most recent days with a commit to show (default 30)
 
 Exit 0 with a series, 1 when the epic is in none of the snapshots, 2 when the
@@ -223,7 +227,19 @@ export function main(args: readonly string[] = process.argv.slice(2), cwd: strin
     return 2;
   }
   const ref = flag(args, "--ref") ?? "HEAD";
-  const path = flag(args, "--path") ?? "beans/defs";
+  let path = flag(args, "--path");
+  if (path === undefined) {
+    // The store this checkout DECLARES, as a path in its own history. A store
+    // kept on a state branch is not in this history: name it with --ref/--path.
+    try {
+      const dir = beanDefsDir(cwd);
+      if (dir === null) throw new Error("this checkout declares no bean store");
+      path = relative(gitText(cwd, ["rev-parse", "--show-toplevel"]).trim(), dir);
+    } catch (e) {
+      console.error(`epic-burndown: ${e instanceof Error ? e.message : e} — pass --ref and --path for a store kept elsewhere.`);
+      return 2;
+    }
+  }
   const days = Number(flag(args, "--days") ?? "30");
   if (!Number.isInteger(days) || days <= 0) {
     console.error("epic-burndown: --days takes a positive whole number.");
