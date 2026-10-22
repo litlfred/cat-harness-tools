@@ -284,6 +284,7 @@
     "declarations:retag": "bun run cat-harness-tools/scripts/declarations-retag.ts",
     "declarations:retag:check": "bun run cat-harness-tools/scripts/declarations-retag.ts --check",
     "milestone:status": "bun run cat-harness-tools/scripts/milestone-status.ts",
+    "epic:burndown": "bun run cat-harness-tools/scripts/epic-burndown.ts",
     "kind:register": "bun run cat-harness-tools/scripts/kind-register.ts",
     "kind:register:check": "bun run cat-harness-tools/scripts/kind-register.ts --check",
     "node-kinds": "bun run cat-harness-tools/scripts/check-node-kinds.ts",
