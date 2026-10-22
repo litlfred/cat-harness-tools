@@ -1,5 +1,6 @@
 ---
 # cat-tools-lwjc
+$schema: bean/1.0.0
 title: 'Per-page todo listing: each page lists only its own todos, with its own count (dm4j residue)'
 status: completed
 type: task

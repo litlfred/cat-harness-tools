@@ -1,5 +1,6 @@
 ---
 # cat-tools-bbnd
+$schema: bean/1.0.0
 title: 'Translation info drawer: open more translation detail from every translation warning — blocks, pages, (sub)graphs, locales'
 status: completed
 type: feature

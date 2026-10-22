@@ -1,5 +1,6 @@
 ---
 # cat-tools-5jij
+$schema: bean/1.0.0
 title: 'qa-axis-summary reads a JSON shape qa-sweep never emits, so every axis reports "criteria run: 0"'
 status: completed
 type: bug

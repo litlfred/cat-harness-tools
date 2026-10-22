@@ -1,12 +1,15 @@
 ---
 # cat-tools-e1lo
+$schema: bean/1.0.0
 title: 'INGEST: narrative description per image, localized, including images extracted from PDFs'
 status: todo
 type: task
+priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-21T18:45:00Z
+updated_at: 2026-10-22T16:34:33Z
+parent: folio-assistant-zzmr
 ---
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
