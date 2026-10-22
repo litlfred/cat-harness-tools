@@ -52,6 +52,34 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 
 /**
+ * Gates that judge FIXITY, not staleness, so post-merge regen never asks them.
+ *
+ * Each says whether a mounted instance still holds exactly the bytes its lock
+ * names. Here that cannot hold, and no writer can make it hold:
+ *
+ * - in a LAYER's run (`layer-post-merge-regen.yml`) the caller's own checkout
+ *   is copied over its locked mount before the first pass, so both fail in the
+ *   audit pass, before any writer runs;
+ * - in the INDEX's run, every writer that regenerates a layer's artefact
+ *   writes into that layer's mount, which breaks its digest.
+ *
+ * Their writers re-lay a mount and leave edited bytes untouched, so asking them
+ * could only end in `unrepaired` and a red run. Measured on cat-harness's run
+ * 39786173033 (2026-10-22): both listed unrepaired, beside two real repairs
+ * that the red run then hid. A layer's own bytes are that layer's to repair,
+ * through its own run.
+ */
+export const FIXITY_CHECKS: Readonly<Record<string, string>> = {
+  "mount:remote:check": "judges a mount against its lock; this run edits mounts by design",
+  "mount:lock:check": "judges a mount against its lock; this run edits mounts by design",
+};
+
+/** The pairs post-merge regen asks: every repairable pair but the {@link FIXITY_CHECKS}. */
+export function postMergePairs<P extends { check: string }>(pairs: readonly P[]): P[] {
+  return pairs.filter((p) => FIXITY_CHECKS[p.check] === undefined);
+}
+
+/**
  * Resolve the repository root containing the gating workflows and scripts.
  * Walks up if inside a submodule or isolated worktree.
  */
@@ -225,10 +253,10 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     const gates = loadGates(repoRoot, { all: !fast });
     const gated = repairableGates(gates, scripts);
     const extra = UNGATED_INPUTS.filter((p) => !gated.some((g) => g.check === p.check));
-    pairs = [
+    pairs = postMergePairs([
       ...extra.map((p) => ({ ...p, io: { inputs: pairIO(p.check)?.inputs } })),
       ...gated.map((p) => ({ ...p, io: pairIO(p.check) })),
-    ];
+    ]);
   }
 
   const runner: Runner =
