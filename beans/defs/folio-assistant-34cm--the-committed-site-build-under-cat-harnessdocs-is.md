@@ -217,7 +217,11 @@ Lane B scrapped the cat-harness-tools copy because the subject lives in folio-as
 2. **Post-cutover conflict distribution re-measured (2026-10-22):**
    - Across `litlfred/folio-assistant` `main@7b7d0736b2` (8 open non-draft PRs, 3 conflicted: `#2577`, `#2559`, `#2544`) and `litlfred/cat-harness` `main@f5bb6652f8` (0 open non-draft PRs, 6 draft PRs): **0** conflicted path-instances under `cat-harness/docs/` (**0%**, down from **44%** / 308 of 704 on 2026-10-03 and **61%** / 169 of 279 on 2026-10-04).
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the committed site build under `cat-harness/docs/` in litlfred/cat-harness and the publish workflow that rebuilds it; every done-when is a decision about that repository's tree. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
 

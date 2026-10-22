@@ -102,7 +102,11 @@ open bean and this does not touch it.
 
 _2026-09-29_ — **Re-parented `ahvw` → `1xhc`** by subject, per todo-manager §"WHICH parent" (owner choice '1 2 3' on the LSI epic-filing proposal, bean ansc). Staging-preview deletion is the staging/concurrency machinery 1xhc already groups (xd1s, w2g5, lx2s).
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns the `cleanup` job of folio-assistant's `feature-staging.yml` deleting previews on `gh-pages`. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
 

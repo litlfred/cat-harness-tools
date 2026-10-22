@@ -79,9 +79,9 @@ Done-when:
 _2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Owner ruling 2026-10-16 (item 1): lift the stale blocks on claimed beans whose blocker is closed; the claim itself is untouched. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
 
 
-*2026-10-22T17:20:00Z* — Claim released (stale-claims sweep, coordinator standard: on evidence, nothing claimed in the last 48h; lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Checked:
+*2026-10-22T16:46:00Z* — Claim released (stale-claims sweep, coordinator standard: on evidence, nothing claimed in the last 48h; lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Checked:
 - No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The latest are a blocker withdrawal on 10-06 and a store reconciliation on 10-16, neither of which is work.
 - No remote branch in any of the three names this bean.
-- The holding branch named above was last touched on 2026-10-03.
+- Its branch `qa-3hk4-oqe3` was local only: no remote branch of that name exists.
 
 The claimed work is NOT all on main: the unticked Done-when boxes above are what remains, and the ticked ones are what landed. Back to todo so the claim does not mislead a sibling session. Nothing was deleted.

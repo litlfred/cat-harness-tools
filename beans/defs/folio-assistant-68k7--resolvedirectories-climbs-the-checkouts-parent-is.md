@@ -98,10 +98,14 @@ larger than it looks, and aimed by guess.
 
 Done by drain lane B on the owner's ruling (never outside the checkout): cat-harness#136.
 
-## Explicitly out of scope
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Explicitly out of scope
 
 Re-litigating `8zsb`'s two fixes. They landed and are verified.
 
-## Owner ruling 2026-10-11 (relayed by lane A)
+### Owner ruling 2026-10-11 (relayed by lane A)
 
 Never look outside the checkout. Sibling lookup for the ROOT instance stops at the checkout root, and the two callers that compose `repoRootFor` unconditionally are fixed to honour that.

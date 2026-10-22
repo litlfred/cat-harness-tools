@@ -46,7 +46,11 @@ The tools half is litlfred/cat-harness-tools#546 (head `adcc95f`). It removes th
 
 Index half: litlfred/folio-assistant#2619 (workflow deleted, tools pinned d753967). Tools half: litlfred/cat-harness-tools#546, merged as `00527df`. It removes the 2 `FOLIO_PATHS` entries and 5 `gates.ts` step exemptions (trivial-skeleton-audit, conditional-class-banner-audit, codemod-leanval, audit-wiring, section-story-audit) that matched only this workflow, and adds corpus budgets for two slow tests. The index re-pin to `00527df` rides lane C's follow-up. Still open, as noted above: `build-clarabel-mpfr.yml`, which only fed this workflow.
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It asks whether folio-assistant's `.github/workflows/witness-pipeline.yml` should be kept, templated or retired, and the remaining box is an owner decision about that repository. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
 

@@ -75,7 +75,11 @@ _2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, item 9
 
 _2026-10-21T19:15:00Z_ — Completed: all 11 self-sidecar gates pass on `main` (`3d586f5794`) with `*/test/results` and `*/test/health/results` absent from the checkout (`audit:coverage`, `root-scan-census:check --against main`, `check:reference-direction:check --against main`, `check:term-mapping --against main`, `readme:subgraphs:check --against main`, `check:viewer-nav --against main`, `check:l1-complete --check`, `skill:register:check` and its full verify chain, `check:glossary --against main`, `check:harness-state:check --against main`). Blockers `oq1j` (completed) and `2gst` (`skill:register:check` verify chain green) lifted.
 
-## Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
 
 Checked against origin/main, prompted by the coordinator's sweep for "todo
 with a Summary of Changes". The 2026-10-01 summary records branch work; the

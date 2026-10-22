@@ -115,7 +115,11 @@ _2026-10-21T17:17:00Z_ — Completed (`status: completed`, 6/6 Done-when boxes v
 - `cat-harness/processes/sdlc/code-change-review.bpmn` `Task_Review` (lines 299–313) specifies adversarial code review against the RED FLAG taxonomy with committed verdict and links `code-node-review` (`cat-harness/skills/sdlc/sdlc-core/code-node-review.md`).
 - Composes with `merge-queue.md`: adversarial review binds per-PR to `head_sha`, while merge-train stacking re-runs `tsc` and the compile/gate set on the combined stack.
 
-## Progress 2026-10-10 (lane B drain re-triage)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Progress 2026-10-10 (lane B drain re-triage)
 
 - [x] **Provenance, with the negative case:** `detectAgentProvenance` reads trailers (Co-Authored-By Claude, Claude-Session), agent branch prefixes, bot actors and PR markers. A human-only PR requires nothing. All covered in `scripts/tests/adversarial-review-gate.test.ts`.
 - [x] **Independence and head SHA:** a review by the same session is rejected, an agent reviewer without a model is incomplete, and a moved head makes the review `stale`. Tested.
@@ -124,7 +128,7 @@ _2026-10-21T17:17:00Z_ — Completed (`status: completed`, 6/6 Done-when boxes v
 - [ ] **Merge-train composition:** not verified here.
 - [ ] **BPMN:** `code-change-review.bpmn` `Task_Review` documents the adversarial review but its `skill ref` is `code-node-review`, and no `prepare-merge` step checks the verdict. Those edits belong to cat-harness (process definitions).
 
-## Re-measured 2026-10-20 — status `todo` is correct; two items landed since 10-10, two remain
+### Re-measured 2026-10-20 — status `todo` is correct; two items landed since 10-10, two remain
 
 - [x] **Required check wired:** folio-assistant `code-quality-gates.yml` runs
   `bun run cat check:adversarial-review` (warn-only), wired 2026-10-14.

@@ -101,11 +101,15 @@ _2026-10-16T06:30:00Z_ — Store reconciliation: status `completed` → `todo` (
 
 - `.github/workflows/post-merge-regen.yml` landed on `litlfred/folio-assistant` `main` via PR `#2599` (`c3a96c3c51`), wiring `bun run cat-harness-tools/scripts/post-merge-regen.ts` on `push: branches: [main]` and `workflow_dispatch`. All 5/5 Done-when boxes verified on `main`.
 
-## Re-triage 2026-10-10 (lane B drain)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-triage 2026-10-10 (lane B drain)
 
 The repair half is in this repository: `scripts/post-merge-regen.ts` detects a stale derived artefact after a merge and generates a repair **PR**, never a push. It has a negative control (no counted change → no PR) and reports honestly (no writer → unrepaired, exit 1). **Nothing calls it:** no workflow in litlfred/folio-assistant mentions `post-merge-regen`, so main going stale is still only reported. The wiring belongs in folio-assistant's workflows; the decision belongs to the owner.
 
-## Owner decision
+### Owner decision
 
 How should post-merge regeneration run?
 
@@ -116,11 +120,11 @@ How should post-merge regeneration run?
 
 **Default if no answer:** option 2. It is a procedure note and adds no new automation that opens PRs.
 
-## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+### Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1:** a folio-assistant workflow on `push: main` runs `post-merge-regen.ts` and opens the repair PR. That workflow file belongs to folio-assistant, so lane A takes it. cat-harness already carries its own `post-merge-regen.yml` as a model.
 
-## Re-measured 2026-10-20 — status `todo` is correct; the owner's option 1 is not wired yet
+### Re-measured 2026-10-20 — status `todo` is correct; the owner's option 1 is not wired yet
 
 The ruling (option 1, 2026-10-11) is half landed. This repository has the reusable
 `.github/workflows/layer-post-merge-regen.yml`, whose header shows the caller to add.

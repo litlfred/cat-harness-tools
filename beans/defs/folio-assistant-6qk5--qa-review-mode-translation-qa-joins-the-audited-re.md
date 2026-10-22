@@ -64,7 +64,11 @@ this may be a child of it rather than a peer.
 
 _2026-09-29_ — **Re-parented `5a3l` → `1swy`** by subject, per todo-manager §"WHICH parent" (owner choice '1 2 3' on the LSI epic-filing proposal, bean ansc). Translation QA joining the audited review record is QA's subject; nothing here is deployment.
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Superseded by arc `3fva` (lane B drain, 2026-10-10). #363's principle, that placement follows provenance, still holds, but the placement it asked for is no longer the rule:
 

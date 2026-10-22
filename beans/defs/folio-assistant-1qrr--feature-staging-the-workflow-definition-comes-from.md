@@ -86,7 +86,11 @@ Lane B scrapped the cat-harness-tools copy because the subject lives in folio-as
 
 _2026-10-22T00:40Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): still live on main (`feature-staging.yml` checks out the PR head under the base's step list). Done-when #3 is up as folio-assistant#2618, a comment on the checkout step and no behaviour change. The owner decision is in that PR: (1, recommended) check out the merge ref, (2) guard each step, (3) document only. Default 3.
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/feature-staging.yml` (definition from BASE, checkout from HEAD), and its first done-when is the owner choosing one of its three shapes for that workflow. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
 

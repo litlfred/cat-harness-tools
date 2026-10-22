@@ -51,7 +51,11 @@ cat-harness#171 and cat-harness-tools#156 are merged. The QR panel pins the bar 
 
 _2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, item 9): the `ndp0` block is lifted here. The bean was completed on 2026-10-12 with every done-when ticked, and the other two copies had already dropped the edge. Session https://claude.ai/code/session_01K9Xi9QSxCNYju8QNu7EuHg.
 
-## Re-triage 2026-10-10 (lane B drain)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-triage 2026-10-10 (lane B drain)
 
 - [x] The icon is back as a declared navbar capability. `cat-harness/docs/assets/js/navbar-row.js` (`.fa-nav-qr` → `.fa-qr-panel`) has it, and `test/navbar-qr.test.ts` passes 7/7 in the CI-shaped mount. The test checks the button, its accessible attributes, the open → hide toggle (l4zi), Escape, and the hashchange update.
 - [ ] The e2e check (`test/navbar-row.e2e.ts`, "QR icon button toggles…") exists, but **the e2e suite cannot start** (cat-tools-g9m3), so it has never fired, and the screenshots for rendered verification can't come from it yet. Now blocked by g9m3.
@@ -62,7 +66,7 @@ _2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, item 9
 
 With e2e running (PR #69 for g9m3), `navbar-row.e2e.ts` fails exactly the 5rmf checks. The rendered row is `Todos, Beans, fsh-guts…, More actions`, with no `QR code for this page`. `navbar-row.js` can draw `qr`, and `NAVBAR_ICONS` in `cat-harness/schemas/cat-harness.ts` allows it, but `cat-harness/cat-harness.json`'s `navbarIcons` does not list it, so `docs/_data/harness.json` resolves `[close, todos, beans, fsh-guts, launcher]`. **The fix is in litlfred/cat-harness:** add `"qr"` between `"fsh-guts"` and `"launcher"` in `navbarIcons` and regenerate `docs/_data/harness.json` (`bun run cat docs:harness`). After that, the two e2e checks here should pass unchanged.
 
-## Lane C, 2026-10-12: the icon is drawn, and its panel now works
+### Lane C, 2026-10-12: the icon is drawn, and its panel now works
 
 - [x] **Declared and drawn.** `qr` is in `cat-harness.json` `navbarIcons` on cat-harness main. The e2e check `navbar-row.e2e.ts` "QR icon button toggles…" passes locally with a minimal Playwright config, which skips the global setup that g9m3 blocks.
 - [x] **The rendered check found two defects**, both fixed in cat-harness `fix/qr-opens-rail`:

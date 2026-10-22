@@ -37,7 +37,11 @@ Lane B scrapped the cat-harness-tools copy: the subject is folio-assistant's own
 
 Since the separation the index tracks one `package.json` (the root's, zero dependencies, workspaces = mounts). Four npm directories and the pip `/cat-harness-tools/python` named mounts, so Dependabot scanned nothing there. litlfred/folio-assistant#2609 keeps only `/.github/scripts` pip and Actions; litlfred/cat-harness-tools#469 gives tools its own pip `/python` + Actions. npm/bun for instances is deferred until `@litlfred/*` resolve from a reachable registry. Box 1 (observe a weekly run) still open.
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): the subject is not in this repository. The bean is about folio-assistant's `.github/dependabot.yml` (its npm-vs-bun ecosystem choice), and every remaining done-when is an observation of that repository's weekly Dependabot run. cat-harness-tools has no `dependabot.yml`. The copy of this bean in the folio-assistant store (`cat/cat-harness/beans`) is the live one; it should stay open there and not be closed as a mirror.
 

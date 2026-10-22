@@ -158,7 +158,11 @@ _2026-10-16T07:15:00Z_ — Reopened: status `completed` → `todo`. Its child `w
 
 _2026-10-21T17:18:00Z_ — Completed (`status: completed`, 8/8 Done-when boxes ticked and all 12/12 child beans completed now that `w8jq` is verified and closed on current `main`).
 
-## Re-measured 2026-10-20 — status `todo` is correct; reopened correctly
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-measured 2026-10-20 — status `todo` is correct; reopened correctly
 
 Still open only because child `w8jq` is open (see its 2026-10-20
 re-measurement: the BPMN skill ref and merge-train composition remain, both in

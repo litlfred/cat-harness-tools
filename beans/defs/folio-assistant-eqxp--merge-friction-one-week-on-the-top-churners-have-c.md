@@ -250,7 +250,11 @@ Work completed and merged in PR #1746 (commit `9965be8b39c4b2b36efe18361c034aa88
 - Refused `skill-register.qa-results.json` and `skills.lsi.json` with recorded test evidence.
 - Tested: `bun test cat-harness-tools/test/coordinator/gitattributes.test.ts` (7 pass, 0 fail, 25 assertions).
 
-## Reasons for Scrapping
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Obsolete after the separation (lane B drain, 2026-10-10). The bean re-measured churn in the **monorepo's** `origin/main`, and that distribution no longer exists in any one repository:
 

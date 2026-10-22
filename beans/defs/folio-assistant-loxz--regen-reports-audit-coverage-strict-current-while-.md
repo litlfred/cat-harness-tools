@@ -51,7 +51,11 @@ Resolved in `cat-harness` commit `469086028e239aa1270b8e007887da1c65e3675b` on `
    - Added suite `describe("judge-mode pairs are distinguished from artefact staleness checks — bean loxz", ...)` verifying `NO_WRITER` declarations, `isJudgeCheck`, passing judge checks yielding `"judged"` (never `"current"`), clean exit 0 handling, and unmounted refusal in writer mode.
    - Verification: `bun test scripts/tests/regen-after-merge.test.ts` (65 pass, 0 fail).
 
-## Completed on landed evidence (2026-10-10)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Completed on landed evidence (2026-10-10)
 
 Closed by a session that did not write it, on evidence rather than authorship (`bean-coordination` §"Closing a bean whose work has already landed"). The work landed in litlfred/cat-harness `46908602` (2026-10-09, "fix(regen): distinguish judge-mode checks from artefact staleness checks (bean loxz)") and moved here with the code in `d8d42ab` (70lx stage 1a). Nobody updated the status.
 

@@ -104,7 +104,11 @@ _2026-10-21T18:18:00Z_ — **Completed.** `litlfred/folio-assistant#2610` (`3d58
 
 _2026-10-22T13:30:00Z_ — **Evidence for the close.** The first `health-check.yml` run to finish since 2026-10-05 was run 38 (39781213346, dispatched on main after litlfred/folio-assistant#2615 merged). #2615 removed the `--filter=blob:none` gh-pages fetch, which had made the clone partial and turned each `ls-tree -l` into a blob fetch. Runs 33 and 36 ran `health` for 14 and 28 min without finishing. In run 38 `health` took 29 s, the whole job 4.5 min, and `✓ pages-publish-health 0 finding(s)`. The run is red only at "Write the report through its state branch": github-actions[bot] gets a 403 pushing to `litlfred/cat-harness:cat/cat-harness/health` (tracked separately).
 
-## Owner decision
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Owner decision
 
 (Lane B drain, 2026-10-10.) The bean asks for the probe's observation to be **committed**, but since arc `3fva` and `5hox` health and QA results stay off main (`test/health/results/` is gitignored), so it is unclear where the observation should live. The reader, `pagesPublishHealthCheck` in cat-harness-tools `test/health/checks.ts`, is here. The writer is a CI job in folio-assistant's `health-check.yml`, which has the network access.
 
@@ -117,11 +121,11 @@ Where should the CI job record the pages-serving observation?
 
 **Default if no answer:** option 4. Nothing is built, and the finding stays as it is today.
 
-## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+### Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1:** record the pages-serving observation on `qa-reports` under `main/<sha>/health/pages-serving.json` through the qa-store publish. The health check reads it offline with `qa:fetch`, and a missing or old entry reads as `unknown`, with its date. Lane A takes the CI writer in folio-assistant's `health-check.yml`; the reader is here.
 
-## Progress 2026-10-11 (lane B)
+### Progress 2026-10-11 (lane B)
 - [x] Schema: `PagesServingObservationSchema` in cat-harness `schemas/health-report.ts` (cat-harness#141, merged).
 - [x] Reader: cat-harness-tools#117. `probePagesServing` reads `main/<HEAD>/health/pages-serving.json` through the qa-store, offline. Missing, or older than 7 days, reads as unknown with its date. Each URL that wasn't served is a major finding. **Held unmerged until lane A's writer publishes**, because otherwise every daily health run would read unknown.
 - [ ] Writer: lane A, in folio-assistant health-check.yml. I sent them the contract.

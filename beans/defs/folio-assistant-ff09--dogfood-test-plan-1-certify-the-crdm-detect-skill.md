@@ -47,12 +47,16 @@ Built to the owner's option 4 (no threshold).
 
 _2026-10-16T06:30:00Z_ — Completed here to match the cat-harness and cat-harness-tools stores (Owner ruling 2026-10-16, item 6); the Summary of Changes above is copied from them. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
 
-## Re-triage 2026-10-10 (lane B drain)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-triage 2026-10-10 (lane B drain)
 
 - **Blocked by `zaui`:** nothing calls `fileCertification` yet, so "a signed certification exists … stored per D5" has nowhere to land.
 - **Measured baseline** (`crdm-detect-eval.test-run.json`, 27 cases from the issue corpus): TP 21, FP 1, TN 4, FN 1, so **precision 0.9545, recall 0.9545, F1 0.9545**.
 
-## Owner decision
+### Owner decision
 
 The owner ruled 2026-10-01 that a requirement comes first. What must crdm-detect reach, on the 27-case issue corpus plus the second-annotator set in `scripts/eval/`?
 
@@ -63,11 +67,11 @@ The owner ruled 2026-10-01 that a requirement comes first. What must crdm-detect
 
 **Default if no answer:** option 1, written as the `req:` requirement once zaui unblocks the filing.
 
-## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+### Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 4, no threshold:** the certification records the numbers and certifies only that the test plan was executed.
 
-## Progress 2026-10-11 (lane B), owner option 4 (no threshold)
+### Progress 2026-10-11 (lane B), owner option 4 (no threshold)
 - [x] `req:crdm-detect-evaluation`, the plan `test/plans/crdm-detect-evaluation.test-plan.json` and the `test-plans` directory declaration (cat-harness#145). The system under test is the `crdm-detect-signals` actor (cat-harness#146).
 - [x] Executed through test-plan-execution.bpmn (cat-harness-tools#122).
   - Run r-3554a15543fc-54762ece6646: 25 pass, 2 warn, 0 fail; P = R = F1 = 0.9545, recorded; the checker agrees on 6 of 27.

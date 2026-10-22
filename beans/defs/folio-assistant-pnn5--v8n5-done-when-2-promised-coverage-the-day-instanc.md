@@ -89,7 +89,11 @@ in the rendering, only in the coverage.
 
 Done by drain lane B on the owner's ruling (kind for kind): cat-harness-tools#115 — webpage held to _data/instance-themes.json (a miss blocks); sticky and publication have no instance-scoped surface (advisory); an unloadable themes.ts reads unknown. Note: who-iris and smart-base themes.ts do not load at folio-assistant main's pins (moved-path imports), so the check reads unknown until #2529's re-pin.
 
-## Owner decision
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Owner decision
 
 (Lane B drain, 2026-10-10: put in pick-one form so it is answerable without reading the whole bean.) What should `check-navbar-consistency.ts` compare for an instance that declares its own theme?
 
@@ -100,6 +104,6 @@ Done by drain lane B on the owner's ruling (kind for kind): cat-harness-tools#11
 
 **Default if no answer:** no change. The pinning test (`the size-1 NOTE is gone, and its PROMISE is NOT yet kept`) stays, and nothing is compared.
 
-## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+### Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1, kind for kind:** a surface of kind K on an instance's pages uses that instance's K-kind theme when it declares one, and falls back to the platform default only for kinds it doesn't declare.

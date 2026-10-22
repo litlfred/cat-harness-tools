@@ -84,7 +84,11 @@ Design: `merge-gate-2026-10-02.md` §1.1, §6. Tracking bean: `5ge1`.
   - `schemas/qa-review.test.ts`: 19 tests passing (24 expect assertions).
   - `bun run typecheck`: clean pass (`tsc --noEmit -p tsconfig.json`).
 
-## Summary of Changes
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Summary of Changes
 
 Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence.
 

@@ -147,7 +147,11 @@ Implemented Option 3 (distinguishable sentinel for stub checkers):
 - Committed in `cat-harness` as commit `b08d6f7158c793d808e3e2d5d02cc0ef11b037cb` on branch `claude/89wq-qa-stub-sentinels`.
 - Pushed to `origin/claude/89wq-qa-stub-sentinels`.
 
-## Summary of Changes
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Summary of Changes
 
 Done with option 3, the bean's recommendation: stubs get a sentinel distinct from a decline.
 

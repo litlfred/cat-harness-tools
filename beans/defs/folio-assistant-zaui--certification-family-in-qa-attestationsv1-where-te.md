@@ -43,7 +43,11 @@ Follow-up from 3o5b (owner, 2026-10-02: open a bean). test-plan-execution.bpmn's
   - `bun test scripts/tests/qa-attestations-writers.test.ts`: 13 pass, 0 fail.
   - `bun run typecheck`: clean (0 errors).
 
-## Progress 2026-10-10 (lane B drain re-triage)
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Progress 2026-10-10 (lane B drain re-triage)
 
 - [x] **Schema and store, in cat-harness:** `schemas/qa-attestations.ts` has the `certification` family (`CertificationEntrySchema`, `certificationPath` → `<attestations>/certification/<id>.attestations.json`, `read`/`write`/`fileCertification`), and `schemas/qa-attestations.test.ts` round-trips a certification file. That satisfies done-when #1 on the cat-harness side.
 - [ ] **The filing step is not wired here:** nothing in cat-harness-tools calls `fileCertification`. In `test-plan-execution.test.ts`, `A_FileCertification` completes without writing a file. Next: have the step (or its skill's tool) call `fileCertification` with the signed entry, and refuse with UNKNOWN on a corrupt store.
@@ -61,7 +65,7 @@ Follow-up from 3o5b (owner, 2026-10-02: open a bean). test-plan-execution.bpmn's
 - [x] Criterion `certification-resolves` is defined in cat-harness `schemas/kg-qa.ts` (cat-harness#150, merged).
 - [ ] Its checker is `auditCertifications` in `scripts/test-plan-audit.ts`, wired into kg-audit's testPlanCriteria (cat-harness-tools#124, in CI). Complete this bean when that PR merges.
 
-## Summary of Changes
+### Summary of Changes
 - **Done-when #1:** fileSignedCertification round-trips through the store, with tests (2026-10-10).
 - **Done-when #2:** the `certification-resolves` criterion is defined in cat-harness#150. Its checker, `auditCertifications`, is wired into kg-audit's testPlanCriteria (cat-harness-tools#124). The family is now judged, not just typed.
   - A refusal filed as a certification fails.
