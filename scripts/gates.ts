@@ -716,38 +716,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     kind: "no-folio",
     reason: "reads `main.log` from a folio's LaTeX run",
   },
-  {
-    match: "scripts/audit-wiring.ts",
-    kind: "no-folio",
-    reason:
-      "the SCRIPT is the platform's (`cat-harness-tools/scripts/audit-wiring.ts`); " +
-      "what it needs and the platform lacks is a folio's witness tree. The " +
-      "earlier reason here — \"no such path in the platform\" — was false, " +
-      "and an exemption resting on a false reason is what this table exists " +
-      "to prevent (bean `52dz`)",
-  },
-  {
-    match: "scripts/section-story-audit.ts",
-    kind: "no-folio",
-    reason:
-      "as `audit-wiring.ts`: the script is the platform's, the section tree " +
-      "it audits is a folio's. Previous reason was false (bean `52dz`)",
-  },
-  {
-    match: "trivial-skeleton-audit.ts",
-    kind: "no-folio",
-    reason: "runs `--cwd content`, a root the convention has retired",
-  },
-  {
-    match: "conditional-class-banner-audit.ts",
-    kind: "no-folio",
-    reason: "audits block banners from the retired `content/` root; see `52dz`",
-  },
-  {
-    match: "codemod-leanval.ts",
-    kind: "no-folio",
-    reason: "a codemod over a folio's Lean blocks",
-  },
   // ── Needs something a checkout does not have ────────────────────────
   {
     match: "site-links.ts",

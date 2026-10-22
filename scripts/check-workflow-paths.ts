@@ -258,10 +258,6 @@ export const FOLIO_PATHS: FolioPath[] = [
     reason: "same retired `cd content` root",
   },
   {
-    match: "pipeline/trivial-skeleton-audit.ts",
-    reason: "invoked with `--cwd content`, the retired root",
-  },
-  {
     match: "pipeline/latex-overfull-report.ts",
     reason:
       "reads a FOLIO's `main.log`, inside `publish.yml` — the ONE workflow " +
@@ -274,10 +270,6 @@ export const FOLIO_PATHS: FolioPath[] = [
       "which made the file internally inconsistent in the one workflow folios " +
       "consume. The check was right that the path does not resolve here and " +
       "wrong about the remedy; that is what this table is for",
-  },
-  {
-    match: "pipeline/codemod-leanval.ts",
-    reason: "reads blocks under the retired `content/` root",
   },
 
   // ── Found by widening the extractor to `bash` (bean `7iog`) ────────
