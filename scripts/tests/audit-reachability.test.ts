@@ -17,6 +17,10 @@ import { loadDecisionTable, unreadableExpressions } from "../../src/workflow/dec
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds already (4.5-4.7 s measured on
+// main), past bun's 5s default once global tasks are indexed too.
+const CORPUS_TIMEOUT = 60_000;
+
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(HARNESS);
 
@@ -160,7 +164,7 @@ describe("the declared corpus is the denominator", () => {
       if (r.state === "unloadable") expect(r.why).toBeTruthy();
       if (r.state === "evaluable") expect(r.unreadable).toEqual([]);
     }
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("a diagram the resolver cannot reach", () => {
@@ -178,7 +182,7 @@ describe("a diagram the resolver cannot reach", () => {
       expect(["stem", "process-id"]).toContain(a.on);
       expect(a.files.length).toBeGreaterThan(1);
     }
-  });
+  }, CORPUS_TIMEOUT);
 });
 
 describe("@entrypoint tells a use from a mention", () => {

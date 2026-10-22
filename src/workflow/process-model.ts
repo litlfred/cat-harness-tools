@@ -32,7 +32,7 @@
  */
 
 import { BpmnModdle } from "bpmn-moddle";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
 import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/role-graph.js";
@@ -1313,6 +1313,27 @@ function ownInstanceGlobalTaskIndex(dir: string): Map<string, string> {
   return out;
 }
 
+/**
+ * A diagram's text, read once per (path, mtime, size).
+ *
+ * The id indexes above walk every `.bpmn` of an instance, and a corpus pass
+ * loads each diagram once, so the same files were read once per diagram per
+ * index. With the global-task index (owner, 2026-10-20, "a1 b1 c1") that was
+ * twice per diagram, and the corpus convention test went over its 5 s budget.
+ * Keyed on the file's mtime and size, so a fixture a test rewrites is read
+ * again: the reason {@link processIndex} is not cached by directory still holds.
+ */
+const bpmnText = new Map<string, { mtimeMs: number; size: number; xml: string }>();
+function readBpmnCached(path: string): string {
+  const st = statSync(path);
+  const hit = bpmnText.get(path);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.xml;
+  const xml = readFileSync(path, "utf-8");
+  if (bpmnText.size > 4096) bpmnText.clear();
+  bpmnText.set(path, { mtimeMs: st.mtimeMs, size: st.size, xml });
+  return xml;
+}
+
 function idIndex(dir: string, pattern: RegExp): Map<string, string> {
   const out = new Map<string, string>();
   // RECURSIVE since placement PR3 (bean `63wl`): a declared `processes/`
@@ -1325,7 +1346,7 @@ function idIndex(dir: string, pattern: RegExp): Map<string, string> {
   const walk = (d: string): void => {
     const entries = readdirSync(d, { withFileTypes: true });
     for (const e of entries.filter((x) => x.isFile() && x.name.endsWith(".bpmn")).sort((a, b) => a.name.localeCompare(b.name))) {
-      const xml = readFileSync(join(d, e.name), "utf-8");
+      const xml = readBpmnCached(join(d, e.name));
       for (const m of xml.matchAll(new RegExp(pattern.source, "g"))) {
         if (!out.has(m[1]!)) out.set(m[1]!, join(d, e.name));
       }

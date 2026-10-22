@@ -24,6 +24,10 @@ import { conventionsDir } from "@litlfred/cat-harness/schemas/skill-definitions-
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
+// A real-corpus sweep: about five seconds already (4.5-4.7 s measured on
+// main), past bun's 5s default once global tasks are indexed too.
+const CORPUS_TIMEOUT = 60_000;
+
 /** The harness root; diagrams are found by NAME through its declared `processes` graphs (bean `63wl`). */
 const HARNESS = resolve(HARNESS_ROOT);
 
@@ -130,5 +134,5 @@ describe("every bound ref resolves to a convention that exists", () => {
     // Non-vacuity: a corpus binding nothing would satisfy the check above and
     // prove the resolver was never exercised.
     expect(bound).toBeGreaterThan(0);
-  });
+  }, CORPUS_TIMEOUT);
 });
