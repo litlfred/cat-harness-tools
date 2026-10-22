@@ -38,7 +38,7 @@ describe("parseQaReport agrees with loadQaReport on the same bytes", () => {
 
   test("the shape rules are applied, not just the parse", () => {
     expect(parseQaReport(SAMPLES.unmarked!, "l")?.$schema).toBe("block-qa/v1");
-    expect(parseQaReport(SAMPLES.bareEntry!, "l")?.criteria).toEqual({ a: [{ result: "pass" }] });
+    expect(parseQaReport(SAMPLES.bareEntry!, "l")?.criteria as unknown).toEqual({ a: [{ result: "pass" }] });
     expect(parseQaReport(SAMPLES.foreign!, "l")).toBeUndefined();
     expect(parseQaReport(SAMPLES.corrupt!, "l")).toBeUndefined();
   });
