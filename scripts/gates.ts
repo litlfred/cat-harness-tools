@@ -471,6 +471,19 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "Its shim, embed and install helpers are covered by pdf-viewer.test.ts in `bun test`",
   },
   {
+    // The knowledge-graph viewer's deploy step (o7eq). It writes the viewer at
+    // its declared route and a forwarding page at its old address into the
+    // BUILT `./_site` (`--site`), or one page (`--out`). Matched by script
+    // rather than by flag so the exemption holds across the switch from one
+    // spelling to the other. Its page and route are covered by
+    // `kg-viewer-route.test.ts` in `bun test` and by the `kg-viewer` e2e specs.
+    match: "scripts/kg-viewer.ts",
+    kind: "ci-only",
+    reason:
+      "a DEPLOY step, not a check: it writes the KG viewer page(s) into ./_site, which only exists " +
+      "inside the site-build job. Its route and page are covered by kg-viewer-route.test.ts",
+  },
+  {
     // Its sibling, and exempt for the same reason. `compose-docs.ts` lays the
     // declared `docs` layers into one tree for Jekyll to build — base
     // (`cat-harness/docs/`) then the repository root's overlay. It COPIES
