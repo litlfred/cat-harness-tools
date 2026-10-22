@@ -1,5 +1,6 @@
 ---
 # folio-assistant-8v0y
+$schema: bean/1.0.0
 title: A bean that RESTATES a live skill's contract is unchecked — kn0t drifted in four places and one turned a measurement into an impression
 status: completed
 type: feature
@@ -18,7 +19,7 @@ and the copy is wrong* — and nothing could read it.
 ## The defect, already paid for
 
 `kn0t` held a second copy of
-[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md).
+[`fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md`](../../fhir-harness/skills/fhir-ig-base/ig-publisher-reduction.md).
 It had drifted in four places; the P1 exit criterion turned *"the derived navigation
 is **diffed**, and the difference is empty or explained entry by entry"* into
 *"navigation matches the Publisher's"*. **"Matches" is an impression; a diff that is

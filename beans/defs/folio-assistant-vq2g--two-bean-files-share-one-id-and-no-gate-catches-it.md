@@ -1,5 +1,6 @@
 ---
 # folio-assistant-vq2g
+$schema: bean/1.0.0
 title: Two bean FILES share one id, and no gate catches it
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-10-03T02:40:59Z
 updated_at: 2026-10-07T11:50:40Z
 parent: folio-assistant-1xhc
 ---
-
 
 Found 2026-10-03 by the first run of `milestone-rollup.ts`, not by looking for
 it: the module reported `openTotal - orphanOpen = 149` while the sum of the

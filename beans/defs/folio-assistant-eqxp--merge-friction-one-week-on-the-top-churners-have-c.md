@@ -1,5 +1,6 @@
 ---
 # folio-assistant-eqxp
+$schema: bean/1.0.0
 title: 'MERGE FRICTION, one week on: the top churners have changed and four more pass 1swy''s test'
 status: completed
 type: task
@@ -242,6 +243,12 @@ measurements and the three negative results (`beans/README.md` and these two).
 
 _2026-10-01_ — Now feeds arc `3fva` (issue #1763, `cat-harness/docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md`).
 
+## Closed 2026-10-09
+
+Work completed and merged in PR #1746 (commit `9965be8b39c4b2b36efe18361c034aa88024466f`, merge commit `512730477118`):
+- Added entry for `skills.tool-run.json` to `.gitattributes`.
+- Refused `skill-register.qa-results.json` and `skills.lsi.json` with recorded test evidence.
+- Tested: `bun test cat-harness-tools/test/coordinator/gitattributes.test.ts` (7 pass, 0 fail, 25 assertions).
 
 ## Reasons for Scrapping
 

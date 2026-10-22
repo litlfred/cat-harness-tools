@@ -1,5 +1,6 @@
 ---
 # folio-assistant-ymsu
+$schema: bean/1.0.0
 title: kg:detangle:check CANNOT FAIL inside bun run cat gates — bun test repairs the sidecar 1140 lines earlier in the same run
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-25T18:38:34Z
 updated_at: 2026-10-07T05:08:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 Measured 2026-09-25, while establishing whether PR #1348 still had anything to
 fix. It is the ROOT CAUSE of #1348's own subject: the detangle staleness that
@@ -1209,4 +1209,3 @@ measured.
 Work landed on `main` in PR #1616 (merge commit `da6302d3a5a6df610271d77e710a607e10333c14`, head commit `2197bc7f7dab`), satisfying all five Done-when criteria with extensive falsification and sweep measurements recorded above.
 Verified against `main`:
 1. `bun run cat kg:detangle:check`: passes with 69 pinned measurements current.
-

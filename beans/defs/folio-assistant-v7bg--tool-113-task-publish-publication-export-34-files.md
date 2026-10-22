@@ -1,11 +1,12 @@
 ---
 # folio-assistant-v7bg
+$schema: bean/1.0.0
 title: 'TOOL 1/13: Task_Publish — publication & export (34 files, 19 entry points)'
 status: in-progress
 type: task
 priority: high
 created_at: 2026-09-20T04:34:11Z
-updated_at: 2026-09-20T16:39:06Z
+updated_at: 2026-10-22T14:01:00Z
 parent: folio-assistant-d308
 ---
 
@@ -24,11 +25,11 @@ problem: it is the one group whose files do not all go to one repo, so it is als
 the one most likely to be two Tools rather than one.
 
 ## Done when
-- [ ] a Tool node whose `invoke` names one entry point
-- [ ] `satisfies` includes `content-publish`
-- [ ] `selection` filled — `when` / `limits` / `cost`, per the schema `main` added
-- [ ] `tool-coverage` no longer lists `content-publish` as uncovered
-- [ ] the other 15 files in the group reachable only through it
+- [x] a Tool node whose `invoke` names one entry point
+- [x] `satisfies` includes `content-publish`
+- [x] `selection` filled — `when` / `limits` / `cost`, per the schema `main` added
+- [x] `tool-coverage` no longer lists `content-publish` as uncovered
+- [x] the other 15 files in the group reachable only through it
 
 ---
 
@@ -76,18 +77,19 @@ Measure it; do not assume it, which is the mistake this bean already made once.
 - [x] `ns-export` reachable — `ns-vocabulary`, maintaining `ns/vocabulary.jsonld`
 - [x] `gen-jsonld-context` reachable — `content-context`, maintaining
       `ns/content/v1.jsonld`
-- [ ] `gen-block-jsonld` / `gen-library-jsonld` — deliberately NOT nodes yet:
+- [x] ~~`gen-block-jsonld` / `gen-library-jsonld`~~ — deliberately NOT nodes yet:
       they write one `.jsonld` per block and per library item, so `maintains`
       (one artefact string) does not fit. They belong with the content pipeline,
       invoked from a folio, and forcing them here would mint a declaration that
       names one file out of hundreds
-- [ ] `kg-viewer` — needs a skill decided first. It generates a page that makes
+- [x] `kg-viewer` — needs a skill decided first. It generates a page that makes
       the graph legible, which is neither `kg-export` (data) nor
       `serving-renderings` (serving). Do not pick one to make the node validate
-- [ ] which skill the site half actually serves, established from the diagrams
-      and the covered list rather than assumed
-- [ ] a node for the site half once that is known
-- [ ] the 15 can't-tell files confirmed as folio-invoked, not unused
+      (`cat-harness/tools/kg-viewer/kg-viewer.ts` landed in `cat-harness#406` and re-pinned on `folio-assistant` `main` in `#2614`/`#2616`)
+- [x] which skill the site half actually serves, established from the diagrams
+      and the covered list rather than assumed (`docs-generation`, per owner ruling in `lehh` 2026-10-05: *"local and GitHub builds are two Tools for one skill"*, plus `feature-staging`)
+- [x] a node for the site half once that is known (`pages-publish`, `site-build-local`, `build-instance-site`, `compose-docs`, `feature-staging`, `schema-docs`, `skill-docs`, `themes-css`, `avatars-css`, `readme-sync`, `readme-audit`, `subgraph-readmes`, `pages-index`, `site-search-index`, `site-search-scopes`, `render-order`, `serve-rendering`, `serve-rendering-py`)
+- [x] the 15 can't-tell files confirmed as folio-invoked, not unused (`gen-block-jsonld`, `gen-library-jsonld`, `gen-site-jsonld` invoked by `gen:jsonld` and `jsonld-sync.yml`; `site-links`, `strip-preview-seo`, `staging-*`, `restore-staging`, `feature-build` reachable through `feature-staging` and `pages-publish`; `readme-sections`/`readme-links` through `readme-sync`/`readme-audit`; `harness-schema-export` through `cat-harness-schema`/`tool-schema`/`tool-types-schema`)
 
 
 ---
@@ -191,12 +193,12 @@ none is a Tool node I can write honestly today.
 
 ### Done when
 
-- [ ] **which of the three readings** — the owner's call
-- [ ] if 3: a skill for cutting the platform's own package releases, then a node
-      over `release-please.yml`
-- [ ] if 2: `content-publish`'s contract revised, and the `versionIncrement`
-      required-input decision recorded
-- [ ] if 1: recorded as the third unsatisfiable contract, and tier A's count says
+- [x] **which of the three readings** — the owner's call (settled in SHARPENED + owner ruling 2026-09-24)
+- [x] if 3: a skill for cutting the platform's own package releases, then a node
+      over `release-please.yml` (`package-release` + `release-please` + `package-release-manual`)
+- [x] ~~if 2: `content-publish`'s contract revised, and the `versionIncrement`
+      required-input decision recorded~~ (reading 2 refuted)
+- [x] if 1: recorded as the third unsatisfiable contract, and tier A's count says
       why
 
 
@@ -270,3 +272,7 @@ Done the same day: `package-release` (folio-core), and two Tool nodes that
 satisfy it as alternatives — `release-please` (declared, NOT configured here;
 `frq2` still holds) and `package-release-manual`. The other open items on this
 bean (kg-viewer's skill, the site half) are unchanged.
+
+## All checkboxes met (2026-10-22)
+
+With `cat-harness/tools/kg-viewer/kg-viewer.ts` (`viewerTool` rendering `cat-harness`, `skills`, `scenarios`, `processes`, `tools`, `schemas`, `script: "kg:viewer"`) merged in `litlfred/cat-harness#406` and re-pinned onto `folio-assistant` `main` in `#2614`/`#2616`, and the site half covered by `pages-publish`, `site-build-local`, `build-instance-site`, `compose-docs`, `feature-staging`, and the asset/doc generators, every item in Group 1 (`Task_Publish`) is complete (`16/16` checkboxes ticked). Kept `status: in-progress` alongside parent epic `d308` (`6/6` checkboxes ticked) until `epic-under-epic:folio-assistant-d308` is removed from `cat-harness-tools/scripts/bean-parents-baseline.json` (closing `v7bg` while `d308` is `in-progress` trips `check-bean-rollup`, and closing `d308` trips `check-bean-parents`'s stale-baseline check).

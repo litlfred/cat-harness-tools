@@ -1,5 +1,6 @@
 ---
 # folio-assistant-u4up
+$schema: bean/1.0.0
 title: merge:train drops gitignored-but-tracked test/results files
 status: completed
 type: bug
@@ -36,4 +37,3 @@ _2026-10-07T03:09:48Z_ — Claimed by claude/u4up-mergetrain-tracked-ignored —
 4. Tests:
    - `cat-harness/scripts/tests/merge-base.test.ts`: verified `take-base on gitignored-tracked paths without stage-2 error` (both standard conflict and modify/delete).
    - `cat-harness-tools/scripts/tests/merge-train.test.ts`: verified `keepTrackedIgnored` restages dropped tracked-ignored files, and `checkTestResultsDrops` detects drops and causes `verdictOf` to return `"needs-a-person"`.
-

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-h2s9
+$schema: bean/1.0.0
 title: The sweep asks gh for mergeable, whose UNKNOWN means 'not computed yet' — and renders it as 'could not be read'
 status: completed
 type: bug
@@ -271,5 +272,3 @@ Work landed on `main` in PR #839 (merge commit `ca457fccc6f3f77df091143370c1ae2a
 Verified on `main`:
 1. `.github/workflows/pr-checks-present.yml` lines 165–171: mergeability is probed via `git ls-remote origin "refs/pull/$pr/merge"`, reserving `UNKNOWN` strictly for probe execution failure.
 2. Verified in production on scheduled Run 133 of `PRs without checks` (run 36218768664) on 2026-09-26.
-
-

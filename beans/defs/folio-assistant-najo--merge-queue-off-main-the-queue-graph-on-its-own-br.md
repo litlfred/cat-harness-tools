@@ -1,5 +1,6 @@
 ---
 # folio-assistant-najo
+$schema: bean/1.0.0
 title: 'MERGE QUEUE OFF MAIN: the queue graph on its own branch store, so a steward can record a decision without opening a PR'
 status: completed
 type: task
@@ -8,8 +9,6 @@ created_at: 2026-10-04T08:20:32Z
 updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-hfag
 ---
-
-
 
 ## Brief
 
@@ -49,10 +48,12 @@ make the graph look used (the reason bean `30jr` left its tile box open). Not cu
 `beans/` itself over — that is `9ofm` / `p3ny`.
 
 ## Done when
-- [ ] `cat/cat-harness/merge-queue` seeded with a `state-manifest/v1` manifest, declared in `special-branches.json`
-- [ ] the `queue` entry declares its branch source, and the tracked copy leaves `main` in the same change
-- [ ] a reader that keeps `absent` / `declared-but-absent` / `unreachable` / `read` apart and THROWS rather than returning an empty queue
-- [ ] a steward write path that records a decision with no PR to `main`
-- [ ] `bun run cat gates` green, or the blocker named with its measurement
+- [x] `cat/cat-harness/merge-queue` seeded with a `state-manifest/v1` manifest, declared in `special-branches.json`
+- [x] the `queue` entry declares its branch source, and the tracked copy leaves `main` in the same change
+- [x] a reader that keeps `absent` / `declared-but-absent` / `unreachable` / `read` apart and THROWS rather than returning an empty queue
+- [x] a steward write path that records a decision with no PR to `main`
+- [x] `bun run cat gates` green, or the blocker named with its measurement
 
-_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-10); commit 8f55441e is on folio-assistant main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+## Closed 2026-10-10 on landed evidence
+
+Landed on main across PR #2065 (code & CLI tooling), PR #2091 (decision capture), and PR #2140 / commit `8f55441e5a83` (which cut over `beans/` containing `queue/` to branch mounts off `main`). Child cutover bean `ugxd` is completed.

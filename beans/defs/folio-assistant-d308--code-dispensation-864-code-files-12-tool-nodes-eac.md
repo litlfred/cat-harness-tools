@@ -1,14 +1,14 @@
 ---
 # folio-assistant-d308
+$schema: bean/1.0.0
 title: 'CODE DISPENSATION: 868 code files → 13 Tool nodes, each bound to a BPMN task'
 status: in-progress
 type: epic
 priority: normal
 created_at: 2026-09-20T04:08:50Z
-updated_at: 2026-09-20T04:33:51Z
+updated_at: 2026-10-22T14:01:00Z
 parent: folio-assistant-zzmr
 ---
-
 
 Owner, 2026-09-20, which is the framing and not a paraphrase of it:
 
@@ -189,14 +189,14 @@ argue the BPMN engine out of the only repo it can live in.
 
 ## Done when
 
-- [ ] the owner picks a dispensation order (the four options are on #223)
-- [ ] each chosen group has a Tool node whose `invoke` names one entry point
-- [ ] `satisfies` on each names the skill its BPMN task already refs
-- [ ] the 157 non-entry-point files in those groups are reachable only through it
-- [ ] `bun run tool-coverage` shows the group's task covered
-- [ ] the 17 SCRAP files reported with sizes and ages, and **waited on** —
+- [x] the owner picks a dispensation order (the four options are on #223; verifiable-here first executed across 27 completed child beans)
+- [x] each chosen group has a Tool node whose `invoke` names one entry point (all 13 groups done across `cat-harness`, `folio-assistant-core`, `folio-assistant-sci`, `fhir-harness`, and `smart-base`, with `v7bg`'s `kg-viewer` re-pinned on `main` in `#2614`/`#2616`)
+- [x] `satisfies` on each names the skill its BPMN task already refs
+- [x] the 157 non-entry-point files in those groups are reachable only through it
+- [x] `bun run tool-coverage` shows the group's task covered (`bun run cat tools:coverage` reports 227 tools declared across 4 instances; all 12 tool-warranted groups covered)
+- [x] the 17 SCRAP files reported with sizes and ages, and **waited on** —
       never removed on an agent's own initiative
-      (`deletion-requires-confirmation`)
+      (`deletion-requires-confirmation`; resolved in child bean `nfgo` after owner ruling on #1644)
 
 ## How this was measured, so the number can be re-derived rather than trusted
 
@@ -379,3 +379,7 @@ into an import path.
 
 Remaining, in verifiable-here order: `shzs` the audit family (12 run here — now
 the highest), then the six that need a folio to prove.
+
+## All 6 checkboxes met (2026-10-22)
+
+All 28 child beans of `d308` are now closed (`27 completed`, `1 scrapped` `8t6r`), with `v7bg` (`Task_Publish`, including `cat-harness/tools/kg-viewer/kg-viewer.ts` from `cat-harness#406`) re-pinned on `folio-assistant` `main` in `#2614`/`#2616` and closed. Every chosen group has its Tool node(s) declared across `cat-harness` (175 tools), `folio-assistant-core` (33), `folio-assistant-sci` (9), `fhir-harness` (6), and `smart-base` (4). Kept `status: in-progress` until `epic-under-epic:folio-assistant-d308` is removed from `cat-harness-tools/scripts/bean-parents-baseline.json` (which otherwise fails `check-bean-parents.ts` when `d308` closes).

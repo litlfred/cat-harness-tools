@@ -1,5 +1,6 @@
 ---
 # folio-assistant-4sim
+$schema: bean/1.0.0
 title: 'DCAT: describe a RELEASE of the glossary / terminology as a published dataset — held until the term model lands'
 status: completed
 type: task
@@ -17,7 +18,7 @@ So this is deliberately NOT built, and the reason is in the ruling's own words: 
 
 **Not a term model.** It describes a `dcat:Dataset` and its `dcat:Distribution`s — a published, versioned, discoverable thing with a licence, a download URL and a media type. That is the one question SKOS and FHIR both answer badly, and it is complementary to both rather than competing with either.
 
-Recorded in [`vocabulary-authority`](../../../cat-harness/skills/kg/kg-core/vocabulary-authority.md): a release of any authoritative vocabulary is DCAT's subject.
+Recorded in [`vocabulary-authority`](../../cat-harness/skills/kg/kg-core/vocabulary-authority.md): a release of any authoritative vocabulary is DCAT's subject.
 
 ## What it would describe here, once there is something to describe
 

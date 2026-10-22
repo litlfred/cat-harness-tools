@@ -1,5 +1,6 @@
 ---
 # folio-assistant-14ve
+$schema: bean/1.0.0
 title: 'REGEN NOT A FIXPOINT: bun run cat regen asks each check once, so a check asked before its input''s writer runs reports current and stays stale'
 status: completed
 type: bug
@@ -52,4 +53,3 @@ _2026-09-30T21:25:46Z_ — Claimed by claude/magical-archimedes-4qkfxp-regen —
 Landed on main in PR #1696 (merge commit `7bdda747816d`, commit `e0bc9e334ce0`: "regen: declared writer for check:prov-qaqc, recorded non-writers, and passes to a fixpoint (beans uju6, 14ve)").
 - Implemented `regenToFixpoint` looping until passes run no writer, capped at 3.
 - Unit tests cover two-step dependency, control, and cap in `cat-harness/test/unit/regen-after-merge.test.ts`.
-

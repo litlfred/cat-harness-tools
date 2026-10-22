@@ -1,5 +1,6 @@
 ---
 # folio-assistant-nfv3
+$schema: bean/1.0.0
 title: 'SKILL REGISTRATION: one command performs the artefact chain, and a gate refuses a skill that arrives without it — 7 merges have paid for its absence'
 status: completed
 type: task
@@ -157,7 +158,7 @@ half-written skill the moment somebody ran it.
 
 `skill-register.ts` is a sibling's **merged** work. Deleting or absorbing it is
 not an agent's call —
-[`deletion-requires-confirmation`](../../../cat-harness/skills/conduct/conduct-core/deletion-requires-confirmation.md) — and two
+[`deletion-requires-confirmation`](../../cat-harness/skills/conduct/conduct-core/deletion-requires-confirmation.md) — and two
 commands one letter apart is a defect that should be closed by a decision rather
 than by whoever pushes next. Both are green side by side, so nothing is broken
 while it waits.

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-jh2j
+$schema: bean/1.0.0
 title: 'TOOL 7/13: Task_Render — LaTeX / PDF rendering (16 files, 3 entry points)'
 status: completed
 type: task
@@ -229,5 +230,3 @@ Completed under owner rulings:
 
 ## Completed on landed evidence
 Landed on `main` in PR #2423 (`feat(latex): harmonise exit-2 contract and mint latex-compilation skill (folio-assistant-jh2j)`), commit `afa1948b01a8`.
-
-
