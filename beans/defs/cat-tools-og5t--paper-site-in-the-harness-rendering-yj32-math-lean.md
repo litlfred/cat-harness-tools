@@ -1,12 +1,12 @@
 ---
 # cat-tools-og5t
 title: 'PAPER SITE in the harness rendering (yj32): math, Lean links and notation macros, blocking qou''s legacy-render retirement'
-status: in-progress
+status: completed
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-21T14:30:00Z
+updated_at: 2026-10-22T16:00:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -214,3 +214,43 @@ I loaded qou's paper in Chromium against a local `server.ts --http`, one deep li
 **NOT established here:**
 - **Math typesetting.** This container's proxy refuses `cdn.jsdelivr.net`, so KaTeX never loads. "0 KaTeX errors" means nothing was typeset at all; it does not mean the math typeset correctly. This check needs a browser with CDN access.
 - **The Lean badge.** My selector (`.lb, .sb-badge`) found no badge on any block. It is unverified whether the selector is wrong or the badge is missing. The Lean helpers themselves are tested in `scripts/tests/viewer-script.test.ts`.
+
+## Verified in Chromium, 2026-10-22: math and the Lean link
+
+This container's proxy refuses `cdn.jsdelivr.net`, which is why the 2026-10-21 check could not show math. This time Playwright served the viewer's three KaTeX files (`katex.min.js`, `katex.min.css`, `contrib/auto-render.min.js`) from the index's own `node_modules/katex`, which is 0.16.47; the viewer asks for 0.16.11. Every other non-local request was aborted.
+
+Setup: viewer from tools main, server `adapters/mcp-server/server.ts --http` on qou `77e7f0e`.
+
+**Math with the folio's macros.** Six blocks were sampled across the kinds, and every one typeset with no KaTeX error and no unrendered `$…$` left in the text:
+
+| block | `.katex` | `.katex-error` |
+|---|---|---|
+| def:bar-involution | 9 | 0 |
+| thm:jones-markov-trace | 40 | 0 |
+| prop:chi-sym-alt-closed-form | 41 | 0 |
+| tbl:hecke-log-decomposition-table-data | 48 | 0 |
+| alg:delta-lambda-closure | 34 | 0 |
+| rem:figure-eight-reeb-theta-value | 59 | 0 |
+
+**The Lean declaration link (ruling A, GitHub source).**
+- The server sends `lean.sourceUrl` for blocks whose `.lean` file it read.
+- The viewer draws "source on GitHub ↗" in the header of the Lean source panel, which opens from the block's ∀ indicator. It is not on the badge itself; that is where #494 put it.
+- Clicking ∀ on three blocks gave links at commit `77e7f0e`, and each line is the declaration:
+  - `bar-involution.lean#L40`: `class BarInvolution`;
+  - `jones-markov-trace.lean#L98`: `structure JonesMarkovTrace`;
+  - `chi-sym-alt-closed-form.lean#L322`: `theorem chiPairProductC_eq`.
+
+## Summary of Changes
+
+All four done-when items, under the owner's ruling of HTML parity (option 1):
+
+1. **Math with the folio's macros:** the viewer renders it (`buildKatexMacros(p.macros)`). Verified in Chromium above.
+2. **Lean:** a status badge per block, with a missing declaration shown rather than hidden (#487 reads `lean.ref`). There is a link to the declaration's source on GitHub at the served commit (#494, ruling A). Verified above.
+3. **Every paper block kind qou uses renders:**
+   - inventory: 16 builders, all in the registry except the `chapter` and `paper` containers;
+   - #527: the paper view no longer dies on `chId`;
+   - #532: table and algorithm deep links load the block instead of a 404;
+   - checked in Chromium on 2026-10-21, and math on 2026-10-22.
+4. **qou's HTML comes from the harness rendering:** qou deprecated its rendered Pages site on 2026-09-27, so the HTML a qou reader gets is this viewer. The PDF stays on its LaTeX path, per the owner's ruling.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
