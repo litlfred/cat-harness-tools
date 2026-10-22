@@ -562,6 +562,8 @@
     "theme:page": "bun run cat-harness-tools/scripts/render-theme-sheet.ts --page",
     "theme:page:check": "bun run cat-harness-tools/scripts/render-theme-sheet.ts --page --check",
     "theme:sheet": "bun run cat-harness-tools/scripts/render-theme-sheet.ts",
+    "theme:viz": "bun run cat-harness-tools/scripts/render-theme-sheet.ts --viz",
+    "theme:viz:check": "bun run cat-harness-tools/scripts/render-theme-sheet.ts --viz --check",
     "themes:css": "bun run cat-harness-tools/scripts/gen-themes-css.ts",
     "themes:css:check": "bun run cat-harness-tools/scripts/gen-themes-css.ts --check",
     "todos": "bun run cat-harness-tools/scripts/todos.ts",
