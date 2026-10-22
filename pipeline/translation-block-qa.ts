@@ -102,7 +102,8 @@ import {
   type PriorOk,
 } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { sourceLocale, targetLocales } from "./translation-index.ts";
-import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, type FreshSidecar } from "../scripts/qa-results.ts";
+import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
+import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
 import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
@@ -144,6 +145,46 @@ let derivedStoredMemo: boolean | undefined;
 function derivedStored(): boolean {
   return (derivedStoredMemo ??=
     qaStorageOf(translationQaPath(INSTANCE_ROOT, join(INSTANCE_ROOT, "content", "x"), "fr"), instanceCheckout()) !== undefined);
+}
+
+/**
+ * Where `--check` reads each sidecar's PRIOR from (bean `8wj1`), or `undefined`
+ * for the working copy.
+ *
+ * The prior is what {@link mergeCriteria} keeps the other writers' entries from
+ * — the "script half". Read off the working copy, a stored tree's results were
+ * a function of whatever happened to be on disk: measured 2026-10-22 against
+ * qa-reports `main`, the same run reported **6** inherited findings with
+ * `test/results/` present and **3** with it absent. In a stored tree with a
+ * readable `--against` entry, the prior comes from the branch instead, so the
+ * working copy cannot move the answer. Unstored, or with no readable entry, it
+ * is the working copy as before, and the run says which.
+ */
+let priorRef: string | undefined;
+
+/** One sidecar's prior: the parsed report, absent, or a refusal. */
+type PriorRead =
+  | { ok: true; doc?: TranslationBlockQaReport; from: string }
+  | { ok: false; state: string; path: string; reason: string };
+
+export function readPrior(
+  existing: string | undefined,
+  out: string,
+  ref: string | undefined = priorRef,
+  store?: QaStoreOptions,
+): PriorRead {
+  if (ref !== undefined) {
+    const b = readBaseline(out, { against: ref, ...(store ? { store } : {}) });
+    if (b.state === "miss") return { ok: true, from: b.from };
+    if (b.state !== "hit") return { ok: false, state: b.state, path: out, reason: `prior on ${b.from}: ${b.reason}` };
+    try {
+      return { ok: true, doc: JSON.parse(b.text) as TranslationBlockQaReport, from: b.from };
+    } catch (e) {
+      return { ok: false, state: "corrupt", path: out, reason: `prior on ${b.from} does not parse: ${(e as Error).message}` };
+    }
+  }
+  if (!existing) return { ok: true, from: "working copy" };
+  return { ok: true, doc: JSON.parse(readFileSync(existing, "utf-8")) as TranslationBlockQaReport, from: "working copy" };
 }
 
 /**
@@ -953,9 +994,13 @@ function sweepSubject(
       tally.skipped++;
       continue;
     }
-    const current = existing
-      ? (JSON.parse(readFileSync(existing, "utf-8")) as TranslationBlockQaReport)
-      : undefined;
+    const prior = readPrior(existing, out);
+    if (!prior.ok) {
+      console.error(`translation-block-qa: UNKNOWN ${relative(INSTANCE_ROOT, subjectRoot)} (${locale}) — ${prior.state}: ${prior.reason}. Nothing was judged for it.`);
+      tally.refused++;
+      continue;
+    }
+    const current = prior.doc;
     const merged = mergeWithAttestations(INSTANCE_ROOT, subjectRoot, locale, current, doc.criteria);
     if (!merged.ok) {
       console.error(refusalLine("translation-block-qa", `${relative(INSTANCE_ROOT, subjectRoot)} (${locale})`, merged));
@@ -1002,6 +1047,13 @@ if (import.meta.main) {
     const a = againstOrUsage(GATE, argv);
     if (a.exit !== undefined) process.exit(a.exit);
     against = a.against;
+    // Bean `8wj1`: in a stored tree, the prior comes from the branch whenever
+    // its entry can be read, so the working copy cannot change the result.
+    if (against !== undefined && derivedStored()) {
+      const m = readQaManifest(against);
+      if (m.state === "hit") priorRef = against;
+      else console.error(`  advisory: priors read from the working copy — qa-reports:${against} is ${m.state} (${m.reason})`);
+    }
   }
   const rootArg = arg("root", "");
   const root = rootArg ? join(INSTANCE_ROOT, rootArg) : docsSourceDirFor(INSTANCE_ROOT);
@@ -1062,14 +1114,14 @@ if (import.meta.main) {
       against,
       label: (p) => relative(INSTANCE_ROOT, p),
       ...(stale > 0 && !derivedStored() ? { extraFailing: { count: stale, detail: `${stale} sidecar(s) stale in an unstored tree — run: ${RERUN_COMMAND}` } } : {}),
-      ...(refused > 0 ? { undetermined: `${refused} (subject, locale) pair(s) whose attestations could not be read` } : {}),
+      ...(refused > 0 ? { undetermined: `${refused} (subject, locale) pair(s) whose attestations or stored prior could not be read` } : {}),
       detail: `${tally.fresh.length} sidecar(s) computed`,
     });
     process.exit(verdict.exit);
   }
 
   if (refused > 0) {
-    console.error(`\n${refused} (subject, locale) pair(s) UNKNOWN: their attestations could not be read, so nothing was written for them`);
+    console.error(`\n${refused} (subject, locale) pair(s) UNKNOWN: their attestations or stored prior could not be read, so nothing was written for them`);
     process.exit(4);
   }
 
