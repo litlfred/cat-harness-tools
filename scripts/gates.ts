@@ -720,21 +720,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "as `audit-wiring.ts`: the script is the platform's, the section tree " +
       "it audits is a folio's. Previous reason was false (bean `52dz`)",
   },
-  {
-    match: "trivial-skeleton-audit.ts",
-    kind: "no-folio",
-    reason: "runs `--cwd content`, a root the convention has retired",
-  },
-  {
-    match: "conditional-class-banner-audit.ts",
-    kind: "no-folio",
-    reason: "audits block banners from the retired `content/` root; see `52dz`",
-  },
-  {
-    match: "codemod-leanval.ts",
-    kind: "no-folio",
-    reason: "a codemod over a folio's Lean blocks",
-  },
   // ── Needs something a checkout does not have ────────────────────────
   {
     match: "site-links.ts",
