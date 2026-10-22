@@ -245,6 +245,25 @@ describe("a successful mount is ignored by the checkout", () => {
     expect(git(root, "status", "--porcelain", "--", "todos").trim()).toBe("");
   });
 
+  test("mounting ONE graph keeps every declared graph's line, and leaves .gitignore byte-identical (bean 792f)", () => {
+    // Bean `792f`: `state:mount -- --id beans` was seen dropping
+    // `/merge-reviews/**` from the block. `--id` narrows the MOUNT, never the
+    // block: the block is written from every declared tip graph.
+    const { root, store } = stateFixture("state-mount-t-").checkout("a");
+    const dirs = [
+      { id: "todos", path: "todos/", graphTypologies: ["todos"], source: TIP_SOURCE },
+      // The graph the bean saw dropped, declared but not the one mounted.
+      { id: "merge-reviews", path: "merge-reviews/", graphTypologies: ["merge-reviews"], source: { kind: "branch", branch: "cat/cat-harness/merge-reviews", keyedBy: "tip" } },
+    ];
+    writeFileSync(join(root, "t.json"), JSON.stringify({ name: "t", directories: dirs }, null, 2) + "\n");
+    const before = `node_modules\n${STATE_IGNORE_BEGIN}\n/merge-reviews/**\n/todos/**\n${STATE_IGNORE_END}\n`;
+    writeFileSync(join(root, ".gitignore"), before);
+    git(root, "add", "-A");
+    git(root, "commit", "-q", "-m", "two declared tip graphs");
+    expect(mountState({ repoRoot: root, store, id: "todos" }).state).toBe("mounted");
+    expect(readFileSync(join(root, ".gitignore"), "utf-8")).toBe(before);
+  });
+
   test("a mount that did not happen writes nothing", () => {
     const { root, store } = stateFixture("state-mount-t-").checkout("a", { kind: "directory" });
     mountState({ repoRoot: root, store });
