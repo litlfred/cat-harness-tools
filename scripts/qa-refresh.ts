@@ -177,8 +177,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
       // which no writer produces, and the record must lose those visibly.
       `${R}/cat-openapi/**`,
       `${R}/folio-assistant/**`,
+      // folio-assistant's own local instance, which holds its repository health
+      // graph (bean folio-assistant-kyrg, owner 2026-10-22).
+      `${R}/folio-assistant-state/**`,
     ],
-    because: "every declared instance's KG verdicts, hosted homes included (bootstrap, bootstrap-tools, cat-harness-tools, cat-openapi, folio-assistant)",
+    because: "every declared instance's KG verdicts, hosted homes included (bootstrap, bootstrap-tools, cat-harness-tools, cat-openapi, folio-assistant, folio-assistant-state)",
   },
   { id: "kg:detangle", run: ["kg:detangle"], writes: [`${R}/detangle/**`], because: "detangle measurements per instance graph" },
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },

@@ -240,9 +240,17 @@ export function mountState(opts: MountOptions = {}): MountResult {
   // to main as a second, diverging copy. Written only after a SUCCESSFUL mount,
   // and only for the full declared set (`opts.id` narrows the mount, not the
   // block), so a partial run never drops a line another graph needs.
+  //
+  // `--id` skips the CLI's remote fan-out, so the layer mounts the declarations
+  // are read from may be OLDER than the lock (bean folio-assistant-792f: a
+  // stale cat-harness mount predating `merge-reviews/` rewrote the block
+  // without it, twice). The block is then rewritten only when the layer
+  // mounts are verified current; otherwise it is left alone, and said so.
   if (result.graphs.some(isPresent)) {
     try {
-      syncStateIgnores(root, opts.id === undefined ? locations : tipLocations(root));
+      const stale = opts.id === undefined ? undefined : staleLayerMounts(root);
+      if (stale !== undefined) result.reason += `; .gitignore left unchanged: ${stale}`;
+      else syncStateIgnores(root, opts.id === undefined ? locations : tipLocations(root));
     } catch (e) {
       result.reason += `; .gitignore not updated: ${(e as Error).message}`;
     }
@@ -281,6 +289,21 @@ export function withStateIgnoreBlock(text: string, locations: readonly Pick<TipL
   }
   const base = text === "" || text.endsWith("\n") ? text : `${text}\n`;
   return `${base}${base === "" ? "" : "\n"}${want.join("\n")}\n`;
+}
+
+/**
+ * Why the layer mounts cannot be trusted to name every declared graph, or
+ * `undefined` when they can. No network: `remoteFanOut`'s check mode hashes
+ * what is on disk against the lock. A checkout with no lock has nothing to be
+ * stale against.
+ */
+export function staleLayerMounts(
+  root: string,
+  check: (root: string) => Parameters<typeof remoteExitCode>[0] = (r) => remoteFanOut(r, { check: true }).state,
+): string | undefined {
+  const state = check(root);
+  if (remoteExitCode(state) === 0) return undefined;
+  return `a layer mount does not match index.lock.json (${state}), so its declarations may omit a graph; run \`bun run cat state:mount\` (no --id) or \`bun run cat mount:lock\` first`;
 }
 
 /** Write the block into `root/.gitignore`. Returns whether the file changed. */
