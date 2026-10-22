@@ -20,7 +20,7 @@
  *
  * ## A tabular entry is a second rung, not the same one with holes
  *
- * `tabular-records.py` writes `tabular.jsonld` and no Stage A output at all.
+ * A tabular entry carries its tabular record and no Stage A output at all.
  * It gets its own branch (`pipeline/tabular-nodes.ts`, bean `p67i`)
  * rather than a parameterised `buildDocumentNodes`, because the shapes differ
  * where it matters: a workbook's grouping node is a *sheet*, and a CSV has no

@@ -13,7 +13,7 @@ import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contribution
 import { TABULAR_CSVW_FILENAME, type TabularCsvwTables } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { UnregisteredPipelinePluginError, usePipelinePluginRegistry } from "../../pipeline/pipeline-plugins.ts";
 import { checkEntry, entryKind } from "../check-l1-complete.ts";
-import { planFor } from "../ingest-document.ts";
+import { planFor, tableNotTaken } from "../ingest-document.ts";
 import { csvwRecord, entrySlug, techMeta } from "../tabular-csvw.ts";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -54,16 +54,28 @@ function filled(answer: (url: string, docId: string) => TabularCsvwTables | null
 }
 
 describe("routing", () => {
-  test("delimited text and xlsx go to the CSVW rung; ODS stays on v1, and says why", () => {
+  test("delimited text, xlsx and ODS all go to the CSVW rung; ODS says it will SKIP", () => {
     const d = tmp();
     const csv = join(d, "cases.csv");
     writeFileSync(csv, "a,b\n1,2\n3,4\n");
     const argv = (m: string | null) => planFor(csv, undefined, join(d, "lib"), m).steps[0]!.join(" ");
     expect(argv(null)).toContain("tabular-csvw.ts");
     expect(argv(XLSX)).toContain("tabular-csvw.ts");
-    expect(argv(ODS)).toContain("tabular-records.py");
+    // 5c-ii option 1: the v1 writer is retired, and it never wrote ODS anyway.
+    expect(argv(ODS)).toContain("tabular-csvw.ts");
+    expect(argv(ODS)).not.toContain("tabular-records.py");
     const ods = planFor(csv, undefined, join(d, "lib"), ODS);
     expect(ods.why).toContain("no CSVW reader for ODS");
+  });
+
+  test("the step's 'not a table I take' is an answer; its other failures are not", () => {
+    const step = ["bun", "run", "/x/scripts/tabular-csvw.ts", "-o", "lib", "f.ods"];
+    expect(tableNotTaken(step, 2)).toBe(true);
+    // Exit 1 is usage, an unfilled slot or a throwing extractor: a failure.
+    expect(tableNotTaken(step, 1)).toBe(false);
+    // Exit 2 from any OTHER step proves nothing (Python gives 2 for a script
+    // it cannot open).
+    expect(tableNotTaken(["python3", "/x/scripts/pdf-pages.py", "-o", "lib", "f.pdf"], 2)).toBe(false);
   });
 });
 

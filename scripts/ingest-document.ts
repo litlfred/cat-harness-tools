@@ -590,6 +590,19 @@ export function recordedUndetermined(step: readonly string[], exitCode: number, 
   return undefined;
 }
 
+/**
+ * The tabular-csvw step answered "not a table I take" — bean `urat`.
+ *
+ * `tabular-csvw.ts` exits 2 only when the slot's reader returns `null`: it
+ * wrote nothing, and said so. Its other failures (usage, a slot nothing
+ * fills, an extractor that throws) exit 1. So exit 2 from THIS step is an
+ * answer, as the vector arms' sidecar is, and the ingest goes on to stage
+ * the entry, whose tabular requirement then reads unmet.
+ */
+export function tableNotTaken(step: readonly string[], exitCode: number): boolean {
+  return exitCode === 2 && basename(step[2] ?? "") === "tabular-csvw.ts";
+}
+
 /** The vector arms whose exit 2 may be an answer, and the sidecar each writes. */
 const VECTOR_ARM_SIDECARS: Record<string, string> = {
   "pdf-vector-labels.py": "vector-labels.json",
@@ -790,14 +803,17 @@ export function planFor(
   // itself via `[Content_Types].xml` or ODF's `mimetype` member. Bean `p67i`;
   // the defect was introduced by `twqe`'s routing and caught before it shipped.
   if (mime !== null && (TABULAR_MIMETYPES as readonly string[]).includes(mime)) {
-    // An xlsx is read as CSVW through the `tabular-csvw` slot, which core
-    // fills (bean `urat`, owner 2026-10-20). An ODS stays on v1 for now:
-    // core has no CSVW reader for it, and an unread ODS is not better.
+    // Every workbook is read as CSVW through the `tabular-csvw` slot, which
+    // core fills (bean `urat`, owner 2026-10-20). Core has no CSVW reader for
+    // ODS yet, so for one the slot answers "not a table I take" and the step
+    // SKIPs; the staged entry then lists its tabular record as unmet. The v1
+    // writer this used to call wrote nothing for ODS either, and stopped the
+    // ingest saying "not a CSV or spreadsheet" (5c-ii, option 1).
     const ods = mime === "application/vnd.oasis.opendocument.spreadsheet";
     return {
       rung: "tabular",
-      why: `the package declares ${mime} — a workbook, read for its sheets and headers${ods ? " (v1: no CSVW reader for ODS yet)" : ""}`,
-      steps: [ods ? ["python3", pyHelper("tabular-records.py"), "-o", lib, pdf] : ["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
+      why: `the package declares ${mime} — a workbook, read for its sheets and headers${ods ? " (no CSVW reader for ODS yet: the step SKIPs)" : ""}`,
+      steps: [["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -1221,6 +1237,10 @@ if (import.meta.main) {
       const recorded = recordedUndetermined(s, r.exitCode, started);
       if (recorded !== undefined) {
         console.log(`  ${basename(s[1] ?? "")}: UNDETERMINED, recorded in ${recorded} — continuing`);
+        continue;
+      }
+      if (tableNotTaken(s, r.exitCode)) {
+        console.log(`  ${basename(s[2] ?? "")}: NOT READ — no tabular-csvw reader takes this file; the staged entry lists its tabular record as unmet`);
         continue;
       }
       console.error(`\n${s[1]} failed (exit ${r.exitCode}) — stopping.`);
