@@ -121,9 +121,9 @@ The claimed work is NOT all on main: the unticked Done-when boxes above are what
   - On cat-harness `docs/source`, 172 blocks were all NO-QA with `test/results/` absent. Now the per-block results are identical both ways.
   - A sidecar the branch cannot read is UNKNOWN, never NO-QA.
   - The MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`. That is routed to lane C.
-- **qa_sweep, option (A), provisional:** taken by the coordinator; the owner may switch it to (B) or (C).
-  - A writer RECOMPOSES rather than judges. Its own criteria do not depend on the prior, and agent attestations come from the store (box 1).
-  - With `test/results/` absent, the entries other script writers left in the same sidecar are not carried. They are regenerated when those writers next run, so nothing is lost.
-  - (B) would give writers `--prior-from <ref>`. (C) would refuse to write with `test/results/` absent.
+- **qa_sweep and the other block writers: option (B), owner, 2026-10-22.** It overrides the provisional (A) the coordinator first took.
+  - Every block writer gains `--prior-from <ref>`, which reads the earlier sidecar from qa-reports.
+  - A rewrite then carries the other writers' entries even when `test/results/` is absent.
+  - A branch read that cannot be made refuses loudly (exit 2), the same way the readers in #563 and #564 do. It never falls back silently to the working copy.
 
-Close this bean when #563 and #564 are merged, unless the owner overrides (A).
+This bean stays in-progress until B's `--prior-from` writers land, together with #563 and #564.
