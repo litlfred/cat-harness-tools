@@ -4,6 +4,7 @@
  *
  * @module scripts/gen-schema-viz
  * @graphNode none — a generator over the schema graph, not a schema itself
+ * @covers none — writer — regenerates the visualisation; judges nothing
  *
  * ## The three pieces, and why the projection is separate from the page
  *
