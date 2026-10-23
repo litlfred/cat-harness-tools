@@ -1,5 +1,6 @@
 ---
 # folio-assistant-4ccr
+$schema: bean/1.0.0
 title: 'WIREFRAME FINDINGS: usability and accessibility defects the as-is wireframes observed (#1023)'
 status: completed
 type: epic
@@ -51,4 +52,13 @@ Every finding in the 22 child beans was re-measured on a local build of that com
 - **New regression:** `g9r2`, the who-iris replica.
 - `mylx` is fixed in #1512.
 
-_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: completed 2026-10-12 in the folio-assistant store once kx0p, 6eiw and dm4j were closed again (beans commit 83def980). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+## Closed 2026-10-09
+
+All 38 child beans under this epic have completed (37 completed, 1 scrapped), and their wireframe usability and accessibility findings have landed across generators, themed layouts, and Jekyll styles:
+- **Completed (37)**: `qbfm`, `duez`, `db80`, `gnqa`, `nnpk`, `7x7g`, `vsv4`, `yhcq`, `9scf`, `xb4p`, `s0ki`, `bgrz`, `ob3m`, `0g7s`, `n5be`, `g9r2`, `xwrt`, `2r2n`, `rtuo`, `269z`, `zpso`, `v215`, `0fua`, `dc64`, `015u`, `pqdv`, `2uui`, `1q4b`, `oi3h`, `w6fu`, `uvt0`, `mylx`, `6eiw`, `qgjh`, `72gk`, `krmw`, `kx0p`.
+- **Scrapped (1)**: `gyoj`.
+`check:bean-rollup` passes clean with 0 open children under this epic.
+
+## Reopened (2026-10-10, drain ml9h)
+
+Lane A reopened children kx0p, 6eiw and dm4j: each was closed on 2026-10-09 without its fix on main (found by drain lane C), so this container cannot be completed while they are open (check:bean-rollup).

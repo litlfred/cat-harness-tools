@@ -1,5 +1,6 @@
 ---
 # folio-assistant-6bhf
+$schema: bean/1.0.0
 title: 'SECURITY SUB-KG: an external identifier reaches join() unvalidated in three HTTP handlers, and the containment helper that fixes it already exists in one script'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-25T16:38:20Z
 updated_at: 2026-09-26T14:31:39Z
 parent: folio-assistant-1xhc
 ---
-
 
 Owner, 2026-09-25, verbatim:
 

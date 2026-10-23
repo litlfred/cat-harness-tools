@@ -1,5 +1,6 @@
 ---
 # folio-assistant-xqdi
+$schema: bean/1.0.0
 title: 'MERGE GATE (b): content-type compile gates - Lean builds, SUSHI/IG AST compiles, JSON-LD + schema validate; site renders advisory'
 status: completed
 type: task
@@ -19,13 +20,29 @@ Content-type compile gates, scoped by changed path and **blocking**:
 Downstream renders (just-the-docs, the Pages site, PDF) are **advisory**, by owner instruction.
 
 ## Done when
-- [ ] a path → gate map is declared as data (not a list in prose), and `gates.ts` reads it
-- [ ] each gate has a test that fails it on purpose
-- [ ] an `unknown` (toolchain absent, or cache cold and timed out) blocks; it is never reported as green
-- [ ] each gate runs on the merge-train result, not only on each PR head
+- [x] a path → gate map is declared as data (not a list in prose), and `gates.ts` reads it
+- [x] each gate has a test that fails it on purpose
+- [x] an `unknown` (toolchain absent, or cache cold and timed out) blocks; it is never reported as green
+- [x] each gate runs on the merge-train result, not only on each PR head
 
+## Closed 2026-10-09
 
-## Summary of Changes
+Implemented in `cat-harness` on branch `claude/xqdi-content-compile-gates`, commit `5154349b`:
+
+- **Data map declaration:** `scripts/content-compile-gates.ts` exports `CONTENT_COMPILE_GATES` declaring `G5` (Lean module compile & audit, blocking), `G6` (FHIR IG compile & AST extract, blocking), `G7` (KG JSON-LD expand/compact & schema validation, blocking), `A1` (Downstream site/doc renders, advisory), `A2` (Full IG Publisher run, advisory), and `A3` (Strict KG audit, advisory).
+- **`gates.ts` integration:** `scripts/gates.ts` imports and re-exports `CONTENT_COMPILE_GATES`, `contentCompileGates`, and `evaluateCompileGates`, providing `--compile-gates-list` and `--compile-gates <paths...>` CLI support.
+- **Third state (`unknown`) enforcement:** Toolchain absence (`lake`/`lean` or `sushi`/AST unavailable) or cache cold timeout produces status `"unknown"`. For blocking gates (G5, G6, G7), `unknown` sets `blocked: true` and `overallPassed: false`; it is never reported as pass/green. For advisory gates (A1, A2), `unknown` warns and does not block merge (`blocked: false`).
+- **Merge-train composition:** `unionOfChangedPaths` aggregates changed paths across all PRs in a train; `compileGatesForMergeTrain` and `evaluateCompileGatesForMergeTrain` evaluate all triggered gates over the combined merge result.
+- **Verification:**
+  - `bun test scripts/tests/content-compile-gates.test.ts`: 29 unit tests covering all 4 Done-when criteria, path routing, intentional failure triggers for each gate, third-state blocking, and merge-train path unions (140 assertions, 0 failures).
+  - `bun test cat-harness/scripts/tests/gates.test.ts`: 16 passing tests (0 failures).
+  - `bun run typecheck`: clean (0 errors).
+
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Summary of Changes
 
 Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence. `scripts/tests/content-compile-gates.test.ts` has one `describe` per done-when, and all 29 tests pass in the CI-shaped mount:
 

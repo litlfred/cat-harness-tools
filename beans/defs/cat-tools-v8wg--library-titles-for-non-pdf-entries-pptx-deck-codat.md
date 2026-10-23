@@ -1,5 +1,6 @@
 ---
 # cat-tools-v8wg
+$schema: bean/1.0.0
 title: Library titles for non-PDF entries (pptx deck, CODATA table)
 status: completed
 type: task

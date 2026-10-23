@@ -1,5 +1,6 @@
 ---
 # folio-assistant-d33q
+$schema: bean/1.0.0
 title: 'MERGE AUTO-RESOLVE: merge:main resolves only DECLARED conflict patterns, proves the result with the gate set, and is the merge-base.bpmn sub-process'
 status: completed
 type: feature
@@ -132,4 +133,3 @@ Two things this is evidence for:
 Landed on main in PR #1754 (merge commit `c172a9ae90a6`, commit `0dc00fda1743`: "merge:main — auto-resolve only declared conflict patterns, proved by the gate set; merge-base.bpmn") and Part B in PR #1820 (merge commit `87431534f530`, commit `76c85c2db3d1`) / PR #1834 (merge commit `4d3eca5fd7e8`, commit `76918b124f05`: "merge-main.yml: fire on conflicted PRs, run main's tool, fail loudly").
 - Implemented declared conflict pattern registry, `merge:main`, and `merge-base.bpmn`.
 - Implemented `merge-main.yml` CI workflow to run `merge:main` on conflicted open PRs when main moves.
-

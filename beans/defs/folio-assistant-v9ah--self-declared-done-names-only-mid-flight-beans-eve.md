@@ -1,5 +1,6 @@
 ---
 # folio-assistant-v9ah
+$schema: bean/1.0.0
 title: 'SELF-DECLARED-DONE NAMES ONLY MID-FLIGHT BEANS: every finding the check produces is one no session may act on, which is thux''s o5qj shape unfixed on the second axis'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-25T17:34:43Z
 updated_at: 2026-09-30T22:21:08Z
 parent: folio-assistant-1xhc
 ---
-
 
 `bean-store`'s `bean-self-declared-done` finding names a claimed bean whose every
 `## Done when` box is ticked, and its implied action is that somebody closes it.

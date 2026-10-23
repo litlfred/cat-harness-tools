@@ -1,5 +1,6 @@
 ---
 # folio-assistant-wekz
+$schema: bean/1.0.0
 title: 'ARCHIVE: moving a bean one level deeper breaks its relative links, and the CLI reports a path it did not write to'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-23T21:44:21Z
 updated_at: 2026-09-23T21:44:43Z
 parent: folio-assistant-1xhc
 ---
-
 
 Owner authorised `beans archive` 2026-09-23, the last outstanding
 `bean-store` finding on [#860](https://github.com/litlfred/folio-assistant/issues/860).

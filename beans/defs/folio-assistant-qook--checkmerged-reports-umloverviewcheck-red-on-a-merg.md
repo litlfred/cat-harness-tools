@@ -1,5 +1,6 @@
 ---
 # folio-assistant-qook
+$schema: bean/1.0.0
 title: check:merged reports a merged tree defective when no real checkout of it is — a symlinked node_modules leaks into the corpus
 status: completed
 type: bug
@@ -8,8 +9,6 @@ created_at: 2026-09-26T11:04:49Z
 updated_at: 2026-10-08T01:15:00Z
 parent: folio-assistant-1xhc
 ---
-
-
 
 ## CORRECTED 2026-09-26 — the cause is NOT `ymsu`, and the title understates it
 
@@ -269,4 +268,3 @@ The `check:environment` change is shape 1 of "Not fixed here, and what the fix h
 ## Landed evidence (PR #2395)
 - Completed and merged to main in PR #2395 (commit `b26c63a773e7`).
 - `check:environment` permits internal node_modules symlink in worktrees. Verified on main.
-

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-cflw
+$schema: bean/1.0.0
 title: 'Generated artefacts collide: 218 sidecars rewritten by one auditor edit'
 status: completed
 type: task
@@ -8,7 +9,6 @@ created_at: 2026-09-19T06:19:28Z
 updated_at: 2026-10-07T17:37:00Z
 parent: folio-assistant-1swy
 ---
-
 
 _2026-09-19T06:19:44Z_ — MEASURED 2026-09-19, on main at d4b9f7479, by appending one comment line to scripts/kg-audit.ts and running `bun run cat kg:audit`:
 

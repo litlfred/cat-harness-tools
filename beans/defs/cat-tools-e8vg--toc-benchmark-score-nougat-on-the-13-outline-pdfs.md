@@ -1,5 +1,6 @@
 ---
 # cat-tools-e8vg
+$schema: bean/1.0.0
 title: 'TOC benchmark: score Nougat on the 13 outline PDFs (needs huggingface.co) (#2302)'
 status: completed
 type: task
