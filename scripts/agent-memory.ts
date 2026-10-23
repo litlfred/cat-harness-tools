@@ -103,6 +103,17 @@ export const AGENT_MEMORY_DIR = join(repoRootFor(ROOT), ".claude", "agent-memory
 export const BEGIN = "<!-- folio:memory:begin -->";
 export const END = "<!-- folio:memory:end -->";
 
+/** Markers for the repo-wide memory section in `AGENTS.md` (bean `31ni`). */
+export const AGENTS_MD_BEGIN = "<!-- cat-harness:agent-memory:begin -->";
+export const AGENTS_MD_END = "<!-- cat-harness:agent-memory:end -->";
+export const AGENTS_MD_FILE = join(repoRootFor(ROOT), "AGENTS.md");
+
+/** Per-target budgets (bean `31ni`). */
+export const CLAUDE_MEMORY_LINE_BUDGET = 200;
+export const ANTIGRAVITY_SKILL_BYTE_BUDGET = 24_000;
+export const ANTIGRAVITY_RULE_BYTE_BUDGET = 24_000;
+export const AGENTS_MD_BYTE_BUDGET = 32_768;
+
 const LABELS = new Set<string>(MEMORY_LABELS);
 
 // ── Parsing the hand-written files ──────────────────────────────
@@ -593,6 +604,160 @@ export function syncAll(write: boolean): SyncResult[] {
   });
 }
 
+// ── Shared priority & budget helpers (bean `31ni`) ──────────────
+
+/**
+ * Live memory entries referencing no specific subagent (`kind: "agent"`).
+ *
+ * These are repository-wide lessons — facts that bind across every session
+ * rather than belonging to one subagent's lane, and are rendered into a
+ * marked repo-wide `AGENTS.md` section as well as reaching every subagent.
+ */
+export function repoWideMemory(entries: readonly MemoryNode[]): MemoryNode[] {
+  return entries.filter(
+    (e) => !e.archived && e.tags.references.every((r) => r.kind !== AGENT_REF_KIND),
+  );
+}
+
+/**
+ * Sort live nodes lowest-priority first so budget enforcement drops `baseline`
+ * before `trap` and `trap` before `stable`, and oldest `createdAt` first within
+ * the same label.
+ */
+export function lowestPriorityFirst(nodes: readonly MemoryNode[]): MemoryNode[] {
+  const rank = (m: MemoryNode): number => MEMORY_LABELS.indexOf(m.label);
+  return [...nodes].sort((a, b) => {
+    const rankDiff = rank(b) - rank(a);
+    if (rankDiff !== 0) return rankDiff;
+    if (a.createdAt && b.createdAt && a.createdAt !== b.createdAt) {
+      return a.createdAt.localeCompare(b.createdAt);
+    }
+    return a.id.localeCompare(b.id);
+  });
+}
+
+export interface FitNodesToByteBudgetResult {
+  active: MemoryNode[];
+  body: string;
+  dropped: MemoryNode[];
+  bytes: number;
+}
+
+/**
+ * Drop lowest-priority nodes one by one until the rendered output (or the
+ * full spliced file when `measureFull` is supplied) fits within `budget` bytes.
+ * Never truncates mid-entry, and returns every dropped node so the caller can
+ * report and gate on it.
+ */
+export function fitNodesToByteBudget(
+  nodes: readonly MemoryNode[],
+  render: (active: readonly MemoryNode[]) => string,
+  budget: number,
+  measureFull?: (body: string) => string,
+): FitNodesToByteBudgetResult {
+  let active = [...nodes];
+  const dropped: MemoryNode[] = [];
+  const dropCandidates = lowestPriorityFirst(nodes);
+
+  while (dropCandidates.length > 0) {
+    const candidateBody = render(active);
+    const measuredText = measureFull ? measureFull(candidateBody) : candidateBody;
+    if (Buffer.byteLength(measuredText, "utf8") <= budget) {
+      break;
+    }
+    const toDrop = dropCandidates.shift()!;
+    dropped.push(toDrop);
+    active = active.filter((n) => n.id !== toDrop.id);
+  }
+
+  const body = render(active);
+  const measuredText = measureFull ? measureFull(body) : body;
+  return {
+    active,
+    body,
+    dropped,
+    bytes: Buffer.byteLength(measuredText, "utf8"),
+  };
+}
+
+export interface TargetDropRecord {
+  target: string;
+  budgetBytes: number;
+  dropped: readonly MemoryNode[];
+}
+
+/**
+ * Format a report when any byte-budgeted target had to drop lowest-priority
+ * nodes to fit its budget, or `null` when nothing was dropped.
+ */
+export function droppedTargetNodesReport(records: readonly TargetDropRecord[]): string | null {
+  const real = records.filter((r) => r.dropped.length > 0);
+  if (real.length === 0) return null;
+  const rows = real
+    .map((r) => {
+      const items = r.dropped.map((d) => `[${d.label.toUpperCase()}] ${d.id} (${d.summary})`).join("; ");
+      return `  ${r.target} (budget ${r.budgetBytes} bytes): ${r.dropped.length} dropped — ${items}`;
+    })
+    .join("\n");
+  return (
+    `\nMemory nodes were dropped to fit target byte budgets (lowest priority first —\n` +
+    `never silent truncation):\n\n${rows}\n\n` +
+    `Shorten or split a long entry with \`<!-- detail -->\`, or mark an obsolete entry\n` +
+    `\`archived: true\` so every target fits within its budget.`
+  );
+}
+
+export interface AgentMemoryTargetDef {
+  id: string;
+  vendor: string;
+  pathPattern: string;
+  scope: "per-agent" | "all-agents" | "repo-wide";
+  delivery: "marked-region" | "whole-file";
+  budget: { unit: "lines" | "bytes"; limit: number };
+}
+
+/**
+ * Active assembler targets and their budgets (bean `31ni`).
+ *
+ * Per-agent vendor targets for Gemini CLI (`4682`), OpenAI Codex CLI (`5zs1`),
+ * Cursor (`uvfs`), and GitHub Copilot (`xxh4`) remain parked per the owner's
+ * 2026-10-20 ruling.
+ */
+export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
+  {
+    id: "claude-agent-memory",
+    vendor: "Claude Code",
+    pathPattern: ".claude/agent-memory/<agent>/MEMORY.md",
+    scope: "per-agent",
+    delivery: "marked-region",
+    budget: { unit: "lines", limit: CLAUDE_MEMORY_LINE_BUDGET },
+  },
+  {
+    id: "antigravity-skill",
+    vendor: "Antigravity",
+    pathPattern: ".agents/skills/<agent>-memory/SKILL.md",
+    scope: "per-agent",
+    delivery: "whole-file",
+    budget: { unit: "bytes", limit: ANTIGRAVITY_SKILL_BYTE_BUDGET },
+  },
+  {
+    id: "antigravity-rule",
+    vendor: "Antigravity",
+    pathPattern: ".agents/rules/agent-memory.md",
+    scope: "all-agents",
+    delivery: "marked-region",
+    budget: { unit: "bytes", limit: ANTIGRAVITY_RULE_BYTE_BUDGET },
+  },
+  {
+    id: "agents-md",
+    vendor: "Repo-wide (AGENTS.md)",
+    pathPattern: "AGENTS.md",
+    scope: "repo-wide",
+    delivery: "marked-region",
+    budget: { unit: "bytes", limit: AGENTS_MD_BYTE_BUDGET },
+  },
+];
+
 // ── Antigravity target (bean `fkqa`) ────────────────────────────
 
 /**
@@ -630,10 +795,36 @@ export function renderAntigravitySkill(agent: string, entries: readonly MemoryNo
   );
 }
 
+export interface RenderAntigravitySkillResult {
+  content: string;
+  dropped: MemoryNode[];
+  bytes: number;
+}
+
+/**
+ * Render one agent's Antigravity `SKILL.md` subject to a byte budget, dropping
+ * lowest-priority nodes (`baseline` -> `trap` -> `stable`) and reporting them.
+ */
+export function renderAntigravitySkillWithBudget(
+  agent: string,
+  entries: readonly MemoryNode[],
+  budget: number = ANTIGRAVITY_SKILL_BYTE_BUDGET,
+): RenderAntigravitySkillResult {
+  const live = entries.filter((n) => !n.archived);
+  const { body, dropped, bytes } = fitNodesToByteBudget(
+    live,
+    (active) => renderAntigravitySkill(agent, active),
+    budget,
+  );
+  return { content: body, dropped, bytes };
+}
+
 export interface AntigravityResult {
   agent: string;
   state: "written" | "unchanged";
   entries: number;
+  dropped: MemoryNode[];
+  bytes: number;
 }
 
 /**
@@ -642,25 +833,31 @@ export interface AntigravityResult {
  * today; a skill folder whose agent no longer exists is removed, since a stale
  * skill would keep teaching a retired agent's lessons.
  */
-export function syncAntigravity(write: boolean, nodes: readonly MemoryNode[] = readMemoryNodes()): AntigravityResult[] {
+export function syncAntigravity(
+  write: boolean,
+  nodes: readonly MemoryNode[] = readMemoryNodes(),
+  budget: number = ANTIGRAVITY_SKILL_BYTE_BUDGET,
+  skillsDir: string = ANTIGRAVITY_SKILLS_DIR,
+): AntigravityResult[] {
   const agents = agentNames();
   const out: AntigravityResult[] = agents.map((agent) => {
     const entries = memoryForAgent(nodes, agent);
-    const path = join(ANTIGRAVITY_SKILLS_DIR, antigravitySkillName(agent), "SKILL.md");
-    const next = renderAntigravitySkill(agent, entries);
+    const path = join(skillsDir, antigravitySkillName(agent), "SKILL.md");
+    const { content: next, dropped, bytes } = renderAntigravitySkillWithBudget(agent, entries, budget);
+    const keptCount = entries.length - dropped.length;
     const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
-    if (current === next) return { agent, state: "unchanged", entries: entries.length };
+    if (current === next) return { agent, state: "unchanged", entries: keptCount, dropped, bytes };
     if (write) {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, next);
     }
-    return { agent, state: "written", entries: entries.length };
+    return { agent, state: "written", entries: keptCount, dropped, bytes };
   });
-  if (write && existsSync(ANTIGRAVITY_SKILLS_DIR)) {
+  if (write && existsSync(skillsDir)) {
     const wanted = new Set(agents.map(antigravitySkillName));
-    for (const e of readdirSync(ANTIGRAVITY_SKILLS_DIR, { withFileTypes: true })) {
+    for (const e of readdirSync(skillsDir, { withFileTypes: true })) {
       if (e.isDirectory() && e.name.endsWith("-memory") && !wanted.has(e.name)) {
-        rmSync(join(ANTIGRAVITY_SKILLS_DIR, e.name), { recursive: true });
+        rmSync(join(skillsDir, e.name), { recursive: true });
       }
     }
   }
@@ -677,7 +874,6 @@ export function syncAntigravity(write: boolean, nodes: readonly MemoryNode[] = r
  */
 export const ANTIGRAVITY_RULES_DIR = join(repoRootFor(ROOT), ".agents", "rules");
 export const ANTIGRAVITY_RULE_FILE = join(ANTIGRAVITY_RULES_DIR, "agent-memory.md");
-export const ANTIGRAVITY_RULE_BYTE_BUDGET = 24_000;
 
 export const DEFAULT_ANTIGRAVITY_RULE_TEMPLATE = `---
 trigger: always_on
@@ -755,36 +951,14 @@ export function renderAntigravityRule(
     return sections.join("\n\n");
   };
 
-  let active = [...live];
-  const dropped: MemoryNode[] = [];
+  const { body, dropped } = fitNodesToByteBudget(
+    live,
+    formatRuleContent,
+    budget,
+    (candidateBody) => spliceRegion(templateOrFile, candidateBody) ?? candidateBody,
+  );
 
-  // Drop candidates sorted by lowest-priority first:
-  // rank: baseline (2) -> trap (1) -> stable (0).
-  // Within same rank: oldest createdAt first, then id.
-  const dropCandidates = [...live].sort((a, b) => {
-    const rankDiff = rank(b) - rank(a);
-    if (rankDiff !== 0) return rankDiff;
-    if (a.createdAt && b.createdAt && a.createdAt !== b.createdAt) {
-      return a.createdAt.localeCompare(b.createdAt);
-    }
-    return a.id.localeCompare(b.id);
-  });
-
-  while (dropCandidates.length > 0) {
-    const candidateBody = formatRuleContent(active);
-    const candidateFile = spliceRegion(templateOrFile, candidateBody) ?? candidateBody;
-    if (Buffer.byteLength(candidateFile, "utf8") <= budget) {
-      break;
-    }
-    const toDrop = dropCandidates.shift()!;
-    dropped.push(toDrop);
-    active = active.filter((n) => n.id !== toDrop.id);
-  }
-
-  return {
-    body: formatRuleContent(active),
-    dropped,
-  };
+  return { body, dropped };
 }
 
 export interface AntigravityRuleResult {
@@ -828,13 +1002,144 @@ export function syncAntigravityRule(
   return { path: ruleFilePath, state: "written", entries, dropped, bytes };
 }
 
+// ── Repo-wide AGENTS.md section target (bean `31ni`) ────────────
+
+/**
+ * Rebase relative links in node prose so they resolve from the repository root `AGENTS.md`.
+ */
+export function rebaseAgentsMdLinks(text: string): string {
+  // Nodes authored in `cat-harness/memory/` refer to skills as `../skills/`.
+  // From the repository root `AGENTS.md`, that relative path is `cat-harness/skills/`.
+  return text.replace(/\]\(\.\.\/skills\//g, "](cat-harness/skills/");
+}
+
+/**
+ * Splice `body` into an `AGENTS.md` file between `<!-- cat-harness:agent-memory:begin -->`
+ * and `<!-- cat-harness:agent-memory:end -->` (or `<!-- folio:memory:begin -->` / `<!-- folio:memory:end -->`).
+ * Returns `undefined` when no valid marker pair is present (the third state: not opted in).
+ */
+export function spliceAgentsMdRegion(file: string, body: string): string | undefined {
+  for (const [begin, end] of [
+    [AGENTS_MD_BEGIN, AGENTS_MD_END],
+    [BEGIN, END],
+  ] as const) {
+    const i = file.indexOf(begin);
+    const j = file.indexOf(end);
+    if (i !== -1 && j !== -1 && j > i) {
+      return body.length > 0
+        ? `${file.slice(0, i + begin.length)}\n\n${body}\n\n${file.slice(j)}`
+        : `${file.slice(0, i + begin.length)}\n${file.slice(j)}`;
+    }
+  }
+  return undefined;
+}
+
+export interface RenderAgentsMdSectionResult {
+  body: string;
+  dropped: MemoryNode[];
+  entries: number;
+  bytes: number;
+}
+
+/**
+ * Render agent-less (repo-wide) live memory nodes for the marked region of `AGENTS.md`,
+ * ordered `STABLE`, `TRAP`, `BASELINE`, with budget enforcement that drops
+ * lowest-priority nodes (`baseline` first, then `trap`) and reports them.
+ */
+export function renderAgentsMdSection(
+  nodes: readonly MemoryNode[],
+  templateOrFile?: string,
+  budget: number = AGENTS_MD_BYTE_BUDGET,
+): RenderAgentsMdSectionResult {
+  const repoWide = repoWideMemory(nodes);
+  const rank = (m: MemoryNode): number => MEMORY_LABELS.indexOf(m.label);
+
+  const formatSection = (activeList: readonly MemoryNode[]): string => {
+    const sorted = [...activeList].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+    return sorted
+      .map((m) => {
+        const head = `### ${m.label.toUpperCase()} — ${m.summary}`;
+        const comment = rebaseAgentsMdLinks(m.comment);
+        const meas = m.measured
+          ? `\n\n> Measured \`${m.measured.command}\` on ${m.measured.date}: ${m.measured.result}`
+          : "";
+        const more = m.detail ? `\n\nMore: \`${detailRelPath(m.id)}\`` : "";
+        return `${head}\n\n${comment}${meas}${more}`;
+      })
+      .join("\n\n");
+  };
+
+  const { active, body, dropped, bytes } = fitNodesToByteBudget(
+    repoWide,
+    formatSection,
+    budget,
+    templateOrFile !== undefined
+      ? (candidateBody) => spliceAgentsMdRegion(templateOrFile, candidateBody) ?? candidateBody
+      : undefined,
+  );
+
+  return {
+    body,
+    dropped,
+    entries: active.length,
+    bytes,
+  };
+}
+
+export interface AgentsMdResult {
+  path: string;
+  state: "written" | "unchanged" | "no-markers" | "missing";
+  entries: number;
+  dropped: MemoryNode[];
+  bytes: number;
+}
+
+/**
+ * Sync the marked repo-wide memory section in `AGENTS.md` from agent-less nodes.
+ *
+ * Respects the third state: if `AGENTS.md` is absent (`missing`) or carries no
+ * memory markers (`no-markers`), it is left untouched and reported as such.
+ */
+export function syncAgentsMd(
+  write: boolean,
+  nodes: readonly MemoryNode[] = readMemoryNodes(),
+  budget: number = AGENTS_MD_BYTE_BUDGET,
+  agentsMdPath: string = AGENTS_MD_FILE,
+): AgentsMdResult {
+  if (!existsSync(agentsMdPath)) {
+    return { path: agentsMdPath, state: "missing", entries: 0, dropped: [], bytes: 0 };
+  }
+  const current = readFileSync(agentsMdPath, "utf8");
+  if (spliceAgentsMdRegion(current, "") === undefined) {
+    return {
+      path: agentsMdPath,
+      state: "no-markers",
+      entries: repoWideMemory(nodes).length,
+      dropped: [],
+      bytes: Buffer.byteLength(current, "utf8"),
+    };
+  }
+  const { body, dropped, entries } = renderAgentsMdSection(nodes, current, budget);
+  const next = spliceAgentsMdRegion(current, body)!;
+  const bytes = Buffer.byteLength(next, "utf8");
+
+  if (next === current) {
+    return { path: agentsMdPath, state: "unchanged", entries, dropped, bytes };
+  }
+  if (write) {
+    writeFileSync(agentsMdPath, next);
+  }
+  return { path: agentsMdPath, state: "written", entries, dropped, bytes };
+}
+
 // ── CLI ─────────────────────────────────────────────────────────
 
 /**
  * `bun run cat-harness-tools/scripts/agent-memory.ts [--check]`
  *
- * `--check` writes nothing and exits non-zero when a file is stale, so CI
- * catches an entry edited in `memory/` and never assembled.
+ * `--check` writes nothing and exits non-zero when a file is stale or when any
+ * target exceeds its budget and drops entries, so CI catches an entry edited
+ * in `memory/` and never assembled or an entry that blew a target's budget.
  *
  * **`no-markers` and `missing` are not failures and not passes.** A file the
  * author has not opted in is left exactly as it is and reported as such — the
@@ -846,23 +1151,52 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   const results = syncAll(!check);
   let stale = 0;
+  const targetDropRecords: TargetDropRecord[] = [];
+
   for (const r of syncAntigravity(!check)) {
-    console.log(`  ${r.state.padEnd(11)} ${`.agents/skills/${antigravitySkillName(r.agent)}`.padEnd(28)} ${r.entries} entries (Antigravity skill)`);
+    const targetPath = `.agents/skills/${antigravitySkillName(r.agent)}`;
+    console.log(
+      `  ${r.state.padEnd(11)} ${targetPath.padEnd(28)} ${r.entries} entries (${r.bytes} bytes, Antigravity skill)`,
+    );
+    if (r.dropped.length > 0) {
+      targetDropRecords.push({
+        target: targetPath,
+        budgetBytes: ANTIGRAVITY_SKILL_BYTE_BUDGET,
+        dropped: r.dropped,
+      });
+    }
     if (r.state === "written" && check) stale++;
   }
+
   const ruleResult = syncAntigravityRule(!check);
   console.log(
     `  ${ruleResult.state.padEnd(11)} ${".agents/rules/agent-memory.md".padEnd(28)} ${ruleResult.entries} entries (${ruleResult.bytes} bytes, Antigravity rule)`,
   );
   if (ruleResult.dropped.length > 0) {
-    console.warn(
-      `  ⚠ Dropped ${ruleResult.dropped.length} lowest-priority memory node(s) to fit Antigravity rule budget (${ANTIGRAVITY_RULE_BYTE_BUDGET} bytes):`,
-    );
-    for (const d of ruleResult.dropped) {
-      console.warn(`    - [${d.label.toUpperCase()}] ${d.id}: ${d.summary}`);
-    }
+    targetDropRecords.push({
+      target: ".agents/rules/agent-memory.md",
+      budgetBytes: ANTIGRAVITY_RULE_BYTE_BUDGET,
+      dropped: ruleResult.dropped,
+    });
   }
   if (ruleResult.state === "written" && check) stale++;
+
+  const agentsMdResult = syncAgentsMd(!check);
+  const agentsMdNote =
+    agentsMdResult.state === "no-markers"
+      ? "no marked region — not opted in, left untouched"
+      : agentsMdResult.state === "missing"
+        ? "no AGENTS.md — nothing to assemble"
+        : `${agentsMdResult.entries} entries (${agentsMdResult.bytes} bytes, repo-wide AGENTS.md)`;
+  console.log(`  ${agentsMdResult.state.padEnd(11)} ${"AGENTS.md".padEnd(28)} ${agentsMdNote}`);
+  if (agentsMdResult.dropped.length > 0) {
+    targetDropRecords.push({
+      target: "AGENTS.md",
+      budgetBytes: AGENTS_MD_BYTE_BUDGET,
+      dropped: agentsMdResult.dropped,
+    });
+  }
+  if (agentsMdResult.state === "written" && check) stale++;
 
   const dropped: { agent: string; entries: string[] }[] = [];
   for (const r of results) {
@@ -878,15 +1212,20 @@ if (import.meta.main) {
     // error -- it still works -- but the TAIL is silently dropped. Naming what
     // falls past the line is what makes this actionable: overflowing into the
     // session log costs nothing, and overflowing into a TRAP costs the entry.
-    if (r.lines > 200) {
+    if (r.lines > CLAUDE_MEMORY_LINE_BUDGET) {
       const detail = r.overflowEntries.length
         ? `and ${r.overflowEntries.length} MEMORY ENTRY(S) fall past it: ${r.overflowEntries.join("; ")}`
         : "and nothing past it is a memory entry — only the hand-written tail";
       console.log(
-        `  ${"".padEnd(11)} ${"".padEnd(28)} ⚠ ${r.lines - 200} line(s) over the harness's 200-line budget, ${detail}`,
+        `  ${"".padEnd(11)} ${"".padEnd(28)} ⚠ ${r.lines - CLAUDE_MEMORY_LINE_BUDGET} line(s) over the harness's ${CLAUDE_MEMORY_LINE_BUDGET}-line budget, ${detail}`,
       );
       if (r.overflowEntries.length) dropped.push({ agent: r.agent, entries: r.overflowEntries });
     }
+  }
+
+  const byteDropReport = droppedTargetNodesReport(targetDropRecords);
+  if (byteDropReport && !check) {
+    console.warn(byteDropReport);
   }
   if (stale > 0) {
     console.error(
@@ -897,6 +1236,10 @@ if (import.meta.main) {
   const report = droppedEntryReport(dropped);
   if (check && report) {
     console.error(report);
+    process.exit(1);
+  }
+  if (check && byteDropReport) {
+    console.error(byteDropReport);
     process.exit(1);
   }
 }

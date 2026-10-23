@@ -25,13 +25,17 @@ import {
 } from "@litlfred/cat-harness/schemas/memory.js";
 import {
   AGENT_MEMORY_DIR,
+  AGENTS_MD_BYTE_BUDGET,
   ANTIGRAVITY_RULE_BYTE_BUDGET,
   ANTIGRAVITY_RULE_FILE,
+  ANTIGRAVITY_SKILL_BYTE_BUDGET,
   agentNames,
   parseMemoryFile,
   readMemoryNodes,
   renderEntries,
+  syncAgentsMd,
   syncAll,
+  syncAntigravity,
   syncAntigravityRule,
 } from "../../scripts/agent-memory.js";
 
@@ -192,5 +196,25 @@ describe("Antigravity workspace rule target (bean fkqa)", () => {
     expect(text).toContain("## platform-boundary-guard");
     expect(text).toContain("### STABLE —");
     expect(text).toContain("### TRAP —");
+  });
+
+  test("every Antigravity workspace skill is current and within its byte budget", () => {
+    for (const r of syncAntigravity(false)) {
+      expect({ agent: r.agent, state: r.state, dropped: r.dropped }).toEqual({
+        agent: r.agent,
+        state: "unchanged",
+        dropped: [],
+      });
+      expect(r.bytes).toBeLessThanOrEqual(ANTIGRAVITY_SKILL_BYTE_BUDGET);
+    }
+  });
+
+  test("the repo-wide AGENTS.md target is gated and drops no entries", () => {
+    const res = syncAgentsMd(false);
+    expect(["unchanged", "no-markers"]).toContain(res.state);
+    expect(res.dropped).toEqual([]);
+    if (res.state === "unchanged") {
+      expect(res.bytes).toBeLessThanOrEqual(AGENTS_MD_BYTE_BUDGET);
+    }
   });
 });
