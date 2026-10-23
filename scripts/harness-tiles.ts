@@ -879,12 +879,27 @@ function tileFor(
    * whole of the fix, and it invents no state — every branch below reads a
    * variable computed above.
    *
-   * `renderExemption` splits `unbuilt`, and only `unbuilt`: `isExemptFrom` is
-   * the same predicate the finding twenty lines down calls, so a render-exempt
-   * instance cannot be told "no viewer yet" by one surface and "not a gap" by
+   * `renderExemption` (instance-wide) and `coverage.exempt.visualiser`
+   * (directory-level, as `check-subgraph-coverage.ts` honours for e.g.
+   * `folio-assistant-sci`'s `sci-lean` template directory; bean
+   * `folio-assistant-6gme`) split `unbuilt`, and only `unbuilt`: the same
+   * predicate the finding twenty lines down calls, so an exempt instance or
+   * directory cannot be told "no viewer yet" by one surface and "not a gap" by
    * the other.
    */
   const exempt = isExemptFrom(decl, "visualiser");
+  const isKindExempt = (kind: string): boolean => {
+    if (exempt) return true;
+    const holding = dirs.filter((d) => (d.graphTypologies ?? []).includes(kind));
+    return (
+      holding.length > 0 &&
+      holding.every(
+        (d) =>
+          typeof d.coverage?.exempt?.visualiser === "string" &&
+          d.coverage.exempt.visualiser.trim().length > 0,
+      )
+    );
+  };
   for (const v of visualisations) {
     if (v.path !== undefined) continue;
     const bucket = stagingOnly.includes(v.kind)
@@ -892,7 +907,7 @@ function tileFor(
       : undiscovered.includes(v.kind)
         ? "undiscovered"
         : "unbuilt";
-    v.note = inertNote(bucket, exempt);
+    v.note = inertNote(bucket, isKindExempt(v.kind));
   }
 
   // ONE NAME PER DESTINATION (bean `ob3m` finding 6). Labelled here, where
@@ -938,10 +953,26 @@ function tileFor(
           `under a declared \`renderExemption\`. Not a gap: it owes ${decl.renderExemption?.owes}`,
       );
     } else {
-      findings.push(
-        `${decl.name}: declares ${unbuilt.length} graph(s) with no published viewer — ` +
-          `${unbuilt.join(", ")}. Declared and not rendered is a gap, not a dead link.`,
-      );
+      const dirExempt = unbuilt.filter((k) => isKindExempt(k));
+      const gaps = unbuilt.filter((k) => !isKindExempt(k));
+      if (dirExempt.length > 0) {
+        const reasons = dirExempt.flatMap((k) =>
+          dirs
+            .filter((d) => (d.graphTypologies ?? []).includes(k))
+            .map((d) => d.coverage?.exempt?.visualiser?.trim())
+            .filter((r): r is string => Boolean(r)),
+        );
+        findings.push(
+          `${decl.name}: ${dirExempt.length} graph(s) render no viewer — ${dirExempt.join(", ")} — ` +
+            `under a declared \`coverage.exempt.visualiser\`. Not a gap: ${reasons.join("; ")}`,
+        );
+      }
+      if (gaps.length > 0) {
+        findings.push(
+          `${decl.name}: declares ${gaps.length} graph(s) with no published viewer — ` +
+            `${gaps.join(", ")}. Declared and not rendered is a gap, not a dead link.`,
+        );
+      }
     }
   }
   if (undiscovered.length > 0) {
