@@ -19,8 +19,21 @@
  *   bun run cat-harness-tools/pipeline/qa-staleness.ts \
  *     content/quantum-observable-universe --criteria voice-status-leak,wall-side-correct
  *
+ *   bun run cat-harness-tools/pipeline/qa-staleness.ts \
+ *     content/quantum-observable-universe --against main
+ *
  * Exit code 0 always (informational). Use `--ci` to exit 1 when any
- * block has stale or missing audit.
+ * block has stale or missing audit, and 2 when any could not be read.
+ *
+ * ## `--against <ref>` reads the sidecars from the qa-reports branch (bean `8wj1`)
+ *
+ * Block QA sidecars are stored on `qa-reports`, so the working copy is the
+ * last sweep's output rather than a record. Read off disk, a checkout without
+ * `test/results/` reported every block NO-QA (measured 2026-10-22 on
+ * cat-harness `docs/source`), which is a fact about the checkout, not about
+ * the blocks. With `--against`, each sidecar is read from the branch, so the
+ * answer does not depend on what is on disk. A branch that cannot be asked is
+ * exit 2; a sidecar it holds but cannot read is UNKNOWN, never NO-QA.
  *
  * @module pipeline/qa-staleness
  */
@@ -31,8 +44,11 @@ import {
   hashBlockFiles,
   walkBlocks,
   loadQaReport,
+  parseQaReport,
   summariseFreshness,
 } from "./qa-utils";
+import { againstOrUsage, readBaseline } from "../scripts/qa-results.ts";
+import { readQaManifest } from "../scripts/qa-store.ts";
 import {
   qaCriteriaByIdFor,
   qaCriteriaFor,
@@ -48,6 +64,7 @@ interface Args {
   axis?: string[];
   json: boolean;
   ci: boolean;
+  against?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -60,16 +77,23 @@ function parseArgs(argv: string[]): Args {
       out.criteria = (argv[++i] ?? "").split(",").filter(Boolean);
     } else if (a === "--axis") {
       out.axis = (argv[++i] ?? "").split(",").filter(Boolean);
+    } else if (a === "--against") {
+      i++;
     } else if (!a.startsWith("--")) {
       if (!out.root) out.root = a;
     }
   }
   if (!out.root) {
     console.error(
-      "usage: qa-staleness.ts <content-root> [--criteria ID,ID] [--json] [--ci]",
+      "usage: qa-staleness.ts <content-root> [--criteria ID,ID] [--json] [--ci] [--against <ref>]",
     );
     process.exit(2);
   }
+  // Validated by the shared parser, so a malformed ref is refused the way
+  // every other `--against` gate refuses it.
+  const a = againstOrUsage("qa-staleness", argv);
+  if (a.exit !== undefined) process.exit(a.exit);
+  if (a.against !== undefined) out.against = a.against;
   return out;
 }
 
@@ -81,7 +105,9 @@ interface BlockReport {
   fresh: string[];
   stale: string[];
   missing: string[];
-  status: "fresh" | "stale" | "partial" | "missing-sidecar" | "no-criteria-applicable";
+  status: "fresh" | "stale" | "partial" | "missing-sidecar" | "no-criteria-applicable" | "unknown";
+  /** Where the sidecar was read from: the working copy, or `qa-reports:<key>`. */
+  from: string;
 }
 
 function run(): void {
@@ -109,7 +135,17 @@ function run(): void {
         ? args.axis.flatMap((a) => WATCHER_CRITERIA_BY_AXIS[a] ?? [])
         : qaCriteriaFor(INSTANCE_ROOT).map((c) => c.id);
 
+  // An entry that cannot be asked makes every block unknown; say it once.
+  if (args.against !== undefined) {
+    const m = readQaManifest(args.against);
+    if (m.state !== "hit") {
+      console.error(`qa-staleness: cannot read qa-reports:${args.against} (${m.state}: ${m.reason}). This is NOT a report of unaudited blocks.`);
+      process.exit(2);
+    }
+  }
+
   const blocks: BlockReport[] = [];
+  let totalUnknown = 0;
   let totalMissing = 0;
   let totalStale = 0;
   let totalFresh = 0;
@@ -134,7 +170,22 @@ function run(): void {
     const paths = { md: block.md, ts: block.ts, lean: block.lean };
     const current = hashBlockFiles(paths);
 
-    const report = loadQaReport(qaPath);
+    let report: ReturnType<typeof loadQaReport>;
+    let from = "working copy";
+    if (args.against !== undefined) {
+      // The canonical (results-tree) path is the one the branch mirrors.
+      const read = readBaseline(blockQaPath(repoRoot, block.root), { against: args.against });
+      from = read.from;
+      if (read.state === "corrupt" || read.state === "unknown") {
+        blocks.push({ label: block.label, kind: block.kind, qa_path: qaRel, qa_exists: true, fresh: [], stale: [], missing: [], status: "unknown", from });
+        totalUnknown++;
+        continue;
+      }
+      // A miss leaves `report` undefined: the branch holds no verdict, NO-QA.
+      if (read.state === "hit") report = parseQaReport(read.text, `${read.from}:${qaRel}`);
+    } else {
+      report = loadQaReport(qaPath);
+    }
     if (!report) {
       blocks.push({
         label: block.label,
@@ -145,6 +196,7 @@ function run(): void {
         stale: [],
         missing: [...wantCriteria],
         status: "missing-sidecar",
+        from,
       });
       totalMissing++;
       continue;
@@ -186,6 +238,7 @@ function run(): void {
       stale,
       missing,
       status,
+      from,
     });
   }
 
@@ -200,7 +253,9 @@ function run(): void {
             fresh: totalFresh,
             stale_or_partial: totalStale,
             missing_sidecar: totalMissing,
+            unknown: totalUnknown,
           },
+          from: args.against !== undefined ? `qa-reports:${args.against}` : "working copy",
           blocks,
         },
         null,
@@ -210,7 +265,9 @@ function run(): void {
   } else {
     console.log(`qa-staleness: ${relative(process.cwd(), rootAbs)}`);
     console.log(
-      `              ${blocks.length} blocks; fresh=${totalFresh}, stale/partial=${totalStale}, no-sidecar=${totalMissing}`,
+      `              ${blocks.length} blocks; fresh=${totalFresh}, stale/partial=${totalStale}, no-sidecar=${totalMissing}` +
+        (totalUnknown > 0 ? `, UNKNOWN=${totalUnknown}` : "") +
+        ` — read from ${args.against !== undefined ? `qa-reports:${args.against}` : "the working copy"}`,
     );
     console.log("");
     for (const b of blocks) {
@@ -219,6 +276,8 @@ function run(): void {
           ? "FRESH"
           : b.status === "missing-sidecar"
             ? "NO-QA"
+            : b.status === "unknown"
+              ? "UNKNOWN"
             : b.status === "stale"
               ? "STALE"
               : b.status === "partial"
@@ -232,6 +291,7 @@ function run(): void {
     }
   }
 
+  if (args.ci && totalUnknown > 0) process.exit(2);
   if (args.ci && (totalMissing > 0 || totalStale > 0)) {
     process.exit(1);
   }

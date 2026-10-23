@@ -1,12 +1,14 @@
 ---
 # cat-tools-tk99
+$schema: bean/1.0.0
 title: 'PROGRAMME PROGRESS: an epic burn-down and a math-progress heat map as a board feed'
-status: todo
+status: in-progress
 type: feature
+priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T15:15:39Z
+updated_at: 2026-10-22T16:42:41Z
 parent: folio-assistant-6lb8
 ---
 
@@ -42,3 +44,13 @@ dependency cannot be expressed as `blocked_by` here. Left `todo`; not
 claimable until those land in whichever store holds them.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+*2026-10-22T17:10:00Z* — Slice 1 (lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr; assigned by the coordinator, who asked that it not wait on ckej). PR litlfred/cat-harness-tools#559 adds `bun run cat epic:burndown -- <epic> [--ref] [--path] [--days] [--json]`. It reads the store's git history, one snapshot per UTC day, and counts the closure beneath an epic the way milestone-rollup does (archive included). A day the epic is absent reads as no data, never zero. History is used rather than `updated_at` because edits outside the CLI do not bump it (the index store's 1l13 closed on 10-22 and reads 10-10).
+
+**Still open, and why each waits:**
+- **Heat map** (chapter × {proved, sorry, axiom, conjecture open, active bean, verdict}): needs the conjecture register (ckej) and work traceability. Unchanged.
+- **Board feed:** the board renders a committed projection (gen-docs-pages writes `milestones` into `assets/beans/index.json`). A burn-down there needs the store's history at publish time, and publish checkouts are shallow, and a state-branch store may be fetched at depth 1. Options to put to the owner before building:
+  1. **(Recommended)** A per-day series appended by the state-push path. Each push adds today's counts to a small committed series, so publish needs no history. Cost: one writer, plus a file that grows by one row a day.
+  2. Deepen the publish fetch of the store branch and compute at publish. Cost: a full-history fetch on every publish.
+  3. Terminal and JSON only. No board feed.
