@@ -127,6 +127,14 @@ function emit(path: string, doc: Record<string, unknown>): void {
  */
 let SITE_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
 
+/**
+ * A page's (or node's) IRI, relative to the site base: where the document is
+ * PUBLISHED. A source above the base is composed into the site under its
+ * instance's name, and so are the documents beside its pages.
+ */
+const pageIri = (slug: string, node?: string): string =>
+  `${CUR.base ? "" : `${CUR.instance}/`}${node === undefined ? siteIri(slug) : siteIri(slug, node)}`;
+
 /** The source directory as its instance spells it — `docs/source` for the base. */
 const srcRel = (): string => relative(CUR.root, SRC_DIR).split("\\").join("/");
 
@@ -150,7 +158,7 @@ function emitBoth(source: string, sitePath: string, doc: Record<string, unknown>
 function nodeDoc(page: WebPage, node: WebPageNode, flat: string): Record<string, unknown> {
   const doc: Record<string, unknown> = {
     "@context": documentContext(node.asset ? SITE_ASSET_TYPES : SITE_NARRATIVE_TYPES, { base: DOCS_SITE_BASE }),
-    "@id": siteIri(page.slug, node.id),
+    "@id": pageIri(page.slug, node.id),
     "@type": [...(node.asset ? SITE_ASSET_TYPES : SITE_NARRATIVE_TYPES)],
     label: node.id,
     provenance: "authored",
@@ -220,17 +228,17 @@ for (const flat of flats) {
 
   emitBoth(join(SRC_DIR, flat, `${flat}.jsonld`), siteNodeSitePath(page.slug), {
     "@context": documentContext(SITE_PAGE_TYPES, { base: DOCS_SITE_BASE }),
-    "@id": siteIri(page.slug),
+    "@id": pageIri(page.slug),
     "@type": [...SITE_PAGE_TYPES],
     label: page.slug,
     title: page.title,
     // Ordered, and that order IS the page. `contains` maps to
     // `dcterms:hasPart` in the published context.
-    contains: page.nodes.map((n) => siteIri(page.slug, n.id)),
+    contains: page.nodes.map((n) => pageIri(page.slug, n.id)),
     provenance: "authored",
     ...(docsSubgraph ? memberOf(docsSubgraph.iri) : {}),
     meta: {
-      publishedAt: `${page.slug}.html`,
+      publishedAt: `${CUR.base ? "" : `${CUR.instance}/`}${page.slug}.html`,
       sourceDir: `${srcRel()}/${flat}`,
       ...(page.navOrder !== undefined ? { navOrder: page.navOrder } : {}),
       ...(page.parent ? { navParent: page.parent } : {}),

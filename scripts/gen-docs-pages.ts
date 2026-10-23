@@ -1230,6 +1230,15 @@ const blockByLabel = new Map<string, { page: string; node: string }>();
  */
 const slugOwner = new Map<string, string>();
 
+/**
+ * Where each page is PUBLISHED, site-relative, for the links the todo board
+ * composes to a block. A page of a source above the base is composed into the
+ * site under its instance's name (`compose-docs.ts`), so its address carries
+ * that prefix; the base instance's is Jekyll's answer for its own site.
+ */
+const pageRoute = new Map<string, string>();
+const publishedAt = (slug: string): string => pageRoute.get(slug) ?? publishedPagePath(OUT_DIR, slug);
+
 for (const src of allDocsSources()) {
 CUR = src;
 if (!src.base) console.log(`  docs source: ${src.instance} — ${relative(repoRootFor(INSTANCE_ROOT), src.srcDir)}`);
@@ -1237,6 +1246,23 @@ const slugs = readdirSync(src.srcDir, { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => d.name)
   .sort();
+// A FIRST render of a source above the base: its translated pages name source
+// pages that do not exist yet, and the translation index refuses a
+// translation of nothing. Each missing page is first laid down as a stub that
+// carries only its title, so the index can see what this run is about to
+// write; the real page replaces it below. Never under `--check`, where a
+// missing page is stale and is reported as such.
+if (!src.base && !check) {
+  for (const slug of slugs) {
+    const manifest = join(src.srcDir, slug, `${slug}.ts`);
+    if (!existsSync(manifest)) continue;
+    const page = ((await import(manifest)) as { default: WebPage }).default;
+    const outPath = join(src.outDir, `${page.slug}.md`);
+    if (existsSync(outPath)) continue;
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, `---\ntitle: ${JSON.stringify(page.title)}\n---\n`);
+  }
+}
 for (const slug of slugs) {
   const manifest = join(src.srcDir, slug, `${slug}.ts`);
   if (!existsSync(manifest)) {
@@ -1260,6 +1286,7 @@ for (const slug of slugs) {
     );
   }
   slugOwner.set(page.slug, src.instance);
+  pageRoute.set(page.slug, src.base ? publishedPagePath(OUT_DIR, page.slug) : `${src.instance}/${publishedPagePath(src.outDir, page.slug)}`);
   // Collected BEFORE rendering, so a page that fails to render still cannot
   // leave a half-filled index behind it.
   //
@@ -1669,7 +1696,7 @@ function processHierarchy(): Record<string, string[]> {
         // `href="{{ "/x.html" | ... }}"`, which terminates the attribute at
         // the second character of the Liquid tag — valid Liquid, broken HTML,
         // and it renders as a link to the empty string.
-        pageHref: (page, node) => `{{ '/${publishedPagePath(OUT_DIR, page)}' | relative_url }}#${node}`,
+        pageHref: (page, node) => `{{ '/${publishedAt(page)}' | relative_url }}#${node}`,
         // Each todo's own page (#1908) — a directory, so the href ends in `/`.
         todoPageHref: (id) => `{{ '/${todoPageSitePath(id)}' | relative_url }}`,
       }),
@@ -1681,7 +1708,7 @@ function processHierarchy(): Record<string, string[]> {
   // differ. Its count is the page's own cardinality, never the folio's.
   {
     const listingOpts = {
-      pageHref: (page: string, node: string) => `{{ '/${publishedPagePath(OUT_DIR, page)}' | relative_url }}#${node}`,
+      pageHref: (page: string, node: string) => `{{ '/${publishedAt(page)}' | relative_url }}#${node}`,
       todoPageHref: (id: string) => `{{ '/${todoPageSitePath(id)}' | relative_url }}`,
     };
     const { pages, unplaced } = groupTodosByPage(items);
@@ -1758,7 +1785,7 @@ function processHierarchy(): Record<string, string[]> {
         todoPageHtml(item, {
           // The block's RENDERING, from the todo page two levels down. A fact
           // about renderings, so it lives on the page and never on the todo.
-          ...(item.target ? { targetHref: `../../${publishedPagePath(OUT_DIR, item.target.page)}#${item.target.node}` } : {}),
+          ...(item.target ? { targetHref: `../../${publishedAt(item.target.page)}#${item.target.node}` } : {}),
         }),
         "data",
       );
