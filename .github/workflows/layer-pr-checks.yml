@@ -61,6 +61,23 @@
 #   compare joins the shards and judges, as before, and keeps main's answer
 #       and the gate seconds for the next run.
 #
+# Main's STORED answer (owner, 2026-10-23: "build should be in seconds/minutes,
+# not tens of minutes"). The exact key above almost never matches on a PR: it
+# holds the tips of the branch-kept graphs and the lower layers' mains, which
+# move every few minutes, so no PR of cat-harness, smart-base or fhir-harness
+# hit it in the 2026-10-23 sample, and every PR ran prepare-base and four base
+# shards, about half its runner minutes, to recompute main. So on a PR's first
+# attempt, when the exact key misses, the answer a run on the caller's main
+# saved is used instead: the one for the same caller commit first, else the
+# newest for any earlier main of the caller. A push to main saves it, as
+# before. The PR is then judged against it and its base side is not run; the
+# step summary says which main it is and how old. What it costs: a failure
+# that arrived on main through the index, a lower layer or a branch-kept graph
+# after that main's run is shown as the PR's own, and a gate main fixed since
+# reads as already red. Re-running ALL jobs (a second attempt) recomputes
+# main exactly, as before. No stored answer at all: the base side runs, as
+# before. The head side is unchanged. `reuse-stored-main: false` turns it off.
+#
 # The CI cone (bean `4rbc`, cat-harness-tools#398). On a PR, a declared gate
 # whose read set, recorded by a green traced run on the caller's main, is
 # unchanged on a side is not run there, and is reported "SKIPPED — inputs
@@ -161,6 +178,11 @@ on:
         required: false
         type: string
         default: "main"
+      reuse-stored-main:
+        description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored instead of recomputing main (see the header). Off: the base side runs on every cache miss."
+        required: false
+        type: boolean
+        default: true
       draft-fast-tier:
         description: "On a draft PR, run only the fast tier: prepare the PR side and typecheck. Turn it on only when the caller's pull_request types include ready_for_review, so the full tier runs when the PR is marked ready."
         required: false
@@ -780,7 +802,15 @@ jobs:
       index: ${{ steps.pins.outputs.index }}
       tools: ${{ steps.pins.outputs.tools }}
       key: ${{ steps.base-key.outputs.key }}
-      cached: ${{ steps.base-lookup.outputs.cache-hit }}
+      # True when main's answer is not computed by this run: cached under the
+      # exact key, or stored by a run on the caller's main (`stored-key`).
+      cached: ${{ steps.base-hit.outputs.hit }}
+      # The key the compare job restores main's answer from, and which it is:
+      # `exact`, `this PR's main` or `an earlier main` (the header).
+      stored-key: ${{ steps.base-hit.outputs.key }}
+      stored-tier: ${{ steps.base-hit.outputs.tier }}
+      # The commit of main this run computes, when it does (kept beside its answer).
+      own-sha: ${{ steps.base-key.outputs.own-sha }}
       cone: ${{ steps.base-key.outputs.cone }}
       shards: ${{ steps.shards.outputs.list }}
       # Whether this job built main's side for its shards. The `run` job reads
@@ -848,11 +878,22 @@ jobs:
             python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
               || state="$state $repo=unreadable-$(date +%s%N)"
           done
-          raw="v3|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
+          raw="v4|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
           echo "main's answer is computed from: $raw"
           hash="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
-          key="layer-pr-checks-main-v3-${GITHUB_REPOSITORY}-$hash"
-          echo "key=$key" >> "$GITHUB_OUTPUT"
+          # The caller's own tree leads the hash (v4), so a PR can find main's
+          # stored answer for the same caller commit by prefix when the rest
+          # moved (the header's "main's STORED answer").
+          own_tree="$src_tree"; own_dir=src
+          [ "$MODE" = "layer" ] || { own_tree="$root_tree"; own_dir=fa; }
+          any="layer-pr-checks-main-v4-${GITHUB_REPOSITORY}-"
+          key="${any}${own_tree}-$hash"
+          {
+            echo "key=$key"
+            echo "prefix-own=${any}${own_tree}-"
+            echo "prefix-any=${any}"
+            echo "own-sha=$(git -C "$own_dir" rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
           # The CI cone's records of the same main (cat-harness-tools#398). A
           # PR restores the newest under the prefix, not this exact key: a
           # record is checked path by path, so an older main's still serves.
@@ -872,12 +913,45 @@ jobs:
           path: ${{ runner.temp }}/cone
           key: ${{ steps.base-key.outputs.cone }}
           lookup-only: true
+      # Not for these exact inputs: the answer a run on the caller's main
+      # stored, for the same caller commit first, then the newest of any
+      # (the header). The last line is the key this answer had before v4,
+      # so the callers' existing mains serve until their next push. A PR's first attempt only: re-running all jobs is how
+      # main is recomputed exactly. Never on a push, which is main's own run.
+      - name: Has a run on main stored an answer to judge against?
+        id: stored-lookup
+        if: >-
+          steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
+          inputs.reuse-stored-main && github.run_attempt == '1'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: ${{ steps.base-key.outputs.key }}
+          restore-keys: |
+            ${{ steps.base-key.outputs.prefix-own }}
+            ${{ steps.base-key.outputs.prefix-any }}
+            layer-pr-checks-main-v3-${{ github.repository }}-
+          lookup-only: true
       - name: Skip the base side when it is
         id: base-hit
+        env:
+          EXACT: ${{ steps.base-lookup.outputs.cache-hit == 'true' }}
+          KEY: ${{ steps.base-key.outputs.key }}
+          STORED: ${{ steps.stored-lookup.outputs.cache-matched-key }}
+          OWN: ${{ steps.base-key.outputs.prefix-own }}
         run: |
-          hit="${{ steps.base-lookup.outputs.cache-hit == 'true' }}"
-          echo "hit=$hit" >> "$GITHUB_OUTPUT"
-          [ "$hit" = "true" ] && echo "main's answer is cached: the base side is not run again" || true
+          set -euo pipefail
+          if [ "$EXACT" = "true" ]; then
+            hit=true; key="$KEY"; tier=exact
+            echo "main's answer is cached: the base side is not run again"
+          elif [ -n "$STORED" ]; then
+            hit=true; key="$STORED"
+            case "$STORED" in "$OWN"*) tier="this PR's main" ;; *) tier="an earlier main" ;; esac
+            echo "main's answer for these exact inputs is not cached; the PR is judged against the one stored for $tier ($STORED), and the base side is not run"
+          else
+            hit=false; key=""; tier=""
+          fi
+          { echo "hit=$hit"; echo "key=$key"; echo "tier=$tier"; } >> "$GITHUB_OUTPUT"
       # A PR needs only main's answer. A push is run for the records, so it
       # stops early only when it would make neither (both already kept).
       - name: Is there anything to prepare?
@@ -885,7 +959,7 @@ jobs:
         env:
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
-          BASE_HIT: ${{ steps.base-lookup.outputs.cache-hit == 'true' }}
+          BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
@@ -1168,13 +1242,46 @@ jobs:
         with:
           path: results
           pattern: results-*
-      - name: Main's answer, cached (bean cis2)
+      - name: Main's answer, cached or stored (bean cis2)
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
-          key: ${{ needs.prepare-base.outputs.key }}
+          key: ${{ needs.prepare-base.outputs.stored-key }}
           fail-on-cache-miss: true
+      - name: Say which main the PR is judged against
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
+        env:
+          TIER: ${{ needs.prepare-base.outputs.stored-tier }}
+          KEY: ${{ needs.prepare-base.outputs.stored-key }}
+        run: |
+          python3 - "$RUNNER_TEMP/base-results/from.json" "$TIER" "$KEY" <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, sys
+          from datetime import datetime, timezone
+          path, tier, key = sys.argv[1:4]
+          try:
+              f = json.load(open(path))
+          except (OSError, ValueError):
+              f = {}
+          print("### Main's side: stored, not recomputed\n")
+          if tier == "exact":
+              print("Main's answer for exactly these inputs was cached; the base side was not run again.")
+          else:
+              print(f"Main's answer for these exact inputs was not cached, so this PR is judged against the answer stored for **{tier}**, and main was not recomputed.")
+          if f:
+              age = ""
+              try:
+                  at = datetime.fromisoformat(f["pinned_at"].replace("Z", "+00:00"))
+                  age = f", {int((datetime.now(timezone.utc) - at).total_seconds() // 3600)} h ago"
+              except (KeyError, ValueError):
+                  pass
+              print(f"\n- main: `{f.get('main', '?')}`, pinned at {f.get('pinned_at', '?')}{age}")
+              print(f"- index: `{f.get('index') or 'the caller'}`; run: {f.get('run', '?')}")
+          else:
+              print(f"\n- stored before its provenance was kept: `{key}`")
+          if tier != "exact":
+              print("\nA failure main took on after that run (through the index, a lower layer or a branch-kept graph) shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
+          PY
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'
@@ -1185,6 +1292,9 @@ jobs:
           # A push ran main's side whatever was cached: it was run for the records.
           CACHED: ${{ needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push' }}
           PUSH: ${{ github.event_name == 'push' }}
+          OWN_SHA: ${{ needs.prepare-base.outputs.own-sha }}
+          PIN_AT: ${{ needs.prepare-base.outputs.at }}
+          INDEX: ${{ needs.prepare-base.outputs.index }}
         run: |
           set -euo pipefail
           sides="base head"
@@ -1200,6 +1310,17 @@ jobs:
           if [ "$CACHED" != "true" ]; then
             mkdir -p "$RUNNER_TEMP/base-results"
             cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
+            # Which main this answer is, for a PR that is judged against it
+            # stored (the header): shown in that PR's step summary.
+            python3 - "$RUNNER_TEMP/base-results/from.json" <<'PY'
+          import json, os, sys
+          json.dump({
+              "main": os.environ["OWN_SHA"],
+              "pinned_at": os.environ["PIN_AT"],
+              "index": os.environ["INDEX"],
+              "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }, open(sys.argv[1], "w"), indent=1)
+          PY
           fi
           mkdir -p "$RUNNER_TEMP/timings"
           if [ "$PUSH" = "true" ]; then
