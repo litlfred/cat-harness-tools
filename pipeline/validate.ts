@@ -20,12 +20,13 @@ import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { resolve, join, basename, dirname, relative, isAbsolute } from "path";
 import {
-  BlockSchema,
   PaperSchema,
   ChapterSchema,
-  CONSTRAINT_RULES,
   type ConstraintContext,
 } from "@litlfred/cat-harness/schemas/constraints.ts";
+// A block is parsed by the schema its kind is typed by: a vocabulary module's
+// (a layer above cat-harness typing its own kinds), else BlockSchema.
+import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "@litlfred/cat-harness/schemas/types.ts";
 import { resolveRenderTarget } from "./render-discovery";
 import { readDeclaredFolioProfile } from "./profile-check";
@@ -356,7 +357,7 @@ async function loadBlocksFromDir(
       const mod = await import(tsPath);
       const block: Block = mod.default;
 
-      const result = BlockSchema.safeParse(block);
+      const result = parseBlock(block);
       if (!result.success) {
         for (const err of result.error.issues) {
           issues.push({
@@ -533,7 +534,7 @@ async function checkUnlistedBlocks(
     } catch {
       continue; // not loadable, so not demonstrably a block; other checks own import errors
     }
-    if (!BlockSchema.safeParse(block).success) continue;
+    if (!parseBlock(block).success) continue;
     issues.push({
       level: "warning",
       block: name,
@@ -901,7 +902,7 @@ export async function validateObjects(
       leanContent: leanCache.get(name),
     };
 
-    for (const rule of CONSTRAINT_RULES) {
+    for (const rule of allConstraintRules()) {
       if (!rule.appliesTo.includes(block.kind)) continue;
       const msg = rule.check(block, ctx);
       if (msg) {

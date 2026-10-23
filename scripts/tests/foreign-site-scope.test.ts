@@ -26,7 +26,7 @@
  *       its own, so its count is not fetched from a site that has none
  *       (it showed "?").
  */
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,6 +55,7 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -454,6 +455,12 @@ describe("the footer line: a folio's site does not print the platform's (#1901 f
 });
 
 describe("the injected rail (rail-standalone-pages --foreign-site) over a fixture folio page", () => {
+  // The rail pins the harness's themes.css, which cat-harness#371 builds at
+  // publish rather than commits: build it here when the checkout lacks it.
+  beforeAll(() => {
+    ensureThemesCss(HARNESS_ROOT);
+  });
+
   test("its icon row names no platform work plan and no root-relative destination", () => {
     const root = mkdtempSync(join(tmpdir(), "foreign-rail-"));
     mkdirSync(join(root, "doc"), { recursive: true });

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { resolveChromium } from "../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { ensureThemesCss } from "./support/themes-css.ts";
 
 /**
  * WHERE A CARD FIRST LANDS ON THE GLASS — two leftovers of PR #1781 (issue
@@ -32,7 +33,7 @@ test.use({
 
 const ROOT = join(HARNESS_ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const THEMES = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/themes.css")), "utf8");
+const THEMES = readFileSync(ensureThemesCss(ROOT), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 const GLASS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Glass</title>
