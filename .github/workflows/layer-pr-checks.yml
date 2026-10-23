@@ -89,6 +89,22 @@
 # so only a push can make records the PRs share. A caller without the `push`
 # trigger records nothing, and every gate runs as before.
 #
+# Pinned to main's record (owner, 2026-10-23, approved on a card at 18:31Z).
+# The records above were made against the index, the lower layers and the
+# branch-kept graphs as main's push pinned them. A PR pinned them NOW, so
+# every gate that reads a lower layer or a graph that moved since read
+# "changed" and ran (smart-base job 120514169054: 3 of 70 gates skipped). So
+# on a PR's first attempt the run takes those pins from the newest record a
+# push kept, the record's pin time for the index and the lower layers and its
+# graph tips, when that record is at most `record-pin-max-hours` old. Only
+# the PR's own changes then differ from what main's gates read, and those are
+# the gates that run. The judging scripts are still resolved now. Both sides
+# use the same pins, so the comparison stays like for like. What it costs: a
+# PR is judged against the lower layers as of main's last push, not their
+# tip; a change that reached them since is judged by the caller's next push
+# to main. Re-running all jobs (a second attempt) pins everything now, as
+# before; no record, or one too old: as before.
+#
 # A caller is the one `uses:` line and nothing else (owner, 2026-10-14:
 # "there shouldnt be copying of code"):
 #
@@ -183,6 +199,16 @@ on:
         required: false
         type: boolean
         default: true
+      pin-to-main-record:
+        description: "On a PR's first attempt, mount the index, the lower layers and the branch-kept graphs at the pins of the newest CI cone record a push to the caller's main kept, so only the PR's own changes defeat the cone (see the header). Off: everything is pinned now."
+        required: false
+        type: boolean
+        default: true
+      record-pin-max-hours:
+        description: "The oldest record, in hours, whose pins a PR takes; an older one is ignored and everything is pinned now."
+        required: false
+        type: number
+        default: 24
       draft-fast-tier:
         description: "On a draft PR, run only the fast tier: prepare the PR side and typecheck. Turn it on only when the caller's pull_request types include ready_for_review, so the full tier runs when the PR is marked ready."
         required: false
@@ -219,6 +245,7 @@ jobs:
       SIDE: head
     outputs:
       at: ${{ steps.pins.outputs.at }}
+      layers-at: ${{ steps.pins.outputs.layers-at }}
       index: ${{ steps.pins.outputs.index }}
       tools: ${{ steps.pins.outputs.tools }}
       shards: ${{ steps.shards.outputs.list }}
@@ -264,10 +291,24 @@ jobs:
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
+      # The newest CI cone record a push to main kept, for its pins (the
+      # header's "Pinned to main's record"). The same restore as the shards'.
+      - &pin-record
+        name: The pins of main's newest record (a PR's first attempt)
+        if: >-
+          steps.pin-restore.outputs.cache-hit != 'true' && github.event_name != 'push' &&
+          inputs.pin-to-main-record && github.run_attempt == '1'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/cone
+          key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
+          restore-keys: |
+            layer-pr-checks-cone-v1-${{ github.repository }}-
       - &pin-write
         if: steps.pin-restore.outputs.cache-hit != 'true'
         env:
           MODE: ${{ inputs.mode }}
+          MAX_HOURS: ${{ inputs.record-pin-max-hours }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/pin"
@@ -298,6 +339,24 @@ jobs:
               f.unlink()
           (pin / "state.json").write_text(json.dumps(out, sort_keys=True, indent=1) + "\n")
           PY
+          # The index and the lower layers are resolved at `layers-at`: now,
+          # or the pin time of main's newest record (restored above, PR only)
+          # with its graph tips, when that record carries its pins and is
+          # young enough. The judging scripts stay at `at`, now.
+          cp "$RUNNER_TEMP/pin/at" "$RUNNER_TEMP/pin/layers-at"
+          rec="$RUNNER_TEMP/cone/pin"
+          if [ -s "$rec/layers-at" ] && [ -s "$rec/state.json" ] && [ -s "$rec/sha" ]; then
+            then_s="$(date -u -d "$(cat "$rec/layers-at")" +%s 2>/dev/null || echo 0)"
+            age=$(( ($(date -u +%s) - then_s) / 3600 ))
+            if [ "$then_s" -gt 0 ] && [ "$age" -le "$MAX_HOURS" ]; then
+              cp "$rec/layers-at" "$RUNNER_TEMP/pin/layers-at"
+              cp "$rec/state.json" "$RUNNER_TEMP/pin/state.json"
+              cp "$rec/sha" "$RUNNER_TEMP/pin/record"
+              echo "pinned to main's record $(cat "$rec/sha") (index, lower layers and graphs as of $(cat "$rec/layers-at"), ${age} h ago)"
+            else
+              echo "main's newest record is ${age} h old, more than ${MAX_HOURS}: everything is pinned now"
+            fi
+          fi
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
@@ -321,16 +380,24 @@ jobs:
         run: |
           set -euo pipefail
           at="$(cat "$RUNNER_TEMP/pin/at")"
+          # The index and the lower layers: at main's record's pin time when
+          # the pin step took it (the header), else at `at`. An older pin
+          # cache of this run attempt has no layers-at: `at`.
+          layers_at="$(cat "$RUNNER_TEMP/pin/layers-at" 2>/dev/null || echo "$at")"
           resolve=ci/.github/scripts/layer-pr-checks/resolve-at.sh
           index=""
-          [ "$MODE" = "index" ] || index="$(bash "$resolve" litlfred/folio-assistant "$INDEX_REF" "$at")"
+          [ "$MODE" = "index" ] || index="$(bash "$resolve" litlfred/folio-assistant "$INDEX_REF" "$layers_at")"
           tools="$(bash "$resolve" litlfred/cat-harness-tools "$TOOLS_REF" "$at")"
           # The judging scripts at the pinned commit, not wherever the ref
           # moved since this job checked it out.
           git -C ci fetch -q --depth 1 origin "$tools"
           git -C ci checkout -q FETCH_HEAD
           echo "pinned at $at: index ${index:-the caller}, judging scripts $tools"
-          { echo "at=$at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
+          if [ "$layers_at" != "$at" ]; then
+            msg="Index, lower layers and branch-kept graphs pinned to main's CI cone record $(cat "$RUNNER_TEMP/pin/record" 2>/dev/null || echo '?') (as of $layers_at), so only this PR's own changes make a gate run again. Re-run all jobs to pin them now."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          { echo "at=$at"; echo "layers-at=$layers_at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
         uses: actions/checkout@v7
@@ -489,7 +556,7 @@ jobs:
           LAYERS: ${{ inputs.layers-at-main }}
           MODE: ${{ inputs.mode }}
           SUBDIR: ${{ inputs.path-in-repo }}
-          PIN_AT: ${{ steps.pins.outputs.at }}
+          PIN_AT: ${{ steps.pins.outputs.layers-at }}
         run: |
           set -euo pipefail
           if [ "$LAYERS" = "auto" ]; then
@@ -799,6 +866,7 @@ jobs:
       SIDE: base
     outputs:
       at: ${{ steps.pins.outputs.at }}
+      layers-at: ${{ steps.pins.outputs.layers-at }}
       index: ${{ steps.pins.outputs.index }}
       tools: ${{ steps.pins.outputs.tools }}
       key: ${{ steps.base-key.outputs.key }}
@@ -821,6 +889,7 @@ jobs:
       - *shards
       - *judging-scripts
       - *pin-restore
+      - *pin-record
       - *pin-write
       - *pin-save
       - *pin-reread
@@ -846,7 +915,7 @@ jobs:
           LAYERS: ${{ inputs.layers-at-main }}
           SUBDIR: ${{ inputs.path-in-repo }}
           TEST_PATH: ${{ inputs.test-path }}
-          PIN_AT: ${{ steps.pins.outputs.at }}
+          PIN_AT: ${{ steps.pins.outputs.layers-at }}
         run: |
           set -euo pipefail
           root_tree="$(git -C fa rev-parse 'HEAD^{tree}')"
@@ -1293,7 +1362,7 @@ jobs:
           CACHED: ${{ needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push' }}
           PUSH: ${{ github.event_name == 'push' }}
           OWN_SHA: ${{ needs.prepare-base.outputs.own-sha }}
-          PIN_AT: ${{ needs.prepare-base.outputs.at }}
+          PIN_AT: ${{ needs.prepare-base.outputs.layers-at }}
           INDEX: ${{ needs.prepare-base.outputs.index }}
         run: |
           set -euo pipefail
@@ -1337,16 +1406,36 @@ jobs:
           key: ${{ needs.prepare-base.outputs.key }}
       # The cone's records, from main's shards (cat-harness-tools#398). Saved
       # from a push, so on the default branch, where every PR can restore them.
+      # This run's pins, kept beside the records, so a PR mounts what main's
+      # gates read (the header's "Pinned to main's record").
+      - name: The pins main's side was mounted at (a push)
+        if: steps.join.outcome == 'success' && github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/pin
+          key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Join the CI cone's records (a push)
         id: cone
         if: steps.join.outcome == 'success' && github.event_name == 'push'
         continue-on-error: true
         env:
           N: ${{ inputs.gate-shards }}
+          LAYERS_AT: ${{ needs.prepare-base.outputs.layers-at }}
         run: |
           set -euo pipefail
           python3 .github/scripts/layer-pr-checks/merge-cone.py results base "$N" "$RUNNER_TEMP/cone/records.json" "$GITHUB_SHA"
-          if [ -f "$RUNNER_TEMP/cone/records.json" ]; then echo "kept=true" >> "$GITHUB_OUTPUT"; fi
+          if [ -f "$RUNNER_TEMP/cone/records.json" ]; then
+            echo "kept=true" >> "$GITHUB_OUTPUT"
+            # Without both, a PR pins everything now, as before.
+            if [ -n "$LAYERS_AT" ] && [ -s "$RUNNER_TEMP/pin/state.json" ]; then
+              mkdir -p "$RUNNER_TEMP/cone/pin"
+              printf '%s\n' "$LAYERS_AT" > "$RUNNER_TEMP/cone/pin/layers-at"
+              cp "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/cone/pin/state.json"
+              printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/cone/pin/sha"
+              echo "kept with the records: the pins of $GITHUB_SHA (index and lower layers as of $LAYERS_AT)"
+            fi
+          fi
       - name: Keep the CI cone's records for the PRs (a push)
         if: steps.cone.outputs.kept == 'true'
         continue-on-error: true
