@@ -31,9 +31,11 @@ import {
   initInstance,
   INSTANCE_STATE_GRAPHS,
   isValidSlug,
+  remotePlatformLayers,
   renderTemplate,
   slugify,
   templatesDir,
+  templatesDirs,
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
@@ -432,11 +434,13 @@ describe("workflow templates (52dz)", () => {
   });
 
   test("the templates come from the declared directory, not a path written in code", () => {
-    // `folio-templates` is looked up by id; the directory it names must hold
-    // both profiles the content types ask for.
+    // `folio-templates` is looked up by id. This layer's own member holds the
+    // profile every folio gets; the paper profile is a member a dependent
+    // layer holds (move M11), found across the checkout, never by its name.
     const dir = templatesDir();
     expect(existsSync(join(dir, "document"))).toBe(true);
-    expect(existsSync(join(dir, "paper"))).toBe(true);
+    expect(templatesDirs()[0]).toBe(dir);
+    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
     expect(folioTemplates("document").every((t) => !t.target.includes("lean"))).toBe(true);
   });
 });
@@ -824,6 +828,23 @@ describe("state graphs follow their resolved source (hp54)", () => {
 });
 
 describe("remote link mode (--link remote, bean c4lg)", () => {
+  const PLATFORM = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
+  const adapter = (contentType: string, instance: string) => ({ contentType, instance, root: `/x/${instance}`, module: `../${instance}/a.ts`, className: "A" });
+
+  test("the remote mounts for a content type come from the declaring instance and its needs, never from a hard-coded name", () => {
+    const adapters = [adapter("paper", "layer-b"), adapter("document", "layer-a")];
+    const needs: Record<string, string[]> = { "/x/layer-a": ["bootstrap", "cat-harness"], "/x/layer-b": ["bootstrap", "cat-harness-tools", "layer-a"] };
+    const closure = (root: string) => needs[root] ?? [];
+    expect(remotePlatformLayers(undefined, adapters, closure)).toEqual(PLATFORM);
+    expect(remotePlatformLayers("document", adapters, closure)).toEqual([...PLATFORM, "layer-a"]);
+    expect(remotePlatformLayers("paper", adapters, closure)).toEqual([...PLATFORM, "layer-a", "layer-b"]);
+  });
+
+  test("a content type no instance declares mounts the platform alone — no invented layer", () => {
+    expect(remotePlatformLayers("document", [], () => ["never-called"])).toEqual(PLATFORM);
+    expect(remotePlatformLayers("paper", [adapter("other", "layer-o")], () => [])).toEqual(PLATFORM);
+  });
+
   test("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
     const d = tmp();
     const r = initFolio({

@@ -91,3 +91,29 @@ describe("external-schemas visualiser wireframe findings (folio-assistant-7x7g)"
   });
 });
 
+
+describe("one instance's page (`subject`): its own records, the corpus reconciliation left to the full page", () => {
+  const specs = loadSpecs();
+  const one = specs.slice(0, 1);
+  const users = declaredUsers(one);
+  const full = page(one, users, ["http://example.org/undeclared#"]);
+  const sub = page(one, users, [], () => undefined, [], {
+    instance: "some-layer",
+    title: "Some layer",
+    directory: "some-layer/external-schemas",
+    fullHref: "../../",
+  });
+
+  it("is titled for the instance, names its directory and links the full page", () => {
+    expect(sub).toContain('title: "External schemas — Some layer"');
+    expect(sub).toContain("`some-layer/external-schemas`");
+    expect(sub).toContain("](../../)");
+  });
+
+  it("draws the instance's records, and not the namespace reconciliation, which compares the corpus against the registry", () => {
+    expect(sub).toContain(`{#${one[0]!.id}}`);
+    expect(full).toContain("## Namespaces the corpus uses");
+    expect(sub).not.toContain("## Namespaces the corpus uses");
+    expect(sub).not.toContain("in use and not declared here");
+  });
+});

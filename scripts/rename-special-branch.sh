@@ -12,7 +12,7 @@
 #   rename-special-branch.sh <owner/repo> <old> <new> --apply    # does it
 #
 #   <old> ending in "/" renames a FAMILY: every branch starting with <old>
-#   gets <old> replaced by <new>  (e.g. lake-cache/ cat/folio-assistant-sci/lake-cache/).
+#   gets <old> replaced by <new>  (e.g. lake-cache/ cat/<layer>/lake-cache/).
 #
 # Examples:
 #   rename-special-branch.sh litlfred/folio-assistant state cat/cat-harness/state --apply

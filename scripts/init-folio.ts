@@ -45,7 +45,7 @@ import {
   type RemoteSource,
 } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
   instanceStateBranch,
@@ -56,7 +56,7 @@ import {
 } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
-import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
+import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
@@ -543,14 +543,35 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
   };
 }
 
+/** The layers every remote-linked instance or folio mounts, whatever its content type. */
+const REMOTE_PLATFORM_LAYERS = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"] as const;
+
 /**
  * The platform layers a remote-linked instance or folio declares as
  * `source.remote` mounts in `index.config.json` (bean `c4lg`).
+ *
+ * The platform layers, then — for a content type — the instance whose
+ * `contentAdapters` declares that type and its `needs` closure, deepest first.
+ * DERIVED, not named: this layer sits below every content layer and may not
+ * spell their names (`check:reference-direction`). A content type no instance
+ * in the checkout declares adds nothing — there is no layer to mount, and
+ * guessing one would write a mount for a repository nobody said exists.
+ *
+ * Exported, with the adapters and the closure injectable, for the tests that
+ * pin the derivation with and without a declaring instance.
  */
-function remotePlatformLayers(contentType: InitFolioOptions["contentType"] | undefined): string[] {
-  const layers = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
-  if (contentType !== undefined) layers.push("folio-assistant-core");
-  if (contentType === "paper") layers.push("folio-assistant-sci");
+export function remotePlatformLayers(
+  contentType: InitFolioOptions["contentType"] | undefined,
+  adapters: readonly BuiltinAdapterDeclaration[] = BUILTIN_ADAPTERS,
+  closureOf: (instanceRoot: string) => string[] = (root) => orderedDependencies(root).map((d) => d.dependency.name),
+): string[] {
+  const layers: string[] = [...REMOTE_PLATFORM_LAYERS];
+  if (contentType === undefined) return layers;
+  const declared = adapters.find((a) => a.contentType === contentType);
+  if (declared === undefined) return layers;
+  for (const name of [...closureOf(declared.root), declared.instance]) {
+    if (!layers.includes(name)) layers.push(name);
+  }
   return layers;
 }
 
@@ -1100,17 +1121,27 @@ export type TemplatePlaceholder = (typeof TEMPLATE_PLACEHOLDERS)[number];
  */
 export const TEMPLATE_PLACEHOLDER_RE = /(?<!\$)\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
-/** Where the templates are, from THIS platform checkout's own declaration. */
-export function templatesDir(): string {
-  // The instance this script belongs to declares the templates: since bean
-  // `70lx` that is cat-harness-tools, where `templates/` moved with the code
-  // that writes it (the id is unchanged). The harness is still the platform
-  // the new folio links; the templates are this layer's.
+/**
+ * Where the templates are: every member of the `folio-templates` subgraph in
+ * this checkout, this layer's own first.
+ *
+ * This layer declares the subgraph and keeps the profile every folio gets
+ * (`document/`). A profile that belongs to a higher layer — the paper
+ * profile's Lean workflows, move M11 — lives in that layer's own
+ * `templates/`, which is a member of the same subgraph (`resolveDirectories`'
+ * MEMBERS rule). The members are found the way the arrow runs: from the
+ * checkout's dependents of this layer (`checkoutDependentsOf`, as
+ * `scenario-overlay` finds overlays), so no layer above is named here.
+ */
+export function templatesDirs(): string[] {
   const instanceRoot = resolve(TOOLS_ROOT);
-  const dir = resolveDirectories([{ name: "(local)", root: instanceRoot, own: true }]).find(
-    (d) => d.id === TEMPLATES_ID,
+  const above = checkoutDependentsOf(instanceRoot).map((d) => ({ name: d.name, root: d.root }));
+  const members = resolveDirectories([...above, { name: "(local)", root: instanceRoot, own: true }]).filter(
+    (d) => d.id === TEMPLATES_ID && existsSync(d.absPath),
   );
-  if (!dir || !existsSync(dir.absPath)) {
+  // This layer's own member first, so a profile it holds is never shadowed.
+  const dirs = [...new Set([...members.filter((d) => d.own), ...members.filter((d) => !d.own)].map((d) => d.absPath))];
+  if (dirs.length === 0) {
     // Refuse rather than write a folio without its workflows and report
     // success: that is the `dh4f` shape, a clean run over nothing.
     throw new Error(
@@ -1118,7 +1149,12 @@ export function templatesDir(): string {
         `so there are no workflow templates to write.`,
     );
   }
-  return dir.absPath;
+  return dirs;
+}
+
+/** This layer's own `folio-templates` directory (the first of {@link templatesDirs}). */
+export function templatesDir(): string {
+  return templatesDirs()[0]!;
 }
 
 export interface TemplateFile {
@@ -1142,13 +1178,15 @@ function walkFiles(dir: string): string[] {
 /** Every template a folio of this content type receives, profile by profile. */
 export function folioTemplates(
   contentType: InitFolioOptions["contentType"],
-  dir: string = templatesDir(),
+  dirs: string | readonly string[] = templatesDirs(),
 ): TemplateFile[] {
+  const searched = typeof dirs === "string" ? [dirs] : dirs;
   const out: TemplateFile[] = [];
   for (const profile of TEMPLATE_PROFILES[contentType]) {
-    const base = join(dir, profile);
-    if (!existsSync(base)) {
-      throw new Error(`init-folio: template profile '${profile}' is missing from ${dir}`);
+    // The first member holding the profile supplies it, whole.
+    const base = searched.map((d) => join(d, profile)).find((p) => existsSync(p));
+    if (base === undefined) {
+      throw new Error(`init-folio: template profile '${profile}' is missing from ${searched.join(", ")}`);
     }
     for (const source of walkFiles(base)) {
       const target = relative(base, source)

@@ -59,7 +59,7 @@ export interface KindEntry {
   /** Repo-relative path of the kind's JSON file. */
   file: string;
   kind: DocumentKind;
-  /** Computed reports of how subjects realise this kind, from the same directory. */
+  /** Computed reports of how subjects realise this kind, from its own directory or a dependent's. */
   coverage: DocumentKindCoverage[];
 }
 
@@ -67,6 +67,7 @@ export interface KindEntry {
 export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs: { instance: string; dir: string }[] } {
   const kinds: KindEntry[] = [];
   const dirs: { instance: string; dir: string }[] = [];
+  const reports: { instance: string; dir: string; report: DocumentKindCoverage }[] = [];
   for (const root of instanceRootsIn(repoRoot)) {
     const instance = readDeclaration(root)?.name ?? basename(root);
     for (const dir of directoriesForGraph(root, GRAPH)) {
@@ -86,12 +87,20 @@ export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs:
         if (isCoverage) coverage.push(parsed.data as DocumentKindCoverage);
         else kinds.push({ instance, file: relative(repoRoot, path).split(sep).join("/"), kind: parsed.data as DocumentKind, coverage: [] });
       }
-      for (const c of coverage) {
-        const owner = kinds.find((k) => k.instance === instance && k.kind.id === c.kind);
-        if (!owner) throw new Error(`${dir}: a coverage report for kind "${c.kind}" (subject ${c.subject}) names no kind this directory declares`);
-        owner.coverage.push(c);
-      }
+      for (const c of coverage) reports.push({ instance, dir, report: c });
     }
+  }
+  // Attached once every kind is read: a coverage report lives with the
+  // SUBJECT it is about, which is usually a layer above the one declaring the
+  // kind (an IG's report on a kind its base layer declares). The kind is the
+  // one of that id its own instance declares, else the one some other
+  // instance in the checkout declares; a report naming no kind anywhere is
+  // still refused.
+  for (const { instance, dir, report: c } of reports) {
+    const owner =
+      kinds.find((k) => k.instance === instance && k.kind.id === c.kind) ?? kinds.find((k) => k.kind.id === c.kind);
+    if (!owner) throw new Error(`${dir}: a coverage report for kind "${c.kind}" (subject ${c.subject}) names no kind any instance in the checkout declares`);
+    owner.coverage.push(c);
   }
   return { kinds, dirs };
 }

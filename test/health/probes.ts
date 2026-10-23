@@ -49,6 +49,7 @@ import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
 } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import {
   stagingSlug,
@@ -976,6 +977,36 @@ export interface SpecialBranchDecl {
   name: string;
   legacy: string[];
   budget?: SpecialBranchBudget;
+  /**
+   * The graph typology whose declaring directory names this family. Set on a
+   * row whose store belongs to a layer above this one (the Lean cache), so
+   * the row never spells that layer's name: {@link readSpecialBranches} takes
+   * the name from the directory's `storage.branchPrefix`.
+   */
+  typology?: string;
+}
+
+/**
+ * The branch prefix a directory of graph typology `typology` declares as its
+ * `storage`, read from every instance in `repoRoot` (the folio itself first);
+ * `undefined` when none declares one. The same reading as `state:drift`'s
+ * `declaredBranches`, keyed by the kind instead of the directory's id.
+ */
+export function declaredFamilyPrefix(repoRoot: string, typology: string): string | undefined {
+  for (const root of instanceRootsIn(repoRoot)) {
+    let decl;
+    try {
+      decl = readDeclaration(root);
+    } catch {
+      continue; // an unreadable declaration is check:declared-dirs' finding
+    }
+    if (!decl) continue;
+    for (const d of [...(decl.directories ?? []), ...nestedDirectories(root, decl)]) {
+      const prefix = (d.storage as { branchPrefix?: string } | undefined)?.branchPrefix;
+      if (prefix && (d.graphTypologies ?? []).includes(typology)) return prefix;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -983,16 +1014,26 @@ export interface SpecialBranchDecl {
  * 2026-10-05: special-branches.json is gone, and the budgets live with the
  * check, choice 3 of 3). The names in it are only what is measured; a
  * branch's name is its declaring directory's `storage`.
+ *
+ * A row that names a `typology` instead of a `name` is resolved against
+ * `repoRoot`'s declarations ({@link declaredFamilyPrefix}); when nothing there
+ * declares it, its `legacy` names are what is measured, and with none of
+ * those either the row matches nothing and reports absent.
  */
-export function readSpecialBranches(path: string): SpecialBranchDecl[] {
-  const raw = JSON.parse(readFileSync(path, "utf-8")) as { branches?: SpecialBranchDecl[] };
-  return (raw.branches ?? []).map((b) => ({
-    id: b.id,
-    shape: b.shape,
-    name: b.name,
-    legacy: [...(b.legacy ?? [])],
-    ...(b.budget ? { budget: b.budget } : {}),
-  }));
+export function readSpecialBranches(path: string, repoRoot?: string): SpecialBranchDecl[] {
+  const raw = JSON.parse(readFileSync(path, "utf-8")) as { branches?: (Omit<SpecialBranchDecl, "name"> & { name?: string })[] };
+  return (raw.branches ?? []).map((b) => {
+    const declared = b.typology !== undefined && repoRoot !== undefined ? declaredFamilyPrefix(repoRoot, b.typology) : undefined;
+    const names = [...new Set([declared ?? b.name, ...(b.legacy ?? [])].filter((n): n is string => Boolean(n)))];
+    return {
+      id: b.id,
+      shape: b.shape,
+      name: names[0] ?? `(no directory declares a ${b.typology ?? b.id} store)`,
+      legacy: names.slice(1),
+      ...(b.budget ? { budget: b.budget } : {}),
+      ...(b.typology ? { typology: b.typology } : {}),
+    };
+  });
 }
 
 /**
@@ -1107,7 +1148,7 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
     specialBranches: probeSpecialBranches({
       repoRoot: o.repoRoot,
       remote,
-      rows: readSpecialBranches(o.specialBranchesPath ?? SPECIAL_BRANCHES_JSON),
+      rows: readSpecialBranches(o.specialBranchesPath ?? SPECIAL_BRANCHES_JSON, o.repoRoot),
     }),
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
   };

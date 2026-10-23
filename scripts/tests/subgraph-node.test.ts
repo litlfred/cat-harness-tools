@@ -139,9 +139,12 @@ describe("converted publishers follow the declared subgraph pattern", () => {
   test("members publisher: docs site pages carry inSubgraph pointing to declared Subgraph", () => {
     const sub = declaredSubgraphNode(ROOT, "docs");
     expect(sub).toBeDefined();
+    // A page this instance still authors: `guides-writing-a-paper` was the
+    // example until it moved to the instance whose papers it is about
+    // (folio-assistant#2598).
     const pagePath = [
-      join(docsSourceDirFor(ROOT), "guides-writing-a-paper", "guides-writing-a-paper.jsonld"),
-      join(ROOT, "content/docs/guides-writing-a-paper/guides-writing-a-paper.jsonld"),
+      join(docsSourceDirFor(ROOT), "guides-beans-and-todos", "guides-beans-and-todos.jsonld"),
+      join(ROOT, "content/docs/guides-beans-and-todos/guides-beans-and-todos.jsonld"),
     ].find(existsSync);
     expect(pagePath).toBeDefined();
     const page = JSON.parse(readFileSync(pagePath!, "utf-8")) as Record<string, unknown>;

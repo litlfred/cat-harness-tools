@@ -186,8 +186,13 @@ describe("0b — roles, actors and capabilities extended by id", () => {
   });
 
   test("redeclaring a lower role is refused — extend it instead", () => {
+    // A redeclaration that only ADDS is a move in flight, accepted with a
+    // warning (owner, 2026-10-23); one that changes what the lower role says
+    // is refused, and that is the case pinned here.
     expect(() =>
-      overlayRoleGraphs(BASE_ROLES, [{ instance: "core", graph: { name: "core", roles: [{ ...BASE_ROLES.roles[0]! }] } }]),
+      overlayRoleGraphs(BASE_ROLES, [
+        { instance: "core", graph: { name: "core", roles: [{ ...BASE_ROLES.roles[0]!, title: "Cataloguer" }] } },
+      ]),
     ).toThrow(/already declared by base/);
   });
 

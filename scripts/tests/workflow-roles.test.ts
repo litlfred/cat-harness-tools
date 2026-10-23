@@ -14,6 +14,7 @@ import { join, basename } from "node:path";
 import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 import { enabled, startInstance, describe as renderInstance } from "../../src/workflow/instance.js";
 import { readRoleGraph, resolveRoleSkills } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -73,11 +74,14 @@ describe("enabled() joins a lane to its declared role", () => {
 
 describe("every activity in every diagram is performed by a declared role", () => {
   test("no enabled step in any process would report an unbound lane", async () => {
+    // The diagrams are the checkout's, so the roles are too: a dependent that
+    // owns a lane may own the role it binds, declared in its own scenarios/.
+    const roles = checkoutRoleGraph(ROOT, graph)?.graph ?? graph;
     const unbound: string[] = [];
     for (const f of processDiagrams(workflowFiles(ROOT)).map((p) => basename(p))) {
       const model = await loadProcessModel(workflowFile(ROOT, f));
       for (const lane of model.lanes) {
-        const role = graph!.roles.find(
+        const role = roles!.roles.find(
           (r) => lane.roleRef !== undefined && r.id === lane.roleRef,
         );
         if (!role) unbound.push(`${f}: ${lane.name ?? lane.id}`);

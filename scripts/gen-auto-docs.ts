@@ -354,7 +354,7 @@ function walk(dir: string, pred: (name: string) => boolean): string[] {
  * Existence-filtered, because a declared-but-absent directory is the `dh4f`
  * defect — a consumer scans nothing and reports a clean run over it.
  */
-export function declaredDirectories(graph: string): Array<{ id: string; absPath: string; path: string }> {
+export function declaredDirectories(graph: string): Array<{ id: string; absPath: string; path: string; instance: string }> {
   // The CORPUS this handler documents (placement PR0, bean `ejye`): this
   // instance plus everything stacked on it, which the platform's
   // `scope: "repository"` mirrors used to supply under ids of their own. Each
@@ -366,11 +366,12 @@ export function declaredDirectories(graph: string): Array<{ id: string; absPath:
     .filter((d) => (d.graphTypologies ?? []).includes(graph as never) && existsSync(d.absPath))
     .sort((a, b) => Number(!own.has(a.absPath)) - Number(!own.has(b.absPath)));
   const taken = new Set<string>();
-  const out: Array<{ id: string; absPath: string; path: string }> = [];
+  const out: Array<{ id: string; absPath: string; path: string; instance: string }> = [];
   for (const d of all) {
-    const id = taken.has(d.id) ? `${d.member ?? d.declaredBy}-${d.id}` : d.id;
+    const instance = d.member ?? d.declaredBy;
+    const id = taken.has(d.id) ? `${instance}-${d.id}` : d.id;
     taken.add(id);
-    out.push({ id, absPath: d.absPath, path: relative(REPO, d.absPath).split("\\").join("/") });
+    out.push({ id, absPath: d.absPath, path: relative(REPO, d.absPath).split("\\").join("/"), instance });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id, "en"));
 }
@@ -801,7 +802,10 @@ export const TYPES: AutoDocType[] = [
             const shared = [...new Set([...defs.values()].flat())].sort();
             items.push({
               path: relative(REPO, f).split("\\").join("/"),
-              name: `Shared steps (${basename(f, ".bpmn")})`,
+              // Named by its INSTANCE, not its file: every layer's file is
+              // `processes/global-tasks.bpmn` (a diagram is its instance plus
+              // its path), so a basename here would label two rows alike.
+              name: `Shared steps (${d.instance})`,
               summary: `${defs.size} global task(s) that this layer's processes call by id.`,
               // `activities: 0` because that is true of it — no process, so no
               // activity in one — and because every row of this index carries

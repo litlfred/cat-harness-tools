@@ -19,7 +19,9 @@
  * `test/health-checks-workflows.test.ts` (bean
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
@@ -54,7 +56,7 @@ import {
   type SpecialBranchMeasure,
   type StagingPreview,
 } from "./checks.ts";
-import { hasRenderedDecision, membersFor, probePagesServing, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
+import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probePagesServing, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
 
 const MB = 1024 * 1024;
 
@@ -1427,7 +1429,7 @@ describe("special-branch-size", () => {
   it("measures a `family` budget in TOTAL — no single cache branch is over, the family is", () => {
     const each = 1.5 * 1024 * MB;
     const r = specialBranchSizeCheck(ctxWith([
-      { id: "lake-cache", name: "cat/folio-assistant-sci/lake-cache/", shape: "family", budget: budget(4 * 1024 * MB, "family", "4gb"), state: "measured", resolved: "cat/folio-assistant-sci/lake-cache/", branches: [1, 2, 3].map((i) => ({ ref: `cat/folio-assistant-sci/lake-cache/p${i}`, bytes: each, files: 1 })) },
+      { id: "build-cache", name: "cat/x/build-cache/", shape: "family", budget: budget(4 * 1024 * MB, "family", "4gb"), state: "measured", resolved: "cat/x/build-cache/", branches: [1, 2, 3].map((i) => ({ ref: `cat/x/build-cache/p${i}`, bytes: each, files: 1 })) },
     ]));
     expect(r.state).toBe("finding");
     expect(r.findings).toHaveLength(1);
@@ -1470,6 +1472,64 @@ describe("special-branch-size", () => {
       todos: [100 * MB, "branch"],
       "auto-docs": [1024 * MB, "branch"],
     });
+  });
+});
+
+describe("a budget row named by TYPOLOGY takes its family from the declaring directory", () => {
+  /**
+   * A repository whose own declaration gives a `build-cache/` directory a
+   * family prefix — or none. Its kind is `auto-docs`, one every checkout
+   * knows: a declaration naming a kind nobody registers does not parse.
+   */
+  function repo(prefix?: string): string {
+    const root = mkdtempSync(join(tmpdir(), "health-typology-"));
+    mkdirSync(join(root, "build-cache"));
+    writeFileSync(
+      join(root, "x.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "x",
+        directories: [
+          { id: "cache", path: "build-cache/", graphTypologies: ["auto-docs"], ...(prefix ? { storage: { branchPrefix: prefix, keyedBy: "family", keyFrom: "<package>" } } : {}), description: "fixture" },
+        ],
+      }),
+    );
+    return root;
+  }
+  function budgets(row: object): string {
+    const dir = mkdtempSync(join(tmpdir(), "health-budgets-"));
+    writeFileSync(join(dir, "b.json"), JSON.stringify({ branches: [row] }));
+    return join(dir, "b.json");
+  }
+  const row = { id: "build-cache", shape: "family", typology: "auto-docs", legacy: ["old-cache/"], budget: { bytes: 1, scope: "family", stated: "1b", basis: "fixture" } };
+
+  it("the declared storage.branchPrefix is the name, the legacy names follow", () => {
+    const root = repo("cat/x/build-cache/");
+    try {
+      expect(declaredFamilyPrefix(root, "auto-docs")).toBe("cat/x/build-cache/");
+      const [r] = readSpecialBranches(budgets(row), root);
+      expect(r).toMatchObject({ id: "build-cache", name: "cat/x/build-cache/", legacy: ["old-cache/"], typology: "auto-docs" });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("with nothing declared, the legacy names are what is measured — never a name the file spells for a layer above", () => {
+    const root = repo();
+    try {
+      expect(declaredFamilyPrefix(root, "auto-docs")).toBeUndefined();
+      const [r] = readSpecialBranches(budgets(row), root);
+      expect(r).toMatchObject({ name: "old-cache/", legacy: [] });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("the committed lake-cache row names its typology, not a layer", () => {
+    const [r] = readSpecialBranches(resolve(import.meta.dir, "branch-budgets.json")).filter((x) => x.id === "lake-cache");
+    expect(r!.typology).toBe("lake-cache");
+    // Read with no repository, only the legacy names remain, newest first.
+    expect([r!.name, ...r!.legacy]).toEqual(["cat-lake-cache/", "lake-cache/"]);
   });
 });
 

@@ -59,14 +59,24 @@ import { detectRepoUrl } from "../src/core/git-refs.js";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { docsSources, type DocsSource } from "../scripts/lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
-const SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
+const BASE_SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
+
+/**
+ * The docs source being projected. Every docs source in the checkout is
+ * (owner, 2026-10-23, "A1" — the same set `gen-docs-pages.ts` renders): the
+ * base instance's first, unchanged, then each instance above it, whose
+ * documents land in ITS source and ITS docs directory's `site/`.
+ */
+let CUR: DocsSource;
+let SRC_DIR = BASE_SRC_DIR;
 // The same fallback `gen-docs-pages.ts` uses, so the two generators name one
 // forge — and so the output does not depend on how this checkout was cloned.
 const REPO_WEB = detectRepoUrl(REPO_ROOT) ?? "https://github.com/litlfred/folio-assistant";
-const docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
+let docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
 
 /**
  * `sourceDocument` as an ADDRESS, not a path — #1772. It is a link-type term
@@ -79,7 +89,7 @@ const docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
  * moved or not.
  */
 function sourceDocumentIri(source: string): string {
-  const repoPath = relative(REPO_ROOT, resolve(INSTANCE_ROOT, source)).split("\\").join("/");
+  const repoPath = relative(REPO_ROOT, resolve(CUR.root, source)).split("\\").join("/");
   return sourceLinks(REPO_WEB, repoPath, "main")?.viewHref ?? source;
 }
 
@@ -101,7 +111,7 @@ function emit(path: string, doc: Record<string, unknown>): void {
     return;
   }
   if (check) {
-    stale.push(path.slice(INSTANCE_ROOT.length + 1));
+    stale.push(relative(REPO_ROOT, path));
     return;
   }
   mkdirSync(dirname(path), { recursive: true });
@@ -115,7 +125,18 @@ function emit(path: string, doc: Record<string, unknown>): void {
  * which the site does not serve, so every `site/…` IRI (and every todo's
  * `target` edge to one) named nothing a reader could open.
  */
-const SITE_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
+let SITE_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
+
+/**
+ * A page's (or node's) IRI, relative to the site base: where the document is
+ * PUBLISHED. A source above the base is composed into the site under its
+ * instance's name, and so are the documents beside its pages.
+ */
+const pageIri = (slug: string, node?: string): string =>
+  `${CUR.base ? "" : `${CUR.instance}/`}${node === undefined ? siteIri(slug) : siteIri(slug, node)}`;
+
+/** The source directory as its instance spells it — `docs/source` for the base. */
+const srcRel = (): string => relative(CUR.root, SRC_DIR).split("\\").join("/");
 
 /**
  * Write the node beside its source AND at its published path.
@@ -137,7 +158,7 @@ function emitBoth(source: string, sitePath: string, doc: Record<string, unknown>
 function nodeDoc(page: WebPage, node: WebPageNode, flat: string): Record<string, unknown> {
   const doc: Record<string, unknown> = {
     "@context": documentContext(node.asset ? SITE_ASSET_TYPES : SITE_NARRATIVE_TYPES, { base: DOCS_SITE_BASE }),
-    "@id": siteIri(page.slug, node.id),
+    "@id": pageIri(page.slug, node.id),
     "@type": [...(node.asset ? SITE_ASSET_TYPES : SITE_NARRATIVE_TYPES)],
     label: node.id,
     provenance: "authored",
@@ -164,14 +185,23 @@ function nodeDoc(page: WebPage, node: WebPageNode, flat: string): Record<string,
   }
   // Recorded so a consumer can find the file without re-deriving the
   // flattening rule from the slug.
-  doc.meta = { ...((doc.meta as Record<string, unknown>) ?? {}), sourceDir: `docs/source/${flat}` };
+  doc.meta = { ...((doc.meta as Record<string, unknown>) ?? {}), sourceDir: `${srcRel()}/${flat}` };
   return doc;
 }
 
-if (!existsSync(SRC_DIR)) {
-  console.log(`gen-site-jsonld: no ${SRC_DIR} — nothing to generate.`);
+if (!existsSync(BASE_SRC_DIR)) {
+  console.log(`gen-site-jsonld: no ${BASE_SRC_DIR} — nothing to generate.`);
   process.exit(0);
 }
+
+let pages = 0;
+let nodes = 0;
+
+for (const src of docsSources(INSTANCE_ROOT)) {
+CUR = src;
+SRC_DIR = src.srcDir;
+SITE_DIR = src.outDir;
+docsSubgraph = src.base ? declaredSubgraphNode(INSTANCE_ROOT, "docs") : declaredSubgraphNode(src.root, "docs");
 
 const flats = readdirSync(SRC_DIR, { withFileTypes: true })
   .filter((d) => d.isDirectory())
@@ -184,12 +214,9 @@ if (flats.length === 0) {
   // nothing is a failure: a clean run on an empty tree is indistinguishable
   // from a clean run on a healthy one, and that is exactly how a broken path
   // survives a gate.
-  console.error("gen-site-jsonld: docs/source/ exists but holds no pages — refusing to report success.");
+  console.error(`gen-site-jsonld: ${relative(REPO_ROOT, SRC_DIR)} exists but holds no pages — refusing to report success.`);
   process.exit(1);
 }
-
-let pages = 0;
-let nodes = 0;
 
 for (const flat of flats) {
   const manifest = join(SRC_DIR, flat, `${flat}.ts`);
@@ -201,18 +228,18 @@ for (const flat of flats) {
 
   emitBoth(join(SRC_DIR, flat, `${flat}.jsonld`), siteNodeSitePath(page.slug), {
     "@context": documentContext(SITE_PAGE_TYPES, { base: DOCS_SITE_BASE }),
-    "@id": siteIri(page.slug),
+    "@id": pageIri(page.slug),
     "@type": [...SITE_PAGE_TYPES],
     label: page.slug,
     title: page.title,
     // Ordered, and that order IS the page. `contains` maps to
     // `dcterms:hasPart` in the published context.
-    contains: page.nodes.map((n) => siteIri(page.slug, n.id)),
+    contains: page.nodes.map((n) => pageIri(page.slug, n.id)),
     provenance: "authored",
     ...(docsSubgraph ? memberOf(docsSubgraph.iri) : {}),
     meta: {
-      publishedAt: `${page.slug}.html`,
-      sourceDir: `docs/source/${flat}`,
+      publishedAt: `${CUR.base ? "" : `${CUR.instance}/`}${page.slug}.html`,
+      sourceDir: `${srcRel()}/${flat}`,
       ...(page.navOrder !== undefined ? { navOrder: page.navOrder } : {}),
       ...(page.parent ? { navParent: page.parent } : {}),
     },
@@ -231,6 +258,7 @@ for (const flat of flats) {
     );
     nodes++;
   }
+}
 }
 
 if (check) {

@@ -78,6 +78,38 @@ describe("triggerFor — the three states", () => {
     expect(t.filters).toEqual(["branches", "paths", "types"]);
   });
 
+  test("a `types:` list that keeps every default PR type is no narrowing: still REQUIRED (bean dft1)", () => {
+    const t = triggerFor(
+      "w.yml",
+      "name: Gates\non:\n  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\n",
+      "pull_request",
+    );
+    expect(t.requirement).toBe("required");
+    expect(t.filters).toEqual([]);
+    const closed = triggerFor(
+      "w.yml",
+      "name: Gates\non:\n  pull_request:\n    types: [opened, synchronize, reopened, closed]\n",
+      "pull_request",
+    );
+    expect(closed.requirement).toBe("required");
+  });
+
+  test("a `types:` list missing a default PR type still narrows: CONDITIONAL", () => {
+    const t = triggerFor("w.yml", "name: Ready\non:\n  pull_request:\n    types: [opened, ready_for_review]\n", "pull_request");
+    expect(t.requirement).toBe("conditional");
+    expect(t.filters).toEqual(["types"]);
+  });
+
+  test("the default-types rule does not hide another filter beside it", () => {
+    const t = triggerFor(
+      "w.yml",
+      "name: Stage\non:\n  pull_request:\n    types: [opened, synchronize, reopened]\n    paths: ['docs/**']\n",
+      "pull_request",
+    );
+    expect(t.requirement).toBe("conditional");
+    expect(t.filters).toEqual(["paths"]);
+  });
+
   test("an event the workflow does not declare is NOT-DECLARED, not a missing required", () => {
     const t = triggerFor("w.yml", "name: Nightly\non:\n  schedule:\n    - cron: '0 0 * * *'\n", "pull_request");
     expect(t.requirement).toBe("not-declared");

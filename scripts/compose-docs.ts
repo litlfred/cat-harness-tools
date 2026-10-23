@@ -119,6 +119,7 @@ import { subscribedTrees } from "./subscribed-trees.ts";
 import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 import { declaredVisualisers, forwardingParts, heldVisualiserPages, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { declaredDocsSources } from "./lib/docs-sources.ts";
 import { dirname } from "node:path";
 import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
 
@@ -1044,7 +1045,14 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       suppliedBy[under] = c.instance;
       continue;
     }
+    // A docs SOURCE the instance declares inside this directory is authored
+    // blocks and manifests that `gen-docs-pages.ts` renders into the pages
+    // beside them — never pages of their own. The base layer keeps its own out
+    // with Jekyll's `exclude`, which names a path from the site root and so
+    // cannot reach one composed under an instance's name; it is left out here.
+    const sources = declaredDocsSources(join(repo, c.root)).map((s) => s.srcDir + sep);
     for (const rel of filesUnder(c.dir)) {
+      if (sources.some((src) => (resolve(c.dir, rel) + sep).startsWith(src))) continue;
       // A composed instance lands under its own name, so its withholding is
       // asked about the path the TREE will carry rather than the instance's
       // own. Skipping this loop would leave a staging-only graph publishable

@@ -35,7 +35,7 @@ describe("loading", () => {
   test("reads the repo's declared capabilities", () => {
     const caps = loadCapabilities(REPO);
     expect(caps.length).toBeGreaterThan(10);
-    expect(caps.map((c) => c.id)).toContain("smart-base");
+    expect(caps.map((c) => c.id)).toContain("bun-runtime");
   });
 
   test("an absent directory yields none rather than throwing", () => {

@@ -52,7 +52,6 @@
         "scripts/tests/block-module.test.ts > loadBlocksUnder sees every block kind > finds proof, algorithm and table — the three the regex missed",
         "scripts/tests/block-module.test.ts > loadBlocksUnder sees every block kind > reads uses[] from the validated object, not from source text",
         "scripts/tests/block-walk-verify.test.ts > the textual read and the module disagree > a label the schema rejects is reported instead of being yielded as a node",
-        "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > .github/actions/lake-cache-restore/action.yml: every lake-cache name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > fhir-harness/scripts/ig-cache.sh: every fhir-ast name, newest first",
         "scripts/tests/cache-family-fallbacks.test.ts > cache scripts carry the same built-in fallback names, in the same order > ig-cache.sh's fallback list is newest first",
         "scripts/tests/check-document-kind-sources.test.ts > the judgement > a declared graph id passes",

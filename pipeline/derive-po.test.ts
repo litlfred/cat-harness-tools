@@ -858,7 +858,12 @@ describe("the pages to catalogue are DISCOVERED, not listed in the script", () =
         expect(composed.startsWith(docs)).toBe(true);
       }
     }
-    // Anti-vacuity: 14 pages x 5 locales, and the count must not quietly be 0.
-    expect(checked).toBe(70);
+    // Anti-vacuity: the count must not quietly be 0, and each page that is
+    // translated is translated into all five. Not an exact page count: which
+    // pages this instance authors changes when one moves to the instance whose
+    // process it shows (folio-assistant#2598), and that is not this function's
+    // concern.
+    expect(checked).toBeGreaterThan(0);
+    expect(checked % 5).toBe(0);
   });
 });

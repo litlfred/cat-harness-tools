@@ -57,7 +57,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { dirname, join, relative, resolve } from "node:path";
 import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
-import { buildQaResult, writeQaResult } from "./qa-results.ts";
+import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
+import { readQaTree } from "./qa-store.ts";
 import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "@litlfred/cat-harness/schemas/tool-run.ts";
 import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
 import {
@@ -419,6 +420,8 @@ export interface IndexSource {
   present: boolean;
   /** The text at a repository-relative path, or `undefined` when the source holds no such file. */
   read(repoPath: string): string | undefined;
+  /** Why a source with `present: false` holds no record — said in the computed verdict. Default: the index directory is absent. */
+  why?: string;
 }
 
 export const CHECKOUT_SOURCE: IndexSource = {
@@ -456,7 +459,7 @@ export function graphVerdict(t: GraphTarget, src: IndexSource = CHECKOUT_SOURCE)
       return {
         result: "pass",
         state: "fresh",
-        detail: `fresh — recomputed in this run (${units} units); no index in the checkout (${relative(REPO, RESULTS)}/ is absent) to be stale`,
+        detail: `fresh — recomputed in this run (${units} units); ${src.why ?? `no index in the checkout (${relative(REPO, RESULTS)}/ is absent) to be stale`}`,
         stableDetail: "fresh — recomputed in this run; there is no index in the checkout to be stale",
         units,
         words,
@@ -495,6 +498,74 @@ export function graphVerdict(t: GraphTarget, src: IndexSource = CHECKOUT_SOURCE)
     failed: [`the last index run FAILED — ${relative(REPO, sc)} is a previous run's output`, `the last run failed — re-run \`${run}\``],
   };
   return { result: state === "fresh" ? "pass" : "fail", state, detail: said[state][0], stableDetail: said[state][1], units, words };
+}
+
+/**
+ * Is the index directory STORED on the `qa-reports` branch (bean `oqe3`)?
+ * Then a copy in the checkout is a measurement of the last run, not a record.
+ */
+export function indexesStored(): boolean {
+  return qaStorageOf(RESULTS) !== undefined;
+}
+
+/**
+ * `lsi check` — compute and judge (bean `oqe3`, proposal §2.3).
+ *
+ * With the index directory STORED on `qa-reports` (cat-harness declares it),
+ * the gate never compares with a working copy: it rebuilds each index in
+ * memory and fails only when one cannot be built. "Stale" no longer exists
+ * as a failure. A committed index whose fingerprint has moved is printed as
+ * advisory, so it is seen, and `qa:refresh` rebuilds the stored record.
+ * That comparison was what made every PR touching a skill regenerate and
+ * commit `test/results/lsi/`, and what made those files conflict.
+ *
+ * `--against <ref>` also reads the stored indexes at that ref and reports
+ * which are current for this tree. That is reported, never gated: an index
+ * is a derived measurement, and its staleness on the branch is the
+ * publisher's job, not this change's defect. A ref with no entry is
+ * UNKNOWN, and is reported.
+ *
+ * Unstored (no declaration says the directory leaves `main`), the working
+ * copy is still the record and the old strict comparison stands.
+ */
+export function checkGraphs(ts: readonly GraphTarget[], opts: { against?: string; stored?: boolean; log?: (line: string) => void } = {}): number {
+  const log = opts.log ?? ((l: string) => console.log(l));
+  const stored = opts.stored ?? indexesStored();
+  const inCheckout = indexesInCheckout();
+  const computed: IndexSource = {
+    present: false,
+    read: () => undefined,
+    why: inCheckout ? `the copy in ${relative(REPO, RESULTS)}/ is stored on qa-reports, so it is not compared` : undefined,
+  };
+  let branch: IndexSource | undefined;
+  let branchFrom = "";
+  if (opts.against !== undefined) {
+    const storage = qaStorageOf(RESULTS);
+    const tree = readQaTree(opts.against, INDEX_DIR, storage ? { branch: storage, repoRoot: REPO } : { repoRoot: REPO });
+    const runs = tree.state === "hit" ? readQaTree(opts.against, RUN_RECORD_DIR, storage ? { branch: storage, repoRoot: REPO } : { repoRoot: REPO }) : undefined;
+    if (tree.state !== "hit") log(`  ? UNKNOWN — no stored indexes at qa-reports ${opts.against}: ${tree.reason}. Reported, not gated.`);
+    else if (runs && (runs.state === "corrupt" || runs.state === "unknown")) log(`  ? UNKNOWN — run records at qa-reports ${opts.against}: ${runs.reason}. Reported, not gated.`);
+    else {
+      branch = sourceFromFiles(new Map([...tree.files, ...(runs?.state === "hit" ? runs.files : [])]));
+      branchFrom = `qa-reports ${tree.key}`;
+    }
+  }
+  let bad = 0;
+  for (const t of ts) {
+    const v = graphVerdict(t, stored ? computed : CHECKOUT_SOURCE);
+    if (v.result === "fail") bad++;
+    log(`${v.result.padEnd(4)}  ${t.instance}/${t.id}  ${v.detail}`);
+    if (v.result === "fail" || !stored) continue;
+    if (inCheckout) {
+      const w = graphVerdict(t, CHECKOUT_SOURCE);
+      if (w.result === "fail") log(`      advisory: the working copy — ${w.detail}. Not gated (stored on qa-reports; judge, never compare).`);
+    }
+    if (branch) {
+      const b = graphVerdict(t, branch);
+      log(`      ${b.result === "fail" ? "advisory" : "current"}: ${branchFrom} — ${b.detail}${b.result === "fail" ? ". Not gated: `qa:refresh` rebuilds it." : ""}`);
+    }
+  }
+  return bad ? 1 : 0;
 }
 
 function audit(strict: boolean): number {
@@ -612,15 +683,13 @@ if (import.meta.main) {
       }
     }
   } else if (cmd === "check") {
-    // Strict freshness for the graphs selected — the verify half of a
-    // `skill:register` step (`lsi:skills` / `lsi:skills:check`).
-    let bad = 0;
-    for (const t of targets()) {
-      const v = graphVerdict(t);
-      if (v.result === "fail") bad++;
-      console.log(`${v.result.padEnd(4)}  ${t.instance}/${t.id}  ${v.detail}`);
-    }
-    process.exit(bad ? 1 : 0);
+    // The verify half of a `skill:register` step (`lsi:skills` /
+    // `lsi:skills:check`). See {@link checkGraphs} for what fails.
+    const usage = judgeUsage("lsi check", process.argv.slice(3), ["--instance", "--graph", "--needed", "--against"]);
+    if (usage !== undefined) process.exit(usage);
+    const { against, exit: badRef } = againstOrUsage("lsi check", process.argv.slice(3));
+    if (badRef !== undefined) process.exit(badRef);
+    process.exit(checkGraphs(targets(), { against }));
   } else if (cmd === "audit") {
     process.exit(audit(process.argv.includes("--strict")));
   } else {

@@ -13,7 +13,7 @@ import { dirname, join, relative, resolve, basename, sep } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { workflowFiles, workflowFile } from "../known-skills.js";
 import { processDiagrams } from "../../src/workflow/process-model.js";
-import { processPresentations, processTarget, type Presentation } from "../process-presentations.js";
+import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { PAGE_LOCALE } from "../viewer-declarations.ts";
@@ -51,11 +51,14 @@ describe("processTarget — where a subprocess box lands", () => {
 
 describe("this repository, right now", () => {
   test("the index is not empty — a check over nothing is not a check", async () => {
-    const idx = await processPresentations(ROOT);
+    // The checkout's index, not one instance's: a page that presents this
+    // instance's process may be authored in an instance above it, and then
+    // its address carries that instance's name (`lib/docs-sources.ts`).
+    const idx = await checkoutProcessPresentations(ROOT);
     expect(idx.size).toBeGreaterThan(0);
-    expect(idx.get("processes/ui/ingest-theme.bpmn")?.map((x) => `${x.page}#${x.node}`)).toEqual([
-      "guides/document-ingestion#ingest-the-theme",
-    ]);
+    const theme = idx.get("processes/ui/ingest-theme.bpmn") ?? [];
+    expect(theme.map((x) => `${x.page}#${x.node}`)).toEqual(["guides/document-ingestion#ingest-the-theme"]);
+    expect(theme[0]!.href.endsWith("guides/document-ingestion.html")).toBe(true);
   });
 
   /** Every anchor a generated page pins, or a heading that would derive one. */

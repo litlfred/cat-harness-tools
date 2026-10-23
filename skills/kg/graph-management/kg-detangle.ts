@@ -56,6 +56,8 @@ import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typolo
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
+import { againstOrUsage, qaStorageOf } from "../../../scripts/qa-results.ts";
+import { readQaTree } from "../../../scripts/qa-store.ts";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -559,6 +561,9 @@ const results = groups.map((g) => {
 // sidecar rather than on a bad number, so it cannot become the gate that
 // always passes. `detangle.ts` says the carve is an adjudication — that stays
 // a person's call, and nothing here grades it.
+// Since bean `oqe3`, only where the tree is NOT stored on `qa-reports`: a
+// stored copy is a measurement, so a stale one there is advisory (see
+// `detangleStored` below).
 // The declared `qa` directory's `detangle/`, resolved in ONE place so every
 // reader of the sidecars agrees with this writer (see `detangleResultsDir`).
 const HARNESS = join(ROOT, "cat-harness");
@@ -579,6 +584,20 @@ const RESULTS_DIR = detangleResultsDir(HARNESS);
  * group with no sidecar beside ones that have them is still STALE.
  */
 const pinnedInCheckout = existsSync(RESULTS_DIR);
+
+/**
+ * Is the detangle tree STORED on `qa-reports` (bean `oqe3`)? cat-harness
+ * declares its `qa` directory with `storage`, so yes. Then the copy in the
+ * checkout is a measurement of the last run, not a record, and a stale or
+ * orphaned sidecar there is ADVISORY: reported in full, never what fails
+ * `--check`. The same rule as `kg:audit:check`'s derived tree. A stale
+ * sidecar here was a regenerate-and-commit round on every PR that moved a
+ * file, and a merge conflict between any two of them (bean `oqe3`). The
+ * stored record is rebuilt by `qa:refresh` in the publish job.
+ *
+ * Unstored, the working copy is still the record, and both stay findings.
+ */
+const detangleStored = qaStorageOf(RESULTS_DIR) !== undefined;
 
 function writeSidecars(): { written: string[]; stale: { path: string; fields: string[] }[] } {
   const written: string[] = [];
@@ -681,6 +700,44 @@ function sweepOrphans(accountedFor: string[]): string[] {
 const checking = process.argv.includes("--check");
 
 /**
+ * `--against <ref>` — compare this run with the stored record at a
+ * `qa-reports` ref instead of the working copy, and REPORT what moved. Never
+ * gated: the carve is an adjudication, so a moved measurement is a reason to
+ * look, not a defect. A ref with no entry is UNKNOWN and is reported. A
+ * malformed ref is a usage error (exit 2).
+ */
+const { against, exit: badAgainst } = againstOrUsage("kg:detangle:check", process.argv.slice(2));
+if (badAgainst !== undefined) process.exit(badAgainst);
+
+/** What moved between this run and the record stored at `against`, or why it could not be read. */
+function compareWithStored(ref: string): { from: string; moved: { path: string; fields: string[] }[]; orphans: string[] } | { unknown: string } {
+  const storage = qaStorageOf(RESULTS_DIR);
+  const tree = readQaTree(ref, RESULTS_DIR, storage ? { branch: storage, repoRoot: ROOT } : { repoRoot: ROOT });
+  if (tree.state !== "hit") return { unknown: `qa-reports ${ref}: ${tree.state} — ${tree.reason}` };
+  const prefix = tree.prefix ? `${tree.prefix}/` : "";
+  const known = new Set<string>();
+  const moved: { path: string; fields: string[] }[] = [];
+  for (const r of results) {
+    const rel = sidecarPathFor(r.group);
+    known.add(rel);
+    const text = tree.files.get(prefix + rel);
+    let stored: unknown = null;
+    try {
+      stored = text === undefined ? null : JSON.parse(text);
+    } catch {
+      // readQaTree already refuses an entry with a JSON file that does not parse.
+    }
+    const fields = staleFields(stored, sidecarFor(r));
+    if (fields.length > 0) moved.push({ path: rel, fields });
+  }
+  const orphans = [...tree.files.keys()]
+    .map((p) => (prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p))
+    .filter((p) => p.endsWith(".detangle.json") && !known.has(p))
+    .sort();
+  return { from: `qa-reports ${tree.key}`, moved, orphans };
+}
+
+/**
  * `--gate-direction` — the CROSS-INSTANCE wrong-direction gate. Bean `p11x`,
  * the owner's Option 2 ruling of 2026-09-30.
  *
@@ -688,8 +745,9 @@ const checking = process.argv.includes("--check");
  *
  * Everything else this script reports is **pinned, not graded**: the carve is
  * an adjudication a person makes (`detangle.ts`, "taste is a declared step"),
- * so `--check` fails on a STALE or ORPHANED sidecar and never on a number
- * being wrong. **That ruling stands and this flag does not touch it.**
+ * so `--check` fails on a STALE or ORPHANED sidecar (in an unstored tree;
+ * advisory in a stored one, bean `oqe3`) and never on a number being wrong.
+ * **That ruling stands and this flag does not touch it.**
  *
  * The one number that is not taste is this one. A module's BUCKET is a
  * judgement; an import pointing at an instance that declares a dependency on
@@ -960,15 +1018,31 @@ if (!process.argv.includes("--json") && !gatingDirection) {
   }
   // NAMED, never counted — the question a stale sidecar raises is WHICH number
   // moved, and a bare count makes the reader go and diff it themselves.
+  const advisory = checking && detangleStored;
+  if (advisory && staleSidecars.length + orphanSidecars.length > 0) {
+    console.log(
+      `  advisory: ${staleSidecars.length} stale and ${orphanSidecars.length} orphaned sidecar(s) in ${where}/ — not gated:` +
+        " the tree is stored on qa-reports (judge, never compare; bean oqe3). `qa:refresh` rebuilds the record.",
+    );
+  }
   for (const s of staleSidecars) {
-    console[checking ? "error" : "log"](`  ${checking ? "STALE" : "updated"}  ${s.path} — ${s.fields.join(", ")}`);
+    console[checking && !advisory ? "error" : "log"](`  ${advisory ? "moved " : checking ? "STALE" : "updated"}  ${s.path} — ${s.fields.join(", ")}`);
   }
   for (const o of orphanSidecars) {
-    console.error(`  ORPHAN ${o} — no current group measures this. Reported, not deleted: it may be a declaration gap rather than a dead group.`);
+    console[advisory ? "log" : "error"](`  ORPHAN ${o} — no current group measures this. Reported, not deleted: it may be a declaration gap rather than a dead group.`);
+  }
+  if (checking && against !== undefined) {
+    const c = compareWithStored(against);
+    if ("unknown" in c) console.log(`  ? UNKNOWN — no stored detangle record to compare with (${c.unknown}). Reported, not gated.`);
+    else {
+      console.log(`  against ${c.from}: ${c.moved.length} group measurement(s) moved, ${c.orphans.length} stored sidecar(s) no current group measures. Reported, not gated.`);
+      for (const m of c.moved) console.log(`    moved  ${m.path} — ${m.fields.join(", ")}`);
+      for (const o of c.orphans) console.log(`    ORPHAN ${o}`);
+    }
   }
 }
 
-if (checking && (staleSidecars.length > 0 || orphanSidecars.length > 0)) {
+if (checking && !detangleStored && (staleSidecars.length > 0 || orphanSidecars.length > 0)) {
   console.error(`\n  Run \`bun run cat kg:detangle\` and commit the result.`);
   process.exit(1);
 }
