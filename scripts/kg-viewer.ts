@@ -20,12 +20,14 @@
  * configuration. A staging build that needed a different page would be a
  * staging build testing something other than what ships.
  *
- * **The graph is its PARENT, not its sibling.** The renderings sit at the base
- * — `<base>/<stub>.jsonld` — and the viewer is the directory that makes
- * `<base>/<stub>` a page a browser can open, since GitHub Pages resolves an
- * extensionless URL only to a directory index. So the page reads
- * `../<stub>.jsonld`. It was a sibling while both lived in `kg/`; the relation
- * moved with the layout, which is why it is written here rather than assumed.
+ * **The graph is found from the SITE ROOT, never as a neighbour.** The page
+ * climbs to the root and descends the document's own path, `exportIdentity`'s
+ * `docPath`. That path has moved twice: a sibling while both lived in `kg/`,
+ * then the parent `<base>/<stub>.jsonld`, and since 2026-10-23
+ * `<base>/<name>/<stub>.jsonld`, every layer's document beside its subjects
+ * (litlfred/cat-harness-tools#603, decision 1b). The viewer's own route
+ * moved separately (`kgViewerRoute`), so neither is written here as an
+ * assumption about the other.
  *
  * ## Why no dependencies, and no force-directed graph
  *
@@ -79,6 +81,7 @@ import { dirname, join, relative } from "node:path";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { redirectStub } from "./compose-docs.ts";
 import { exportIdentity } from "./kg-export.js";
+import { instanceDocPath } from "./instance-exports.js";
 import { SUBJECT_KINDS } from "./lib/subject-iri.ts";
 import {
   UI_STRINGS,
@@ -119,7 +122,11 @@ export function upFrom(route: string): string {
  * which is the instance's own page and wins (the same refusal
  * `writeForwardingPages` makes).
  */
-export function writeViewer(site: string, stub: string, html = (up: string) => viewerHtml(stub, undefined, undefined, up)): { page: string; forwarded?: string } {
+export function writeViewer(
+  site: string,
+  stub: string,
+  html = (up: string) => viewerHtml(stub, undefined, undefined, up),
+): { page: string; forwarded?: string } {
   const route = kgViewerRoute(stub);
   const page = join(site, route, "index.html");
   mkdirSync(dirname(page), { recursive: true });
@@ -168,8 +175,12 @@ export function viewerHtml(
   catalogues: LocaleCatalogue[] = loadCatalogues(ROOT),
   planned: PlannedLocale[] = plannedLocales(ROOT),
   up = "../",
+  // Site-relative. Every layer's document, the host's included, sits at
+  // `<name>/<stub>.jsonld` since 2026-10-23 (litlfred/cat-harness-tools#603,
+  // decision 1b) — `exportIdentity`'s `docPath`, which the CLI passes.
+  docPath = instanceDocPath({ name: stub, stub }),
 ): string {
-  const doc = `${up}${stub}.jsonld`;
+  const doc = `${up}${docPath}`;
 
   // English is not a catalogue — it is the msgid, so every string is present
   // by definition and a lookup that misses falls back to it. It heads the
@@ -1255,7 +1266,7 @@ if (import.meta.main) {
     const i = process.argv.indexOf(f);
     return i !== -1 ? process.argv[i + 1] : undefined;
   };
-  const { stub } = exportIdentity({ baseUrl: arg("--base-url") ?? process.env.KG_BASE_URL });
+  const { stub, docPath } = exportIdentity({ baseUrl: arg("--base-url") ?? process.env.KG_BASE_URL });
   // `--out <file>`: one file, the graph its parent — what the e2e specs and the
   // deploy's `_site/` take. Otherwise the published layout, the viewer at its
   // route and a forwarding page at its old address, under `--site <dir>` or,
@@ -1264,12 +1275,14 @@ if (import.meta.main) {
   // publish (`cat-harness.json` `builtAtPublish`).
   const out = arg("--out");
   if (out === undefined) {
-    const { page, forwarded } = writeViewer(siteTarget(join(ROOT, siteDirFor(ROOT))), stub);
-    console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${stub}.jsonld`);
+    const { page, forwarded } = writeViewer(siteTarget(join(ROOT, siteDirFor(ROOT))), stub, (up) =>
+      viewerHtml(stub, undefined, undefined, up, docPath),
+    );
+    console.log(`KG viewer → ${relative(ROOT, page)}\n  reads  ${upFrom(kgViewerRoute(stub))}${docPath}`);
     console.log(forwarded ? `  forwards ${relative(ROOT, forwarded)}` : `  ${stub}/ holds a page already; no forwarding page`);
   } else {
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, viewerHtml(stub));
-    console.log(`KG viewer → ${relative(ROOT, out)}\n  reads  ../${stub}.jsonld  (parent, resolved at load)`);
+    writeFileSync(out, viewerHtml(stub, undefined, undefined, "../", docPath));
+    console.log(`KG viewer → ${relative(ROOT, out)}\n  reads  ../${docPath}  (from the site root, resolved at load)`);
   }
 }

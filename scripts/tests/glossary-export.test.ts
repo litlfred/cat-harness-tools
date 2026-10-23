@@ -34,6 +34,7 @@ import {
   LEDGER_SCHEMA,
   buildGlossary,
   glossaryIri,
+  legacyGlossaryDocuments,
   liveLedgerEntry,
   readLanes,
   type Ledger,
@@ -315,13 +316,43 @@ describe("retirement — reported, never deleted", () => {
 
 describe("glossaryIri", () => {
   test("it is derived from the document PATH, not rebuilt from the stub", () => {
-    // Bean `dyd3`: the host publishes at `<stub>.jsonld` and a foreign
-    // instance at `<stub>/<stub>.jsonld`. A caller that recomposes the path
-    // gets the host's answer for every instance.
+    // Bean `dyd3`: a document's path decides it, wherever that is — the
+    // host's root `<stub>.jsonld` until #603 decision 1b, and every layer's
+    // `<name>/<stub>.jsonld` since. A caller that recomposes the path gets
+    // one instance's answer for every instance.
     expect(glossaryIri("https://x.test", "cat-harness.jsonld")).toBe("https://x.test/cat-harness-glossary.jsonld");
     expect(glossaryIri("https://x.test/", "bootstrap/bootstrap.jsonld")).toBe(
       "https://x.test/bootstrap/bootstrap-glossary.jsonld",
     );
+  });
+});
+
+// #603 decision 1b (owner, 2026-10-23): the host's glossary moved under
+// `<site>/<name>/` with its graph document. The old root address forwards.
+describe("the host glossary's old root address", () => {
+  const BASE = "https://x.test/site";
+  test("forwards the document and each lane usage, for one release", () => {
+    const { doc } = buildGlossary({ baseUrl: BASE });
+    expect(String(doc["@id"])).toBe(`${BASE}/cat-harness/cat-harness-glossary.jsonld`);
+    const site = mkdtempSync(join(tmpdir(), "glossary-legacy-"));
+    try {
+      const moved = legacyGlossaryDocuments(doc, join(site, "cat-harness", "cat-harness-glossary.jsonld"), undefined, BASE)!;
+      expect(moved.oldIri).toBe(`${BASE}/cat-harness-glossary.jsonld`);
+      const old = JSON.parse(readFileSync(join(site, "cat-harness-glossary.jsonld"), "utf-8")) as Record<string, unknown>;
+      expect([old["@id"], old.deprecated, old.isReplacedBy, old.sameAs]).toEqual([moved.oldIri, true, doc["@id"], doc["@id"]]);
+      const us = usages(doc);
+      expect(us.length).toBeGreaterThan(0);
+      expect(moved.count).toBe(us.length);
+      const stones = new Map((old["@graph"] as Node[]).map((t) => [String(t.isReplacedBy), String(t["@id"])]));
+      for (const u of us) {
+        const id = String(u["@id"]);
+        expect(stones.get(id)).toBe(id.replace(`${BASE}/cat-harness/cat-harness.jsonld#`, `${BASE}/cat-harness.jsonld#`));
+      }
+      // Anywhere but the published path, the site root is unknown: nothing.
+      expect(legacyGlossaryDocuments(doc, join(site, "x.jsonld"), undefined, BASE)).toBeUndefined();
+    } finally {
+      rmSync(site, { recursive: true, force: true });
+    }
   });
 });
 

@@ -39,7 +39,7 @@ const wf = (n: string) => readFileSync(join(REPO, ".github", "workflows", n), "u
 function workflow(drop: string[] = []): string {
   const lines: Record<string, string> = {
     plan: "          bun run cat-harness/scripts/instance-exports.ts --out-dir ./_site",
-    "cat-harness": '          bun run cat-harness/scripts/kg-export.ts             --scope instance --out "./_site/${STUB}.jsonld"',
+    "cat-harness": '          bun run cat-harness/scripts/kg-export.ts             --scope instance --out "./_site/${STUB}/${STUB}.jsonld"',
     bootstrap: '          bun run bootstrap-tools/scripts/export-graph.ts --root ./bootstrap --base-url "x" --out y',
   };
   return Object.entries(lines)
@@ -132,14 +132,17 @@ describe("completeness — bean 4ak5 item 5", () => {
   test("the host publisher is accepted with the default scope and with `instance`, never `checkout`", () => {
     // Bean `4ak5` item 2: `checkout` would publish every stacked instance's
     // nodes under the host's name again — the state the split ended.
-    const host = (flags: string): string[] =>
+    const host = (flags: string, out = "./_site/\${STUB}/\${STUB}.jsonld"): string[] =>
       incompleteExports(
-        new Map([[DEPLOY_WORKFLOW, `${workflow(["cat-harness"])}\n          bun run cat-harness/scripts/kg-export.ts ${flags}--out "./_site/\${STUB}.jsonld"`]]),
+        new Map([[DEPLOY_WORKFLOW, `${workflow(["cat-harness"])}\n          bun run cat-harness/scripts/kg-export.ts ${flags}--out "${out}"`]]),
         declared,
       );
     expect(host("")).toEqual([]);
     expect(host('--base-url "$BASE" --scope instance ')).toEqual([]);
     expect(host("--scope checkout ").join("\n")).toContain("`cat-harness` is exempt");
+    // #603 decision 1b (owner, 2026-10-23): the host's document sits under its
+    // own directory. The old root `--out` would write it where its `@id` is not.
+    expect(host("--scope instance ", "./_site/\${STUB}.jsonld").join("\n")).toContain("`cat-harness` is exempt");
   });
 
   test("a publisher named only in a COMMENT is not a publisher", () => {

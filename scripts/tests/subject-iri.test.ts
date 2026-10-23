@@ -82,6 +82,18 @@ describe("telling this document's subjects from everything else", () => {
     expect(legacyFragmentIri("https://x.test/elsewhere", CORE)).toBeUndefined();
   });
 
+  // #603 decision 1b (owner, 2026-10-23): the host's document moved from the
+  // site root to `<site>/<name>/` in the same release, so its old fragments
+  // are of the ROOT document, not the one that now holds the subject.
+  test("a document that moved names its old fragments by the old document", () => {
+    const moved = "https://x.test/site/cat-harness/cat-harness.jsonld";
+    const iri = makeIri(moved, "skill", "a");
+    expect(iri).toBe("https://x.test/site/cat-harness/skill/a");
+    expect(legacyFragmentIri(iri, moved, HOST)).toBe(`${HOST}#skill/a`);
+    expect(legacyFragmentIri(iri, moved)).toBe(`${moved}#skill/a`);
+    expect(legacyFragmentIri(makeIri(moved, "process", "P/flow/F"), moved, HOST)).toBe(`${HOST}#process/P/flow/F`);
+  });
+
   test("a subject's files sit at its path; a flow has none; nothing escapes the directory", () => {
     expect(subjectFileStem(makeIri(CORE, "decision", "gate/D 1"), CORE)).toBe("decision/gate/D 1");
     expect(subjectFileStem(makeIri(CORE, "process", "P/flow/F"), CORE)).toBeUndefined();

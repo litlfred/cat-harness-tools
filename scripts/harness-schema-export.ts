@@ -118,7 +118,9 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
       "The root declaration every instance carries as `<name>.json`: what it is called, " +
       "where it publishes, and which directories it scans for which kind of graph. " +
       "Generated from `CatHarnessDeclarationSchema` in schemas/cat-harness.ts, which is authoritative.",
-    ...(base ? { $comment: `Instance graph: ${renderingPath(base, `${stub}.jsonld`)}` } : {}),
+    // Under the instance's own directory, the host's included, since #603
+    // decision 1b (owner, 2026-10-23) — `kg-export`'s `exportIdentity`.
+    ...(base ? { $comment: `Instance graph: ${renderingPath(base, decl?.name ?? stub, `${stub}.jsonld`)}` } : {}),
   };
 }
 

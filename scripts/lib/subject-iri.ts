@@ -32,11 +32,19 @@
 /**
  * Every kind a subject IRI may carry. {@link subjectIri} refuses any other.
  *
- * Closed on purpose: {@link subjectPathOf} tells this document's subjects from
- * an IRI that only shares its directory — the host's document sits at the
- * site root, so another instance's `…/folio-assistant-core/skill/x` and the
- * host's `…/tools/x.jsonld` start with the same base — by the first segment
- * after it. An open set could not tell `folio-assistant-core/…` from a kind.
+ * Its first job is gone: the host's document sat at the site root, so the set
+ * had to tell another instance's `…/folio-assistant-core/skill/x` from a kind.
+ * Since 2026-10-23 every layer's document, the host's included, sits at
+ * `<site>/<instance>/<stub>.jsonld` with its subjects beside it (owner: one
+ * rule for every layer; subjects beside their document), so no instance
+ * folder shares a subject's base.
+ *
+ * It stays closed for the two jobs left. {@link subjectPathOf} still has to
+ * tell a subject from the other files in the same directory: the Tool
+ * documents (`tools/<id>.jsonld`), the diagram vocabulary
+ * (`processes/ns.jsonld`), the context and the document itself. And a kind
+ * nobody declared is a typo that would mint an address no page serves, so
+ * {@link subjectIri} refuses it rather than publishing it.
  */
 export const SUBJECT_KINDS: readonly string[] = [
   "actor",
@@ -150,15 +158,20 @@ export function subjectPathOf(iri: string, docIri: string): string | undefined {
 
 /**
  * The `#fragment` IRI this subject had before #603:
- * `<doc dir>/<stub>.jsonld#<kind>/<id>`, a flow's `#flow/` folded back to `/flow/`.
+ * `<old document>#<kind>/<id>`, a flow's `#flow/` folded back to `/flow/`.
  * What a one-release tombstone is named by. `undefined` when `iri` is not a
  * subject of `docIri`'s document.
+ *
+ * `legacyDocIri` is the document the fragment was OF, when that is not
+ * `docIri`: the host's document left the site root for
+ * `<site>/<instance>/` in the same release (owner, 2026-10-23), so its old
+ * fragments name `<site>/<stub>.jsonld`, not the new document.
  */
-export function legacyFragmentIri(iri: string, docIri: string): string | undefined {
+export function legacyFragmentIri(iri: string, docIri: string, legacyDocIri: string = docIri): string | undefined {
   if (mintsFragments(docIri)) return undefined;
   const path = subjectPathOf(iri, docIri);
   if (path === undefined) return undefined;
-  return `${docIri}#${path.replace(`#${FLOW_SEGMENT}/`, `/${FLOW_SEGMENT}/`)}`;
+  return `${legacyDocIri}#${path.replace(`#${FLOW_SEGMENT}/`, `/${FLOW_SEGMENT}/`)}`;
 }
 
 /**

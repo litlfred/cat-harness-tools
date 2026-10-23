@@ -153,7 +153,10 @@ describe("converted publishers follow the declared subgraph pattern", () => {
     // which the export keeps as a tombstone `sameAs` this very IRI. Either
     // names the declared node; anything else is the defect this test is for.
     // Drop the legacy arm with the tombstones.
-    const legacy = legacyFragmentIri(sub!.iri, exportIdentity({ instanceRoot: sub!.declared.instanceRoot }).docIri);
+    // The old fragment is of the document the LAST release published: the
+    // host's root one, which moved under `<site>/<name>/` (#603 decision 1b).
+    const id = exportIdentity({ instanceRoot: sub!.declared.instanceRoot });
+    const legacy = legacyFragmentIri(sub!.iri, id.docIri, id.legacyDocIri ?? id.docIri);
     expect([sub!.iri, legacy]).toContain(page["inSubgraph"] as string);
   });
 

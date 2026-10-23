@@ -34,7 +34,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { buildExport, exportIdentity, publishedDocument, writeLegacyDocuments, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
 import { legacyFragmentIri, subjectPathOf } from "../lib/subject-iri.ts";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
@@ -179,7 +179,10 @@ describe("kg export", () => {
     // rename — correctly, but for the wrong reason: the property here is that
     // the document names ITSELF, which holds whatever the stub is. The value
     // is pinned once, in the naming test below, where it IS the subject.
-    expect(EXPORT["@id"]).toBe(`${BASE}/${artefactStub(readDeclaration(join(HARNESS_ROOT))!)}.jsonld`);
+    // Under the instance's own directory, the host's included, since #603
+    // decision 1b (owner, 2026-10-23): `<base>/<name>/<stub>.jsonld`.
+    const decl = readDeclaration(join(HARNESS_ROOT))!;
+    expect(EXPORT["@id"]).toBe(`${BASE}/${decl.name}/${artefactStub(decl)}.jsonld`);
     expect(EXPORT["@type"]).toBe("http://www.w3.org/ns/prov#Entity");
     expect(EXPORT.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
@@ -384,7 +387,12 @@ describe("kg export", () => {
     // is pinned HERE and derived everywhere else, because this test is the one
     // whose subject is the name itself.
     expect(stub).toBe("cat-harness");
-    expect(exportIdentity({ baseUrl: BASE }).docIri).toBe(`${BASE}/${stub}.jsonld`);
+    // The host is no longer special (#603 decision 1b, owner 2026-10-23: one
+    // rule for every layer, subjects beside their document). Its old root
+    // address is where the one-release tombstones are served.
+    expect(exportIdentity({ baseUrl: BASE }).docIri).toBe(`${BASE}/${decl.name}/${stub}.jsonld`);
+    expect(exportIdentity({ baseUrl: BASE }).docPath).toBe(`${decl.name}/${stub}.jsonld`);
+    expect(exportIdentity({ baseUrl: BASE }).legacyDocIri).toBe(`${BASE}/${stub}.jsonld`);
     expect(buildDeclarationSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/${stub}.schema.json`);
 
     // THE OTHER HALF OF THIS TEST WAS REVERSED BY THE OWNER, 2026-09-21, and
@@ -665,7 +673,13 @@ describe("every self-URL the export publishes resolves to something published", 
   /** Every path the deploy emits, built the way the workflows build it. */
   function publishedPaths(): Set<string> {
     const stub = artefactStub(readDeclaration(join(HARNESS_ROOT))!);
+    // The host's document under its own directory since #603 decision 1b
+    // (owner, 2026-10-23), and its old root address kept for one release as
+    // the tombstone document the same step writes.
+    const { docPath, legacyDocPath } = exportIdentity({ baseUrl: BASE });
     const out = new Set<string>([
+      docPath,
+      docPath.replace(/\.jsonld$/, ".json"),
       `${stub}.jsonld`,
       `${stub}.json`,
       `${stub}.schema.json`,
@@ -743,7 +757,14 @@ describe("every self-URL the export publishes resolves to something published", 
     // `tool-types.schema.json`. A port's `schema` names one of these.
     for (const n of Object.keys(TOOL_TYPES)) out.add(`tool-types/${n}.schema.json`);
     const toolDir = join(HARNESS_ROOT, "tools");
-    for (const f of readdirSync(toolDir, { withFileTypes: true })) if (f.isDirectory()) out.add(`tools/${f.name}.jsonld`);
+    // Beside the document, so under `<name>/` since #603 decision 1b; the
+    // old root `tools/<id>.jsonld` holds each one's tombstone for a release.
+    const docDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
+    for (const f of readdirSync(toolDir, { withFileTypes: true })) {
+      if (!f.isDirectory()) continue;
+      out.add(`${docDir}tools/${f.name}.jsonld`);
+      out.add(`tools/${f.name}.jsonld`);
+    }
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
     // Each subject's page and document (#603), which the deploy's kg-export
@@ -753,15 +774,16 @@ describe("every self-URL the export publishes resolves to something published", 
     // writer does not produce must fail here. Pages serves `<x>.html` at `<x>`.
     const site = mkdtempSync(join(tmpdir(), "kg-subjects-"));
     try {
-      const write = (doc: Record<string, unknown>, at: string) => {
-        for (const f of writeSubjectDocuments(doc, join(site, at))) {
+      const write = (doc: Record<string, unknown>, at: string, legacy?: string) => {
+        const files = [...writeSubjectDocuments(doc, join(site, at)), ...writeLegacyDocuments(doc, join(site, at), at, legacy)];
+        for (const f of files) {
           const rel = relative(site, f).split("\\").join("/");
           out.add(rel);
           if (rel.endsWith("/index.html")) out.add(rel.slice(0, -"index.html".length));
           else if (rel.endsWith(".html")) out.add(rel.slice(0, -".html".length));
         }
       };
-      write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, `${stub}.jsonld`);
+      write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, docPath, legacyDocPath);
       for (const p of instanceExportPlan()) {
         const e = OWNER_DOCS.get(resolve(REPO, p.path));
         if (e !== undefined) write(publishedDocument(e) as Record<string, unknown>, `${p.stub}/${p.stub}.jsonld`);
@@ -1259,6 +1281,38 @@ describe("each Tool is its own document, at the path its IRI names", () => {
     }
   });
 
+  // #603 decision 1b (owner, 2026-10-23): the host's document and Tools left
+  // the site root. Each old address must still answer, with where it went.
+  test("the old root document and each old Tool document forward, for one release", () => {
+    const pub = publishedDocument(EXPORT_CANONICAL) as unknown as Record<string, unknown>;
+    const { docPath, legacyDocPath, legacyDocIri, docIri } = exportIdentity({ baseUrl: BASE });
+    expect(pub["@id"]).toBe(docIri);
+    expect(legacyDocPath).toBeDefined();
+    const site = mkdtempSync(join(tmpdir(), "kgx-legacy-"));
+    try {
+      const written = writeLegacyDocuments(pub, join(site, docPath), docPath, legacyDocPath);
+      const root = JSON.parse(readFileSync(join(site, legacyDocPath!), "utf-8")) as Record<string, unknown>;
+      expect(root["@id"]).toBe(legacyDocIri);
+      expect([root.deprecated, root.isReplacedBy, root.sameAs]).toEqual([true, docIri, docIri]);
+      const stones = root["@graph"] as Array<Record<string, unknown>>;
+      expect(stones.length).toBeGreaterThan(1000);
+      for (const t of stones) expect(String(t["@id"]).startsWith(`${legacyDocIri}#`)).toBe(true);
+      // One file per Tool at its old address, its one node the tombstone.
+      const tools = (pub["@graph"] as Array<Record<string, unknown>>).filter((n) => n["@type"] === termIri("Tool"));
+      expect(written.length).toBe(1 + tools.length);
+      for (const t of tools) {
+        const old = toolIri(legacyDocIri!, String(t.name));
+        const doc = JSON.parse(readFileSync(join(site, "tools", `${String(t.name)}.jsonld`), "utf-8")) as Record<string, unknown>;
+        expect(doc["@id"]).toBe(old);
+        expect(doc["@graph"]).toEqual([{ "@id": old, deprecated: true, isReplacedBy: t["@id"], sameAs: t["@id"] }]);
+      }
+      // `--out` that does not end in the document's path names no site root.
+      expect(writeLegacyDocuments(pub, join(site, "elsewhere.jsonld"), docPath, legacyDocPath)).toEqual([]);
+    } finally {
+      rmSync(site, { recursive: true, force: true });
+    }
+  });
+
   test("no Tool is a fragment of the instance document any more", () => {
     const own = String(EXPORT_ALT["@id"]);
     for (const n of EXPORT_ALT["@graph"] as Array<Record<string, unknown>>) {
@@ -1472,7 +1526,13 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
   // #603's tombstones (a subject's old fragment, `sameAs` its path) are the
   // ones whose replacement is in THIS graph under that very fragment; the
   // rest are this block's: nodes that moved to their owner's document.
-  const migrated = (t: Record<string, unknown>): boolean => legacyFragmentIri(String(t.isReplacedBy), DOC) === t["@id"];
+  // The host's last release published them under its ROOT document (#603
+  // decision 1b), so the old fragments name that one, not `DOC`.
+  const LEGACY = exportIdentity({ baseUrl: BASE }).legacyDocIri ?? DOC;
+  // A Tool's old document forwards to it too (`<base>/tools/<id>.jsonld`).
+  const here = new Set(graph.filter((n) => !isTombstone(n)).map((n) => String(n["@id"])));
+  const migrated = (t: Record<string, unknown>): boolean =>
+    legacyFragmentIri(String(t.isReplacedBy), DOC, LEGACY) === t["@id"] || (t.sameAs === t.isReplacedBy && here.has(String(t.isReplacedBy)));
   const tombstones = graph.filter((n) => isTombstone(n) && !migrated(n));
 
   test("no node's source path is outside this instance", () => {
@@ -1501,7 +1561,7 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
       .filter((n) => !isTombstone(n))
       .map((n) => String(n["@id"]))
       .filter((id) => !here.has(id))
-      .map((id) => legacyFragmentIri(id, DOC) ?? id);
+      .map((id) => legacyFragmentIri(id, DOC, LEGACY) ?? id);
     expect(moved.length).toBeGreaterThan(0);
     const stones = new Set(tombstones.map((n) => String(n["@id"])));
     expect(moved.filter((id) => !stones.has(id))).toEqual([]);
@@ -1550,8 +1610,8 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
     const missing: string[] = [];
     for (const n of subjects) {
       const id = String(n["@id"]);
-      const old = legacyFragmentIri(id, DOC)!;
-      expect(old.startsWith(`${DOC}#`)).toBe(true);
+      const old = legacyFragmentIri(id, DOC, LEGACY)!;
+      expect(old.startsWith(`${LEGACY}#`)).toBe(true);
       const t = stones.get(old);
       if (t === undefined) missing.push(old);
       else expect(t).toEqual({ "@id": old, deprecated: true, isReplacedBy: id, sameAs: id });

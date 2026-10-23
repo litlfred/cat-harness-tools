@@ -61,6 +61,7 @@ import { join, resolve } from "node:path";
 
 import { artefactStub, readDeclaration, renderingPath } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import type { CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDocPath } from "./instance-exports.js";
 
 /**
  * Anything whose destination can be checked against a built tree.
@@ -144,7 +145,10 @@ export function siteLinks(
     // `@id` in the document names — so that is what is linked, even though the
     // build also publishes a `.json` alias for hosts with no `.jsonld` media
     // type. Linking the alias would advertise a URL no `@id` claims.
-    { id: "jsonld", path: sitePath(`${stub}.jsonld`), target: `${stub}.jsonld` },
+    // Under the instance's own directory, the host's included, since #603
+    // decision 1b (owner, 2026-10-23): `exportIdentity`'s `docPath`, through
+    // the same resolver. The old root `<stub>.jsonld` is a tombstone now.
+    { id: "jsonld", path: sitePath(instanceDocPath({ name: decl.name, stub })), target: instanceDocPath({ name: decl.name, stub }) },
   ];
   if (repoUrl) out.push({ id: "source", url: repoUrl });
   return out;
