@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { contentAt, resolveTipLocation, tipLocations } from "../branch-store.js";
-import { STATE_IGNORE_BEGIN, STATE_IGNORE_END, delegatedReport, delegatedStores, mountState, report, withStateIgnoreBlock } from "../state-mount.js";
+import { STATE_IGNORE_BEGIN, STATE_IGNORE_END, delegatedReport, delegatedStores, mountState, report, staleLayerMounts, withStateIgnoreBlock } from "../state-mount.js";
 import { cleanup, git, MANIFEST, stateFixture, TIP_SOURCE, BRANCH } from "./state-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -245,6 +245,25 @@ describe("a successful mount is ignored by the checkout", () => {
     expect(git(root, "status", "--porcelain", "--", "todos").trim()).toBe("");
   });
 
+  test("mounting ONE graph keeps every declared graph's line, and leaves .gitignore byte-identical (bean 792f)", () => {
+    // Bean `792f`: `state:mount -- --id beans` was seen dropping
+    // `/merge-reviews/**` from the block. `--id` narrows the MOUNT, never the
+    // block: the block is written from every declared tip graph.
+    const { root, store } = stateFixture("state-mount-t-").checkout("a");
+    const dirs = [
+      { id: "todos", path: "todos/", graphTypologies: ["todos"], source: TIP_SOURCE },
+      // The graph the bean saw dropped, declared but not the one mounted.
+      { id: "merge-reviews", path: "merge-reviews/", graphTypologies: ["merge-reviews"], source: { kind: "branch", branch: "cat/cat-harness/merge-reviews", keyedBy: "tip" } },
+    ];
+    writeFileSync(join(root, "t.json"), JSON.stringify({ name: "t", directories: dirs }, null, 2) + "\n");
+    const before = `node_modules\n${STATE_IGNORE_BEGIN}\n/merge-reviews/**\n/todos/**\n${STATE_IGNORE_END}\n`;
+    writeFileSync(join(root, ".gitignore"), before);
+    git(root, "add", "-A");
+    git(root, "commit", "-q", "-m", "two declared tip graphs");
+    expect(mountState({ repoRoot: root, store, id: "todos" }).state).toBe("mounted");
+    expect(readFileSync(join(root, ".gitignore"), "utf-8")).toBe(before);
+  });
+
   test("a mount that did not happen writes nothing", () => {
     const { root, store } = stateFixture("state-mount-t-").checkout("a", { kind: "directory" });
     mountState({ repoRoot: root, store });
@@ -289,5 +308,25 @@ describe("checkout-relative markers and damaged mounts (bean 1ple)", () => {
     expect(text).toContain("damaged?");
     expect(text).not.toContain("push them with `bun run cat state:push`");
     expect(text).toContain("--allow-mass-delete");
+  });
+});
+
+describe("staleLayerMounts — `--id` rewrites the .gitignore block only over current layer mounts (bean 792f)", () => {
+  test("a checkout with no lock has nothing to be stale against", () => {
+    const root = mkdtempSync(join(tmpdir(), "stale-layers-"));
+    try {
+      expect(staleLayerMounts(root)).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("CORRUPTED: a layer mount that does not match the lock is stale, and says what to run", () => {
+    for (const state of ["missing", "could-not-determine"] as const) {
+      const why = staleLayerMounts("/nowhere", () => state);
+      expect(why).toContain(state);
+      expect(why).toContain("state:mount");
+    }
+    for (const state of ["mounted", "unverified-approver", "not-enabled"] as const) expect(staleLayerMounts("/nowhere", () => state)).toBeUndefined();
   });
 });

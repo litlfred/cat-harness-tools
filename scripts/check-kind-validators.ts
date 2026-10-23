@@ -38,7 +38,7 @@ import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from
 import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
 import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/declared-nodes.js";
-import { typedBlockKinds } from "@litlfred/cat-harness/schemas/constraints.js";
+import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
@@ -521,12 +521,24 @@ async function main(): Promise<number> {
     // hold the typed kinds against — said, never read as a pass.
     console.log("\n· block kinds not examined: standalone, no checkout holds the instances that declare them");
   } else {
-    const typed = new Set(typedBlockKinds());
+    // BlockSchema's kinds and every typed vocabulary module's: a layer above
+    // cat-harness types its own kinds, so a composition without it neither
+    // discovers nor types them.
+    let typedKinds: string[];
+    try {
+      typedKinds = allTypedBlockKinds();
+    } catch (e) {
+      // A module that breaks the contract would leave its kinds untyped and
+      // every block of them failing validation: a finding, not a crash.
+      console.log(`\n✗ a typed vocabulary module could not be loaded: ${(e as Error).message}`);
+      return 1;
+    }
+    const typed = new Set(typedKinds);
     const untyped = [...discovered].filter((k) => !typed.has(k));
     const undiscovered = [...typed].filter((k) => !discovered.has(k));
     console.log(`\n${discovered.size} block kind(s) discovered from block-kinds/ nodes`);
     if (untyped.length || undiscovered.length) {
-      for (const k of untyped) console.log(`  ✗ block kind "${k}" is declared by a node but no BlockSchema member types it`);
+      for (const k of untyped) console.log(`  ✗ block kind "${k}" is declared by a node but neither BlockSchema nor a vocabulary module types it`);
       for (const k of undiscovered) console.log(`  ✗ block kind "${k}" is typed by BlockSchema but no block-kinds/ node declares it`);
       return 1;
     }
@@ -548,6 +560,7 @@ async function main(): Promise<number> {
       if (inst === undefined || !existsSync(join(inst, n.vocabulary))) missingModules.push(`${n.adapter}: ${n.vocabulary} (declared by ${file})`);
     }
     console.log(`\n${vocabularies.size} content-adapter vocabular(ies) discovered from content-adapters/ nodes`);
+    for (const v of loadedVocabularies()) console.log(`  · ${v.adapter}: ${v.schemas.size} kind(s) typed by its vocabulary module (${relative(REPO_ROOT ?? resolve(HARNESS_ROOT, ".."), v.module)})`);
     if (orphanKinds.length || missingModules.length) {
       for (const k of orphanKinds) console.log(`  ✗ block kind "${k.kind}" names adapter "${k.adapter}", which no content-adapters/ node declares`);
       for (const m of missingModules) console.log(`  ✗ vocabulary module not found — ${m}`);

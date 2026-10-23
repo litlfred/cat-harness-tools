@@ -33,7 +33,7 @@ import { join, resolve } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import { declaredContributions } from "../ensure-landing-sticky.js";
-import { buildPage, sheetBody, wornBy } from "../render-theme-sheet.js";
+import { buildPage, buildViz, sheetBody, VIEWER_TOOL, wornBy } from "../render-theme-sheet.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = HARNESS_ROOT;
@@ -98,5 +98,30 @@ describe("the themes page", () => {
     for (const c of cards) expect(worn.get(c.contribution.theme.themeId)).toContain(c.contribution.id);
     const total = [...worn.values()].reduce((n, v) => n + v.length, 0);
     expect(total).toBe(cards.length);
+  });
+});
+
+describe("the themes viewer (bean folio-assistant-6gme)", () => {
+  // Built at publish, never committed, so there is no copy to compare with:
+  // this asks what the generator produces, not whether a file is current.
+  const viz = buildViz(HARNESS_ROOT);
+
+  it("is drawn only where a `themes` visualiser is declared", () => {
+    // Undefined until cat-harness declares the visualiser; then it is at its route.
+    if (viz === undefined) return;
+    expect(viz.path.endsWith(join("themes", "index.md"))).toBe(true);
+  });
+
+  it("names the Tool that renders it, and opens with the platform's themes", () => {
+    if (viz === undefined) return;
+    expect(viz.md).toContain(`rendered-by: ${VIEWER_TOOL}`);
+    expect(viz.md).toContain("## The platform");
+    expect(viz.themes).toBeGreaterThanOrEqual(THEMES.length);
+  });
+
+  it("gives every instance it read a section, and names any it could not", () => {
+    if (viz === undefined) return;
+    expect((viz.md.match(/^## /gm) ?? []).length).toBeGreaterThanOrEqual(1 + viz.instances);
+    for (const m of viz.missing) expect(viz.md).toContain(m);
   });
 });

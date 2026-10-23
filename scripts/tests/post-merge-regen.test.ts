@@ -10,6 +10,8 @@ import { join } from "node:path";
 import {
   buildPrBody,
   checkPostMergeRegen,
+  FIXITY_CHECKS,
+  postMergePairs,
   resolveRepoRoot,
   type GhExecutor,
   type GitExecutor,
@@ -349,6 +351,23 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       expect(report.prOpened).toBe(false);
       expect(report.exitCode).toBe(1);
       expect(report.summary).toContain("Repair failed: 1 check(s) could not be repaired");
+    });
+  });
+
+  describe("fixity gates are not asked", () => {
+    test("the mount checks are left out, and every other pair is kept in order", () => {
+      const pairs = [
+        { check: "library:viz:check", writer: "library:viz" },
+        { check: "mount:remote:check", writer: "mount:remote" },
+        { check: "readme:subgraphs:check", writer: "readme:subgraphs" },
+        { check: "mount:lock:check", writer: "mount:lock" },
+      ];
+      expect(postMergePairs(pairs).map((p) => p.check)).toEqual(["library:viz:check", "readme:subgraphs:check"]);
+    });
+
+    test("each excluded gate says why", () => {
+      expect(Object.keys(FIXITY_CHECKS).sort()).toEqual(["mount:lock:check", "mount:remote:check"]);
+      for (const reason of Object.values(FIXITY_CHECKS)) expect(reason.length).toBeGreaterThan(20);
     });
   });
 

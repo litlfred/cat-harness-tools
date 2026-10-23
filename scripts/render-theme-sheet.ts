@@ -60,14 +60,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { THEME_LAYOUTS, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
+import { instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "@litlfred/cat-harness/schemas/theme.js";
+import { instanceThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import type { ImageRegion, KgImage } from "@litlfred/cat-harness/schemas/kg-node.js";
 import { avatarClip, dataUri } from "./render-avatar-crops.js";
 import { declaredContributions } from "./ensure-landing-sticky.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.ts";
 
 /** The AAA floor. A value below it is not a worse theme; it is a failing one. */
 export const AAA = 7;
@@ -193,11 +195,15 @@ export function sheetBody(
   root: string,
   src: ImageSource,
   worn: ReadonlyMap<string, readonly string[]> = new Map(),
+  themes: readonly ResolvedTheme[] = THEMES,
 ): { html: string; css: string; themes: number; missing: string[] } {
+  // A theme's art is declared by the instance that owns the theme, so `root`
+  // is that instance's root: the platform's for `THEMES`, an instance's for
+  // its own `INSTANCE_THEMES`.
   const images = readDeclaration(root)?.images ?? [];
   const missing: string[] = [];
 
-  const rows = THEMES.map((t) => {
+  const rows = themes.map((t) => {
     const p = t.palette;
     const backdrop = resolveThemeBackdrop(t, images);
     if (backdrop.missing.length > 0) missing.push(`${t.id}: ${backdrop.missing.join(", ")}`);
@@ -293,7 +299,7 @@ export function sheetBody(
 .fa-theme-sheet td.art{display:inline-block;width:31%;vertical-align:top;padding:4px}
 .fa-theme-sheet td.art[colspan]{display:block;width:auto}
 }`;
-  return { html, css, themes: THEMES.length, missing };
+  return { html, css, themes: themes.length, missing };
 }
 
 /** The standalone sheet: every image inlined, openable from anywhere. */
@@ -369,10 +375,110 @@ ${body.html}
   return { md, themes: body.themes, missing: body.missing };
 }
 
+// ── The `themes` visualiser (bean folio-assistant-6gme) ──────────────────
+
+/** The Tool node that draws the `themes` visualiser. */
+export const VIEWER_TOOL = "theme-viewer";
+
+/**
+ * The `themes` VISUALISER: every theme in the checkout, the platform's and
+ * every instance's, at the route the declaration gives it.
+ *
+ * Bean `folio-assistant-6gme`, owner 2026-10-20: *"every kind gets a viewer"*.
+ * The `themes` kind is declared by instances (smart-base's WHO SMART IG
+ * template theme, who-iris's IRIS and WHO publication themes) as a
+ * `themes.ts` exporting `INSTANCE_THEMES`, and until this page nothing drew
+ * them: `theme:page` draws the platform's `THEMES` only. They are read
+ * through `instanceThemes`, the one resolution every generator uses, so this
+ * page cannot show a theme the runtime does not resolve, and an instance whose
+ * themes cannot be read gets a row saying why rather than no row.
+ *
+ * Built at publish, like every viewer over a kind the whole checkout holds:
+ * which instances are mounted is a fact about the checkout, not this commit.
+ */
+export function buildViz(root: string): { path: string; md: string; themes: number; instances: number; missing: string[] } | undefined {
+  const route = declaredPageRoute(root, VIEWER_TOOL);
+  if (route === undefined) return undefined;
+  const repoRoot = repoRootFor(root);
+  const site = resolve(root, siteDirFor(root));
+  // An image is linked only where the site publishes it; anything else is
+  // reported as unread on the page rather than linked to a 404.
+  const srcFor = (instanceRoot: string): ImageSource => (img) => {
+    const abs = join(instanceRoot, img.src);
+    if (!existsSync(abs)) return undefined;
+    const rel = relative(site, abs).split("\\").join("/");
+    return rel.startsWith("..") ? undefined : `{{ '/${rel}' | relative_url }}`;
+  };
+
+  const platform = sheetBody(root, srcFor(root), wornBy(root));
+  const missing = [...platform.missing];
+  let total = platform.themes;
+  const sections: string[] = [];
+  const declaring = instanceRootsIn(repoRoot)
+    .map((r) => ({ r, name: readDeclaration(r)?.name }))
+    .filter((x): x is { r: string; name: string } => x.name !== undefined && instanceDirectoriesForGraph(x.r, "themes").length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const { r, name } of declaring) {
+    const got = instanceThemes(repoRoot, name);
+    if (!got.ok) {
+      sections.push(`## ${name}\n\nDeclares a \`themes\` directory whose themes cannot be read: \`${got.miss.kind}\`.\n`);
+      continue;
+    }
+    const body = sheetBody(r, srcFor(r), new Map(), got.themes);
+    total += body.themes;
+    missing.push(...body.missing.map((m) => `${name}/${m}`));
+    sections.push(`## ${name}\n\n**${body.themes} theme(s)**, declared in ${name}'s \`themes\` directory.\n\n${body.html}\n`);
+  }
+
+  const md = withRenderedByFrontMatter(
+    `---
+title: "Themes"
+description: "Every theme in this checkout — the platform's and each instance's — with its palette, measured contrast and art."
+---
+<!-- GENERATED by cat-harness-tools/scripts/render-theme-sheet.ts --viz — do not edit; run \`bun run cat theme:viz\`. -->
+<style>
+${platform.css}
+</style>
+
+# Themes
+
+${LEDE}
+
+**${total} theme(s)**: ${platform.themes} from the platform and ${total - platform.themes} declared by ${declaring.length} instance(s).
+
+## The platform
+
+${platform.html}
+
+${sections.join("\n")}`,
+    VIEWER_TOOL,
+  );
+  return { path: join(site, route, "index.md"), md, themes: total, instances: declaring.length, missing };
+}
+
 if (import.meta.main) {
   const root = HARNESS_ROOT;
   const argv = process.argv.slice(2);
-  if (argv.includes("--page")) {
+  if (argv.includes("--viz")) {
+    const viz = buildViz(root);
+    if (viz === undefined) {
+      console.log(`  · no visualiser declared rendered by ${VIEWER_TOOL} — nothing to publish`);
+      process.exit(0);
+    }
+    if (argv.includes("--check")) {
+      const current = existsSync(viz.path) ? readFileSync(viz.path, "utf-8") : "";
+      if (current !== viz.md) {
+        console.error(`::error::render-theme-sheet: ${relative(repoRootFor(root), viz.path)} is stale — run \`bun run cat theme:viz\``);
+        process.exit(1);
+      }
+      console.log(`✓ themes viewer is current — ${viz.themes} theme(s), ${viz.instances} instance(s)`);
+    } else {
+      mkdirSync(dirname(viz.path), { recursive: true });
+      writeFileSync(viz.path, viz.md);
+      console.log(`Themes viewer → ${relative(repoRootFor(root), viz.path)}\n  ${viz.themes} theme(s), ${viz.instances} instance(s)`);
+      for (const m of viz.missing) console.log(`  incomplete backdrop — ${m}`);
+    }
+  } else if (argv.includes("--page")) {
     const { md, themes, missing } = buildPage(root);
     if (themes === 0) {
       console.error("No themes are declared. Nothing was rendered — that is not a clean run.");

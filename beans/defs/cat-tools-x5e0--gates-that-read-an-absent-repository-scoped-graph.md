@@ -40,3 +40,11 @@ Measured on litlfred/smart-immunizations#66 (771314f, cat-harness ac96988, cat-h
    - `sweep:mark:check` (via `resolveBeanGraphNode`): `absent` gives judgement `ok` with "not applicable: …".
    - Every other caller of the two resolvers keeps treating `absent` as it treats `refused` until someone decides otherwise. That is the safe default: no reader turns an absent graph into an empty pass.
 4. `skill:register`'s "no package manifests" is investigated separately; it does not look like the same cause.
+
+
+*2026-10-22T16:45:00Z* — Status (lane A drain, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Three of the four Done-when boxes are met on main:
+
+- **Consumers say not applicable** and **derive:publish skips an absent writer**: #520 (61804f07, 2026-10-21), the proposed design above.
+- **skill:register's missing manifests are explained and fixed**: #521 (ac55077b, 2026-10-21, bean j3ls). The cause was not the absent graph. The instance judged is the one mounting the harness, and smart-immunizations declares no knowledge-graph directory: its smart-immunizations.json declares library, l1-extraction and qa only, and none is a KG content typology. It was read as "cannot tell" (exit 2). It is now not applicable (exit 0). Re-measured here against smart-immunizations f6be51f: declaredKgDirectories returns []. The four failures in the body were measured at tools ca99a6b, which predates both PRs.
+
+**Still open:** smart-immunizations#66 goes green without changing smart-immunizations. This was NOT measured here, because litlfred/smart-immunizations is not in this session's repository scope. It needs a re-run of #66's layer-pr-checks with tools pinned at or after ac55077b. Close this bean when that run is green.
