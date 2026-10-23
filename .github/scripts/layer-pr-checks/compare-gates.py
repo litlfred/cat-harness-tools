@@ -20,10 +20,25 @@ green traced run on main `<sha>` read is unchanged. It is listed as
 counted. On base it stands for that recorded green run: a head failure
 against it is NEW, exactly as against a base that exited 0, because base's
 inputs were that green run's.
+
+A gate that carries `diagnostics` on both sides (`run-root-gates.py`: the
+errors it printed, line numbers left out) is judged finer when it is red on
+both: a diagnostic head holds more times than base is NEW, so a gate already
+red on main still fails the PR that adds an error to it. Without them on both
+sides, red on both stays "failing on main too".
 """
 import json
 import os
 import sys
+from collections import Counter
+
+
+def new_diagnostics(base_entry, head_entry):
+    """The diagnostics head holds more times than base, or [] when either side has none recorded."""
+    if not isinstance(base_entry, dict) or "diagnostics" not in base_entry or "diagnostics" not in head_entry:
+        return []
+    extra = Counter(head_entry["diagnostics"]) - Counter(base_entry["diagnostics"])
+    return sorted(extra.elements())
 
 
 def side_cell(entry):
@@ -47,7 +62,7 @@ def base_exit(entry):
 def main():
     base = json.load(open(sys.argv[1]))
     head = json.load(open(sys.argv[2]))
-    rows, new = [], []
+    rows, new, added = [], [], {}
     for name in sorted(head):
         if head[name].get("unchanged"):
             # Not run on head: its recorded read set is unchanged (the CI cone).
@@ -68,6 +83,10 @@ def main():
         elif h == 2 and b in (0, 1):
             verdict = "NEW: could not determine"
             new.append(name)
+        elif new_diagnostics(base.get(name), head[name]):
+            added[name] = new_diagnostics(base.get(name), head[name])
+            verdict = f"failing on main too, and NEW: {len(added[name])} error(s) main does not have"
+            new.append(name)
         else:
             verdict = "failing on main too"
         rows.append(f"| `{name}` | {side_cell(base.get(name))} | {h} | {verdict} |")
@@ -75,7 +94,9 @@ def main():
     if new:
         lines.append(f"**{len(new)} gate(s) newly failing.** Their output tails:")
         for name in new:
-            lines += ["", f"### `{name}`", "", "```", head[name]["tail"], "```"]
+            # The errors themselves when the gate listed them, else its output's tail.
+            body = "\n".join(added.get(name) or head[name].get("diagnostics") or []) or head[name]["tail"]
+            lines += ["", f"### `{name}`", "", "```", body, "```"]
     summary = "\n".join(lines)
     print(summary)
     path = os.environ.get("GITHUB_STEP_SUMMARY")
