@@ -39,7 +39,7 @@
  *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts
  *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
@@ -58,8 +58,8 @@ import {
   unusedNamespaces,
   type ExternalSchema,
 } from "@litlfred/cat-harness/schemas/external-schema.js";
-import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutInstanceRoots, pageParts, visualiserFor, visualiserPageDir, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
@@ -197,6 +197,14 @@ export function page(
   inUse: readonly string[],
   fileHref: (repoPath: string) => string | undefined = () => undefined,
   broaderInUse: readonly string[] = [],
+  /**
+   * Set for ONE INSTANCE'S page (`<route>/instance/<name>/`): that instance's
+   * own records, under its own title. The namespace reconciliation is left
+   * out there and linked to instead. It compares the corpus against the
+   * REGISTRY, so over a single instance's records it would report every
+   * namespace the corpus uses as undeclared.
+   */
+  subject?: { instance: string; title: string; directory: string; fullHref: string },
 ): string {
   const userCell = (u: string): string => {
     const h = fileHref(u);
@@ -219,12 +227,28 @@ export function page(
 
   const b: string[] = [
     "---",
-    'title: "External schemas"',
-    'description: "The specifications this repository depends on — the edition of each, what would move if one bumped, and the terms it actually branches on."',
-    "generated: gen-external-schemas-viz.ts — do not hand-edit; run `bun run cat external-schemas:viz`",
+    ...(subject
+      ? [
+          `title: ${JSON.stringify(`External schemas — ${subject.title}`)}`,
+          `description: ${JSON.stringify(`The specifications ${subject.title} declares in its own external-schema directory: the edition of each, what would move if one bumped, and the terms it branches on.`)}`,
+          "generated: gen-external-schemas-viz.ts, built at publish — never committed",
+          "nav_exclude: true",
+        ]
+      : [
+          'title: "External schemas"',
+          'description: "The specifications this repository depends on — the edition of each, what would move if one bumped, and the terms it actually branches on."',
+          "generated: gen-external-schemas-viz.ts — do not hand-edit; run `bun run cat external-schemas:viz`",
+        ]),
     "---",
     `<style>${CSS}</style>`,
     "",
+    ...(subject
+      ? [
+          `The records **${cell(subject.title)}** (\`${cell(subject.instance)}\`) holds in \`${cell(subject.directory)}\`, read at this build's pins. ` +
+            `The platform's own registry, and the namespaces the whole corpus uses compared against it, are on [the full page](${subject.fullHref}).`,
+          "",
+        ]
+      : []),
     "A specification here is **referenced, not held**: the edition is named and",
     "the terms this repository actually acts on are materialised into the graph,",
     "but the document itself stays at the authority. That split is the owner's:",
@@ -292,14 +316,16 @@ export function page(
   // Reported either way. "Nothing undeclared" and "the reconciliation did not
   // run" are different facts, and a section that appeared only on a finding
   // could not tell them apart.
-  b.push("## Namespaces the corpus uses against the ones it declares", "");
-  b.push(
+  if (!subject) b.push("## Namespaces the corpus uses against the ones it declares", "");
+  if (!subject) b.push(
     `Read from diagram files (BPMN and DMN), metadata records, and JSON-LD contexts — **${allInUse.length}** namespace IRI(s)`,
     "are in use across the corpus. Derived rather than listed, so an artefact that adopts a new",
     "vocabulary shows up here instead of going unnoticed.",
     "",
   );
-  if (undeclared.length === 0) {
+  if (subject) {
+    // The reconciliation is the registry's (see `subject`), so it is not drawn here.
+  } else if (undeclared.length === 0) {
     b.push("Every namespace the corpus declares is covered by a record above.", "");
   } else {
     b.push(
@@ -310,7 +336,7 @@ export function page(
       "",
     );
   }
-  if (unused.length > 0) {
+  if (!subject && unused.length > 0) {
     b.push(
       `**${unused.length} declared and not in use.** Not a defect on its own: a`,
       "record may cover a namespace only some artefacts carry. It is here because",
@@ -406,6 +432,50 @@ export function page(
   return b.join("\n").trimEnd() + "\n";
 }
 
+/**
+ * The pages the visualiser's `instance` sub-graph owes: one per OTHER
+ * instance in the checkout that declares an `external-schema` directory, at
+ * `<route>/<subgraphUnder>/<instance>/index.md`, holding that instance's own
+ * records. The harness's own directory is the full page and gets none.
+ *
+ * Built at publish (the harness's `builtAtPublish`): each reads a layer above
+ * the harness at the checkout's pins, so no commit of the harness can hold one
+ * current. `--check` therefore judges only the committed full page.
+ *
+ * Empty when the visualiser declares no `subgraphs: "instance"`.
+ */
+export function instancePages(repo: string, docsBase: string, fileHref: (repoPath: string) => string | undefined = () => undefined): { pages: Map<string, string>; under?: string } {
+  const pages = new Map<string, string>();
+  const handlerRoot = existsSync(join(repo, "cat-harness")) ? join(repo, "cat-harness") : INSTANCE_ROOT;
+  let v;
+  try {
+    v = visualiserFor(handlerRoot, VIEWER_TOOL);
+  } catch {
+    return { pages };
+  }
+  if (v.subgraphs !== "instance") return { pages };
+  const under = v.subgraphUnder?.[KIND];
+  const full = pageParts({ harness: v.harness, visualiser: v.id });
+  for (const root of checkoutInstanceRoots(repo)) {
+    const decl = readDeclaration(root);
+    if (decl === undefined || decl.name === v.harness) continue;
+    const dirs = (decl.directories ?? []).filter((d) => (d.graphTypologies ?? []).includes(KIND) && typeof d.path === "string");
+    if (dirs.length === 0) continue;
+    const specs = dirs.flatMap((d) => loadSpecs(join(root, d.path!)));
+    const sub = under ? `${under}/${decl.name}` : decl.name;
+    const depth = sub.split("/").length;
+    const directory = dirs.map((d) => relative(repo, join(root, d.path!)).split(sep).join("/")).join(", ");
+    const text = page(specs, declaredUsers(specs, repo), [], fileHref, [], {
+      instance: decl.name,
+      title: decl.title ?? decl.name,
+      directory,
+      fullHref: "../".repeat(depth),
+    });
+    pages.set(join(visualiserPageDir(docsBase, { ...full, subgraph: sub }), "index.md"), withRenderedByFrontMatter(text, VIEWER_TOOL));
+  }
+  return { pages, ...(under ? { under: visualiserPageDir(docsBase, { ...full, subgraph: under }) } : {}) };
+}
+
 if (import.meta.main) {
   const check = process.argv.includes("--check");
   const specs = loadSpecs();
@@ -457,11 +527,18 @@ if (import.meta.main) {
       );
       process.exit(1);
     }
-    console.log(`✓ external-schemas viewer is current — ${specs.length} specification(s)`);
+    console.log(`✓ external-schemas viewer is current — ${specs.length} specification(s); per-instance pages are built at publish and not judged here`);
   } else {
     mkdirSync(join(out, ".."), { recursive: true });
     writeFileSync(out, rendered);
     console.log(`external-schemas viewer: ${specs.length} specification(s) → ${PAGE}`);
     console.log(`  ${users.uses.length} declared use(s), ${users.unknown.length} naming no record`);
+    const inst = instancePages(REPO, docsBase, fileHref);
+    if (inst.under !== undefined) rmSync(inst.under, { recursive: true, force: true });
+    for (const [p, text] of inst.pages) {
+      mkdirSync(join(p, ".."), { recursive: true });
+      writeFileSync(p, text);
+      console.log(`  instance page → ${relative(docsBase, p)}`);
+    }
   }
 }

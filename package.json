@@ -619,6 +619,7 @@
     "index:render:check": "bun run cat-harness-tools/scripts/index-render.ts --check",
     "block-qa:publish": "bun run cat-harness-tools/scripts/publish-block-qa.ts",
     "openapi:ingest": "bun run cat-harness-tools/openapi/scripts/ingest-openapi.ts",
+    "openapi:viz": "bun run cat-harness-tools/openapi/scripts/gen-openapi-viewer.ts",
     "openapi:ingest:rendered": "bun run cat-harness-tools/openapi/scripts/ingest-openapi-rendered.ts",
     "site:instance": "bun run cat-harness-tools/scripts/build-instance-site.ts",
     "pack:tarball": "bun run cat-harness-tools/scripts/pack-tarball.ts",
