@@ -69,9 +69,13 @@ on:
 permissions:
   contents: write
 
+# A publish: never cancelled in progress, so a run is not stopped between
+# its context and vocabulary writes to `gh-pages` (owner, 2026-10-23). Without
+# cancel-in-progress the group still keeps only the NEWEST pending run, so a
+# burst of main pushes publishes the running one and the latest.
 concurrency:
   group: layer-publish-context-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || github.event.repository.name }}
