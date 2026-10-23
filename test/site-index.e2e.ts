@@ -178,7 +178,7 @@ test.describe("a load that FAILS says so", () => {
   // `ui-accessibility`: *"a `console.warn` is not saying so: it reaches a
   // developer with the console open and no reader ever."* The reader-visible
   // half of that, for this region, is the attribute — which `docs-ui.css`
-  // turns into a sentence on the paper and `dak-pdf.ts` turns into a refusal.
+  // turns into a sentence on the paper and `render-wait.ts` turns into a refusal.
   test("a 404 is `failed`, and the navbar is left exactly as built", async ({ page }) => {
     await open(page, {}, { status: 404 });
     await expect(html(page)).toHaveAttribute("data-fa-render", "failed");
@@ -248,7 +248,7 @@ test.describe("the declared minimum cross-checks the registrations", () => {
   test("a page that declares no region carries NO attribute", async ({ page }) => {
     // "Never asked" is a third state and not a value of the other two. A
     // generated dashboard that writes its own `<head>` is exactly this case,
-    // and `dak-pdf.ts` reads the absence as "nothing to wait for".
+    // and `render-wait.ts` reads the absence as "nothing to wait for".
     await page.goto("/");
     await page.setContent(
       harness({ regions: null, meta: false }).replace(

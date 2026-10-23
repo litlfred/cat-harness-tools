@@ -22,8 +22,9 @@
 
 import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { checkoutCapabilities } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 
 export interface CapabilityDetection {
   method: "command" | "env-var" | "file-exists" | "mcp-probe" | "always";
@@ -61,22 +62,45 @@ export interface CapabilityStatus {
   missingRequires: string[];
 }
 
-/** Load every declared capability. Returns `[]` when the directory is absent. */
+/**
+ * Load every declared capability: the platform's, then those the checkout's
+ * higher instances add in their own `scenarios/capabilities/`
+ * (`checkoutCapabilities`, the scenario overlay). A probe whose subject is a
+ * higher layer's toolchain is declared by that layer, never down here, and is
+ * still run. Returns `[]` when the platform declares no capability directory.
+ */
 export function loadCapabilities(repoRoot: string): Capability[] {
   // The declared home inside `scenarios` (bean rqao). An instance with no
   // platform `scenarios` graph declares no capabilities: `[]`, as before.
   const dir = capabilitiesDir(repoRoot);
   if (dir === undefined || !existsSync(dir)) return [];
-  const out: Capability[] = [];
-  for (const f of readdirSync(dir).sort()) {
-    if (!f.endsWith(".json")) continue;
-    try {
-      const c = JSON.parse(readFileSync(join(dir, f), "utf-8")) as Capability;
-      if (c?.id && c?.detection?.method) out.push(c);
-    } catch {
-      // A malformed probe is not a present capability. Skipping it here is
-      // safe because `probe` reports it absent, which is the honest default.
+  // `<platform>/<scenarios>/capabilities` → the platform instance's root.
+  const platformRoot = resolve(dir, "..", "..");
+  let records: Record<string, unknown>[];
+  try {
+    records = checkoutCapabilities(platformRoot, dir);
+  } catch (e) {
+    // The overlay refuses a malformed file or a redeclared id loudly; a
+    // dependency check must still report, so it falls back to the platform's
+    // own probes and SAYS that it did.
+    console.error(`capabilities: the checkout overlay could not be read (${e instanceof Error ? e.message : String(e)}); reporting the platform's own probes only`);
+    records = [];
+    for (const f of readdirSync(dir).sort()) {
+      if (!f.endsWith(".json")) continue;
+      try {
+        records.push(JSON.parse(readFileSync(join(dir, f), "utf-8")) as Record<string, unknown>);
+      } catch {
+        // A malformed probe is not a present capability. Skipping it here is
+        // safe because `probe` reports it absent, which is the honest default.
+      }
     }
+  }
+  const out: Capability[] = [];
+  for (const r of records) {
+    const c = r as unknown as Capability & { path?: string };
+    if (!c?.id || !c?.detection?.method) continue;
+    const { path: _path, ...cap } = c;
+    out.push(cap as Capability);
   }
   return out;
 }
