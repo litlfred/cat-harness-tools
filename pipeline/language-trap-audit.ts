@@ -83,6 +83,8 @@ import { join, relative, resolve, dirname, basename } from "node:path";
 import { blockQaPath, existingBlockQaPath } from "./qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { findContentRepoRoot } from "./repo-root";
+import { loadPriorBlockReport, priorRefusalLine } from "./qa-utils";
+import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 
 // ---------------------------------------------------------------------------
 // block-qa/v1 sidecar types, inlined (same pattern as the sibling audits).
@@ -543,6 +545,10 @@ function headSha(repoRoot: string): string {
   }
 }
 
+/** `--prior-from <ref>` (owner ruling B, bean `8wj1`), and how many priors it could not read. */
+let PRIOR_FROM: string | undefined;
+let priorRefusals = 0;
+
 function writeSidecar(
   b: Block,
   findings: Finding[],
@@ -559,7 +565,16 @@ function writeSidecar(
   const qaReadPath = existingBlockQaPath(repoRoot, blockRoot);
   const qaPath = blockQaPath(repoRoot, blockRoot);
   let prior: QaSidecarDoc | undefined;
-  if (qaReadPath) {
+  if (PRIOR_FROM !== undefined) {
+    // Read from qa-reports, never the working copy (owner ruling B, 8wj1).
+    const r = loadPriorBlockReport(repoRoot, blockRoot, PRIOR_FROM);
+    if (!r.ok) {
+      console.error(priorRefusalLine("language-trap-audit", relative(repoRoot, blockRoot), r));
+      priorRefusals++;
+      return false;
+    }
+    prior = r.report as QaSidecarDoc | undefined;
+  } else if (qaReadPath) {
     try {
       prior = JSON.parse(readFileSync(qaReadPath, "utf8")) as QaSidecarDoc;
     } catch {
@@ -775,8 +790,10 @@ function main() {
     else if (a === "--write-sidecars") writeSidecars = true;
     else if (a === "--quiet") quiet = true;
     else if (a === "--top") top = parseInt(argv[++i], 10);
+    else if (a === PRIOR_FROM_FLAG) i++; // its value is read by priorFromOrExit
     else if (!a.startsWith("--")) roots.push(a);
   }
+  PRIOR_FROM = priorFromOrExit("language-trap-audit");
   const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"])
     .toString()
     .trim();
@@ -874,6 +891,10 @@ function main() {
     console.log(`  total candidate fails: ${fails.length}`);
     if (jsonOut) console.log(`  json -> ${jsonOut}`);
     if (mdOut) console.log(`  md   -> ${mdOut}`);
+  }
+  if (priorRefusals > 0) {
+    console.error(`language-trap-audit: UNKNOWN — ${priorRefusals} sidecar(s) not written because their prior could not be read from qa-reports:${PRIOR_FROM}; see above`);
+    process.exit(2);
   }
   if (refusedSidecars > 0) {
     console.error(`language-trap-audit: UNKNOWN — ${refusedSidecars} sidecar(s) not written; see above`);

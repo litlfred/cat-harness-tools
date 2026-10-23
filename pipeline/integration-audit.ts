@@ -34,13 +34,14 @@ import { existsSync } from "fs";
 import { resolve, relative, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
-import { walkBlocks, loadQaReport, saveQaReport } from "./qa-utils";
+import { walkBlocks, loadPriorBlockReport, priorRefusalLine, saveQaReport } from "./qa-utils";
+import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 import {
   qaCriteriaByIdFor,
   qaCriteriaFor,
   WATCHER_CRITERIA_BY_AXIS,
 } from "./qa-criteria-registry";
-import { blockQaPath, existingBlockQaPath } from "./qa-paths";
+import { blockQaPath } from "./qa-paths";
 import { blockAttestationKey, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { findContentRepoRoot } from "./repo-root";
 import type { BlockQaReport } from "@litlfred/cat-harness/schemas/block-qa.ts";
@@ -89,6 +90,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--include-agent") out.includeAgent = true;
     else if (a === "--json") out.json = true;
     else if (a === "--no-sweep") out.noSweep = true;
+    else if (a === PRIOR_FROM_FLAG) i++; // its value is read by priorFromOrExit
     else if (a === "--criteria") {
       out.criteria = valueFor(a, i++).split(",").filter(Boolean);
     } else if (a === "--axis") {
@@ -101,7 +103,7 @@ function parseArgs(argv: string[]): Args {
     console.error(
       "usage: integration-audit.ts <content-root> " +
         "[--criteria ID,ID | --axis NAME,NAME | --all] " +
-        "[--dry-run] [--include-agent] [--json] [--no-sweep]",
+        "[--dry-run] [--include-agent] [--json] [--no-sweep] [--prior-from <ref>]",
     );
     process.exit(2);
   }
@@ -189,6 +191,7 @@ function invalidateBlock(
 
 function run(): void {
   const args = parseArgs(process.argv.slice(2));
+  const priorFrom = priorFromOrExit("integration-audit");
   const rootAbs = resolve(args.root);
   if (!existsSync(rootAbs)) {
     console.error(`integration-audit: root not found: ${rootAbs}`);
@@ -208,6 +211,7 @@ function run(): void {
   let totalBlocks = 0;
   let blocksAffected = 0;
   let refused = 0;
+  let priorRefused = 0;
 
   const repoRoot = findContentRepoRoot();
 
@@ -222,15 +226,17 @@ function run(): void {
     //
     // `undefined` means no verdict anywhere — the same `continue` the missing
     // file always took, and never "I looked in the wrong place".
-    const qaReadPath = existingBlockQaPath(repoRoot, block.root);
+    // With `--prior-from`, read from qa-reports instead (owner ruling B, 8wj1).
+    const prior = loadPriorBlockReport(repoRoot, block.root, priorFrom);
+    if (!prior.ok) {
+      console.error(priorRefusalLine("integration-audit", relative(repoRoot, block.root), prior));
+      priorRefused++;
+      continue;
+    }
     // Attestations come from the store, never from the prior report (bean
     // `8wj1`, C11): this tool rewrites the report, so a prior whose agent
     // entries were missing would otherwise be saved without them.
-    const attested = resolvePrior(
-      repoRoot,
-      blockAttestationKey(repoRoot, block.root),
-      qaReadPath ? loadQaReport(qaReadPath) : undefined,
-    );
+    const attested = resolvePrior(repoRoot, blockAttestationKey(repoRoot, block.root), prior.report);
     if (!attested.ok) {
       console.error(refusalLine("integration-audit", relative(repoRoot, block.root), attested));
       refused++;
@@ -277,6 +283,10 @@ function run(): void {
     if (!args.dryRun) {
       saveQaReport(qaPath, report);
     }
+  }
+  if (priorRefused > 0) {
+    console.error(`integration-audit: UNKNOWN — ${priorRefused} block(s) not written because their prior could not be read from qa-reports:${priorFrom}`);
+    process.exit(2);
   }
   if (refused > 0) {
     console.error(`integration-audit: UNKNOWN — ${refused} block(s) not written because their attestations could not be read`);
@@ -344,6 +354,8 @@ function run(): void {
         rootAbs,
         "--only",
         toInvalidate.join(","),
+        // The re-sweep rewrites the same sidecars, so it reads them from the same place.
+        ...(priorFrom !== undefined ? [PRIOR_FROM_FLAG, priorFrom] : []),
       ],
       { stdio: args.json ? "ignore" : "inherit" },
     );

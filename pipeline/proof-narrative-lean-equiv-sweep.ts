@@ -20,10 +20,12 @@ import {
   hashBlockFiles,
   gitHeadSha,
   walkBlocks,
-  loadQaReport,
+  loadPriorBlockReport,
+  priorRefusalLine,
   saveQaReport,
   entryIsFresh,
 } from "./qa-utils";
+import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 import type {
   QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 // The one contract for where a block's verdict lives — see
@@ -31,7 +33,7 @@ import type {
 // only, mirroring REPO_ROOT — the content repo root the module comment above
 // anchors everything else to); `existingBlockQaPath` for reading (results
 // tree first, legacy `<block>.qa.json` sibling as fallback).
-import { blockQaPath, existingBlockQaPath } from "./qa-paths";
+import { blockQaPath } from "./qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 
 /**
@@ -57,10 +59,12 @@ interface Args {
 
 function parseArgs(argv: string[]): Args {
   const out: Args = { root: "", dryRun: false, json: false, force: false };
-  for (const a of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
     if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
     else if (a === "--force") out.force = true;
+    else if (a === PRIOR_FROM_FLAG) i++; // its value is read by priorFromOrExit
     else if (!a.startsWith("-")) out.root = a;
   }
   return out;
@@ -462,6 +466,7 @@ export function checkEquivalence(
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const priorFrom = priorFromOrExit("proof-narrative-lean-equiv-sweep");
   if (!args.root) {
     console.error("Usage: bun run cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts <chapter-dir>");
     process.exit(2);
@@ -498,6 +503,7 @@ async function main() {
   let skipped_no_lean = 0;
   // Blocks NOT written because their attestations could not be read. Never a pass.
   let refused = 0;
+  let priorRefused = 0;
 
   for (const block of walkBlocks(rootPath)) {
     if (!block.lean || !existsSync(block.lean)) {
@@ -516,7 +522,6 @@ async function main() {
     // root the module comment above anchors everything to, never the
     // platform checkout).
     const qaWritePath = blockQaPath(REPO_ROOT, block.root);
-    const qaReadPath = existingBlockQaPath(REPO_ROOT, block.root) ?? qaWritePath;
 
     if (!mdPath || !existsSync(mdPath)) {
       skipped_no_lean++;
@@ -532,7 +537,13 @@ async function main() {
     // This sweep records its verdict as `reviewer.kind: "agent"`, so what it
     // writes is an ATTESTATION and lives in the store (bean `8wj1`, D2). The
     // prior report's own copy is never what is carried forward (C11).
-    const attested = resolvePrior(REPO_ROOT, blockAttestationKey(REPO_ROOT, block.root), loadQaReport(qaReadPath));
+    const prior = loadPriorBlockReport(REPO_ROOT, block.root, priorFrom);
+    if (!prior.ok) {
+      console.error(priorRefusalLine("proof-narrative-lean-equiv-sweep", pathRelative(REPO_ROOT, block.root), prior));
+      priorRefused++;
+      continue;
+    }
+    const attested = resolvePrior(REPO_ROOT, blockAttestationKey(REPO_ROOT, block.root), prior.report);
     if (!attested.ok) {
       console.error(refusalLine("proof-narrative-lean-equiv-sweep", pathRelative(REPO_ROOT, block.root), attested));
       refused++;
@@ -647,6 +658,10 @@ async function main() {
         }
       }
     }
+  }
+  if (priorRefused > 0) {
+    console.error(`proof-narrative-lean-equiv-sweep: UNKNOWN — ${priorRefused} block(s) not written because their prior could not be read from qa-reports:${priorFrom}`);
+    process.exit(2);
   }
   if (refused > 0) {
     console.error(`proof-narrative-lean-equiv-sweep: UNKNOWN — ${refused} block(s) not written because their attestations could not be read`);

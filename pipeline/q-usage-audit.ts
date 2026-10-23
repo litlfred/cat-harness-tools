@@ -60,6 +60,8 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { blockQaPath, existingBlockQaPath } from "./qa-paths.ts";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { loadPriorBlockReport, priorRefusalLine } from "./qa-utils.ts";
+import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 
 /**
  * Root of the CONTENT repo being audited.
@@ -108,6 +110,7 @@ const paperFilter = paperArg(args);
  */
 const KNOWN_FLAGS = new Set([
   "--no-write", "--strict", "--json", "--no-orphans", "--chapter", "--paper",
+  PRIOR_FROM_FLAG,
 ]);
 /**
  * The flags that consume the token after them. Derived by scanning `args`
@@ -123,7 +126,7 @@ const KNOWN_FLAGS = new Set([
  * verbatim in a comment trips it. Scanning for the flag tokens gets the
  * indices without re-introducing the idiom, and handles a repeated flag.
  */
-const VALUE_FLAGS = new Set(["--chapter", "--paper"]);
+const VALUE_FLAGS = new Set(["--chapter", "--paper", PRIOR_FROM_FLAG]);
 const flagValueIdx = new Set(
   args.flatMap((a, i) => (VALUE_FLAGS.has(a) ? [i + 1] : [])),
 );
@@ -135,7 +138,7 @@ if (unknownArgs.length > 0) {
     `q-usage-audit: unrecognised argument(s): ${unknownArgs.join(", ")}\n` +
       `\nThis audit is corpus-wide and has no positional/per-file interface.\n` +
       `Scope it with:  --paper <name>   --chapter <name>\n` +
-      `Other flags:    --no-write  --strict  --json  --no-orphans\n` +
+      `Other flags:    --no-write  --strict  --json  --no-orphans  --prior-from <ref>\n` +
       `\nRefusing to run: a discarded scope argument would rewrite every\n` +
       `sidecar in the corpus (measured: 3,573). See qou bean qou-fx71.`,
   );
@@ -144,6 +147,18 @@ if (unknownArgs.length > 0) {
   // argument from a bad working directory.
   process.exit(64);
 }
+
+/**
+ * `--prior-from <ref>` (bean `8wj1`, owner option B, 2026-10-22): read each
+ * block's earlier report from the results store at that ref instead of the
+ * working copy. A read that cannot be completed refuses that block and the run
+ * exits 2 — the owner's code for it — rather than falling back, which would
+ * make a missing store look like a block with no history. A malformed ref also
+ * exits 2 (from `priorFromOrExit`), not 64: it is a refusal of the read, and
+ * the ruling names one code for it.
+ */
+const PRIOR_FROM = priorFromOrExit("q-usage-audit");
+let priorRefusals = 0;
 
 // ── Content repo discovery (AFTER args are validated) ───────────
 
@@ -284,7 +299,15 @@ function updateSidecar(b: BlockTriple, results: Map<string, QUsageResult>): bool
   const writePath = blockQaPath(REPO_ROOT, blockRoot);
   const readPath = existingBlockQaPath(REPO_ROOT, blockRoot);
   let prior: QaSidecar | undefined;
-  if (readPath) {
+  if (PRIOR_FROM !== undefined) {
+    const loaded = loadPriorBlockReport(REPO_ROOT, blockRoot, PRIOR_FROM);
+    if (!loaded.ok) {
+      console.error(priorRefusalLine("q-usage-audit", relative(REPO_ROOT, blockRoot), loaded));
+      priorRefusals++;
+      return false;
+    }
+    prior = loaded.report as QaSidecar | undefined;
+  } else if (readPath) {
     try {
       prior = JSON.parse(readFileSync(readPath, "utf-8")) as QaSidecar;
     } catch {
@@ -657,8 +680,10 @@ function main(): void {
       }
     }
     stats.set(b.chapter, stat);
-    if (!updateSidecar(b, results)) refusedSidecars++;
-    else if (!noWrite) touchedSidecars++;
+    const priorRefusalsBefore = priorRefusals;
+    if (!updateSidecar(b, results)) {
+      if (priorRefusals === priorRefusalsBefore) refusedSidecars++;
+    } else if (!noWrite) touchedSidecars++;
   }
 
   // Orphan library-tree coverage — Lean files reachable by no block's
@@ -763,6 +788,10 @@ function main(): void {
   // Orphan `fail`s are real §7c violations (mixed-substrate files); count
   // them toward strict exit. Orphan `warn`s (base-ring advisories) do not.
   const orphanFails = orphan.findings.filter((f) => f.result === "fail").length;
+  if (priorRefusals > 0) {
+    console.error(`q-usage-audit: UNKNOWN — ${priorRefusals} sidecar(s) not written because the prior report could not be read at ${PRIOR_FROM}`);
+    process.exit(2);
+  }
   if (refusedSidecars > 0) {
     console.error(`q-usage-audit: UNKNOWN — ${refusedSidecars} sidecar(s) not written because their attestations could not be read`);
     process.exit(4);
