@@ -86,7 +86,7 @@ import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { docsSources, type DocsSource } from "./lib/docs-sources.ts";
+import { docsSources, qualifiedKey, type DocsSource } from "./lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
@@ -369,8 +369,10 @@ const QA_ASSETS_STORED = qaStorageOf(QA_ASSET_DIR) !== undefined;
 /**
  * An instance's OWN witness tree: its pages' projections are its QA output, so
  * they sit under its `test/results/`, as the base instance's do under
- * {@link QA_ASSET_DIR}. The site build copies each tree into `/assets/qa/`,
- * which is why a page slug must be unique across every docs source.
+ * {@link QA_ASSET_DIR}. The site build copies the base's tree into
+ * `/assets/qa/` and each other instance's into `/assets/qa/<instance>/`, the
+ * address its badges name (`lib/docs-sources.ts`), so one slug in two sources
+ * is two witness directories.
  */
 function qaAssetDirOf(src: DocsSource): string {
   return src.base ? QA_ASSET_DIR : join(src.root, "test", "results", "witnesses");
@@ -731,7 +733,10 @@ function qaIcons(page: WebPage, node: WebPageNode): string {
   for (const subject of subjects) {
     for (const family of familiesFor(subject)) {
       const key = `${node.id}.${family}`;
-      out.push(qaBadgePlaceholder({ family, key, noun: subjectNoun(subject), slug }));
+      // The ADDRESS is qualified by instance above the base — its witness tree
+      // is published at `/assets/qa/<instance>/` (`lib/docs-sources.ts`) — and
+      // the files on disk keep their plain `<slug>/` directory.
+      out.push(qaBadgePlaceholder({ family, key, noun: subjectNoun(subject), slug: qualifiedKey(CUR, slug) }));
 
       // The INDEX half — what the corpus says. Nothing below reaches the page.
       if (!corpusOf().present) continue;
@@ -820,7 +825,7 @@ function pageQaIcons(page: WebPage): string {
     }
   }
 
-  return `<span class="fa-qa-badges fa-page-qa-badges">${qaBadgePlaceholder({ family, key, noun: "page", slug })}</span>`;
+  return `<span class="fa-qa-badges fa-page-qa-badges">${qaBadgePlaceholder({ family, key, noun: "page", slug: qualifiedKey(CUR, slug) })}</span>`;
 }
 /**
  * The block's label, read from its own module rather than composed.
@@ -1221,20 +1226,21 @@ if (import.meta.main) {
  * loop must run first — which it does: the index is emitted after every page.
  */
 const blockByLabel = new Map<string, { page: string; node: string }>();
+const blockFileOf = (src: DocsSource, flat: string, node: string): string =>
+  relative(repoRootFor(INSTANCE_ROOT), join(src.srcDir, flat, `${node}.ts`)).split(sep).join("/");
+/** The docs source that holds each plain label in {@link blockByLabel}. */
+const labelSource = new Map<string, DocsSource>();
+/** The file that declares each plain label, checkout-relative, for the warning. */
+const labelFile = new Map<string, string>();
 
-/**
- * Which docs source published each page slug. A slug is the page's route
- * within its docs directory AND its witness directory under `/assets/qa/`,
- * which every instance's tree is copied into — so two sources claiming one
- * slug would publish two pages' verdicts at one address. Refused, naming both.
- */
-const slugOwner = new Map<string, string>();
 
 /**
  * Where each page is PUBLISHED, site-relative, for the links the todo board
- * composes to a block. A page of a source above the base is composed into the
- * site under its instance's name (`compose-docs.ts`), so its address carries
- * that prefix; the base instance's is Jekyll's answer for its own site.
+ * composes to a block — keyed by the page's QUALIFIED slug
+ * (`lib/docs-sources.ts`), so one slug in two sources is two pages. A page of
+ * a source above the base is composed into the site under its instance's name
+ * (`compose-docs.ts`), so its address carries that prefix; the base
+ * instance's is Jekyll's answer for its own site.
  */
 const pageRoute = new Map<string, string>();
 const publishedAt = (slug: string): string => pageRoute.get(slug) ?? publishedPagePath(OUT_DIR, slug);
@@ -1278,15 +1284,10 @@ for (const slug of slugs) {
   if (page.slug.replace(/\//g, "-") !== slug) {
     throw new Error(`${manifest} declares slug "${page.slug}" but lives in ${slug}/`);
   }
-  const prevOwner = slugOwner.get(page.slug);
-  if (prevOwner !== undefined) {
-    throw new Error(
-      `two docs sources publish page "${page.slug}": ${prevOwner} and ${src.instance}. ` +
-        `A slug addresses the page and its QA witnesses; one of them must be renamed.`,
-    );
-  }
-  slugOwner.set(page.slug, src.instance);
-  pageRoute.set(page.slug, src.base ? publishedPagePath(OUT_DIR, page.slug) : `${src.instance}/${publishedPagePath(src.outDir, page.slug)}`);
+  // Qualified by instance above the base, so the same slug in two sources is
+  // two pages (`docsSources` has already warned, naming both files).
+  const pageKey = qualifiedKey(src, page.slug);
+  pageRoute.set(pageKey, src.base ? publishedPagePath(OUT_DIR, page.slug) : `${src.instance}/${publishedPagePath(src.outDir, page.slug)}`);
   // Collected BEFORE rendering, so a page that fails to render still cannot
   // leave a half-filled index behind it.
   //
@@ -1299,14 +1300,34 @@ for (const slug of slugs) {
     const label = blockLabel(page, node);
     if (label === undefined) continue;
     const prev = blockByLabel.get(label);
-    if (prev !== undefined) {
+    const at = { page: pageKey, node: node.id };
+    if (prev !== undefined && labelSource.get(label) === src) {
       throw new Error(
         `two blocks declare the label "${label}": ${prev.page}/${prev.node} and ` +
           `${page.slug}/${node.id}. A label is page-qualified so that it is unique; ` +
           `a note pointing at this one could not say which block it meant.`,
       );
     }
-    blockByLabel.set(label, { page: page.slug, node: node.id });
+    // A source above the base ALSO answers to its instance-qualified label,
+    // which no other source can hold.
+    if (!src.base) blockByLabel.set(qualifiedKey(src, label), at);
+    if (prev !== undefined) {
+      // Another SOURCE holds this label: the same section in two layers, most
+      // likely a move in flight (owner, 2026-10-23: warn, never fail). The
+      // plain label stays with the source that declared it first — the lower
+      // layer, so what the base publishes does not change — until that copy
+      // is removed; this one is reached by its qualified label.
+      // Said once for the whole page when the PAGE is in both sources.
+      if (prev.page !== qualifiedKey(labelSource.get(label)!, page.slug)) console.warn(
+        `⚠ block label "${label}" is declared in ${labelSource.get(label)!.instance} (${labelFile.get(label)}) ` +
+          `and in ${src.instance} (${blockFileOf(src, slug, node.id)}). The plain label stays with ${labelSource.get(label)!.instance}; ` +
+          `this one is "${qualifiedKey(src, label)}". If this is a move in flight, finish it by removing the lower copy.`,
+      );
+      continue;
+    }
+    blockByLabel.set(label, at);
+    labelSource.set(label, src);
+    labelFile.set(label, blockFileOf(src, slug, node.id));
   }
   const outPath = join(src.outDir, `${page.slug}.md`);
   mkdirSync(dirname(outPath), { recursive: true });

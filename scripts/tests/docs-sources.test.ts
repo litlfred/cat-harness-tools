@@ -10,14 +10,17 @@
  * declares a docs source is found and renders into the directory that
  * declares it; one that declares none, declares an absent one, or declares it
  * under a non-`docs` or repository-scoped directory contributes nothing; and
- * the base instance's own source is always first and never read twice.
+ * the base instance's own source is always first and never read twice. And
+ * the same page in two sources is two pages — every key above the base is
+ * qualified by its instance — which is warned about, naming both files, and
+ * never refused (owner, 2026-10-23).
  */
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { declaredDocsSources, docsSources } from "../lib/docs-sources.ts";
+import { declaredDocsSources, docsSources, qualifiedKey, warnSamePages } from "../lib/docs-sources.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -122,5 +125,66 @@ describe("docsSources", () => {
       { name: "base", root: base },
     ]);
     expect(found.map((s) => s.instance)).toEqual(["base", "a"]);
+  });
+});
+
+describe("the same page in two sources", () => {
+  function page(srcDir: string, flat: string): void {
+    mkdirSync(join(srcDir, flat), { recursive: true });
+  }
+
+  test("every key above the base is qualified by its instance; the base's are unchanged", () => {
+    const t = tree();
+    const base = instance(t, "base", [{ id: "docs", path: "docs/", graphTypologies: ["docs"] }]);
+    docsJson(join(base, "docs"), "source");
+    const up = instance(t, "up", [{ id: "up-docs", path: "docs/", graphTypologies: ["docs"] }]);
+    docsJson(join(up, "docs"), "source");
+    const [b, u] = docsSources(base, [{ name: "up", root: up }]);
+    expect(qualifiedKey(b!, "guides/x")).toBe("guides/x");
+    expect(qualifiedKey(u!, "guides/x")).toBe("up/guides/x");
+    expect(qualifiedKey(b!, "guides-x")).not.toBe(qualifiedKey(u!, "guides-x"));
+  });
+
+  test("a page in a lower and a higher source: both kept, one warning naming both files", () => {
+    const t = tree();
+    const base = instance(t, "base", [{ id: "docs", path: "docs/", graphTypologies: ["docs"] }]);
+    docsJson(join(base, "docs"), "source");
+    const up = instance(t, "up", [{ id: "up-docs", path: "docs/", graphTypologies: ["docs"] }]);
+    docsJson(join(up, "docs"), "source");
+    page(join(base, "docs", "source"), "guides-moved");
+    page(join(up, "docs", "source"), "guides-moved");
+    page(join(up, "docs", "source"), "guides-only-up");
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const found = docsSources(base, [{ name: "up", root: up }]);
+      expect(found.map((s) => s.instance)).toEqual(["base", "up"]);
+      const msgs = warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('"guides-moved"'));
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0]).toContain("base/docs/source/guides-moved");
+      expect(msgs[0]).toContain("up/docs/source/guides-moved");
+      expect(msgs[0]).toMatch(/move in flight/);
+      expect(warn.mock.calls.some((c) => String(c[0]).includes("guides-only-up"))).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("two sources of ONE instance holding one page: warned, not refused", () => {
+    const t = tree();
+    const root = instance(t, "ig", [
+      { id: "a", path: "docs/", graphTypologies: ["docs"] },
+      { id: "b", path: "site-docs/", graphTypologies: ["docs"] },
+    ]);
+    docsJson(join(root, "docs"), "source");
+    docsJson(join(root, "site-docs"), "source");
+    page(join(root, "docs", "source"), "same");
+    page(join(root, "site-docs", "source"), "same");
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const dups = warnSamePages(declaredDocsSources(root));
+      expect(dups).toEqual([{ page: "same", files: ["ig (ig/docs/source/same)", "ig (ig/site-docs/source/same)"] }]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

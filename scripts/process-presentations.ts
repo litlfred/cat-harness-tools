@@ -103,6 +103,12 @@ async function presentationsIn(src: DocsSource, out: Map<string, Presentation[]>
       if (node.asset?.kind !== "bpmn") continue;
       const k = key(node.asset.source);
       const list = out.get(k) ?? [];
+      // The same page and section from a second docs source — one page in two
+      // layers, which `docsSources` has warned about (a move in flight, as a
+      // rule). It is listed once, from the source read first, so a diagram's
+      // link does not turn into "presented more than once" — and what the
+      // base renders does not change — merely because the copy above exists.
+      if (list.some((x) => x.page === page.slug && x.node === node.id)) continue;
       list.push({
         page: page.slug,
         href: publishedHref(src, page.slug),

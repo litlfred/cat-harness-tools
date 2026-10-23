@@ -23,11 +23,28 @@
  * first ({@link checkoutDependentsOf}) — the order `scenario-overlay` reads
  * higher layers' scenarios in. This file names no instance: which ones exist
  * is the checkout's answer, never a list written down here.
+ *
+ * ## Every key a source above the base publishes is qualified by its instance
+ *
+ * A page's slug is unique only WITHIN its source. Its route already carries
+ * the instance (a source above the base is composed into the site under the
+ * instance's name), and so does every key derived from it
+ * ({@link qualifiedKey}): the page key todos attach to and the listing they
+ * are grouped under, the address of its QA witnesses
+ * (`/assets/qa/<instance>/<slug>/`, which the site build copies each
+ * instance's witness tree into) and its block labels. The base instance's keys
+ * are its own, unqualified, so what it publishes is unchanged.
+ *
+ * So the same page in two layers is two distinct pages with two distinct
+ * IRIs, and nothing collides. Owner, 2026-10-23: that is never a failure,
+ * only a warning ({@link warnSamePages}), naming both files — it is usually a
+ * move in flight (the higher layer has added the page and the lower layer has
+ * not removed it yet), which the warning says how to finish.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { declarationPathIn, docsSourceDirFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { checkoutDependentsOf } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /** One declared docs source: where its pages are authored and where they render. */
@@ -131,6 +148,50 @@ export function docsSources(
       seen.add(s.srcDir);
       out.push(s);
     }
+  }
+  warnSamePages(out);
+  return out;
+}
+
+/**
+ * `key` — a page slug, a flattened slug, a label — as the whole checkout
+ * names it: unchanged for the base instance, prefixed with the instance's
+ * name (`<instance>/<key>`) for a source above it, the prefix its pages are
+ * composed under. Two sources holding one key therefore never share one.
+ */
+export function qualifiedKey(src: DocsSource, key: string): string {
+  return src.base ? key : `${src.instance}/${key}`;
+}
+
+const warned = new Set<string>();
+
+/**
+ * Warn, once per process, for each page directory (flattened slug) that more
+ * than one source holds — never fail (owner, 2026-10-23): with every key
+ * qualified ({@link qualifiedKey}) they are distinct pages. Each warning names
+ * both files. Returns the duplicates, for a caller or a test to inspect.
+ */
+export function warnSamePages(sources: readonly DocsSource[]): Array<{ page: string; files: string[] }> {
+  const holders = new Map<string, string[]>();
+  for (const src of sources) {
+    if (!existsSync(src.srcDir)) continue;
+    for (const d of readdirSync(src.srcDir, { withFileTypes: true })) {
+      if (!d.isDirectory()) continue;
+      const file = relative(repoRootFor(src.root), join(src.srcDir, d.name)).split(sep).join("/");
+      holders.set(d.name, [...(holders.get(d.name) ?? []), `${src.instance} (${file})`]);
+    }
+  }
+  const out: Array<{ page: string; files: string[] }> = [];
+  for (const [page, files] of [...holders].sort(([a], [b]) => a.localeCompare(b))) {
+    if (files.length < 2) continue;
+    out.push({ page, files });
+    const msg =
+      `⚠ docs page "${page}" is in more than one docs source: ${files.join(" and ")}. ` +
+      `Each is published as its own page, at its own instance's address. ` +
+      `If this is a move in flight, finish it by removing the lower copy.`;
+    if (warned.has(msg)) continue;
+    warned.add(msg);
+    console.warn(msg);
   }
   return out;
 }
