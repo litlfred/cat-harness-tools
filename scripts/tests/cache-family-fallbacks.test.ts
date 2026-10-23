@@ -10,6 +10,10 @@
  * fallback list lost a name, or reordered it, resolves a different branch from
  * the rest when no declaration is present.
  *
+ * A folio template's copy of the restore action is tested by the layer that
+ * keeps that template (move M11): a test here naming its path would be this
+ * layer naming one above it.
+ *
  * Each script names the names as whole tokens: `lake-cache` is a substring of
  * both newer names, so a bare `toContain` would pass a file that never names it.
  *
@@ -32,7 +36,6 @@ const FAMILIES = {
       "cat-harness-tools/scripts/lake-cache-produce.py",
       "cat-harness-tools/scripts/reseed-lean-cache.sh",
       ".github/actions/lake-cache-restore/action.yml",
-      "cat-harness-tools/templates/paper/github/actions/lake-cache-restore/action.yml",
     ],
   },
   "fhir-ast": {
