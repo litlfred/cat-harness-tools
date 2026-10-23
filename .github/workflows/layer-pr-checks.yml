@@ -667,6 +667,20 @@ jobs:
           PY
             exit 0
           fi
+          # Owner, 2026-10-23 (option A): the QA working copy that
+          # `uml:overview` builds here runs `skill:register`, which re-ran
+          # nine checks (~190 s) that this side's gate shards run anyway over
+          # the same tree. Name the checks the shards run, from the same
+          # derivation they use (`run-gates.py --list`); skill-register.ts
+          # leaves exactly those to them, in CI only, and reports them as not
+          # run here. A list that cannot be derived names nothing: every
+          # check is verified here, as before.
+          own_flag=""; [ -n "$INSTANCE" ] && own_flag="--instance $INSTANCE"
+          # shellcheck disable=SC2086 -- own_flag is empty or one flag and its value
+          CAT_SKILL_REGISTER_VERIFIED_BY_GATES="$(python3 ../ci/.github/scripts/layer-pr-checks/run-gates.py . --list $own_flag 2>/dev/null \
+            | python3 -c 'import json,sys; print(",".join(sorted({k.split(":", 1)[1] for k in json.load(sys.stdin)["gates"]})))' 2>/dev/null || true)"
+          export CAT_SKILL_REGISTER_VERIFIED_BY_GATES
+          echo "checks this side's gates run: $(printf '%s' "$CAT_SKILL_REGISTER_VERIFIED_BY_GATES" | tr ',' '\n' | grep -c . || true)"
           injected=""
           if ! python3 -c 'import json,sys; sys.exit(0 if "cat" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             cp package.json "$RUNNER_TEMP/package.json.orig"
