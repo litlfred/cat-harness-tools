@@ -96,10 +96,11 @@ describe("the real corpus", () => {
 
   test("the @id names where it is actually served", () => {
     // The declared Subgraph node's own path (#603), whose page and `.jsonld`
-    // kg-export writes beside the instance document.
-    expect(doc["@id"]).toBe("https://litlfred.github.io/folio-assistant/directory/fsh-guts");
+    // kg-export writes beside the instance document — under the host's own
+    // directory, like every layer's (#603 decision 1b, owner 2026-10-23).
+    expect(doc["@id"]).toBe("https://litlfred.github.io/folio-assistant/cat-harness/directory/fsh-guts");
     expect(buildFshGutsExport(ROOT, "https://example.invalid/preview")["@id"]).toBe(
-      "https://example.invalid/preview/directory/fsh-guts",
+      "https://example.invalid/preview/cat-harness/directory/fsh-guts",
     );
   });
 
