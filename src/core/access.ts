@@ -65,8 +65,12 @@ const PLATFORM_ROOT = resolve(HARNESS_ROOT);
  * started with either). When `root` declares no `policies` graph the platform's
  * own policies apply — a folio that writes none inherits the defaults, which is
  * what `dependents: skip` on the declaration means.
+ *
+ * `dependents: false` leaves out the policies that higher layers in the
+ * checkout keep beside them. A file a layer commits, such as its PROV record,
+ * must not name a higher layer, so its generator passes this.
  */
-export function loadAccessContext(root: string): AccessContext {
+export function loadAccessContext(root: string, opts: { dependents?: boolean } = {}): AccessContext {
   const policyDirs = directoriesForGraph(root, "policies");
   const instanceRoot = policyDirs.length > 0 ? root : PLATFORM_ROOT;
   const dirs = policyDirs.length > 0 ? policyDirs : directoriesForGraph(PLATFORM_ROOT, "policies");
@@ -91,7 +95,9 @@ export function loadAccessContext(root: string): AccessContext {
     const owner = findInstanceRoot(dir) ?? instanceRoot;
     for (const a of checkoutActors(owner, dir)) actors.set(a.id, a);
     const read = new Set(dirs.map((d) => resolve(d)));
-    policies = overlayPolicies(policies, policyLayersAbove(owner).filter((l) => !read.has(l.dir)));
+    if (opts.dependents !== false) {
+      policies = overlayPolicies(policies, policyLayersAbove(owner).filter((l) => !read.has(l.dir)));
+    }
     break;
   }
   return { policies, graph, actors };
