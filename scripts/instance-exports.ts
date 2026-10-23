@@ -81,10 +81,13 @@ export const PUBLISHED_ELSEWHERE: Readonly<Record<string, PublishedElsewhere>> =
     // instance's nodes under this name again, so it does not match.
     // `<name>/<stub>.jsonld` since #603 decision 1b (owner, 2026-10-23): the
     // host's document sits under its own directory like every layer's, and
-    // the step writes the old root `<stub>.jsonld` as its tombstone. The
-    // old `--out "./_site/${STUB}.jsonld"` no longer matches, because it
-    // would publish a document whose `@id` names a path it is not at.
-    publisher: /kg-export\.ts\s+(?:--base-url\s+\S+\s+)?(?:--scope\s+instance\s+)?--out\s+"\.\/_site\/\$\{STUB\}\/\$\{STUB\}\.jsonld"/,
+    // the step writes the old root `<stub>.jsonld` as its tombstone. The old
+    // `--out "./_site/${STUB}.jsonld"` still matches, for the one release
+    // the tombstones cover: the exporter reads it as naming the same site
+    // and writes the document at its published path (`placedOut`), so the
+    // index's workflows and this layer can be re-pinned in either order.
+    // Drop the old arm with the tombstones.
+    publisher: /kg-export\.ts\s+(?:--base-url\s+\S+\s+)?(?:--scope\s+instance\s+)?--out\s+"\.\/_site\/(?:\$\{STUB\}\/)?\$\{STUB\}\.jsonld"/,
     why:
       "the host: built by its own step, not this script, though since 2026-10-23 it publishes where every layer " +
       "does, `<name>/<stub>.jsonld`, the address every published `@id` names (the old root `<stub>.jsonld` holds " +

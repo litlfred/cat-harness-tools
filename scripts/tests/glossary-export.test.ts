@@ -40,6 +40,7 @@ import {
   type Ledger,
 } from "../glossary-export.ts";
 import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/glossary-ledger.ts";
+import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -353,6 +354,18 @@ describe("the host glossary's old root address", () => {
     } finally {
       rmSync(site, { recursive: true, force: true });
     }
+  });
+});
+
+describe("an old-layout --out names the same site (placedOut)", () => {
+  test("the old root path is read as the site root; the new path and any other are kept", () => {
+    const P = "cat-harness/cat-harness.jsonld";
+    const L = "cat-harness.jsonld";
+    expect(placedOut("./_site/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: true });
+    expect(placedOut("./_site/cat-harness/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: false });
+    expect(placedOut("/tmp/x/doc.jsonld", P, L)).toEqual({ out: "/tmp/x/doc.jsonld", moved: false });
+    // A foreign instance has no old address: nothing is moved.
+    expect(placedOut("./_site/cat-harness.jsonld", P, undefined)).toEqual({ out: "./_site/cat-harness.jsonld", moved: false });
   });
 });
 

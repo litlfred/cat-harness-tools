@@ -135,7 +135,7 @@ import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-har
 import { kgRoots } from "./known-skills.js";
 import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";
-import { movedDocument, siteRootOf } from "./lib/moved-document.ts";
+import { movedDocument, placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/code-list.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
@@ -797,9 +797,17 @@ if (import.meta.main) {
   const instanceDir = resolve(instanceRoot ?? ROOT);
   // `_kg/` stands for the site root: the glossary sits beside its graph
   // document, `<name>/<stub>-glossary.jsonld` (#603 decision 1b).
-  const out =
-    arg("--out") ??
-    join(repoRootFor(ROOT), "_kg", exportIdentity({ baseUrl, instanceRoot }).docPath.replace(/\.jsonld$/, "-glossary.jsonld"));
+  const gid = exportIdentity({ baseUrl, instanceRoot });
+  const glossaryPathOf = (p: string): string => p.replace(/\.jsonld$/, "-glossary.jsonld");
+  const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", glossaryPathOf(gid.docPath));
+  // An old-layout deploy step is read as naming the same site (#603
+  // decision 1b, `placedOut`), so the re-pins can land in either order.
+  const { out, moved: outMoved } = placedOut(
+    asked,
+    glossaryPathOf(gid.docPath),
+    gid.legacyDocPath === undefined ? undefined : glossaryPathOf(gid.legacyDocPath),
+  );
+  if (outMoved) console.log(`--out ${asked} is the old root address; writing the glossary at ${out}, and its tombstone there`);
 
   console.log(`${ledger.instance} swimlane glossary`);
   console.log(`  ${report.concepts} concept(s), ${report.usages} lane usage(s)`);

@@ -163,7 +163,7 @@ import {
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
-import { siteRootOf } from "./lib/moved-document.ts";
+import { placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -4275,7 +4275,12 @@ if (import.meta.main) {
   // `_kg/` stands for the site root, so the document sits at its published
   // path under it, `<name>/<stub>.jsonld` (#603 decision 1b), and the old
   // root address beside it holds the tombstones, as on the site.
-  const out = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);
+  const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);
+  // A deploy step still naming the old root path is read as naming the same
+  // site (#603 decision 1b), so the index's workflows and this layer can be
+  // re-pinned in either order. See `placedOut`.
+  const { out, moved: outMoved } = placedOut(asked, docPath, legacyDocPath);
+  if (outMoved) console.log(`--out ${asked} is the old root address; writing the document at its published path, ${out}, and the tombstone there`);
   const data = await buildExport({ baseUrl, instanceRoot, scope });
 
   mkdirSync(dirname(out), { recursive: true });

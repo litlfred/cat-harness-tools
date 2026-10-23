@@ -45,6 +45,26 @@ export function siteRootOf(out: string, path: string): string | undefined {
 }
 
 /**
+ * Where a document is written, given the `--out` a deploy passed.
+ *
+ * A deploy step written for the OLD layout passes the old path,
+ * `<site>/<legacy path>`. Written there as asked, the document would sit at
+ * an address its own `@id` does not name, and its subjects and tombstones
+ * would land beside the wrong directory. So an `--out` ending in the old
+ * path is read as naming the same site, and the document goes to its
+ * published path under it. This keeps a deploy written for either layout
+ * correct while the index's workflows and this layer are re-pinned in
+ * separate changes (#603 decision 1b). It goes with the tombstones, one
+ * release later.
+ */
+export function placedOut(out: string, path: string, legacyPath: string | undefined): { out: string; moved: boolean } {
+  if (legacyPath === undefined || legacyPath === path || siteRootOf(out, path) !== undefined) return { out, moved: false };
+  const root = siteRootOf(out, legacyPath);
+  // `siteRootOf` keeps the root's trailing separator, so the two concatenate.
+  return root === undefined ? { out, moved: false } : { out: `${root}${path}`, moved: true };
+}
+
+/**
  * The tombstone document for `newDoc` at `oldIri`: the document itself
  * forwarded, and each `[old, new]` pair as a node of its `@graph`.
  * `context` is the new document's own, extended with the three terms.

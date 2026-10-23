@@ -141,8 +141,11 @@ describe("completeness — bean 4ak5 item 5", () => {
     expect(host('--base-url "$BASE" --scope instance ')).toEqual([]);
     expect(host("--scope checkout ").join("\n")).toContain("`cat-harness` is exempt");
     // #603 decision 1b (owner, 2026-10-23): the host's document sits under its
-    // own directory. The old root `--out` would write it where its `@id` is not.
-    expect(host("--scope instance ", "./_site/\${STUB}.jsonld").join("\n")).toContain("`cat-harness` is exempt");
+    // own directory. The old root `--out` is still accepted for the release
+    // the tombstones cover, because the exporter places the document at its
+    // published path whichever it is given (`placedOut`); any other path is not.
+    expect(host("--scope instance ", "./_site/\${STUB}.jsonld")).toEqual([]);
+    expect(host("--scope instance ", "./_site/elsewhere/\${STUB}.jsonld").join("\n")).toContain("`cat-harness` is exempt");
   });
 
   test("a publisher named only in a COMMENT is not a publisher", () => {

@@ -1065,7 +1065,9 @@ describe("a package's id is declared, not derived from its path", () => {
   // Reads other instances' exports, so it runs only where those instances
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("in the PUBLISHED graph the witness is a tombstone forwarding to its own instance's document", () => {
-    const at = `${EXPORT["@id"]}#package/${WITNESS}`;
+    // Named by the fragment the LAST release published: of the host's old
+    // root document, which moved under `<site>/<name>/` (#603 decision 1b).
+    const at = `${exportIdentity({ instanceRoot: HARNESS_ROOT }).legacyDocIri ?? EXPORT["@id"]}#package/${WITNESS}`;
     const t = (EXPORT["@graph"] as Array<Record<string, unknown>>).find((n) => n["@id"] === at);
     expect(t).toEqual({ "@id": at, deprecated: true, isReplacedBy: publishedIdentity(join(REPO, WITNESS)).docIri });
   });
