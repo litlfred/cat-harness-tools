@@ -23,6 +23,15 @@
 #     2026-10-14: "A harnessed repo should run not just core but all of the
 #     checks in the dependency harness"), on main and on the PR; fails only
 #     on a gate the PR newly breaks (`run-gates.py`).
+#   - Among those gates, in layer mode: the INDEX's own gates over the
+#     composed root, the caller swapped in (owner, 2026-10-23, item 2:
+#     a layer PR merges only on a green index run with it pinned). The index
+#     lints and typechecks every mounted instance, which no gate of the
+#     caller's harness did, so a PR could pass here and turn the index red
+#     when pinned (cat-harness-tools#385). Which gates is data,
+#     `.github/scripts/layer-pr-checks/root-gates.json`; they are judged
+#     error by error, so a gate already red on main still fails the PR that
+#     adds an error to it (`run-root-gates.py`, `compare-gates.py`).
 # And one report that never blocks: the caller's directory READMEs, stale or
 # current, as a QA warning (owner, 2026-10-16: "QA report, but not gate").
 #
@@ -555,6 +564,16 @@ jobs:
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi
+      - &root-gates
+        name: The index's own gates over the composed root (layer mode)
+        # After the state mount and the IG pages, before derive:publish, which
+        # is the order the index's own TypeScript job runs them in. Never
+        # fatal: recorded, and judged by the compare job against main.
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
+        working-directory: fa
+        run: |
+          python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
+            ../ci/.github/scripts/layer-pr-checks/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
         if: steps.skip-prep.outputs.hit != 'true'
@@ -701,6 +720,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/prepared"
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py save fa "$RUNNER_TEMP/mounted.txt" "$RUNNER_TEMP/prepared/root"
           cp "$RUNNER_TEMP/derive-publish.json" "$RUNNER_TEMP/prepared/"
+          if [ -f "$RUNNER_TEMP/root-gates.json" ]; then cp "$RUNNER_TEMP/root-gates.json" "$RUNNER_TEMP/prepared/"; fi
           # The previous run's gate seconds, so the shards balance by time.
           if [ -f "$RUNNER_TEMP/timings/gates.json" ]; then cp "$RUNNER_TEMP/timings/gates.json" "$RUNNER_TEMP/prepared/timings.json"; fi
           zstd -q -T0 --rm "$RUNNER_TEMP/prepared/root.tar"
@@ -851,6 +871,7 @@ jobs:
       - *install
       - *chromium
       - *state-mount
+      - *root-gates
       - *derive
       - *timings-restore
       - *snapshot-save
@@ -920,6 +941,7 @@ jobs:
           zstd -q -d --rm "$p/root.tar.zst"
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py apply fa "$p/root"
           cp "$p/derive-publish.json" "$RUNNER_TEMP/derive-publish.json"
+          if [ -f "$p/root-gates.json" ]; then cp "$p/root-gates.json" "$RUNNER_TEMP/root-gates.json"; fi
           # The same seconds in every shard of this side, so they agree on the split.
           if [ -f "$p/timings.json" ]; then echo "GATE_TIMINGS=$p/timings.json" >> "$GITHUB_ENV"; fi
       # The CI cone's records (bean `4rbc`, cat-harness-tools#398): the newest
@@ -1014,7 +1036,7 @@ jobs:
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
           MODE: ${{ inputs.mode }}
           SIDE: ${{ env.SIDE }}
-        # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
+        # shellcheck disable=SC2086 -- OWN and ROOT_GATES are empty or one flag and its value
         run: |
           set -euo pipefail
           export GATE_JUNIT="$RUNNER_TEMP/junit.xml"
@@ -1028,7 +1050,11 @@ jobs:
             echo "corpus-gate diff base ($SIDE): $GATE_DIFF_BASE"
           fi
           export GATE_DIFF_BASE
-          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json"
+          # Layer mode: the index's own gates, run by the prepare job. Always
+          # passed there, so a side that wrote none is recorded as exit 2.
+          ROOT_GATES=""
+          [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
+          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
       - uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}

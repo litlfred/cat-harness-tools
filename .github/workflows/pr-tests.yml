@@ -27,6 +27,15 @@
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
 # PR newly breaks. The step summary lists every failure, old and new.
 #
+# The same two runs also run the INDEX's own gates over the composed root
+# (owner, 2026-10-23, item 2: a layer PR merges only on a green index run with
+# it pinned). The index lints every mounted instance with this layer's eslint
+# config and typechecks every instance; #385 passed every check here and
+# failed the index's lint once pinned. Which gates is data,
+# `.github/scripts/layer-pr-checks/root-gates.json`, shared with
+# `layer-pr-checks.yml`; the `index-gates` job judges them error by error, so
+# one already red on main still fails the PR that adds an error to it.
+#
 # NO E2E JOB, and why (bean cat-tools-g9m3, Done-when 3). The Playwright suite
 # (`bun run cat test:e2e`, 83 `*.e2e.ts` specs under `test/` on 2026-10-12) cannot be run
 # meaningfully against this mount yet: with the paths fixed (#65), collection
@@ -191,6 +200,8 @@ jobs:
         with:
           path: src
           fetch-depth: 2
+      - name: Keep the PR's root-gate runner, so both sides run the same one
+        run: cp -r src/.github/scripts/layer-pr-checks judge
       - &base-side
         # Both sides check out the PR's merge commit; the base side steps to its
         # first parent, the main it merges into. Never `pull_request.base.sha`:
@@ -210,13 +221,15 @@ jobs:
           fi
           git log -1 --format='base side: %h %s'
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Cache base junit report (bean cis2)
+      - name: Cache base junit report and root gates (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
         uses: actions/cache@v6
         with:
-          path: ${{ runner.temp }}/junit.xml
-          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/root-gates.json
+          key: pr-tests-junit-base-v2-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}-${{ hashFiles('judge/run-root-gates.py', 'judge/root-gates.json') }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -243,6 +256,12 @@ jobs:
           print(f"{sys.argv[2]}: mounted")
           PY
           done
+      - name: The index's own gates over the composed root
+        # Before the tests, which write into the tree. Judged by the
+        # index-gates job, not by this exit code.
+        if: steps.base-cache.outputs.cache-hit != 'true'
+        working-directory: fa
+        run: python3 ../judge/run-root-gates.py . ../judge/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
       - name: bun test
         if: steps.base-cache.outputs.cache-hit != 'true'
         working-directory: fa
@@ -253,7 +272,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.side }}
-          path: ${{ runner.temp }}/junit.xml
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/root-gates.json
 
   standalone-run:
     # The standalone ratchet (bean `ho66`; owner, 2026-10-14). The tracked
@@ -354,3 +375,23 @@ jobs:
           path: junit
       - name: Compare PR failures with main
         run: python3 .github/scripts/compare-test-failures.py junit/junit-base/junit.xml junit/junit-head/junit.xml
+
+  index-gates:
+    name: Index gates (no new failures)
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - uses: actions/download-artifact@v8
+        with:
+          path: junit
+      - name: Compare the index's own gates with main
+        # A side that wrote no report could not be judged: never a pass.
+        run: |
+          set -euo pipefail
+          for side in base head; do
+            test -s "junit/junit-$side/root-gates.json" || { echo "::error::the $side side wrote no root-gates.json: could not determine"; exit 2; }
+          done
+          python3 .github/scripts/layer-pr-checks/compare-gates.py junit/junit-base/root-gates.json junit/junit-head/root-gates.json
