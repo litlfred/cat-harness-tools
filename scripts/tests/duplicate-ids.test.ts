@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { duplicateIds } from "../check-duplicate-ids.js";
+import { duplicateIds, idOf } from "../check-duplicate-ids.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 describe("duplicateIds", () => {
@@ -24,6 +24,24 @@ describe("duplicateIds", () => {
   });
   test("single-quoted and unquoted ids are read", () => {
     expect([...duplicateIds(`<i id='q'></i><i id=q></i>`)]).toEqual([["q", 2]]);
+  });
+});
+
+describe("only an attribute named id counts", () => {
+  test("id= inside another attribute's value is text (jekyll-seo-tag's og:title, folio-assistant#2628)", () => {
+    const html = `<meta property="og:title" content="carry id=”x”"><meta name="twitter:title" content="carry id=”x”">`;
+    expect(duplicateIds(html).size).toBe(0);
+    expect(duplicateIds(`<a title='say id="y"'></a><b title='say id="y"'></b>`).size).toBe(0);
+  });
+
+  test("a real duplicate after other attributes is still found", () => {
+    expect(duplicateIds(`<input id="a"><input class="b" data-id="z" id="a">`)).toEqual(new Map([["a", 2]]));
+  });
+
+  test("idOf ignores data-id and similar names, and is case-insensitive", () => {
+    expect(idOf(`<div data-id="d" aria-labelledby="l">`)).toBeUndefined();
+    expect(idOf(`<div ID="u">`)).toBe("u");
+    expect(idOf(`<input disabled id=bare>`)).toBe("bare");
   });
 });
 
