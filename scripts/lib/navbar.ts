@@ -1174,6 +1174,18 @@ export function visualiserNavDeclaration(entries: readonly VisualiserNavEntry[])
  * a malformed declaration falls back to the headings rather than to an empty
  * section, and `check-viewer-nav.ts` reports a page with neither.
  */
+/**
+ * The page with its visualiser-nav declaration taken out — bean `gp2f`, page
+ * weight. Once the rail has read the declaration into its own data, the block
+ * is a second copy of the same menu that nothing in the browser reads (the
+ * rail draws from `#fa-rail`). On an IG site it is the IG's whole menu, the
+ * same on every page: 2.9 KB of each `smart-trust/*.html` on gh-pages
+ * `1ad53fa`, beside the 3.7 KB the rail already carries.
+ */
+export function withoutVisualiserNav(html: string): string {
+  return html.replace(new RegExp(`<script\\b[^>]*\\b${VISUALISER_NAV_ATTR}\\b[^>]*>[\\s\\S]*?</script>`, "i"), "");
+}
+
 export function visualiserNavOf(html: string, label: string): NavGroup | undefined {
   const m = new RegExp(
     `<script\\b[^>]*\\b${VISUALISER_NAV_ATTR}\\b[^>]*>([\\s\\S]*?)</script>`,

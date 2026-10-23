@@ -684,6 +684,21 @@ describe("the document index — `documentIndexOf`", () => {
     expect(graphs).toContain('href="#todo-t1"');
     expect(graphs).not.toContain('href="#a"');
   });
+
+  it("drops the declaration once the rail has read it, and keeps a malformed one (gp2f)", () => {
+    const decl = `<script type="application/json" data-fa-visualiser-nav>[{"label":"node-x","href":"#node-x"}]</script>`;
+    const opts = { instance: "cat-harness", toRoot: "..", links: [] };
+    const read = injectRail(page(`${decl}<h2 id="a">A</h2>`), opts)!;
+    expect(region(read, "fa-nav-graphs")).toContain('href="#node-x"');
+    expect(read).not.toContain("data-fa-visualiser-nav");
+    const bad = `<script type="application/json" data-fa-visualiser-nav>not json</script>`;
+    expect(injectRail(page(`${bad}<h2 id="a">A</h2>`), opts)!).toContain(bad);
+    // Railed from shared data, the page keeps the menu once: in `#fa-rail`.
+    const files: string[] = [];
+    const shared = injectRail(page(`${decl}<h2 id="a">A</h2>`), { ...opts, emitRailData: (f) => files.push(f) })!;
+    expect(shared).not.toContain("data-fa-visualiser-nav");
+    expect(shared).toContain('"documentIndex"');
+  });
 });
 
 describe("a declared avatar region crops the mark — `603s`", () => {
