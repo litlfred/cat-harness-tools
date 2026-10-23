@@ -12,8 +12,6 @@
   },
   "resolves": [
     "docs/source/guides-beans-and-todos/guides-beans-and-todos.ts::processes/sdlc/bean-lifecycle.bpmn",
-    "docs/source/guides-document-ingestion/guides-document-ingestion.ts::processes/library/document-ingestion.bpmn",
-    "docs/source/guides-document-ingestion/guides-document-ingestion.ts::processes/ui/ingest-theme.bpmn",
     "docs/source/process-crdm-methodology/process-crdm-methodology.ts::processes/process/crdm-requirements.bpmn",
     "schemas/detangle.ts::schemas/detangle.ts",
     "schemas/graph-typology-registry.ts::schemas/interaction.ts",

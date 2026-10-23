@@ -103,7 +103,7 @@ describe("lsi check over a stored index directory", () => {
     expect(flag.stdout + flag.stderr).toContain("unknown flag");
     const ref = spawnSync("bun", ["run", LSI, "check", "--graph", "skills", "--against", "refs/heads/main"], { cwd: REPO, encoding: "utf-8" });
     expect(ref.status).toBe(2);
-  });
+  }, 60_000);
 });
 
 describe("kg:detangle:check over a stored detangle tree", () => {
@@ -126,8 +126,14 @@ describe("kg:detangle:check over a stored detangle tree", () => {
     180_000,
   );
 
-  test("a malformed --against is a usage error (2), never a missing baseline", () => {
-    const r = spawnSync("bun", ["run", DETANGLE, "--check", "--against", "refs/heads/main"], { cwd: REPO, encoding: "utf-8" });
-    expect(r.status).toBe(2);
-  });
+  test(
+    "a malformed --against is a usage error (2), never a missing baseline",
+    () => {
+      const r = spawnSync("bun", ["run", DETANGLE, "--check", "--against", "refs/heads/main"], { cwd: REPO, encoding: "utf-8" });
+      expect(r.status).toBe(2);
+    },
+    // It spawns `bun run`, which loads the module graph before it parses a flag:
+    // the 5 s default is too short on a loaded runner (it failed twice on #631).
+    60_000,
+  );
 });

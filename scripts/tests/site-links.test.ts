@@ -39,17 +39,21 @@ function build(opts: { viewer?: boolean; graph?: boolean }): string {
     mkdirSync(join(dir, "folio-assistant"), { recursive: true });
     writeFileSync(join(dir, "folio-assistant", "index.html"), "<!doctype html>");
   }
-  if (opts.graph) writeFileSync(join(dir, "folio-assistant.jsonld"), "{}");
+  if (opts.graph) {
+    mkdirSync(join(dir, "folio-assistant"), { recursive: true });
+    writeFileSync(join(dir, "folio-assistant", "folio-assistant.jsonld"), "{}");
+  }
   return dir;
 }
 
 describe("siteLinks", () => {
   test("resolves the viewer and the graph through the published layout", () => {
     const byId = Object.fromEntries(siteLinks(DECL, "https://github.com/o/r").map((l) => [l.id, l]));
-    // `<base>/<stub>/` and `<base>/<stub>.jsonld` — what `renderingPath`
-    // documents and what the Pages workflow builds.
+    // `<base>/<stub>/` and `<base>/<name>/<stub>.jsonld` — what the Pages
+    // workflow builds. The graph sits under the instance's own directory, the
+    // host's included, since #603 decision 1b (owner, 2026-10-23).
     expect(byId.kg.path).toBe("/folio-assistant/");
-    expect(byId.jsonld.path).toBe("/folio-assistant.jsonld");
+    expect(byId.jsonld.path).toBe("/folio-assistant/folio-assistant.jsonld");
     expect(byId.source.url).toBe("https://github.com/o/r");
   });
 
@@ -75,7 +79,8 @@ describe("siteLinks", () => {
       siteLinks({ name: "smart-base", stub: "base" }).map((l) => [l.id, l]),
     );
     expect(byId.kg.path).toBe("/base/");
-    expect(byId.jsonld.path).toBe("/base.jsonld");
+    // The directory is the NAME, the file the stub (`instanceDocPath`).
+    expect(byId.jsonld.path).toBe("/smart-base/base.jsonld");
   });
 
   test("no detectable forge means no source link, not a guessed one", () => {
@@ -89,7 +94,9 @@ describe("siteLinks", () => {
     for (const l of siteLinks(DECL)) {
       if (!l.path) continue;
       expect(l.path.startsWith("/")).toBe(true);
-      expect(l.path.startsWith("/folio-assistant/folio-assistant")).toBe(false);
+      // The baseurl twice would be `/folio-assistant/folio-assistant/…`; the
+      // document's own `<name>/<stub>.jsonld` is one segment, not that.
+      expect(l.path.startsWith("/folio-assistant/folio-assistant/")).toBe(false);
     }
   });
 });

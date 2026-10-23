@@ -298,6 +298,12 @@ export interface ComposedInstance {
    * renamed, and the failure would look like "this branch touches nothing".
    */
   root: string;
+  /**
+   * True when the instance also declares an `igSite` directory: its own IG
+   * site is built at `/<instance>/` (`stage-ig-sites.ts`, bean `mftp`) and
+   * answers `/<instance>/index.html`, so no stub may be written there.
+   */
+  igSite?: boolean;
 }
 
 /**
@@ -344,7 +350,8 @@ export function composedInstances(repo = REPO): ComposedInstance[] {
       if (!entry.path || entry.composed !== true) continue;
       const abs = join(repo, e.name, entry.path);
       if (!existsSync(abs)) continue;
-      out.push({ instance: d.name ?? e.name, dir: abs, under: d.name ?? e.name, root: e.name });
+      const igSite = (d.directories ?? []).some((x) => (x as { igSite?: boolean }).igSite === true);
+      out.push({ instance: d.name ?? e.name, dir: abs, under: d.name ?? e.name, root: e.name, ...(igSite ? { igSite } : {}) });
     }
   }
   // A SUBSCRIBED instance's composed directories, from the tree this checkout
@@ -1029,6 +1036,11 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   for (const d of carry) {
     const c = d.instance;
     if (!d.carry) {
+      // An instance with its own IG site has its landing page there: the IG
+      // build composes `/<instance>/index.html` after this tree, and refuses
+      // a path the host source already holds. A stub here would be a second
+      // answer for one URL, so the IG site's own landing stands instead.
+      if (c.igSite) continue;
       const under = `${c.under}/index.md`;
       // The stub is a file in the tree like any other, so it answers to
       // withholding like any other. A canonical build never reaches here (it

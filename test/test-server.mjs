@@ -109,6 +109,41 @@ function mountedPath(pathname) {
   }
 }
 
+/**
+ * THE COMPOSED ROUTE, emulated the same way. `compose-docs.ts` lays an
+ * instance's directory declared `composed: true` into the site's Jekyll source
+ * under the instance's name, so `<site>/<instance>/<rest>` is
+ * `<instance>/<that directory>/<rest>` — where a page of a docs source above
+ * the base, and its site JSON-LD (`gen-site-jsonld.ts`, the `@id` a todo's
+ * `target` names), are published. The build composes; this server serves the
+ * checkout, so a request there that names no committed file falls back to the
+ * declared directory. Read from the instance's own declaration, plain JSON,
+ * and checked to stay under that directory; nothing else is emulated.
+ */
+function composedPath(pathname) {
+  const m = new RegExp(`^${SITE_ROOT}/([a-z0-9][a-z0-9-]*)/(.+)$`).exec(pathname);
+  if (!m) return undefined;
+  let decl;
+  try {
+    decl = JSON.parse(fs.readFileSync(path.join(ROOT, m[1], `${m[1]}.json`), "utf8"));
+  } catch {
+    return undefined;
+  }
+  if (decl?.name !== m[1]) return undefined;
+  for (const d of decl.directories ?? []) {
+    if (d?.composed !== true || typeof d.path !== "string") continue;
+    const dir = path.resolve(ROOT, m[1], d.path);
+    const candidate = path.resolve(dir, m[2]);
+    if (!candidate.startsWith(dir + path.sep)) continue;
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch {
+      // not in this directory
+    }
+  }
+  return undefined;
+}
+
 const server = http.createServer((req, res) => {
   let pathname;
   try {
@@ -129,7 +164,7 @@ const server = http.createServer((req, res) => {
   try {
     stat = fs.statSync(filePath);
   } catch {
-    const mounted = mountedPath(pathname);
+    const mounted = mountedPath(pathname) ?? composedPath(pathname);
     if (mounted === undefined) {
       return send(res, 404, `Not found: ${pathname}`, { "Content-Type": "text/plain" });
     }

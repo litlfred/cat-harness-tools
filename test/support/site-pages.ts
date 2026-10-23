@@ -21,6 +21,7 @@ import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visuali
 import {
   declaredVisualisers,
   existingPageDir,
+  heldVisualiserPages,
   pageParts,
   siteOwnerDir,
   visualiserPageDir,
@@ -64,10 +65,23 @@ export function declaredPageDirIn(
   return pageDirOf(repoRoot, v.harness, v.id, rest);
 }
 
+/**
+ * Where the page is on disk, in the order `visualiserPageRef` finds it: in the
+ * site owner's tree (localised, else at its old address), else where a harness
+ * that HOLDS its own page commits it, in its own site directory
+ * (`heldVisualiserPages`, wrong-direction move M1), which compose lays at its
+ * route only in the site build. Only when none of
+ * them holds a page is the localised route returned, for the read to fail on.
+ */
 function pageDirOf(repoRoot: string, harness: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale">): string {
   const site = siteOwnerDir(repoRoot);
   const parts = { harness, visualiser: id, ...rest };
-  return existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
+  const existing = existingPageDir(site, parts);
+  if (existing !== undefined) return existing;
+  const held = rest.subgraph === undefined
+    ? heldVisualiserPages(repoRoot).find((h) => h.visualiser.harness === harness && h.visualiser.id === id)
+    : undefined;
+  return held?.dir ?? visualiserPageDir(site, pageParts(parts));
 }
 
 /** The URL path `test-server.mjs` serves an absolute directory under the repository root at, with a trailing slash. */

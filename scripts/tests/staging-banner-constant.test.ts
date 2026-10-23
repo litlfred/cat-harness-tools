@@ -86,6 +86,17 @@ describe("the injected HTML does not depend on the build — bean `g196`", () =>
     expect(JSON.parse(a.json).sha).toBe("aaaaaaa");
   });
 
+  test("the CI results link rides in staging.json, never in the page", () => {
+    // The preview does not wait for CI, so it links to where the results
+    // appear. Per-build, so it belongs with the facts, not in the markup.
+    const c = build({ checksUrl: "https://github.com/o/r/pull/1/checks" });
+    expect(JSON.parse(c.json).checksUrl).toBe("https://github.com/o/r/pull/1/checks");
+    expect(c.html.get("index.html")).not.toContain("/pull/1/checks");
+    expect(c.html.get("index.html")).toBe(a.html.get("index.html"));
+    expect(FRAGMENT).toContain("f.checksUrl");
+    rmSync(c.dir, { recursive: true, force: true });
+  });
+
   test("every page in one build carries the SAME fragment, at any depth", () => {
     // `reference/skills/deep/nested/page.html` is four levels down. A
     // `<script src>` would have needed a document-relative href and so would

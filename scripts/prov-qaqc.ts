@@ -56,7 +56,7 @@ import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harne
 import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { accessContext, type AccessContext, type Principal } from "../src/core/access.js";
+import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
 import type { HistoryEntry, InstanceState } from "../src/workflow/instance.js";
 import { isActivity, isDecision, loadProcessModel, processDiagrams, type ProcessModel } from "../src/workflow/process-model.js";
@@ -288,7 +288,9 @@ export async function buildReport(
   repo: string = REPO,
   opts: { ctx?: AccessContext; graph?: RoleGraph; instances?: InstanceState[]; diagrams?: string[] } = {},
 ): Promise<Report> {
-  const ctx = opts.ctx ?? accessContext(HARNESS);
+  // Only this layer's own policies: the output is committed in cat-harness,
+  // and a lower layer's file must not name a higher layer's policy.
+  const ctx = opts.ctx ?? loadAccessContext(HARNESS, { dependents: false });
   const graph = "graph" in opts ? opts.graph : roleGraphFor(HARNESS);
   let diagrams: string[] | undefined = opts.diagrams;
   const candidates = () => (diagrams ??= processDiagrams(workflowFiles(HARNESS, corpusScopeFor(HARNESS))));

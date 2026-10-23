@@ -7,7 +7,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 413,
+      "failed": 409,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -303,9 +303,6 @@
         "test/coordinator/kg-export-checkout.test.ts > kg export > internal links resolve, bar the known data defects",
         "test/coordinator/kg-validate-nested-instances.test.ts > kg:validate over nested instances (bean `676g`) > a path is owned by the DEEPEST instance that contains it",
         "test/coordinator/kg-validate-nested-instances.test.ts > kg:validate over nested instances (bean `676g`) > resolving against the auditor's own instance — the old behaviour — refuses a nested sidecar",
-        "test/coordinator/library-entry-iri-checkout.test.ts > asset and rendering: two resources, two IRIs (owner, 2026-10-02) > entryView takes a link only when it is a DECLARED root, never any page",
-        "test/coordinator/library-entry-iri-checkout.test.ts > asset and rendering: two resources, two IRIs (owner, 2026-10-02) > every entry's @id IS the address of its published JSON-LD, and that file is published",
-        "test/coordinator/library-links-checkout.test.ts > a library reference resolves only where its target exists > links every projected item to its viewer page and README",
         "test/coordinator/library-withheld-checkout.test.ts > (load-time error) ENOENT: no such file or directory, lstat 'who-pub-tps-931'",
         "test/coordinator/memory-refs-checkout.test.ts > memory entries name roles and agents that exist > every agent reference is a declared subagent",
         "test/coordinator/merge-guard-workflows.test.ts > check 5 — a held run on a bot-merged head is judged by its dispatch > parseMergeMainDispatches reads today's merge-main.yml, and refuses a line it cannot read",
@@ -377,7 +374,6 @@
         "test/coordinator/subgraphs-checkout.test.ts > repository-scoped directories are attributed > fsh-guts is exempt because it DECLARES an unpublished kind",
         "test/coordinator/subgraphs-checkout.test.ts > repository-scoped directories are attributed > the x4v4 separation survives the change",
         "test/coordinator/subgraphs-checkout.test.ts > subgraph containment is derived from declared paths > a repository-scoped directory is not a child of an instance-relative one",
-        "test/coordinator/subgraphs-checkout.test.ts > the entanglement report > the dangling category exists and is computed, not skipped",
         "test/coordinator/tech-meta-checkout.test.ts > the mechanical facts > the real corpus agrees with what pdf-structure recorded independently",
         "test/coordinator/term-mapping-checkout.test.ts > corpus — the real glossary, asserting scope rather than a count > every candidate gets a row for BOTH targets, and fhir is never silently unmapped",
         "test/coordinator/theme-by-ref-checkout.test.ts > instanceStickyThemes — every instance's sticky themes, for the board stylesheet > over this repository: who-iris's iris-sticky is found, and holds iris-web's accent",

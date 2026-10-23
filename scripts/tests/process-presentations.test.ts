@@ -16,6 +16,7 @@ import { processDiagrams } from "../../src/workflow/process-model.js";
 import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { docsSources } from "../lib/docs-sources.ts";
 import { PAGE_LOCALE } from "../viewer-declarations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -84,10 +85,22 @@ describe("this repository, right now", () => {
       );
     expect(links.length).toBeGreaterThan(0);
     const broken: string[] = [];
+    // A page of a layer above the base is composed into the site under its
+    // instance's name, from that layer's own docs directory (moves M6–M8).
+    const above = docsSources(ROOT).filter((s) => !s.base);
     for (const { svg, href } of links) {
       // Relative to the SVG FILE — which is how docs-ui re-anchors it when inlined.
       const [path, anchor] = href.split("#");
       const abs = resolve(SVG_DIR, path!);
+      const layer = above.find((s) => abs.startsWith(join(SITE, s.instance) + sep));
+      if (layer !== undefined) {
+        const rel = relative(join(SITE, layer.instance), abs).split(sep).join("/");
+        const src = sourceForPermalink(layer.outDir, `/${rel}`);
+        const md = src === undefined ? join(layer.outDir, rel.replace(/\.html$/, ".md")) : join(layer.outDir, src);
+        if (!existsSync(md)) broken.push(`${svg}: ${href} — no page at ${relative(ROOT, md)}`);
+        else if (anchor && !anchorsOf(readFileSync(md, "utf-8")).has(anchor)) broken.push(`${svg}: ${href} — ${md.split("/").pop()} has no #${anchor}`);
+        continue;
+      }
       // Published address -> the page that is served there, by Jekyll's own
       // permalink rule (bean `kc7k`), not by swapping `.html` for `.md`.
       const source = abs.startsWith(SITE) ? sourceForPermalink(SITE, `/${relative(SITE, abs).split(sep).join("/")}`) : undefined;

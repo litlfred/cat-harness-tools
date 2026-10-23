@@ -1136,9 +1136,18 @@ export const TEMPLATE_PLACEHOLDER_RE = /(?<!\$)\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s
 export function templatesDirs(): string[] {
   const instanceRoot = resolve(TOOLS_ROOT);
   const above = checkoutDependentsOf(instanceRoot).map((d) => ({ name: d.name, root: d.root }));
-  const members = resolveDirectories([...above, { name: "(local)", root: instanceRoot, own: true }]).filter(
-    (d) => d.id === TEMPLATES_ID && existsSync(d.absPath),
-  );
+  // Each layer is asked for its OWN `folio-templates`, one at a time. Resolved
+  // as one chain, a `templates/` another layer declares under a different id
+  // (core's `core-templates`) claims the path as ITS member first, and the
+  // paper profile sci declares as `folio-templates` was never found.
+  const ownTemplates = (link: { name: string; root: string }, own: boolean) =>
+    resolveDirectories([{ ...link, own: true }])
+      .filter((d) => d.id === TEMPLATES_ID && d.own && existsSync(d.absPath))
+      .map((d) => ({ ...d, own }));
+  const members = [
+    ...ownTemplates({ name: "(local)", root: instanceRoot }, true),
+    ...above.flatMap((l) => ownTemplates(l, false)),
+  ];
   // This layer's own member first, so a profile it holds is never shadowed.
   const dirs = [...new Set([...members.filter((d) => d.own), ...members.filter((d) => !d.own)].map((d) => d.absPath))];
   if (dirs.length === 0) {

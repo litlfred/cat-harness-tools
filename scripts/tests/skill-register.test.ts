@@ -50,6 +50,8 @@ import {
   skillPackages,
   stepsToRun,
   unlisted,
+  verifyHere,
+  VERIFIED_BY_GATES_ENV,
   withoutKey,
 } from "../skill-register.js";
 import { BUILDING_ENV } from "../qa-working-copy.ts";
@@ -559,5 +561,33 @@ describe("inside a build of the QA working copy, the steps that read it are defe
     // uml:overview calls requireCurrentWorkingCopy; a step that reads the copy
     // and is not marked would bring the cycle back.
     expect(STEPS.filter((s) => s.readsQaCopy).map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
+  });
+});
+
+describe("in CI, the verifies the run's own gates ask are left to them (owner, 2026-10-23, option A)", () => {
+  const all = "skill:commands:check,skills:docs:check,check:glossary,auto:docs:check,lsi:skills:check,lsi:viz:check,kg:audit:check,kg:detangle:check,subgraph:jsonld:check";
+  test("locally, every step is verified, whatever the variable says", () => {
+    const { verify, byGates } = verifyHere(STEPS, false, { [VERIFIED_BY_GATES_ENV]: all });
+    expect(verify).toEqual([...STEPS]);
+    expect(byGates).toEqual([]);
+  });
+
+  test("CI without the variable verifies every step", () => {
+    for (const ci of ["true", "1"]) expect(verifyHere(STEPS, false, { CI: ci }).byGates).toEqual([]);
+  });
+
+  test("CI=false or 0 is not CI", () => {
+    for (const ci of ["false", "0", ""]) expect(verifyHere(STEPS, false, { CI: ci, [VERIFIED_BY_GATES_ENV]: all }).byGates).toEqual([]);
+  });
+
+  test("never under --check: there the verifies ARE the gate", () => {
+    expect(verifyHere(STEPS, true, { CI: "true", [VERIFIED_BY_GATES_ENV]: all }).byGates).toEqual([]);
+  });
+
+  test("in CI, exactly the named verifies are left to the gates, and the rest still run here", () => {
+    const { verify, byGates } = verifyHere(STEPS, false, { CI: "true", [VERIFIED_BY_GATES_ENV]: " kg:audit:check, check:glossary ,nonesuch" });
+    expect(byGates.map((s) => s.verify.join(" "))).toEqual(["check:glossary", "kg:audit:check"]);
+    expect(verify.length + byGates.length).toBe(STEPS.length);
+    expect(verify.map((s) => s.verify.join(" "))).not.toContain("kg:audit:check");
   });
 });
