@@ -160,7 +160,7 @@ function endOfTemplate(src: string, from: number): number {
  * Inside `${…}` the text is JavaScript, so a brace may be nested, a `}` may
  * sit inside a string, and a backtick opens a template of its own. All three
  * appear in the files this gate exists for — `${who ? \`…\` : "…"}` is one
- * line of `dak-pdf.ts` — so none of them can be waved through.
+ * line of a PDF generator — so none of them can be waved through.
  */
 function endOfInterpolation(src: string, from: number): number {
   let depth = 1;
