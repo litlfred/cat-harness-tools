@@ -23,6 +23,7 @@ import { folioDir, folioDirDeferred, deferResolution} from "@litlfred/cat-harnes
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { references, referenceMap, CSLEntrySchema } from "./references-registry-di";
+import { referenceEntryIds } from "./reference-entries";
 import { findContentRepoRoot } from "./repo-root";
 import { requirePaper } from "./repo-root";
 import { paperArg } from "./cli-args";
@@ -165,6 +166,8 @@ const leanFiles = [
 // only when key resolves against a known reference (mirrors .md scan).
 const LEAN_BRACKET_PATTERN = /(?<![!\w])\[([a-z][a-z0-9_-]*\d{4}[a-z0-9_-]*)\](?!\()/g;
 
+const knownRefIds = new Set<string>([...referenceMap.keys(), ...referenceEntryIds(REPO_ROOT)]);
+
 const unresolvedLeanRefs = new Map<string, string[]>();
 for (const file of leanFiles) {
   const content = readFileSync(file, "utf-8");
@@ -174,7 +177,7 @@ for (const file of leanFiles) {
     const key = match[1];
     leanCitations.add(key);
     // Skip cross-paper refs (paper-dir:label format) and manuscript self-refs
-    if (!referenceMap.has(key) && key !== "manuscript" && !key.includes(":")) {
+    if (!knownRefIds.has(key) && key !== "manuscript" && !key.includes(":")) {
       if (!unresolvedLeanRefs.has(key)) unresolvedLeanRefs.set(key, []);
       unresolvedLeanRefs.get(key)!.push(file.replace(REPO_ROOT + "/", ""));
     }
@@ -183,7 +186,7 @@ for (const file of leanFiles) {
   const bracketP = new RegExp(LEAN_BRACKET_PATTERN.source, LEAN_BRACKET_PATTERN.flags);
   while ((match = bracketP.exec(content)) !== null) {
     const key = match[1];
-    if (referenceMap.has(key)) {
+    if (knownRefIds.has(key)) {
       leanCitations.add(key);
     }
   }
@@ -217,7 +220,7 @@ for (const file of texFiles) {
     // \cite{a,b,c} → split on commas
     for (const key of match[1].split(",").map((k: string) => k.trim())) {
       texCitations.add(key);
-      if (!referenceMap.has(key)) {
+      if (!knownRefIds.has(key)) {
         warn(key, `\\cite{${key}} in ${file.replace(REPO_ROOT + "/", "")} not found in references`);
       }
     }
@@ -228,7 +231,7 @@ for (const file of texFiles) {
     const bracketP = new RegExp(BRACKET_CITE_PATTERN.source, BRACKET_CITE_PATTERN.flags);
     while ((match = bracketP.exec(content)) !== null) {
       const key = match[1];
-      if (referenceMap.has(key)) {
+      if (knownRefIds.has(key)) {
         texCitations.add(key);
       }
     }

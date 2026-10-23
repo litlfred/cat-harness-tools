@@ -5,8 +5,12 @@
  * all 914 qou references, measured when it moved.
  */
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Data as CSLData } from "csl-json";
 import { cslToBibtex, formatPerson, ordinal, texEscape } from "./bibtex-format";
+import { buildBibtex, folioBibtexTitle } from "./export-bibtex";
 
 const garoufalidis2004 = {
   id: "garoufalidis2004",
@@ -58,4 +62,21 @@ describe("helpers", () => {
     expect(formatPerson({ family: "King", given: "Martin", suffix: "Jr." })).toBe("King, Jr., Martin");
   });
   test("ordinal", () => expect([1, 2, 3, 4, 11, 21, 112].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "11th", "21st", "112th"]));
+});
+
+describe("export-bibtex header (de-hardcoded title)", () => {
+  test("uses the folio config title when declared, never a hardcoded folio name", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bib-title-"));
+    try {
+      expect(folioBibtexTitle(dir)).toBe("% Bibliography");
+      expect(folioBibtexTitle(dir)).not.toContain("Quantum Observable Universe");
+      writeFileSync(join(dir, "sample.config.json"), JSON.stringify({ name: "sample", title: "Sample Folio" }));
+      expect(folioBibtexTitle(dir)).toBe("% Bibliography for Sample Folio");
+      const bib = buildBibtex([garoufalidis2004], dir);
+      expect(bib).toContain("% Bibliography for Sample Folio");
+      expect(bib).toContain("@article{garoufalidis2004,");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
