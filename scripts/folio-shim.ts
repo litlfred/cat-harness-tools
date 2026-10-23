@@ -22,6 +22,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readDeclaredFolioProfile } from "../pipeline/profile-check.ts";
 import { missingReexports, shimAssistant } from "./lib/folio-shim.ts";
 
@@ -34,8 +35,7 @@ export interface ShimOutcome {
 
 /** Check, or bring up to date, the shim of the folio at `root`. */
 export function folioShim(root: string, opts: { check: boolean }): ShimOutcome {
-  // declared-path-literal: the folio content root, as init-folio writes it.
-  const shim = join(root, "folio", "schema", "builders.ts");
+  const shim = join(folioDir(root), "schema", "builders.ts");
   if (!existsSync(shim)) return { state: "undetermined", shim, lines: [], detail: "no builders shim here" };
   const text = readFileSync(shim, "utf-8");
   if (shimAssistant(text) === undefined) {
