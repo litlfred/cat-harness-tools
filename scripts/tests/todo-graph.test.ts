@@ -18,7 +18,7 @@ import { join } from "node:path";
 import jsonld from "jsonld";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteIri, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { TodoIndexSchema, type TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
@@ -34,6 +34,7 @@ import {
 import { TODO_PAGE_CONFIG_ID, isTodoPage, todoPageHtml } from "../todo-page.ts";
 import { renderTodoListing } from "../todo-listing.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { docsSources, siteNodeOf } from "../lib/docs-sources.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -179,15 +180,21 @@ describe("what is published", () => {
     if (item.target) {
       const { page, node } = item.target;
       test(`${item.id}: its target IRI names a file the site publishes`, () => {
-        const iri = siteNodeIri(page, node);
-        const file = join(SITE, iri.slice(DOCS_SITE_BASE.length));
+        // The checkout's answer, as the generator asks it: a page of a source
+        // above the base is published under its instance, and its JSON-LD is
+        // in that instance's docs directory until compose lays it there.
+        const { sitePath, file } = siteNodeOf(docsSources(ROOT), page, node);
+        const iri = `${DOCS_SITE_BASE}${sitePath}`;
         expect(existsSync(file)).toBe(true);
         const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
         // The site form: the shared context, or since bean `63q4` the
         // owning instance's own, always with the site as `@base`.
         expect(ContentContextSchema.safeParse(doc["@context"]).success).toBe(true);
         expect((doc["@context"] as unknown[])[1]).toEqual(SITE_DOCUMENT_CONTEXT[1]);
-        expect(doc["@id"]).toBe(siteIri(page, node));
+        expect(doc["@id"]).toBe(sitePath);
+        // The published todo names that same node.
+        const published = JSON.parse(readFileSync(join(SITE, todoSitePath(item.id)), "utf8")) as { target?: { "@id": string } };
+        expect(published.target?.["@id"]).toBe(iri);
       });
     }
   }

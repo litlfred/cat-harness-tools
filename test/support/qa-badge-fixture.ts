@@ -62,6 +62,22 @@ export function badgeRunFor(pageMd: string, nodeKey: string): string {
 }
 
 /**
+ * The verdict index a generated badge run fetches, as the page names it
+ * (`data-qa-index`), so a spec routes the URL the markup really asks for
+ * rather than one spelled beside it. A page's index moves with the page: one
+ * above the base is at `/assets/qa/<instance>/<page>/qa-index.json`.
+ *
+ * @throws if the run names no index, or more than one.
+ */
+export function indexUrlOf(run: string): string {
+  const urls = [...new Set([...run.matchAll(/data-qa-index="([^"]+)"/g)].map((m) => m[1]!))];
+  if (urls.length !== 1) {
+    throw new Error(`a badge run names ${urls.length} verdict indexes (${urls.join(", ")}); expected exactly one`);
+  }
+  return urls[0]!;
+}
+
+/**
  * The page's real verdict index, with named rows replaced or removed.
  *
  * `null` REMOVES the row, which is how a spec reaches "could not determine at
