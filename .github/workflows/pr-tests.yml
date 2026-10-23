@@ -49,11 +49,18 @@
 # a job that fails when `playwright test --list` collects fewer than the specs
 # on disk, and runs them.
 
+# DRAFT PRs RUN THE FAST TIER ONLY (owner, 2026-10-23, "1y"; bean `dft1`).
+# On a draft, `pin` and `typecheck` run. The tests, the standalone measurement
+# and the index's own gates (`run-tests`, `standalone-run`) are skipped. Each
+# "(no new failures)" job then passes with "draft: full tier skipped" in its
+# summary, so no check is left pending. `ready_for_review` is a trigger, so
+# the full tier runs as soon as the PR is marked ready. The green draft run is
+# never the newest run on a head that is ready for review.
 name: PR checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
   workflow_dispatch:
 
 permissions:
@@ -187,6 +194,8 @@ jobs:
   run-tests:
     name: bun test (${{ matrix.side }})
     needs: pin
+    # The full tier: not on a draft (see the header).
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -291,6 +300,8 @@ jobs:
     # the closure anyway.
     name: standalone (${{ matrix.side }})
     needs: pin
+    # The full tier: not on a draft (see the header).
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -347,17 +358,27 @@ jobs:
   standalone:
     name: Standalone (no new failures)
     needs: standalone-run
+    # On a draft the full tier above was skipped: pass, and say so. Otherwise
+    # the default `success()`, as before.
+    if: ${{ github.event.action != 'closed' && (success() || (github.event.pull_request.draft == true && !cancelled())) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Draft
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
+        if: github.event.pull_request.draft != true
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
       - uses: actions/download-artifact@v8
+        if: github.event.pull_request.draft != true
         with:
           path: standalone
       - name: Judge the PR against main and the baseline
+        if: github.event.pull_request.draft != true
         run: >-
           python3 .github/scripts/compare-standalone.py scripts/standalone-baseline.json cat-harness-tools
           standalone/standalone-base/standalone.json standalone/standalone-head/standalone.json
@@ -365,29 +386,49 @@ jobs:
   tests:
     name: Tests (no new failures)
     needs: run-tests
+    # On a draft the full tier above was skipped: pass, and say so. Otherwise
+    # the default `success()`, as before.
+    if: ${{ github.event.action != 'closed' && (success() || (github.event.pull_request.draft == true && !cancelled())) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Draft
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
+        if: github.event.pull_request.draft != true
         with:
           sparse-checkout: .github/scripts
       - uses: actions/download-artifact@v8
+        if: github.event.pull_request.draft != true
         with:
           path: junit
       - name: Compare PR failures with main
+        if: github.event.pull_request.draft != true
         run: python3 .github/scripts/compare-test-failures.py junit/junit-base/junit.xml junit/junit-head/junit.xml
 
   index-gates:
     name: Index gates (no new failures)
     needs: run-tests
+    # On a draft the full tier above was skipped: pass, and say so. Otherwise
+    # the default `success()`, as before.
+    if: ${{ github.event.action != 'closed' && (success() || (github.event.pull_request.draft == true && !cancelled())) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Draft
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
+        if: github.event.pull_request.draft != true
         with:
           sparse-checkout: .github/scripts/layer-pr-checks
       - uses: actions/download-artifact@v8
+        if: github.event.pull_request.draft != true
         with:
           path: junit
       - name: Compare the index's own gates with main
+        if: github.event.pull_request.draft != true
         # A side that wrote no report could not be judged: never a pass.
         run: |
           set -euo pipefail

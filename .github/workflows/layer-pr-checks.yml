@@ -81,6 +81,21 @@
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
 #
+# Draft PRs (owner, 2026-10-23, "1y"; bean `dft1`): with `draft-fast-tier:
+# true`, a DRAFT pull request runs the fast tier only. prepare-head mounts the
+# PR side and typechecks; prepare-base, the shards and the index's own gates are
+# skipped; and `compare` passes or fails on the typecheck alone, saying "draft:
+# full tier skipped" in its summary. The full tier runs when the PR is not a
+# draft. The input is off by default. A caller turns it on only together with
+# `ready_for_review` in its `pull_request` types:
+#
+#   on: { pull_request: { types: [opened, synchronize, reopened, ready_for_review] }, ... }
+#   jobs: { checks: { uses: ...layer-pr-checks.yml@main, with: { draft-fast-tier: true } } }
+#
+# Without that trigger, nothing runs when a draft is marked ready, so the
+# draft run's green check would stand on the head. merge-guard's check 5
+# reads that run, and it would pass a PR that never ran its tests and gates.
+#
 # Everything every caller would otherwise repeat is decided here: the instance
 # is the calling repository's name, the folio-assistant ref is `index-ref`'s
 # default, the judging scripts are at main, and one run per PR is kept
@@ -146,6 +161,11 @@ on:
         required: false
         type: string
         default: "main"
+      draft-fast-tier:
+        description: "On a draft PR, run only the fast tier: prepare the PR side and typecheck. Turn it on only when the caller's pull_request types include ready_for_review, so the full tier runs when the PR is marked ready."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -569,7 +589,9 @@ jobs:
         # After the state mount and the IG pages, before derive:publish, which
         # is the order the index's own TypeScript job runs them in. Never
         # fatal: recorded, and judged by the compare job against main.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
+        # Part of the full tier: skipped on a draft under `draft-fast-tier`,
+        # with the shard hand-off steps below.
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -708,7 +730,7 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/timings
@@ -717,7 +739,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -730,7 +752,7 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         uses: actions/upload-artifact@v7
         with:
           name: prepared-${{ env.SIDE }}
@@ -741,7 +763,9 @@ jobs:
 
   prepare-base:
     name: Prepare the main side, unless main's answer is cached
-    if: github.event.action != 'closed'
+    # Not on a draft under `draft-fast-tier`: it has no full tier to compare
+    # against. `run` then skips too, because it needs this job to succeed.
+    if: github.event.action != 'closed' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -1088,6 +1112,7 @@ jobs:
           SKIP: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip == 'true' }}
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
+          DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
         run: |
           if [ "$PUSH" = "true" ]; then
             if [ "$PREPARED" = "true" ]; then
@@ -1102,6 +1127,11 @@ jobs:
             msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$DRAFT" = "true" ]; then
+            msg="draft: full tier skipped. This draft PR was prepared and typechecked only; the tests, the gates and the comparison with main run when it is marked ready for review."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+            echo "draft=true" >> "$GITHUB_OUTPUT"
           else
             echo "only=false" >> "$GITHUB_OUTPUT"
           fi
@@ -1221,3 +1251,22 @@ jobs:
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1
+      # A draft under `draft-fast-tier`: the fast tier is judged here. A PR
+      # side that could not be prepared is red, never a pass. So is a failed
+      # typecheck.
+      - name: Draft verdict (fast tier)
+        if: steps.pins-only.outputs.draft == 'true'
+        env:
+          PREPARED: ${{ needs.prepare-head.result }}
+          TYPECHECK: ${{ needs.prepare-head.outputs.typecheck }}
+        run: |
+          echo "prepare-head: $PREPARED, typecheck: ${TYPECHECK:-not run}"
+          echo "fast tier: prepare-head $PREPARED, typecheck ${TYPECHECK:-not run}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PREPARED" != "success" ]; then
+            echo "::error::draft: the PR side could not be prepared ($PREPARED)"
+            exit 1
+          fi
+          if [ "$TYPECHECK" = "failure" ]; then
+            echo "::error::draft: typecheck failed (full tier skipped)"
+            exit 1
+          fi
