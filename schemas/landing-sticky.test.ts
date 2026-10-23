@@ -37,6 +37,7 @@ import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
 import { inAggregate } from "../test/support/checkout.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { declaredDocsSources } from "../scripts/lib/docs-sources.ts";
 import { dirname } from "node:path";
 
 const REPO = join(dirname(HARNESS_ROOT));
@@ -546,8 +547,18 @@ describe("EVERY declared link resolves to a page that exists", () => {
     "%s -> %s resolves to a source page",
     (_label, href) => {
       const stem = href.replace(/^\//, "").replace(/\.html$/, "");
-      const candidates = [`${stem}.md`, join(stem, "index.md"), `${stem}.html`];
-      expect(candidates.some((c) => existsSyncSafe(join(DOCS, c)))).toBe(true);
+      const candidates = (s: string) => [`${s}.md`, join(s, "index.md"), `${s}.html`];
+      // `/<instance>/<page>` is a page an instance above this one renders
+      // into a docs directory it declares (`lib/docs-sources.ts`), composed
+      // into the one site under the instance's own name.
+      const [head, ...rest] = stem.split("/");
+      const roots = [
+        ...candidates(stem).map((c) => join(DOCS, c)),
+        ...(rest.length > 0
+          ? declaredDocsSources(join(REPO, head!)).flatMap((s) => candidates(rest.join("/")).map((c) => join(s.outDir, c)))
+          : []),
+      ];
+      expect(roots.some((c) => existsSyncSafe(c))).toBe(true);
     },
   );
 
