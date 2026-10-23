@@ -16,7 +16,7 @@
  * smart-base, smart-trust), which only the whole checkout's script table holds.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -29,7 +29,12 @@ import {
   STEP_EXEMPTIONS,
   checkScriptNames,
   commandRunsScript,
+  declaresWriter,
+  gateSegments,
   gatesFrom,
+  isWriterStep,
+  loadGatesCiRuns,
+  loadWriterSteps,
   runnableGatesFrom,
   unresolvedGatesFrom,
   loadGates,
@@ -248,5 +253,87 @@ jobs:
     expect(carriesUnexpandedVariable("bun run cat gates --all")).toBe(false);
     // A literal dollar that is not a variable reference must not be caught.
     expect(carriesUnexpandedVariable("bun run x -- --label '$'")).toBe(false);
+  });
+});
+
+describe("a step that declares itself a writer is not a gate in the pool", () => {
+  // folio-assistant#2633 runs the whole-repository projections' writers as
+  // plain lines at the END of a gates job, so CI goes red when a writer cannot
+  // write. `gatesFrom` reads every `bun` line as a gate, so without this the
+  // local runner put them in the gate list: a writer rewriting what the gates
+  // beside it read, and the tree guard (`ymsu`) reporting the run NOT clean
+  // for the write that is the step's whole purpose. The mark is DATA — the
+  // script's own `@covers none — writer` — so no name is listed here.
+  const WRITER_DOC = "/**\n * Regenerates a projection.\n *\n * @covers none — writer — regenerates the visualisation; judges nothing\n */\n";
+  const MENTION_DOC = "/**\n * Declares itself with\n *     @covers none — writer — like this\n * @covers none — a report\n */\n";
+
+  function fixture(): string {
+    const dir = mkdtempSync(join(tmpdir(), "gates-writers-"));
+    mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+    mkdirSync(join(dir, "tools"), { recursive: true });
+    writeFileSync(join(dir, "tools", "gen-proj.ts"), WRITER_DOC);
+    writeFileSync(join(dir, "tools", "report.ts"), MENTION_DOC);
+    writeFileSync(join(dir, "tools", "nav.ts"), "/**\n * @covers pages\n */\n");
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        scripts: {
+          "proj:viz": "bun run tools/gen-proj.ts",
+          "proj:viz:check": "bun run tools/gen-proj.ts --check",
+          report: "bun run tools/report.ts",
+          "check:nav": "bun run tools/nav.ts",
+        },
+      }),
+    );
+    writeFileSync(
+      join(dir, GATES_WORKFLOW),
+      [
+        "jobs:",
+        "  gates-unrun:",
+        "    steps:",
+        "      - run: bun run cat check:nav",
+        "      - run: bun run cat report",
+        "      - name: the projections' writers, last",
+        "        run: |",
+        "          bun run cat proj:viz",
+        "          bun run tools/gen-proj.ts",
+        "",
+      ].join("\n"),
+    );
+    return dir;
+  }
+
+  test("the mark is a USE in the docblock, never a mention", () => {
+    expect(declaresWriter(WRITER_DOC)).toBe(true);
+    // An indented sample and a plain `@covers none` are not the mark.
+    expect(declaresWriter(MENTION_DOC)).toBe(false);
+  });
+
+  test("read from a workflow line, a declared writer is held out of the gate list and the pool", () => {
+    const dir = fixture();
+    try {
+      // Both shapes a workflow uses: through the script table, and by path.
+      expect(isWriterStep(dir, "bun run cat proj:viz")).toBe(true);
+      expect(isWriterStep(dir, "bun run tools/gen-proj.ts")).toBe(true);
+      expect(isWriterStep(dir, "bun run cat report")).toBe(false);
+      expect(isWriterStep(dir, "bun run cat check:nav")).toBe(false);
+
+      // `gatesFrom` still answers "what does CI run" — all four lines.
+      expect(gatesFrom(readFileSync(join(dir, GATES_WORKFLOW), "utf-8")).map((g) => g.command)).toHaveLength(4);
+
+      const gates = loadGates(dir).map((g) => g.command);
+      expect(gates).toEqual(["bun run cat check:nav", "bun run cat report"]);
+      expect(loadWriterSteps(dir).map((g) => g.command)).toEqual(["bun run cat proj:viz", "bun run tools/gen-proj.ts"]);
+
+      // So no segment the runner builds — parallel or serial — holds a writer,
+      // even with every gate declared read-only.
+      const pooled = gateSegments(loadGates(dir), () => true).flatMap((s) => s.gates.map((g) => g.command));
+      expect(pooled.some((c) => c.includes("proj:viz") || c.includes("gen-proj"))).toBe(false);
+
+      // And the CI census (`audit:coverage`) still counts them: CI runs them.
+      expect(loadGatesCiRuns(dir).map((g) => g.command)).toEqual([...gates, "bun run cat proj:viz", "bun run tools/gen-proj.ts"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
