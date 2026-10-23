@@ -32,9 +32,10 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkoutRootFor, directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { actionGraph, readPolicies, type ActionGraph, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
-import { actorsDir, readActors, readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { actorsDir, readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { checkoutActors, overlayPolicies, policyLayersAbove } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { kgRoots } from "../../scripts/known-skills.js";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
@@ -70,7 +71,7 @@ export function loadAccessContext(root: string): AccessContext {
   const instanceRoot = policyDirs.length > 0 ? root : PLATFORM_ROOT;
   const dirs = policyDirs.length > 0 ? policyDirs : directoriesForGraph(PLATFORM_ROOT, "policies");
 
-  const policies = new Map<string, OdrlPolicy>();
+  let policies = new Map<string, OdrlPolicy>();
   for (const d of dirs) for (const [uid, p] of readPolicies(d)) policies.set(uid, p);
 
   const profile = kgRoots(instanceRoot)
@@ -80,11 +81,17 @@ export function loadAccessContext(root: string): AccessContext {
 
   const actors = new Map<string, LoadedActor>();
   // The declared home inside `scenarios` (bean rqao), the same one kg-audit
-  // and check-actor-reach read.
+  // and check-actor-reach read — overlaid, as they overlay it, with the actors
+  // the checkout's dependent instances add or extend, and with the policies
+  // those instances keep beside them. Read alone, an actor a dependent adds
+  // is "not a declared actor" here, and the lane it plays refuses it.
   for (const base of [root, checkoutRootFor(instanceRoot)]) {
     const dir = actorsDir(base);
     if (dir === undefined || !existsSync(dir)) continue;
-    for (const a of readActors(dir)) actors.set(a.id, a);
+    const owner = findInstanceRoot(dir) ?? instanceRoot;
+    for (const a of checkoutActors(owner, dir)) actors.set(a.id, a);
+    const read = new Set(dirs.map((d) => resolve(d)));
+    policies = overlayPolicies(policies, policyLayersAbove(owner).filter((l) => !read.has(l.dir)));
     break;
   }
   return { policies, graph, actors };

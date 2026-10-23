@@ -28,6 +28,7 @@ import {
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { docsSources } from "../lib/docs-sources.ts";
 
 const ROOT = join(HARNESS_ROOT);
 
@@ -171,22 +172,24 @@ describe("the witnesses are committed in one place and published in another", ()
 describe("a generated page carries structure, never a verdict", () => {
   /** Every page `gen-docs-pages.ts` writes, read from disk. */
   const pages = () => {
-    const dir = join(ROOT, siteDirFor(ROOT));
     const out: Array<{ path: string; text: string }> = [];
     const walk = (d: string, depth: number) => {
       for (const e of readdirSync(d, { withFileTypes: true })) {
         const p = join(d, e.name);
-        // `docs/` and `docs/guides/` only — the generator writes nowhere else,
-        // and `docs/reference/` holds 153 hand-generated instruction bodies
-        // this rule has nothing to say about.
-        if (e.isDirectory() && e.name === "guides" && depth === 0) walk(p, depth + 1);
+        // A docs directory and its chapter folders, one level down — where
+        // the generator writes `<slug>.md`. Not `reference/`, which holds 153
+        // hand-generated instruction bodies this rule has nothing to say
+        // about, and not the `_`-prefixed Jekyll or `source`/`site` folders.
+        if (e.isDirectory() && depth === 0 && !/^(_|\.)|^(reference|source|site)$/.test(e.name)) walk(p, depth + 1);
         else if (e.isFile() && e.name.endsWith(".md")) {
           const text = readFileSync(p, "utf-8");
           if (text.includes("fa-qa-badge")) out.push({ path: p, text });
         }
       }
     };
-    walk(dir, 0);
+    // Every docs source one run renders, not only this instance's: a page
+    // about a higher layer's process is authored in that layer.
+    for (const s of docsSources(ROOT)) if (existsSync(s.outDir)) walk(s.outDir, 0);
     return out;
   };
 

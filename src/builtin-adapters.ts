@@ -82,6 +82,8 @@ export interface BuiltinAdapterDeclaration {
   className: string;
   /** The instance whose declaration this came from — for the boot log. */
   instance: string;
+  /** That instance's absolute root, so a caller can walk its `needs` without rescanning. */
+  root: string;
   /** The `contentType` this one specialises, if declared. */
   extends?: string;
 }
@@ -137,6 +139,7 @@ export function discoverBuiltinAdapters(
         module: relative(harnessRoot, join(root, a.module)).split("\\").join("/"),
         className: a.className,
         instance: name,
+        root,
         ...(a.extends !== undefined ? { extends: a.extends } : {}),
       });
     }

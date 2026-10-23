@@ -107,7 +107,8 @@ import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
+import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
+import { injectRailOnce } from "./lib/rail-once.js";
 import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
@@ -1060,7 +1061,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       const mark = instanceMark(built, m.name, toRoot);
       const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
-      const railed = injectRail(before, {
+      const railed = injectRailOnce(before, {
         ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
         instance: named.harness ?? m.name,
         ...(named.site ? { homeLabel: named.site } : {}),
@@ -1495,7 +1496,7 @@ export function railStandalonePages(
       // The page tree, cut to the instance's own pages when the page is inside one.
       const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
       const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
-      const railed = injectRail(before, {
+      const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
         ...(homeLabel ? { homeLabel } : {}),
         toRoot,

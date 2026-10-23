@@ -80,12 +80,34 @@ const FILTER_KEYS = [
 ] as const;
 
 /**
+ * The `pull_request` activity types GitHub fires on when a workflow lists none:
+ * a PR is opened, its head is pushed, or it is reopened. A `types:` list that
+ * holds all three still runs on every head a PR gets, so it narrows nothing
+ * this module asks about. Bean `dft1`: a workflow adds `ready_for_review` to
+ * re-run its full tier when a draft is marked ready, and that addition must
+ * not move it from `required` to `conditional`. If it did, merge-guard
+ * (check 5) and merge-steward would stop treating its absence as a finding.
+ */
+const DEFAULT_PR_TYPES = ["opened", "synchronize", "reopened"] as const;
+const PR_EVENTS = new Set(["pull_request", "pull_request_target"]);
+
+/** Whether `spec.types` narrows a `pull_request(_target)` event at all. */
+function typesNarrow(event: string, types: unknown): boolean {
+  if (!PR_EVENTS.has(event)) return true;
+  const list = typeof types === "string" ? [types] : Array.isArray(types) ? types : null;
+  if (list === null) return true;
+  return !DEFAULT_PR_TYPES.every((t) => list.includes(t));
+}
+
+/**
  * How far a workflow's declaration settles whether a run was owed.
  *
  * - `required` — it declares the event with no filters, so a run is owed for
  *   every occurrence of that event. Its absence is a finding.
  * - `conditional` — it declares the event behind `paths`, `branches`, `types`
- *   or similar. Whether a run was owed depends on the diff or the ref, which a
+ *   or similar. A `pull_request` `types:` list that keeps all of GitHub's
+ *   default types (opened, synchronize, reopened) is not a narrowing, so on
+ *   its own it leaves the workflow `required`. Whether a run was owed depends on the diff or the ref, which a
  *   commit id does not carry. **Not a finding and not a pass.**
  * - `not-declared` — it does not respond to the event at all.
  */
@@ -153,7 +175,8 @@ export function triggerFor(file: string, text: string, event: string): WorkflowT
   const spec = events.get(event);
   if (spec === null || spec === undefined) return { file, name, requirement: "required", filters: [] };
   if (typeof spec !== "object") return { file, name, requirement: "required", filters: [] };
-  const filters = FILTER_KEYS.filter((k) => k in (spec as Record<string, unknown>));
+  const rec = spec as Record<string, unknown>;
+  const filters = FILTER_KEYS.filter((k) => k in rec && (k !== "types" || typesNarrow(event, rec.types)));
   return filters.length === 0
     ? { file, name, requirement: "required", filters: [] }
     : { file, name, requirement: "conditional", filters: [...filters] };

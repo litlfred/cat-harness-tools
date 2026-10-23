@@ -5,16 +5,21 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
   buildPrBody,
+  builtAtPublishIn,
   checkPostMergeRegen,
   FIXITY_CHECKS,
   postMergePairs,
   resolveRepoRoot,
+  treeMoveTracker,
   type GhExecutor,
   type GitExecutor,
+  type PublishTimeDeclaration,
 } from "../post-merge-regen.ts";
 import type { Runner } from "../regen-after-merge.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -387,5 +392,138 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
       expect(body).toContain("reviewable PR rather than direct push");
       expect(body).toContain("accidental-repair hazard");
     });
+  });
+});
+
+/**
+ * Bean `folio-assistant-p7mb`: an output an instance declares `builtAtPublish`
+ * is gitignored and never committed, so post-merge regen must not report it
+ * stale. Measured on cat-harness run 39786173033 (2026-10-22): `library:viz`,
+ * `uploads:viz`, `voices:viz`, `document-kinds:viz` and `slice:sqlite` were
+ * listed stale and "repaired" only because their publish-time pages were absent.
+ */
+describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", () => {
+  // A scratch composed tree: one instance `inst` declaring one directory and one file built at publish.
+  const PUBLISH_DIR = "out/pages/";
+  const PUBLISH_FILE = "out/index.json";
+  const COMMITTED = "notes.txt";
+
+  const scratch = (): { repo: string; decls: PublishTimeDeclaration[]; done: () => void } => {
+    const repo = mkdtempSync(join(tmpdir(), "post-merge-regen-p7mb-"));
+    mkdirSync(join(repo, "inst"), { recursive: true });
+    writeFileSync(join(repo, "inst", COMMITTED), "committed\n");
+    const decls = [{ root: join(repo, "inst"), builtAtPublish: [{ path: PUBLISH_DIR }, { path: PUBLISH_FILE }] }];
+    return { repo, decls, done: () => rmSync(repo, { recursive: true, force: true }) };
+  };
+
+  const quietGit = (changed: string[] = []): GitExecutor => ({
+    getCurrentSha: () => "39786173033000000000000000000000000000ab",
+    getChangedFiles: () => changed,
+    createBranch: () => {},
+    commitAll: () => {},
+    pushBranch: () => {},
+  });
+  const noPr: GhExecutor = {
+    findExistingPr: () => undefined,
+    createPr: () => {
+      throw new Error("no repair PR may be opened for a builtAtPublish output");
+    },
+  };
+
+  test("builtAtPublishIn asks isBuiltAtPublish of the owning instance, with the instance-relative path", () => {
+    const decls: PublishTimeDeclaration[] = [
+      { root: "/r/inst", builtAtPublish: [{ path: PUBLISH_DIR }, { path: PUBLISH_FILE }] },
+      { root: "/r/inst/nested", builtAtPublish: [] },
+    ];
+    expect(builtAtPublishIn("inst/out/pages/a/index.html", decls, "/r")).toBe(true);
+    expect(builtAtPublishIn("inst/out/index.json", decls, "/r")).toBe(true);
+    expect(builtAtPublishIn("inst/notes.txt", decls, "/r")).toBe(false);
+    // Another instance's tree, and the deepest instance declaring nothing, are not this one's declaration.
+    expect(builtAtPublishIn("other/out/pages/a.html", decls, "/r")).toBe(false);
+    expect(builtAtPublishIn("inst/nested/out/pages/a.html", decls, "/r")).toBe(false);
+  });
+
+  test("the tracker tells a builtAtPublish write from a committed one, and a same-bytes rewrite moves nothing", () => {
+    const { repo, decls, done } = scratch();
+    try {
+      const t = treeMoveTracker(repo, decls);
+      expect(t.take()).toEqual({ builtAtPublish: [], committed: [] }); // the baseline
+      mkdirSync(join(repo, "inst/out/pages"), { recursive: true });
+      writeFileSync(join(repo, "inst/out/pages/index.html"), "<p>built</p>");
+      writeFileSync(join(repo, "inst", COMMITTED), "committed\n"); // same bytes
+      expect(t.take()).toEqual({ builtAtPublish: ["inst/out/pages/index.html"], committed: [] });
+      writeFileSync(join(repo, "inst", COMMITTED), "changed\n");
+      expect(t.take()).toEqual({ builtAtPublish: [], committed: ["inst/notes.txt"] });
+    } finally {
+      done();
+    }
+  });
+
+  test("a check red only because its builtAtPublish outputs are absent is NOT reported stale, and opens no PR", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      let built = false;
+      const runner: Runner = (script) => {
+        if (script === "library:viz:check") return built;
+        if (script === "library:viz") {
+          mkdirSync(join(repo, "inst/out/pages"), { recursive: true });
+          writeFileSync(join(repo, "inst/out/pages/index.html"), "<p>built</p>");
+          writeFileSync(join(repo, "inst", PUBLISH_FILE), "{}");
+          built = true;
+          return true;
+        }
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "library:viz:check", writer: "library:viz" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual(["library:viz:check"]);
+      expect(report.prOpened).toBe(false);
+      expect(report.exitCode).toBe(0);
+      expect(report.summary).toContain("builtAtPublish");
+    } finally {
+      done();
+    }
+  });
+
+  test("control: a writer that also moves a COMMITTED file is still a stale check, repaired", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      let built = false;
+      const runner: Runner = (script) => {
+        if (script === "render:bpmn:check") return built;
+        if (script === "render:bpmn") {
+          mkdirSync(join(repo, "inst/out/pages"), { recursive: true });
+          writeFileSync(join(repo, "inst/out/pages/other.svg"), "<svg/>");
+          writeFileSync(join(repo, "inst", COMMITTED), "redrawn\n");
+          built = true;
+          return true;
+        }
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "render:bpmn:check", writer: "render:bpmn" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(["inst/notes.txt"]),
+        gh: noPr,
+      });
+      expect(report.status).toBe("repaired");
+      expect(report.staleChecks).toEqual(["render:bpmn:check"]);
+      expect(report.repairedChecks).toEqual(["render:bpmn:check"]);
+      expect(report.builtAtPublishChecks).toEqual([]);
+    } finally {
+      done();
+    }
   });
 });

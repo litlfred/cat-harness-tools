@@ -26,8 +26,10 @@ import {
   commandsCiRuns,
   gatesFrom,
   unresolvedGatesFrom,
+  isWriterStep,
   loadGates,
   loadUnresolved,
+  loadWriterSteps,
   otherWorkflowSteps,
   unclassifiedSteps,
   unrunScripts,
@@ -240,6 +242,9 @@ describe("a strict reader and a loose one agree", () => {
       // The third stated bucket (bean `72a8`): steps the runner performs as a
       // PRECONDITION — once, before the pool — rather than as gates in it.
       ...PRECONDITION_STEPS,
+      // The fourth: steps whose script declares `@covers none — writer`,
+      // which the runner runs AFTER the gates rather than as gates.
+      ...loadWriterSteps(ROOT, { all: true }).map((g) => g.command),
     ]);
     // A PUBLISHER job's lines are dropped on purpose, by `publishes` (bean
     // `16ei`): a job holding `contents: write` is not a gate, and `bun run
@@ -350,5 +355,21 @@ describe("a command whose shell variable this reader discarded is NOT a gate", (
     const skipped = unresolvedGatesFrom(real, { all: true, skipPublishers: true });
     expect(skipped).toHaveLength(1);
     expect(skipped[0]?.command).toContain("translation:catalogue:check");
+  });
+});
+
+describe("a declared writer in the gates workflow runs after the gates, never among them", () => {
+  test("every line whose script declares `@covers none — writer` is a writer step, not a gate", () => {
+    // Over the REAL workflow. `gatesFrom` reads each `bun` line as a gate;
+    // the runner holds the declared writers out of that list (and so out of
+    // the pool and the tree guard) and runs them last, as CI does. Vacuous
+    // where the workflow runs no writer — the fixture in gates.test.ts is what
+    // proves the partition; this proves the real set obeys it.
+    const lines = gatesFrom(readFileSync(join(ROOT, GATES_WORKFLOW), "utf-8"), { all: true }).map((g) => g.command);
+    const writers = new Set(loadWriterSteps(ROOT, { all: true }).map((g) => g.command));
+    const gates = new Set(loadGates(ROOT, { all: true }).map((g) => g.command));
+    for (const c of lines.filter((c) => isWriterStep(ROOT, c))) {
+      expect({ c, writer: writers.has(c), gate: gates.has(c) }).toEqual({ c, writer: true, gate: false });
+    }
   });
 });

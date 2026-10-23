@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readdirSync 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { LOCAL_PACKAGES, discoverLocalPackages, locateLocalSkill } from "./skill-fetch.js";
+import { LOCAL_PACKAGES, REFERENCE_PACKAGES, discoverLocalPackages, locateLocalSkill } from "./skill-fetch.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
@@ -334,5 +334,14 @@ describe("locateLocalSkill — a skill asked for in a package that no longer hol
   });
   test("a skill nobody holds is still unknown", () => {
     expect("error" in locateLocalSkill("nowhere", "core", packages)).toBe(true);
+  });
+});
+
+describe("REFERENCE_PACKAGES — pinned to a commit, never a branch (bean c4lg / 0mpw)", () => {
+  test("every reference package pins ref to a 40-hex commit SHA", () => {
+    expect(Object.keys(REFERENCE_PACKAGES).length).toBeGreaterThan(0);
+    for (const [pkg, entry] of Object.entries(REFERENCE_PACKAGES)) {
+      expect(entry.ref, `${pkg} must pin ref to a 40-hex commit SHA`).toMatch(/^[0-9a-f]{40}$/);
+    }
   });
 });

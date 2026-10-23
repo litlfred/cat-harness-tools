@@ -108,7 +108,7 @@ import {
 } from "./input-hash.ts";
 import { openTrace } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptNameOf, scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import {
   CONTENT_COMPILE_GATES,
   compileGatesForPaths,
@@ -270,6 +270,53 @@ export interface StepExemption {
  * read its output — a race — and a second time on every run.
  */
 export const PRECONDITION_STEPS: readonly string[] = ["bun run cat qa:working-copy"];
+
+/**
+ * A WRITER's mark: `@covers none — writer — …` as a use in its script's
+ * module docblock (` * @covers`, exactly one space either side of the star —
+ * `coversIn`'s rule in audit-coverage.ts, so a mention in prose is not a use).
+ * The first token after `none` is the role; the reason follows the next dash.
+ */
+export const WRITER_MARK = /^ \* @covers none\s+[—–-]{1,2}\s+writer\b/m;
+
+/** Whether a script's text declares it a writer — see {@link WRITER_MARK}. */
+export function declaresWriter(text: string): boolean {
+  return WRITER_MARK.test(text);
+}
+
+/**
+ * Whether a workflow line runs a script that DECLARES itself a writer.
+ *
+ * Steps a workflow runs to REWRITE something rather than to judge it — the
+ * whole-repository projections' writers, run as plain lines so a writer that
+ * cannot write is red (`@covers none`, since a writer judges nothing). In the
+ * local runner such a line in the gate list is wrong twice: it rewrites what
+ * the gates around it read, and the tree guard (bean `ymsu`) then reports the
+ * run NOT clean for a write that was the step's whole purpose. So they are
+ * held out of the gate list like {@link PRECONDITION_STEPS}, and run as a
+ * separate phase (see `main`).
+ *
+ * DATA, not a list of names: the mark is read from the script the line runs
+ * (the line's own `.ts` path, or the `.ts` paths its script-table entry
+ * names — one hop, as `bun run cat <name>` resolves it), so a writer added to
+ * a workflow is sequenced by declaring itself, and nothing here names the
+ * layer that declares it.
+ */
+export function isWriterStep(root: string, command: string, scripts: Record<string, string> = scriptsOf(root)): boolean {
+  const name = scriptNameOf(command);
+  const expanded = name !== undefined ? scripts[name] : undefined;
+  const text = expanded === undefined ? command : `${command} ${expanded}`;
+  for (const m of text.matchAll(/[\w./@-]+\.ts\b/g)) {
+    const file = join(root, m[0].replace(/^\.\//, ""));
+    if (!existsSync(file)) continue;
+    try {
+      if (declaresWriter(readFileSync(file, "utf-8"))) return true;
+    } catch {
+      // unreadable: not shown to be a writer, so it stays a gate
+    }
+  }
+  return false;
+}
 
 const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   // The `nn8e` remote-mount replay used to be exempted here, matched on
@@ -1269,7 +1316,36 @@ export function loadUnresolved(root: string, opts: { all?: boolean } = {}): Gate
  * `loadGates` for **what can I run**, this for **what does CI run**.
  */
 export function loadGatesCiRuns(root: string, opts: { all?: boolean } = {}): Gate[] {
-  return [...loadGates(root, opts), ...loadUnresolved(root, opts)];
+  // The writers too: CI runs them, as plain lines, and each declares `@covers`.
+  return [...loadGates(root, opts), ...loadWriterSteps(root, opts), ...loadUnresolved(root, opts)];
+}
+
+/**
+ * The gates workflow's runnable lines, partitioned: the GATES, and the
+ * declared WRITERS ({@link isWriterStep}) held out of them. Preconditions are
+ * in neither — `main` runs `qa:working-copy` itself.
+ */
+function workflowGates(root: string, opts: { all?: boolean }): { gates: Gate[]; writers: Gate[] } {
+  const runnable = runnableGatesFrom(readFileSync(join(root, GATES_WORKFLOW), "utf-8"), { ...opts, skipPublishers: true }).filter(
+    (g) => !PRECONDITION_STEPS.includes(g.command),
+  );
+  const scripts = scriptsOf(root);
+  const gates: Gate[] = [];
+  const writers: Gate[] = [];
+  for (const g of runnable) (isWriterStep(root, g.command, scripts) ? writers : gates).push(g);
+  return { gates, writers };
+}
+
+/**
+ * The WRITER steps of the gates workflow, in workflow order — held out of
+ * {@link loadGates}, so out of the parallel pool and out of the tree guard's
+ * accounting, and run by `main` AFTER every gate, which is where CI puts them
+ * ("last in the job on purpose"): nothing judged reads what they rewrite. A
+ * content root's gate set carries none.
+ */
+export function loadWriterSteps(root: string, opts: { all?: boolean } = {}): Gate[] {
+  if (rootProfile(root) === "content") return [];
+  return workflowGates(root, opts).writers;
 }
 
 /** Read and parse, refusing an empty result. The RUNNER's list — see {@link loadGatesCiRuns}. */
@@ -1283,14 +1359,11 @@ export function loadGates(root: string, opts: { all?: boolean } = {}): Gate[] {
     if (gates.length === 0) throw new NoGatesFound(`${LAYER_PR_CHECKS} (run-gates.py --list)`);
     return gates;
   }
-  const path = join(root, GATES_WORKFLOW);
   // The RUNNER's list, so the filter belongs here rather than in `gatesFrom`:
   // a command referencing a shell variable this reader discarded cannot be run
   // as written, but CI does run it, and `gatesFrom` is what the accounting
   // checks read as "what CI runs". `reportUnresolved` prints what this drops.
-  const gates = runnableGatesFrom(readFileSync(path, "utf-8"), { ...opts, skipPublishers: true }).filter(
-    (g) => !PRECONDITION_STEPS.includes(g.command),
-  );
+  const gates = workflowGates(root, opts).gates;
   if (gates.length === 0) throw new NoGatesFound(GATES_WORKFLOW);
   if (!opts.all) return gates;
 
@@ -2175,10 +2248,18 @@ if (import.meta.main) {
     console.log("");
   }
 
+  // Declared writers in the workflow (`isWriterStep`): not gates, so not in
+  // the pool or the tree guard's accounting; run after every gate, as CI does.
+  const writers = loadWriterSteps(ROOT, { all });
+
   const scope = all
     ? "every job, plus every locally-runnable step from the other workflows"
     : `the fast set (every job that does not install a browser)`;
-  console.log(`${gates.length} gate(s) — ${scope}\n`);
+  console.log(
+    `${gates.length} gate(s) — ${scope}` +
+      (writers.length ? `; then ${writers.length} declared writer(s), after them` : "") +
+      "\n",
+  );
 
   // Reported on EVERY run, not only with `--list`: an unclassified step is a
   // check CI runs and this does not, and the whole cost of that gap was
@@ -2202,6 +2283,10 @@ if (import.meta.main) {
 
   if (listOnly) {
     for (const g of gates) console.log(`  ${g.command.padEnd(52)} ${g.step}`);
+    if (writers.length) {
+      console.log(`\nWRITERS — ${writers.length} step(s) declaring \`@covers none — writer\`; run AFTER every gate, one at a time, as CI runs them last:`);
+      for (const g of writers) console.log(`  ${g.command.padEnd(52)} ${g.step}`);
+    }
     // `--list` is where somebody goes to learn what this tool covers, so the
     // commands it will NOT run belong here most of all. Omitting them would
     // make the list read as the whole gate set.
@@ -2350,6 +2435,26 @@ if (import.meta.main) {
   skipper.save();
   console.log(`\n(${((performance.now() - t0) / 1000).toFixed(0)}s wall for the gate run)`);
 
+  // ── Declared writers, AFTER every gate (`isWriterStep`) ────────────────
+  //
+  // CI runs them last in their job so that they rewrite nothing a gate judges;
+  // here they run after the whole set for the same reason, one at a time and
+  // never in the pool. Their writes are their purpose, so the tree guard does
+  // not snapshot them: attributing a projection rewrite to them would report
+  // the run NOT clean for doing what they are for. A writer that FAILS is red,
+  // which is the one thing CI asks of them.
+  if (writers.length) {
+    console.log(`\n${writers.length} declared writer(s), after the gates — their writes are not gate mutations:\n`);
+    for (const g of writers) {
+      process.stdout.write(`▸ ${g.command}   (writer)\n`);
+      const [cmd, ...args] = g.command.split(/\s+/);
+      const started = performance.now();
+      const r = await runTee(cmd!, args);
+      process.stdout.write(`  ↳ ${((performance.now() - started) / 1000).toFixed(1)}s, exit ${r.code}: ${g.command}\n`);
+      if (r.code !== 0) failed.push({ gate: g, why: salientFailures(r.output) });
+    }
+  }
+
   /** A run that reached a `traced` input site records nothing (`input-trace.ts`); say so. */
   function tracedReport(script: string, reached: string | undefined): boolean {
     if (reached === undefined) return false;
@@ -2423,7 +2528,7 @@ if (import.meta.main) {
   if (skippedGates.length > 0) {
     console.log(`  (${skippedGates.length} gate(s) SKIPPED — inputs unchanged since each last passed; \`--no-cache\` asks them)`);
   }
-  console.log(`✗ ${failed.length} of ${gates.length} failed:`);
+  console.log(`✗ ${failed.length} of ${gates.length + writers.length} failed:`);
   for (const { gate, why } of failed) {
     console.log(`  · ${gate.command}   (${gate.job} / ${gate.step})`);
     // The whole point of bean `ucb9`. Without these lines a gate that is

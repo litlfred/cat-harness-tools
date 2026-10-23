@@ -62,7 +62,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { declinesNavbar, injectRail, type NavItem } from "./lib/harness-rail.js";
+import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
+import { injectRailOnce } from "./lib/rail-once.js";
 import { withSavedScheme } from "./lib/scheme-css.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -281,7 +282,7 @@ export function withViewerNav(html: string, pageAbs: string, o: ViewerNav): stri
       own = html.slice(0, at) + visualiserNavDeclaration(o.section) + html.slice(at);
     }
   }
-  const railed = injectRail(withHeadingIds(own), {
+  const railed = injectRailOnce(withHeadingIds(own), {
     instance: named.harness ?? instance,
     ...(named.site ? { homeLabel: named.site } : {}),
     toRoot,

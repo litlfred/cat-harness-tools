@@ -14,6 +14,5 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `folio-templates`, 
 | file | what it is | used by |
 |---|---|---|
 | [`document/`](document/) | _nothing declares what this holds_ | |
-| [`public-comment/`](public-comment/) | _nothing declares what this holds_ | |
 
 <!-- kg:subgraph:end -->

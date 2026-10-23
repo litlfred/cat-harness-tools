@@ -318,6 +318,28 @@ describe("three states", () => {
     }
   });
 
+  it("a NAMED docs directory is read without a `_config.yml`, and an absent one is still unreadable", () => {
+    // An instance above the base renders its docs pages into a directory the
+    // site build composes under its name: it is not a Jekyll site of its own,
+    // so the caller names it (`gen-docs-pages.ts`). Named but absent stays the
+    // third state rather than becoming "no translations".
+    const root = mkdtempSync(join(tmpdir(), "translation-index-named-"));
+    try {
+      writeInstanceConfig(root, JSON.stringify({ contentType: "docs" }, null, 2));
+      const dir = join(root, "site-docs");
+      mkdirSync(join(dir, "fr"), { recursive: true });
+      writeFileSync(join(dir, "index.md"), SOURCE_PAGE, "utf-8");
+      writeFileSync(join(dir, "fr", "index.md"), FRENCH_PAGE, "utf-8");
+      const { index, findings } = buildTranslationIndex(root, dir);
+      expect(findings.filter((f) => f.severity !== "note")).toEqual([]);
+      expect(index.locales).toEqual(["fr"]);
+      const absent = buildTranslationIndex(root, join(root, "no-such-dir"));
+      expect(absent.findings.some((f) => f.severity === "unreadable")).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("a site with no translations at all is DETERMINED empty", () => {
     const { root, dispose } = instance({ [`${SITE_DIR}/index.md`]: SOURCE_PAGE });
     try {

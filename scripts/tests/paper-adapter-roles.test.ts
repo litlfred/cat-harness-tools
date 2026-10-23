@@ -4,7 +4,8 @@
  *
  * Asserts:
  * 1. The 3 paper roles (lean-authoring-agent, proof-review-agent, compute-authoring-agent)
- *    exist in cat-harness/scenarios/roles.json with personas and descriptions.
+ *    exist, with personas and descriptions, in the harness's scenarios/roles.json or —
+ *    since move M4 took them up with the paper skills they carry — in the paper layer's.
  * 2. Every skill in folio-paper-adapter is bound to a role or carries `consulted: true`.
  * 3. 0% unbound skills in folio-paper-adapter.
  *
@@ -34,11 +35,20 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     roles: Array<{ id: string; persona?: string; description?: string; actorKinds?: string[] }>;
   };
 
-  test("the three paper roles are declared in cat-harness/scenarios/roles.json with personas", () => {
-    const roleIds = new Set(harnessRoles.roles.map((r) => r.id));
+  const paperRolesPath = join(COORDINATOR, "folio-assistant-sci", "scenarios", "roles.json");
+  const paperRoles = (
+    existsSync(paperRolesPath) ? JSON.parse(readFileSync(paperRolesPath, "utf-8")) : {}
+  ) as {
+    roles?: Array<{ id: string; persona?: string; description?: string; actorKinds?: string[]; skills?: string[] }>;
+    extensions?: Array<{ role: string; skills: string[] }>;
+  };
+  const allRoles = [...harnessRoles.roles, ...(paperRoles.roles ?? [])];
+
+  test("the three paper roles are declared, by the harness or the paper layer, with personas", () => {
+    const roleIds = new Set(allRoles.map((r) => r.id));
     for (const id of ["lean-authoring-agent", "proof-review-agent", "compute-authoring-agent"]) {
       expect(roleIds.has(id)).toBe(true);
-      const role = harnessRoles.roles.find((r) => r.id === id)!;
+      const role = allRoles.find((r) => r.id === id)!;
       expect(role.description).toBeDefined();
       expect(role.description!.length).toBeGreaterThan(10);
       expect(role.persona).toBeDefined();
@@ -71,11 +81,12 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     expect(sciRolesPath).toBeDefined();
 
     const sciRoles = JSON.parse(readFileSync(sciRolesPath!, "utf-8")) as {
+      roles?: Array<{ id: string; skills?: string[] }>;
       extensions?: Array<{ role: string; skills: string[] }>;
     };
 
     const boundSkills = new Set<string>();
-    for (const r of harnessRoles.roles) {
+    for (const r of [...harnessRoles.roles, ...(sciRoles.roles ?? [])]) {
       for (const s of (r as { skills?: string[] }).skills || []) boundSkills.add(s);
     }
     for (const ext of sciRoles.extensions || []) {

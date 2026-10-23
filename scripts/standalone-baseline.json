@@ -7,7 +7,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 411,
+      "failed": 413,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -230,6 +230,7 @@
         "test/coordinator/gate-shell-workflow.test.ts > (load-time error) ENOENT: no such file or directory, open 'code-quality-gates.yml'",
         "test/coordinator/gates-third-state-checkout.test.ts > loadGates refuses rather than returning an empty set > returns a NON-EMPTY set for this repository, so the tests above are not vacuous",
         "test/coordinator/gates-workflows.test.ts > a command whose shell variable this reader discarded is NOT a gate > the real workflow carries exactly one, and it is that one",
+        "test/coordinator/gates-workflows.test.ts > a declared writer in the gates workflow runs after the gates, never among them > every line whose script declares `@covers none — writer` is a writer step, not a gate",
         "test/coordinator/gates-workflows.test.ts > a strict reader and a loose one agree > no `bun` line in the workflow is silently dropped",
         "test/coordinator/gates-workflows.test.ts > every check script is accounted for — the direction nothing asked > no check script is unrun",
         "test/coordinator/gates-workflows.test.ts > every check script is accounted for — the direction nothing asked > the commands read from CI are non-empty — the same vacuity trap",

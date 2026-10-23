@@ -34,9 +34,18 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
-import { INDEX_CONFIG_FILENAME, INDEX_CONFIG_SCHEMA, formatIndexConfig, withIgnoreBlock, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
+import {
+  INDEX_CONFIG_FILENAME,
+  INDEX_CONFIG_SCHEMA,
+  formatIndexConfig,
+  readIndexConfig,
+  withIgnoreBlock,
+  type IndexConfig,
+  type IndexInstance,
+  type RemoteSource,
+} from "@litlfred/cat-harness/schemas/index-config.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
   instanceStateBranch,
@@ -47,8 +56,8 @@ import {
 } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
-import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
-import { TOOLS_ROOT } from "./lib/roots.ts";
+import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";
+import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
@@ -72,8 +81,11 @@ export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant
  * - `sibling` — a checkout beside the folio, reached by a relative path.
  *   Right when one working copy of the platform serves several folios, or when
  *   you are developing the platform and the folio together.
+ * - `remote` — platform layers declared as `source.remote` mounts in
+ *   `index.config.json` (pinned to 40-char commit SHAs) and mounted at the
+ *   repository root by `state:mount` / `mount:remote`.
  */
-export type LinkMode = "submodule" | "sibling";
+export type LinkMode = "submodule" | "sibling" | "remote";
 
 /**
  * What every harness instance needs, whether or not it holds a folio.
@@ -189,7 +201,7 @@ const HARNESS_SUBDIR = "cat-harness";
 
 /** The platform's code root, from the checkout root a folio links it at. */
 function platformDir(assistant: string): string {
-  return `${assistant}/${HARNESS_SUBDIR}`;
+  return posixSegments(`${assistant}/${HARNESS_SUBDIR}`).join("/");
 }
 
 /**
@@ -201,7 +213,7 @@ function platformDir(assistant: string): string {
  */
 const TOOLS_SUBDIR = "cat-harness-tools";
 function toolsDir(assistant: string): string {
-  return `${assistant}/${TOOLS_SUBDIR}`;
+  return posixSegments(`${assistant}/${TOOLS_SUBDIR}`).join("/");
 }
 
 /**
@@ -531,13 +543,101 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
   };
 }
 
+/** The layers every remote-linked instance or folio mounts, whatever its content type. */
+const REMOTE_PLATFORM_LAYERS = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"] as const;
+
+/**
+ * The platform layers a remote-linked instance or folio declares as
+ * `source.remote` mounts in `index.config.json` (bean `c4lg`).
+ *
+ * The platform layers, then — for a content type — the instance whose
+ * `contentAdapters` declares that type and its `needs` closure, deepest first.
+ * DERIVED, not named: this layer sits below every content layer and may not
+ * spell their names (`check:reference-direction`). A content type no instance
+ * in the checkout declares adds nothing — there is no layer to mount, and
+ * guessing one would write a mount for a repository nobody said exists.
+ *
+ * Exported, with the adapters and the closure injectable, for the tests that
+ * pin the derivation with and without a declaring instance.
+ */
+export function remotePlatformLayers(
+  contentType: InitFolioOptions["contentType"] | undefined,
+  adapters: readonly BuiltinAdapterDeclaration[] = BUILTIN_ADAPTERS,
+  closureOf: (instanceRoot: string) => string[] = (root) => orderedDependencies(root).map((d) => d.dependency.name),
+): string[] {
+  const layers: string[] = [...REMOTE_PLATFORM_LAYERS];
+  if (contentType === undefined) return layers;
+  const declared = adapters.find((a) => a.contentType === contentType);
+  if (declared === undefined) return layers;
+  for (const name of [...closureOf(declared.root), declared.instance]) {
+    if (!layers.includes(name)) layers.push(name);
+  }
+  return layers;
+}
+
+function headSha(dir: string): string | undefined {
+  if (!existsSync(dir)) return undefined;
+  const r = spawnSync("git", ["rev-parse", "HEAD"], { cwd: dir, stdio: "pipe" });
+  if (r.status !== 0) return undefined;
+  const sha = r.stdout.toString().trim();
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : undefined;
+}
+
+/**
+ * Resolve the pinned `source.remote` for `layer` from the enclosing platform
+ * checkout's `index.config.json` when available, falling back to `git rev-parse
+ * HEAD` (or a deterministic 40-char SHA outside git) with `litlfred/<layer>`.
+ */
+function resolveRemoteLayerSource(layer: string): RemoteSource {
+  const platformRoot = REPO_ROOT ?? resolve(TOOLS_ROOT, "..");
+  const idx = readIndexConfig(platformRoot);
+  if (idx.state === "ok") {
+    const entry = idx.config.instances.find((e) => e.name === layer);
+    if (entry?.source !== undefined && "remote" in entry.source) {
+      const { repository, ref, overrides } = entry.source.remote;
+      return {
+        repository,
+        ref,
+        ...(overrides !== undefined ? { overrides } : {}),
+      };
+    }
+  }
+  const layerDir = resolve(platformRoot, layer);
+  const ref = headSha(layerDir) ?? headSha(TOOLS_ROOT) ?? "0".repeat(40);
+  return {
+    repository: `litlfred/${layer}`,
+    ref,
+    overrides: { [layer]: { whole: true } },
+  };
+}
+
+function remotePlatformInstances(contentType: InitFolioOptions["contentType"] | undefined): IndexInstance[] {
+  return remotePlatformLayers(contentType).map((layer) => ({
+    name: layer,
+    source: { remote: resolveRemoteLayerSource(layer) },
+  }));
+}
+
 /**
  * The `index.config.json` a new folio starts with: one instance, the one
  * scaffolded, declared at the root, its config INLINE in the entry (bean
- * `ymvt`). Exported for the test that holds `init-folio` to the schema.
+ * `ymvt`), plus any remote-mounted platform layers when `--link remote` is
+ * used (bean `c4lg`). Exported for the test that holds `init-folio` to the schema.
  */
-export function newFolioIndex(slug: string, config: Record<string, unknown> = {}): IndexConfig {
-  return { $schema: INDEX_CONFIG_SCHEMA, instances: [{ name: slug, source: { local: { at: "." } }, ...config }] };
+export function newFolioIndex(
+  slug: string,
+  config: Record<string, unknown> = {},
+  remoteInstances: IndexInstance[] = [],
+): IndexConfig {
+  const instances: IndexInstance[] = [
+    { name: slug, source: { local: { at: "." } }, ...config },
+    ...remoteInstances,
+  ];
+  return {
+    $schema: INDEX_CONFIG_SCHEMA,
+    instances,
+    ...(instances.length > 1 ? { site: { landing: slug } } : {}),
+  };
 }
 
 /**
@@ -906,7 +1006,7 @@ function documentSiteLayer(): string {
 function stagingWorkflow(assistant: string, contentType: InitFolioOptions["contentType"]): string {
   const on = contentType === "document";
   const build = on
-    ? `bun run ${assistant}/${documentSiteLayer()}/scripts/build-document-site.ts --out _site`
+    ? `bun run ${posixSegments(`${assistant}/${documentSiteLayer()}/scripts/build-document-site.ts`).join("/")} --out _site`
     : `echo "::error::set build_command in .github/workflows/staging.yml to build this folio''s site" && exit 1`;
   const header = on
     ? `# The site is built by the platform's build-document-site.ts: one page per
@@ -1346,6 +1446,7 @@ export function enclosingRepoRoot(root: string): string | null {
 }
 
 function defaultAssistantPath(link: LinkMode): string {
+  if (link === "remote") return ".";
   return link === "submodule" ? "folio-assistant" : "../folio-assistant";
 }
 
@@ -1466,7 +1567,8 @@ function writeInstanceFiles(s: Scaffold): void {
   // config INLINE in the entry (bean `ymvt`: no `<slug>.config.json` is
   // written; the index is the one config). No `site.landing`: a sole instance is the landing
   // with no flag, and naming one now would be a decision nobody has made.
-  const index = newFolioIndex(o.slug, instanceConfig(o, assistant));
+  const remote = o.link === "remote" ? remotePlatformInstances(o.contentType) : [];
+  const index = newFolioIndex(o.slug, instanceConfig(o, assistant), remote);
   write(INDEX_CONFIG_FILENAME, formatIndexConfig(index));
   write(".mcp.json", mcpJson(assistant));
   write(".claude/settings.json", claudeSettings(assistant));
@@ -1532,6 +1634,11 @@ function finishScaffold(s: Scaffold): void {
     // caller who had already added the submodule (and passed --skip-vcs
     // precisely because of that) to add it again.
     result.notes.push(`Add the platform: git submodule add ${FOLIO_ASSISTANT_REPO} ${assistant}`);
+  }
+  if ((o.skipVcs || o.dryRun) && o.link === "remote") {
+    result.notes.push(
+      `Linked via remote mounts in index.config.json — run 'bun run cat state:mount' (after approving pins with 'bun run cat mount:remote --approve') to mount the platform layers.`,
+    );
   }
 
   if (o.contentType !== undefined && !existsSync(join(root, assistant))) {
@@ -1823,6 +1930,13 @@ function linkPlatform(
     return;
   }
 
+  if (o.link === "remote") {
+    result.notes.push(
+      `Linked via remote mounts in index.config.json — run 'bun run cat state:mount' (after approving pins with 'bun run cat mount:remote --approve') to mount the platform layers.`,
+    );
+    return;
+  }
+
   if (existsSync(join(root, assistant))) {
     result.notes.push(`'${assistant}' already exists — left as is.`);
     return;
@@ -2094,7 +2208,7 @@ Options:
   --slug <slug>       Document slug under folio/           (default: from --title)
   --title <title>     Document title                         (required)
   --author <name>     Author. Repeat for several.            (required for a folio)
-  --link <mode>       submodule | sibling                    (default: submodule)
+  --link <mode>       submodule | sibling | remote           (default: submodule)
   --assistant <path>  Path to folio-assistant, relative to the folio root
   --force             Overwrite files that already exist
   --dry-run           Report what would be written
@@ -2167,7 +2281,7 @@ function parseArgs(argv: string[]): ParsedArgs | "help" {
       case "--author": authors.push(next()); break;
       case "--link": {
         const l = next();
-        if (l !== "submodule" && l !== "sibling") throw new Error(`--link must be submodule or sibling, got '${l}'`);
+        if (l !== "submodule" && l !== "sibling" && l !== "remote") throw new Error(`--link must be submodule, sibling or remote, got '${l}'`);
         link = l;
         break;
       }

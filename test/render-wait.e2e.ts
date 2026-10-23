@@ -12,9 +12,9 @@
  * Interactive print cannot be made to wait — `beforeprint` is synchronous, a
  * `fetch` cannot be awaited inside it, and no browser lets a script hold the
  * print dialogue open. `docs-ui.css`'s `@media print` rules cover that case by
- * making a premature print say so on the paper. **So `scripts/dak-pdf.ts` is
- * the only place in this repository where the obligation is actually
- * enforceable**, which makes it the only place a claim about it can be
+ * making a premature print say so on the paper. **So `scripts/render-wait.ts`,
+ * which the headless PDF writers print through, is the only place in this
+ * repository where the obligation is actually enforceable**, which makes it the only place a claim about it can be
  * falsified. A refusal that nothing exercises is a refusal that silently stops
  * refusing.
  *
@@ -22,7 +22,7 @@
  *
  * | page state | what must happen |
  * |---|---|
- * | no `data-fa-render` at all | **emit** — the page declares no dynamic region, so there is nothing to wait for. `dak-pdf` assembles its own HTML today and is exactly this case. |
+ * | no `data-fa-render` at all | **emit** — the page declares no dynamic region, so there is nothing to wait for. A PDF writer that assembles its own HTML is exactly this case. |
  * | `ready` | **emit** |
  * | `failed` | **refuse**, naming the attribute |
  * | still `pending` at the deadline | **refuse**, naming the timeout |
@@ -49,7 +49,7 @@
  */
 import { test, expect } from "@playwright/test";
 
-import { RENDER_WAIT_MS, waitForRender } from "../scripts/dak-pdf.ts";
+import { RENDER_WAIT_MS, waitForRender } from "../scripts/render-wait.ts";
 
 /** What `renderPdf` would do: emit, or throw before writing anything. */
 async function outcome(page: import("@playwright/test").Page, html: string) {
@@ -71,10 +71,10 @@ const settles = (to: string) =>
 test.describe("a page with nothing to wait for is printed", () => {
   test("no `data-fa-render` at all: emit — never asked is not pending", async ({ page }) => {
     // THE ROW A NARROWER TEST WOULD GET WRONG, and the one that matters most
-    // today: `dak-pdf` assembles its own HTML and carries no attribute, so
-    // treating absent as `pending` would hang the only live caller for 30 s
-    // and then refuse it.
-    const r = await outcome(page, `<html><body>a DAK, assembled by dak-pdf itself</body></html>`);
+    // today: a PDF writer that assembles its own HTML carries no attribute,
+    // so treating absent as `pending` would hang that caller for 30 s and
+    // then refuse it.
+    const r = await outcome(page, `<html><body>a document, assembled by its PDF writer itself</body></html>`);
     expect(r.emitted, r.why).toBe(true);
   });
 

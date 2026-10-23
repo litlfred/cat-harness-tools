@@ -151,6 +151,8 @@ import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProject
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
 import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { graphReadPath } from "./graph-read.ts";
 import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/session-survey.ts";
 import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
 import { BoardSchema } from "@litlfred/cat-harness/schemas/board.ts";
@@ -724,6 +726,12 @@ function notDrawnHere(g: StateGraph): string {
 
 /** `<base>/<graph>/` — the visualiser for one declared state graph. */
 function dashboardPage(g: StateGraph, graphs: StateGraph[]): string {
+  // The verdicts are read off the mounted branch, server-side: no projection
+  // is published for them, and none is needed for a table (bean `w8jq`).
+  if (g.kinds.includes(MERGE_REVIEWS_KIND)) {
+    const read = graphReadPath(g.id, REPO_ROOT);
+    return mergeReviewsPage(g, graphs, read.state === "ok" ? read.at : null);
+  }
   const head =
     `<h1 id="${esc(g.id)}">${esc(g.id)}</h1>` +
     `<p class="sv-sub">${esc(g.path)} · ${esc(g.kinds.join(", "))}</p>`;
@@ -1554,6 +1562,127 @@ export function sweepMarkSection(files: readonly string[]): string {
       : `<table><thead><tr><th>check</th><th>checked</th><th>by</th><th>read</th><th>findings</th></tr></thead>` +
         `<tbody>${rows}</tbody></table>`)
   );
+}
+
+/** The graph typology this harness keeps one adversarial verdict per PR head in (bean `w8jq`). */
+export const MERGE_REVIEWS_KIND = "merge-reviews";
+
+/** `owner/repo`, as a verdict may name the repository its pull request is in. */
+const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+/**
+ * The adversarial review verdicts (`merge-reviews`, `merge-review/v1`, bean
+ * `w8jq`): one row per `<head sha>.json`, newest review first — the pull
+ * request, the head and base it is bound to, the latest review's result, who
+ * reviewed it (session and model) and when, and how many BLOCKING flags are
+ * still open.
+ *
+ * The verdict's facts only. Whether the head is still the pull request's head
+ * is GitHub's to answer (and `check:adversarial-review`'s to judge), so the
+ * pull request is linked rather than a "stale" column guessed from a copy.
+ * The link needs the repository, which `merge-review/v1` records only as an
+ * optional `repository` (`owner/repo`); a verdict without one shows its
+ * number unlinked rather than a link to a guessed repository.
+ *
+ * A file that is not a valid verdict is listed with the reason, never dropped:
+ * a reviewer believes it recorded a verdict (the rule {@link mergeQueueSection}
+ * follows). A head that disagrees with the file's name is said so, because
+ * the gate looks a verdict up by its name.
+ */
+export function mergeReviewsSection(files: readonly string[]): string {
+  type Row = { at: string; html: string };
+  const good: Row[] = [];
+  const broken: string[] = [];
+  for (const f of files) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(f, "utf-8"));
+    } catch {
+      broken.push(`<tr><td colspan="7"><code>${esc(basename(f))}</code> — not readable JSON</td></tr>`);
+      continue;
+    }
+    const r = MergeReviewSchema.safeParse(raw);
+    if (!r.success) {
+      const i = r.error.issues[0];
+      broken.push(
+        `<tr><td colspan="7"><code>${esc(basename(f))}</code> — not a valid verdict — ` +
+          `${esc(i?.path.join(".") || "(root)")}: ${esc(i?.message ?? "")}</td></tr>`,
+      );
+      continue;
+    }
+    const v = r.data;
+    const repo = (raw as { repository?: unknown }).repository;
+    const pr =
+      v.pr === undefined
+        ? "—"
+        : typeof repo === "string" && REPOSITORY.test(repo)
+          ? `<a href="https://github.com/${esc(repo)}/pull/${v.pr}">${esc(repo)}#${v.pr}</a>`
+          : `#${v.pr}`;
+    const reviews = [...v.reviews].sort((a, b) => b.at.localeCompare(a.at));
+    const last = reviews[0];
+    const named = basename(f, ".json");
+    const head =
+      `<code>${esc(v.head_sha.slice(0, 12))}</code>` +
+      (named === v.head_sha ? "" : `<br>file is named <code>${esc(named.slice(0, 12))}</code>`);
+    const result = last
+      ? `${esc(last.result)}${reviews.length > 1 ? ` <span class="sv-sub">(+${reviews.length - 1} earlier)</span>` : ""}`
+      : "no review recorded";
+    const who = last
+      ? `${esc(last.reviewer.by)} <code>${esc(last.reviewer.session)}</code>${last.reviewer.model ? `<br>${esc(last.reviewer.model)}` : ""}`
+      : "";
+    const open = last
+      ? getReviewFindings(last).filter((x) => x.weight === "blocking" && x.status === "open").length
+      : 0;
+    good.push({
+      at: last?.at ?? v.updated_at ?? "",
+      html:
+        `<tr><td>${pr}</td><td>${head}</td><td><code>${esc(v.base_sha.slice(0, 12))}</code></td>` +
+        `<td>${result}</td><td>${who}</td><td>${esc(last?.at ?? v.updated_at ?? "")}</td><td>${last ? open : ""}</td></tr>`,
+    });
+  }
+  good.sort((a, b) => b.at.localeCompare(a.at));
+  return (
+    partHeading("verdicts", "Verdicts", files.length, broken.length, "verdict(s)") +
+    (files.length === 0
+      ? `<p class="sv-sub">No adversarial review verdict recorded in this store.</p>`
+      : `<p class="sv-sub">The verdict an independent reviewing session recorded on each pull request's head. ` +
+        `Whether that head is still current is GitHub's fact: open the pull request for it.</p>` +
+        `<div style="overflow-x: auto"><table><thead><tr><th>pull request</th><th>head</th><th>base</th><th>verdict</th>` +
+        `<th>reviewer</th><th>reviewed</th><th>open blocking</th></tr></thead>` +
+        `<tbody>${[...good.map((g) => g.html), ...broken].join("")}</tbody></table></div>`)
+  );
+}
+
+/**
+ * `<base>/<harness>/merge-reviews/` — the verdicts, read from the mounted
+ * state branch. `dir` is null when the graph is not mounted in this build, and
+ * the page then says the verdicts are UNKNOWN: a dashboard opening at zero
+ * would be indistinguishable from a store nobody has written to.
+ */
+export function mergeReviewsPage(
+  g: Pick<StateGraph, "id" | "path" | "kinds">,
+  graphs: StateGraph[],
+  dir: string | null,
+): string {
+  const files =
+    dir === null || !existsSync(dir)
+      ? null
+      : readdirSync(dir)
+          .filter((f) => f.endsWith(".json") && f !== "manifest.json")
+          .sort()
+          .map((f) => join(dir, f));
+  return page({
+    title: "Merge reviews",
+    liquid: false,
+    body:
+      `<h1 id="${esc(g.id)}">Merge reviews</h1>` +
+      `<p class="sv-sub">${esc(g.path)} · ${esc(g.kinds.join(", "))}</p>` +
+      (files === null
+        ? `<p class="sv-sub"><code>${esc(g.path)}</code> is not mounted in this build, so its verdicts are ` +
+          `<strong>unknown</strong>, not none. <code>bun run cat state:mount</code> mounts it.</p>`
+        : mergeReviewsSection(files)) +
+      registry(graphs, g.id),
+  });
 }
 
 /**
