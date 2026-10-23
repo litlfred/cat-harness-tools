@@ -194,6 +194,22 @@ export function siteNodeOf(sources: readonly DocsSource[], key: string, nodeId?:
   return { sitePath: sourceSiteNodePath(src, slug, nodeId), file: join(src.outDir, siteNodeSitePath(slug, nodeId)) };
 }
 
+/**
+ * The rendered page of `slug` (unqualified, as its manifest declares it),
+ * from whichever docs source holds it: the source, the page's qualified key
+ * ({@link qualifiedKey}), and the file `gen-docs-pages.ts` writes it to,
+ * `<outDir>/<slug>.md`. Sources are asked in {@link docsSources} order, so
+ * while a page is in two layers (a move in flight) the lower copy answers,
+ * as it keeps the plain label. `undefined` when no source holds the page.
+ * A reader of a generated page asks here rather than spelling one layer's
+ * site directory, which goes stale the day the page moves up a layer.
+ */
+export function docsPageOf(sources: readonly DocsSource[], slug: string): { source: DocsSource; key: string; file: string } | undefined {
+  const flat = slug.replace(/\//g, "-");
+  const source = sources.find((s) => existsSync(join(s.srcDir, flat)));
+  return source === undefined ? undefined : { source, key: qualifiedKey(source, slug), file: join(source.outDir, `${slug}.md`) };
+}
+
 const warned = new Set<string>();
 
 /**

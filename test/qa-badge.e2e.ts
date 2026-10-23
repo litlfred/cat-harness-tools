@@ -2,8 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { badgeRunFor, indexWithRows } from "./support/qa-badge-fixture.js";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { badgeRunFor, indexUrlOf, indexWithRows } from "./support/qa-badge-fixture.js";
+import { docsPageOf, docsSources } from "../scripts/lib/docs-sources.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -38,7 +39,8 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
  *   - **not available in this build** — the index says `corpus: "absent"`:
  *     the build had no QA results, so whether anything was swept is unknown.
  *
- * **The markup is the generator's own, lifted out of `docs/process/publication-workflow.md`.**
+ * **The markup is the generator's own, lifted out of the rendered `process/publication-workflow` page**,
+ * from whichever docs source holds it now (`docsPageOf`).
  * The verdicts are NOT the corpus's: `qa-badge-fixture.ts` sets them, and
  * throws by name if a node the spec addresses has left the page. A test whose
  * fixture is a live corpus verdict is the very defect this PR is about, and
@@ -47,11 +49,19 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const SITE = siteDirFor(ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
-const PAGE_MD = join(ROOT, SITE, "process/publication-workflow.md");
+/**
+ * The rendered page, from the docs source that holds it — not one layer's site
+ * directory, which went stale when the page moved up to the content core.
+ */
+const PAGE_SLUG = "process/publication-workflow";
+const PAGE_MD = (() => {
+  const at = docsPageOf(docsSources(ROOT), PAGE_SLUG);
+  if (at === undefined) throw new Error(`no docs source in this checkout holds the page \`${PAGE_SLUG}\``);
+  return at.file;
+})();
 /**
  * The page's badge index, as a COMMITTED FIXTURE — a copy of the generator's
  * `folio-qa-index/v1` output for this page. It was read from
@@ -74,7 +84,8 @@ const NO_ROW = "see-also.block";
 const KG = "editing-and-the-hci-validation-gate.kg";
 
 const PAGE_URL = "http://qa.test/page.html";
-const INDEX_URL = "/assets/qa/process-publication-workflow/qa-index.json";
+/** The index the page's own badges fetch, read off the markup (`indexUrlOf`). */
+const INDEX_URL = indexUrlOf(badgeRunFor(PAGE_MD, LOUD));
 
 /** The verdicts this spec asserts on, set here rather than read off disk. */
 const INDEX_BODY = indexWithRows(INDEX_JSON, {

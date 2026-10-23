@@ -20,7 +20,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { declaredDocsSources, docsSources, qualifiedKey, siteNodeOf, warnSamePages, type DocsSource } from "../lib/docs-sources.ts";
+import { declaredDocsSources, docsPageOf, docsSources, qualifiedKey, siteNodeOf, warnSamePages, type DocsSource } from "../lib/docs-sources.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -218,5 +218,31 @@ describe("siteNodeOf — where a page's site JSON-LD is published", () => {
   test("a key that only LOOKS qualified, naming no page of that source, is the base's", () => {
     const s = sources();
     expect(siteNodeOf(s, "upper/process/x").sitePath).toBe("site/upper/process/x.jsonld");
+  });
+});
+
+describe("docsPageOf — the rendered page, from the source that holds it", () => {
+  function sources(): DocsSource[] {
+    const t = tree();
+    const base: DocsSource = { instance: "base", root: join(t, "base"), srcDir: join(t, "base", "docs", "source"), outDir: join(t, "base", "docs"), base: true };
+    const upper: DocsSource = { instance: "upper", root: join(t, "upper"), srcDir: join(t, "upper", "docs", "source"), outDir: join(t, "upper", "docs"), base: false };
+    mkdirSync(join(base.srcDir, "process-x"), { recursive: true });
+    mkdirSync(join(upper.srcDir, "process-y"), { recursive: true });
+    mkdirSync(join(upper.srcDir, "process-x"), { recursive: true });
+    return [base, upper];
+  }
+
+  test("a page that moved up is read from the layer that holds it, under its qualified key", () => {
+    const s = sources();
+    expect(docsPageOf(s, "process/y")).toEqual({ source: s[1]!, key: "upper/process/y", file: join(s[1]!.outDir, "process/y.md") });
+  });
+
+  test("a page in two layers (a move in flight) answers from the lower one", () => {
+    const s = sources();
+    expect(docsPageOf(s, "process/x")?.file).toBe(join(s[0]!.outDir, "process/x.md"));
+  });
+
+  test("a page no source holds is undefined, not a guessed path", () => {
+    expect(docsPageOf(sources(), "process/z")).toBeUndefined();
   });
 });
