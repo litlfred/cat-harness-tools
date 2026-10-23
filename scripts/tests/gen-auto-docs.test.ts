@@ -95,6 +95,14 @@ describe("index/processes extracts what a BPMN declares about itself", () => {
     expect(items.some((i) => (i.facts?.skills ?? "").length > 0)).toBe(true);
   });
 
+  it("a layer's shared-steps file is labelled by its instance, so two layers' rows differ", () => {
+    // Every layer names the file `processes/global-tasks.bpmn`; labelled by
+    // basename, cat-harness's and folio-assistant-core's rows read alike.
+    const shared = items.filter((i) => i.name.startsWith("Shared steps ("));
+    expect(new Set(shared.map((i) => i.name)).size).toBe(shared.length);
+    for (const i of shared) expect(i.name).not.toBe("Shared steps (global-tasks)");
+  });
+
   it("summaries are one sentence, not a whole documentation block", () => {
     for (const i of items) {
       if (!i.summary) continue;
