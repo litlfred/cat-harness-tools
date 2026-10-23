@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { loadProcessModel } from "../../src/workflow/process-model.js";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 import { reachability } from "../../src/workflow/reachability.js";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -152,7 +152,8 @@ describe("the real corpus", () => {
     // sweep. Measured 2026-09-23 across the corpus — 0 unreachable, 0 no-exit,
     // and exactly one pre-start gate.
     const diagram = (n: string): string => workflowFile(join(HARNESS_ROOT), n);
-    const files = workflowFiles(join(HARNESS_ROOT)).filter((f) => f.endsWith(".bpmn")).map((x) => basename(x));
+    // A layer's global-tasks file holds no process (`processDiagrams`).
+    const files = processDiagrams(workflowFiles(join(HARNESS_ROOT))).map((x) => basename(x));
     expect(files.length, "no diagrams found — this assertion would be vacuous").toBeGreaterThan(20);
     let gates = 0;
     for (const f of files) {

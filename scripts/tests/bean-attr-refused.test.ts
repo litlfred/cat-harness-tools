@@ -37,7 +37,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const made: string[] = [];
@@ -130,7 +130,9 @@ describe("what the guard must not break", () => {
 describe("the real corpus", () => {
   test("every diagram in this repository still loads", async () => {
     const { workflowFiles } = await import("../known-skills.ts");
-    const files = workflowFiles(join(HARNESS_ROOT)).filter((f) => f.endsWith(".bpmn"));
+    // A layer's shared global-tasks file holds no process and is read through
+    // the call activities that call it, so it is not loaded as one.
+    const files = processDiagrams(workflowFiles(join(HARNESS_ROOT)));
     // Vacuity guard: an empty corpus would pass this trivially.
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {
