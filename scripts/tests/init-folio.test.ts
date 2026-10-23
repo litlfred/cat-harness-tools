@@ -38,6 +38,7 @@ import {
   type InitFolioOptions,
 } from "../init-folio";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -819,5 +820,86 @@ describe("state graphs follow their resolved source (hp54)", () => {
   test("the branch convention refuses an instance name that would make an invalid ref", () => {
     expect(instanceStateBranch("demo-x", "beans")).toBe("cat/demo-x/beans");
     expect(() => instanceStateBranch("a..b", "beans")).toThrow();
+  });
+});
+
+describe("remote link mode (--link remote, bean c4lg)", () => {
+  test("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
+    const d = tmp();
+    const r = initFolio({
+      targetDir: d,
+      contentType: "document",
+      slug: SLUG,
+      title: "Cold Chain Guidance",
+      authors: ["A. Author"],
+      link: "remote",
+      skipVcs: true,
+    });
+    const rawIdx = JSON.parse(readFileSync(join(d, "index.config.json"), "utf-8"));
+    const idx = IndexConfigSchema.parse(rawIdx);
+    expect(idx.site?.landing).toBe(SLUG);
+
+    const localEntry = idx.instances.find((e) => e.name === SLUG);
+    expect(localEntry?.source).toEqual({ local: { at: "." } });
+
+    const remoteNames = idx.instances.filter((e) => e.source !== undefined && "remote" in e.source).map((e) => e.name);
+    expect(remoteNames).toEqual([
+      "cat-harness",
+      "cat-harness-tools",
+      "bootstrap",
+      "bootstrap-tools",
+      "folio-assistant-core",
+    ]);
+    for (const entry of idx.instances) {
+      if (entry.source && "remote" in entry.source) {
+        expect(entry.source.remote.repository).toBe(`litlfred/${entry.name}`);
+        expect(entry.source.remote.ref).toMatch(/^[0-9a-f]{40}$/);
+        expect(entry.source.remote.overrides?.[entry.name]?.whole).toBe(true);
+      }
+    }
+
+    expect(checkIgnoreBlock(d, idx)).toEqual({ state: "current" });
+    const gitignoreText = readFileSync(join(d, ".gitignore"), "utf-8");
+    expect(gitignoreText).toContain("/cat-harness/");
+    expect(gitignoreText).toContain("/cat-harness-tools/");
+    expect(gitignoreText).toContain("/folio-assistant-core/");
+
+    const builders = readFileSync(join(d, "folio/schema/builders.ts"), "utf-8");
+    expect(builders).toContain('export * from "../../cat-harness/schemas/builders";');
+
+    const wf = readFileSync(join(d, ".github/workflows/staging.yml"), "utf-8");
+    expect(wf).toContain("bun run folio-assistant-core/scripts/build-document-site.ts --out _site");
+    expect(r.notes.join("\n")).toContain("Linked via remote mounts in index.config.json");
+  });
+
+  test("CLI --link remote scaffolds a paper folio with folio-assistant-sci included in remote mounts", () => {
+    const d = tmp();
+    const cli = spawnSync(
+      "bun",
+      [
+        "run",
+        join(REPO_ROOT, "cat-harness-tools/scripts/init-folio.ts"),
+        "--dir",
+        d,
+        "--type",
+        "paper",
+        "--slug",
+        SLUG,
+        "--title",
+        "Cold Chain Guidance",
+        "--author",
+        "A. Author",
+        "--link",
+        "remote",
+        "--skip-vcs",
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(cli.status).toBe(0);
+    const idx = IndexConfigSchema.parse(JSON.parse(readFileSync(join(d, "index.config.json"), "utf-8")));
+    expect(idx.site?.landing).toBe(SLUG);
+    const remoteNames = idx.instances.filter((e) => e.source !== undefined && "remote" in e.source).map((e) => e.name);
+    expect(remoteNames).toContain("folio-assistant-sci");
+    expect(checkIgnoreBlock(d, idx)).toEqual({ state: "current" });
   });
 });
