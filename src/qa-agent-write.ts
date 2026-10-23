@@ -39,7 +39,10 @@ import {
   saveQaReport,
   readBlockManifest,
   resolveCanonicalLean,
+  loadPriorBlockReport,
+  priorRefusalLine,
 } from "../pipeline/qa-utils";
+import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "../pipeline/qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import type {
@@ -197,10 +200,25 @@ const relPaths = {
 // An agent verdict is an ATTESTATION (bean `8wj1`, D2): written to the store
 // first, with the block's other attestations read from the store rather than
 // from the prior report (C11). An unreadable store means nothing is written.
+// `--prior-from <ref>` (bean `8wj1`, owner option B) reads the earlier report
+// from the results store at that ref. An unreadable read refuses with exit 2
+// rather than falling back to the working copy.
+const priorFrom = priorFromOrExit("qa-agent-write");
+let priorReport: BlockQaReport | undefined;
+if (priorFrom !== undefined) {
+  const loaded = loadPriorBlockReport(contentRepoRoot, resolve(base), priorFrom);
+  if (!loaded.ok) {
+    console.error(priorRefusalLine("qa-agent-write", relative(contentRepoRoot, resolve(base)), loaded));
+    process.exit(2);
+  }
+  priorReport = loaded.report;
+} else if (qaReadPath !== undefined) {
+  priorReport = loadQaReport(qaReadPath);
+}
 const attested = resolvePrior(
   contentRepoRoot,
   blockAttestationKey(contentRepoRoot, resolve(base)),
-  qaReadPath === undefined ? undefined : loadQaReport(qaReadPath),
+  priorReport,
 );
 if (!attested.ok) {
   console.error(refusalLine("qa-agent-write", relative(contentRepoRoot, resolve(base)), attested));

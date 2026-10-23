@@ -28,7 +28,8 @@ import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { hashBlockFiles, resolveCanonicalLean } from "./qa-utils";
+import { hashBlockFiles, loadPriorBlockReport, priorRefusalLine, resolveCanonicalLean } from "./qa-utils";
+import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /** The platform checkout: the fallback anchor when no content repo encloses the block. */
@@ -51,7 +52,7 @@ if (!blockMd || !criterion || !result) {
   console.error(
     "usage: qa-agent-entry.ts --block <block.md> --criterion <id> " +
       "--result pass|fail|warn|n/a [--severity ...] [--evidence ...] " +
-      "[--notes ...] [--id ...]",
+      "[--notes ...] [--id ...] [--prior-from <ref>]",
   );
   process.exit(2);
 }
@@ -125,8 +126,20 @@ interface QaSidecarDoc {
   [k: string]: unknown;
 }
 
+// `--prior-from <ref>` reads the earlier report from the results store at that
+// ref instead of the working copy (bean `8wj1`, owner option B). A read that
+// cannot be completed refuses with exit 2: falling back to the working copy
+// would let a missing store look like a block with no history.
+const priorFrom = priorFromOrExit("qa-agent-entry");
 let prior: QaSidecarDoc | undefined;
-if (qaReadPath) {
+if (priorFrom !== undefined) {
+  const loaded = loadPriorBlockReport(repoRoot, blockRoot, priorFrom);
+  if (!loaded.ok) {
+    console.error(priorRefusalLine("qa-agent-entry", relative(repoRoot, blockRoot), loaded));
+    process.exit(2);
+  }
+  prior = loaded.report as QaSidecarDoc | undefined;
+} else if (qaReadPath) {
   try {
     prior = JSON.parse(readFileSync(qaReadPath, "utf8")) as QaSidecarDoc;
   } catch {

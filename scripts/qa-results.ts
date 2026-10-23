@@ -248,6 +248,38 @@ export function againstRef(argv: readonly string[] = process.argv): string | und
   return ref;
 }
 
+/**
+ * `--prior-from <ref>` (bean `8wj1`, owner ruling B, 2026-10-22): a block
+ * WRITER reads the sidecar it rewrites from qa-reports at `ref` rather than
+ * from the working copy, so the entries other writers left in it are carried
+ * even when `test/results/` is absent. Same refs as {@link AGAINST_FLAG}.
+ */
+export const PRIOR_FROM_FLAG = "--prior-from";
+
+/** The `--prior-from` ref this run was given, or `undefined`; a malformed one is a {@link QaUsageError}. */
+export function priorFromRef(argv: readonly string[] = process.argv): string | undefined {
+  const i = argv.indexOf(PRIOR_FROM_FLAG);
+  const inline = argv.find((a) => a.startsWith(`${PRIOR_FROM_FLAG}=`));
+  if (i < 0 && inline === undefined) return undefined;
+  const ref = inline !== undefined ? inline.slice(PRIOR_FROM_FLAG.length + 1) : argv[i + 1];
+  if (ref === undefined || ref === "" || ref.startsWith("--")) {
+    throw new QaUsageError(`${PRIOR_FROM_FLAG} needs a ref: main | <sha> | main/<sha> | pr/<n> | pr/<n>/<sha>`);
+  }
+  parseQaRef(ref);
+  return ref;
+}
+
+/** {@link priorFromRef} for a writer's entry point: a malformed ref is exit 2, said once. */
+export function priorFromOrExit(writer: string, argv: readonly string[] = process.argv): string | undefined {
+  try {
+    return priorFromRef(argv);
+  } catch (e) {
+    if (!(e instanceof QaUsageError)) throw e;
+    console.error(`${writer}: ${e.message}`);
+    process.exit(2);
+  }
+}
+
 /** `argv` without `--against <ref>`, for producers that check their own flags. */
 export function withoutAgainst(argv: readonly string[]): string[] {
   const out: string[] = [];

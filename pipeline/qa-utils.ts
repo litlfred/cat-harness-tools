@@ -39,7 +39,9 @@ import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfre
 import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";
-import { existingBlockQaPath } from "./qa-paths";
+import { blockQaPath, existingBlockQaPath } from "./qa-paths";
+import { readBaseline } from "../scripts/qa-results.ts";
+import type { QaStoreOptions } from "../scripts/qa-store.ts";
 
 // ── Hashing ─────────────────────────────────────────────────────
 
@@ -1209,6 +1211,48 @@ export function parseQaReport(text: string, label: string): BlockQaReport | unde
   } catch {
     return undefined;
   }
+}
+
+/** A block writer's prior: the report (absent is a miss), or a refusal. */
+export type PriorBlockReport =
+  | { ok: true; report?: BlockQaReport; from: string }
+  | { ok: false; state: string; path: string; reason: string };
+
+/**
+ * The sidecar a block writer is about to rewrite, as it stands now.
+ *
+ * Without `priorFrom`, the working copy, as every writer has always read it:
+ * the results-tree copy, else the legacy sibling (`existingBlockQaPath`).
+ *
+ * With `priorFrom` (bean `8wj1`, owner ruling B, 2026-10-22), it is read from
+ * qa-reports at that ref, at the block's canonical results-tree path, so the
+ * rewrite carries the entries other writers left even when `test/results/` is
+ * absent. A miss is no prior. A read that cannot be made, or a sidecar that is
+ * not a block-qa report, REFUSES: the caller writes nothing for the block and
+ * the run exits 2. It never falls back to the working copy.
+ */
+export function loadPriorBlockReport(
+  repoRoot: string,
+  blockRoot: string,
+  priorFrom?: string,
+  store?: QaStoreOptions,
+): PriorBlockReport {
+  if (priorFrom === undefined) {
+    const p = existingBlockQaPath(repoRoot, blockRoot);
+    return { ok: true, report: p ? loadQaReport(p) : undefined, from: "working copy" };
+  }
+  const out = blockQaPath(repoRoot, blockRoot);
+  const b = readBaseline(out, { against: priorFrom, ...(store ? { store } : {}) });
+  if (b.state === "miss") return { ok: true, from: b.from };
+  if (b.state !== "hit") return { ok: false, state: b.state, path: out, reason: `prior on ${b.from}: ${b.reason}` };
+  const report = parseQaReport(b.text, `${b.from}:${out}`);
+  if (!report) return { ok: false, state: "corrupt", path: out, reason: `prior on ${b.from} is not a block-qa/v1 report` };
+  return { ok: true, report, from: b.from };
+}
+
+/** One line for a prior that could not be read; the writer wrote nothing for this block. */
+export function priorRefusalLine(writer: string, subject: string, r: { state: string; path: string; reason: string }): string {
+  return `${writer}: UNKNOWN ${subject} — ${r.state}: ${r.reason}. Nothing was written for it.`;
 }
 
 export function saveQaReport(path: string, report: BlockQaReport): void {

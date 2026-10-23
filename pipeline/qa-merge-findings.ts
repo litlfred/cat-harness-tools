@@ -25,6 +25,7 @@
  * Usage:
  *
  *   bun run cat-harness-tools/pipeline/qa-merge-findings.ts --file findings.json
+ *   … [--prior-from <ref>]   read each block's earlier report from the results store at <ref>
  *   bun run cat-harness-tools/pipeline/qa-merge-findings.ts < findings.json
  *
  * @module pipeline/qa-merge-findings
@@ -40,7 +41,10 @@ import {
   saveQaReport,
   readBlockManifest,
   insertAdjudication,
+  loadPriorBlockReport,
+  priorRefusalLine,
 } from "./qa-utils";
+import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { qaCriteriaByIdFor } from "./qa-criteria-registry";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
@@ -140,6 +144,10 @@ function blockRootFromInput(f: FindingInput): string | undefined {
 
 function run(): void {
   const args = parseArgs(process.argv.slice(2));
+  // `--prior-from <ref>` (bean `8wj1`, owner option B): read each block's
+  // earlier report from the results store at that ref. A bad ref exits 2 here.
+  const priorFrom = priorFromOrExit("qa-merge-findings");
+  let priorRefused = 0;
   const raw = args.file ? readFileSync(args.file, "utf-8") : readStdin();
   let batch: BatchInput;
   try {
@@ -221,11 +229,21 @@ function run(): void {
     // (see the comment on `qaPath` above).
     // An adjudication is an ATTESTATION: it is written to the store first, and
     // the store — never the prior report — is where the others come from.
-    const attested = resolvePrior(
-      repo,
-      blockAttestationKey(repo, rootAbs),
-      loadQaReport(existingBlockQaPath(repo, rootAbs) ?? qaPath),
-    );
+    let priorReport: BlockQaReport | undefined;
+    if (priorFrom !== undefined) {
+      const loaded = loadPriorBlockReport(repo, rootAbs, priorFrom);
+      if (!loaded.ok) {
+        // Unreadable at the ref: refuse rather than fall back to the working
+        // copy, which would make a missing store look like no history.
+        console.error(priorRefusalLine("qa-merge-findings", relative(repo, rootAbs), loaded));
+        priorRefused++;
+        continue;
+      }
+      priorReport = loaded.report;
+    } else {
+      priorReport = loadQaReport(existingBlockQaPath(repo, rootAbs) ?? qaPath);
+    }
+    const attested = resolvePrior(repo, blockAttestationKey(repo, rootAbs), priorReport);
     if (!attested.ok) {
       console.error(refusalLine("qa-merge-findings", relative(repo, rootAbs), attested));
       refused++;
@@ -303,6 +321,7 @@ function run(): void {
       2,
     ),
   );
+  if (priorRefused > 0) process.exit(2);
   if (refused > 0) process.exit(4);
 }
 

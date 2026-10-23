@@ -71,7 +71,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const INSTANCE_ROOT = resolve(dirname(__filename), "..");
 
-import { GIT_SHA_UNKNOWN, applicabilityGap, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadQaReport, loadQaScriptSidecar, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
+import { GIT_SHA_UNKNOWN, applicabilityGap, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
 import {
   qaCriteriaFor,
   qaCriteriaByIdFor,
@@ -83,7 +83,8 @@ import { isCriterionSourceMiss, resolveCriterionSource } from "./criterion-sourc
 import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { ContributionRegistry, composedKindOwner, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { usesGraphHash } from "./uses-graph-hash";
-import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
+import { blockQaPath, findContentRepoRoot } from "./qa-paths";
+import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -149,6 +150,7 @@ function parseArgs(argv: string[]): Args {
     }
     else if (a === "--json") out.json = true;
     else if (a === "--ci") out.ci = true;
+    else if (a === PRIOR_FROM_FLAG) i++; // its value is read by priorFromOrExit
     else if (a === "--only") {
       out.only = (argv[++i] ?? "").split(",").filter(Boolean);
     } else if (a === "--axis") {
@@ -160,7 +162,7 @@ function parseArgs(argv: string[]): Args {
   if (!out.root) {
     console.error(
       "usage: qa-sweep.ts <content-root> [--only ID,ID] [--axis NAME[,NAME]] [--dry-run] [--json] [--ci]\n" +
-        "                   [--script-sidecar-root DIR]",
+        "                   [--script-sidecar-root DIR] [--prior-from <ref>]",
     );
     process.exit(2);
   }
@@ -218,6 +220,7 @@ interface BlockSweepResult {
 
 async function run(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  const priorFrom = priorFromOrExit("qa-sweep");
   // Resolved ONCE, from the registry rather than from an import list: every
   // automated criterion declares the module its checker lives in, so an
   // adapter's checkers are reached because its criteria name them and not
@@ -391,6 +394,7 @@ async function run(): Promise<void> {
   let totalNeedsAgent = 0;
   // Blocks NOT written because their attestations could not be read. Never a pass.
   let attestationRefusals = 0;
+  let priorRefusals = 0;
 
   // `includeUnlabelled`: the sweep's question is "what prose ships?", not "what
   // is in the dependency graph". Unlabelled `prose()` blocks — chapter intros
@@ -428,11 +432,13 @@ async function run(): Promise<void> {
     // used to write a report holding only script entries and drop every agent
     // and human verdict without a word (C11). A store that cannot be read
     // means this block is not written at all, and the run says UNKNOWN.
-    const attested = resolvePrior(
-      contentRepoRoot,
-      blockAttestationKey(contentRepoRoot, block.root),
-      loadQaReport(existingBlockQaPath(contentRepoRoot, block.root) ?? qaPath),
-    );
+    const prior = loadPriorBlockReport(contentRepoRoot, block.root, priorFrom);
+    if (!prior.ok) {
+      console.error(priorRefusalLine("qa-sweep", relative(contentRepoRoot, block.root), prior));
+      priorRefusals++;
+      continue;
+    }
+    const attested = resolvePrior(contentRepoRoot, blockAttestationKey(contentRepoRoot, block.root), prior.report);
     if (!attested.ok) {
       console.error(refusalLine("qa-sweep", relative(contentRepoRoot, block.root), attested));
       attestationRefusals++;
@@ -917,6 +923,10 @@ async function run(): Promise<void> {
     }
   }
 
+  if (priorRefusals > 0) {
+    console.error(`qa-sweep: UNKNOWN — ${priorRefusals} block(s) not written because their prior could not be read from qa-reports:${priorFrom}; see above`);
+    process.exit(2);
+  }
   if (attestationRefusals > 0) {
     console.error(
       `qa-sweep: UNKNOWN — ${attestationRefusals} block(s) not written because their attestations could not be read; see above`,
