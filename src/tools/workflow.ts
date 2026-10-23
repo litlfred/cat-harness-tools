@@ -41,7 +41,7 @@ import { complete, describe, startInstance, type InstanceState } from "../workfl
 import { describePreflight, preflight, preflightRefusal } from "../workflow/preflight.js";
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
-import { applyWorkPlanOp } from "../workflow/bean-link.js";
+import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
 import { checkGate, loadRelaxations, validateRelaxations } from "../workflow/gate.js";
 import { type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { roleGraphFor } from "../../scripts/known-skills.js";
@@ -442,7 +442,10 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       const plan = op
         ? applyWorkPlanOp(root, next.bean, op, {
             note,
-            instanceCompleted: next.status === "completed",
+            // `resolve` also fires when only archive steps are left, so a
+            // diagram can end in one (`onlyArchiveLeft`). `archive` itself
+            // still needs the instance to have completed.
+            instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
           })
         : undefined;
 

@@ -121,8 +121,8 @@ describe("what the guard must not break", () => {
   test("an unknown op VALUE is still refused by its own check", async () => {
     // The pre-existing check, asserted here so a future edit cannot collapse
     // the two into one and lose the more specific message.
-    await expect(loadProcessModel(diagram('<cat-harness.processes:bean op="archive"/>'))).rejects.toThrow(
-      /op="archive" is not implemented/,
+    await expect(loadProcessModel(diagram('<cat-harness.processes:bean op="reopen"/>'))).rejects.toThrow(
+      /op="reopen" is not implemented/,
     );
   });
 });

@@ -5,10 +5,11 @@
  * has none of it.
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { applyWorkPlanOp, findBean, listBeans } from "../../src/workflow/bean-link";
+import { applyWorkPlanOp, findBean, listBeans, onlyArchiveLeft } from "../../src/workflow/bean-link";
+import type { InstanceState } from "../../src/workflow/instance";
 import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-model";
 
 /**
@@ -116,6 +117,54 @@ describe("an instance with no bean", () => {
   });
 });
 
+describe("the store as it is laid out now: beans/defs/ (bean folio-assistant-m8gz)", () => {
+  // The flat beans/ above is the layout this module was written against. The
+  // store moved to beans/defs/, and a lookup in beans/ alone then found
+  // nothing, so every engine claim, note and resolve recorded nothing.
+  const defsBean = (id: string, status: string, sub = ""): string => {
+    const dir = join(repo, "beans", "defs", sub);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `${id}--work.md`);
+    writeFileSync(path, `---\n# ${id}\ntitle: Work\nstatus: ${status}\ntype: task\nupdated_at: 2026-01-01T00:00:00Z\n---\n\nBody.\n`);
+    return path;
+  };
+
+  test("a bean in beans/defs/ is found, and so is one already in its archive/", () => {
+    defsBean("dddd", "todo");
+    defsBean("eeee", "completed", "archive");
+    expect(findBean(repo, "dddd")?.path).toBe(join(repo, "beans", "defs", "dddd--work.md"));
+    expect(findBean(repo, "eeee")?.path).toBe(join(repo, "beans", "defs", "archive", "eeee--work.md"));
+    expect(applyWorkPlanOp(repo, "dddd", "claim").summary).toBe("bean dddd: todo → in-progress");
+  });
+
+  test("archive moves a completed bean into archive/, keeping its status and recording why", () => {
+    const from = defsBean("ffff", "completed");
+    const r = applyWorkPlanOp(repo, "ffff", "archive", { instanceCompleted: true, note: "Archived: the CRDM close signed it off." });
+    const to = join(repo, "beans", "defs", "archive", "ffff--work.md");
+    expect(r.summary).toBe("bean ffff archived (completed) to archive/");
+    expect(existsSync(from)).toBe(false);
+    const body = readFileSync(to, "utf8");
+    expect(body).toContain("status: completed");
+    expect(body).toContain("Archived: the CRDM close signed it off.");
+    expect(applyWorkPlanOp(repo, "ffff", "archive", { instanceCompleted: true }).summary).toBe("bean ffff already archived");
+  });
+
+  test("archive refuses a bean that is not terminal, and notes why (check:bean-archive's invariant)", () => {
+    const path = defsBean("gggg", "in-progress");
+    const r = applyWorkPlanOp(repo, "gggg", "archive", { instanceCompleted: true });
+    expect(r.summary).toContain("left in place");
+    expect(existsSync(path)).toBe(true);
+    expect(readFileSync(path, "utf8")).toContain("only a completed or scrapped bean may be archived");
+  });
+
+  test("archive refuses while the process it tracks is still running", () => {
+    const path = defsBean("hhhh", "completed");
+    const r = applyWorkPlanOp(repo, "hhhh", "archive", { instanceCompleted: false });
+    expect(r.summary).toContain("still running");
+    expect(existsSync(path)).toBe(true);
+  });
+});
+
 describe("the diagrams declare which operation each step performs", () => {
 
   test("an op this build does not implement is refused, not ignored", async () => {
@@ -144,5 +193,52 @@ describe("the diagrams declare which operation each step performs", () => {
     await expect(loadProcessModel(join(dir, "bad.bpmn"))).rejects.toThrow(UnsupportedBpmn);
     await expect(loadProcessModel(join(dir, "bad.bpmn"))).rejects.toThrow(/obliterate/);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("resolve before a closing archive step", () => {
+  // S → Work → Resolve → [Archive] → E, with the archive step optionally followed by more work.
+  const diagram = (afterArchive: boolean): string => `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/0.1.0/processes/ns#"
+                  id="D" targetNamespace="urn:x">
+  <bpmn:process id="Process_A" name="A" isExecutable="false">
+    <bpmn:startEvent id="S"/>
+    <bpmn:task id="Work" name="Work"/>
+    <bpmn:task id="Resolve" name="Resolve"><bpmn:extensionElements><cat-harness.processes:bean op="resolve"/></bpmn:extensionElements></bpmn:task>
+    <bpmn:task id="Archive" name="Archive"><bpmn:extensionElements><cat-harness.processes:bean op="archive"/></bpmn:extensionElements></bpmn:task>
+    ${afterArchive ? '<bpmn:task id="More" name="More"/>' : ""}
+    <bpmn:endEvent id="E"/>
+    <bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="Work"/>
+    <bpmn:sequenceFlow id="F2" sourceRef="Work" targetRef="Resolve"/>
+    <bpmn:sequenceFlow id="F3" sourceRef="Resolve" targetRef="Archive"/>
+    ${afterArchive
+      ? '<bpmn:sequenceFlow id="F4" sourceRef="Archive" targetRef="More"/><bpmn:sequenceFlow id="F5" sourceRef="More" targetRef="E"/>'
+      : '<bpmn:sequenceFlow id="F4" sourceRef="Archive" targetRef="E"/>'}
+  </bpmn:process>
+</bpmn:definitions>
+`;
+  const state = (tokens: string[], status: "running" | "completed" = "running"): InstanceState => ({
+    id: "i", processId: "Process_A", source: "a.bpmn", subject: "s", tokens, arrivals: {}, history: [],
+    status, startedAt: "", updatedAt: "",
+  });
+  const load = async (afterArchive: boolean) => {
+    const dir = mkdtempSync(join(tmpdir(), "bean-archive-"));
+    writeFileSync(join(dir, "a.bpmn"), diagram(afterArchive));
+    const model = await loadProcessModel(join(dir, "a.bpmn"));
+    rmSync(dir, { recursive: true, force: true });
+    return model;
+  };
+
+  test("a token on a closing archive step counts as finished; one on earlier work does not", async () => {
+    const model = await load(false);
+    expect(onlyArchiveLeft(model, state(["Archive"]))).toBe(true);
+    expect(onlyArchiveLeft(model, state(["Resolve"]))).toBe(false);
+    expect(onlyArchiveLeft(model, state([], "completed"))).toBe(true);
+  });
+
+  test("an archive step with work after it does not let resolve fire early", async () => {
+    const model = await load(true);
+    expect(onlyArchiveLeft(model, state(["Archive"]))).toBe(false);
   });
 });
