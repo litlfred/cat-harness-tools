@@ -58,4 +58,27 @@ describe("an absent results directory is not 'no runs' (audit C5, bean 2gst)", (
       rmSync(empty, { recursive: true, force: true });
     }
   });
+  test("storeFallback: miss or corrupt remains looked=false (unknown); hit checks files from the store", () => {
+    const missed = checkTestRuns(INSTANCE, join(dir, "never-created"), SKILLS, () => ({ looked: false, files: [] }));
+    expect(missed.looked).toBe(false);
+    expect(missed.runs).toBe(0);
+
+    const hitText = JSON.stringify({
+      $schema: "folio-test-run/v1",
+      subject: "s",
+      data: basis,
+      process: basis,
+      outcome: {},
+      updated_at: "t",
+      skill: "crdm-detect",
+      cases: [good],
+    });
+    const hit = checkTestRuns(INSTANCE, join(dir, "never-created"), SKILLS, () => ({
+      looked: true,
+      files: [{ where: "test/results/a-good.test-run.json", text: hitText }],
+    }));
+    expect(hit.looked).toBe(true);
+    expect(hit.runs).toBe(1);
+    expect(hit.checked).toBe(1);
+  });
 });
