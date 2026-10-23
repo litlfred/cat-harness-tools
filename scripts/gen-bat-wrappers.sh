@@ -50,8 +50,6 @@ WRAPPED=(
   cat-harness-tools/scripts/install-beans.sh
   cat-harness-tools/scripts/install-bun.sh
   cat-harness-tools/scripts/install-lean-atlas.sh
-  cat-harness-tools/scripts/lake-cache-fetch.sh
-  cat-harness-tools/scripts/lake-cache.sh
   cat-harness-tools/scripts/lean-build-all.sh
   cat-harness-tools/scripts/lean-build-bg.sh
   cat-harness-tools/scripts/lean-build-timed.sh
@@ -61,7 +59,6 @@ WRAPPED=(
   cat-harness-tools/scripts/open-folio-assistant.sh
   cat-harness-tools/scripts/render-on-change.sh
   cat-harness-tools/scripts/render-pre-commit.sh
-  cat-harness-tools/scripts/reseed-lean-cache.sh
   cat-harness-tools/scripts/sage-mcp.sh
   cat-harness-tools/scripts/session-start-coord-sweep.sh
   cat-harness-tools/scripts/session-status.sh

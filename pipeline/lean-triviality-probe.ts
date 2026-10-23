@@ -70,8 +70,9 @@
  *   bun run cat-harness-tools/pipeline/lean-triviality-probe.ts \
  *     --lake-root content/<paper>/lean --limit 20 [--out docs/audits/lean-triviality.json]
  *
- * Requires a Lean toolchain and restored oleans:
- *   scripts/lake-cache.sh restore-toolchain && scripts/lake-cache.sh restore
+ * Requires a Lean toolchain and restored oleans, from the `lean-cache` tool
+ * of the layer that owns Lean:
+ *   lake-cache.sh restore-toolchain && lake-cache.sh restore
  *
  * @module pipeline/lean-triviality-probe
  */
@@ -310,7 +311,7 @@ if (import.meta.main) {
   --out FILE        Output cache (default docs/audits/lean-triviality.json)
 
 Ladder (cheapest first): ${TACTIC_LADDER.join(", ")}
-Needs: scripts/lake-cache.sh restore-toolchain && ... restore`);
+Needs: the lean-cache tool's lake-cache.sh restore-toolchain && ... restore`);
     process.exit(2);
   }
 
