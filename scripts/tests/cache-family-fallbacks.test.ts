@@ -10,9 +10,10 @@
  * fallback list lost a name, or reordered it, resolves a different branch from
  * the rest when no declaration is present.
  *
- * A folio template's copy of the restore action is tested by the layer that
- * keeps that template (move M11): a test here naming its path would be this
- * layer naming one above it.
+ * A cache family whose scripts live in a layer above is tested by that layer:
+ * the Lean cache scripts and the folio template's restore action moved up
+ * (folio-assistant#2598, move M11), and a test here naming their paths would be
+ * this layer naming one above it.
  *
  * Each script names the names as whole tokens: `lake-cache` is a substring of
  * both newer names, so a bare `toContain` would pass a file that never names it.
@@ -27,17 +28,6 @@ const REPO = resolve(import.meta.dir, "..", "..", "..");
 
 /** Newest first: the name a script writes when nothing exists, then its legacy names in resolution order. */
 const FAMILIES = {
-  "lake-cache": {
-    names: ["cat/folio-assistant-sci/lake-cache", "cat-lake-cache", "lake-cache"],
-    files: [
-      "cat-harness-tools/scripts/lake-cache.sh",
-      "cat-harness-tools/scripts/lake-cache-fetch.sh",
-      "cat-harness-tools/scripts/lake-cache-fetch-multi.py",
-      "cat-harness-tools/scripts/lake-cache-produce.py",
-      "cat-harness-tools/scripts/reseed-lean-cache.sh",
-      ".github/actions/lake-cache-restore/action.yml",
-    ],
-  },
   "fhir-ast": {
     names: ["cat/fhir-harness/fhir-ast", "cat-fhir-ast", "fhir-ast"],
     files: ["fhir-harness/scripts/ig-cache.sh"],
@@ -63,13 +53,7 @@ describe("cache scripts carry the same built-in fallback names, in the same orde
   }
 
   // The order matters where the list is written as one literal. Pinned on the
-  // two literals a reader would copy: lake-cache.sh's and ig-cache.sh's.
-  test("lake-cache.sh's fallback list is newest first", () => {
-    const text = readFileSync(resolve(REPO, "cat-harness-tools/scripts/lake-cache.sh"), "utf-8");
-    expect(text).toContain('CACHE_PREFIX="cat/folio-assistant-sci/lake-cache"');
-    expect(text).toContain('LEGACY_CACHE_PREFIXES="cat-lake-cache lake-cache"');
-  });
-
+  // literal a reader would copy: ig-cache.sh's.
   test("ig-cache.sh's fallback list is newest first", () => {
     const text = readFileSync(resolve(REPO, "fhir-harness/scripts/ig-cache.sh"), "utf-8");
     expect(text).toContain('for p in "cat/fhir-harness/fhir-ast/" "cat-fhir-ast/" "fhir-ast/"; do');
