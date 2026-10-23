@@ -539,7 +539,7 @@ export function beanGateUnmounted(text: string, file: string): WorkflowFinding[]
  * for that reason, and a QA step that was meant to be a warning went red with
  * no output.
  *
- * The sanctioned forms are `code=0; cmd || code=$?` (as `merge-guard.yml`
+ * The sanctioned forms are `code=0; cmd || code=$?` (as `post-merge-regen.yml`
  * does) or a `set +e` earlier in the same body. Detected per `run: |` block:
  * a line that is only `<name>=$?`, with no `set +e` before it in that block.
  *
@@ -581,7 +581,7 @@ export function exitStatusSwallowed(text: string, file: string): WorkflowFinding
       detail:
         `\`${read[1]}=$?\` on its own line. Actions runs this body as \`bash -e\`, so the command before it ` +
         `ends the step on a non-zero exit and this line is never reached. Write \`${read[1]}=0\` before the ` +
-        `command and \`|| ${read[1]}=$?\` after it (as \`merge-guard.yml\` does), or \`set +e\` earlier in the body.`,
+        `command and \`|| ${read[1]}=$?\` after it (as \`post-merge-regen.yml\` does), or \`set +e\` earlier in the body.`,
     });
   }
   return out;
