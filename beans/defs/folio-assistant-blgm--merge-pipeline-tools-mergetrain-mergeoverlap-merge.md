@@ -1,5 +1,6 @@
 ---
 # folio-assistant-blgm
+$schema: bean/1.0.0
 title: 'MERGE PIPELINE TOOLS: merge:train, merge:overlap, merge:leftover replace the steward''s scratch scripts'
 status: completed
 type: task
@@ -16,8 +17,13 @@ Owner approved 2026-10-02. Three commands for the merge steward, replacing scrat
 - merge:leftover — landed / not-landed / could-not-determine for a PR after a train.
 
 ## Done when
-- [ ] three scripts with unit tests on fixtures, package.json scripts, Tool nodes
-- [ ] draft PR open, gates green
-- [ ] PR body carries a Tools section for the merge-queue skill on claude/merge-pipeline-epic
+- [x] three scripts with unit tests on fixtures, package.json scripts, Tool nodes
+- [x] draft PR open, gates green
+- [x] PR body carries a Tools section for the merge-queue skill on claude/merge-pipeline-epic
 
-_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-09); commit 4d9b2e29 is on folio-assistant main, commit 5205ab34 is on folio-assistant main, commit 5dca4d08 is on folio-assistant main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+## Evidence: Closed on Landed Work (2026-10-09)
+
+Landed on main in PR #1895 (commits `4d9b2e291fbf`, `5dca4d08b154`, `5205ab34820c`, `b028e5d65f92`):
+1. `cat-harness-tools/scripts/merge-train.ts`, `merge-overlap.ts`, `merge-leftover.ts` implemented with unit tests in `cat-harness-tools/scripts/tests/merge-train.test.ts`, `merge-overlap.test.ts`, `merge-leftover.test.ts` (39 passing unit tests).
+2. Tool nodes registered: `cat-harness/test/results/kg-qa/tools/merge-train.kg-qa.json`, `merge-overlap.kg-qa.json`, `merge-leftover.kg-qa.json`, and process diagram `cat-harness/processes/sdlc/merge-train.bpmn`.
+3. Merged onto main; gates green.

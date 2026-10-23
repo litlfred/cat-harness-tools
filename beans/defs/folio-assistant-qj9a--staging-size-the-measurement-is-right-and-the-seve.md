@@ -1,5 +1,6 @@
 ---
 # folio-assistant-qj9a
+$schema: bean/1.0.0
 title: 'STAGING SIZE: the measurement is right and the SEVERITY is an unverifiable claim — critical predicts a failed publish, and nothing in this repo can observe enforcement'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-25T18:10:30Z
 updated_at: 2026-10-08T01:15:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 `health` reports `staging-preview-size` as **critical** while every deploy keeps
 succeeding. I went looking for a wrong number and did not find one: **the
@@ -404,4 +404,3 @@ All four Done-when items are ticked and re-derivable from the merged PRs below; 
 ## Landed evidence (PR #2397)
 - Completed and merged to main in PR #2397 (commit `03c23312ce4c`).
 - Owner approved closing of architectural investigation. Verified on main.
-

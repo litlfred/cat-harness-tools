@@ -5,6 +5,7 @@
  *
  * @module scripts/gen-uploads-viz
  * @graphNode none — a generator over the uploads half of the library graph
+ * @covers none — writer — regenerates the visualisation; judges nothing
  *
  * Third sibling of `gen-schema-viz.ts` and `gen-library-viz.ts`, and the same
  * shape MINUS ONE PIECE: those two publish a projection and a viewer over it;

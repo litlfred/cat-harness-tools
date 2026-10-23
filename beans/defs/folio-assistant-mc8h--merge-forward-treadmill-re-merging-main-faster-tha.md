@@ -1,5 +1,6 @@
 ---
 # folio-assistant-mc8h
+$schema: bean/1.0.0
 title: 'MERGE-FORWARD TREADMILL: re-merging main faster than CI can answer means never getting a verdict — #1064 took four base merges and observed zero gates runs'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-23T13:25:16Z
 updated_at: 2026-10-07T17:47:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 Found by getting it wrong on [#1064](https://github.com/litlfred/folio-assistant/pull/1064),
 and written down because the mistake is cheap to repeat.

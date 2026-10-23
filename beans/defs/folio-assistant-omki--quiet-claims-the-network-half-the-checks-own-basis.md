@@ -1,5 +1,6 @@
 ---
 # folio-assistant-omki
+$schema: bean/1.0.0
 title: 'QUIET CLAIMS, THE NETWORK HALF: the check''s own basis calls its count an upper bound — supply the signal it cannot see'
 status: completed
 type: task
@@ -8,7 +9,6 @@ created_at: 2026-09-25T16:26:09Z
 updated_at: 2026-10-07T04:53:47Z
 parent: folio-assistant-1xhc
 ---
-
 
 `bean-quiet-claims` reads one signal — hours since the bean's own `updated_at` —
 and its threshold `basis` says so in as many words: the count is an **UPPER

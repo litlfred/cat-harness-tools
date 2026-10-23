@@ -1,5 +1,6 @@
 ---
 # folio-assistant-fq5u
+$schema: bean/1.0.0
 title: 'DOWNSTREAM TOOLS IN QA: a run record per downstream tool, and QA goes stale when its inputs change — LSI first'
 status: completed
 type: feature
@@ -41,4 +42,3 @@ Branch `claude/magical-archimedes-4qkfxp-fq5u`.
 - **Member 2: the site search index.** New Tool node `site-search-index` (`judgedAt: published`) and a `search-index` verifier in `publish-verify`'s set: present, parses, non-empty, every indexed page resolves in the tree, and indexed pages >= 0.5 x pages carrying the search box (basis: a local build on 2026-09-23 had 1,347 of 1,347; halved for pages mounted after Jekyll). The staging preview passes `--search-index borrowed`: it serves the published index or a declared-empty one, so only presence and parsing are asked.
 - **The family in `kg:audit`** (`scripts/downstream-runs.ts`): per-Tool `tool-downstream-fresh` (minor; replaces the graph-level `lsi-index-fresh`), and graph-level `downstream-tool-declared` (major, repo-scoped): a member reader, a run record or a publish verifier naming a Tool with no matching declaration is a finding.
 - **Where it surfaces:** the kg:audit report and sidecars. Today `tool:lsi-index tool-downstream-fresh (4)` — four prose graphs that need an index and have never been run (agent-skills/library, cat-harness/docs, smart-base/library, smart-trust/smart-trust-docs) — and `tool:site-search-index` `unknown` naming its verifier. `bun run cat health` was not extended; the box allowed either.
-

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-nba0
+$schema: bean/1.0.0
 title: 'QA scoping: automated:false criteria bypass BOTH the adapter and profile gates'
 status: completed
 type: task
@@ -67,4 +68,3 @@ Landed on main in PR #2487 (commit `13e78a516292`, "fix(qa-scoping): evaluate ad
 - Phantom `needs-agent` queuing prevented on irrelevant content profiles.
 - Regression test added in `cat-harness/scripts/tests/profile-scoping.test.ts`.
 - Verified and passed all 18 CI gates on main.
-

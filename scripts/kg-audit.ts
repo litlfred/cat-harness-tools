@@ -130,6 +130,7 @@ import {
 } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { ANYONE, ODRL_ACTIONS, readPolicies, readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
+import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
 import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
@@ -1856,7 +1857,23 @@ function proseNamesResolve(): KgCriterionEntry {
  */
 function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> {
   // declared-path-literal: the conventional fallback when no declaration names the directory
-  const r = checkTestRuns(root, ownDirectoryById(root, "qa", "test/results"), skills);
+  const resultsDir = ownDirectoryById(root, "qa", "test/results");
+  const r = checkTestRuns(root, resultsDir, skills, () => {
+    if (!against) return { looked: false, files: [] };
+    const storage = qaStorageOf(resultsDir);
+    if (!storage) return { looked: false, files: [] };
+    const tree = readQaTree(against, resultsDir, { branch: storage, repoRoot: REPO_ROOT });
+    if (tree.state !== "hit") return { looked: false, files: [] };
+    const prefix = tree.prefix ? `${tree.prefix}/` : "";
+    const files: { where: string; text: string }[] = [];
+    for (const [p, text] of [...tree.files.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      const relToResults = prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p;
+      if (!relToResults.includes("/") && relToResults.endsWith(".test-run.json")) {
+        files.push({ where: relative(root, join(resultsDir, relToResults)), text });
+      }
+    }
+    return { looked: true, files };
+  });
   // Only a DECLARED `qa` directory that is absent is unknown. An instance that
   // declares none (bootstrap, …) has no results to read, and its
   // missing conventional directory is a determined "no runs": `n/a`.

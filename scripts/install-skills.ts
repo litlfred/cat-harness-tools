@@ -6,7 +6,7 @@
  * @module cat-harness-tools/scripts/install-skills
  *
  * ```sh
- * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity] [--into <dir>] [--check]
+ * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity|gemini|cursor|copilot] [--into <dir>] [--check]
  * ```
  *
  * ## The owner's ruling, 2026-10-10
@@ -33,17 +33,44 @@
  *
  * Each skill becomes `<host dir>/<prefix>-<name>/SKILL.md`: the source front
  * matter with `name` replaced by the prefixed name, a provenance line, and the
- * body unchanged. The two hosts written today share that layout, verified
- * against their documentation:
+ * body unchanged. Every host here reads that layout natively, as an Agent
+ * Skill with a required `name` and `description` (bean `cat-tools-0nxe`,
+ * vendor docs read 2026-10-20):
  *
- * | host | directory |
- * |---|---|
- * | Claude Code | `.claude/skills/` |
- * | Antigravity | `.agents/skills/` |
+ * | host | directory | source |
+ * |---|---|---|
+ * | Claude Code | `.claude/skills/` | Claude Code docs |
+ * | Antigravity | `.agents/skills/` | Antigravity docs |
+ * | Gemini CLI | `.gemini/skills/` | https://geminicli.com/docs/cli/skills/ |
+ * | Cursor | `.cursor/skills/` | https://cursor.com/docs/skills |
+ * | Copilot | `.github/skills/` | https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/create-skills |
  *
- * Gemini CLI, Cursor and Copilot are not written yet: their formats differ
- * (rules files, instructions files) and were not verified here. Writing a guess
- * would produce files a host silently ignores.
+ * `.agents/skills/` is also read by Gemini CLI (an alias that takes precedence
+ * over `.gemini/skills/`), Cursor and Copilot, so `--host antigravity` alone
+ * reaches all four of those; the per-host directories are for a checkout that
+ * wants one host's tree only. Copilot reads skills in the cloud agent, code
+ * review, the CLI, the app and VS Code agent mode.
+ *
+ * Cursor requires `name` to be lowercase letters, digits and hyphens, and to
+ * match the folder. That holds for every installed name (prefix, hyphen,
+ * name), and a name that breaks it is skipped with the reason rather than
+ * written where a host would refuse it.
+ *
+ * ## Process checklists, installed as skills (bean `folio-assistant-cy4p`)
+ *
+ * Owner, 2026-10-16 (thread "BPMN engine status", option 1): the BPMN engine's
+ * "downcompilation per coding agent" is the committed checklist of each
+ * diagram (`bpmn-checklist.ts`) installed as one skill per host, not a
+ * compiler per agent. Every host here takes Markdown, and the checklist already
+ * is Markdown. So each `<stem>.checklist.md` found beside a diagram, or in an
+ * instance's `assets/workflows/checklists/`, becomes `<prefix>-process-<stem>`:
+ * a generated front matter (the description names the process and how to walk
+ * it) over the checklist body, unchanged. It takes the prefix of the instance
+ * that holds the checklist. The checklist is read as committed, never
+ * regenerated here: `bpmn:checklist:check` keeps it current, so the installed
+ * copy is a rendering of a rendering and still never an authority. An agent
+ * with the MCP server uses `bpmn-engine`, which refuses a wrong turn; one
+ * without walks the checklist.
  *
  * ## Owned output only
  *
@@ -56,15 +83,21 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { isSkillMd } from "./known-skills.ts";
+import { findInstanceRoot, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { orderedDependencies, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { isSkillMd, workflowDirs } from "./known-skills.ts";
 
 /** Where each host loads project skills from, relative to the project root. */
 export const HOSTS = {
   claude: ".claude/skills",
   antigravity: ".agents/skills",
+  gemini: ".gemini/skills",
+  cursor: ".cursor/skills",
+  copilot: ".github/skills",
 } as const;
+
+/** An Agent Skill name every host accepts: Cursor's rule, the strictest of the five. */
+export const SKILL_NAME = /^[a-z0-9-]+$/;
 export type Host = keyof typeof HOSTS;
 
 /** The line that marks a `SKILL.md` as this script's output, and so its to replace or remove. */
@@ -81,6 +114,8 @@ export interface SourceSkill {
   prefix?: string;
   /** Why it cannot be installed, when it cannot. */
   skip?: string;
+  /** The source text, when it is not the file as it stands (a checklist gets a generated front matter). */
+  text?: string;
 }
 
 const FRONT_MATTER = /^---\n([\s\S]*?)\n---\n?/;
@@ -115,9 +150,65 @@ export function readSourceSkill(file: string): SourceSkill | undefined {
   return { name, file, instance, ...(prefix ? { prefix } : {}), ...(skip ? { skip } : {}) };
 }
 
-/** Every skill the harness at `root` would install, in overlay order (root last). */
+/** The suffix `bpmn-checklist.ts` writes, and the first line it starts with. */
+const CHECKLIST_SUFFIX = ".checklist.md";
+const GENERATED_FROM = /^<!-- GENERATED from (\S+) by /;
+
+/**
+ * A committed checklist read as a skill: `process-<stem>`, with a front matter
+ * whose description names the process, its diagram and how to walk it. A file
+ * that is not `bpmn-checklist.ts` output is not a checklist, and is ignored.
+ */
+export function readChecklistSkill(file: string): SourceSkill | undefined {
+  if (!file.endsWith(CHECKLIST_SUFFIX)) return undefined;
+  const body = readFileSync(file, "utf-8");
+  const lines = body.split("\n");
+  const source = GENERATED_FROM.exec(lines[0] ?? "")?.[1];
+  if (!source) return undefined;
+  const title = /^# Checklist — (.+)$/m.exec(body)?.[1]?.trim() ?? basename(file, CHECKLIST_SUFFIX);
+  // The diagram's own first sentence, when it has one: the line after the
+  // "Generated, and not the authority" note and before the first step.
+  const firstStep = lines.findIndex((l) => l.startsWith("## "));
+  const purpose = lines.slice(0, firstStep < 0 ? lines.length : firstStep).find((l) => l.trim() !== "" && !/^(<!--|#|>)/.test(l));
+  const description =
+    `Walk the "${title}" process (${source}) one step at a time: follow each step's next: line, not the page order, ` +
+    `and record each step with the workflow call it names.${purpose ? ` ${purpose.trim()}` : ""}`;
+  const name = `process-${basename(file, CHECKLIST_SUFFIX)}`;
+  const instance = findInstanceRoot(file) ?? "";
+  const prefix = instance ? declaredPrefix(instance) : undefined;
+  // JSON string syntax is valid YAML double-quoted, so any title or sentence survives.
+  const text = `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n${body}`;
+  return { name, file, instance, ...(prefix ? { prefix } : {}), text };
+}
+
+/**
+ * Every committed checklist in the instances the harness at `root` stands on:
+ * beside each diagram in a declared workflow directory, and in each instance's
+ * `assets/workflows/checklists/`, where the harness keeps those of the
+ * instances below it. Dependencies first, the root last, as for skills.
+ */
+export function collectChecklists(root: string): SourceSkill[] {
+  const instances: string[] = [];
+  const add = (r: string | undefined): void => {
+    if (r && !instances.includes(resolve(r))) instances.push(resolve(r));
+  };
+  for (const dep of orderedDependencies(root)) add(dep.rootPath);
+  for (const d of resolveSkillDirs(root)) add(findInstanceRoot(d));
+  add(root);
+  const files = new Set<string>();
+  for (const inst of instances) {
+    const dirs = [...workflowDirs(inst), join(inst, siteDirFor(inst), "assets", "workflows", "checklists")];
+    for (const d of dirs) if (existsSync(d)) for (const f of walkMd(d)) if (f.endsWith(CHECKLIST_SUFFIX)) files.add(f);
+  }
+  return [...files].map(readChecklistSkill).filter((s): s is SourceSkill => s !== undefined);
+}
+
+/** Every skill the harness at `root` would install, in overlay order (root last), then its process checklists. */
 export function collectSkills(root: string): SourceSkill[] {
-  return resolveSkillDirs(root).flatMap((d) => walkMd(d).sort().map(readSourceSkill).filter((s): s is SourceSkill => s !== undefined));
+  return [
+    ...resolveSkillDirs(root).flatMap((d) => walkMd(d).sort().map(readSourceSkill).filter((s): s is SourceSkill => s !== undefined)),
+    ...collectChecklists(root),
+  ];
 }
 
 /** The installed copy: the prefixed name in the front matter, a provenance line, the body unchanged. */
@@ -155,9 +246,13 @@ export function planInstall(root: string, skills: readonly SourceSkill[] = colle
       continue;
     }
     const installed = `${prefix}-${s.name}`;
+    if (!SKILL_NAME.test(installed)) {
+      skipped.push({ file: rel, reason: `"${installed}" is not lowercase letters, digits and hyphens, which Cursor requires` });
+      continue;
+    }
     if (from.has(installed)) collisions.push({ name: installed, lost: from.get(installed)!, won: rel });
     from.set(installed, rel);
-    files.set(installed, renderInstalled(readFileSync(s.file, "utf-8"), installed, rel));
+    files.set(installed, renderInstalled(s.text ?? readFileSync(s.file, "utf-8"), installed, rel));
   }
   return { files, skipped, collisions };
 }

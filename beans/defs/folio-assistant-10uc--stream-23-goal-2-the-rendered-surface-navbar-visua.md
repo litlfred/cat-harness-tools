@@ -1,5 +1,6 @@
 ---
 # folio-assistant-10uc
+$schema: bean/1.0.0
 title: 'RENDERED SURFACE: navbar, visualisers, stickies — GOAL 2''s stream, moved under GOAL 4 at GOAL 2''s sign-off'
 status: in-progress
 type: task
@@ -127,7 +128,7 @@ Coordinate on `o7eq` rather than deciding it unilaterally.
       `main` and `aspect-ratio: 1` is live at `docs-ui.css:4549`. So what
       merged is two records, not code. The owner was told before it merged,
       and a correction is posted on the PR.
-- [~] The six owner-blocked beans asked as questions the owner can answer by
+- [ ] The six owner-blocked beans asked as questions the owner can answer by
       selecting, with a preview URL where one is needed — **the six are two
       and a half**: `h32d`, `g196`, and half of `yj32`. Four were already
       answered elsewhere (`6lb8` via `db7g`; `jbx2`, `rptk` `completed`;
@@ -135,8 +136,7 @@ Coordinate on `o7eq` rather than deciding it unilaterally.
       answered 2026-09-22** — a declared graph with no viewer is SHOWN, inert
       and labelled; recorded on `603s` and `yj32`. Six decisions remain queued,
       each to be put in full when it is next, per `interaction-modality`
-      §"More than one decision pending". `alox`/`o3xy` still need a PAGE link,
-      not the site root
+      §"More than one decision pending".
 
 ---
 
@@ -193,3 +193,7 @@ Every id below re-read from the store on `main` d1a5d6ea, not carried forward (`
 Checked on main f44d88fd9 by session https://claude.ai/code/session_01FrpbCpM7BWxGCPsu618MLr. This bean says to close it last, when `603s`, `6lb8` (via `q2wm`) and `ob3m` close. Today: `603s` completed; `6lb8`, `q2wm` and `ob3m` all in-progress; `supn` todo. Left open.
 
 _2026-10-16T10:30:00Z_ — Renamed from 'STREAM 2/3: GOAL 2 — the rendered surface…': GOAL 2 (p5wm) was signed off 2026-10-05 and this stream moved under GOAL 4 (rwmf), so the old title named the wrong goal (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-21T18:13:00Z_ — Re-checked on `main` `3d586f5794`: `h32d`, `alox` (archived), `o3xy`, `ob3m`, and `603s` are all `completed`; only `g196`, `yj32`, `b5f0`, `6lb8` (waiting only on `q2wm`'s lazy-fetch box), and `supn` remain open. Changed `- [~]` on box 5 to `- [ ]` so `bun run cat health` (`DONE_WHEN_BOX`) counts 4/5 rather than falsely reporting 4/4 all-ticked.
+
+_2026-10-21T19:52:00Z_ — Box 5 dropped its last clause, "`alox`/`o3xy` still need a PAGE link, not the site root": both are `completed` (see the 18:13Z note), and the 18:13Z un-tick left an unchecked clause naming `alox` as a precondition, which `check:stale-paths` refuses index-wide (`✗ 10uc [done-when]: its path routes through alox`). The box stays open for what remains: `g196`, `yj32`, `b5f0`, `6lb8`, `supn`.

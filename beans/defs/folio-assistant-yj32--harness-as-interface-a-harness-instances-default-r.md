@@ -1,5 +1,6 @@
 ---
 # folio-assistant-yj32
+$schema: bean/1.0.0
 title: 'HARNESS AS INTERFACE: a harness instance''s default rendering is LHS + docs/ + a themed folio board, and it is a KG-DS management system'
 status: todo
 type: epic
@@ -8,7 +9,6 @@ created_at: 2026-09-20T13:47:14Z
 updated_at: 2026-10-05T04:57:14Z
 parent: folio-assistant-rwmf
 ---
-
 
 Owner, 2026-09-20, verbatim — this is the largest architectural statement in
 the session and paraphrasing it would lose the parts that constrain the design:

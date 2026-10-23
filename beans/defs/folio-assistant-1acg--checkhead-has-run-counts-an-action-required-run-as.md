@@ -1,5 +1,6 @@
 ---
 # folio-assistant-1acg
+$schema: bean/1.0.0
 title: check:head-has-run counts an action_required run as RAN — a run that never executed satisfies 'the gates fired'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-10-03T00:15:20Z
 updated_at: 2026-10-03T01:21:22Z
 parent: folio-assistant-1xhc
 ---
-
 
 ## The defect, in one line
 

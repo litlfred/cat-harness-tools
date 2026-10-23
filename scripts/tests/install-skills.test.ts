@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { INSTALLED_MARKER, ownedInstalls, planInstall, renderInstalled, type SourceSkill } from "../install-skills.ts";
+import { HOSTS, INSTALLED_MARKER, ownedInstalls, planInstall, readChecklistSkill, renderInstalled, type SourceSkill } from "../install-skills.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "install-skills-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -78,5 +78,69 @@ describe("ownedInstalls", () => {
     skillFile("host/.claude/skills/my-own/SKILL.md", "---\nname: my-own\n---\nmine\n");
     expect(ownedInstalls(host)).toEqual(["cat-old"]);
     expect(ownedInstalls(join(tmp, "nowhere"))).toEqual([]);
+  });
+});
+
+describe("readChecklistSkill (bean folio-assistant-cy4p)", () => {
+  const CHECKLIST = [
+    "<!-- GENERATED from cat-harness/processes/sdlc/activity-log.bpmn by cat-harness-tools/scripts/bpmn-checklist.ts. Do not edit: change the diagram and regenerate (bun run cat bpmn:checklist). -->",
+    "",
+    "# Checklist — Agent \"activity\" log: runs",
+    "",
+    "> **Generated, and not the authority.** Walked as a state machine.",
+    "",
+    "What an agent writes down about its own run.",
+    "",
+    "## Begin — Start (`Start`)",
+    "",
+    "- next: → `Task_A`",
+    "",
+  ].join("\n");
+  const file = skillFile("p/processes/activity-log.checklist.md", CHECKLIST);
+
+  it("names it process-<stem>, keeps the checklist body unchanged, and describes how to walk it", () => {
+    const s = readChecklistSkill(file)!;
+    expect(s.name).toBe("process-activity-log");
+    expect(s.text!.endsWith(CHECKLIST)).toBe(true);
+    const description = /^description: (.+)$/m.exec(s.text!)![1]!;
+    // Double-quoted YAML is JSON string syntax, so the quotes and colon in the title survive.
+    const parsed = JSON.parse(description) as string;
+    expect(parsed).toContain('"Agent "activity" log: runs"');
+    expect(parsed).toContain("cat-harness/processes/sdlc/activity-log.bpmn");
+    expect(parsed).toContain("next:");
+    expect(parsed.endsWith("What an agent writes down about its own run.")).toBe(true);
+  });
+
+  it("installs under the prefix like any skill, from its generated text", () => {
+    const s = readChecklistSkill(file)!;
+    const plan = planInstall(tmp, [{ ...s, prefix: "cat" }]);
+    const out = plan.files.get("cat-process-activity-log")!;
+    expect(out.startsWith("---\nname: cat-process-activity-log\ndescription: ")).toBe(true);
+    expect(out).toContain(INSTALLED_MARKER);
+    expect(out).toContain("# Checklist — ");
+  });
+
+  it("ignores a .checklist.md that bpmn-checklist.ts did not write, and any other file", () => {
+    expect(readChecklistSkill(skillFile("p/processes/hand.checklist.md", "# my own list\n"))).toBeUndefined();
+    expect(readChecklistSkill(skillFile("p/processes/notes.md", CHECKLIST))).toBeUndefined();
+  });
+});
+
+describe("hosts (bean cat-tools-0nxe)", () => {
+  it("every host reads <dir>/<name>/SKILL.md natively, each from its own documented directory", () => {
+    expect(HOSTS).toEqual({
+      claude: ".claude/skills",
+      antigravity: ".agents/skills",
+      gemini: ".gemini/skills",
+      cursor: ".cursor/skills",
+      copilot: ".github/skills",
+    });
+  });
+
+  it("a name Cursor would refuse (not lowercase letters, digits and hyphens) is skipped with the reason", () => {
+    const bad = skillFile("d/skills/Bad_Name.md", "---\nname: Bad_Name\ndescription: d\n---\nx\n");
+    const plan = planInstall(tmp, [{ name: "Bad_Name", file: bad, instance: tmp, prefix: "cat" }]);
+    expect(plan.files.size).toBe(0);
+    expect(plan.skipped[0]!.reason).toMatch(/Cursor requires/);
   });
 });

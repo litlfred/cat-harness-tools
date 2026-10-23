@@ -1,11 +1,12 @@
 ---
 # folio-assistant-7mwa
+$schema: bean/1.0.0
 title: Retire qa:resolve-conflicts and the test/results .gitattributes entries; move the 14 per-instance test/results dirs and the folio_init template
 status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-10T16:49:34Z
+updated_at: 2026-10-16T06:30:00Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-oqe3
@@ -36,3 +37,5 @@ The per-instance `test/results/` dirs (`folio-assistant-sci`, `fhir-harness`, `s
 - `qa-resolve-conflicts.test.ts` and the attributes test
 
 `init-folio.ts:433,451` (the `folio_init` AGENTS template says "Commit") is also here. The reader beans this one now follows in practice are `folio-assistant-2gst`, `0dav`, `id4s`, `oq1j`, `8wj1`, `c8uq`, `tfqf` and `cxcn`.
+
+_2026-10-16T06:30:00Z_ — Blocker `2ae2` (scrapped; replaced by `tfqf` and `8wj1`) swapped for those two, both still in progress. Owner ruling 2026-10-16 (item 3). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

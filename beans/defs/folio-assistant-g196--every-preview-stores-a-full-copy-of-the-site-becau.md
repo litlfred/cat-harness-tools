@@ -1,5 +1,6 @@
 ---
 # folio-assistant-g196
+$schema: bean/1.0.0
 title: Every preview stores a full copy of the site because per-preview facts are baked into every page
 status: todo
 type: feature
@@ -8,7 +9,6 @@ created_at: 2026-09-19T12:53:43Z
 updated_at: 2026-10-16T10:30:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 **In one sentence:** every staging preview stores a full ~37.5 MB copy of the
 site because three per-preview facts are baked into all ~530 pages, so git's

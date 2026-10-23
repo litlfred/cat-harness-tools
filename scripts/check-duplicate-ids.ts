@@ -29,13 +29,30 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { isVendoredViewer } from "./pdf-viewer.ts";
 
+/**
+ * A start tag's `id` attribute, read attribute by attribute.
+ *
+ * A regex for `id=` over the whole tag also matches text INSIDE another
+ * attribute's value. jekyll-seo-tag writes a page title into
+ * `<meta property="og:title" content="…">` and `twitter:title`, curling its
+ * quotes, so a bean titled `… carry id="fa-nav-open"` reported
+ * `”fa-nav-open”` twice on a page that held no duplicate id
+ * (folio-assistant#2628, 2026-10-23).
+ */
+export function idOf(tag: string): string | undefined {
+  const attrs = tag.replace(/^<[a-zA-Z][a-zA-Z0-9-]*/, "");
+  for (const a of attrs.matchAll(/\s([^\s=<>"'/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+    if (a[1]!.toLowerCase() === "id") return a[2] ?? a[3] ?? a[4];
+  }
+  return undefined;
+}
+
 /** The ids that occur more than once in one HTML document, with their counts. */
 export function duplicateIds(html: string): Map<string, number> {
   const body = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => m.replace(/>[\s\S]*<\//, "></"));
   const counts = new Map<string, number>();
   for (const tag of body.matchAll(/<[a-zA-Z][a-zA-Z0-9-]*\b[^<>]*>/g)) {
-    const id = /\sid\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/.exec(tag[0]);
-    const v = id?.[1] ?? id?.[2] ?? id?.[3];
+    const v = idOf(tag[0]);
     if (v === undefined || v === "") continue;
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }

@@ -58,6 +58,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
@@ -628,7 +629,10 @@ export function newFolioIndex(
  * differently. One file holds the coupling; moving the platform is a one-line
  * edit here rather than a sweep over the whole corpus.
  */
-function builderShim(assistant: string): string {
+function builderShim(assistant: string, contentType: string): string {
+  // The vocabulary modules this folio's profile needs (the science layer's
+  // `mathpaper` for a paper): their builders are theirs, not cat-harness's.
+  const vocabularies = vocabularyModulesFor(contentType).map((m) => `${reexportLine(assistant, m)}\n`).join("");
   return `/**
  * Re-export of folio-assistant's content-object builders.
  *
@@ -641,7 +645,7 @@ function builderShim(assistant: string): string {
  */
 
 export * from "../../${platformDir(assistant)}/schemas/builders";
-`;
+${vocabularies}`;
 }
 
 function typesShim(assistant: string): string {
@@ -1792,7 +1796,7 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
 
   // 2. The builder shim — the one place the platform path is written down.
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-  write("folio/schema/builders.ts", builderShim(assistant));
+  write("folio/schema/builders.ts", builderShim(assistant, o.contentType));
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
   write("folio/schema/types.ts", typesShim(assistant));
 

@@ -262,16 +262,16 @@ describe("Schema files", () => {
     expect(content).toContain("export interface SkillPackage");
   });
 
-  test("constraints.ts exports Zod schemas for all block kinds", () => {
+  test("constraints.ts exports Zod schemas for cat-harness's own block kinds", () => {
+    // The science layer's kinds (definition, theorem, …) are typed by its
+    // vocabulary module since 2026-10-22, not by constraints.ts.
     const content = readFileSync(
       join(INSTANCE_ROOT, "schemas/constraints.ts"),
       "utf-8"
     );
     for (const schema of [
-      "DefinitionSchema", "TheoremSchema", "LemmaSchema",
-      "PropositionSchema", "CorollarySchema", "ProofSchema",
-      "ExampleSchema", "RemarkSchema", "ProseSchema",
-      "ComputationSchema",
+      "AlgorithmSchema", "ExampleSchema", "RemarkSchema", "ProseSchema",
+      "ComputationSchema", "ProvableBaseSchema",
     ]) {
       expect(content).toContain(`export const ${schema}`);
     }

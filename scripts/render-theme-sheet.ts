@@ -385,8 +385,8 @@ export const VIEWER_TOOL = "theme-viewer";
  * every instance's, at the route the declaration gives it.
  *
  * Bean `folio-assistant-6gme`, owner 2026-10-20: *"every kind gets a viewer"*.
- * The `themes` kind is declared by instances (smart-base's WHO SMART IG
- * template theme, who-iris's IRIS and WHO publication themes) as a
+ * The `themes` kind is declared by instances (an IG template theme, a
+ * publisher's publication themes) as a
  * `themes.ts` exporting `INSTANCE_THEMES`, and until this page nothing drew
  * them: `theme:page` draws the platform's `THEMES` only. They are read
  * through `instanceThemes`, the one resolution every generator uses, so this

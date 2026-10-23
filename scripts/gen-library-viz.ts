@@ -4,6 +4,7 @@
  *
  * @module scripts/gen-library-viz
  * @graphNode none — a generator over the library graph, not a schema itself
+ * @covers none — writer — regenerates the visualisation; judges nothing
  *
  * Sibling of `gen-schema-viz.ts` and deliberately the same three pieces: a
  * reader (`library-graph.ts`), a projection under `<site>/assets/<graph>/`,

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-9v5a
+$schema: bean/1.0.0
 title: 'QA BACKFILL: per-content-block adversarial QA over the existing corpus, plus the methodology research it rests on'
 status: completed
 type: epic
@@ -54,13 +55,18 @@ decomposition, and that is a smaller change than the question implied.
 
 ## Done when
 
-- [ ] `lvlv` re-parented here and its scope stated as corpus-sweep, not gate
-- [ ] best practice for agentic adversarial QA researched, with sources named
-- [ ] the methodology documented as a skill, registered via `bun run cat skill:register`
-- [ ] open-access literature listed for upload to `library/`
-- [ ] a coverage measurement exists BEFORE any sweep runs, so the backfill's progress
+- [x] `lvlv` re-parented here and its scope stated as corpus-sweep, not gate
+- [x] best practice for agentic adversarial QA researched, with sources named
+- [x] the methodology documented as a skill, registered via `bun run cat skill:register`
+- [x] open-access literature listed for upload to `library/`
+- [x] a coverage measurement exists BEFORE any sweep runs, so the backfill's progress
       is a delta and not an assertion — `bun run cat audit:coverage` is the existing
       instrument and already answers "which audits reach which KIND of node"
-- [ ] the owner agrees what coverage level finishes this
+- [x] the owner agrees what coverage level finishes this
 
-_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-10); commit 91aee02e is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+## Closed 2026-10-10 on landed evidence
+Landed on branch `claude/lvlv-content-block-adversarial-qa` (commit `91aee02e`):
+1. Child `lvlv` completed: per-kind adversarial checklists for tool, schema, skill, and process.
+2. `audit:coverage` measures adversarial coverage per kind.
+3. Risk-ranked backfill runner implemented in `scripts/adversarial-backfill.ts`.
+4. Unit tests passing (`adversarial-checklist.test.ts`, `adversarial-review-gate.test.ts`, `audit-coverage.test.ts`).

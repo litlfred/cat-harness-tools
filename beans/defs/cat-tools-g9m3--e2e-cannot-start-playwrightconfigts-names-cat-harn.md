@@ -1,5 +1,6 @@
 ---
 # cat-tools-g9m3
+$schema: bean/1.0.0
 title: 'E2E CANNOT START: playwright.config.ts names ../cat-harness/test (moved in 70lx), and under it a .js specifier fails to resolve — 0 specs, no job reports it'
 status: completed
 type: bug
