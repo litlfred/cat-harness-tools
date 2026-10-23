@@ -546,12 +546,12 @@ export function beanGateUnmounted(text: string, file: string): WorkflowFinding[]
 export function exitStatusSwallowed(text: string, file: string): WorkflowFinding[] {
   const out: WorkflowFinding[] = [];
   const lines = text.split("\n");
-  let block: { indent: number; plusE: boolean } | undefined;
+  let block: { indent: number; plusE: boolean; prev: string } | undefined;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]!;
     const start = /^(\s*)(?:- )?run:\s*[|>][-+]?\s*$/.exec(l);
     if (start !== null) {
-      block = { indent: start[1]!.length, plusE: false };
+      block = { indent: start[1]!.length, plusE: false, prev: "" };
       continue;
     }
     if (block === undefined) continue;
@@ -564,7 +564,15 @@ export function exitStatusSwallowed(text: string, file: string): WorkflowFinding
     if (body.startsWith("#")) continue;
     if (/^set\b.*(?:\s\+[a-zA-Z]*e|\+o\s+errexit)/.test(body)) block.plusE = true;
     const read = /^([A-Za-z_][A-Za-z0-9_]*)=\$\?\s*(?:#.*)?$/.exec(body);
+    const prev = block.prev;
+    block.prev = body;
     if (read === null || block.plusE) continue;
+    // Reached on a failure, so `$?` is the failed command's status: the first
+    // line of an `else` (a failed `if` condition does not end a `bash -e`
+    // step), or of a `cmd || {` group. `shell-exit-status.test.ts` refuses
+    // `$?` after a command substitution, so `if X=$(cmd); then ... else rc=$?`
+    // is how a substitution's status is read.
+    if (/^else$|(?:;|\s)else$|\|\|\s*\{?$/.test(prev)) continue;
     out.push({
       file,
       line: i + 1,
@@ -572,7 +580,8 @@ export function exitStatusSwallowed(text: string, file: string): WorkflowFinding
       detail:
         `\`${read[1]}=$?\` on its own line. Actions runs this body as \`bash -e\`, so the command before it ` +
         `ends the step on a non-zero exit and this line is never reached. Write \`${read[1]}=0\` before the ` +
-        `command and \`|| ${read[1]}=$?\` after it (as \`merge-guard.yml\` does), or \`set +e\` earlier in the body.`,
+        `command and \`|| ${read[1]}=$?\` after it (as \`merge-guard.yml\` does), read it first in the \`else\` of ` +
+        `\`if cmd; then\` (the form for a command substitution), or \`set +e\` earlier in the body.`,
     });
   }
   return out;

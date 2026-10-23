@@ -39,6 +39,19 @@ describe("exit-status-swallowed", () => {
     expect(f[0]!.line).toBe(two.split("\n").length);
   });
 
+  test("the first line of an else, or of a `|| {` group, reads the failed command's status", () => {
+    // feature-staging.yml / docs-site.yml: shell-exit-status.test.ts refuses $? after a substitution.
+    const ifElse = 'if DIR=$(bun x.ts); then\n  DIR=${DIR%/}\nelse\n  rc=$?\n  [ "$rc" -eq 3 ] || exit "$rc"\nfi';
+    expect(exitStatusSwallowed(step(ifElse), "t.yml")).toEqual([]);
+    expect(exitStatusSwallowed(step("if bun x.ts; then :; else\n  rc=$?\nfi"), "t.yml")).toEqual([]);
+    expect(exitStatusSwallowed(step("bun x.ts || {\n  rc=$?\n  exit $rc\n}"), "t.yml")).toEqual([]);
+  });
+
+  test("the else exemption is the first line only", () => {
+    const later = "if bun x.ts; then :; else\n  bun y.ts\n  rc=$?\nfi";
+    expect(exitStatusSwallowed(step(later), "t.yml")).toHaveLength(1);
+  });
+
   test("a comment naming `code=$?` is not a read", () => {
     expect(exitStatusSwallowed(step("# then code=$? would be skipped\ncode=0\nbun x || code=$?"), "t.yml")).toEqual([]);
   });
