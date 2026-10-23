@@ -64,7 +64,7 @@
 # Main's STORED answer (owner, 2026-10-23: "build should be in seconds/minutes,
 # not tens of minutes"). The exact key above almost never matches on a PR: it
 # holds the tips of the branch-kept graphs and the lower layers' mains, which
-# move every few minutes, so no PR of cat-harness, smart-base or fhir-harness
+# move every few minutes, so no layer PR in the 2026-10-23 sample
 # hit it in the 2026-10-23 sample, and every PR ran prepare-base and four base
 # shards, about half its runner minutes, to recompute main. So on a PR's first
 # attempt, when the exact key misses, the answer a run on the caller's main
@@ -340,9 +340,8 @@ jobs:
           # steps to its first parent (below). Never `pull_request.base.sha`:
           # it is the base as of the PR's last push, older than the main the
           # merge commit holds whenever main moved since, so head-vs-base would
-          # charge main's own changes to the PR (seen on
-          # https://github.com/litlfred/smart-base/pull/57, where
-          # https://github.com/litlfred/smart-base/pull/53 landed between).
+          # charge main's own changes to the PR (seen on a layer PR on
+          # 2026-10-22, where another of that layer's PRs landed between).
           # `github.ref`, never `''`: an expression's `a && '' || b` is `b`,
           # because `''` is falsy, so index mode checked out the caller's
           # `index-ref` default, `main`, and judged main against its own
@@ -560,7 +559,7 @@ jobs:
         # the same reason). The index's OWN Playwright installs it, so the
         # browser build is the one that Playwright expects: a bare `npx
         # playwright` may fetch another
-        # (https://github.com/litlfred/smart-base/pull/57: "Executable doesn't
+        # (seen on a layer PR on 2026-10-22: "Executable doesn't
         # exist at .../chromium_headless_shell-1243").
         working-directory: fa
         run: |
