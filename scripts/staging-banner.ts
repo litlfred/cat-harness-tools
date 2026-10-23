@@ -119,6 +119,12 @@ export interface StagingFacts {
   issueUrl: string | null;
   runUrl: string;
   /**
+   * Where this build's CI results will appear (the PR's or the commit's
+   * checks page), or `null`. A preview renders in parallel with CI and never
+   * waits for it, so the banner links to the results instead of stating them.
+   */
+  checksUrl?: string | null;
+  /**
    * Root of the PUBLISHED site this preview is compared with: `main`'s, or for
    * a stacked PR its base branch's preview (bean `5uuf`).
    */
@@ -295,6 +301,7 @@ function fill(d,f,r){
     d.appendChild(link(f.mainSite+'/'+rel,'compare with '+(f.beforeRef||'main')+' \\u2197'));
   }
   d.appendChild(sep());d.appendChild(link(f.runUrl,'build log'));
+  if(f.checksUrl){d.appendChild(sep());d.appendChild(link(f.checksUrl,'CI results'));}
   stamp(f);
   measure();
 }
@@ -486,6 +493,7 @@ if (import.meta.main) {
     issue,
     issueUrl: issue ? `${required("issues-url").replace(/\/+$/, "")}/${issue}` : null,
     runUrl: required("run-url"),
+    checksUrl: flag("checks-url") || null,
     mainSite,
     beforeRef: flag("before-ref") || null,
     mainPagesKnown,
