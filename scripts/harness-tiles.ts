@@ -881,7 +881,7 @@ function tileFor(
    *
    * `renderExemption` (instance-wide) and `coverage.exempt.visualiser`
    * (directory-level, as `check-subgraph-coverage.ts` honours for e.g.
-   * `folio-assistant-sci`'s `sci-lean` template directory; bean
+   * a higher instance's Lean template directory; bean
    * `folio-assistant-6gme`) split `unbuilt`, and only `unbuilt`: the same
    * predicate the finding twenty lines down calls, so an exempt instance or
    * directory cannot be told "no viewer yet" by one surface and "not a gap" by
