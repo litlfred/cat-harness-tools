@@ -88,10 +88,21 @@ export interface PanelTask {
   id: string;
   name: string;
   type: string;
+  /**
+   * The step's own page: its subject IRI `…/process/P/node/T` (#603). Absent
+   * when its instance's graph publishes no subject pages.
+   */
+  href?: string;
   lane?: string;
+  /** The lane's own page, `…/process/P/lane/L`. Absent as `href` is. */
+  laneHref?: string;
   skills: PanelSkill[];
-  /** For a call activity: the process it descends into. */
-  calls?: PanelLink;
+  /**
+   * For a call activity: the process it descends into. `href` is the called
+   * process's own page (its subject IRI) where one is published, else its
+   * diagram page; `diagram` is the diagram page.
+   */
+  calls?: PanelLink & { diagram?: string };
   /**
    * For a call to a GLOBAL TASK: the step this layer shares, its BPMN kind,
    * and the values this call gives its inputs. The task's skills are the
@@ -108,6 +119,8 @@ export interface PanelTask {
 export interface PanelData {
   $schema: "process-task-panel/v1";
   process: string;
+  /** The process's own page, `…/process/P` (#603). Absent as {@link PanelTask.href} is. */
+  processHref?: string;
   tasks: Record<string, PanelTask>;
 }
 
@@ -209,11 +222,17 @@ export const PANEL_SCRIPT = `(function () {
     panel.textContent = "";
     var close = el("button", "pt-close", "\\u00d7"); close.type = "button"; close.setAttribute("aria-label", "Close");
     close.onclick = function () { hide(); }; panel.appendChild(close);
-    var task = obj(t.type.replace(/^bpmn:/, ""), t.name, "task");
+    var task = obj(t.type.replace(/^bpmn:/, ""), link({ name: t.name, href: t.href }), "task");
     task.appendChild(el("div", "pt-attr", "id = " + t.id));
-    if (t.lane) task.appendChild(el("div", "pt-attr", "lane = " + t.lane));
+    if (t.lane) { var ln = el("div", "pt-attr", "lane = "); ln.appendChild(link({ name: t.lane, href: t.laneHref })); task.appendChild(ln); }
+    if (data && data.processHref) { var pr = el("div", "pt-attr", "process = "); pr.appendChild(link({ name: data.process, href: data.processHref })); task.appendChild(pr); }
     panel.appendChild(task);
-    if (t.calls) { panel.appendChild(edge("calls")); panel.appendChild(obj("Process", link(t.calls), "proc")); }
+    if (t.calls) {
+      panel.appendChild(edge("calls"));
+      var cp = obj("Process", link(t.calls), "proc");
+      if (t.calls.diagram && t.calls.diagram !== t.calls.href) { var dg = el("div", "pt-attr"); dg.appendChild(link({ name: "diagram", href: t.calls.diagram })); cp.appendChild(dg); }
+      panel.appendChild(cp);
+    }
     if (t.shared) {
       panel.appendChild(edge("calls"));
       var gt = obj(t.shared.type.replace(/^bpmn:/, ""), t.shared.id, "proc");

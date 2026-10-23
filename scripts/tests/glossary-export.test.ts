@@ -92,16 +92,17 @@ describe("the corpus it is actually run against", () => {
     // with the graph's `performedBy` links.
     const roleIds = concepts(doc)
       .map((c) => c["@id"] as string)
-      .filter((i) => i.includes("#role/"));
+      .filter((i) => i.includes("/role/"));
     expect(roleIds.length).toBeGreaterThan(0);
-    for (const i of roleIds) expect(i).toMatch(/\.jsonld#role\/[^/]+$/);
+    // A path, not a fragment of the instance document (#603).
+    for (const i of roleIds) expect(i).toMatch(/^[^#]*\/role\/[^/#]+$/);
   });
 
   test("ten names for one pipeline are ten altLabels, not ten terms", () => {
     // The measurement that corrected the bean's recorded mapping: 85 distinct
     // lane names resolve to 36 roles, and `build-pipeline` alone is named ten
     // ways. A concept per lane name would have copied one definition onto ten.
-    const bp = concepts(doc).find((c) => c["@id"]?.toString().endsWith("#role/build-pipeline"));
+    const bp = concepts(doc).find((c) => c["@id"]?.toString().endsWith("/role/build-pipeline"));
     expect(bp).toBeDefined();
     expect((bp!.altLabel as string[]).length).toBeGreaterThanOrEqual(5);
     // ...and the definition is authored once, in `roles.json`.
@@ -128,7 +129,7 @@ describe("the corpus it is actually run against", () => {
     const ids = new Set(concepts(doc).map((c) => c["@id"] as string));
     for (const u of usages(doc)) {
       expect(ids.has(u.ofConcept as string)).toBe(true);
-      expect(String(u.inProcess)).toMatch(/#process\//);
+      expect(String(u.inProcess)).toMatch(/^[^#]*\/process\/[^/#]+$/);
     }
   });
 
@@ -161,7 +162,7 @@ describe("the corpus it is actually run against", () => {
     expect(report.undrawn.length).toBeGreaterThan(0);
     const ids = new Set(concepts(doc).map((c) => c["@id"] as string));
     for (const r of report.undrawn) {
-      expect([...ids].some((i) => i.endsWith(`#role/${r}`))).toBe(true);
+      expect([...ids].some((i) => i.endsWith(`/role/${r}`))).toBe(true);
     }
   });
 

@@ -79,6 +79,7 @@ import { dirname, join, relative } from "node:path";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { redirectStub } from "./compose-docs.ts";
 import { exportIdentity } from "./kg-export.js";
+import { SUBJECT_KINDS } from "./lib/subject-iri.ts";
 import {
   UI_STRINGS,
   loadCatalogues,
@@ -457,6 +458,7 @@ export function viewerHtml(
 // STAGING/<slug>/ with no configuration.
 const DOC = ${JSON.stringify(doc)};
 const STUB = ${JSON.stringify(stub)};
+const SUBJECT_KINDS = ${JSON.stringify(SUBJECT_KINDS)};
 
 /*
  * The chrome's words, per language.
@@ -489,11 +491,17 @@ let G = [], byId = new Map(), backlinks = new Map(), declared = new Set(),
 
 // A Tool is its own document, \`<dir>/tools/<id>.jsonld\` (bean \`tdir\`), not a
 // fragment, so it is shortened to the \`tool/<id>\` its fragment used to read.
+// A subject is a path since #603, \`<doc dir>/<kind>/<id>\`, and a flow
+// \`…/process/P#flow/F\`: both read as the \`<kind>/<id>\` the fragment did.
+const SUBJECT_AT = new RegExp("/((?:" + SUBJECT_KINDS.join("|") + ")/[^]*)$");
 const short = (iri) => {
   const s = String(iri);
-  if (s.includes("#")) return s.split("#").pop();
   const t = /\\/tools\\/([^/]+)\\.jsonld$/.exec(s);
-  return t ? "tool/" + decodeURIComponent(t[1]) : s;
+  if (t) return "tool/" + decodeURIComponent(t[1]);
+  const m = SUBJECT_AT.exec(s);
+  if (m) return m[1].replace("#flow/", "/flow/");
+  if (s.includes("#")) return s.split("#").pop();
+  return s;
 };
 const typeOf = (n) => short(n["@type"] ?? "").split("/").pop();
 /**

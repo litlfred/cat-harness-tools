@@ -132,6 +132,7 @@
  * @covers bean-defs
  */
 import { Database } from "bun:sqlite";
+import { mintsFragments, subjectBase, subjectPathOf } from "./lib/subject-iri.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -911,14 +912,18 @@ type KgNode = Record<string, unknown> & { "@id": string; "@type"?: string | stri
  * row carries the pointer `planPayloads` computes for the subgraph files, and
  * the client fetches the committed payload.
  *
- * IRIs are stored relative to the document: `skill/todo-manager` for
- * `<doc>#skill/todo-manager`, with `<doc>#` in `meta.base`. Measured: the
- * fragment form is what keeps 14,000 edges from carrying a 60-byte prefix
- * twice each, plus once more in the reverse index.
+ * A subject's IRI is stored relative to the document's directory:
+ * `skill/todo-manager` for `<doc dir>/skill/todo-manager` (#603), with
+ * `<doc dir>` in `meta.base`, so `meta.base + iri` is the IRI again. Measured
+ * when it was `<doc>#`: the short form is what keeps 14,000 edges from
+ * carrying a 60-byte prefix twice each, plus once more in the reverse index.
+ * Only this document's subjects are shortened (`subjectPathOf`): the host's
+ * directory is the site root, under which every instance's subjects sit.
  */
 export function kgData(doc: { "@id": string; "@context": unknown; "@graph": unknown[] }, plan: PayloadPlan): SliceData {
-  const base = `${doc["@id"]}#`;
-  const rel = (iri: string) => (iri.startsWith(base) ? iri.slice(base.length) : iri);
+  const docIri = doc["@id"];
+  const base = mintsFragments(docIri) ? `${docIri}#` : subjectBase(docIri);
+  const rel = (iri: string) => subjectPathOf(iri, docIri) ?? iri;
   const ctx = (Array.isArray(doc["@context"]) ? Object.assign({}, ...doc["@context"].filter((c) => typeof c === "object")) : doc["@context"]) as Record<string, unknown>;
   const edgeTerms = Object.keys(ctx)
     .filter((k) => { const v = ctx[k]; return typeof v === "object" && v !== null && (v as Record<string, unknown>)["@type"] === "@id"; })

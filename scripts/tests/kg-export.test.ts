@@ -34,7 +34,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { buildExport, exportIdentity, publishedDocument, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { legacyFragmentIri, subjectPathOf } from "../lib/subject-iri.ts";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
@@ -745,6 +746,29 @@ describe("every self-URL the export publishes resolves to something published", 
     for (const f of readdirSync(toolDir, { withFileTypes: true })) if (f.isDirectory()) out.add(`tools/${f.name}.jsonld`);
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
+    // Each subject's page and document (#603), which the deploy's kg-export
+    // writes beside the host's document and `instance-exports.ts` beside each
+    // planned instance's. Read from what `writeSubjectDocuments` WRITES, not
+    // from the nodes, for the depiction's reason: an `@id` naming a file the
+    // writer does not produce must fail here. Pages serves `<x>.html` at `<x>`.
+    const site = mkdtempSync(join(tmpdir(), "kg-subjects-"));
+    try {
+      const write = (doc: Record<string, unknown>, at: string) => {
+        for (const f of writeSubjectDocuments(doc, join(site, at))) {
+          const rel = relative(site, f).split("\\").join("/");
+          out.add(rel);
+          if (rel.endsWith("/index.html")) out.add(rel.slice(0, -"index.html".length));
+          else if (rel.endsWith(".html")) out.add(rel.slice(0, -".html".length));
+        }
+      };
+      write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, `${stub}.jsonld`);
+      for (const p of instanceExportPlan()) {
+        const e = OWNER_DOCS.get(resolve(REPO, p.path));
+        if (e !== undefined) write(publishedDocument(e) as Record<string, unknown>, `${p.stub}/${p.stub}.jsonld`);
+      }
+    } finally {
+      rmSync(site, { recursive: true, force: true });
+    }
     return out;
   }
 
@@ -863,7 +887,7 @@ describe("a Role comes from the registry; a lane is a Lane that binds one", () =
     expect(binding.length).toBeGreaterThanOrEqual(1);
     expect(log.bindsLane).toBeUndefined();
     expect(log.hasSkill).toContain(
-      EXPORT["@graph"].find((n) => String(n["@id"]).endsWith("#skill/activity-log"))!["@id"],
+      EXPORT["@graph"].find((n) => String(n["@id"]).endsWith("/skill/activity-log"))!["@id"],
     );
   });
 
@@ -895,7 +919,8 @@ const D3 = await (async () => {
   const SKOS = "http://www.w3.org/2004/02/skos/core#";
   const LABEL = "http://www.w3.org/2000/01/rdf-schema#label";
   const TITLE = "http://purl.org/dc/terms/title";
-  const roleIri = (id: string) => id.includes("#role/");
+  // A role is a subject, so a path: `<doc dir>/role/<id>` (#603).
+  const roleIri = (id: string) => /^[^#]*\/role\/[^/#]+$/.test(id);
   const glossary = buildGlossary({ today: () => "2026-10-02" }).doc;
   const kgRoles = EXPORT["@graph"].filter((n) => roleIri(String(n["@id"])));
   const glossaryRoles = (glossary["@graph"] as Array<Record<string, unknown>>).filter((n) => roleIri(String(n["@id"])));
@@ -1057,7 +1082,7 @@ describe("a package's id is declared, not derived from its path", () => {
     // bootstrap would notice.
     for (const p of packages()) {
       if (p["hasManifest"] !== true) continue;
-      const id = String(p["@id"]).split("#package/")[1];
+      const id = String(p["@id"]).split("/package/")[1];
       expect(id, `package at ${String(p["path"])}`).toBe(String(p["name"]));
     }
   });
@@ -1141,8 +1166,8 @@ describe("exporting ANOTHER instance's graph", () => {
       .filter((d) => d !== own);
     for (const n of e["@graph"] as Array<Record<string, unknown>>) {
       for (const s of (n.satisfies ?? []) as string[]) {
-        if (s.startsWith(`${own}#`)) continue;
-        expect({ s, home: homes.some((h) => s.startsWith(`${h}#`)) }).toEqual({ s, home: true });
+        if (subjectPathOf(s, own) !== undefined) continue;
+        expect({ s, home: homes.some((h) => subjectPathOf(s, h) !== undefined) }).toEqual({ s, home: true });
       }
     }
   });
@@ -1345,7 +1370,7 @@ describe("DMN decisions are nodes, linked to their gateways and to DMN 1.3", () 
         ),
       );
     expect(declared.length).toBeGreaterThan(0);
-    const emitted = decisions.map((n) => String(n["@id"]).split("#decision/")[1]);
+    const emitted = decisions.map((n) => String(n["@id"]).split("/decision/")[1]);
     for (const d of declared) expect(emitted).toContain(d);
     for (const n of decisions) {
       expect(n.conformsTo as string[]).toContain(dmn13);
@@ -1363,7 +1388,7 @@ describe("DMN decisions are nodes, linked to their gateways and to DMN 1.3", () 
       // The link names the same table the authored ref does.
       const [file, id] = String(g.decisionRef).split("#");
       const stem = file!.split("/").pop()!.replace(/\.dmn$/, "");
-      expect(String(g.decidedBy).endsWith(`#decision/${stem}/${id}`)).toBe(true);
+      expect(String(g.decidedBy).endsWith(`/decision/${stem}/${id}`)).toBe(true);
     }
   });
 
@@ -1443,7 +1468,12 @@ for (const r of instanceRootsIn(REPO)) {
 describe("the published graph is this instance's own (bean 4ak5 item 2)", () => {
   const HOST = resolve(join(HARNESS_ROOT));
   const graph = EXPORT_CANONICAL["@graph"] as Array<Record<string, unknown>>;
-  const tombstones = graph.filter(isTombstone);
+  const DOC = String(EXPORT_CANONICAL["@id"]);
+  // #603's tombstones (a subject's old fragment, `sameAs` its path) are the
+  // ones whose replacement is in THIS graph under that very fragment; the
+  // rest are this block's: nodes that moved to their owner's document.
+  const migrated = (t: Record<string, unknown>): boolean => legacyFragmentIri(String(t.isReplacedBy), DOC) === t["@id"];
+  const tombstones = graph.filter((n) => isTombstone(n) && !migrated(n));
 
   test("no node's source path is outside this instance", () => {
     const outside: string[] = [];
@@ -1465,7 +1495,13 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
     // `tombstonesFor` re-running it fails here rather than leaving an `@id`
     // with no forwarding address.
     const here = new Set(graph.filter((n) => !isTombstone(n)).map((n) => String(n["@id"])));
-    const moved = (EXPORT_CHECKOUT["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"]).filter((id) => !here.has(id));
+    // A moved node's tombstone is named by the FRAGMENT the last release
+    // published (#603), not by the path it would have had here.
+    const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>)
+      .filter((n) => !isTombstone(n))
+      .map((n) => String(n["@id"]))
+      .filter((id) => !here.has(id))
+      .map((id) => legacyFragmentIri(id, DOC) ?? id);
     expect(moved.length).toBeGreaterThan(0);
     const stones = new Set(tombstones.map((n) => String(n["@id"])));
     expect(moved.filter((id) => !stones.has(id))).toEqual([]);
@@ -1474,10 +1510,16 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
   });
 
   test("a tombstone is exactly the ruling's shape, and the context maps it to OWL and Dublin Core", () => {
-    for (const t of tombstones) expect(Object.keys(t).sort()).toEqual(["@id", "deprecated", "isReplacedBy"]);
+    // `sameAs` too when the owner holds the SAME node (#603); a node forwarded
+    // to a document, which holds no node for it, gets none.
+    for (const t of tombstones) {
+      expect(Object.keys(t).sort()).toEqual(t.sameAs === undefined ? ["@id", "deprecated", "isReplacedBy"] : ["@id", "deprecated", "isReplacedBy", "sameAs"]);
+      if (t.sameAs !== undefined) expect(t.sameAs).toBe(t.isReplacedBy as string);
+    }
     const ctx = EXPORT_CANONICAL["@context"] as Record<string, Record<string, string>>;
     expect(ctx.deprecated!["@id"]).toBe("http://www.w3.org/2002/07/owl#deprecated");
     expect(ctx.isReplacedBy).toEqual({ "@id": "http://purl.org/dc/terms/isReplacedBy", "@type": "@id" });
+    expect(ctx.sameAs).toEqual({ "@id": "http://www.w3.org/2002/07/owl#sameAs", "@type": "@id" });
   });
 
   test("every tombstone forwards to a node its owner's PUBLISHED document holds", () => {
@@ -1491,13 +1533,30 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
     const lost: string[] = [];
     for (const t of tombstones) {
       const to = String(t.isReplacedBy);
-      const doc = to.split("#")[0]!;
-      const held = OWNER_EXPORTS.get(doc);
-      const stub = stubOf.get(doc);
+      // The owner document: `to` itself, or the one whose subject `to` is.
+      const doc = OWNER_EXPORTS.has(to) ? to : [...OWNER_EXPORTS.keys()].find((d) => subjectPathOf(to, d) !== undefined);
+      const held = doc === undefined ? undefined : OWNER_EXPORTS.get(doc);
+      const stub = doc === undefined ? undefined : stubOf.get(doc);
       const ok = held !== undefined && stub !== undefined && published.has(stub) && (to === doc || held.has(to));
       if (!ok) lost.push(`${String(t["@id"])} → ${to}`);
     }
     expect(lost).toEqual([]);
+  });
+
+  test("every subject keeps its pre-#603 fragment as a one-release tombstone, sameAs its path", () => {
+    const subjects = graph.filter((n) => !isTombstone(n) && subjectPathOf(String(n["@id"]), DOC) !== undefined);
+    expect(subjects.length).toBeGreaterThan(1000);
+    const stones = new Map(graph.filter(isTombstone).map((t) => [String(t["@id"]), t]));
+    const missing: string[] = [];
+    for (const n of subjects) {
+      const id = String(n["@id"]);
+      const old = legacyFragmentIri(id, DOC)!;
+      expect(old.startsWith(`${DOC}#`)).toBe(true);
+      const t = stones.get(old);
+      if (t === undefined) missing.push(old);
+      else expect(t).toEqual({ "@id": old, deprecated: true, isReplacedBy: id, sameAs: id });
+    }
+    expect(missing).toEqual([]);
   });
 
   // Reads other instances' exports, so it runs only where those instances

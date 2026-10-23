@@ -3950,6 +3950,7 @@ export function writeSubjectDocuments(published: Record<string, unknown>, out: s
   const written: string[] = [];
   if (subjects.length === 0) return written;
   const contextFile = out.replace(/\.jsonld$/, "") + ".context.jsonld";
+  mkdirSync(dir, { recursive: true });
   writeFileSync(contextFile, JSON.stringify({ "@context": published["@context"] }, null, 2) + "\n");
   written.push(contextFile);
   const contextName = basename(contextFile);

@@ -58,6 +58,27 @@ export const SUBJECT_KINDS: readonly string[] = [
 
 const KINDS = new Set(SUBJECT_KINDS);
 
+/**
+ * Stubs whose document is still published by a generator that mints
+ * `#fragment` subjects — bootstrap's, by bootstrap-tools' `export-graph.ts`
+ * (`instance-exports.ts` `PUBLISHED_ELSEWHERE`), until its own phase of #603.
+ *
+ * A link INTO such a document has to name what that document holds, so
+ * {@link subjectIri} keeps the old form for it: `kg-export` links a Tool to
+ * `bootstrap.jsonld#skill/<id>`, and `glossary-export` mints bootstrap's
+ * concepts the same way. Remove the entry in the PR that moves its publisher
+ * to paths. `subject-iri.test.ts` holds it to `PUBLISHED_ELSEWHERE`.
+ */
+export const FRAGMENT_DOCUMENT_STUBS: readonly string[] = ["bootstrap"];
+
+const FRAGMENT_STUBS = new Set(FRAGMENT_DOCUMENT_STUBS);
+
+/** Is `docIri` a document whose subjects are still `#fragment`s ({@link FRAGMENT_DOCUMENT_STUBS})? */
+export function mintsFragments(docIri: string): boolean {
+  const file = docIri.slice(docIri.lastIndexOf("/") + 1);
+  return file.endsWith(".jsonld") && FRAGMENT_STUBS.has(file.slice(0, -".jsonld".length));
+}
+
 /** The segment of a process id that names a sequence flow: `P/flow/F`. */
 export const FLOW_SEGMENT = "flow";
 
@@ -85,7 +106,8 @@ function escapeId(id: string): string {
  * The IRI of subject `<kind>/<id>` in the document `docIri` names.
  *
  * A process flow (`kind` `process`, `id` `P/flow/F`) is the fragment
- * `<doc dir>/process/P#flow/F`; every other id is a path.
+ * `<doc dir>/process/P#flow/F`; every other id is a path. In a document
+ * {@link mintsFragments} names, it is the old `<doc>#<kind>/<id>`.
  *
  * @throws when `kind` is not in {@link SUBJECT_KINDS}
  */
@@ -93,6 +115,7 @@ export function subjectIri(docIri: string, kind: string, id: string): string {
   if (!KINDS.has(kind)) {
     throw new Error(`subjectIri: "${kind}" is not a subject kind — add it to SUBJECT_KINDS (scripts/lib/subject-iri.ts)`);
   }
+  if (mintsFragments(docIri)) return `${docIri}#${kind}/${escapeId(id)}`;
   const base = subjectBase(docIri);
   if (kind === "process") {
     const at = id.indexOf(`/${FLOW_SEGMENT}/`);
@@ -111,6 +134,12 @@ export function subjectIri(docIri: string, kind: string, id: string): string {
  * subjects — the inverse of {@link subjectIri}, still escaped.
  */
 export function subjectPathOf(iri: string, docIri: string): string | undefined {
+  if (mintsFragments(docIri)) {
+    if (!iri.startsWith(`${docIri}#`)) return undefined;
+    const frag = iri.slice(docIri.length + 1);
+    const slash = frag.indexOf("/");
+    return slash > 0 && KINDS.has(frag.slice(0, slash)) ? frag : undefined;
+  }
   const base = subjectBase(docIri);
   if (!iri.startsWith(base) || iri === docIri) return undefined;
   const rest = iri.slice(base.length);
@@ -126,6 +155,7 @@ export function subjectPathOf(iri: string, docIri: string): string | undefined {
  * subject of `docIri`'s document.
  */
 export function legacyFragmentIri(iri: string, docIri: string): string | undefined {
+  if (mintsFragments(docIri)) return undefined;
   const path = subjectPathOf(iri, docIri);
   if (path === undefined) return undefined;
   return `${docIri}#${path.replace(`#${FLOW_SEGMENT}/`, `/${FLOW_SEGMENT}/`)}`;
@@ -137,6 +167,8 @@ export function legacyFragmentIri(iri: string, docIri: string): string | undefin
  * none: it is a fragment of its process's page, so `undefined`.
  */
 export function subjectFileStem(iri: string, docIri: string): string | undefined {
+  // A fragment document's subjects are served by the document itself.
+  if (mintsFragments(docIri)) return undefined;
   const path = subjectPathOf(iri, docIri);
   if (path === undefined || path.includes("#")) return undefined;
   const segments = path.split("/").map((s) => decodeURIComponent(s));

@@ -95,9 +95,11 @@ describe("the real corpus", () => {
   });
 
   test("the @id names where it is actually served", () => {
-    expect(doc["@id"]).toBe("https://litlfred.github.io/folio-assistant/cat-harness.jsonld#directory/fsh-guts");
+    // The declared Subgraph node's own path (#603), whose page and `.jsonld`
+    // kg-export writes beside the instance document.
+    expect(doc["@id"]).toBe("https://litlfred.github.io/folio-assistant/directory/fsh-guts");
     expect(buildFshGutsExport(ROOT, "https://example.invalid/preview")["@id"]).toBe(
-      "https://example.invalid/preview/cat-harness.jsonld#directory/fsh-guts",
+      "https://example.invalid/preview/directory/fsh-guts",
     );
   });
 

@@ -5,6 +5,7 @@
  * graph by source path, NOT from the generator's own plan — a test that reads
  * the membership back from the thing that decided it can only agree with it.
  */
+import { subjectPathOf } from "../lib/subject-iri.ts";
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -75,7 +76,7 @@ const iriOf = (rel: string): string => `${plan.rootIri}${rel}`;
 function expectedSdlc(): Set<string> {
   const out = new Set<string>();
   for (const n of plan.nodes.values()) {
-    if (!n["@id"].startsWith(`${HOST_DOC}#`)) continue;
+    if (subjectPathOf(n["@id"], HOST_DOC) === undefined) continue;
     for (const k of ["instructionsPath", "module", "sourcePath", "path"]) {
       const v = n[k];
       if (typeof v !== "string" || v.length === 0) continue;

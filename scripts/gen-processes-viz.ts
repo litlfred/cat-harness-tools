@@ -105,6 +105,7 @@ import {
   type PanelTask,
 } from "./lib/task-panel.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
+import { subjectHref } from "./lib/subject-pages.ts";
 import { methodologyNodes } from "./check-methodology-evidence.js";
 import { instanceOf, pageRelPath as methodologiesPageRel } from "./gen-methodologies-viz.js";
 import { declaredRoute } from "./viewer-declarations.js";
@@ -529,6 +530,12 @@ export interface PanelContext {
   methodologyHref: (name: string) => string | undefined;
   roleHref: (roleId: string) => string | undefined;
   roleTitle: (roleId: string) => string | undefined;
+  /**
+   * A subject's own page — `<doc dir>/process/P`, `…/node/T`, `…/lane/L` —
+   * for the subject `<kind>/<id>` declared by the repo-relative `file`
+   * (`lib/subject-pages.ts`, #603). Undefined where no page is published.
+   */
+  subjectHref: (file: string, kind: string, id: string) => string | undefined;
   /** skill → its `uses-methodology`, when its front matter says it. */
   usesMethodology: (skill: string) => readonly string[] | undefined;
 }
@@ -542,8 +549,11 @@ export interface PanelContext {
  *   pages of cat-harness-tools #422, from the declared `methodologies-viewer`
  *   route and the methodology graph's own nodes — a name no node declares
  *   gets no link;
- * - roles: the row on the auto-docs Roles index, from the declared
- *   `auto-docs-viewer` route and the `roles.json` that declares the role.
+ * - roles: the Role's own page, its subject IRI `<doc dir>/role/<id>`
+ *   (#603), where its instance's graph publishes one; else the row on the
+ *   auto-docs Roles index, from the declared `auto-docs-viewer` route and
+ *   the `roles.json` that declares the role;
+ * - steps, lanes and processes: their own pages, `<doc dir>/process/P…` (#603).
  */
 export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skillPagesOf(repo)): PanelContext {
   const root = up(repo);
@@ -558,11 +568,11 @@ export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skil
     // No methodology graph declared: every methodology stays code.
   }
   const autoDocs = declaredRoute(harness, "auto-docs-viewer");
-  const roleAt = new Map<string, { path: string; title: string }>();
+  const roleAt = new Map<string, { path: string; title: string; kg: string }>();
   for (const inst of instanceRoots(repo)) {
     for (const kg of kgRoots(inst)) {
       for (const r of readRoleGraph(kg)?.roles ?? []) {
-        if (!roleAt.has(r.id)) roleAt.set(r.id, { path: `${relative(repo, kg).split("\\").join("/")}/roles.json#${r.id}`, title: r.title });
+        if (!roleAt.has(r.id)) roleAt.set(r.id, { path: `${relative(repo, kg).split("\\").join("/")}/roles.json#${r.id}`, title: r.title, kg });
       }
     }
   }
@@ -575,8 +585,13 @@ export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skil
     },
     roleHref: (id) => {
       const at = roleAt.get(id);
-      return at && autoDocs ? `${root}${autoDocs}/index/roles/index.html#${autoDocsRowId(at.path)}` : undefined;
+      if (at === undefined) return undefined;
+      return (
+        subjectHref(join(at.kg, "roles.json"), "role", id) ??
+        (autoDocs ? `${root}${autoDocs}/index/roles/index.html#${autoDocsRowId(at.path)}` : undefined)
+      );
     },
+    subjectHref: (file, kind, id) => subjectHref(join(repo, file), kind, id),
     roleTitle: (id) => roleAt.get(id)?.title,
     usesMethodology: (s) => edges.get(s)?.usesMethodology,
   };
@@ -596,16 +611,30 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
     const lane = laneByName.get(st.lane);
     const roleId = lane?.roleId;
     const called = st.calledElement ? byId.get(st.calledElement) : undefined;
+    const href = ctx.subjectHref(row.file, "process", `${row.id}/node/${st.id}`);
+    const laneHref = lane ? ctx.subjectHref(row.file, "process", `${row.id}/lane/${lane.id}`) : undefined;
     tasks[st.id] = {
       id: st.id,
       name: st.name,
       type: st.type,
+      ...(href ? { href } : {}),
       ...(st.lane ? { lane: st.lane } : {}),
+      ...(laneHref ? { laneHref } : {}),
       skills: st.skills.map((s) => {
         const ms = ctx.usesMethodology(s);
         return { ...link(s, ctx.skillHref(s)), ...(ms ? { methodologies: ms.map((m) => link(m, ctx.methodologyHref(m))) } : {}) };
       }),
-      ...(st.calledElement ? { calls: called ? { name: called.name, href: `${called.stem}.html` } : { name: st.calledElement } } : {}),
+      ...(st.calledElement
+        ? {
+            calls: called
+              ? {
+                  name: called.name,
+                  href: ctx.subjectHref(called.file, "process", called.id) ?? `${called.stem}.html`,
+                  diagram: `${called.stem}.html`,
+                }
+              : { name: st.calledElement },
+          }
+        : {}),
       ...(st.globalTask ? { shared: st.globalTask } : {}),
       ...(roleId
         ? {
@@ -620,7 +649,8 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
           : {}),
     };
   }
-  return { $schema: "process-task-panel/v1", process: row.id, tasks };
+  const processHref = ctx.subjectHref(row.file, "process", row.id);
+  return { $schema: "process-task-panel/v1", process: row.id, ...(processHref ? { processHref } : {}), tasks };
 }
 
 /** skill → the diagrams that run it. The join nothing else exposes. */

@@ -134,6 +134,7 @@ import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGr
 import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
 import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
+import { legacyFragmentIri } from "./lib/subject-iri.ts";
 import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/code-list.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
@@ -471,8 +472,16 @@ export function buildGlossary(opts: {
   // `"glossary/usage"` kind also reads as a directory path to
   // `check:declared-paths`, which flagged it: a literal that looks like a path
   // and names nothing that resolves is exactly what that gate is for.
-  const usageIri = (l: LaneOccurrence): string =>
-    makeIri(id.docIri, "glossary-usage", `${l.processId}/${l.laneId}`);
+  //
+  // A usage is a node of the SKOS glossary, and the glossary keeps `#`
+  // (#603: vocabularies and the glossary are the exception to path IRIs), so
+  // it keeps the fragment it always had — `legacyFragmentIri` of the one
+  // minter's answer, never a second spelling. The concepts it links (roles,
+  // lanes) are graph subjects and take paths.
+  const usageIri = (l: LaneOccurrence): string => {
+    const iri = makeIri(id.docIri, "glossary-usage", `${l.processId}/${l.laneId}`);
+    return legacyFragmentIri(iri, id.docIri) ?? iri;
+  };
 
   // Which field becomes which predicate is DECLARED, in the `vocab-mapping`
   // tables under `vocab-mappings/` (bean `k74z`, owner 2026-10-02), and

@@ -19,7 +19,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { declaredSubgraphNode, makeIri } from "../kg-export.ts";
+import { declaredSubgraphNode, exportIdentity, makeIri } from "../kg-export.ts";
+import { legacyFragmentIri } from "../lib/subject-iri.ts";
 import { memberOf, subgraphContainer, subgraphIri, subgraphPublicationFindings } from "../subgraph-node.ts";
 import { buildFshGutsExport } from "../fsh-guts-export.ts";
 import { todoGraphDocument } from "../todo-graph.ts";
@@ -144,7 +145,13 @@ describe("converted publishers follow the declared subgraph pattern", () => {
     ].find(existsSync);
     expect(pagePath).toBeDefined();
     const page = JSON.parse(readFileSync(pagePath!, "utf-8")) as Record<string, unknown>;
-    expect(page["inSubgraph"]).toBe(sub!.iri);
+    // The page is COMMITTED in the content layer, so for the one release the
+    // #603 tombstones cover it may still carry the subgraph's old fragment —
+    // which the export keeps as a tombstone `sameAs` this very IRI. Either
+    // names the declared node; anything else is the defect this test is for.
+    // Drop the legacy arm with the tombstones.
+    const legacy = legacyFragmentIri(sub!.iri, exportIdentity({ instanceRoot: sub!.declared.instanceRoot }).docIri);
+    expect([sub!.iri, legacy]).toContain(page["inSubgraph"] as string);
   });
 
   test("authoring registries: roles.json is an authoring registry projected into KG export, not a standalone published subgraph document", () => {
