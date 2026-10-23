@@ -83,7 +83,7 @@
 #
 # Draft PRs (owner, 2026-10-23, "1y"; bean `dft1`): with `draft-fast-tier:
 # true`, a DRAFT pull request runs the fast tier only. prepare-head mounts the
-# PR side and typechecks; prepare-base, the shards and the index's own gates are
+# PR side and typechecks, without derive:publish or Chromium; prepare-base, the shards and the index's own gates are
 # skipped; and `compare` passes or fails on the typecheck alone, saying "draft:
 # full tier skipped" in its summary. The full tier runs when the PR is not a
 # draft. The input is off by default. A caller turns it on only together with
@@ -530,7 +530,9 @@ jobs:
         run: bun install
       - &chromium
         name: Install Chromium, for the checks that draw through a browser
-        if: steps.skip-prep.outputs.hit != 'true'
+        # Not on a draft under `draft-fast-tier`: only derive:publish and the
+        # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -598,7 +600,10 @@ jobs:
             ../ci/.github/scripts/layer-pr-checks/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
-        if: steps.skip-prep.outputs.hit != 'true'
+        # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
+        # only the tests and gates read these pages, and a draft runs neither.
+        # The typecheck does not read them. A ready_for_review run builds them.
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
