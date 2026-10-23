@@ -15,6 +15,7 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 import { workflowFile } from "../../scripts/known-skills.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { WORK_PLAN_OPS } from "../../src/workflow/bean-link.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -54,9 +55,11 @@ describe("the diagrams declare which operation each step performs", () => {
         // marked as touching the plan whose op is absent would silently do
         // nothing, and `toContain(undefined)` would not say so clearly.
         expect(n.workPlanOp).toBeDefined();
-        expect(["claim", "note", "resolve"]).toContain(n.workPlanOp!);
+        expect([...WORK_PLAN_OPS]).toContain(n.workPlanOp!);
       }
     }
-    expect(marked).toBe(11);
+    // 12 since folio-assistant-core#149 ended draft-to-publication with an
+    // archive step (bean m8gz).
+    expect(marked).toBe(12);
   });
 });
