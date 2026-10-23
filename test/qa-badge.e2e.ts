@@ -84,8 +84,19 @@ const NO_ROW = "see-also.block";
 const KG = "editing-and-the-hci-validation-gate.kg";
 
 const PAGE_URL = "http://qa.test/page.html";
+/**
+ * What a page's verdict index is called. The URL read off the markup must end
+ * in it: the route below answers that URL with `INDEX_BODY`, so a page that
+ * named some other file would leave the badges painting from nothing. It is
+ * also the QA-doc name `e2e-corpus-coupling.test.ts` recognises this spec by.
+ */
+const INDEX_FILE = "qa-index.json";
 /** The index the page's own badges fetch, read off the markup (`indexUrlOf`). */
-const INDEX_URL = indexUrlOf(badgeRunFor(PAGE_MD, LOUD));
+const INDEX_URL = (() => {
+  const url = indexUrlOf(badgeRunFor(PAGE_MD, LOUD));
+  if (!url.endsWith(`/${INDEX_FILE}`)) throw new Error(`the page's badges fetch \`${url}\`, not a \`${INDEX_FILE}\``);
+  return url;
+})();
 
 /** The verdicts this spec asserts on, set here rather than read off disk. */
 const INDEX_BODY = indexWithRows(INDEX_JSON, {
