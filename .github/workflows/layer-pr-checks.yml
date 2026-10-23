@@ -467,7 +467,9 @@ jobs:
           skip=false
           if git -C src rev-parse -q --verify 'HEAD^2' >/dev/null; then
             changed="$(git -C src diff --name-only 'HEAD^1' HEAD)"
-            if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Evq '(^|/)index\.(lock|config)\.json$'; then
+            # A here-string, not `printf | grep -q`: with pipefail, grep -q exiting early
+            # SIGPIPEs printf on a long list, and the `!` read that as "pins only" (#661).
+            if [ -n "$changed" ] && ! grep -Eqv '(^|/)index\.(lock|config)\.json$' <<<"$changed"; then
               skip=true
               echo "only the caller's own pins changed:"; echo "$changed"
             fi
