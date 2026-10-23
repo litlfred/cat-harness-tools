@@ -6,7 +6,7 @@ status: in-progress
 type: task
 priority: critical
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-23T07:52:00Z
+updated_at: 2026-10-23T08:26:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -140,3 +140,11 @@ This bean stays in-progress until B's `--prior-from` writers land, together with
 - **Open:** #563 (translation:block-qa:check) and #568.
 
 Stays in-progress until #563 and #568 land.
+
+
+*2026-10-23T08:26:00Z* — All three code parts of the third Done-when are merged to cat-harness-tools main:
+- #563 (`translation:block-qa:check` priors read from the store), 05fa7f1
+- #564 (`qa-staleness --against`), 67240eb
+- #568 (`--prior-from` on every block writer), 3db526d
+
+**Still open:** the MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`, routed to lane C. The index also has to re-pin to these mains, which lane C does via folio-assistant#2628. Stays in-progress until the wrapper lands.
