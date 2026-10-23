@@ -193,7 +193,9 @@ describe("classify", () => {
     // forbid it. `docs/process/publication-workflow.md` was one of the 2 refusals that
     // blocked #1888 after 53 of its 55 conflicts had resolved.
     const pages = generatedDocsPages();
-    expect(pages.length).toBeGreaterThanOrEqual(17);
+    // 10 since moves M6–M8 (cat-harness#445) took seven pages up to the
+    // layers whose processes they show. A floor, so an empty walk still fails.
+    expect(pages.length).toBeGreaterThanOrEqual(10);
     // Deriving the subjects from the tree is the point: a page added to
     // `docs/source/` lands here and fails until the glob names its slug.
     const unmatched = pages.filter((p) => classify(p).pattern?.id !== "docs-pages");
