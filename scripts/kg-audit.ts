@@ -67,7 +67,7 @@ import { readSchemaGraph } from "./schema-graph.js";
 import { checkTools, unresolvedPaths } from "./check-tools.js";
 import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
 import { tools, toolsOf } from "../tools/discover.js";
-import { kgDirectories, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
+import { kgDirectories, kgRoots, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { baseDocsDir, docsLayers } from "./compose-docs.js";
 import { PAIR_CRITERION, discoverPairs, evaluatePairsFrom, readAttestations, type PairAttestation } from "./prose-code-pairs.js";
 import { VOICE_REVIEW_CRITERION, evaluateVoiceReviewsFrom, readVoiceReviews, skillVoices, type VoiceReview } from "./skill-voice-review.js";
@@ -128,7 +128,7 @@ import {
   type RoleGraph,
   type LoadedActor,
 } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { ANYONE, ODRL_ACTIONS, readPolicies, readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
+import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
@@ -145,7 +145,7 @@ import {
   remotePackageSkills,
 } from "./known-skills.js";
 import { LOCAL_PACKAGES } from "./skill-packages.js";
-import { repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
 import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -153,7 +153,13 @@ import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
 import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
-import { checkoutActors, checkoutRoleGraph, neededActors } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import {
+  checkoutActors,
+  checkoutPolicies,
+  checkoutRoleGraph,
+  neededActors,
+  neededPolicies,
+} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
@@ -1528,7 +1534,10 @@ function auditRoles(
       if (lane.roleRef) explicitRefs.add(lane.roleRef);
     }
   }
-  const declared = new Set(graph.roles.map((r) => r.id));
+  // A role may inherit one that an instance it `needs` declares — `readRoleGraph`
+  // accepts that parent through `needs` — so a parent resolves against the same
+  // closure a lane's role ref does, not against this instance's own roles alone.
+  const declared = new Set([...graph.roles.map((r) => r.id), ...resolvableRoleIds]);
   // `tested-by:` on every skill a role may carry — this instance's and every
   // instance it `needs`, the reach `resolvableSkills` has — for
   // `mechanical-role-untested`.
@@ -2353,7 +2362,12 @@ function auditGraph(
     }
   }
 
-  const declaredPerms = new Set((readPermissions(KG_ROOT)?.permissions ?? []).map((p) => p.id));
+  // The folio ODRL profile is declared once, by the platform: an instance that
+  // declares none of its own (one whose actors' grants live in its own
+  // policies/) names the profile's actions, as `core/access.ts` reads them.
+  const vocabulary =
+    readPermissions(KG_ROOT) ?? kgRoots(root).map((r) => readPermissions(r)).find((v) => v !== undefined);
+  const declaredPerms = new Set((vocabulary?.permissions ?? []).map((p) => p.id));
   const badPerms: KgFinding[] = [];
   // The ODRL side (issue #1180): every rule's action is declared (or ODRL's
   // own), and every assignee is an actor or `folio:anyone`. A rule naming an
@@ -2719,12 +2733,18 @@ const refUnjudgeable = (ref: string): boolean =>
 // every instance it needs, and its own. Reading the platform's alone reported
 // a downstream's own actors (the IHE ITI VHL Sharer, Receiver) as undeclared
 // on every requirement and role that names them.
+//
+// Their grants come from the same layers' `policies/`: an actor a dependent
+// adds keeps its ODRL grants in that dependent's own policies, beside it.
+const PLATFORM_ROOT = ACTOR_DIR ? findInstanceRoot(ACTOR_DIR) : undefined;
+// declared-path-literal: the convention fallback, at the call site, as POLICY_DIR.
+const PLATFORM_POLICY_DIR = PLATFORM_ROOT ? ownDirectoryById(PLATFORM_ROOT, "policies", "policies") : POLICY_DIR;
 const actors =
   corpusScopeFor(root) === "checkout"
-    ? checkoutActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
+    ? checkoutActors(root, ACTOR_DIR, policyGrants(checkoutPolicies(root, POLICY_DIR)))
     : INSTANCE_RUN
-      ? neededActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
-      : readActors(ACTOR_DIR, readPolicyGrants(POLICY_DIR));
+      ? neededActors(root, ACTOR_DIR, policyGrants(neededPolicies(root, PLATFORM_POLICY_DIR)))
+      : readActors(ACTOR_DIR, policyGrants(readPolicies(POLICY_DIR)));
 
 let graph: RoleGraph | undefined;
 let graphError: string | undefined;
