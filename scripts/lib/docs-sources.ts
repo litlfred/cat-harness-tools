@@ -45,6 +45,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn, docsSourceDirFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteNodeSitePath } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { checkoutDependentsOf } from "@litlfred/cat-harness/schemas/harness-config.ts";
 
 /** One declared docs source: where its pages are authored and where they render. */
@@ -161,6 +162,36 @@ export function docsSources(
  */
 export function qualifiedKey(src: DocsSource, key: string): string {
   return src.base ? key : `${src.instance}/${key}`;
+}
+
+/**
+ * Where a page's site JSON-LD (or one of its nodes') is published,
+ * SITE-relative, which is also its `@id` against the site base:
+ * `site/<slug>[/nodes/<id>].jsonld`, under `<instance>/` for a source above
+ * the base, because that source is composed into the site under its
+ * instance's name. `gen-site-jsonld.ts` writes it at this address, so
+ * anything that links a node (a todo's `target`) asks here rather than
+ * prefixing `site/` to a qualified key — which named
+ * `site/<instance>/<slug>/…`, a file nothing publishes.
+ */
+export function sourceSiteNodePath(src: DocsSource, slug: string, nodeId?: string): string {
+  return `${src.base ? "" : `${src.instance}/`}${siteNodeSitePath(slug, nodeId)}`;
+}
+
+/**
+ * A page named by its QUALIFIED key ({@link qualifiedKey}), resolved to the
+ * source that holds it: its site-relative node path
+ * ({@link sourceSiteNodePath}) and the file `gen-site-jsonld.ts` writes it
+ * to. A key is a source's above the base when it starts with that instance's
+ * name and the source holds the page; otherwise it is the base's.
+ */
+export function siteNodeOf(sources: readonly DocsSource[], key: string, nodeId?: string): { sitePath: string; file: string } {
+  const holds = (src: DocsSource, slug: string): boolean => existsSync(join(src.srcDir, slug.replace(/\//g, "-")));
+  const src = sources.find((s) => !s.base && key.startsWith(`${s.instance}/`) && holds(s, key.slice(s.instance.length + 1)))
+    ?? sources.find((s) => s.base);
+  if (src === undefined) return { sitePath: siteNodeSitePath(key, nodeId), file: siteNodeSitePath(key, nodeId) };
+  const slug = src.base ? key : key.slice(src.instance.length + 1);
+  return { sitePath: sourceSiteNodePath(src, slug, nodeId), file: join(src.outDir, siteNodeSitePath(slug, nodeId)) };
 }
 
 const warned = new Set<string>();

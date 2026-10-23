@@ -86,7 +86,8 @@ import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { docsSources, qualifiedKey, type DocsSource } from "./lib/docs-sources.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
@@ -1783,13 +1784,16 @@ function processHierarchy(): Record<string, string[]> {
       console.warn("gen-docs-pages: no instance in this checkout declares a `todos` subgraph — todos.jsonld is published without its container node");
     }
     const subgraph = declared && { iri: declared.iri, contentSource: declared.contentSource };
-    const graph = serialiseJsonld(todoGraphDocument(items, subgraph));
+    // A target on a page of a source above the base is published under that
+    // instance (`gen-site-jsonld.ts`), so its IRI is resolved, not spelled.
+    const targetIri = (page: string, node: string): string => `${DOCS_SITE_BASE}${siteNodeOf(allDocsSources(), page, node).sitePath}`;
+    const graph = serialiseJsonld(todoGraphDocument(items, subgraph, targetIri));
     for (const ext of [".jsonld", ".json"]) {
       emit(join(OUT_DIR, TODO_GRAPH_SITE_PATH.replace(/\.jsonld$/, ext)), graph, "data");
     }
     const wanted = new Set<string>();
     for (const item of items) {
-      const doc = serialiseJsonld(todoDocument(item, subgraph));
+      const doc = serialiseJsonld(todoDocument(item, subgraph, targetIri));
       const asset = join(OUT_DIR, todoSitePath(item.id));
       if (!check) mkdirSync(dirname(asset), { recursive: true });
       for (const ext of [".jsonld", ".json"]) {

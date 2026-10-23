@@ -20,7 +20,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { declaredDocsSources, docsSources, qualifiedKey, warnSamePages } from "../lib/docs-sources.ts";
+import { declaredDocsSources, docsSources, qualifiedKey, siteNodeOf, warnSamePages, type DocsSource } from "../lib/docs-sources.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -186,5 +186,37 @@ describe("the same page in two sources", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("siteNodeOf — where a page's site JSON-LD is published", () => {
+  function sources(): DocsSource[] {
+    const t = tree();
+    const base: DocsSource = { instance: "base", root: join(t, "base"), srcDir: join(t, "base", "docs", "source"), outDir: join(t, "base", "docs"), base: true };
+    const upper: DocsSource = { instance: "upper", root: join(t, "upper"), srcDir: join(t, "upper", "docs", "source"), outDir: join(t, "upper", "docs"), base: false };
+    mkdirSync(join(base.srcDir, "process-x"), { recursive: true });
+    mkdirSync(join(upper.srcDir, "process-y"), { recursive: true });
+    return [base, upper];
+  }
+
+  test("a base page: site/<slug>/nodes/<id>.jsonld, in the base's site directory", () => {
+    const s = sources();
+    expect(siteNodeOf(s, "process/x", "n")).toEqual({
+      sitePath: "site/process/x/nodes/n.jsonld",
+      file: join(s[0]!.outDir, "site/process/x/nodes/n.jsonld"),
+    });
+  });
+
+  test("a page above the base: under its instance, as gen-site-jsonld publishes it — never site/<instance>/…", () => {
+    const s = sources();
+    expect(siteNodeOf(s, qualifiedKey(s[1]!, "process/y"), "n")).toEqual({
+      sitePath: "upper/site/process/y/nodes/n.jsonld",
+      file: join(s[1]!.outDir, "site/process/y/nodes/n.jsonld"),
+    });
+  });
+
+  test("a key that only LOOKS qualified, naming no page of that source, is the base's", () => {
+    const s = sources();
+    expect(siteNodeOf(s, "upper/process/x").sitePath).toBe("site/upper/process/x.jsonld");
   });
 });

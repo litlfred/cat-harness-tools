@@ -152,8 +152,17 @@ function linked(href: string | undefined, identifier: string, type?: string, nam
   };
 }
 
+/**
+ * A site node's IRI from a todo's `target` parts: the page's QUALIFIED key
+ * and the node id. The default suits a page of the base instance; the
+ * generator passes the checkout's answer (`siteNodeOf` in
+ * `lib/docs-sources.ts`), which also places a page of a source above the base
+ * under its instance, where `gen-site-jsonld.ts` publishes it.
+ */
+export type TargetIri = (page: string, node: string) => string;
+
 /** One todo, as a JSON-LD node (no `@context` — the caller wraps it). */
-export function todoNode(item: TodoIndexItem): Record<string, unknown> {
+export function todoNode(item: TodoIndexItem, targetIri: TargetIri = siteNodeIri): Record<string, unknown> {
   const node: Record<string, unknown> = {
     "@id": todoIri(item.id),
     "@type": "Todo",
@@ -171,7 +180,7 @@ export function todoNode(item: TodoIndexItem): Record<string, unknown> {
   // graph onto the site's own base. A label resolving to no block keeps its
   // label and gets no edge — the third state, reported rather than guessed.
   if (item.target !== undefined) {
-    node["target"] = { "@id": siteNodeIri(item.target.page, item.target.node), label: item.target.label };
+    node["target"] = { "@id": targetIri(item.target.page, item.target.node), label: item.target.label };
   } else if (item.targetLabel !== undefined) {
     node["label"] = item.targetLabel;
   }
@@ -192,8 +201,8 @@ export function todoNode(item: TodoIndexItem): Record<string, unknown> {
 }
 
 /** A todo as a member of its declared subgraph: the node plus `inSubgraph`. */
-function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined): Record<string, unknown> {
-  return { ...todoNode(item), ...(subgraph ? memberOf(subgraph.iri) : {}) };
+function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined, targetIri?: TargetIri): Record<string, unknown> {
+  return { ...todoNode(item, targetIri), ...(subgraph ? memberOf(subgraph.iri) : {}) };
 }
 
 /**
@@ -201,8 +210,8 @@ function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined): Re
  * todo says which declared subgraph it is part of — the same node, with the
  * same edges, as inside the whole graph.
  */
-export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph): Record<string, unknown> {
-  return { "@context": TODO_CONTEXT, ...memberNode(item, subgraph) };
+export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph, targetIri?: TargetIri): Record<string, unknown> {
+  return { "@context": TODO_CONTEXT, ...memberNode(item, subgraph, targetIri) };
 }
 
 /**
@@ -219,7 +228,7 @@ export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph): Reco
  * the bare `@graph`: no container is invented to stand in for the missing
  * declaration.
  */
-export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: TodoSubgraph): Record<string, unknown> {
+export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: TodoSubgraph, targetIri?: TargetIri): Record<string, unknown> {
   return {
     "@context": TODO_CONTEXT,
     ...(subgraph
@@ -234,7 +243,7 @@ export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: To
           ...(subgraph.contentSource ? { contentSource: subgraph.contentSource } : {}),
         })
       : {}),
-    "@graph": items.map((i) => memberNode(i, subgraph)),
+    "@graph": items.map((i) => memberNode(i, subgraph, targetIri)),
   };
 }
 
