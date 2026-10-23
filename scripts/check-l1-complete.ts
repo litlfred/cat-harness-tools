@@ -73,6 +73,7 @@ import {
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
+import { COVER_FILENAME } from "./library-graph.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
 
 /**
@@ -209,6 +210,8 @@ export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "bloc
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
   "images.json",
+  // The entry's first-page thumbnail, written by `library:covers` (#437).
+  COVER_FILENAME,
   VECTOR_LABELS_FILE,
   VECTOR_FIGURES_FILE,
   "manifest.jsonld",
