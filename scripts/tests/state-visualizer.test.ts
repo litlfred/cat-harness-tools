@@ -44,6 +44,9 @@ import {
   memorySubjectPage,
   drawsInstanceHub,
   perInstanceSubjects,
+  MERGE_REVIEWS_KIND,
+  mergeReviewsPage,
+  mergeReviewsSection,
   VIEWER_TOOL,
 } from "../state-visualizer.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
@@ -583,7 +586,7 @@ describe("orphan dashboards — a page that answers to no declaration", () => {
     // The strongest statement available: ask for the worst case — nothing is
     // wanted — and assert the answer is exactly this generator's own pages,
     // never one of the site's other directories.
-    const dashboards = ["beans", "todos", "qa", "attestations", "health", "issue-marks", "uploads", "swimlane-glossary"].map(visOf);
+    const dashboards = ["beans", "todos", "qa", "attestations", "health", "issue-marks", "merge-reviews", "uploads", "swimlane-glossary"].map(visOf);
     // And the hub at a per-instance visualiser's own route (#294: code and the
     // registry kinds), read from the declaration through the writer's own
     // selection rather than listed, so a new hub is ours without an edit here.
@@ -1326,6 +1329,110 @@ describe("pipeline plugins and editor checkers are registries (cat-harness-tools
       expect(drawsInstanceHub(["editor-checkers"], false, 1)).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("merge reviews (bean w8jq)", () => {
+  const sha = (c: string) => c.repeat(40);
+  const review = (at: string, result: string, flags: unknown[] = []) => ({
+    reviewer: { by: "agent", session: "session_rev", model: "m-1" },
+    author_sessions: ["session_auth"],
+    skill_hash: "h",
+    at,
+    coverage: { files_total: 2, files_reviewed: 2 },
+    result,
+    flags,
+  });
+  const blocking = (id: string, status: string) => ({
+    id,
+    category: "correctness",
+    severity: "major",
+    weight: "blocking",
+    where: "a.ts:1",
+    evidence: "printed 1, expected 2",
+    status,
+  });
+
+  function store(entries: Record<string, string>): string {
+    const dir = mkdtempSync(join(tmpdir(), "merge-reviews-"));
+    for (const [name, body] of Object.entries(entries)) writeFileSync(join(dir, name), body);
+    return dir;
+  }
+
+  test("one row per verdict, newest review first, the pull request linked when the repository is named", () => {
+    const dir = store({
+      [`${sha("a")}.json`]: JSON.stringify({
+        $schema: "merge-review/v1",
+        repository: "o/r",
+        pr: 7,
+        base_sha: sha("b"),
+        head_sha: sha("a"),
+        reviews: [review("2026-10-20T10:00:00Z", "fail", [blocking("f1", "open"), blocking("f2", "resolved")]), review("2026-10-21T10:00:00Z", "fail", [blocking("f1", "open")])],
+      }),
+      [`${sha("c")}.json`]: JSON.stringify({
+        $schema: "merge-review/v1",
+        pr: 9,
+        base_sha: sha("b"),
+        head_sha: sha("c"),
+        reviews: [review("2026-10-22T10:00:00Z", "pass")],
+      }),
+      "manifest.json": "{}",
+    });
+    try {
+      const files = [`${sha("a")}.json`, `${sha("c")}.json`].map((f) => join(dir, f));
+      const html = mergeReviewsSection(files);
+      expect(html).toContain("Verdicts — 2 verdict(s)");
+      expect(html).toContain('<a href="https://github.com/o/r/pull/7">o/r#7</a>');
+      // No repository: the number, never a link to a guessed one.
+      expect(html).toContain("<td>#9</td>");
+      expect(html).not.toContain("/pull/9");
+      expect(html).toContain(`<code>${"a".repeat(12)}</code>`);
+      expect(html).toContain("fail <span class=\"sv-sub\">(+1 earlier)</span>");
+      expect(html).toContain("agent <code>session_rev</code><br>m-1");
+      // The LATEST review's open blocking flags: one, not the earlier review's.
+      expect(html).toContain("<td>2026-10-21T10:00:00Z</td><td>1</td>");
+      // Newest first: the pass of the 22nd before the fail of the 21st.
+      expect(html.indexOf("#9")).toBeLessThan(html.indexOf("o/r#7"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an unreadable or invalid file is listed with its reason, never dropped; a misnamed head is said", () => {
+    const dir = store({
+      "bad.json": "{",
+      "invalid.json": JSON.stringify({ $schema: "merge-review/v1", head_sha: sha("d") }),
+      "renamed.json": JSON.stringify({ $schema: "merge-review/v1", base_sha: sha("b"), head_sha: sha("e"), repository: "<x>", pr: 3 }),
+    });
+    try {
+      const html = mergeReviewsSection(["bad.json", "invalid.json", "renamed.json"].map((f) => join(dir, f)));
+      expect(html).toContain("Verdicts — 1 verdict(s), 2 unreadable");
+      expect(html).toContain("<code>bad.json</code> — not readable JSON");
+      expect(html).toContain("<code>invalid.json</code> — not a valid verdict — base_sha");
+      expect(html).toContain("file is named <code>renamed</code>");
+      expect(html).toContain("no review recorded");
+      // A repository that is not `owner/repo` is not linked, and not echoed raw.
+      expect(html).toContain("<td>#3</td>");
+      expect(html).not.toContain("<x>");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an empty store says none; an unmounted one says unknown, not none", () => {
+    const g = { id: "merge-reviews", path: "merge-reviews/", kinds: [MERGE_REVIEWS_KIND] };
+    const dir = store({ "manifest.json": "{}" });
+    try {
+      const empty = mergeReviewsPage(g, [], dir);
+      expect(empty).toContain("No adversarial review verdict recorded in this store.");
+      expect(empty).toContain("render_with_liquid: false");
+      expect(empty).toContain(GENERATED_BY);
+      const unknown = mergeReviewsPage(g, [], null);
+      expect(unknown).toContain("<strong>unknown</strong>, not none");
+      expect(unknown).not.toContain("No adversarial review verdict");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
