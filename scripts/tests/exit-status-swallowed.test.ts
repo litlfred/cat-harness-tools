@@ -39,6 +39,17 @@ describe("exit-status-swallowed", () => {
     expect(f[0]!.line).toBe(two.split("\n").length);
   });
 
+  test("the first command of an `else` reads the failed `if` condition's status", () => {
+    const body = "if DIR=$(bun x.ts); then\n  DIR=${DIR%/}\nelse\n  rc=$?\n  [ \"$rc\" -eq 3 ] || exit \"$rc\"\nfi";
+    expect(exitStatusSwallowed(step(body), "t.yml")).toEqual([]);
+  });
+
+  test("but a read AFTER another command in the `else` branch is still a finding", () => {
+    const f = exitStatusSwallowed(step("if bun x; then\n  :\nelse\n  bun y\n  rc=$?\nfi"), "t.yml");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.line).toBe(10);
+  });
+
   test("a comment naming `code=$?` is not a read", () => {
     expect(exitStatusSwallowed(step("# then code=$? would be skipped\ncode=0\nbun x || code=$?"), "t.yml")).toEqual([]);
   });

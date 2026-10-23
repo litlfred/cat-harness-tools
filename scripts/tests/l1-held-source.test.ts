@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ENTRY_SIDECARS, checkEntry, heldSources } from "../check-l1-complete.ts";
+import { COVER_FILENAME } from "../library-graph.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -77,5 +78,13 @@ describe("contents", () => {
     const again = checkEntry(dir).requirements.find((r) => r.name === "contents");
     expect(again?.state).toBe("met");
     expect(again?.detail).toContain("1 held source(s) matching their recorded sha256: doc.docx");
+  });
+
+  test("the library:covers thumbnail is a declared entry content (#437)", () => {
+    expect(ENTRY_SIDECARS).toContain(COVER_FILENAME);
+    const dir = entry();
+    writeFileSync(join(dir, COVER_FILENAME), "PNG");
+    const contents = checkEntry(dir).requirements.find((r) => r.name === "contents");
+    expect(contents?.detail ?? "").not.toContain(COVER_FILENAME);
   });
 });

@@ -40,7 +40,7 @@
  *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { join, posix, relative, resolve, sep } from "node:path";
 
 import { baseDocsDir } from "./compose-docs.js";
 import {
@@ -59,7 +59,8 @@ import {
   type ExternalSchema,
 } from "@litlfred/cat-harness/schemas/external-schema.js";
 import { checkoutInstanceRoots, pageParts, visualiserFor, visualiserPageDir, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
@@ -519,7 +520,24 @@ if (import.meta.main) {
   const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const out = join(docsBase, PAGE);
 
-  if (check) {
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"). The page lists every
+  // declared user of every specification in the CHECKOUT (`declaredUsers`
+  // reads the whole corpus, mounts included), so it moves with the index's
+  // pins: a layer above adding one BPMN file made cat-harness's committed page
+  // stale (folio-assistant-core#155). When the instance declares the route
+  // `builtAtPublish` with this script as its writer, `derive:publish` runs it
+  // and `--check` has no committed bytes to compare (the `methodologies:viz`
+  // rule).
+  const builtHere = isBuiltAtPublish(
+    readDeclaration(INSTANCE_ROOT)?.builtAtPublish ?? [],
+    posix.join(siteDirFor(INSTANCE_ROOT), PAGE),
+  );
+
+  if (check && builtHere) {
+    console.log(
+      `✓ external-schemas viewer: ${PAGE} is built at publish (builtAtPublish), not committed — nothing to compare; \`bun run cat external-schemas:viz\` writes it`,
+    );
+  } else if (check) {
     const current = existsSync(out) ? readFileSync(out, "utf-8") : "";
     if (current !== rendered) {
       console.error(

@@ -207,7 +207,7 @@ describe("the guard fires", () => {
     for (const p of [
       "test/results/kg-qa/processes/x.kg-qa.json",
       "docs/source/concepts-harness/overview.fr.translation-qa.json",
-      "test/health/results/repository.health-report.json",
+      "test/health/results/example.health-report.json",
       "docs/assets/qa/page/qa-index.json",
     ]) {
       expect(findCorpusCoupling(`const x = readFileSync("${p}", "utf8");`)).toHaveLength(1);

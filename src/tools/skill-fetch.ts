@@ -10,10 +10,10 @@ const skillCache = new Map<string, { content: string; fetchedAt: number }>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 // Registry of known external skill packages (reference-only, not synced)
-const REFERENCE_PACKAGES: Record<string, { repo: string; ref: string; skills: Record<string, string> }> = {
+export const REFERENCE_PACKAGES: Record<string, { repo: string; ref: string; skills: Record<string, string> }> = {
   "academic-research-skills": {
     repo: "Imbad0202/academic-research-skills",
-    ref: "main",
+    ref: "5a1a5a687602c79c31b1ab8603ebcf8de65a9579",
     skills: {
       "academic-paper-reviewer": "academic-paper-reviewer/SKILL.md",
       "academic-paper-reviewer/quality-rubrics": "academic-paper-reviewer/references/quality_rubrics.md",
