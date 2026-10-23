@@ -214,7 +214,7 @@ describe("a witness under an ABSENT results tree is unknown, not lost (bean `c8u
     const root = join("/", "r");
     const absent = [join(root, "test", "results"), join(root, "test", "health", "results") + "/"];
     expect(underAbsentResults(root, "test/results/kg-qa.manifest.json", absent)).toBe(true);
-    expect(underAbsentResults(root, "test/health/results/repository.health-report.json", absent)).toBe(true);
+    expect(underAbsentResults(root, "test/health/results/example.health-report.json", absent)).toBe(true);
     // A sibling whose name merely STARTS with the directory's is not inside it.
     expect(underAbsentResults(root, "test/results-old/x.json", absent)).toBe(false);
     expect(underAbsentResults(root, "processes/x.bpmn", absent)).toBe(false);

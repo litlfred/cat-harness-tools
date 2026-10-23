@@ -542,16 +542,23 @@ export function beanGateUnmounted(text: string, file: string): WorkflowFinding[]
  * The sanctioned forms are `code=0; cmd || code=$?` (as `merge-guard.yml`
  * does) or a `set +e` earlier in the same body. Detected per `run: |` block:
  * a line that is only `<name>=$?`, with no `set +e` before it in that block.
+ *
+ * Also sanctioned: the read as the FIRST command of an `else` branch. `bash
+ * -e` never stops on a failing `if` condition, and `$?` there is that
+ * condition's status. `if X=$(cmd); then …; else rc=$?; …; fi` is the
+ * index's own `feature-staging.yml` / `docs-site.yml` form (exit 3 means
+ * "declared, not published"), and flagging it held folio-assistant#2628 red
+ * on correct code.
  */
 export function exitStatusSwallowed(text: string, file: string): WorkflowFinding[] {
   const out: WorkflowFinding[] = [];
   const lines = text.split("\n");
-  let block: { indent: number; plusE: boolean } | undefined;
+  let block: { indent: number; plusE: boolean; prev: string } | undefined;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]!;
     const start = /^(\s*)(?:- )?run:\s*[|>][-+]?\s*$/.exec(l);
     if (start !== null) {
-      block = { indent: start[1]!.length, plusE: false };
+      block = { indent: start[1]!.length, plusE: false, prev: "" };
       continue;
     }
     if (block === undefined) continue;
@@ -564,7 +571,9 @@ export function exitStatusSwallowed(text: string, file: string): WorkflowFinding
     if (body.startsWith("#")) continue;
     if (/^set\b.*(?:\s\+[a-zA-Z]*e|\+o\s+errexit)/.test(body)) block.plusE = true;
     const read = /^([A-Za-z_][A-Za-z0-9_]*)=\$\?\s*(?:#.*)?$/.exec(body);
-    if (read === null || block.plusE) continue;
+    const afterElse = /^else\s*(?:#.*)?$/.test(block.prev);
+    block.prev = body;
+    if (read === null || block.plusE || afterElse) continue;
     out.push({
       file,
       line: i + 1,
