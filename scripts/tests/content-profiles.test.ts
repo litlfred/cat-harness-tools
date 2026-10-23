@@ -25,7 +25,7 @@ import {
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { vocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 
 describe("the profile partition", () => {
   test("document and math are disjoint and cover the built-in kinds", () => {
@@ -64,13 +64,17 @@ describe("the profile partition", () => {
     );
   });
 
-  test("`definition` is in the math profile for a reason the type enforces", () => {
+  // The module that types `definition`: the science layer's vocabulary module
+  // since 2026-10-22. Absent when this checkout does not mount that layer.
+  const definitionModule = vocabularies().find((v) => v.schemas.has("definition"))?.module;
+
+  test.skipIf(definitionModule === undefined)("`definition` is in the math profile for a reason the type enforces", () => {
     // DefinitionBlock declares `lean: LeanRef` — REQUIRED, unlike every other
     // kind's optional one. A document folio therefore cannot hold one even in
     // principle, which is the sharpest point of the whole partition. If this
     // ever moves to the document profile, the type has changed and the
     // partition's stated rationale is stale.
-    const src = Bun.file(pathToFileURL(join(HARNESS_ROOT, "schemas", "types.ts"))).text();
+    const src = Bun.file(pathToFileURL(definitionModule!)).text();
     return src.then((text) => {
       const iface = text.slice(text.indexOf("export interface DefinitionBlock"));
       const body = iface.slice(0, iface.indexOf("\n}"));

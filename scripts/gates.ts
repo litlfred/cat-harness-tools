@@ -1574,6 +1574,11 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     reason: "runs over a folio's content tree; the platform carries none",
   },
   {
+    script: "folio:shim:check",
+    kind: "no-folio",
+    reason: "runs over a folio's builders shim; the platform carries no folio, so here it exits 2 (no builders shim here)",
+  },
+  {
     script: "check:upstream-pins",
     kind: "scheduled",
     reason: "`upstream-pins.yml` runs it weekly; pins do not move with a diff",
