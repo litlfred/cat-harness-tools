@@ -8,9 +8,10 @@ priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-22T17:01:31Z
-parent: folio-assistant-zzmr
+updated_at: 2026-10-22T17:10:00Z
 ---
+
+Parent epic (in index store): folio-assistant-zzmr.
 
 **Rehomed 2026-10-10 from `litlfred/folio-assistant-core` bean `folio-assistant-d5f1`** by the owner's ruling (the code this bean changes lives in cat-harness-tools; the core copy stays as a pointer). Body copied verbatim below; history and rulings recorded there remain authoritative up to this date.
 
@@ -359,13 +360,13 @@ The ruling lands in four stages, so no stored narrative is invalid at any point:
       language at `[..., "narrative", j]`, the queue shows `[lang]`, and
       `decide` writes the one entry the reviewer saw. Tests in
       `scripts/tests/narratives.test.ts`, mutation-checked.
-- [ ] **3**: the six slot schemas in cat-harness (`document-image`,
+- [x] **3**: the six slot schemas in cat-harness (`document-image`,
       `block-summary`, `tabular-records`, `vector-figure`,
       `figure-description`, `tabular-csvw`) switch to `NarrativeSlotSchema`,
       and the stored narratives (274 per the count above, across the
       cat-harness, core, sci and who-iris libraries) migrate to lists with
       their source `lang`.
-- [ ] **4**: the single form goes, and `lang` becomes required.
+- [x] **4**: the single form goes, and `lang` becomes required.
 - [ ] then the bean's own work: an agent drafts each configured language, and
       each draft goes to the queue for a person.
 
@@ -379,10 +380,10 @@ slot holds several languages, which entry does a single-text display show?
 The owner chose **"Locale match, else first"**. Stage 3 is therefore split, so
 that no layer's typecheck breaks when the slot types widen:
 
-- [ ] **3a**, cat-harness#396: `narrativeFor(slot, lang?)`. It matches the
+- [x] **3a**, cat-harness#396: `narrativeFor(slot, lang?)`. It matches the
       exact `lang`, then the primary subtag, then falls back to the first
       entry.
-- [ ] **3b**, this repository (`feat/e1lo-readers-slot-aware`):
+- [x] **3b**, this repository (`feat/e1lo-readers-slot-aware`):
   - Counters read every entry: `check-l1-complete` (figures with text,
     images still not-authored, and table detail lines as `lang:state`).
   - The sidecar parse check uses `NarrativeSlotSchema`, so a valid list is
@@ -392,10 +393,10 @@ that no layer's typecheck breaks when the slot types widen:
   - Still to do: folio-assistant-core `scripts/lsi-blocks.ts:88`
     (`block.narrative?.text`). It is another repository, handed to the
     coordinator.
-- [ ] **3c**, cat-harness: the six slot schemas switch to
+- [x] **3c**, cat-harness: the six slot schemas switch to
       `NarrativeSlotSchema`, and `block-summary` / `figure-description`
       read through it.
-- [ ] **3d**: the 274 stored narratives migrate to lists with their source
+- [x] **3d**: the 274 stored narratives migrate to lists with their source
       `lang`, in four content repositories.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.

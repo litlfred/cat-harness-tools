@@ -68,10 +68,10 @@ existence"* — this says where that artefact is served from.
 
 ## Done when
 
-- [ ] `enabled` is a declared field with a default of enabled, and a disabled
+- [x] `enabled` is a declared field with a default of enabled, and a disabled
       instance is a declaration rather than an absence
-- [ ] The three questions above are answered by the owner
-- [ ] One resolver composes an instance's published URL, and every consumer
+- [x] The three questions above are answered by the owner
+- [x] One resolver composes an instance's published URL, and every consumer
       goes through it — no site path composed by hand
 - [ ] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
       under its own segment, and a test asserts the layout for at least two
@@ -139,10 +139,10 @@ links:
 
 - [x] The URL segment is the instance's `name` — ruled
 - [x] The declared graph is a path segment rather than elided — ruled
-- [ ] The root instance's exception is chosen (1 or 2 above)
-- [ ] `enabled` is a declared field defaulting to enabled, so "not rendered"
+- [x] The root instance's exception is chosen (1 or 2 above)
+- [x] `enabled` is a declared field defaulting to enabled, so "not rendered"
       is a declaration and not an absence
-- [ ] One resolver composes an instance's published URL and every consumer
+- [x] One resolver composes an instance's published URL and every consumer
       goes through it
 - [ ] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
       under its own segment, with a test asserting the layout for at least two

@@ -72,12 +72,12 @@ with that package"). This repository supplies the mechanism: the KaTeX
 dependency, the macro channel, and a link slot on a block.
 
 ### Proposed done-when (for option 1 below)
-- [ ] a paper block renders its math with KaTeX using the folio's notation
+- [x] a paper block renders its math with KaTeX using the folio's notation
       macros, pinned by a rendered-output test on a qou block that uses a macro
-- [ ] a block with a Lean counterpart links to the declaration, and a block
+- [x] a block with a Lean counterpart links to the declaration, and a block
       whose declaration is missing is reported, never silently unlinked
-- [ ] every paper block kind qou uses renders: an inventory is measured first
-- [ ] qou's HTML comes from the harness rendering, and its `build.yml` no
+- [x] every paper block kind qou uses renders: an inventory is measured first
+- [x] qou's HTML comes from the harness rendering, and its `build.yml` no
       longer needs `publish.yml@0fba270` for HTML
 
 ## Owner decision
@@ -126,13 +126,13 @@ The scoping above searched `src/`, `scripts/` and `pipeline/` and missed
 
 So, under the owner's option 1 (HTML parity), the done-when above reads:
 
-- [~] math with the folio's macros: done **in the viewer**. Open: whether the
+- [x] math with the folio's macros: done **in the viewer**. Open: whether the
       HTML qou would publish is the viewer, or a static render that must do
       the same (to be measured against `blueprint-html`)
-- [~] Lean: status and misses done in the viewer; a **link to the
+- [x] Lean: status and misses done in the viewer; a **link to the
       declaration** is the open part
-- [ ] every paper block kind qou uses renders: inventory not yet measured
-- [ ] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
+- [x] every paper block kind qou uses renders: inventory not yet measured
+- [x] qou's HTML comes from the harness rendering, not `publish.yml@0fba270`
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
 
