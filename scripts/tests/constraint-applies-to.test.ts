@@ -56,14 +56,14 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
       "asks whether a PROVABLE block should have been a conjecture, given " +
       "its Lean stub. The question is meaningless for any other kind.",
   },
-  "mathpaper-md-exists": {
-    kinds: ["definition", "theorem", "lemma", "proposition", "corollary", "conjecture"],
-    because:
-      "md-exists for the science layer's kinds, carried by its vocabulary " +
-      "module since 2026-10-22; the six it always covered (proof never was).",
-  },
   "md-exists": {
-    kinds: ["example", "remark", "simulator", "prose", "recommendation"],
+    // With `mathpaper-md-exists`, the science layer's copy for its own kinds
+    // (since 2026-10-22): the two together cover these, whichever holds which
+    // while cat-harness's copy is cut down to its own kinds. See SHARED below.
+    kinds: [
+      "definition", "theorem", "lemma", "proposition", "corollary",
+      "conjecture", "example", "remark", "simulator", "prose", "recommendation",
+    ],
     because:
       // `recommendation` joined when cat-harness admitted the normative
       // statement kind: its body is prose, so it carries a companion .md.
@@ -73,6 +73,13 @@ const KIND_SPECIFIC: Record<string, { kinds: string[]; because: string }> = {
       "wider than its behaviour; see bean j19q.",
   },
 };
+
+/**
+ * A scope split across rules by layer: the ids listed beside a KIND_SPECIFIC
+ * entry cover its kinds TOGETHER. `md-exists` is cat-harness's; the science
+ * layer's vocabulary module carries the same check for its kinds.
+ */
+const SHARED: Record<string, string[]> = { "md-exists": ["mathpaper-md-exists"] };
 
 const RULES = allConstraintRules();
 const byId = new Map(RULES.map((c) => [c.id, c]));
@@ -88,7 +95,7 @@ describe("constraint appliesTo coverage", () => {
     for (const rule of RULES) {
       const missing = BLOCK_KINDS.filter((k) => !rule.appliesTo.includes(k));
       if (missing.length === 0) continue;
-      if (KIND_SPECIFIC[rule.id]) continue;
+      if (KIND_SPECIFIC[rule.id] || Object.values(SHARED).some((ids) => ids.includes(rule.id))) continue;
       unexplained.push(`${rule.id} skips: ${missing.join(", ")}`);
     }
     expect(unexplained).toEqual([]);
@@ -101,7 +108,9 @@ describe("constraint appliesTo coverage", () => {
       if (!inScope(kinds)) continue;
       const rule = byId.get(id);
       expect({ id, found: rule !== undefined }).toEqual({ id, found: true });
-      expect({ id, kinds: [...rule!.appliesTo].sort() }).toEqual({ id, kinds: [...kinds].sort() });
+      const covered = new Set([id, ...(SHARED[id] ?? [])].flatMap((r) => byId.get(r)?.appliesTo ?? []));
+      const declared = kinds.filter((k) => (BLOCK_KINDS as readonly string[]).includes(k) || covered.has(k));
+      expect({ id, kinds: [...covered].sort() }).toEqual({ id, kinds: [...declared].sort() });
     }
   });
 
