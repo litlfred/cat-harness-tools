@@ -24,7 +24,6 @@ import {
   profileForContentType,
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { pathToFileURL } from "node:url";
-import { join } from "node:path";
 import { vocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 
 describe("the profile partition", () => {
