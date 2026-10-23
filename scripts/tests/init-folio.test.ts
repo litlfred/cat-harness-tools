@@ -35,6 +35,7 @@ import {
   renderTemplate,
   slugify,
   templatesDir,
+  templatesDirs,
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
@@ -433,11 +434,13 @@ describe("workflow templates (52dz)", () => {
   });
 
   test("the templates come from the declared directory, not a path written in code", () => {
-    // `folio-templates` is looked up by id; the directory it names must hold
-    // both profiles the content types ask for.
+    // `folio-templates` is looked up by id. This layer's own member holds the
+    // profile every folio gets; the paper profile is a member a dependent
+    // layer holds (move M11), found across the checkout, never by its name.
     const dir = templatesDir();
     expect(existsSync(join(dir, "document"))).toBe(true);
-    expect(existsSync(join(dir, "paper"))).toBe(true);
+    expect(templatesDirs()[0]).toBe(dir);
+    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
     expect(folioTemplates("document").every((t) => !t.target.includes("lean"))).toBe(true);
   });
 });

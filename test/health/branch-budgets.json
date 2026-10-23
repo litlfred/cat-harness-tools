@@ -23,7 +23,8 @@
     {
       "id": "lake-cache",
       "shape": "family",
-      "name": "cat/folio-assistant-sci/lake-cache/",
+      "typology": "lake-cache",
+      "$typology_comment": "The family's NAME is the storage.branchPrefix of the directory that declares graph typology `lake-cache` (a Lean folio's; the kind belongs to the layer that owns Lean, which this layer does not name). Read by readSpecialBranches from the checked repository's declarations; the legacy names below are measured when nothing declares it. The budget is the owner's, unchanged.",
       "legacy": [
         "cat-lake-cache/",
         "lake-cache/"
