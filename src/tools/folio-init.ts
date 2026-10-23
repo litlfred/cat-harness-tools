@@ -83,12 +83,13 @@ export function registerFolioInitTools(server: McpServer): void {
         .describe("Directory name under folio/. Derived from the title when omitted."),
       dir: z.string().default(".")
         .describe("Folio root to scaffold into, relative to the repo the server was pointed at."),
-      link: z.enum(["submodule", "sibling"]).default("submodule")
+      link: z.enum(["submodule", "sibling", "remote"]).default("submodule")
         .describe(
           "How the folio reaches folio-assistant. 'submodule' pins it at " +
           "folio-assistant/ inside the folio, so a clone gets the exact platform " +
           "revision the content was authored against. 'sibling' uses a checkout " +
-          "beside the folio — right when one platform copy serves several folios.",
+          "beside the folio — right when one platform copy serves several folios. " +
+          "'remote' declares the platform layers as pinned source.remote mounts in index.config.json.",
         ),
       assistant_path: z.string().optional()
         .describe("Override the path to folio-assistant, relative to the folio root."),
