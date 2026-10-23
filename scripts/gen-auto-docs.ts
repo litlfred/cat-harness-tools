@@ -106,6 +106,7 @@ import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
 
 function decodeEntities(s: string): string {
   return s
@@ -477,6 +478,23 @@ function processSources(ext = ".bpmn"): Array<[string, string]> {
   return out;
 }
 
+/** Each global task a `.bpmn` defines, by id, with the skill refs inside it. */
+function globalTaskSkills(xml: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const re = /<((?:[\w.-]+:)?global(?:User|Script|Manual|BusinessRule)?Task)\b[^>]*?\sid="([^"]+)"[^>]*?(\/?)>/g;
+  for (const m of xml.matchAll(re)) {
+    if (m[3] === "/") {
+      out.set(m[2]!, []);
+      continue;
+    }
+    const start = m.index! + m[0].length;
+    const end = xml.indexOf(`</${m[1]}>`, start);
+    const body = xml.slice(start, end < 0 ? undefined : end);
+    out.set(m[2]!, [...new Set([...body.matchAll(/<[\w.-]+:skill\b[^>]*\sref="([^"]+)"/g)].map((x) => x[1]!))]);
+  }
+  return out;
+}
+
 /** One row per file of `ext`, named by `nameRe`'s first group, else the filename. */
 function bpmnishFiles(ext: string, nameRe: RegExp): AutoDocItem[] {
   const items: AutoDocItem[] = [];
@@ -739,6 +757,13 @@ export const TYPES: AutoDocType[] = [
       for (const d of [...declaredDirectories("processes"), ...declaredDirectories("cat-harness")]) {
         if (seen.has(d.absPath)) continue;
         seen.add(d.absPath);
+        // This directory's global tasks, by id → skills: a layer shares its
+        // steps within itself only (c1), so one directory's file is enough.
+        const globalsHere = new Map<string, string[]>();
+        for (const f of walk(d.absPath, (n) => n.endsWith(".bpmn"))) {
+          const xml = readFileSync(f, "utf-8");
+          if (isGlobalTasksFile(xml)) for (const [id, sk] of globalTaskSkills(xml)) globalsHere.set(id, sk);
+        }
         for (const f of walk(d.absPath, (n) => n.endsWith(".bpmn"))) {
           const xml = readFileSync(f, "utf-8");
           // `(?:bpmn:)?` on EVERY element, because the prefix is a document's
@@ -768,9 +793,31 @@ export const TYPES: AutoDocType[] = [
           // lane's instead. A generated index, compared by a check against its
           // own generator, so nothing went red — the defect arrived with the
           // fix to a different one.
+          // A layer's shared global-tasks file (owner, 2026-10-20, "a1") holds
+          // no process: listed as what it is, and its tasks' skills counted on
+          // the processes that call them, so moving a step there loses no row.
+          if (isGlobalTasksFile(xml)) {
+            const defs = globalTaskSkills(xml);
+            const shared = [...new Set([...defs.values()].flat())].sort();
+            items.push({
+              path: relative(REPO, f).split("\\").join("/"),
+              name: `Shared steps (${basename(f, ".bpmn")})`,
+              summary: `${defs.size} global task(s) that this layer's processes call by id.`,
+              // `activities: 0` because that is true of it — no process, so no
+              // activity in one — and because every row of this index carries
+              // the fact: absent would read as unmeasured.
+              facts: { activities: "0", "global tasks": String(defs.size), ...(shared.length ? { skills: shared.join(", ") } : {}) },
+            });
+            continue;
+          }
           const doc = processDocumentation(xml);
           const lanes = [...xml.matchAll(/<(?:bpmn:)?lane\b[^>]*\sname="([^"]*)"/g)].map((m) => m[1]!);
-          const skills = [...new Set([...xml.matchAll(ownElementPattern(xml, "skill", String.raw`\s+ref="([^"]+)"`))].map((m) => m[1]!))];
+          const called = [...xml.matchAll(/<(?:bpmn:)?callActivity\b[^>]*\scalledElement="([^"]+)"/g)].flatMap(
+            (m) => globalsHere.get(m[1]!) ?? [],
+          );
+          const skills = [
+            ...new Set([...[...xml.matchAll(ownElementPattern(xml, "skill", String.raw`\s+ref="([^"]+)"`))].map((m) => m[1]!), ...called]),
+          ];
           const acts = (xml.match(/<(?:bpmn:)?(task|serviceTask|userTask|callActivity)\b/g) ?? []).length;
           const facts: Record<string, string> = { activities: String(acts) };
           if (lanes.length) facts.lanes = lanes.join(" · ");

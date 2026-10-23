@@ -76,6 +76,7 @@ import {
   INVOLVEMENT_VOCABULARIES,
   isActivity,
   loadProcessModel,
+  processDiagrams,
   RACI_INVOLVEMENTS,
   type InvolvementVocabulary,
 } from "../src/workflow/process-model.js";
@@ -189,7 +190,7 @@ export function raciRowsOf(model: {
 /** Build the chart across every diagram the declaration names. */
 export async function raciRows(root: string = ROOT): Promise<RaciRow[]> {
   const rows: RaciRow[] = [];
-  for (const file of workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"))) {
+  for (const file of processDiagrams(workflowFiles(root, corpusScopeFor(root)))) {
     rows.push(...raciRowsOf(await loadProcessModel(file)));
   }
   return rows;

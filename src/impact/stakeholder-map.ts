@@ -57,7 +57,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { isSkillMd, kgRoots, skillMdDirs, workflowFiles, corpusScopeFor, roleGraphFor } from "../../scripts/known-skills.js";
 import { join, relative } from "node:path";
-import { loadProcessModel, isActivity } from "../workflow/process-model.js";
+import { loadProcessModel, isActivity, processDiagrams } from "../workflow/process-model.js";
 import { readRoleGraph, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 
 export interface SkillImpact { name: string; path: string }
@@ -146,7 +146,7 @@ export async function stakeholderMap(root: string, changed: string[]): Promise<S
   // `processes/`. An impact report that misses a diagram reports NO
   // lane affected, which is indistinguishable from a change that affects
   // nobody — the one wrong answer this analysis must not give.
-  const diagrams = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
+  const diagrams = processDiagrams(workflowFiles(root, corpusScopeFor(root)));
 
   if (diagrams.length > 0 && changedSkills.size > 0) {
     for (const file of diagrams) {
