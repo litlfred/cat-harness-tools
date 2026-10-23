@@ -209,7 +209,9 @@ test.describe("kg viewer", () => {
     // `satisfies` is an @id-coerced term, so its values render as buttons.
     await page.locator(".detail td .link").first().click();
     await expect(page.locator(".detail h3")).not.toHaveText(String(before));
-    await expect(page.locator(".detail .iri")).toContainText("#");
+    // The target is a skill, at its subject page: `<doc dir>/skill/<id>`
+    // (cat-harness-tools#603), not a fragment of the graph document.
+    await expect(page.locator(".detail .iri")).toContainText("/skill/");
   });
 
   test("back-links are computed, so a node says what points AT it", async ({ page }) => {
