@@ -31,6 +31,7 @@ import {
   initInstance,
   INSTANCE_STATE_GRAPHS,
   isValidSlug,
+  remotePlatformLayers,
   renderTemplate,
   slugify,
   templatesDir,
@@ -824,6 +825,23 @@ describe("state graphs follow their resolved source (hp54)", () => {
 });
 
 describe("remote link mode (--link remote, bean c4lg)", () => {
+  const PLATFORM = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
+  const adapter = (contentType: string, instance: string) => ({ contentType, instance, root: `/x/${instance}`, module: `../${instance}/a.ts`, className: "A" });
+
+  test("the remote mounts for a content type come from the declaring instance and its needs, never from a hard-coded name", () => {
+    const adapters = [adapter("paper", "layer-b"), adapter("document", "layer-a")];
+    const needs: Record<string, string[]> = { "/x/layer-a": ["bootstrap", "cat-harness"], "/x/layer-b": ["bootstrap", "cat-harness-tools", "layer-a"] };
+    const closure = (root: string) => needs[root] ?? [];
+    expect(remotePlatformLayers(undefined, adapters, closure)).toEqual(PLATFORM);
+    expect(remotePlatformLayers("document", adapters, closure)).toEqual([...PLATFORM, "layer-a"]);
+    expect(remotePlatformLayers("paper", adapters, closure)).toEqual([...PLATFORM, "layer-a", "layer-b"]);
+  });
+
+  test("a content type no instance declares mounts the platform alone — no invented layer", () => {
+    expect(remotePlatformLayers("document", [], () => ["never-called"])).toEqual(PLATFORM);
+    expect(remotePlatformLayers("paper", [adapter("other", "layer-o")], () => [])).toEqual(PLATFORM);
+  });
+
   test("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
     const d = tmp();
     const r = initFolio({

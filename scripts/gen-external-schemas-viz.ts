@@ -454,7 +454,7 @@ if (import.meta.main) {
   // declared user of every specification in the CHECKOUT (`declaredUsers`
   // reads the whole corpus, mounts included), so it moves with the index's
   // pins: a layer above adding one BPMN file made cat-harness's committed page
-  // stale (folio-assistant-core#155). When the instance declares the route
+  // stale. When the instance declares the route
   // `builtAtPublish` with this script as its writer, `derive:publish` runs it
   // and `--check` has no committed bytes to compare (the `methodologies:viz`
   // rule).
