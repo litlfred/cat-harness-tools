@@ -18,7 +18,8 @@ import { join } from "node:path";
 import jsonld from "jsonld";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteIri, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { docsSources, sourceFileOf } from "../lib/docs-sources.ts";
 import { TodoIndexSchema, type TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
@@ -28,6 +29,7 @@ import {
   todoDocument,
   todoGraphDocument,
   todoIri,
+  targetNodeIri,
   todoPageSitePath,
   todoSitePath,
 } from "../todo-graph.ts";
@@ -162,6 +164,15 @@ describe("the no-JS floor", () => {
   });
 });
 
+describe("targetNodeIri", () => {
+  test("a base page's node is under site/", () => {
+    expect(targetNodeIri("process/x", "n", new Set(["core"]))).toBe(siteNodeIri("process/x", "n"));
+  });
+  test("a page above the base is published under its instance, then site/", () => {
+    expect(targetNodeIri("core/process/x", "n", new Set(["core"]))).toBe(`${DOCS_SITE_BASE}core/site/process/x/nodes/n.jsonld`);
+  });
+});
+
 describe("what is published", () => {
   const graph = JSON.parse(readFileSync(join(SITE, "todos.jsonld"), "utf8")) as Record<string, unknown>;
 
@@ -179,15 +190,19 @@ describe("what is published", () => {
     if (item.target) {
       const { page, node } = item.target;
       test(`${item.id}: its target IRI names a file the site publishes`, () => {
-        const iri = siteNodeIri(page, node);
-        const file = join(SITE, iri.slice(DOCS_SITE_BASE.length));
+        // A page of a layer above the base is published from that layer's own
+        // docs directory, under its instance's name (moves M6–M8).
+        const sources = docsSources(ROOT);
+        const above = new Set(sources.filter((s) => !s.base).map((s) => s.instance));
+        const path = targetNodeIri(page, node, above).slice(DOCS_SITE_BASE.length);
+        const file = sourceFileOf(sources, path);
         expect(existsSync(file)).toBe(true);
         const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
         // The site form: the shared context, or since bean `63q4` the
         // owning instance's own, always with the site as `@base`.
         expect(ContentContextSchema.safeParse(doc["@context"]).success).toBe(true);
         expect((doc["@context"] as unknown[])[1]).toEqual(SITE_DOCUMENT_CONTEXT[1]);
-        expect(doc["@id"]).toBe(siteIri(page, node));
+        expect(doc["@id"]).toBe(path);
       });
     }
   }

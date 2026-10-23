@@ -163,6 +163,18 @@ export function qualifiedKey(src: DocsSource, key: string): string {
   return src.base ? key : `${src.instance}/${key}`;
 }
 
+/**
+ * The file on disk that publishes a site-relative path: a path under a source
+ * above the base (`<instance>/…`, see {@link qualifiedKey}) is in that
+ * source's own docs directory, anything else in the base's.
+ */
+export function sourceFileOf(sources: readonly DocsSource[], sitePath: string): string {
+  const above = sources.find((s) => !s.base && sitePath.startsWith(`${s.instance}/`));
+  if (above !== undefined) return join(above.outDir, sitePath.slice(above.instance.length + 1));
+  const base = sources.find((s) => s.base) ?? sources[0]!;
+  return join(base.outDir, sitePath);
+}
+
 const warned = new Set<string>();
 
 /**

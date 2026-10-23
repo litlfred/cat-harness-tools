@@ -1783,13 +1783,16 @@ function processHierarchy(): Record<string, string[]> {
       console.warn("gen-docs-pages: no instance in this checkout declares a `todos` subgraph — todos.jsonld is published without its container node");
     }
     const subgraph = declared && { iri: declared.iri, contentSource: declared.contentSource };
-    const graph = serialiseJsonld(todoGraphDocument(items, subgraph));
+    // The instances whose pages are composed under their own name: a todo on
+    // one of their blocks points at `<instance>/site/…` (`targetNodeIri`).
+    const above = new Set(allDocsSources().filter((s) => !s.base).map((s) => s.instance));
+    const graph = serialiseJsonld(todoGraphDocument(items, subgraph, above));
     for (const ext of [".jsonld", ".json"]) {
       emit(join(OUT_DIR, TODO_GRAPH_SITE_PATH.replace(/\.jsonld$/, ext)), graph, "data");
     }
     const wanted = new Set<string>();
     for (const item of items) {
-      const doc = serialiseJsonld(todoDocument(item, subgraph));
+      const doc = serialiseJsonld(todoDocument(item, subgraph, above));
       const asset = join(OUT_DIR, todoSitePath(item.id));
       if (!check) mkdirSync(dirname(asset), { recursive: true });
       for (const ext of [".jsonld", ".json"]) {

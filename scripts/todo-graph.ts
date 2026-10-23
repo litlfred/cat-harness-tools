@@ -57,7 +57,7 @@
  * disagree with the index the board reads.
  */
 import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.js";
-import { DOCS_SITE_BASE, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE, siteNodeIri, siteNodeSitePath } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { memberOf, subgraphContainer } from "./subgraph-node.ts";
@@ -152,8 +152,24 @@ function linked(href: string | undefined, identifier: string, type?: string, nam
   };
 }
 
-/** One todo, as a JSON-LD node (no `@context` — the caller wraps it). */
-export function todoNode(item: TodoIndexItem): Record<string, unknown> {
+/**
+ * The IRI of the site node a todo is attached to. A page of a docs source
+ * above the base has a qualified key (`<instance>/<slug>`) and is composed
+ * into the site under its instance, so its node is published at
+ * `<instance>/site/<slug>/nodes/<id>.jsonld` — the `@id` gen-site-jsonld
+ * gives it. `above` names those instances; any other page is the base's.
+ */
+export function targetNodeIri(page: string, node: string, above: ReadonlySet<string> = new Set()): string {
+  const slash = page.indexOf("/");
+  const instance = slash > 0 ? page.slice(0, slash) : undefined;
+  if (instance !== undefined && above.has(instance)) {
+    return `${DOCS_SITE_BASE}${instance}/${siteNodeSitePath(page.slice(slash + 1), node)}`;
+  }
+  return siteNodeIri(page, node);
+}
+
+/** One todo, as a JSON-LD node (no `@context` — the caller wraps it). `above`: see {@link targetNodeIri}. */
+export function todoNode(item: TodoIndexItem, above?: ReadonlySet<string>): Record<string, unknown> {
   const node: Record<string, unknown> = {
     "@id": todoIri(item.id),
     "@type": "Todo",
@@ -171,7 +187,7 @@ export function todoNode(item: TodoIndexItem): Record<string, unknown> {
   // graph onto the site's own base. A label resolving to no block keeps its
   // label and gets no edge — the third state, reported rather than guessed.
   if (item.target !== undefined) {
-    node["target"] = { "@id": siteNodeIri(item.target.page, item.target.node), label: item.target.label };
+    node["target"] = { "@id": targetNodeIri(item.target.page, item.target.node, above), label: item.target.label };
   } else if (item.targetLabel !== undefined) {
     node["label"] = item.targetLabel;
   }
@@ -192,8 +208,8 @@ export function todoNode(item: TodoIndexItem): Record<string, unknown> {
 }
 
 /** A todo as a member of its declared subgraph: the node plus `inSubgraph`. */
-function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined): Record<string, unknown> {
-  return { ...todoNode(item), ...(subgraph ? memberOf(subgraph.iri) : {}) };
+function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined, above?: ReadonlySet<string>): Record<string, unknown> {
+  return { ...todoNode(item, above), ...(subgraph ? memberOf(subgraph.iri) : {}) };
 }
 
 /**
@@ -201,8 +217,8 @@ function memberNode(item: TodoIndexItem, subgraph: TodoSubgraph | undefined): Re
  * todo says which declared subgraph it is part of — the same node, with the
  * same edges, as inside the whole graph.
  */
-export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph): Record<string, unknown> {
-  return { "@context": TODO_CONTEXT, ...memberNode(item, subgraph) };
+export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph, above?: ReadonlySet<string>): Record<string, unknown> {
+  return { "@context": TODO_CONTEXT, ...memberNode(item, subgraph, above) };
 }
 
 /**
@@ -219,7 +235,11 @@ export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph): Reco
  * the bare `@graph`: no container is invented to stand in for the missing
  * declaration.
  */
-export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: TodoSubgraph): Record<string, unknown> {
+export function todoGraphDocument(
+  items: readonly TodoIndexItem[],
+  subgraph?: TodoSubgraph,
+  above?: ReadonlySet<string>,
+): Record<string, unknown> {
   return {
     "@context": TODO_CONTEXT,
     ...(subgraph
@@ -234,7 +254,7 @@ export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: To
           ...(subgraph.contentSource ? { contentSource: subgraph.contentSource } : {}),
         })
       : {}),
-    "@graph": items.map((i) => memberNode(i, subgraph)),
+    "@graph": items.map((i) => memberNode(i, subgraph, above)),
   };
 }
 

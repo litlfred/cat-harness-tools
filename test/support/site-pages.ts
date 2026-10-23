@@ -21,6 +21,7 @@ import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visuali
 import {
   declaredVisualisers,
   existingPageDir,
+  heldVisualiserPages,
   pageParts,
   siteOwnerDir,
   visualiserPageDir,
@@ -61,7 +62,13 @@ export function declaredPageDirIn(
   if (v === undefined) {
     throw new Error(`${repoRoot}: no instance named \`${harness}\` declares a visualiser \`${id}\``);
   }
-  return pageDirOf(repoRoot, v.harness, v.id, rest);
+  // A page the harness keeps in its own site directory (move M1: who-iris's
+  // catalogue) is not in the site owner's tree; compose-docs lays it there
+  // only for a site build, so the spec reads it where it is committed.
+  const site = siteOwnerDir(repoRoot);
+  const parts = { harness, visualiser: id, ...rest };
+  const held = rest.subgraph === undefined ? heldVisualiserPages(repoRoot).find((h) => h.visualiser.harness === harness && h.visualiser.id === id) : undefined;
+  return existingPageDir(site, parts) ?? held?.dir ?? visualiserPageDir(site, pageParts(parts));
 }
 
 function pageDirOf(repoRoot: string, harness: string, id: string, rest: Pick<VisualiserRouteParts, "subgraph" | "locale">): string {
