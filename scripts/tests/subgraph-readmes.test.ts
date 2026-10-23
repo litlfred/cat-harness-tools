@@ -61,7 +61,7 @@ test("over the real tree, every link in every generated README resolves", async 
  */
 const BPMN = (name: string, extra = "") => `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/0.1.0/processes/ns#">
+                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns#">
   <bpmn:process id="Process_${name}" name="${name} flow">
     <bpmn:startEvent id="StartEvent_Drop" name="A file lands in drop/" />
 ${extra}  </bpmn:process>

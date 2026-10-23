@@ -84,7 +84,7 @@ function pairsIn(workflow: string): Array<{ layer: Layer; dir: string }> {
 function segmentOf(layer: Layer): string {
   // The core layer's namespace is its declaring instance's (folio-assistant#2598).
   const ns = layer === "core" ? contentLayerInstance()!.namespace : namespaceForLayer(layer);
-  // Skipping a release segment (`0.1.0`), which is the version and not the layer.
+  // Skipping a release segment (`v0`, or an older copy's `0.1.0`), which is the version and not the layer.
   const m = ns.match(/\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns#$/);
   if (!m) throw new Error(`namespace for ${layer} is not <base>/<segment>/ns#: ${ns}`);
   return m[1]!;

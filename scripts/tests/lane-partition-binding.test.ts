@@ -19,7 +19,7 @@ import { join } from "node:path";
 
 import { loadProcessModel, partitionTolerated } from "../../src/workflow/process-model.ts";
 
-const NS = "https://litlfred.github.io/bootstrap/0.1.0/processes/ns#";
+const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns#";
 
 /** A one-task diagram whose head and lane markup the test chooses. */
 function diagram(opts: { head?: string; lane: string; laneExt?: string }): string {
@@ -58,7 +58,7 @@ async function modelOf(xml: string) {
   }
 }
 
-const IMPORT = `<bpmn:import namespace="${NS}" location="https://litlfred.github.io/bootstrap/0.1.0/processes/ns.jsonld" importType="http://www.w3.org/ns/json-ld"/>`;
+const IMPORT = `<bpmn:import namespace="${NS}" location="https://litlfred.github.io/bootstrap/v0/processes/ns.jsonld" importType="http://www.w3.org/ns/json-ld"/>`;
 const RESOURCE = `<bpmn:resource id="build-pipeline" name="Build pipeline"/>`;
 const LEGACY = (ref: string) => `<bootstrap.processes:role ref="${ref}"/>`;
 

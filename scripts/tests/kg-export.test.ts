@@ -706,7 +706,7 @@ describe("every self-URL the export publishes resolves to something published", 
     // One document per NAMESPACE, as downloads. The extensionless `<dir>/ns`
     // is NOT published here any more (owner, 2026-10-15, folio-assistant#2560):
     // the term IRIs moved to each instance's own iriBase
-    // (`<iriBase><version>/ns#`), served by that instance's own Pages
+    // (`<iriBase>v<major>/ns#`), served by that instance's own Pages
     // (`publish-instance-context.ts vocab`), and `<dir>/ns/` is a directory on
     // this site. Measured before removing it: this file's dead-link walk passed
     // with the three extensionless entries gone, so nothing named them.

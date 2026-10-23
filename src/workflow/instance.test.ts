@@ -31,7 +31,7 @@ function createWorkflowFixtures(): { dir: string; parentPath: string } {
 
   const parentXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/0.1.0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
                   id="Defs_Parent" targetNamespace="urn:test">
   <bpmn:process id="Process_Parent" name="Parent Process">
     <bpmn:extensionElements>
@@ -85,7 +85,7 @@ function createWorkflowFixtures(): { dir: string; parentPath: string } {
 
   const childXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/0.1.0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
                   id="Defs_Child" targetNamespace="urn:test">
   <bpmn:process id="Process_Child" name="Child Process">
     <bpmn:extensionElements>

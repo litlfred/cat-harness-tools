@@ -66,12 +66,12 @@ describe("build", () => {
 
 describe("vocabulary paths", () => {
   test("served where its @id points, under the iriBase, in three spellings", () => {
-    expect(vocabularyPaths("https://x.github.io/y/0.1.0/ns", "https://x.github.io/y/")).toEqual({
-      paths: ["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"],
+    expect(vocabularyPaths("https://x.github.io/y/v0/ns", "https://x.github.io/y/")).toEqual({
+      paths: ["v0/ns", "v0/ns.jsonld", "v0/ns.json"],
     });
     // A trailing `#` on the @id, and no trailing slash on the base, change nothing.
-    expect(vocabularyPaths("https://x.github.io/y/0.1.0/ns#", "https://x.github.io/y")).toEqual({
-      paths: ["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"],
+    expect(vocabularyPaths("https://x.github.io/y/v0/ns#", "https://x.github.io/y")).toEqual({
+      paths: ["v0/ns", "v0/ns.jsonld", "v0/ns.json"],
     });
   });
 
@@ -91,7 +91,7 @@ describe("vocabulary paths", () => {
 describe("an instance whose `ns` is a document (D1)", () => {
   test("its context is built for, and served at, the path beside the vocabulary", () => {
     put("doc/doc.json", { name: "doc", needs: [], iriBase: "https://example.github.io/doc/", jsonldPrefixes: { skos: "http://www.w3.org/2004/02/skos/core#" } });
-    put("doc/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.github.io/doc/0.1.0/ns", "@type": "skos:ConceptScheme" });
+    put("doc/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.github.io/doc/v0/ns", "@type": "skos:ConceptScheme" });
     const doc = buildOne(root, "doc", opts);
     expect(doc.kind).toBe("built");
     if (doc.kind !== "built") return;

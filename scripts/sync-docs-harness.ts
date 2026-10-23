@@ -675,9 +675,10 @@ const payload = {
    * EVERY INSTANCE'S VERSION, and its release addresses where it declares an
    * `iriBase` — so a page writes `{{ site.data.harness.releases.bootstrap.version }}`
    * and never a number that goes stale on the next bump (owner, 2026-09-29:
-   * "make variables of version available to minimize drift"). `agent` is
-   * `<iriBase><version>/`, for identifiers; `human` is `<iriBase>v<major>/`,
-   * for pages. Read from the declarations, so a bump is one edit.
+   * "make variables of version available to minimize drift"). `agent`, for
+   * identifiers, and `human`, for pages, are both `<iriBase>v<major>/` (owner,
+   * 2026-10-23: the major, not the full version, is in every address). Read
+   * from the declarations, so a bump is one edit.
    */
   releases: Object.fromEntries(
     instanceRootsIn(REPO_ROOT).flatMap((root) => {
