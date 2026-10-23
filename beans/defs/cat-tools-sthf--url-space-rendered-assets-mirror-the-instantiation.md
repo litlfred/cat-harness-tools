@@ -528,7 +528,7 @@ Kept in progress: this session takes the index half after litlfred/folio-assista
 
 ## Summary of Changes
 
-Mirrors `folio-assistant-o7eq`, which the coordinator completed in the index store on 2026-10-23 with every box ticked. This bean is that work's tools-store copy. All boxes above are now ticked. The 7 that were open were all index-half items, and #2617 does each of them: the publish layout, the stub collision and the bootstrap path.
+Mirrors `folio-assistant-o7eq`, which the coordinator completed in the index store on 2026-10-23 with every box ticked. This bean is that work's tools-store copy. All boxes above are now ticked. The 9 that were open were all index-half items, and #2617 does each of them: the publish layout, the stub collision and the bootstrap path.
 
 - **Tools half:**
   - #549 (e009a87): `bootstrap-graph-repo-root.test.ts` asserts that the bootstrap `.jsonld`'s `@id` equals its served path, captures from `print-published-path` included.
