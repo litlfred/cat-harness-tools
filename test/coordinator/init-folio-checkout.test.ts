@@ -16,6 +16,7 @@ import { tmpdir } from "os";
 
 import {
   initFolio,
+  remotePlatformLayers,
   type InitFolioOptions,
 } from "../../scripts/init-folio.ts";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -166,5 +167,20 @@ describe("a scaffold says what it stands on (zmdo)", () => {
     expect(config.dependencies).toEqual({
       folioAssistant: [{ name: "folio-assistant-sci", path: "../platform/folio-assistant-sci" }],
     });
+  });
+});
+
+describe("remote mounts derived from the checkout's declarations (--link remote)", () => {
+  // Pins the derivation against the composed checkout: the same list, in the
+  // same order, as the names init-folio used to hard-code.
+  const PLATFORM = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
+  test("a document folio mounts the platform and the document adapter's instance", () => {
+    expect(remotePlatformLayers("document")).toEqual([...PLATFORM, "folio-assistant-core"]);
+  });
+  test("a paper folio mounts the paper adapter's instance after what it needs", () => {
+    expect(remotePlatformLayers("paper")).toEqual([...PLATFORM, "folio-assistant-core", "folio-assistant-sci"]);
+  });
+  test("a contentless instance mounts the platform alone", () => {
+    expect(remotePlatformLayers(undefined)).toEqual(PLATFORM);
   });
 });

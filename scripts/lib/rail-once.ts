@@ -6,8 +6,8 @@
  * `visualiserNavOf`) has that menu read into the rail's own data. Left in the
  * page, the block is a second copy of the same menu that nothing in the
  * browser reads: the rail draws from `#fa-rail`. On an IG site it is the IG's
- * whole menu, the same on every page — 2.9 KB of each `smart-trust/*.html` on
- * gh-pages `1ad53fa`, beside the 3.7 KB the rail already carries.
+ * whole menu, the same on every page — 2.9 KB of every page of one published
+ * IG, measured, beside the 3.7 KB the rail already carries.
  *
  * A wrapper rather than a change inside `injectRail` on purpose:
  * `harness-rail.ts` is bundled into the committed `navbar.js`

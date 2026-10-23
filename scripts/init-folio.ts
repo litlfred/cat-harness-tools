@@ -45,7 +45,7 @@ import {
   type RemoteSource,
 } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { declaredSubgraph, materialiseDeclaredDirectories, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import {
   instanceStateBranch,
@@ -56,7 +56,7 @@ import {
 } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
-import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
+import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
@@ -543,14 +543,35 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
   };
 }
 
+/** The layers every remote-linked instance or folio mounts, whatever its content type. */
+const REMOTE_PLATFORM_LAYERS = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"] as const;
+
 /**
  * The platform layers a remote-linked instance or folio declares as
  * `source.remote` mounts in `index.config.json` (bean `c4lg`).
+ *
+ * The platform layers, then — for a content type — the instance whose
+ * `contentAdapters` declares that type and its `needs` closure, deepest first.
+ * DERIVED, not named: this layer sits below every content layer and may not
+ * spell their names (`check:reference-direction`). A content type no instance
+ * in the checkout declares adds nothing — there is no layer to mount, and
+ * guessing one would write a mount for a repository nobody said exists.
+ *
+ * Exported, with the adapters and the closure injectable, for the tests that
+ * pin the derivation with and without a declaring instance.
  */
-function remotePlatformLayers(contentType: InitFolioOptions["contentType"] | undefined): string[] {
-  const layers = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
-  if (contentType !== undefined) layers.push("folio-assistant-core");
-  if (contentType === "paper") layers.push("folio-assistant-sci");
+export function remotePlatformLayers(
+  contentType: InitFolioOptions["contentType"] | undefined,
+  adapters: readonly BuiltinAdapterDeclaration[] = BUILTIN_ADAPTERS,
+  closureOf: (instanceRoot: string) => string[] = (root) => orderedDependencies(root).map((d) => d.dependency.name),
+): string[] {
+  const layers: string[] = [...REMOTE_PLATFORM_LAYERS];
+  if (contentType === undefined) return layers;
+  const declared = adapters.find((a) => a.contentType === contentType);
+  if (declared === undefined) return layers;
+  for (const name of [...closureOf(declared.root), declared.instance]) {
+    if (!layers.includes(name)) layers.push(name);
+  }
   return layers;
 }
 
