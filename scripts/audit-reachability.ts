@@ -330,7 +330,7 @@ export async function decisionReach(repo: string, dmn: string[], refs: Map<strin
       continue;
     }
     for (const d of declared) {
-      const key = `${basename(abs)}#${d.id}`;
+      const key = `${abs}#${d.id}`;
       const referencedBy = (refs.get(key) ?? []).sort();
       try {
         const table = await loadDecisionTable(abs, d.id);
@@ -383,8 +383,24 @@ export async function processReach(
 ): Promise<{ rows: ProcessReach[]; ambiguous: Ambiguity[]; decisionRefs: Map<string, string[]> }> {
   // The list the engine itself serves, so this cannot disagree with it.
   const listed = new Set(processFiles(repo));
+  // Only a file `workflow_start` could resolve by stem competes for one. A
+  // layer's shared global-tasks file holds no process, `processFiles` never
+  // lists it, and its tasks are found by element id within the calling
+  // diagram's own instance (owner, 2026-10-20, "c1") — so two layers each
+  // holding `processes/global-tasks.bpmn` is not a clash, and counting it as
+  // one was a false `process-ambiguous` that failed `--check`.
+  const shared = new Set(
+    bpmn.filter((f) => {
+      try {
+        return isGlobalTasksFile(readFileSync(f, "utf-8"));
+      } catch {
+        return false; // unreadable: the load below reports it as `unloadable`
+      }
+    }),
+  );
   const byStem = new Map<string, string[]>();
   for (const f of bpmn) {
+    if (shared.has(f)) continue;
     const stem = basename(f, ".bpmn");
     byStem.set(stem, [...(byStem.get(stem) ?? []), f]);
   }
@@ -397,7 +413,7 @@ export async function processReach(
     let id: string | undefined;
     let why: string | undefined;
     try {
-      if (isGlobalTasksFile(readFileSync(abs, "utf-8"))) {
+      if (shared.has(abs)) {
         const defs = await loadGlobalTasks(abs);
         rows.push({
           file,
@@ -411,7 +427,12 @@ export async function processReach(
       byId.set(id, [...(byId.get(id) ?? []), abs]);
       for (const n of model.nodes.values()) {
         if (!n.decisionRef) continue;
-        const key = n.decisionRef.replace(/^decisions\//, "");
+        // Keyed by the table's resolved PATH, the way `loadDecisions` finds
+        // it (relative to the diagram), never its basename: two instances may
+        // each hold a `decisions/<name>.dmn`, and a basename key gave each
+        // table the other's referrers.
+        const [ref, id] = n.decisionRef.split("#");
+        const key = `${join(dirname(abs), ref ?? "")}#${id ?? ""}`;
         decisionRefs.set(key, [...(decisionRefs.get(key) ?? []), `${basename(abs)}#${n.id}`]);
       }
     } catch (e) {
