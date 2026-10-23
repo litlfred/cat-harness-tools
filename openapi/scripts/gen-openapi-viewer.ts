@@ -26,7 +26,7 @@
  * |---|---|
  * | `index.html` | the hub: every instance declaring an `openapi` directory, with the documents each holds |
  * | `<instance>/…` | that instance's graph exactly as {@link pagesFor} draws it: its index, a page per document and per operation, their JSON-LD nodes, and the shared loader |
- * | `<instance>/<file>` | each document, copied beside the pages, since a page fetches it from `../<file>` |
+ * | `<instance>/<file>` | each document, copied beside the pages, since a page fetches it from `../<file>`; never its provenance node, which is a materialization record and stays in the graph |
  *
  * The renderer is `gen-openapi-pages.ts`, imported, never restated: a second
  * drawing of the same graph could disagree with the IG site's. The IRIs the
@@ -173,8 +173,11 @@ export function plannedFiles(root: string, site: string): { files: Map<string, s
       }
       const src = openapiDir(s.root, readConfig(s.root));
       for (const d of s.documents ?? []) {
+        // The document only. Its provenance node stays in the graph: it is a
+        // materialization record (`folio-materialization/v1`), and a copy of it
+        // here would make the site's docs a directory holding materialized
+        // nodes that no declaration answers for (`check:read-only-graphs`).
         files.set(join(at, d.file), { copy: join(src, d.file) });
-        files.set(join(at, `${d.id}.source.json`), { copy: join(src, `${d.id}.source.json`) });
       }
     }
   }

@@ -91,6 +91,8 @@ describe("gen-openapi-viewer --site", () => {
   it("copies each document beside the pages that fetch it", () => {
     expect(read("api/gateway.openapi.json")).toBe(readFileSync(join(checkout, "api", "openapi", "gateway.openapi.json"), "utf8"));
     expect(read("api/gateway/index.html")).toContain("../gateway.openapi.json");
+    // Not the provenance node: a materialization record in the site's docs is one no declaration answers for.
+    expect(files()).not.toContain(join(route, "api", "gateway.source.json"));
   });
 
   it("a graph that does not read is unknown, with why, on the hub and its own page", () => {
