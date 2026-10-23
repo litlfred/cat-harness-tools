@@ -335,7 +335,7 @@ function main(): void {
   // (`lib/jekyll-pages-nav.ts`). Hrefs are site-absolute and go through
   // `relative_url` like every other row here.
   const pagesDir = opt("--pages");
-  const pages = pagesDir ? pagesNav(jekyllNavPages(pagesDir)) : undefined;
+  const pages = pagesDir ? pagesNav(jekyllNavPages(pagesDir), { locale: opt("--locale") ?? "en" }) : undefined;
   if (pages?.orphans.length) console.warn(`gen-navbar-include: ${pages.orphans.length} page(s) name a parent no listed page has; kept at the top level: ${pages.orphans.slice(0, 5).join(", ")}`);
   const instance = opt("--instance");
   if (instance) {

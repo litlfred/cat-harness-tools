@@ -3,9 +3,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { jekyllNavPages, pagesNav } from "../lib/jekyll-pages-nav.ts";
+import { jekyllNavPages, harnessOfUrl, pagesNav } from "../lib/jekyll-pages-nav.ts";
 import { expandRail, injectRail, railDataJson } from "../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "../lib/navbar.ts";
+import { pageLangOf } from "../mount-instance-docs.ts";
 
 /**
  * The rail's server-built "Pages" section — owner, 2026-10-15, "folio rail
@@ -92,5 +93,103 @@ describe("the rail carries Pages, from shared data too", () => {
       expect(labels).toEqual([RAIL_SECTION_LABELS.pages, RAIL_SECTION_LABELS.folders]);
       expect(html).toContain('href="../guide/install.html"');
     }
+  });
+});
+
+describe("xka5 — Pages grouped by harness from the URL, with sub-doc graphs from _config.yml defaults", () => {
+  const HARNESS_SITE = {
+    "_config.yml": [
+      "defaults:",
+      '  - scope: { path: "start" }',
+      '    values: { parent: "Start here" }',
+      '  - scope: { path: "concepts" }',
+      '    values: { parent: "Concepts" }',
+      '  - scope: { path: "*/README.md" }',
+      "    values: { nav_exclude: true }",
+      '  - scope: { path: "start/*" }',
+      '    values: { permalink: "/docs/cat-harness/:path/:basename:output_ext" }',
+      '  - scope: { path: "concepts/*" }',
+      '    values: { permalink: "/docs/cat-harness/:path/:basename:output_ext" }',
+    ].join("\n"),
+    "index.md": fm({ title: "Home", nav_order: 1 }),
+    "start/README.md": fm({ title: "Start README" }),
+    "start/index.md": fm({ title: "Start here", parent: "" }),
+    "start/installation.md": fm({ title: "Installation", nav_order: 99 }),
+    "start/getting-started.md": fm({ title: "Getting started", nav_order: 1 }),
+    "concepts/index.md": fm({ title: "Concepts", parent: "" }),
+    "concepts/architecture.md": fm({ title: "Architecture" }),
+    "concepts/theming.md": fm({ title: "Theming", parent: "Architecture", grand_parent: "Concepts" }),
+    "who-iris/index.md": fm({ title: "WHO IRIS", permalink: "/docs/who-iris/" }),
+    "who-iris/ingest.md": fm({ title: "Ingestion", parent: "WHO IRIS", permalink: "/docs/who-iris/ingest.html" }),
+  };
+
+  test("harnessOfUrl derives the harness from /docs/<h>/, /<outer>/docs/<h>/, and /<h>/docs/", () => {
+    expect(harnessOfUrl("/docs/cat-harness/start/")).toBe("cat-harness");
+    expect(harnessOfUrl("/docs/who-iris/ingest.html")).toBe("who-iris");
+    expect(harnessOfUrl("/cat-harness/docs/smart-base/overview.html")).toBe("smart-base");
+    expect(harnessOfUrl("/smart-base/docs/index.html")).toBe("smart-base");
+    expect(harnessOfUrl("/")).toBeUndefined();
+    expect(harnessOfUrl("/guide/install.html")).toBeUndefined();
+  });
+
+  test("_config.yml defaults supply parent and nav_exclude; parent: '' keeps a group index at its harness root", () => {
+    const navPages = jekyllNavPages(site(HARNESS_SITE));
+    expect(navPages.some((p) => p.title === "Start README")).toBe(false);
+    expect(navPages.find((p) => p.title === "Start here")!.parent).toBeUndefined();
+    expect(navPages.find((p) => p.title === "Installation")!.parent).toBe("Start here");
+    expect(navPages.find((p) => p.title === "Architecture")!.parent).toBe("Concepts");
+  });
+
+  test("top level is Home plus the harnesses derived from the URL; sub-doc graphs nest below each harness", () => {
+    const { items, orphans } = pagesNav(jekyllNavPages(site(HARNESS_SITE)), {
+      prefix: "..",
+      here: "/docs/cat-harness/concepts/theming.html",
+      locale: "en",
+    });
+    expect(orphans).toEqual([]);
+    expect(items.map((i) => i.label)).toEqual(["Home", "cat-harness", "WHO IRIS"]);
+    const ch = items.find((i) => i.label === "cat-harness")!;
+    expect(ch.fold).toBe("2 pages");
+    expect(ch.children!.map((c) => c.label)).toEqual(["Concepts", "Start here"]);
+    const start = ch.children!.find((c) => c.label === "Start here")!;
+    expect(start.depth).toBe(1);
+    expect(start.children!.map((c) => c.label)).toEqual(["Getting started", "Installation"]);
+    expect(start.children![0]!.depth).toBe(2);
+    const concepts = ch.children!.find((c) => c.label === "Concepts")!;
+    const arch = concepts.children![0]!;
+    expect(arch.label).toBe("Architecture");
+    expect(arch.depth).toBe(2);
+    const theming = arch.children![0]!;
+    expect(theming.label).toBe("Theming");
+    expect(theming.depth).toBe(3);
+    expect(theming.current).toBe(true);
+    const iris = items.find((i) => i.label === "WHO IRIS")!;
+    expect(iris.href).toBe("../docs/who-iris/");
+    expect(iris.children!.map((c) => c.label)).toEqual(["Ingestion"]);
+  });
+});
+
+describe("xka5 — order within a level is alphabetical in the reader's locale", () => {
+  const LOCALE_SITE = {
+    "index.md": fm({ title: "Home", nav_order: 99 }),
+    "angstrom.md": fm({ title: "Ångström", nav_order: 1 }),
+    "apple.md": fm({ title: "apple", nav_order: 50 }),
+    "zebra.md": fm({ title: "Zebra", nav_order: 2 }),
+    "zebra-b.md": fm({ title: "beta", parent: "Zebra", nav_order: 1 }),
+    "zebra-a.md": fm({ title: "Alpha", parent: "Zebra", nav_order: 2 }),
+  };
+
+  test("English ('en') sorts Ångström with A before apple and Zebra; Swedish ('sv') sorts Ångström after Zebra", () => {
+    const pages = jekyllNavPages(site(LOCALE_SITE));
+    const en = pagesNav(pages, { locale: "en" }).items;
+    const sv = pagesNav(pages, { locale: "sv" }).items;
+    expect(en.map((i) => i.label)).toEqual(["Home", "Ångström", "apple", "Zebra"]);
+    expect(sv.map((i) => i.label)).toEqual(["Home", "apple", "Zebra", "Ångström"]);
+    expect(en.find((i) => i.label === "Zebra")!.children!.map((c) => c.label)).toEqual(["Alpha", "beta"]);
+  });
+
+  test("pageLangOf reads <html lang='…'> and defaults to 'en'", () => {
+    expect(pageLangOf('<!doctype html><html lang="sv"><head></head><body></body></html>')).toBe("sv");
+    expect(pageLangOf("<!doctype html><html><head></head><body></body></html>")).toBe("en");
   });
 });

@@ -798,6 +798,14 @@ export interface RailPassOptions {
   themeSource?: string;
 }
 
+const HTML_LANG = /<html\b[^>]*\blang=["']([^"']+)["']/i;
+
+/** The page's declared `<html lang="…">`, or `"en"` when the page omits it — bean `xka5`. */
+export function pageLangOf(html: string): string {
+  const m = HTML_LANG.exec(html);
+  return m?.[1]?.trim() || "en";
+}
+
 /**
  * The platform's generated DATA `docs-ui.js` reads, shipped with a foreign
  * site beside {@link PINNED_CHROME_FILES} — owner, 2026-10-15, "Yes, ship
@@ -1059,7 +1067,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       // other themed page (`railStandalonePages`), or the page shows both.
       const before = pageTree !== undefined && hasThemeSidebar(read) ? stripThemeSidebar(read) : read;
       const mark = instanceMark(built, m.name, toRoot);
-      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
       const railed = injectRailOnce(before, {
         ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
@@ -1494,7 +1502,7 @@ export function railStandalonePages(
       // The landing's mark is not this site's: a site with no instance of its own draws none.
       const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
       // The page tree, cut to the instance's own pages when the page is inside one.
-      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
       const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
       const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
