@@ -32,6 +32,7 @@ import {
   type NavbarModel,
 } from "../lib/navbar.js";
 import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, injectRail, wantsLinkedRail, railModel, withNavbarRow } from "../lib/harness-rail.js";
+import { injectRailOnce } from "../lib/rail-once.js";
 import { NAVBAR_CSS, documentIndexOf, visualiserLabelOf } from "../lib/navbar.js";
 import { thinPageHtml } from "../thin-page.js";
 import {
@@ -685,17 +686,16 @@ describe("the document index — `documentIndexOf`", () => {
     expect(graphs).not.toContain('href="#a"');
   });
 
-  it("drops the declaration once the rail has read it, and keeps a malformed one (gp2f)", () => {
+  it("injectRailOnce drops the declaration once the rail has read it, and keeps a malformed one (gp2f)", () => {
     const decl = `<script type="application/json" data-fa-visualiser-nav>[{"label":"node-x","href":"#node-x"}]</script>`;
     const opts = { instance: "cat-harness", toRoot: "..", links: [] };
-    const read = injectRail(page(`${decl}<h2 id="a">A</h2>`), opts)!;
+    const read = injectRailOnce(page(`${decl}<h2 id="a">A</h2>`), opts)!;
     expect(region(read, "fa-nav-graphs")).toContain('href="#node-x"');
     expect(read).not.toContain("data-fa-visualiser-nav");
     const bad = `<script type="application/json" data-fa-visualiser-nav>not json</script>`;
-    expect(injectRail(page(`${bad}<h2 id="a">A</h2>`), opts)!).toContain(bad);
+    expect(injectRailOnce(page(`${bad}<h2 id="a">A</h2>`), opts)!).toContain(bad);
     // Railed from shared data, the page keeps the menu once: in `#fa-rail`.
-    const files: string[] = [];
-    const shared = injectRail(page(`${decl}<h2 id="a">A</h2>`), { ...opts, emitRailData: (f) => files.push(f) })!;
+    const shared = injectRailOnce(page(`${decl}<h2 id="a">A</h2>`), { ...opts, emitRailData: () => {} })!;
     expect(shared).not.toContain("data-fa-visualiser-nav");
     expect(shared).toContain('"documentIndex"');
   });

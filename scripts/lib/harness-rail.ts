@@ -36,7 +36,6 @@
 export {
   documentIndexOf,
   visualiserNavOf,
-  withoutVisualiserNav,
   NAV_COLLAPSED_PX,
   NAV_GLYPH_PX,
   NAV_OPEN_PX,
@@ -47,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, withoutVisualiserNav, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -260,14 +259,9 @@ export function wantsLinkedRail(html: string): boolean {
  * An explicit `o.documentIndex` still wins, for a caller that has a better
  * answer than the headings — a declared index in the graph, say.
  */
-export function injectRail(page: string, o: RailOptions): string | undefined {
-  const label = o.visualiserLabel ?? visualiserLabelOf(page) ?? RAIL_SECTION_LABELS.onThisPage;
-  const declared = o.documentIndex ? undefined : visualiserNavOf(page, label);
-  const documentIndex = o.documentIndex ?? declared ?? documentIndexOf(page, label);
-  // A declaration the rail has just read is not left behind as a second copy
-  // of the same menu (bean `gp2f`). A malformed one is kept: the rail fell
-  // back to the headings, and `check-viewer-nav.ts` is what reports it.
-  const html = declared ? withoutVisualiserNav(page) : page;
+export function injectRail(html: string, o: RailOptions): string | undefined {
+  const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? RAIL_SECTION_LABELS.onThisPage;
+  const documentIndex = o.documentIndex ?? visualiserNavOf(html, label) ?? documentIndexOf(html, label);
   const root = o.assetRoot ?? o.toRoot;
   const chrome = o.chromeRoot ?? root;
   if (o.emitRailData) {
