@@ -2,11 +2,11 @@
 # folio-assistant-8wj1
 $schema: bean/1.0.0
 title: 'QA READERS F4: block and translation read-modify-write writers stop dropping agent verdicts when the prior is absent — the block-qa D2 split'
-status: todo
+status: in-progress
 type: task
 priority: critical
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-22T17:01:31Z
+updated_at: 2026-10-23T07:52:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -127,3 +127,16 @@ The claimed work is NOT all on main: the unticked Done-when boxes above are what
   - A branch read that cannot be made refuses loudly (exit 2), the same way the readers in #563 and #564 do. It never falls back silently to the working copy.
 
 This bean stays in-progress until B's `--prior-from` writers land, together with #563 and #564.
+
+
+*2026-10-23T07:52:00Z* — Option (B) under way; claimed by lane A (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr).
+- **litlfred/cat-harness-tools#568** adds `--prior-from <ref>` to every block writer. These are qa-sweep; integration-audit, which passes the flag through to its child qa-sweep; language-trap-audit; proof-narrative-lean-equiv-sweep; q-usage-audit; qa-agent-entry; qa-merge-findings; and src/qa-agent-write.
+- **How a read at the ref resolves:**
+  - A hit is the prior.
+  - A miss is a block with no history.
+  - An unreachable store, or a report that is corrupt or not block-qa/v1, refuses that block with an `UNKNOWN … Nothing was written for it` line, and the run exits 2. It never falls back to the working copy.
+  - A malformed ref exits 2 before any read.
+- **Merged:** #564 (`qa-staleness --against`), 2026-10-23.
+- **Open:** #563 (translation:block-qa:check) and #568.
+
+Stays in-progress until #563 and #568 land.
