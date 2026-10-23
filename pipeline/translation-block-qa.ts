@@ -1049,10 +1049,18 @@ if (import.meta.main) {
     against = a.against;
     // Bean `8wj1`: in a stored tree, the prior comes from the branch whenever
     // its entry can be read, so the working copy cannot change the result.
+    // A bad ref was refused by `againstOrUsage` above; what `readQaManifest`
+    // throws here is "no remote" / "not inside a git checkout" (standalone lays
+    // the layers out under a parent directory with no `.git`), which is
+    // unknown, the same as `judgeSidecarTree` below.
     if (against !== undefined && derivedStored()) {
-      const m = readQaManifest(against);
-      if (m.state === "hit") priorRef = against;
-      else console.error(`  advisory: priors read from the working copy — qa-reports:${against} is ${m.state} (${m.reason})`);
+      try {
+        const m = readQaManifest(against);
+        if (m.state === "hit") priorRef = against;
+        else console.error(`  advisory: priors read from the working copy — qa-reports:${against} is ${m.state} (${m.reason})`);
+      } catch (e) {
+        console.error(`  advisory: priors read from the working copy — qa-reports:${against} is unknown (${(e as Error).message})`);
+      }
     }
   }
   const rootArg = arg("root", "");
