@@ -812,6 +812,51 @@ describe("a render-exempt instance is not missing what it was excused from", () 
     const who = tilesOf(f).find((t) => t.name === "who")!;
     expect(who.findings.join(" ")).toContain("no published viewer");
   });
+
+  test("a directory declaring `coverage.exempt.visualiser` renders `no viewer by design` and a `Not a gap` finding (bean folio-assistant-6gme)", () => {
+    // `folio-assistant-sci/folio-assistant-sci.json` declares `coverage.exempt.visualiser`
+    // on `sci-lean` ("This directory holds a Lean TEMPLATE, not a Lake package...").
+    // `check-subgraph-coverage.ts` honours `dir.coverage?.exempt?.visualiser`, and
+    // `harness-tiles.ts` must agree so the row says "no viewer by design" and the
+    // finding says "Not a gap" while non-exempted unbuilt kinds still report as gaps.
+    const f = fixture({
+      host: host(),
+      sci: {
+        name: "sci",
+        needs: ["host"],
+        directories: [
+          {
+            id: "sci-lean",
+            path: "lean/",
+            graphTypologies: ["lean"],
+            coverage: {
+              exempt: {
+                visualiser: "This directory holds a Lean TEMPLATE, not a Lake package.",
+              },
+            },
+          },
+          {
+            id: "lib",
+            path: "library/",
+            graphTypologies: ["library"],
+          },
+        ],
+      },
+    });
+    const sci = tilesOf(f).find((t) => t.name === "sci")!;
+    expect(sci.visualisations).toEqual([
+      { kind: "lean", label: "Lean packages", note: "no viewer by design" },
+      { kind: "library", label: "Library", note: "no viewer yet" },
+    ]);
+    const exemptFinding = sci.findings.find((x) => x.includes("render no viewer"))!;
+    expect(exemptFinding).toContain("lean");
+    expect(exemptFinding).toContain("coverage.exempt.visualiser");
+    expect(exemptFinding).toContain("Not a gap");
+    expect(exemptFinding).toContain("This directory holds a Lean TEMPLATE");
+    const gapFinding = sci.findings.find((x) => x.includes("no published viewer"))!;
+    expect(gapFinding).toContain("library");
+    expect(gapFinding).not.toContain("lean");
+  });
 });
 
 describe("an icon's URL is the SITE DIRECTORY's mount, not the instance's front door", () => {
