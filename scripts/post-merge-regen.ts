@@ -28,11 +28,16 @@
  *    and opens NO repair PR, preventing churn.
  * 4. Honest reporting: if a check has no writer or its writer fails, it is
  *    reported as unrepaired/defect (exit 1), not claimed as a repair.
+ * 5. A `builtAtPublish` output is never stale (bean `folio-assistant-p7mb`):
+ *    a check whose writer moved only paths an instance declares it builds at
+ *    publish is reported in `builtAtPublishChecks`, not as stale or repaired.
+ *    Those paths are gitignored, so no repair of them could ever land.
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 import { loadGates } from "./gates.ts";
 import {
@@ -44,7 +49,9 @@ import {
   type Pair,
   type Runner,
 } from "./regen-after-merge.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { pairIO } from "./task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -77,6 +84,156 @@ export const FIXITY_CHECKS: Readonly<Record<string, string>> = {
 /** The pairs post-merge regen asks: every repairable pair but the {@link FIXITY_CHECKS}. */
 export function postMergePairs<P extends { check: string }>(pairs: readonly P[]): P[] {
   return pairs.filter((p) => FIXITY_CHECKS[p.check] === undefined);
+}
+
+/** One instance's root and what it declares it builds at publish. */
+export interface PublishTimeDeclaration {
+  /** Absolute. */
+  root: string;
+  builtAtPublish: readonly Pick<BuiltAtPublish, "path">[];
+}
+
+/** Every instance under `repoRoot` that declares `builtAtPublish` (bean `p7mb`). */
+export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaration[] {
+  return instanceRootsIn(repoRoot).flatMap((root) => {
+    let list: readonly BuiltAtPublish[] = [];
+    try {
+      list = readDeclaration(root)?.builtAtPublish ?? [];
+    } catch {
+      // An unreadable declaration declares nothing here: its paths then count
+      // as committed, which can keep a check stale, never hide a stale one.
+    }
+    return list.length > 0 ? [{ root: resolve(root), builtAtPublish: list }] : [];
+  });
+}
+
+/**
+ * Whether `rel` (repo-relative) is declared `builtAtPublish` by the instance
+ * that holds it: the deepest instance root containing it, asked through
+ * {@link isBuiltAtPublish} with the path relative to that root.
+ */
+export function builtAtPublishIn(rel: string, decls: readonly PublishTimeDeclaration[], repoRoot: string): boolean {
+  const abs = resolve(repoRoot, rel);
+  let owner: PublishTimeDeclaration | undefined;
+  for (const d of decls) {
+    if ((abs === d.root || abs.startsWith(d.root + sep)) && (owner === undefined || d.root.length > owner.root.length)) owner = d;
+  }
+  if (owner === undefined) return false;
+  return isBuiltAtPublish(owner.builtAtPublish, relative(owner.root, abs).split(sep).join("/"));
+}
+
+/** What a writer moved: paths declared `builtAtPublish`, and every other path. */
+export interface WriterMoves {
+  builtAtPublish: string[];
+  committed: string[];
+}
+
+/**
+ * Watches the tree around each writer, so a check that was red ONLY because
+ * its `builtAtPublish` outputs were absent is not reported stale (bean `p7mb`).
+ *
+ * Why it is needed: CI judges a publish-time writer's `:check` after
+ * `derive:publish` has built those outputs (folio-assistant's `publish-pages`
+ * job). Post-merge regen runs no `derive:publish`, so in its tree the outputs
+ * are absent, the check is red, the writer "repairs" it, and the run listed it
+ * stale and repaired — files that are gitignored and can never be committed
+ * (cat-harness run 39786173033: `library:viz`, `uploads:viz`, `voices:viz`,
+ * `document-kinds:viz`, `slice:sqlite`, …).
+ *
+ * `take()` returns what moved since the previous `take()`. The first call
+ * only lays the baseline. A path under a declaration is judged by its stat
+ * (added, removed or rewritten); any other path by its bytes, so a writer that
+ * rewrites a committed file with the same bytes moved nothing. A file whose
+ * stat did not change is taken as unchanged, so nothing is rehashed for it.
+ */
+export interface MoveTracker {
+  take: () => WriterMoves;
+}
+
+/** Never content: install artefacts, git, and the scratch a build writes (as `publish-check.ts`). */
+const UNWATCHED_DIRS = new Set(["node_modules", ".git", "_site", "build"]);
+
+export function treeMoveTracker(repoRoot: string, decls: readonly PublishTimeDeclaration[] = publishTimeDeclarations(repoRoot)): MoveTracker {
+  type Seen = { stat: string; publishTime: boolean; hash?: string };
+  let last: Map<string, Seen> | undefined;
+  const walk = (prev: Map<string, Seen> | undefined): Map<string, Seen> => {
+    const out = new Map<string, Seen>();
+    const visit = (dir: string): void => {
+      let entries;
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (UNWATCHED_DIRS.has(e.name)) continue;
+        const abs = join(dir, e.name);
+        if (e.isDirectory()) visit(abs);
+        else if (e.isFile()) {
+          const rel = relative(repoRoot, abs).split(sep).join("/");
+          const st = statSync(abs);
+          const stat = `${st.size}:${st.mtimeMs}:${st.ctimeMs}`;
+          const before = prev?.get(rel);
+          const publishTime = before?.publishTime ?? builtAtPublishIn(rel, decls, repoRoot);
+          if (publishTime) out.set(rel, { stat, publishTime });
+          else if (before !== undefined && before.stat === stat) out.set(rel, before);
+          else out.set(rel, { stat, publishTime, hash: createHash("sha256").update(readFileSync(abs)).digest("hex") });
+        }
+      }
+    };
+    visit(repoRoot);
+    return out;
+  };
+  return {
+    take: () => {
+      const now = walk(last);
+      const prev = last;
+      last = now;
+      const moves: WriterMoves = { builtAtPublish: [], committed: [] };
+      if (prev === undefined) return moves;
+      for (const p of new Set([...prev.keys(), ...now.keys()])) {
+        const a = prev.get(p);
+        const b = now.get(p);
+        const publishTime = (a ?? b)!.publishTime;
+        const moved = publishTime ? a?.stat !== b?.stat : a?.hash !== b?.hash;
+        if (moved) (publishTime ? moves.builtAtPublish : moves.committed).push(p);
+      }
+      moves.builtAtPublish.sort();
+      moves.committed.sort();
+      return moves;
+    },
+  };
+}
+
+/**
+ * Wrap `runner` so every run of a pair's WRITER is watched by `tracker`, and
+ * what it moved is added up per writer in `moves` (all passes together).
+ */
+export function watchWriters(
+  runner: Runner,
+  writers: ReadonlySet<string>,
+  tracker: MoveTracker,
+  moves: Map<string, WriterMoves>,
+): Runner {
+  return async (script: string): Promise<boolean> => {
+    if (!writers.has(script)) return runner(script);
+    tracker.take(); // what moved before it is not this writer's
+    const ok = await runner(script);
+    const m = tracker.take();
+    const sum = moves.get(script) ?? { builtAtPublish: [], committed: [] };
+    moves.set(script, { builtAtPublish: [...sum.builtAtPublish, ...m.builtAtPublish], committed: [...sum.committed, ...m.committed] });
+    return ok;
+  };
+}
+
+/**
+ * A check whose writer, in every run, moved at least one `builtAtPublish` path
+ * and nothing else: it was red only because its publish-time outputs were not
+ * built, which is not staleness of anything a commit holds.
+ */
+export function onlyBuiltAtPublish(writer: string | undefined, moves: ReadonlyMap<string, WriterMoves>): boolean {
+  const m = writer === undefined ? undefined : moves.get(writer);
+  return m !== undefined && m.builtAtPublish.length > 0 && m.committed.length === 0;
 }
 
 /**
@@ -124,6 +281,13 @@ export interface PostMergeRegenOptions {
   pairs?: readonly Pair[];
   explain?: boolean;
   runner?: Runner;
+  /**
+   * Watches the tree around each writer ({@link treeMoveTracker}). Defaults to
+   * one over `repoRoot` when the runner is the real one; an injected runner
+   * runs no real writer, so there is nothing on disk to watch unless a tracker
+   * is injected with it.
+   */
+  tracker?: MoveTracker;
   git?: GitExecutor;
   gh?: GhExecutor;
 }
@@ -135,6 +299,12 @@ export interface PostMergeRegenReport {
   repairedChecks: string[];
   unrepairedChecks: string[];
   noWriterChecks: string[];
+  /**
+   * Checks that were red only because their `builtAtPublish` outputs were not
+   * built: their writer moved declared publish-time paths and nothing else
+   * (bean `p7mb`). Not stale, not repaired, and never in a repair PR.
+   */
+  builtAtPublishChecks: string[];
   changedFiles: string[];
   prOpened: boolean;
   prUrl?: string;
@@ -259,7 +429,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     ]);
   }
 
-  const runner: Runner =
+  const baseRunner: Runner =
     opts.runner ??
     (async (script: string): Promise<boolean> => {
       const r = spawnSync("bun", ["run", "cat", script], {
@@ -269,13 +439,19 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       });
       return r.status === 0;
     });
+  // Bean `p7mb`: what each writer moves, so a check red only for want of its
+  // publish-time outputs is told apart from a stale one after the repair pass.
+  const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot) : undefined);
+  const moves = new Map<string, WriterMoves>();
+  const writers = new Set(pairs.flatMap((p) => (p.writer === undefined ? [] : [p.writer])));
+  const runner: Runner = tracker === undefined ? baseRunner : watchWriters(baseRunner, writers, tracker, moves);
 
   // Step 1: Audit pass with dryRun: true to inspect current state of derived artefacts
   const { results: auditResults } = await regenPass(pairs, runner, { dryRun: true });
 
   const stale = auditResults.filter((r) => r.outcome === "regenerated");
   const noWriter = auditResults.filter((r) => r.outcome === "no-writer");
-  const staleCheckNames = stale.map((s) => s.check);
+  let staleCheckNames = stale.map((s) => s.check);
   const noWriterCheckNames = noWriter.map((n) => n.check);
 
   // Negative control check: If no files are stale and no checks failed without a writer, clean!
@@ -286,6 +462,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: [],
       unrepairedChecks: [],
       noWriterChecks: [],
+      builtAtPublishChecks: [],
       changedFiles: [],
       prOpened: false,
       summary: `Clean (negative control): all ${pairs.length} verify/write pair(s) are current. No repair needed, 0 PRs opened.`,
@@ -301,6 +478,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: [],
       unrepairedChecks: [],
       noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: [],
       changedFiles: [],
       prOpened: false,
       summary: `Defect: ${noWriter.length} check(s) failed with no writer counterpart: ${noWriterCheckNames.join(", ")}`,
@@ -317,20 +495,13 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   }
   const shortSha = currentSha && currentSha !== "unknown" ? currentSha.slice(0, 10) : Date.now().toString(36);
   const branch = opts.branchName ?? `automation/post-merge-regen-${shortSha}`;
-  const prTitle = `fix(derived): regenerate post-merge derived artefacts (${staleCheckNames.join(", ")})`;
-  const prBody = buildPrBody({
-    staleChecks: staleCheckNames,
-    commitSha: currentSha,
+  const payloadFor = (checks: readonly string[]) => ({
+    title: `fix(derived): regenerate post-merge derived artefacts (${checks.join(", ")})`,
+    body: buildPrBody({ staleChecks: checks, commitSha: currentSha, branch, base: baseBranch }),
     branch,
     base: baseBranch,
   });
-
-  const prPayload = {
-    title: prTitle,
-    body: prBody,
-    branch,
-    base: baseBranch,
-  };
+  let prPayload = payloadFor(staleCheckNames);
 
   // If in dry-run mode or check-only mode:
   if (opts.dryRun) {
@@ -340,6 +511,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: [],
       unrepairedChecks: [],
       noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: [],
       changedFiles: [],
       prOpened: false,
       repairBranch: branch,
@@ -356,6 +528,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: [],
       unrepairedChecks: [],
       noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: [],
       changedFiles: [],
       prOpened: false,
       repairBranch: branch,
@@ -370,9 +543,37 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   const unrepaired = fixpoint.results.filter(
     (r) => r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer",
   );
-  const repaired = fixpoint.results.filter((r) => r.outcome === "regenerated");
+  // A repair whose writer moved only `builtAtPublish` paths built what the
+  // publish builds; nothing a commit holds was stale (bean `p7mb`).
+  const builtAtPublishCheckNames = fixpoint.results
+    .filter((r) => r.outcome === "regenerated" && onlyBuiltAtPublish(r.writer, moves))
+    .map((r) => r.check);
+  const publishTime = new Set(builtAtPublishCheckNames);
+  const repaired = fixpoint.results.filter((r) => r.outcome === "regenerated" && !publishTime.has(r.check));
   const repairedCheckNames = repaired.map((r) => r.check);
   const unrepairedCheckNames = unrepaired.map((u) => u.check);
+  staleCheckNames = staleCheckNames.filter((c) => !publishTime.has(c));
+  const publishNote =
+    builtAtPublishCheckNames.length > 0
+      ? ` ${builtAtPublishCheckNames.length} check(s) were red only for want of their builtAtPublish outputs, not stale: ${builtAtPublishCheckNames.join(", ")}.`
+      : "";
+
+  if (unrepaired.length === 0 && repaired.length === 0 && staleCheckNames.length === 0) {
+    return {
+      status: "clean",
+      staleChecks: [],
+      repairedChecks: [],
+      unrepairedChecks: [],
+      noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: builtAtPublishCheckNames,
+      changedFiles: [],
+      prOpened: false,
+      summary: `Clean: nothing a commit holds is stale.${publishNote} No repair PR.`,
+      exitCode: 0,
+    };
+  }
+  prPayload = payloadFor(staleCheckNames);
+  const prTitle = prPayload.title;
 
   if (unrepaired.length > 0) {
     return {
@@ -381,6 +582,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: repairedCheckNames,
       unrepairedChecks: unrepairedCheckNames,
       noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: builtAtPublishCheckNames,
       changedFiles: [],
       prOpened: false,
       repairBranch: branch,
@@ -399,9 +601,10 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       repairedChecks: repairedCheckNames,
       unrepairedChecks: [],
       noWriterChecks: noWriterCheckNames,
+      builtAtPublishChecks: builtAtPublishCheckNames,
       changedFiles: [],
       prOpened: false,
-      summary: `Writers ran but left 0 changed files in working copy. Negative control: no repair PR needed.`,
+      summary: `Writers ran but left 0 changed files in working copy. Negative control: no repair PR needed.${publishNote}`,
       exitCode: 0,
     };
   }
@@ -420,6 +623,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
         repairedChecks: repairedCheckNames,
         unrepairedChecks: [],
         noWriterChecks: noWriterCheckNames,
+        builtAtPublishChecks: builtAtPublishCheckNames,
         changedFiles,
         prOpened: false,
         prNumber,
@@ -457,6 +661,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     repairedChecks: repairedCheckNames,
     unrepairedChecks: [],
     noWriterChecks: noWriterCheckNames,
+    builtAtPublishChecks: builtAtPublishCheckNames,
     changedFiles,
     prOpened,
     prUrl,
@@ -465,7 +670,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     prPayload,
     summary: prOpened
       ? `Repaired ${repairedCheckNames.length} check(s). Opened repair PR #${prNumber ?? prUrl} on branch "${branch}".`
-      : `Repaired ${repairedCheckNames.length} check(s) across ${changedFiles.length} file(s). PR creation not requested (--create-pr).`,
+      : `Repaired ${repairedCheckNames.length} check(s) across ${changedFiles.length} file(s). PR creation not requested (--create-pr).${publishNote}`,
     exitCode: 0,
   };
 }
@@ -502,6 +707,9 @@ if (import.meta.main) {
     console.log(report.summary);
     if (report.staleChecks.length > 0) {
       console.log(`Stale check(s): ${report.staleChecks.join(", ")}`);
+    }
+    if (report.builtAtPublishChecks.length > 0) {
+      console.log(`Red only for want of builtAtPublish outputs, not stale: ${report.builtAtPublishChecks.join(", ")}`);
     }
     if (report.changedFiles.length > 0) {
       console.log(`Changed file(s) (${report.changedFiles.length}):\n${report.changedFiles.map((f) => `  ${f}`).join("\n")}`);
