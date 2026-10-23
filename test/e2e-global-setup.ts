@@ -40,7 +40,9 @@ export default function globalSetup(): void {
   // The same resolution both specs use: the instance directory above `test/`.
   const stub = artefactStubFor(join(HARNESS_ROOT));
   for (const [file, script, ...args] of [
-    [`_kg/${stub}.jsonld`, "cat-harness-tools/scripts/kg-export.ts"],
+    // The document's published path under `_kg/`, the instance's own
+    // directory (#603 decision 1b), which the exporter's default `--out` is.
+    [`_kg/${stub}/${stub}.jsonld`, "cat-harness-tools/scripts/kg-export.ts"],
     [`_kg/${stub}/index.html`, "cat-harness-tools/scripts/kg-viewer.ts", "--out", `_kg/${stub}/index.html`],
   ] as const) {
     if (!existsSync(file)) execFileSync("bun", ["run", script, ...args], { stdio: "inherit" });

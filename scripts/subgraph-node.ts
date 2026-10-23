@@ -39,20 +39,21 @@
  * without the Subgraph node or a member without `inSubgraph` fails it.
  */
 
-/** The fragment kind `kg-export` mints a declared directory's node under. */
+import { subjectIri } from "./lib/subject-iri.ts";
+
+/** The kind `kg-export` mints a declared directory's node under. */
 export const SUBGRAPH_FRAGMENT_KIND = "directory";
 
 /**
- * The declared Subgraph node's IRI, in the document `docIri` names.
+ * The declared Subgraph node's IRI, in the document `docIri` names:
+ * `<doc dir>/directory/<id>` (litlfred/cat-harness-tools#603).
  *
- * `kg-export`'s `makeIri(docIri, "directory", id)`, stated here so a publisher
- * need not import the exporter, and pinned equal to it by
- * `subgraph-node.test.ts`: `/` stays legal in the fragment, and only the
- * characters that end or re-delimit a fragment are escaped.
+ * `kg-export`'s `makeIri(docIri, "directory", id)` — both call
+ * `lib/subject-iri.ts`, so a publisher need not import the exporter and the
+ * two cannot drift; `subgraph-node.test.ts` pins them equal.
  */
 export function subgraphIri(docIri: string, id: string): string {
-  const safe = id.replace(/[%#?\s]/g, (c) => encodeURIComponent(c));
-  return `${docIri}#${SUBGRAPH_FRAGMENT_KIND}/${safe}`;
+  return subjectIri(docIri, SUBGRAPH_FRAGMENT_KIND, id);
 }
 
 /** The member's edge to its subgraph. Spread it into each member node. */

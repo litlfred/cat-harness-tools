@@ -353,6 +353,8 @@ describe("gen-slice-sqlite — library", () => {
 
 describe("gen-slice-sqlite — kg", () => {
   const DOC = "https://example.org/site/x.jsonld";
+  // Subjects are paths beside the document since #603.
+  const DIR = "https://example.org/site/";
   const doc = {
     "@id": DOC,
     "@context": {
@@ -362,28 +364,28 @@ describe("gen-slice-sqlite — kg", () => {
       title: "ex:title",
     },
     "@graph": [
-      { "@id": `${DOC}#skill/b`, "@type": "https://example.org/ns#Skill", name: "b", title: "Late materialization skill", partOf: `${DOC}#pkg/p`, uses: [`${DOC}#skill/a`, `${DOC}#missing`] },
-      { "@id": `${DOC}#skill/a`, "@type": ["https://example.org/ns#Skill"], name: "a", description: "Indexes descriptions without storing them.", partOf: { "@id": `${DOC}#pkg/p` } },
-      { "@id": `${DOC}#pkg/p`, "@type": "https://example.org/ns#Package", name: "p" },
+      { "@id": `${DIR}skill/b`, "@type": "https://example.org/ns#Skill", name: "b", title: "Late materialization skill", partOf: `${DIR}package/p`, uses: [`${DIR}skill/a`, `${DIR}skill/missing`] },
+      { "@id": `${DIR}skill/a`, "@type": ["https://example.org/ns#Skill"], name: "a", description: "Indexes descriptions without storing them.", partOf: { "@id": `${DIR}package/p` } },
+      { "@id": `${DIR}package/p`, "@type": "https://example.org/ns#Package", name: "p" },
     ],
   };
 
-  test("nodes keyed by fragment, every @id-typed term an edge, types compacted, a dangling target reported by the view", () =>
+  test("nodes keyed by subject path, every @id-typed term an edge, types compacted, a dangling target reported by the view", () =>
     withDir((dir) => {
       const plan = emptyPlan();
-      plan.links.set(`${DOC}#skill/a`, { "@id": `${BASE}/payload/sha256/${"a".repeat(64)}`, sha256: "a".repeat(64), bytes: 9 });
+      plan.links.set(`${DIR}skill/a`, { "@id": `${BASE}/payload/sha256/${"a".repeat(64)}`, sha256: "a".repeat(64), bytes: 9 });
       const d = kgData(doc, plan);
       const m = buildSlice(KG_SLICE, d, dir);
       expect(m.rows).toEqual({ nodes: 3, edges: 4, dangling: 1 });
       const db = new Database(join(dir, m.file), { readonly: true });
       expect(db.query(`SELECT iri, type, payload_sha256 AS p FROM nodes ORDER BY rowid`).all()).toEqual([
-        { iri: "pkg/p", type: "ex:Package", p: null },
+        { iri: "package/p", type: "ex:Package", p: null },
         { iri: "skill/a", type: "ex:Skill", p: "a".repeat(64) },
         { iri: "skill/b", type: "ex:Skill", p: null },
       ]);
-      expect(db.query(`SELECT value FROM meta WHERE key = 'base'`).get()).toEqual({ value: `${DOC}#` });
-      expect(db.query(`SELECT src FROM incoming WHERE iri = 'pkg/p' ORDER BY src`).all()).toEqual([{ src: "skill/a" }, { src: "skill/b" }]);
-      expect(db.query(`SELECT dst FROM dangling`).all()).toEqual([{ dst: "missing" }]);
+      expect(db.query(`SELECT value FROM meta WHERE key = 'base'`).get()).toEqual({ value: DIR });
+      expect(db.query(`SELECT src FROM incoming WHERE iri = 'package/p' ORDER BY src`).all()).toEqual([{ src: "skill/a" }, { src: "skill/b" }]);
+      expect(db.query(`SELECT dst FROM dangling`).all()).toEqual([{ dst: "skill/missing" }]);
       const hit = db.query(`SELECT n.iri FROM kg_fts f JOIN nodes n ON n.rowid = f.rowid WHERE kg_fts MATCH ?`).all(`"without storing"`);
       expect(hit).toEqual([{ iri: "skill/a" }]);
       db.close();
@@ -392,7 +394,7 @@ describe("gen-slice-sqlite — kg", () => {
 
   test("a pointer at a payload the published tree does not hold fails --check", () => {
     const plan = emptyPlan();
-    plan.links.set(`${DOC}#skill/a`, { "@id": `${BASE}/payload/sha256/${"b".repeat(64)}`, sha256: "b".repeat(64), bytes: 1 });
+    plan.links.set(`${DIR}skill/a`, { "@id": `${BASE}/payload/sha256/${"b".repeat(64)}`, sha256: "b".repeat(64), bytes: 1 });
     withDir((dir) => {
       const problems = checkSlice(KG_SLICE as SliceDef, kgData(doc, plan), { publishedPayloadDir: dir });
       expect(problems.some((p) => p.includes("which the published tree does not hold"))).toBe(true);

@@ -51,7 +51,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const REPO_A11Y = join(HARNESS_ROOT);
 
 // The viewer lives one level DOWN from the graph — `_kg/<stub>/index.html`
-// reading `../<stub>.jsonld` — mirroring the published layout, where
+// reading `../<stub>/<stub>.jsonld` (#603 decision 1b) — mirroring the published layout, where
 // `<base>/<stub>/` is the directory that makes the extensionless
 // `<base>/<stub>` a page GitHub Pages can serve. Driving the real relative
 // path is the point: a viewer that resolved its document correctly in a flat
@@ -62,12 +62,12 @@ const REPO_A11Y = join(HARNESS_ROOT);
  *
  * These were `folio-assistant` literals until the 2026-09-21 stub rename
  * (issue #649), which is the same repair made in `kg-viewer.e2e.ts` and for
- * the same reason: the exporter writes `_kg/<stub>.jsonld`, so a literal here
+ * the same reason: the exporter writes `_kg/<stub>/<stub>.jsonld`, so a literal here
  * sends the suite looking for a file nothing produces.
  */
 const STUB = artefactStubFor(REPO_A11Y);
 
-// `_kg/${STUB}.jsonld` and its page are generated once, before any worker
+// `_kg/${STUB}/${STUB}.jsonld` and its page are generated once, before any worker
 // starts, by `e2e-global-setup.ts` (bean `dlqu`) — not here, where every
 // worker loading this module would run the generators concurrently.
 

@@ -162,6 +162,8 @@ import {
 } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
+import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
+import { placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -437,6 +439,11 @@ export function buildContext(): Record<string, unknown> {
     // document, which is the whole use of keeping the old `@id`.
     deprecated: { "@id": `${STANDARD_PREFIXES.owl}deprecated`, "@type": `${XSD}boolean` },
     isReplacedBy: { "@id": `${STANDARD_PREFIXES.dcterms}isReplacedBy`, ...link },
+    // A `#fragment` subject's tombstone also says it IS the slash-path node
+    // (litlfred/cat-harness-tools#603): the same subject under a new name, not
+    // a presentation of it — so `owl:sameAs` is right here where it is wrong
+    // for `alternateOf` above. See `migrationTombstones`.
+    sameAs: { "@id": `${STANDARD_PREFIXES.owl}sameAs`, ...link },
 
     // ── The standards a graph is written in, and what validates it ──────
     //
@@ -891,24 +898,23 @@ function keywordAliases(): Set<string> {
 }
 
 /**
- * How a node's IRI is formed: a **fragment of the published document**.
+ * How a node's IRI is formed: **`<doc dir>/<kind>/<id>`**, a path beside the
+ * published document — never a `#fragment` of it (litlfred/cat-harness-tools#603;
+ * the rule is cat-harness `kg-export.md` §"Subject IRIs — a path, not a
+ * `#fragment`"). A process's flow is the one exception, `…/process/P#flow/F`.
  *
- * `<base>/kg/<stub>.jsonld#skill/todo-manager` — fetching it retrieves this
- * document and the fragment selects the node, which is true. The tempting
- * alternative, `<base>/kg/skill/todo-manager`, reads better and is a **lie**:
- * nothing serves that path. AGENTS.md records the same defect in the README
- * generator, which composed PDF links by convention and shipped twenty-three
- * 404s. An `@id` that looks dereferenceable and is not is worse than one that
- * is obviously local.
+ * It was `<doc>#<kind>/<id>`, because a path nothing serves is a 404 with an
+ * `@id` in front of it — the README generator's twenty-three PDF 404s. That
+ * reason still holds, so the export now SERVES every path it mints:
+ * {@link writeSubjectDocuments} writes `<kind>/<id>.jsonld` and
+ * `<kind>/<id>.html` beside the document, and the old fragments keep a
+ * one-release tombstone ({@link migrationTombstones}).
+ *
+ * The form itself is `scripts/lib/subject-iri.ts`'s, so this and
+ * `subgraph-node`'s `subgraphIri` cannot spell it two ways.
  */
 export function makeIri(docIri: string, kind: string, id: string): string {
-  // `/` is legal in a fragment and is the separator this scheme uses, so it is
-  // deliberately NOT escaped — `encodeURIComponent` would turn every process
-  // node into `…#process/P%2Fnode%2FT`, which is both unreadable and a
-  // different IRI from the one a reader would type. Only the characters that
-  // genuinely terminate or re-delimit a fragment are escaped.
-  const safe = id.replace(/[%#?\s]/g, (c) => encodeURIComponent(c));
-  return `${docIri}#${kind}/${safe}`;
+  return subjectIri(docIri, kind, id);
 }
 
 interface Node {
@@ -2809,11 +2815,14 @@ function findDanglingLinks(graph: Node[], docIri: string): Array<{ from: string;
       if (v === undefined) continue;
       for (const to of Array.isArray(v) ? v : [v]) {
         const t = String(to);
-        // "Internal" means a fragment of THIS document. Testing for a bare `#`
-        // was wrong: FOLIO_NS itself ends in `#`, so every vocabulary IRI read
-        // as a broken node reference.
-        if (!t.startsWith(`${docIri}#`) && !ids.has(t)) continue;
-        if (!ids.has(t)) out.push({ from: String(n["@id"]), edge, to: t });
+        // "Internal" means a subject THIS document mints: `<doc dir>/<kind>/…`
+        // with a known kind (`subjectPathOf`). Testing for a bare `#` was
+        // wrong: FOLIO_NS itself ends in `#`, so every vocabulary IRI read as
+        // a broken node reference; and testing for the doc dir alone would
+        // claim every other instance's subjects for the host, whose document
+        // sits at the site root.
+        if (ids.has(t) || subjectPathOf(t, docIri) === undefined) continue;
+        out.push({ from: String(n["@id"]), edge, to: t });
       }
     }
   }
@@ -2988,13 +2997,23 @@ export function exportIdentity(opts: ExportOptions = {}): {
    * which is the same thing because `_site/` is served at the base.
    *
    * Returned rather than recomposed from `stub`, for the reason `base` is:
-   * `<stub>.jsonld` is right for the host instance and WRONG for a foreign
-   * one, which sits at `<stub>/<stub>.jsonld` (bean `dyd3`). A caller that
+   * a document sits at `<name>/<stub>.jsonld` (bean `dyd3`; the host too
+   * since 2026-10-23), and only one with its own `canonicalUrl` at
+   * `<stub>.jsonld`. A caller that
    * rebuilds it from the stub gets the host's answer for every instance, and
    * the QA sidecar did exactly that — naming its findings' subject as a
    * document at a path nothing writes.
    */
   docPath: string;
+  /**
+   * Where this document was published until 2026-10-23, when that is not
+   * `docPath`: the host's `<stub>.jsonld` at the site root, before every
+   * layer's document moved under `<base>/<name>/` (#603 decision 1b). Its
+   * one-release tombstones are written there and named by it.
+   */
+  legacyDocPath?: string;
+  /** {@link legacyDocPath} as an IRI under `base`. */
+  legacyDocIri?: string;
   /** The canonical document's IRI, when one is declared. */
   canonicalIri?: string;
   /** True when this export is published somewhere other than canonical. */
@@ -3084,8 +3103,8 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // `<baseurl>/<instantiated harness>/<path to rendered content>`** — with
   // `<baseurl>/bootstrap/bootstrap.jsonld` named as the worked example.
   //
-  // So the host publishes at the root and a foreign instance publishes under
-  // its own segment. This was `<base>/<stub>.jsonld` for both until `dyd3`,
+  // So the host published at the root and a foreign instance under its own
+  // segment — until 2026-10-23, below, when the host joined them. This was `<base>/<stub>.jsonld` for both until `dyd3`,
   // which is how bootstrap's graph came to exist at TWO paths under TWO
   // `@id`s — 88 subjects with two identities no consumer would ever merge.
   // Measured 2026-09-21: the site-root path had the 2 links and violated the
@@ -3100,14 +3119,30 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // The segment is the instance's NAME, through the one resolver
   // (`instanceDocPath`, bean `cat-tools-sthf`); `stub` names the file. They
   // are equal for every instance declared today, so this moved no address.
-  const docPath = foreignInstance && !ownCanonical ? instanceDocPath({ name: decl?.name ?? stub, stub }) : `${stub}.jsonld`;
+  //
+  // ── AND THE HOST TOO, since 2026-10-23 ─────────────────────────────────
+  //
+  // The host published at the root until the owner's ruling of 2026-10-23
+  // (litlfred/cat-harness-tools#603, decision 1b(i), "move all"): *the host
+  // is no longer special*. Its document, its Tools and its subjects sit under
+  // `<base>/<name>/` like every other layer's — one rule for every layer, and
+  // subjects beside their document. The root address it had is
+  // `legacyDocPath`, and the one-release tombstones name it.
+  //
+  // A foreign instance with its OWN `canonicalUrl` is unchanged here: on its
+  // own site it is the host, and where its document goes there is phase 2 of
+  // #603 (litlfred/cat-harness-tools#638).
+  const rootDocPath = `${stub}.jsonld`;
+  const docPath = foreignInstance && ownCanonical ? rootDocPath : instanceDocPath({ name: decl?.name ?? stub, stub });
   const docIri = renderingPath(base, docPath);
   const canonicalIri = canonicalBase ? renderingPath(canonicalBase, docPath) : undefined;
+  const legacyDocPath = foreignInstance ? undefined : rootDocPath;
   return {
     stub,
     docIri,
     base,
     docPath,
+    ...(legacyDocPath === undefined ? {} : { legacyDocPath, legacyDocIri: renderingPath(base, legacyDocPath) }),
     canonicalIri,
     isPreview: canonicalIri !== undefined && docIri !== canonicalIri,
     instanceDir: instance,
@@ -3209,17 +3244,29 @@ const tombstoneMemo = new Map<string, Promise<Tombstones>>();
  * DOCUMENT, found by its path. A node neither finds, or two owners claim, is a problem:
  * a tombstone that points nowhere is a 404 with extra steps.
  */
-async function tombstonesFor(kept: ReadonlySet<string>, docIri: string, base: string, baseUrl: string | undefined): Promise<Tombstones> {
-  const key = `${docIri}\0${base}\0${baseUrl ?? ""}\0${kept.size}`;
+async function tombstonesFor(
+  kept: ReadonlySet<string>,
+  docIri: string,
+  base: string,
+  baseUrl: string | undefined,
+  legacyDocIri: string = docIri,
+): Promise<Tombstones> {
+  const key = `${docIri}\0${legacyDocIri}\0${base}\0${baseUrl ?? ""}\0${kept.size}`;
   let hit = tombstoneMemo.get(key);
   if (hit === undefined) {
-    hit = computeTombstones(kept, docIri, base, baseUrl);
+    hit = computeTombstones(kept, docIri, base, baseUrl, legacyDocIri);
     tombstoneMemo.set(key, hit);
   }
   return hit;
 }
 
-async function computeTombstones(kept: ReadonlySet<string>, docIri: string, base: string, baseUrl: string | undefined): Promise<Tombstones> {
+async function computeTombstones(
+  kept: ReadonlySet<string>,
+  docIri: string,
+  base: string,
+  baseUrl: string | undefined,
+  legacyDocIri: string,
+): Promise<Tombstones> {
   const problems: string[] = [];
   // A source the CHECKOUT build could not read is a hole in the tombstone
   // set, so it is reported — prefixed, since the instance build read fine.
@@ -3235,7 +3282,7 @@ async function computeTombstones(kept: ReadonlySet<string>, docIri: string, base
   const dropped = new Map<string, Node>();
   for (const n of checkout) {
     const id = String(n["@id"]);
-    if (!kept.has(id) && id.startsWith(`${docIri}#`)) dropped.set(id, n);
+    if (!kept.has(id) && subjectPathOf(id, docIri) !== undefined) dropped.set(id, n);
   }
   if (dropped.size === 0) return { nodes: [], problems };
 
@@ -3250,18 +3297,21 @@ async function computeTombstones(kept: ReadonlySet<string>, docIri: string, base
     const { nodes } = await collectInstanceNodes(inst, id.docIri, id.base, [], undefined, baseUrl);
     for (const n of nodes) {
       const iri = String(n["@id"]);
-      if (!iri.startsWith(`${id.docIri}#`)) continue;
-      const frag = iri.slice(id.docIri.length + 1);
-      owners.set(frag, [...(owners.get(frag) ?? []), iri]);
+      const path = subjectPathOf(iri, id.docIri);
+      if (path === undefined) continue;
+      owners.set(path, [...(owners.get(path) ?? []), iri]);
     }
   }
 
   const nodes: Node[] = [];
   for (const [id, n] of [...dropped].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const claims = owners.get(id.slice(docIri.length + 1)) ?? [];
+    const claims = owners.get(subjectPathOf(id, docIri)!) ?? [];
+    // The host's last release published these under its ROOT document, which
+    // moved under `<base>/<name>/` in the same release (#603 decision 1b).
+    const old = legacyFragmentIri(id, docIri, legacyDocIri) ?? id;
     let to: string | undefined;
     if (claims.length > 1) {
-      problems.push(`tombstones: ${id} is minted by ${claims.length} instances (${claims.join(", ")}) — no single replacement`);
+      problems.push(`tombstones: ${old} is minted by ${claims.length} instances (${claims.join(", ")}) — no single replacement`);
       continue;
     }
     if (claims.length === 1) to = claims[0];
@@ -3271,14 +3321,56 @@ async function computeTombstones(kept: ReadonlySet<string>, docIri: string, base
       if (inst !== undefined && resolve(inst) !== resolve(ROOT)) to = publishedIdentity(inst, baseUrl).docIri;
     }
     if (to === undefined) {
-      problems.push(`tombstones: ${id} left this document and no instance publishes it — nothing to forward it to`);
+      problems.push(`tombstones: ${old} left this document and no instance publishes it — nothing to forward it to`);
       continue;
     }
     // No `@type`, by the ruling's shape: the node is no longer anything
     // here, and a type would put it back in every per-type count and view.
-    nodes.push({ "@id": id, deprecated: true, isReplacedBy: to } as unknown as Node);
+    // Named by the `#fragment` the last release published (#603): the
+    // slash-path form of a node that left was never published here, so a
+    // tombstone under it would forward an address nobody holds.
+    nodes.push({
+      "@id": old,
+      deprecated: true,
+      isReplacedBy: to,
+      ...(claims.length === 1 ? { sameAs: to } : {}),
+    } as unknown as Node);
   }
   return { nodes, problems };
+}
+
+/**
+ * One tombstone per subject this document now names by a PATH, under the
+ * `#fragment` IRI it had until litlfred/cat-harness-tools#603:
+ *
+ *     { "@id": "<old doc>#<kind>/<id>", "deprecated": true,
+ *       "isReplacedBy": "<doc dir>/<kind>/<id>", "sameAs": "<doc dir>/<kind>/<id>" }
+ *
+ * `<old doc>` is `legacyDocIri` when the document itself moved — the host's,
+ * from `<base>/<stub>.jsonld` to `<base>/<name>/<stub>.jsonld` (owner,
+ * 2026-10-23, decision 1b: one rule for every layer, subjects beside their
+ * document). Then each Tool's old document gets one as well,
+ * `<base>/tools/<id>.jsonld` → `<base>/<name>/tools/<id>.jsonld`.
+ *
+ * The {@link tombstonesFor} shape, for the reason it exists: GitHub Pages
+ * cannot redirect a fragment, so a consumer holding the old `@id` fetches this
+ * document and must find the new name at the old one. `sameAs` because it is
+ * the same subject under a new name. ONE RELEASE ONLY, like those — remove in
+ * the next, with the `sameAs` context term.
+ */
+export function migrationTombstones(graph: readonly Node[], docIri: string, legacyDocIri: string = docIri): Node[] {
+  const out: Node[] = [];
+  for (const n of graph) {
+    const id = String(n["@id"]);
+    const old =
+      legacyFragmentIri(id, docIri, legacyDocIri) ??
+      (legacyDocIri !== docIri && n["@type"] === termIri("Tool") && typeof n.name === "string" && id === toolIri(docIri, n.name)
+        ? toolIri(legacyDocIri, n.name)
+        : undefined);
+    if (old === undefined) continue;
+    out.push({ "@id": old, deprecated: true, isReplacedBy: id, sameAs: id } as unknown as Node);
+  }
+  return out;
 }
 
 /**
@@ -3313,6 +3405,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     docIri,
     base,
     docPath,
+    legacyDocIri,
     canonicalIri,
     isPreview,
     instanceDir: exportedInstance,
@@ -3443,8 +3536,9 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
         n.alternateOf = toolIri(canonicalIri, String(n.name));
         continue;
       }
-      if (!id.startsWith(`${docIri}#`)) continue;
-      n.alternateOf = `${canonicalIri}#${id.slice(docIri.length + 1)}`;
+      const path = subjectPathOf(id, docIri);
+      if (path === undefined) continue;
+      n.alternateOf = `${subjectBase(canonicalIri)}${path}`;
     }
   }
 
@@ -3452,11 +3546,16 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
   // tombstone is exactly the ruling's three fields; and kept out of `counts`
   // and `danglingLinks` below, so a link to a node that LEFT still reads as
   // dangling rather than as resolved by its own forwarding address.
-  const tombstones =
+  const moved =
     !foreign && scope === "instance"
-      ? await tombstonesFor(new Set(graph.map((n) => String(n["@id"]))), docIri, base, opts.baseUrl)
+      ? await tombstonesFor(new Set(graph.map((n) => String(n["@id"]))), docIri, base, opts.baseUrl, legacyDocIri)
       : { nodes: [], problems: [] };
-  problems.push(...tombstones.problems);
+  problems.push(...moved.problems);
+  // Every subject's pre-#603 fragment, after the moved nodes' — disjoint
+  // from them, since those name nodes this graph no longer holds.
+  // The host's are named by its old ROOT document (`legacyDocIri`, #603
+  // decision 1b), and `writeLegacyDocuments` serves them there.
+  const tombstones = { nodes: [...moved.nodes, ...migrationTombstones(graph, docIri, legacyDocIri)] };
 
   // §3.4. Computed over the instance being EXPORTED, not over this one — a
   // foreign instance's document states that instance's dependency set, and
@@ -3790,8 +3889,9 @@ async function sidecarMode(mode: "check" | "write", baseUrl: string | undefined)
  * The owner, 2026-10-15: *"i want a seperate jsonld for each Tool w/ its own
  * IRI"* and *"dont externalize the json on main, only when rendered in
  * gh-pages."* So these are BUILD OUTPUT, written where `--out` is (the deploy
- * passes `./_site/<stub>.jsonld`, `instance-exports.ts`
- * `./_site/<stub>/<stub>.jsonld`; the default is the gitignored `_kg/`), and
+ * and `instance-exports.ts` both pass `./_site/<name>/<stub>.jsonld`, the
+ * host's included since #603 decision 1b; the default is the gitignored
+ * `_kg/` with the same layout), and
  * never committed beside the source: the source of a Tool is its
  * `tools/<id>/<id>.ts`.
  *
@@ -3845,6 +3945,270 @@ export function writeToolDocuments(published: Record<string, unknown>, out: stri
   return written;
 }
 
+/**
+ * One small document AND one page per subject, written beside the instance
+ * document — what makes a slash-path `@id` load (litlfred/cat-harness-tools#603).
+ *
+ * `makeIri` mints `<doc dir>/<kind>/<id>`; a path nothing serves is the 404
+ * `makeIri`'s own history warns about, so minting and serving land together.
+ * The same relation as {@link writeToolDocuments}: the document is served at
+ * `--out`, so `<dir of --out>/<kind>/<id>.*` is where the IRI resolves.
+ *
+ * - `<kind>/<id>.jsonld` — `partOf` the instance document, and the subject
+ *   as the first node of `@graph`. A process's document also holds its flows,
+ *   which are fragments of its page (`process/P#flow/F`). Its `@context` is
+ *   the instance document's, published ONCE beside it as
+ *   `<stub>.context.jsonld` and named by IRI: inlined, its ~13 KB was most of
+ *   every subject's bytes (67 MB for cat-harness's ~1,700 subjects, measured
+ *   2026-10-23).
+ * - `<kind>/<id>.html` — a small page carrying the same JSON-LD in a
+ *   `<script type="application/ld+json">`, with `<link rel="alternate">` to
+ *   the `.jsonld`. GitHub Pages serves `<id>.html` at the extensionless path,
+ *   which is the subject IRI itself (checked on the live site 2026-10-23).
+ * - `<kind>/<id>/index.html` too when the subject has subjects UNDER it (a
+ *   process: `process/P/node/T`), so the bare path loads whether the host
+ *   prefers the file or the directory.
+ *
+ * Build output, like the Tool documents: never committed.
+ *
+ * @returns the paths written
+ */
+export function writeSubjectDocuments(published: Record<string, unknown>, out: string): string[] {
+  const docIri = String(published["@id"]);
+  const graph = (published["@graph"] ?? []) as Node[];
+  const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
+  // A flow's `<process>#flow/F` belongs on its process's page.
+  const fragmentsOf = new Map<string, Node[]>();
+  const subjects: Array<{ node: Node; stem: string }> = [];
+  for (const n of graph) {
+    const id = String(n["@id"]);
+    // A tombstone names an old fragment and carries no `@type`; it has no page.
+    if (n["@type"] === undefined) continue;
+    const stem = subjectFileStem(id, docIri);
+    if (stem !== undefined) {
+      subjects.push({ node: n, stem });
+      continue;
+    }
+    const hash = id.indexOf("#");
+    if (hash !== -1 && subjectPathOf(id, docIri) !== undefined) {
+      const owner = id.slice(0, hash);
+      fragmentsOf.set(owner, [...(fragmentsOf.get(owner) ?? []), n]);
+    }
+  }
+  // Every `<kind>/<id>` with a subject path under it (`process/P` under `process/P/node/T`).
+  const parentStems = new Set<string>();
+  for (const { stem } of subjects) {
+    const parts = stem.split("/");
+    for (let i = 2; i < parts.length; i++) parentStems.add(parts.slice(0, i).join("/"));
+  }
+  const dir = dirname(out);
+  const written: string[] = [];
+  if (subjects.length === 0) return written;
+  const contextFile = out.replace(/\.jsonld$/, "") + ".context.jsonld";
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(contextFile, JSON.stringify({ "@context": published["@context"] }, null, 2) + "\n");
+  written.push(contextFile);
+  const contextName = basename(contextFile);
+  for (const { node, stem } of subjects) {
+    const id = String(node["@id"]);
+    const name = stem.split("/").pop()!;
+    const doc = {
+      // Absolute where the document is; relative to the subject's file otherwise.
+      "@context": /^https?:\/\//.test(docIri)
+        ? `${subjectBase(docIri)}${contextName}`
+        : `${"../".repeat(stem.split("/").length - 1)}${contextName}`,
+      "@id": `${id}.jsonld`,
+      partOf: docIri,
+      ...stamp,
+      "@graph": [node, ...(fragmentsOf.get(id) ?? [])],
+    };
+    const file = join(dir, `${stem}.jsonld`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
+    written.push(file);
+    const page = join(dir, `${stem}.html`);
+    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, docIri));
+    written.push(page);
+    if (parentStems.has(stem)) {
+      const index = join(dir, stem, "index.html");
+      mkdirSync(dirname(index), { recursive: true });
+      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, docIri));
+      written.push(index);
+    }
+  }
+  return written;
+}
+
+/**
+ * The one-release tombstones of a document that MOVED, served at the
+ * addresses it moved from — litlfred/cat-harness-tools#603 decision 1b
+ * (owner, 2026-10-23: the host is no longer special; one rule for every
+ * layer, subjects beside their document).
+ *
+ * The host's document left `<base>/<stub>.jsonld` for
+ * `<base>/<name>/<stub>.jsonld`, and its Tools `<base>/tools/<id>.jsonld` for
+ * `<base>/<name>/tools/<id>.jsonld`. A consumer holding an old address must
+ * find the new one AT the old one — GitHub Pages cannot redirect a `.jsonld`
+ * — so this writes, under the site root `--out` implies:
+ *
+ * - `<legacyDocPath>`: the old document as a tombstone itself (`deprecated`,
+ *   `isReplacedBy` and `sameAs` the new document) whose `@graph` is every
+ *   tombstone named by one of its `#fragment`s;
+ * - `tools/<id>.jsonld` beside it: one per Tool, the Tool's tombstone as its
+ *   single node, the shape {@link writeToolDocuments} gives the live one.
+ *
+ * The tombstones stay in the new document's `@graph` as well, where the 4ak5
+ * mechanism (`tombstonesFor`) has always put them, so a reader of either
+ * finds them. ONE RELEASE ONLY, with the rest of the tombstones.
+ *
+ * Nothing is written when `--out` does not end in `docPath`: the site root
+ * would be a guess, and a tombstone at a guessed path forwards nothing.
+ *
+ * @returns the paths written
+ */
+export function writeLegacyDocuments(
+  published: Record<string, unknown>,
+  out: string,
+  docPath: string,
+  legacyDocPath: string | undefined,
+): string[] {
+  if (legacyDocPath === undefined || legacyDocPath === docPath) return [];
+  const siteRoot = siteRootOf(out, docPath);
+  if (siteRoot === undefined) return [];
+  const docIri = String(published["@id"]);
+  // The new document's IRI with its path swapped for the old one: the same
+  // base, so the same answer `exportIdentity` gives as `legacyDocIri`.
+  if (!docIri.endsWith(docPath)) return [];
+  const legacyDocIri = docIri.slice(0, docIri.length - docPath.length) + legacyDocPath;
+  const graph = (published["@graph"] ?? []) as Node[];
+  const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
+  const isTomb = (n: Node): boolean => n["@type"] === undefined && (n as Record<string, unknown>).deprecated === true;
+  const fragmentTombs = graph.filter((n) => isTomb(n) && String(n["@id"]).startsWith(`${legacyDocIri}#`));
+  const legacyToolBase = `${subjectBase(legacyDocIri)}tools/`;
+  const toolTombs = graph.filter((n) => isTomb(n) && String(n["@id"]).startsWith(legacyToolBase));
+
+  // The context the new document publishes once beside itself; named, not
+  // inlined (~13 KB a copy). Written here too when nothing else wrote it.
+  const contextFile = out.replace(/\.jsonld$/, "") + ".context.jsonld";
+  if (!existsSync(contextFile)) {
+    mkdirSync(dirname(contextFile), { recursive: true });
+    writeFileSync(contextFile, JSON.stringify({ "@context": published["@context"] }, null, 2) + "\n");
+  }
+  const contextPath = docPath.replace(/\.jsonld$/, "") + ".context.jsonld";
+  const contextFrom = (fromDir: string): string =>
+    /^https?:\/\//.test(docIri)
+      ? `${subjectBase(docIri)}${basename(contextFile)}`
+      : `${"../".repeat(fromDir.split("/").filter(Boolean).length)}${contextPath}`;
+
+  const written: string[] = [];
+  const legacyFile = join(siteRoot, legacyDocPath);
+  mkdirSync(dirname(legacyFile), { recursive: true });
+  writeFileSync(
+    legacyFile,
+    JSON.stringify(
+      {
+        "@context": contextFrom(dirname(legacyDocPath) === "." ? "" : dirname(legacyDocPath)),
+        "@id": legacyDocIri,
+        deprecated: true,
+        isReplacedBy: docIri,
+        sameAs: docIri,
+        ...stamp,
+        "@graph": fragmentTombs,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  written.push(legacyFile);
+  const legacyDir = dirname(legacyDocPath) === "." ? "" : dirname(legacyDocPath);
+  for (const t of toolTombs) {
+    const rel = String(t["@id"]).slice(subjectBase(legacyDocIri).length);
+    if (rel.includes("..") || !rel.endsWith(".jsonld")) continue;
+    const file = join(siteRoot, legacyDir, rel);
+    mkdirSync(dirname(file), { recursive: true });
+    const relDir = dirname(join(legacyDir, rel)).split(sep).join("/");
+    writeFileSync(
+      file,
+      JSON.stringify({ "@context": contextFrom(relDir), "@id": t["@id"], partOf: legacyDocIri, ...stamp, "@graph": [t] }, null, 2) + "\n",
+    );
+    written.push(file);
+  }
+  return written;
+}
+
+const escHtml = (v: unknown): string =>
+  String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+/** A value as HTML: an IRI is a link, a list is each of its items. */
+function valueHtml(v: unknown): string {
+  if (Array.isArray(v)) return v.map(valueHtml).join("<br>");
+  if (v !== null && typeof v === "object") {
+    const id = (v as Record<string, unknown>)["@id"];
+    return typeof id === "string" ? valueHtml(id) : `<code>${escHtml(JSON.stringify(v))}</code>`;
+  }
+  const s = String(v);
+  return /^https?:\/\//.test(s) ? `<a href="${escHtml(s)}">${escHtml(s)}</a>` : escHtml(s);
+}
+
+/**
+ * One subject's page: its fields, its flows (each at the `id` its fragment
+ * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
+ * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
+ */
+function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readonly Node[], jsonldHref: string, docIri: string): string {
+  const id = String(node["@id"]);
+  const title = String(node.title ?? node.name ?? id.split("/").pop());
+  const type = stripNamespace(String(node["@type"]));
+  const rows = (n: Node): string =>
+    Object.entries(n)
+      .filter(([k]) => k !== "@id" && k !== "@type")
+      .map(([k, v]) => `<tr><th>${escHtml(k)}</th><td>${valueHtml(v)}</td></tr>`)
+      .join("\n");
+  const flows = fragments
+    .map((f) => {
+      const fid = String(f["@id"]);
+      const anchor = fid.slice(fid.indexOf("#") + 1);
+      return `<section id="${escHtml(anchor)}"><h3>${escHtml(anchor)}</h3><table>${rows(f)}</table></section>`;
+    })
+    .join("\n");
+  // `<` escaped so no value can close the script element early.
+  const json = JSON.stringify(doc).replace(/</g, "\\u003c");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(title)} · ${escHtml(type)}</title>
+<link rel="alternate" type="application/ld+json" href="${escHtml(jsonldHref)}">
+<script type="application/ld+json">
+${json}
+</script>
+<style>
+:root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fff; --muted: #6e6e73; --line: #d2d2d7; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --bg: #1c1c1e; --muted: #a1a1a6; --line: #3a3a3c; } }
+body { margin: 0 auto; max-width: 60rem; padding: 1.5rem 1rem; font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; word-break: break-all; }
+.muted { color: var(--muted); }
+table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+th { width: 12rem; font-weight: 600; }
+a { color: inherit; }
+</style>
+</head>
+<body>
+<p class="muted">${escHtml(type)}</p>
+<h1>${escHtml(title)}</h1>
+<p class="iri">${escHtml(id)}</p>
+<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>
+<table>
+${rows(node)}
+</table>
+${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
+</body>
+</html>
+`;
+}
+
 if (import.meta.main) {
   const arg = (flag: string): string | undefined => {
     const i = process.argv.indexOf(flag);
@@ -3896,7 +4260,7 @@ if (import.meta.main) {
   if (process.argv.includes("--check") || process.argv.includes("--sidecars")) {
     process.exit(await sidecarMode(process.argv.includes("--check") ? "check" : "write", baseUrl));
   }
-  const { stub, docPath } = exportIdentity({ baseUrl, instanceRoot });
+  const { stub, docPath, legacyDocPath } = exportIdentity({ baseUrl, instanceRoot });
   // Named after the repository, per the stub convention — `<stub>.jsonld`,
   // never a generic `kg.json`. `.jsonld` because it IS JSON-LD; the extension
   // is what tells a fetcher to treat it as one.
@@ -3908,7 +4272,15 @@ if (import.meta.main) {
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.
   // input-site: inert #1d8aaee1 — default export destination, an output path this script writes, never reads
-  const out = arg("--out") ?? join(repoRootFor(ROOT), "_kg", `${stub}.jsonld`);
+  // `_kg/` stands for the site root, so the document sits at its published
+  // path under it, `<name>/<stub>.jsonld` (#603 decision 1b), and the old
+  // root address beside it holds the tombstones, as on the site.
+  const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);
+  // A deploy step still naming the old root path is read as naming the same
+  // site (#603 decision 1b), so the index's workflows and this layer can be
+  // re-pinned in either order. See `placedOut`.
+  const { out, moved: outMoved } = placedOut(asked, docPath, legacyDocPath);
+  if (outMoved) console.log(`--out ${asked} is the old root address; writing the document at its published path, ${out}, and the tombstone there`);
   const data = await buildExport({ baseUrl, instanceRoot, scope });
 
   mkdirSync(dirname(out), { recursive: true });
@@ -3921,9 +4293,15 @@ if (import.meta.main) {
   const published = { ...publishedDocument(data), ...stagingFields() };
   writeFileSync(out, JSON.stringify(published, null, 2) + "\n");
   const toolDocs = writeToolDocuments(published, out);
+  const subjectDocs = writeSubjectDocuments(published, out);
+  const legacyDocs = writeLegacyDocuments(published, out, docPath, legacyDocPath);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
   if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);
+  if (legacyDocs.length > 0) console.log(`  + ${legacyDocs.length} tombstone document(s) at the old address(es), first ${relative(ROOT, legacyDocs[0])}`);
+  else if (legacyDocPath !== undefined && legacyDocPath !== docPath)
+    console.log(`  (no tombstone documents: --out does not end in ${docPath}, so the site root, and ${legacyDocPath} under it, is unknown)`);
+  if (subjectDocs.length > 0) console.log(`  + ${subjectDocs.length} subject file(s) (.jsonld and .html) → ${relative(ROOT, dirname(out)) || "."}/<kind>/`);
   for (const [t, n] of Object.entries(data.counts).sort()) console.log(`  ${String(n).padStart(5)}  ${t}`);
   console.log(`  ${String(data["@graph"].length).padStart(5)}  total`);
 
@@ -4035,7 +4413,7 @@ if (import.meta.main) {
 
   if (data.danglingLinks.length > 0) {
     console.warn(`\n${data.danglingLinks.length} dangling internal link(s) — reported, not fatal:`);
-    for (const d of data.danglingLinks) console.warn(`  · ${d.edge} → ${d.to.split("#")[1]}`);
+    for (const d of data.danglingLinks) console.warn(`  · ${d.edge} → ${subjectPathOf(d.to, data["@id"]) ?? d.to}`);
   }
 
   if (data.problems.length > 0) {
