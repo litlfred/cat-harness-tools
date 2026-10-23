@@ -243,11 +243,18 @@ export function docsImpact(inputs: readonly string[], root: string, out: string)
   const here = import.meta.dir;
   const script = [join(here, "docs-rendered-impact.ts"), join(here, "..", "..", "cat-harness", "scripts", "docs-rendered-impact.ts")].find((p) => existsSync(p));
   if (!script) return "no docs renderer (docs-rendered-impact.ts) on this checkout";
+  // The list goes in a file: a re-pinned mount expands to thousands of paths,
+  // past what one argument may hold (E2BIG, measured on a ten-mount re-pin).
+  const dir = mkdtempSync(join(tmpdir(), "docs-impact-"));
   try {
-    execFileSync("bun", ["run", script, "--root", root, "--changed", inputs.join(","), "--out", out], { stdio: ["ignore", "inherit", "inherit"] });
+    const list = join(dir, "changed.txt");
+    writeFileSync(list, inputs.join("\n") + "\n");
+    execFileSync("bun", ["run", script, "--root", root, "--changed-from", list, "--out", out], { stdio: ["ignore", "inherit", "inherit"] });
     return undefined;
   } catch (e) {
     return `the docs renderer failed: ${(e as Error).message.split("\n")[0]}`;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 

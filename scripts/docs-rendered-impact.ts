@@ -44,7 +44,7 @@
  * is what then says which pages actually moved.
  *
  * Usage:
- *   bun run cat-harness-tools/scripts/docs-rendered-impact.ts (--changed a,b | --base <ref> [--head <ref>])
+ *   bun run cat-harness-tools/scripts/docs-rendered-impact.ts (--changed a,b | --changed-from <file> | --base <ref> [--head <ref>])
  *     [--site <prefix>] [--out impact.json]
  *
  * @module cat-harness/scripts/docs-rendered-impact
@@ -336,10 +336,14 @@ if (import.meta.main) {
   const repo = resolve(arg("--root") ?? ".");
   const base = arg("--base");
   const head = arg("--head") ?? (base ? "HEAD" : undefined);
-  const changed = arg("--changed")?.split(",").filter(Boolean)
+  // `--changed-from <file>`, one path per line: a re-pinned mount expands to
+  // thousands of paths, past what one argument may hold (E2BIG).
+  const from = arg("--changed-from");
+  const changed = (from ? readFileSync(from, "utf-8").split("\n").map((l) => l.trim()).filter(Boolean) : undefined)
+    ?? arg("--changed")?.split(",").filter(Boolean)
     ?? (base ? execFileSync("git", ["-C", repo, "diff", "--name-only", `${base}...${head}`], { encoding: "utf-8" }).split("\n").filter(Boolean) : undefined);
   if (!changed) {
-    console.error("usage: docs-rendered-impact.ts (--changed a,b | --base <ref> [--head <ref>]) [--root <repo>] [--site <prefix>] [--out file]");
+    console.error("usage: docs-rendered-impact.ts (--changed a,b | --changed-from <file> | --base <ref> [--head <ref>]) [--root <repo>] [--site <prefix>] [--out file]");
     process.exit(2);
   }
   const mounts = docsMounts(repo);
