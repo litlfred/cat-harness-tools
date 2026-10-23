@@ -776,3 +776,24 @@ describe("a redirect page carries the ?query and the #fragment (folio-assistant#
     expect(html).toContain("\\u003c/script>");
   });
 });
+
+describe("a composed instance's docs SOURCE is never composed (owner, 2026-10-23, A1)", () => {
+  test("its rendered pages are composed under its name; the blocks they were rendered from are not", () => {
+    const root = fixture({ "index.md": "base" }, {});
+    const upper = join(root, "upper");
+    mkdirSync(join(upper, "docs", "source", "guides-x"), { recursive: true });
+    writeDeclaration(upper, JSON.stringify({ name: "upper", directories: [{ id: "upper-docs", path: "docs/", graphTypologies: ["docs"], composed: true }] }));
+    writeFileSync(join(upper, "docs", "docs.json"), JSON.stringify({ name: "upper", directories: [{ id: "docs-source", path: "source", graphTypologies: ["docs"] }] }));
+    writeFileSync(join(upper, "docs", "source", "guides-x", "overview.md"), "a block\n");
+    mkdirSync(join(upper, "docs", "guides"), { recursive: true });
+    writeFileSync(join(upper, "docs", "guides", "x.md"), "---\ntitle: X\n---\n");
+    try {
+      const r = compose(out(root), root);
+      expect(existsSync(join(out(root), "upper", "guides", "x.md"))).toBe(true);
+      expect(existsSync(join(out(root), "upper", "source"))).toBe(false);
+      expect(Object.keys(r.suppliedBy).filter((k) => k.startsWith("upper/source"))).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

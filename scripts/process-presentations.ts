@@ -21,13 +21,13 @@
  * @module scripts/process-presentations
  */
 import { existsSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 
-import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { baseDocsSource, declaredDocsSources, docsSources, type DocsSource } from "./lib/docs-sources.ts";
 
 /**
  * The part of a `WebPage` manifest this reads, declared here rather than
@@ -59,9 +59,18 @@ export interface Presentation {
   pageTitle: string;
 }
 
-/** The docs manifests, as `gen-docs-pages.ts` finds them: `docs/source/<slug>/<slug>.ts`. */
-export function docsManifests(instanceRoot: string): string[] {
-  const dir = docsSourceDirFor(instanceRoot);
+/**
+ * The docs sources ONE instance holds, as `gen-docs-pages.ts` reads them: the
+ * base instance's own (`docsSourceDirFor`), or the ones an instance above it
+ * declares (`lib/docs-sources.ts`).
+ */
+function sourcesOf(instanceRoot: string): DocsSource[] {
+  if (resolve(instanceRoot) === resolve(HARNESS_ROOT)) return [baseDocsSource(instanceRoot)];
+  return declaredDocsSources(instanceRoot);
+}
+
+/** The manifests of one docs source: `<source>/<slug>/<slug>.ts`. */
+function manifestsIn(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -70,28 +79,62 @@ export function docsManifests(instanceRoot: string): string[] {
     .sort();
 }
 
+/** The docs manifests, as `gen-docs-pages.ts` finds them: `docs/source/<slug>/<slug>.ts`. */
+export function docsManifests(instanceRoot: string): string[] {
+  return sourcesOf(instanceRoot).flatMap((s) => manifestsIn(s.srcDir));
+}
+
 /**
- * Every BPMN presentation, keyed by the diagram's source path as the page
- * spells it (`processes/x.bpmn`), in page then section order.
+ * Where a page of `src` is published, site-relative. The base instance's
+ * pages are the site's own; an instance above it is COMPOSED into the site
+ * under its own name (`compose-docs.ts`), so its pages sit under that.
  */
-export async function processPresentations(instanceRoot: string): Promise<Map<string, Presentation[]>> {
-  const out = new Map<string, Presentation[]>();
-  for (const manifest of docsManifests(instanceRoot)) {
+function publishedHref(src: DocsSource, slug: string): string {
+  const own = publishedPagePath(src.outDir, slug);
+  return src.base ? own : `${src.instance}/${own}`;
+}
+
+async function presentationsIn(src: DocsSource, out: Map<string, Presentation[]>, key: (source: string) => string): Promise<void> {
+  for (const manifest of manifestsIn(src.srcDir)) {
     // input-site: traced #e8ca3daa — a docs page manifest, loaded by path
     inputSiteReached("process-presentations: computed load");
     const page = ((await import(manifest)) as { default: PageManifest }).default;
     for (const node of page.nodes) {
       if (node.asset?.kind !== "bpmn") continue;
-      const list = out.get(node.asset.source) ?? [];
+      const k = key(node.asset.source);
+      const list = out.get(k) ?? [];
       list.push({
         page: page.slug,
-        href: publishedPagePath(join(instanceRoot, siteDirFor(instanceRoot)), page.slug),
+        href: publishedHref(src, page.slug),
         node: node.id,
         pageTitle: page.title,
         ...(node.title ? { title: node.title } : {}),
       });
-      out.set(node.asset.source, list);
+      out.set(k, list);
     }
+  }
+}
+
+/**
+ * Every BPMN presentation, keyed by the diagram's source path as the page
+ * spells it (`processes/x.bpmn`) — relative to the page's OWN instance — in
+ * page then section order.
+ */
+export async function processPresentations(instanceRoot: string): Promise<Map<string, Presentation[]>> {
+  const out = new Map<string, Presentation[]>();
+  for (const src of sourcesOf(instanceRoot)) await presentationsIn(src, out, (s) => s);
+  return out;
+}
+
+/**
+ * Every presentation in the checkout — the base instance's pages and every
+ * docs source above it — keyed relative to `baseRoot`, so a reader rooted
+ * there (`render-bpmn.ts`) finds a diagram whichever instance's page shows it.
+ */
+export async function checkoutProcessPresentations(baseRoot: string = HARNESS_ROOT): Promise<Map<string, Presentation[]>> {
+  const out = new Map<string, Presentation[]>();
+  for (const src of docsSources(baseRoot)) {
+    await presentationsIn(src, out, (s) => relative(baseRoot, join(src.root, s)).split(sep).join("/"));
   }
   return out;
 }

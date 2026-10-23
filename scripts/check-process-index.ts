@@ -46,6 +46,7 @@
  * @covers processes, docs
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { docsSources } from "./lib/docs-sources.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
@@ -61,7 +62,16 @@ const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 const OUT = join(ROOT, subgraphOutDir(ROOT));
-const PAGE = join(docsSourceDirFor(ROOT), "process-publication-workflow", "every-workflow-in-the-repo.md");
+/**
+ * The block that mounts the view, in whichever docs source holds its page —
+ * the page may be authored by an instance above this one (`lib/docs-sources.ts`).
+ * The base instance's own path when no source holds it, so a missing page is
+ * still reported where it was expected.
+ */
+const PAGE_BLOCK = join("process-publication-workflow", "every-workflow-in-the-repo.md");
+const PAGE =
+  docsSources(ROOT).map((s) => join(s.srcDir, PAGE_BLOCK)).find((f) => existsSync(f)) ??
+  join(docsSourceDirFor(ROOT), PAGE_BLOCK);
 
 type Doc = Record<string, unknown>;
 const list = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v : [v]);

@@ -86,6 +86,7 @@ import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { docsSources, type DocsSource } from "./lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
@@ -107,6 +108,40 @@ const SOURCE_LOCALE = sourceLocale(INSTANCE_ROOT);
 // `content/` — without tripping the folio-emptiness gate.
 const SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
+
+/**
+ * EVERY docs source in the checkout, the base instance's first (owner,
+ * 2026-10-23, "A1": one run reads the docs-source directory every mounted
+ * instance declares). The base instance's is {@link SRC_DIR} → {@link OUT_DIR},
+ * unchanged; an instance above it renders its own pages into the docs
+ * directory that declares them (`lib/docs-sources.ts`). Lazy, so importing
+ * this module for a test does not walk the checkout.
+ */
+let DOCS_SOURCES: DocsSource[] | undefined;
+function allDocsSources(): DocsSource[] {
+  DOCS_SOURCES ??= docsSources(INSTANCE_ROOT);
+  return DOCS_SOURCES;
+}
+
+/**
+ * The docs source the page being rendered belongs to. Module-level, like
+ * `qaIndex` below and for its reason: the page loop sets it before each page,
+ * and the functions that read a block, a sidecar or a witness are several
+ * frames down. Starts as the base instance's, so every exported helper a test
+ * calls answers exactly as it did before there was more than one source.
+ */
+let CUR: DocsSource = {
+  instance: INSTANCE_ROOT,
+  root: resolve(INSTANCE_ROOT),
+  srcDir: resolve(SRC_DIR),
+  outDir: resolve(OUT_DIR),
+  base: true,
+};
+
+/** The source directory as its instance sees it — `docs/source` for the base. */
+function srcRel(src: DocsSource = CUR): string {
+  return relative(src.root, src.srcDir).split(sep).join("/");
+}
 
 /**
  * The forge this checkout points at.
@@ -207,7 +242,7 @@ export function readQaSummary(blockDir: string, block: string): QaSummary | unde
   // no verdict recorded against it — counts here as `na`, which leaves every
   // state this function has ever returned unchanged (a sidecar of nothing but
   // `n/a` and `unknown` was `unswept` before and still is).
-  const doc = readWitnessDoc("block", join(blockDir, `${block}.md`), INSTANCE_ROOT);
+  const doc = readWitnessDoc("block", join(blockDir, `${block}.md`), CUR.root);
   if (!doc) return undefined;
   return {
     state: doc.state,
@@ -253,8 +288,8 @@ let storedAbsent = 0;
 export function declaredEditLocation(target: string): { source: string; repo?: string } {
   // `editTarget` answers instance-relative, except for a `../` asset, which it
   // already made checkout-relative; whichever exists is the file.
-  const inInstance = resolve(INSTANCE_ROOT, target);
-  const abs = existsSync(inInstance) ? inInstance : resolve(repoRootFor(INSTANCE_ROOT), target);
+  const inInstance = resolve(CUR.root, target);
+  const abs = existsSync(inInstance) ? inInstance : resolve(repoRootFor(CUR.root), target);
   const owner = instanceRepositoryEntries()
     .filter((e) => abs === e.root || abs.startsWith(e.root + sep))
     .sort((a, b) => b.root.length - a.root.length)[0];
@@ -271,15 +306,15 @@ function instanceRepositoryEntries(): InstanceRepository[] {
 export function editTarget(page: WebPage, node: WebPageNode): string | null {
   if (node.asset) {
     const src = node.asset.source;
-    return src.startsWith("../") ? repoRelative(src) : src;
+    return src.startsWith("../") ? relative(repoRootFor(CUR.root), resolve(CUR.root, src)).replace(/\\/g, "/") : src;
   }
   const narrative = node.block ?? node.lead;
-  if (narrative) return `docs/source/${page.slug.replace(/\//g, "-")}/${narrative}.md`;
+  if (narrative) return `${srcRel()}/${page.slug.replace(/\//g, "-")}/${narrative}.md`;
   return null;
 }
 
 function readBlock(page: WebPage, nodeId: string, block: string): string {
-  const mdPath = join(SRC_DIR, page.slug.replace(/\//g, "-"), `${block}.md`);
+  const mdPath = join(CUR.srcDir, page.slug.replace(/\//g, "-"), `${block}.md`);
   if (!existsSync(mdPath)) {
     throw new Error(
       `node "${nodeId}" of page "${page.slug}" names block "${block}", ` +
@@ -332,6 +367,28 @@ const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
 const QA_ASSETS_STORED = qaStorageOf(QA_ASSET_DIR) !== undefined;
 
 /**
+ * An instance's OWN witness tree: its pages' projections are its QA output, so
+ * they sit under its `test/results/`, as the base instance's do under
+ * {@link QA_ASSET_DIR}. The site build copies each tree into `/assets/qa/`,
+ * which is why a page slug must be unique across every docs source.
+ */
+function qaAssetDirOf(src: DocsSource): string {
+  return src.base ? QA_ASSET_DIR : join(src.root, "test", "results", "witnesses");
+}
+const storedTrees = new Map<string, boolean>();
+/** {@link QA_ASSETS_STORED}, asked of whichever witness tree `path` is in. */
+function qaStoredFor(path: string): boolean {
+  for (const src of [CUR, ...(DOCS_SOURCES ?? [])]) {
+    const dir = qaAssetDirOf(src);
+    if (path === dir || path.startsWith(dir + sep)) {
+      if (!storedTrees.has(dir)) storedTrees.set(dir, src.base ? QA_ASSETS_STORED : qaStorageOf(dir) !== undefined);
+      return storedTrees.get(dir)!;
+    }
+  }
+  return QA_ASSETS_STORED;
+}
+
+/**
  * Was the DERIVED QA corpus in this checkout before this run wrote anything?
  *
  * Asked HERE, before the first witness is emitted, because this generator
@@ -344,6 +401,13 @@ const QA_ASSETS_STORED = qaStorageOf(QA_ASSET_DIR) !== undefined;
  * than a count. See `qaCorpusAvailability`.
  */
 const QA_CORPUS = qaCorpusAvailability(INSTANCE_ROOT);
+const corpora = new Map<string, ReturnType<typeof qaCorpusAvailability>>();
+/** {@link QA_CORPUS} for the source being rendered — asked once per instance, before its first witness. */
+function corpusOf(src: DocsSource = CUR): ReturnType<typeof qaCorpusAvailability> {
+  if (src.base) return QA_CORPUS;
+  if (!corpora.has(src.root)) corpora.set(src.root, qaCorpusAvailability(src.root));
+  return corpora.get(src.root)!;
+}
 if (!QA_CORPUS.present) {
   console.log(
     `  ? the derived QA corpus is ABSENT (${QA_CORPUS.trees.map((t) => relative(INSTANCE_ROOT, t.dir)).join(", ")}): ` +
@@ -501,7 +565,7 @@ function subjectNoun(subjectPath: string): string {
 }
 
 function pageDir(page: WebPage): string {
-  return join(SRC_DIR, page.slug.replace(/\//g, "-"));
+  return join(CUR.srcDir, page.slug.replace(/\//g, "-"));
 }
 
 
@@ -660,7 +724,7 @@ export function qaBadgePlaceholder(opts: { family: QaFamily; key: string; noun: 
 function qaIcons(page: WebPage, node: WebPageNode): string {
   const subjects: string[] = [];
   if (node.block) subjects.push(join(pageDir(page), `${node.block}.md`));
-  if (node.asset) subjects.push(join(INSTANCE_ROOT, node.asset.source));
+  if (node.asset) subjects.push(join(CUR.root, node.asset.source));
 
   const slug = page.slug.replace(/\//g, "-");
   const out: string[] = [];
@@ -670,16 +734,16 @@ function qaIcons(page: WebPage, node: WebPageNode): string {
       out.push(qaBadgePlaceholder({ family, key, noun: subjectNoun(subject), slug }));
 
       // The INDEX half — what the corpus says. Nothing below reaches the page.
-      if (!QA_CORPUS.present) continue;
+      if (!corpusOf().present) continue;
       // EXISTENCE first: `sidecarPaths` stats the disk and returns only files
       // that are there — "has anything ever ruled on this?".
-      if (sidecarPaths(family, subject, INSTANCE_ROOT).length === 0) {
+      if (sidecarPaths(family, subject, CUR.root).length === 0) {
         qaUnswept.push(key);
         continue;
       }
-      const doc = readWitnessDoc(family, subject, INSTANCE_ROOT);
+      const doc = readWitnessDoc(family, subject, CUR.root);
       if (doc) {
-        const abs = join(QA_ASSET_DIR, slug, `${key}.json`);
+        const abs = join(qaAssetDirOf(CUR), slug, `${key}.json`);
         // Minified: these are fetched by the browser, never read as a diff, and
         // the corpus sweep took the set from 35 files to 134. Indentation was 32%
         // of 2.9 MB — a third of what every reader of the site would download for
@@ -745,12 +809,12 @@ function pageQaIcons(page: WebPage): string {
   const slug = page.slug.replace(/\//g, "-");
   const key = `page.${family}`;
 
-  if (QA_CORPUS.present) {
-    const doc = rollUpWitnessDocs(family, subjects, INSTANCE_ROOT, `${page.title} — translations`);
+  if (corpusOf().present) {
+    const doc = rollUpWitnessDocs(family, subjects, CUR.root, `${page.title} — translations`);
     if (!doc) {
       qaUnswept.push(key);
     } else {
-      const abs = join(QA_ASSET_DIR, slug, `${key}.json`);
+      const abs = join(qaAssetDirOf(CUR), slug, `${key}.json`);
       emitWitness(abs, JSON.stringify(withSidecarLinks(doc)) + "\n");
       qaIndex[key] = { state: doc.state, counts: doc.counts };
     }
@@ -769,7 +833,7 @@ function pageQaIcons(page: WebPage): string {
  */
 function blockLabel(page: WebPage, node: WebPageNode): string | undefined {
   const slug = page.slug.replace(/\//g, "-");
-  const file = join(SRC_DIR, slug, `${node.id}.ts`);
+  const file = join(CUR.srcDir, slug, `${node.id}.ts`);
   if (!existsSync(file)) return undefined;
   const m = /^\s*label:\s*"([^"]+)"/m.exec(readFileSync(file, "utf-8"));
   return m ? m[1] : undefined;
@@ -864,7 +928,7 @@ function siteAddressed(page: WebPage, path: string): string {
 
 /** Where a page's content is authored — the file to edit instead of the output. */
 function manifestRef(page: WebPage): string {
-  return `docs/source/${page.slug.replace(/\//g, "-")}/`;
+  return `${srcRel()}/${page.slug.replace(/\//g, "-")}/`;
 }
 
 /**
@@ -882,10 +946,14 @@ function manifestRef(page: WebPage): string {
  * `dh4f` defect exactly — a consumer scanning nothing and reporting a clean run
  * over it. An unreadable index is a third state, not an empty one.
  */
-let TRANSLATION_INDEX: TranslationIndex | undefined;
-function translationIndex(): TranslationIndex {
-  if (TRANSLATION_INDEX !== undefined) return TRANSLATION_INDEX;
-  const { index, findings } = buildTranslationIndex(INSTANCE_ROOT);
+const TRANSLATION_INDEXES = new Map<string, TranslationIndex>();
+function translationIndex(src: DocsSource = CUR): TranslationIndex {
+  const cached = TRANSLATION_INDEXES.get(src.outDir);
+  if (cached !== undefined) return cached;
+  // An instance above the base renders into its own docs directory, which is
+  // composed into the base's site rather than being a Jekyll site itself — so
+  // its index is asked of that directory, by name.
+  const { index, findings } = src.base ? buildTranslationIndex(src.root) : buildTranslationIndex(src.root, src.outDir);
   const hard = findings.filter((f) => f.severity !== "note");
   if (hard.length > 0) {
     throw new Error(
@@ -894,7 +962,7 @@ function translationIndex(): TranslationIndex {
         hard.map((f) => `  ${f.severity}  ${f.where}: ${f.message}`).join("\n"),
     );
   }
-  TRANSLATION_INDEX = index;
+  TRANSLATION_INDEXES.set(src.outDir, index);
   return index;
 }
 
@@ -924,7 +992,7 @@ function renderPage(page: WebPage): string {
   // `guides-who-smart-ig` — a key that matches no page and silently resolves to
   // "source language only". Measured on this corpus the two happen to give the
   // same answer, which is precisely why it needs saying.
-  const locales = localesReadableFor(INSTANCE_ROOT, translationIndex(), pageKey(page.slug));
+  const locales = localesReadableFor(CUR.root, translationIndex(), pageKey(page.slug));
 
   lines.push("---");
   lines.push("layout: default");
@@ -952,7 +1020,7 @@ function renderPage(page: WebPage): string {
     lines.push("documents:");
     for (const d of page.documents) lines.push(`  - ${d}`);
   }
-  lines.push(`lang: ${SOURCE_LOCALE}`);
+  lines.push(`lang: ${CUR.base ? SOURCE_LOCALE : sourceLocale(CUR.root)}`);
   if (locales.length > 0) {
     lines.push(`available_locales: ${JSON.stringify(locales)}`);
   }
@@ -991,8 +1059,14 @@ function renderPage(page: WebPage): string {
   lines.push("{:toc}");
   lines.push("</details>");
   lines.push("");
+  // The forge the source sits in: this checkout's for the base instance, as
+  // always; the DECLARING instance's repository for one above it, from the
+  // same declarations the per-node edit links read.
+  const owner = CUR.base ? undefined : declaredEditLocation(manifestRef(page));
+  const web = owner?.repo ? `https://github.com/${owner.repo}` : REPO_WEB;
+  const srcPath = owner?.repo ? owner.source.replace(/\/+$/, "") : `${srcRel()}/${page.slug.replace(/\//g, "-")}`;
   lines.push(
-    `_This page is generated from [\`docs/source/${page.slug.replace(/\//g, "-")}/\`](${REPO_WEB}/tree/main/docs/source/${page.slug.replace(/\//g, "-")}) — ` +
+    `_This page is generated from [\`${manifestRef(page)}\`](${web}/tree/main/${srcPath}) — ` +
       `each section below links to its own source._`,
   );
   lines.push("");
@@ -1094,7 +1168,7 @@ function emitWitness(path: string, content: string): void {
   // run cannot leave an empty witness tree that a later reader mistakes for a
   // fetched one.
   if (!check) mkdirSync(dirname(path), { recursive: true });
-  emit(path, content, QA_ASSETS_STORED ? "stored" : "verdict");
+  emit(path, content, qaStoredFor(path) ? "stored" : "verdict");
   emittedQa.add(path);
 }
 
@@ -1114,7 +1188,7 @@ const QA_LINK_KEY = siteLinkKey();
  */
 function withSidecarLinks(doc: QaWitnessDoc): QaWitnessDoc {
   const sidecarLinks = doc.sidecars.map((p) =>
-    qaResultLinkFor(resolve(INSTANCE_ROOT, p), { repoRoot: repoRootFor(INSTANCE_ROOT), repoWeb: REPO_WEB, key: QA_LINK_KEY }),
+    qaResultLinkFor(resolve(CUR.root, p), { repoRoot: repoRootFor(CUR.root), repoWeb: REPO_WEB, key: QA_LINK_KEY }),
   );
   return { ...doc, sidecarLinks };
 }
@@ -1131,10 +1205,6 @@ if (!existsSync(SRC_DIR)) {
 // silently edits the working tree is a test run nobody can trust, and on a
 // `--check` CI job it would compare freshly written output against itself.
 if (import.meta.main) {
-const slugs = readdirSync(SRC_DIR, { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => d.name)
-  .sort();
 
 /**
  * Every block's declared label, resolved to the page and node it is on.
@@ -1152,8 +1222,23 @@ const slugs = readdirSync(SRC_DIR, { withFileTypes: true })
  */
 const blockByLabel = new Map<string, { page: string; node: string }>();
 
+/**
+ * Which docs source published each page slug. A slug is the page's route
+ * within its docs directory AND its witness directory under `/assets/qa/`,
+ * which every instance's tree is copied into — so two sources claiming one
+ * slug would publish two pages' verdicts at one address. Refused, naming both.
+ */
+const slugOwner = new Map<string, string>();
+
+for (const src of allDocsSources()) {
+CUR = src;
+if (!src.base) console.log(`  docs source: ${src.instance} — ${relative(repoRootFor(INSTANCE_ROOT), src.srcDir)}`);
+const slugs = readdirSync(src.srcDir, { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name)
+  .sort();
 for (const slug of slugs) {
-  const manifest = join(SRC_DIR, slug, `${slug}.ts`);
+  const manifest = join(src.srcDir, slug, `${slug}.ts`);
   if (!existsSync(manifest)) {
     console.error(`  ! ${slug}/ has no ${slug}.ts manifest — skipped`);
     continue;
@@ -1167,6 +1252,14 @@ for (const slug of slugs) {
   if (page.slug.replace(/\//g, "-") !== slug) {
     throw new Error(`${manifest} declares slug "${page.slug}" but lives in ${slug}/`);
   }
+  const prevOwner = slugOwner.get(page.slug);
+  if (prevOwner !== undefined) {
+    throw new Error(
+      `two docs sources publish page "${page.slug}": ${prevOwner} and ${src.instance}. ` +
+        `A slug addresses the page and its QA witnesses; one of them must be renamed.`,
+    );
+  }
+  slugOwner.set(page.slug, src.instance);
   // Collected BEFORE rendering, so a page that fails to render still cannot
   // leave a half-filled index behind it.
   //
@@ -1188,7 +1281,7 @@ for (const slug of slugs) {
     }
     blockByLabel.set(label, { page: page.slug, node: node.id });
   }
-  const outPath = join(OUT_DIR, `${page.slug}.md`);
+  const outPath = join(src.outDir, `${page.slug}.md`);
   mkdirSync(dirname(outPath), { recursive: true });
   // `renderPage` fills `qaIndex` as a side effect of emitting the badges, so
   // the reset has to happen before it and the write after it.
@@ -1203,11 +1296,14 @@ for (const slug of slugs) {
   // the corpus absent it is still written, saying `corpus: "absent"`, so the
   // badges read "not available in this build" rather than "could not load".
   if (/data-qa-index=/.test(body)) {
-    const idxAbs = join(QA_ASSET_DIR, slug, QA_INDEX_FILE);
-    emitWitness(idxAbs, qaIndexDoc(page.slug, QA_CORPUS.present, qaIndex, qaUnswept));
+    const idxAbs = join(qaAssetDirOf(src), slug, QA_INDEX_FILE);
+    emitWitness(idxAbs, qaIndexDoc(page.slug, corpusOf(src).present, qaIndex, qaUnswept));
   }
   console.log(`  ${check ? "·" : "✓"} ${slug}.md (${page.nodes.length} nodes)`);
 }
+}
+// Everything below is the BASE instance's: its todos, beans, zoom and QA graph.
+CUR = allDocsSources()[0]!;
 
 /**
  * Resolve a todo's knowledge-graph edges to things a reader can follow.
@@ -1985,10 +2081,13 @@ publishAuthoredPageTranslationQa();
 // another commit's pages, not this checkout's defect: reported, not gated.
 // The write path still removes it, so what the site build publishes is clean.
 const orphanedQaAssets = new Set<string>();
-for (const orphan of listQaAssets()) {
+// Every source's tree, each judged by its own storage — an instance above the
+// base that loses a page must lose that page's projections too.
+const witnessTrees = [...new Set(allDocsSources().map(qaAssetDirOf))];
+for (const orphan of witnessTrees.flatMap((d) => listQaAssets(d))) {
   if (emittedQa.has(orphan)) continue;
   orphanedQaAssets.add(orphan);
-  if (check && QA_ASSETS_STORED) {
+  if (check && qaStoredFor(orphan)) {
     console.log(`  · advisory: ${relative(INSTANCE_ROOT, orphan)} is orphaned in the stored working copy`);
   } else if (check) {
     console.error(`  ✗ ${orphan} is orphaned`);

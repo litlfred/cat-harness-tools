@@ -436,13 +436,17 @@ function translatablePages(root: string, type: string): string[] {
  * Never throws for content reasons: a corpus problem comes back as a finding
  * so the caller can report every one of them, rather than the first.
  */
-export function buildTranslationIndex(instanceRoot: string): BuildResult {
+export function buildTranslationIndex(instanceRoot: string, siteDir?: string): BuildResult {
   const findings: IndexFinding[] = [];
   const src = sourceLocale(instanceRoot);
   const type = contentType(instanceRoot);
   const empty: TranslationIndex = { $schema: INDEX_SCHEMA, sourceLocale: src, locales: [], pages: {} };
 
-  const site = siteRoot(instanceRoot);
+  // `siteDir` names a docs directory that is not a Jekyll site of its own —
+  // one an instance above the base renders into and the site build composes
+  // under the instance's name (`gen-docs-pages.ts`). Named by the caller, so
+  // it is checked to EXIST rather than for a `_config.yml` it never has.
+  const site = siteDir !== undefined ? (existsSync(siteDir) ? siteDir : undefined) : siteRoot(instanceRoot);
   if (!site) {
     findings.push({
       where: `${SITE_DIR}/_config.yml`,

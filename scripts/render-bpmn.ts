@@ -45,7 +45,7 @@ import {
   readDeclaration,
   isExemptFrom,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { processPresentations, processTarget } from "./process-presentations.js";
+import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -155,8 +155,12 @@ for (const file of sources) {
   }
 }
 
-/** Page sections presenting each diagram, keyed as a page spells its source. */
-const presentations = await processPresentations(ROOT);
+/**
+ * Page sections presenting each diagram, keyed relative to this instance —
+ * from every docs source in the checkout, so a diagram presented on a page an
+ * instance above this one authors is still linked to that section.
+ */
+const presentations = await checkoutProcessPresentations(ROOT);
 
 /**
  * From a rendered SVG back up to the site root. Every link is written
