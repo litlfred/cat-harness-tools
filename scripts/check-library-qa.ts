@@ -79,6 +79,7 @@ import { basename, dirname, extname, join } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { readEntryBlocks, readLibraryGraph, type LibraryEntry } from "./library-graph.ts";
 import {
   catalogueRecordFor,
@@ -177,7 +178,10 @@ export function readEntryFacts(dir: string, id: string, instance: string): Entry
   if (sread && "reason" in sread) unreadable.push({ file: STRUCTURE_FILENAME, why: sread.reason.replace(dir, "<entry>") });
   const structure: Json | undefined = sread && !("reason" in sread) ? obj(sread.raw) : undefined;
   const referenced = read("referenced.json");
-  const tabular = read("tabular.jsonld");
+  // v1 `tabular.jsonld`, or the CSVW record that replaces it for delimited and
+  // workbook sources (bean `urat`). Both carry the same `source` block.
+  const tabularFile = existsSync(join(dir, "tabular.jsonld")) ? "tabular.jsonld" : TABULAR_CSVW_FILENAME;
+  const tabular = read(tabularFile);
   const smeta = obj(structure?.metadata);
   const docinfo = obj(smeta.docinfo);
   const identity = obj(referenced?.identity);
@@ -190,7 +194,7 @@ export function readEntryFacts(dir: string, id: string, instance: string): Entry
     ...fr("manifest.jsonld", "meta.source_file", meta.source_file),
     ...fr(STRUCTURE_FILENAME, "source.file", obj(structure?.source).file),
     ...fr("referenced.json", "source.file", obj(referenced?.source).file),
-    ...fr("tabular.jsonld", "source.file", tsource.file),
+    ...fr(tabularFile, "source.file", tsource.file),
   ];
 
   // The catalogue lives at the INSTANCE root, two levels up from `library/<slug>`.
@@ -225,7 +229,7 @@ export function readEntryFacts(dir: string, id: string, instance: string): Entry
     agent: [
       ...["author", "authors", "creator", "publisher"].flatMap((k) => fr("manifest.jsonld", `meta.${k}`, flat(meta[k]))),
       ...["author", "authors", "publisher"].flatMap((k) => fr("referenced.json", `identity.${k}`, flat(identity[k]))),
-      ...fr("tabular.jsonld", "source.publisher", tsource.publisher),
+      ...fr(tabularFile, "source.publisher", tsource.publisher),
     ],
     year: [
       ...["year", "date", "issued"].flatMap((k) => fr("manifest.jsonld", `meta.${k}`, yearOf(String(meta[k] ?? "")))),

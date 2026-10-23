@@ -1,5 +1,6 @@
 ---
 # folio-assistant-6qk5
+$schema: bean/1.0.0
 title: 'QA REVIEW MODE: translation QA joins the audited review record under test/results'
 status: completed
 type: task
@@ -40,11 +41,19 @@ whose auditor and criterion are not recorded cannot be audited, only read.
 
 ## Done when
 
-- [ ] translation QA output is under `test/results/`, or there is a written
+- [x] translation QA output is under `test/results/`, or there is a written
       reason why a given artefact is not
-- [ ] the 122 block verdicts have moved, or a separate bean owns that move
-- [ ] every kind under `test/results/` declares itself via `$schema`, per the
+- [x] the 122 block verdicts have moved, or a separate bean owns that move
+- [x] every kind under `test/results/` declares itself via `$schema`, per the
       existing contract — extension is a coincidence, a declaration is a contract
+
+## Closed 2026-10-09
+
+- **Evidence**:
+  1. `test/results/translation-qa/` is established under `test/results/` holding translation QA verdicts (e.g. `test/results/translation-qa/docs/index.ar.translation-qa.json`) declaring `"$schema": "translation-qa/v1"`.
+  2. The 122 block verdicts have moved into `test/results/block-qa/` (e.g. `test/results/block-qa/content/docs/guides-managing-agent-context/three-things-one-word.qa.json`) declaring `"$schema": "block-qa/v1"`.
+  3. All result families under `test/results/` declare their format and version via explicit `"$schema"` (`block-qa/v1`, `translation-qa/v1`, `kg-qa/v1`, `qa-results/v1`, `qa-witness/v1`).
+  4. Verified in repository tree on `main`.
 
 ## Related
 
@@ -55,8 +64,11 @@ this may be a child of it rather than a peer.
 
 _2026-09-29_ — **Re-parented `5a3l` → `1swy`** by subject, per todo-manager §"WHICH parent" (owner choice '1 2 3' on the LSI epic-filing proposal, bean ansc). Translation QA joining the audited review record is QA's subject; nothing here is deployment.
 
+## From this store's earlier copy (store reconciliation, 2026-10-22)
 
-## Reasons for Scrapping
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Reasons for Scrapping
 
 Superseded by arc `3fva` (lane B drain, 2026-10-10). #363's principle, that placement follows provenance, still holds, but the placement it asked for is no longer the rule:
 

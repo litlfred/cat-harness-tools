@@ -121,10 +121,21 @@ import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
-import { beforeHeadEnd, headEndTag } from "./lib/navbar.ts";
+import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
+import { instanceSitePath } from "./instance-exports.ts";
+
+/**
+ * An instance's route — `<instance>` or `<instance>/<path>`, no slash at
+ * either end — composed by cat-harness's `publishedPath` (`case: "instance"`),
+ * through the same helper `instance-exports.ts` uses, so the instance as
+ * itself and its served directories sit where the URL-space ruling puts them
+ * (bean `cat-tools-sthf`) and nowhere a hand-written path could drift to.
+ */
+export const instanceRoute = (name: string, path = ""): string => instanceSitePath(name, path).replace(/\/+$/, "");
 
 /** The platform's published site, no trailing slash: where a folio's own site links the platform's pages. */
 const PLATFORM_BASE = DOCS_SITE_BASE.replace(/\/$/, "");
@@ -261,7 +272,7 @@ export function withRoutes<T extends Mountable>(
     // kind comes first claim the route.
     if (declaredRoot.has(m.name) && !m.instanceRoot) return byKind;
     rooted.add(m.name);
-    return [...byKind, { ...m, route: m.name }];
+    return [...byKind, { ...m, route: instanceRoute(m.name) }];
   });
   return { candidates, undetermined };
 }
@@ -742,6 +753,9 @@ function foreignScope(platformBase: string, instance?: string): ForeignScope {
 /** The attribute marking the platform UI a foreign page loads, so a second pass adds none. */
 export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
 
+/** A `<script>` that loads `docs-ui.js`, at any base and with any query string. */
+const LOADS_DOCS_UI = /<script\b[^>]*\bsrc="[^"]*\/assets\/js\/docs-ui\.js(?:\?[^"]*)?"/i;
+
 /**
  * Load the platform's `docs-ui` stylesheet and script into a FOLIO's page.
  *
@@ -756,6 +770,10 @@ export const PLATFORM_UI_ATTR = "data-fa-platform-ui";
  */
 export function withPlatformUi(html: string, chromeRoot: string, platformBase?: string): string {
   if (html.includes(PLATFORM_UI_ATTR)) return html;
+  // A page whose own layout already loads docs-ui.js (a theme page the rail
+  // pass reaches with `themeSource`) gets no second copy: two copies each draw
+  // the language and QA badge bar under the title, so the page showed it twice.
+  if (LOADS_DOCS_UI.test(html)) return withSavedScheme(html);
   const head = headEndTag(html)?.index ?? -1;
   if (head < 0) return html;
   const tags =
@@ -1056,18 +1074,24 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         emitRailData: railDataWriter(siteAbs),
       });
       if (railed === undefined) {
+        // Railed by its own generator (the IRIS replica's pages): its rail is
+        // its own, its first paint is the site's — it reaches this pass with
+        // no first-paint snippet, and the standalone pass never sees a mount
+        // route. Not a page that "took no rail", so it is not reported as one.
+        if (hasRail(before)) {
+          const finished = finishRailedPage(before, false);
+          if (finished !== read) writeFileSync(file, finished);
+          continue;
+        }
         skipped.push(file.slice(siteAbs.length + 1));
-        // Not railed here, but painted by the site's rule all the same: a page
-        // its generator railed (the IRIS replica's pages) reaches this pass
-        // with no first-paint snippet, and the standalone pass never sees a
-        // mount route.
+        // Not railed here, but painted by the site's rule all the same.
         const schemed = withSavedScheme(read);
         if (schemed !== read) writeFileSync(file, schemed);
         continue;
       }
-      const after = withSavedScheme(withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) }));
+      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) });
       // The docs pages' own locale chrome, on a page Jekyll never laid out (#2219).
-      writeFileSync(file, m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after);
+      writeFileSync(file, finishRailedPage(m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after, false));
       injected++;
     }
   }
@@ -1126,6 +1150,22 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
 // code span (reference/skill-instructions/rendered-verification) matched the
 // bare attribute, was counted as navigated, and kept its theme side bar.
 const NAVIGATED = /<nav class="fa-nav"|<nav\b[^>]*\bid="site-nav"/;
+
+/**
+ * What every railed page of a site carries, whichever pass or generator put
+ * the rail there: no theme sidebar beside it when the site's pages are railed
+ * from the theme source (owner, 2026-10-15, "one rail on every page"), and the
+ * site's CURRENT first-paint snippet (`withSavedScheme` upgrades a stale one).
+ * Idempotent, so it can run on a page any number of times.
+ *
+ * Measured on the live root, 2026-10-16: 56 railed pages with no snippet (the
+ * IRIS replica's pages and the mount routes, which the mount pass railed
+ * or found railed and never gave one), one with a stale snippet, and two
+ * with the theme's sidebar beside the rail.
+ */
+export function finishRailedPage(html: string, stripTheme: boolean): string {
+  return withSavedScheme(stripTheme ? stripThemeSidebar(html) : html);
+}
 
 /** A meta-refresh redirect stub, which {@link railStandalonePages} leaves bare. */
 const REDIRECT = /<meta\s+http-equiv="refresh"/i;
@@ -1350,7 +1390,7 @@ export function railStandalonePages(
   mountRoutes: readonly string[],
   foreign?: ForeignSiteRail,
   opts: RailPassOptions = {},
-): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; replacedThemeSidebar: number; pinned?: ReturnType<typeof pinPlatformChrome> } {
+): { injected: number; alreadyNavigated: number; redirects: number; declined: number; skipped: string[]; replacedThemeSidebar: number; finished: number; pinned?: ReturnType<typeof pinPlatformChrome> } {
   const skipped: string[] = [];
   let injected = 0;
   let alreadyNavigated = 0;
@@ -1385,6 +1425,7 @@ export function railStandalonePages(
       const rel = abs.slice(siteAbs.length + 1);
       if (e.isDirectory()) {
         if (!owned(rel)) walk(abs);
+        else if (mountRoutes.some((r) => rel === r || rel.startsWith(`${r}/`))) finish(abs);
         continue;
       }
       if (!e.name.endsWith(".html") || owned(rel)) continue;
@@ -1397,9 +1438,13 @@ export function railStandalonePages(
         // Its rail is its own, but its first paint is the site's rule: a page
         // a generator railed itself (the IRIS replica's pages, 2026-10-15)
         // carried no first-paint snippet, so it painted the static dark sheet
-        // and flipped once the rail's script ran. Idempotent.
-        const schemed = withSavedScheme(read);
-        if (schemed !== read) writeFileSync(abs, schemed);
+        // and flipped once the rail's script ran. And a railed page that also
+        // wears the theme's sidebar loses the sidebar: one rail. Idempotent.
+        const finished = finishRailedPage(before, false);
+        if (finished !== read) {
+          writeFileSync(abs, finished);
+          if (themed) replacedThemeSidebar++;
+        }
         continue;
       }
       // A REDIRECT STUB is not a page anybody stays on — the mount writes one
@@ -1482,12 +1527,34 @@ export function railStandalonePages(
       injected++;
     }
   };
+  // THE MOUNT ROUTES, FINISHED. Their pages are the mount pass's to rail, but
+  // what every railed page carries is this site's rule, checked here, last,
+  // after every generator: the mount pass ran before some of them, and a
+  // page it found railed by its own generator it used to leave as it was.
+  let finished = 0;
+  const finish = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith(".")) continue;
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) {
+        finish(abs);
+        continue;
+      }
+      if (!e.name.endsWith(".html")) continue;
+      const read = readFileSync(abs, "utf-8");
+      if (!hasRail(read)) continue;
+      const out = finishRailedPage(read, pageTree !== undefined);
+      if (out === read) continue;
+      writeFileSync(abs, out);
+      finished++;
+    }
+  };
   if (existsSync(siteAbs)) walk(siteAbs);
   // The files those pages now link, shipped with them — only when a page was railed.
   const pinned = foreign && injected > 0 ? pinPlatformChrome(siteAbs) : undefined;
   // The page layout the top bar is laid out by, beside the pages that link it.
   if (injected > 0) writePageLayout(siteAbs);
-  return { injected, alreadyNavigated, redirects, declined, skipped, replacedThemeSidebar, ...(pinned ? { pinned } : {}) };
+  return { injected, alreadyNavigated, redirects, declined, skipped, replacedThemeSidebar, finished, ...(pinned ? { pinned } : {}) };
 }
 
 /**
@@ -1545,7 +1612,7 @@ interface DeclaredEntry {
 }
 
 /** One declared directory, resolved — in-tree, or held from a subscription. */
-interface ResolvedEntry {
+export interface ResolvedEntry {
   name: string;
   instanceDir: string;
   entry: DeclaredEntry & { path: string };
@@ -1554,7 +1621,7 @@ interface ResolvedEntry {
   subscribed?: string;
 }
 
-type ParsedDeclaration = Record<string, unknown> & { name?: string; directories?: DeclaredEntry[] };
+type ParsedDeclaration = Record<string, unknown> & { name?: string; enabled?: boolean; directories?: DeclaredEntry[] };
 
 /** Every instance declaration at `repo`'s top level, parsed — an unparseable one is skipped, since `kg:schema:check` owns it. */
 function topLevelDeclarations(repo: string): { dirName: string; dir: string; decl: ParsedDeclaration }[] {
@@ -1649,7 +1716,7 @@ function readSubscribedMountEntries(repo: string): SubscribedRead {
   const inTree = new Set(decls.map((d) => d.decl.name ?? d.dirName));
   const trees = subscribedTrees(
     all
-      .filter((d) => Array.isArray(d.decl["subscriptions"]))
+      .filter((d) => isPublished(d.decl) && Array.isArray(d.decl["subscriptions"]))
       .map((d) => ({ dir: d.dir, decl: { ...d.decl, name: d.decl.name ?? d.dirName } as Parameters<typeof subscribedTrees>[0][number]["decl"] })),
   );
   const problems: string[] = [];
@@ -1688,9 +1755,12 @@ function readSubscribedMountEntries(repo: string): SubscribedRead {
  * instances exist or what a directory is called. Since bean `g8jp` it includes
  * the held directories of subscribed instances ({@link subscribedMountEntries}).
  */
-function declaredEntries(repo = REPO): ResolvedEntry[] {
+export function declaredEntries(repo = REPO): ResolvedEntry[] {
   const out: ResolvedEntry[] = [];
   for (const { dirName, dir, decl: d } of topLevelDeclarations(repo)) {
+    // Not publishing is a declaration (`"enabled": false`), so a disabled
+    // instance mounts nothing and redirects nothing; it is not a gap.
+    if (!isPublished(d)) continue;
     for (const entry of d.directories ?? []) {
       if (!entry.path) continue;
       out.push({
@@ -1731,7 +1801,7 @@ export interface Served {
 export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries()): Served[] {
   return entries
     .filter((x) => x.entry.served === true)
-    .map((x) => ({ name: x.name, dir: x.abs, route: `${x.name}/${x.entry.path.replace(/^\/+|\/+$/g, "")}` }));
+    .map((x) => ({ name: x.name, dir: x.abs, route: instanceRoute(x.name, x.entry.path.replace(/^\/+|\/+$/g, "")) }));
 }
 
 /** The directory's own declared viewer, repo-relative, or `undefined` (#1168 B7a-2b). */

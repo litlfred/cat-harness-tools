@@ -50,6 +50,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { workflowFiles } from "./known-skills.ts";
+import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
 import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
 import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
@@ -71,7 +72,10 @@ export function declaredDiagrams(repoRoot: string = REPO): Map<string, string> {
   const out = new Map<string, string>();
   for (const inst of instanceRootsIn(repoRoot)) {
     for (const abs of workflowFiles(inst, "instance")) {
-      if (abs.endsWith(".bpmn") && !out.has(repoRel(abs))) out.set(repoRel(abs), resolve(inst));
+      // A layer's shared global-tasks file holds no process, so it is no Process node.
+      if (abs.endsWith(".bpmn") && !out.has(repoRel(abs)) && !isGlobalTasksFile(readFileSync(abs, "utf-8"))) {
+        out.set(repoRel(abs), resolve(inst));
+      }
     }
   }
   return out;

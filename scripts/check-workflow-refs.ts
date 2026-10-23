@@ -35,7 +35,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative } from "node:path";
-import { loadProcessModel, isActivity } from "../src/workflow/process-model.js";
+import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
@@ -149,7 +149,7 @@ knownCount += skills.size;
 // Absolute paths from every declared directory. A dangling `<bootstrap.processes:skill
 // ref>` in a diagram this checker never opens is a broken reference reported
 // as clean, which is the exact failure this script exists to prevent.
-const files = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
+const files = processDiagrams(workflowFiles(root, corpusScopeFor(root)));
 fileCount += files.length;
 
 

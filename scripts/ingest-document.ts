@@ -79,7 +79,7 @@ import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 
 /**
@@ -99,7 +99,10 @@ import { COVER_FILENAME } from "./library-graph.ts";
  *
  * ## `--instance <dir>`: ingest into a CONTENT instance's library
  *
- * Without it this is cat-harness, and that is still the default. With it, the
+ * Without it this is the instance being worked on — cat-harness, unless a
+ * separated instance's repository MOUNTS the harness, when it is that instance
+ * (`resolveWorkingInstanceRoot`, bean `j3ls`: from a separated content instance the staging tree
+ * landed inside the mounted harness). With it, the
  * staging tree and the destination library are resolved against `<dir>`, which
  * must hold an instance declaration (`<name>.json`). This is the case of a
  * content folio such as `litlfred/qou`, checked out beside the harness: before
@@ -115,8 +118,11 @@ import { COVER_FILENAME } from "./library-graph.ts";
  */
 const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
 
-/** `--instance <dir>` or `--instance=<dir>`, else the harness. Exported for tests. */
-export function resolveInstanceRoot(argv: readonly string[], fallback: string = HARNESS_ROOT): string {
+/** `--instance <dir>` or `--instance=<dir>`, else the working instance. Exported for tests. */
+export function resolveInstanceRoot(
+  argv: readonly string[],
+  fallback: string = resolveWorkingInstanceRoot({ argv: [] }).root,
+): string {
   let chosen: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -584,6 +590,19 @@ export function recordedUndetermined(step: readonly string[], exitCode: number, 
   return undefined;
 }
 
+/**
+ * The tabular-csvw step answered "not a table I take" — bean `urat`.
+ *
+ * `tabular-csvw.ts` exits 2 only when the slot's reader returns `null`: it
+ * wrote nothing, and said so. Its other failures (usage, a slot nothing
+ * fills, an extractor that throws) exit 1. So exit 2 from THIS step is an
+ * answer, as the vector arms' sidecar is, and the ingest goes on to stage
+ * the entry, whose tabular requirement then reads unmet.
+ */
+export function tableNotTaken(step: readonly string[], exitCode: number): boolean {
+  return exitCode === 2 && basename(step[2] ?? "") === "tabular-csvw.ts";
+}
+
 /** The vector arms whose exit 2 may be an answer, and the sidecar each writes. */
 const VECTOR_ARM_SIDECARS: Record<string, string> = {
   "pdf-vector-labels.py": "vector-labels.json",
@@ -784,10 +803,17 @@ export function planFor(
   // itself via `[Content_Types].xml` or ODF's `mimetype` member. Bean `p67i`;
   // the defect was introduced by `twqe`'s routing and caught before it shipped.
   if (mime !== null && (TABULAR_MIMETYPES as readonly string[]).includes(mime)) {
+    // Every workbook is read as CSVW through the `tabular-csvw` slot, which
+    // core fills (bean `urat`, owner 2026-10-20). Core has no CSVW reader for
+    // ODS yet, so for one the slot answers "not a table I take" and the step
+    // SKIPs; the staged entry then lists its tabular record as unmet. The v1
+    // writer this used to call wrote nothing for ODS either, and stopped the
+    // ingest saying "not a CSV or spreadsheet" (5c-ii, option 1).
+    const ods = mime === "application/vnd.oasis.opendocument.spreadsheet";
     return {
       rung: "tabular",
-      why: `the package declares ${mime} — a workbook, read for its sheets and headers`,
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      why: `the package declares ${mime} — a workbook, read for its sheets and headers${ods ? " (no CSVW reader for ODS yet: the step SKIPs)" : ""}`,
+      steps: [["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -813,7 +839,7 @@ export function planFor(
     return {
       rung: "tabular",
       why: "no magic bytes, but the rows split consistently — delimited text",
-      steps: [["python3", pyHelper("tabular-records.py"), "-o", lib, pdf]],
+      steps: [["bun", "run", tsHelper("tabular-csvw.ts"), "-o", lib, pdf]],
     };
   }
 
@@ -1211,6 +1237,10 @@ if (import.meta.main) {
       const recorded = recordedUndetermined(s, r.exitCode, started);
       if (recorded !== undefined) {
         console.log(`  ${basename(s[1] ?? "")}: UNDETERMINED, recorded in ${recorded} — continuing`);
+        continue;
+      }
+      if (tableNotTaken(s, r.exitCode)) {
+        console.log(`  ${basename(s[2] ?? "")}: NOT READ — no tabular-csvw reader takes this file; the staged entry lists its tabular record as unmet`);
         continue;
       }
       console.error(`\n${s[1]} failed (exit ${r.exitCode}) — stopping.`);

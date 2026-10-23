@@ -95,7 +95,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the site
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: site
           ref: ${{ github.event.repository.default_branch }}
@@ -130,8 +130,11 @@ jobs:
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           args=(--instance . --depth "$DEPTH" --summary-file "$RUNNER_TEMP/repin.md")
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
-          bun ../tools/cat-harness-tools/scripts/repin-standing.ts "${args[@]}"
-          code=$?
+          # `|| code=$?`: Actions runs this as `bash -e`, so a bare call
+          # followed by `code=$?` ended the step on a refusal before the
+          # summary and the `code` output below were written.
+          code=0
+          bun ../tools/cat-harness-tools/scripts/repin-standing.ts "${args[@]}" || code=$?
           cat "$RUNNER_TEMP/repin.md" >> "$GITHUB_STEP_SUMMARY" || true
           echo "code=$code" >> "$GITHUB_OUTPUT"
           # A refused or undetermined instance is a red run, and nothing is pushed:

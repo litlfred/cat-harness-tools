@@ -1,11 +1,12 @@
 ---
 # folio-assistant-pnn5
+$schema: bean/1.0.0
 title: 'v8n5 Done-when #2 promised coverage ''the day instance #2 declares a theme'' — that day came and nothing compares'
 status: completed
 type: task
 priority: normal
 created_at: 2026-09-30T21:24:19Z
-updated_at: 2026-10-11T06:39:00Z
+updated_at: 2026-10-11T06:52:45Z
 parent: folio-assistant-1xhc
 ---
 
@@ -84,8 +85,15 @@ instance that declares its own theme. Nobody has measured it — which is the
 whole point of the missing check, and why this bean does not assert a defect
 in the rendering, only in the coverage.
 
+## Summary of Changes
 
-## Owner decision
+Done by drain lane B on the owner's ruling (kind for kind): cat-harness-tools#115 — webpage held to _data/instance-themes.json (a miss blocks); sticky and publication have no instance-scoped surface (advisory); an unloadable themes.ts reads unknown. Note: who-iris and smart-base themes.ts do not load at folio-assistant main's pins (moved-path imports), so the check reads unknown until #2529's re-pin.
+
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Owner decision
 
 (Lane B drain, 2026-10-10: put in pick-one form so it is answerable without reading the whole bean.) What should `check-navbar-consistency.ts` compare for an instance that declares its own theme?
 
@@ -96,21 +104,6 @@ in the rendering, only in the coverage.
 
 **Default if no answer:** no change. The pinning test (`the size-1 NOTE is gone, and its PROMISE is NOT yet kept`) stays, and nothing is compared.
 
-
-
-## Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
+### Owner ruling 2026-10-11 (relayed by lane A, answered in their session)
 
 **Option 1, kind for kind:** a surface of kind K on an instance's pages uses that instance's K-kind theme when it declares one, and falls back to the platform default only for kinds it doesn't declare.
-
-
-
-## Summary of Changes
-
-Built to the owner's option 1 (kind for kind) in cat-harness-tools#115 (merged 2026-10-11).
-- `check-navbar-consistency.ts` judges every (themed instance, declared kind) pair through the exported `judgeThemeKinds`.
-  - **webpage:** held to `_data/instance-themes.json` and to `head_custom.html` reading it. A miss is a blocking `theme-fallback`.
-  - **sticky and publication:** no surface selects these by instance, so the instance falls back by construction. Reported as advisory `theme-kind-unconsumed`.
-  - **an unloadable themes.ts:** unknown. `--check` exits 2 when nothing else fails.
-- Falsification tests replace the pinning test.
-- **Known:** at the current index.lock pins, who-iris and smart-base themes.ts don't load (imports of moved cat-harness files). So the real corpus reads 0 judged and 2 unknown until a re-pin. I sent lane A the re-pin request.
-- **Follow-up, not filed here:** a platform surface that selects an instance's sticky or publication theme.

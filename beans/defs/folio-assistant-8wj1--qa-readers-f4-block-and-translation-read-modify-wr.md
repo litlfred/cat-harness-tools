@@ -1,11 +1,12 @@
 ---
 # folio-assistant-8wj1
+$schema: bean/1.0.0
 title: 'QA READERS F4: block and translation read-modify-write writers stop dropping agent verdicts when the prior is absent — the block-qa D2 split'
 status: in-progress
 type: task
 priority: critical
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-16T06:30:00Z
+updated_at: 2026-10-23T08:26:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -101,3 +102,49 @@ Cherry-picked `8758a003..e8caf202`, then:
 **Still open.** The third Done-when (the script half through `qa-store`). Also, `translation-roundtrip.ts` writes agent round-trip entries straight into a legacy-path sidecar and is not yet a store writer. With a store hit, its new entry makes the next writer refuse with `conflict`: loud, not lost.
 
 _2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Owner ruling 2026-10-16 (item 1): lift the stale blocks on claimed beans whose blocker is closed; the claim itself is untouched. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+
+*2026-10-22T16:46:00Z* — Claim released (stale-claims sweep, coordinator standard: on evidence, nothing claimed in the last 48h; lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Checked:
+- No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The latest are a blocker withdrawal on 10-06 and a store reconciliation on 10-16, neither of which is work.
+- No remote branch in any of the three names this bean.
+- The holding branch named above (`claude/quirky-davinci-ixuymr`) was last touched on 2026-10-03.
+
+The claimed work is NOT all on main: the unticked Done-when boxes above are what remains, and the ticked ones are what landed. Back to todo so the claim does not mislead a sibling session. Nothing was deleted.
+
+
+*2026-10-22T17:10:00Z* — Progress, and a provisional ruling (lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). The third Done-when has three parts.
+
+- **translation:block-qa:check:** litlfred/cat-harness-tools#563.
+  - In a stored tree with `--against`, each prior is read from qa-reports instead of the working copy.
+  - Measured in the index at 1730012 against qa-reports main: inherited findings were 6 with `test/results/` present and 3 with it absent. They are now 6 both ways, with the same verdict.
+- **qa_staleness:** litlfred/cat-harness-tools#564 adds `qa-staleness --against <ref>`.
+  - On cat-harness `docs/source`, 172 blocks were all NO-QA with `test/results/` absent. Now the per-block results are identical both ways.
+  - A sidecar the branch cannot read is UNKNOWN, never NO-QA.
+  - The MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`. That is routed to lane C.
+- **qa_sweep and the other block writers: option (B), owner, 2026-10-22.** It overrides the provisional (A) the coordinator first took.
+  - Every block writer gains `--prior-from <ref>`, which reads the earlier sidecar from qa-reports.
+  - A rewrite then carries the other writers' entries even when `test/results/` is absent.
+  - A branch read that cannot be made refuses loudly (exit 2), the same way the readers in #563 and #564 do. It never falls back silently to the working copy.
+
+This bean stays in-progress until B's `--prior-from` writers land, together with #563 and #564.
+
+
+*2026-10-23T07:52:00Z* — Option (B) under way; claimed by lane A (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr).
+- **litlfred/cat-harness-tools#568** adds `--prior-from <ref>` to every block writer. These are qa-sweep; integration-audit, which passes the flag through to its child qa-sweep; language-trap-audit; proof-narrative-lean-equiv-sweep; q-usage-audit; qa-agent-entry; qa-merge-findings; and src/qa-agent-write.
+- **How a read at the ref resolves:**
+  - A hit is the prior.
+  - A miss is a block with no history.
+  - An unreachable store, or a report that is corrupt or not block-qa/v1, refuses that block with an `UNKNOWN … Nothing was written for it` line, and the run exits 2. It never falls back to the working copy.
+  - A malformed ref exits 2 before any read.
+- **Merged:** #564 (`qa-staleness --against`), 2026-10-23.
+- **Open:** #563 (translation:block-qa:check) and #568.
+
+Stays in-progress until #563 and #568 land.
+
+
+*2026-10-23T08:26:00Z* — All three code parts of the third Done-when are merged to cat-harness-tools main:
+- #563 (`translation:block-qa:check` priors read from the store), 05fa7f1
+- #564 (`qa-staleness --against`), 67240eb
+- #568 (`--prior-from` on every block writer), 3db526d
+
+**Still open:** the MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`, routed to lane C. The index also has to re-pin to these mains, which lane C does via folio-assistant#2628. Stays in-progress until the wrapper lands.

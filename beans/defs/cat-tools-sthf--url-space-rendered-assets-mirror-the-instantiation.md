@@ -1,12 +1,13 @@
 ---
 # cat-tools-sthf
+$schema: bean/1.0.0
 title: 'URL SPACE: rendered assets mirror the instantiation structure — <baseurl>/ for the root, <baseurl>/<instance>/<path> for every enabled harness'
-status: todo
+status: completed
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:43Z
-updated_at: 2026-10-10T16:33:43Z
+updated_at: 2026-10-23T09:30:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -67,15 +68,15 @@ existence"* — this says where that artefact is served from.
 
 ## Done when
 
-- [ ] `enabled` is a declared field with a default of enabled, and a disabled
+- [x] `enabled` is a declared field with a default of enabled, and a disabled
       instance is a declaration rather than an absence
-- [ ] The three questions above are answered by the owner
-- [ ] One resolver composes an instance's published URL, and every consumer
+- [x] The three questions above are answered by the owner
+- [x] One resolver composes an instance's published URL, and every consumer
       goes through it — no site path composed by hand
-- [ ] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
+- [x] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
       under its own segment, and a test asserts the layout for at least two
       instances
-- [ ] The bootstrap `.jsonld` / `.json` resolves at its instance path, which
+- [x] The bootstrap `.jsonld` / `.json` resolves at its instance path, which
       is the example the owner named
 
 Related: `yj32` (harness as interface), `hfkl` (bootstrap's json/jsonld is its
@@ -138,14 +139,14 @@ links:
 
 - [x] The URL segment is the instance's `name` — ruled
 - [x] The declared graph is a path segment rather than elided — ruled
-- [ ] The root instance's exception is chosen (1 or 2 above)
-- [ ] `enabled` is a declared field defaulting to enabled, so "not rendered"
+- [x] The root instance's exception is chosen (1 or 2 above)
+- [x] `enabled` is a declared field defaulting to enabled, so "not rendered"
       is a declaration and not an absence
-- [ ] One resolver composes an instance's published URL and every consumer
+- [x] One resolver composes an instance's published URL and every consumer
       goes through it
-- [ ] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
+- [x] `docs-site.yml` and `feature-staging.yml` publish each enabled instance
       under its own segment, with a test asserting the layout for at least two
-- [ ] The bootstrap `.jsonld` / `.json` resolves at its instance path
+- [x] The bootstrap `.jsonld` / `.json` resolves at its instance path
 
 
 ## OWNER, 2026-09-20 — question 3 answered: the root's docs are INSTALLED
@@ -442,3 +443,100 @@ What remains is harness work in cat-harness-tools and cat-harness:
 
 By the owner's ruling on the rehome decision, the bean is re-filed in the
 cat-harness-tools store, and this copy stays as a pointer.
+
+
+## Re-measured 2026-10-20 — every remaining item starts outside this repository
+
+All questions are answered (ruling 2026-10-10 above). Of the four remaining
+items, measured at cat-harness `main` and cat-harness-tools `3420b76`:
+
+- the `enabled` field: absent from `schemas/cat-harness.ts` in **cat-harness**;
+- the one resolver: **cat-harness** has path helpers (`artefactStub`,
+  `siteDir`/`siteDirFor`, `siteFileFor`, `publishedAssetPath`), and here
+  `scripts/sync-docs-harness.ts` goes through a shared `siteLinks`
+  (`scripts/site-links.ts`). But none composes the three-case
+  `<base>/` / `<base>/<instance>/<path>` rule settled above, and
+  `scripts/root-index.ts` and `scripts/kg-export.ts` build paths from
+  `artefactStub` directly. *(Corrected 2026-10-20 by a QA pass of this note: it
+  first said no URL-composing function existed and that every consumer composed
+  its own, which overstated it.)*
+- the workflow layout: `docs-site.yml` / `feature-staging.yml` are in
+  **folio-assistant**, not here;
+- the bootstrap `.jsonld` path: follows the resolver.
+
+So the first two land in cat-harness, and only then does this repo switch its
+consumers to the resolver. Left `todo` here; this bean is the consumer half,
+and the field and resolver should be filed (or found) in the cat-harness store.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+_2026-10-20T15:24:28Z_ — Blocked by `folio-assistant-nbal` (cat-harness graph store), which files and builds the prerequisite: litlfred/cat-harness#376 (commit `1ef09a59`) adds `schemas/url-space.ts` with `publishedPath({case: "root" | "instance" | "viewer", …}, base)` and `isPublished({enabled})`, and `enabled?: boolean` on the declaration. The consumer switch here starts once #376 is on this repository's pin. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T17:13:17Z_ — Claimed by feat/sthf-url-space-consumers — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+
+## Consumer half landed — 2026-10-20
+
+`nbal` (cat-harness#376) is on cat-harness `main`, which this repository's CI
+mounts, so the blocker is lifted. In this repository every writer and reader
+of a foreign instance's published files now goes through cat-harness's
+`publishedPath` (`case: "instance"`), via one helper,
+`instanceSitePath` / `instanceDocPath` in `scripts/instance-exports.ts`:
+
+- `instance-exports.ts`: the document at `<name>/<stub>.jsonld` and its
+  `<name>/schema/`; the plan leaves out an instance that declares
+  `"enabled": false` (`isPublished`);
+- `kg-export.ts`: a foreign instance's `docPath`, hence its `@id`;
+- `root-index.ts`: where the index looks for each export, and it skips a
+  disabled instance instead of reporting it missing;
+- `kg-changed-assets.ts`: where it reads each built document.
+
+**No published address moved.** The segment is now the instance's NAME, as the
+2026-09-20 ruling says, where it used to be the stub. Every instance declared
+today has name = stub, and a test pins that, so a future instance whose stub
+differs is a visible decision and not a silent move (`blv9`).
+
+### Done when, now
+
+- [x] the root instance's exception: settled by the rulings above
+- [x] `enabled` is a declared field defaulting to enabled (`nbal`), and the
+      plan and the root index honour it
+- [x] one resolver composes an instance's published URL, and every consumer in
+      this repository goes through it (the repository-wide artefacts stay at
+      the root, as the 2026-10-10 exception declares: `site-links.ts`)
+- [x] `docs-site.yml` / `feature-staging.yml` publish each enabled instance:
+      **folio-assistant's workflows**, not this repository
+- [x] the bootstrap `.jsonld` resolves at its instance path: bootstrap is
+      published by bootstrap-tools' `export-graph.ts` (`PUBLISHED_ELSEWHERE`),
+      so the check belongs there
+
+Released to `todo`: the two open boxes are in other repositories.
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.
+
+_2026-10-20T18:55:43Z_ — Claimed by claude/sthf-mount-instance-docs — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+## mount-instance-docs through the resolver — 2026-10-20
+
+litlfred/cat-harness-tools#493 (merge `5045230`) completes the consumer half in this repository. `mount-instance-docs.ts`, the last consumer here that composed an instance's route by hand, now builds the instance-as-itself and served-directory routes through `publishedPath` (via `instance-exports`' `instanceSitePath`). It also skips `"enabled": false` instances in `declaredEntries` and in the subscription walk. A test lays out three instances: two published, one of them with a stub that differs from its name, and one disabled.
+
+### What remains, all in folio-assistant (the index half)
+- [x] `docs-site.yml` and `feature-staging.yml` compose paths through `publishedPath`/`isPublished` and skip `enabled: false` (o7eq note, 2026-10-20: `docs-site.yml` :613-617, :661-664, :682, :708; `feature-staging.yml` :1291-1311, :1415-1416, :1446)
+- [x] the `cat-harness` stub / KG-viewer collision: `_site/cat-harness/index.html` takes case 2's `<base>/cat-harness/`. This is a placement question, to go to the owner if it needs a call.
+- [x] the bootstrap `.jsonld`/`.json` resolves at its instance path from the resolver
+
+Kept in progress: this session takes the index half after litlfred/folio-assistant#2612 (session https://claude.ai/code/session_016heucWhrncLm4uy52csBcz).
+
+## Summary of Changes
+
+Mirrors `folio-assistant-o7eq`, which the coordinator completed in the index store on 2026-10-23 with every box ticked. This bean is that work's tools-store copy. All boxes above are now ticked. The 9 that were open were all index-half items, and #2617 does each of them: the publish layout, the stub collision and the bootstrap path.
+
+- **Tools half:**
+  - #549 (e009a87): `bootstrap-graph-repo-root.test.ts` asserts that the bootstrap `.jsonld`'s `@id` equals its served path, captures from `print-published-path` included.
+  - #493 (5045230): `mount-instance-docs.ts` goes through `publishedPath`.
+  - `nbal`: `enabled` is a declared field.
+- **Index half:** litlfred/folio-assistant#2617 (e3323fc, lane S, merged 2026-10-23).
+  - `docs-site.yml` and `feature-staging.yml` publish each enabled instance through `publishedPath` / `isPublished` and skip `enabled: false`.
+  - The KG viewer lands at `<locale>/<stub>/kg/` with the forwarding page at `<stub>/`, which resolves the `cat-harness` stub collision.
+  - bootstrap's directory comes from the resolver.
+
+#549 and #2617 were both verified as merged on GitHub before this bean was closed. Closed by lane A (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr) on the coordinator's request.

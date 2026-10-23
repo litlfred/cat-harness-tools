@@ -18,7 +18,7 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { loadProcessModel } from "../src/workflow/process-model.js";
+import { loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
 import { loadRelaxations, validateRelaxations, PolicyError } from "../src/workflow/gate.js";
 
 const root = HARNESS_ROOT;
@@ -27,9 +27,7 @@ const root = HARNESS_ROOT;
 // one whose relaxations go unchecked — the policy gate passing because it
 // never looked.
 const models = await Promise.all(
-  workflowFiles(root, corpusScopeFor(root))
-    .filter((f) => f.endsWith(".bpmn"))
-    .map((f) => loadProcessModel(f)),
+  processDiagrams(workflowFiles(root, corpusScopeFor(root))).map((f) => loadProcessModel(f)),
 );
 
 console.log("Processes");

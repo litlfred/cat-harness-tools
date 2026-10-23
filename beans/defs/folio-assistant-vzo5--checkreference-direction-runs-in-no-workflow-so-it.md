@@ -1,5 +1,6 @@
 ---
 # folio-assistant-vzo5
+$schema: bean/1.0.0
 title: check:reference-direction runs in NO workflow, so its PENDING guard — the half its docblock calls enforced — fires nowhere
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-29T22:16:35Z
 updated_at: 2026-10-06T14:30:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 Found by a goal-review sweep, 2026-09-29, on `origin/main` @ `35402147f55`.
 

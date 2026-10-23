@@ -37,7 +37,7 @@
 import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { resolve, join, basename } from "path";
-import { BlockSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
+import { parseBlock } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 import type { Block } from "@litlfred/cat-harness/schemas/types.ts";
 import { requirePaper, findContentRepoRoot } from "./repo-root";
 import { paperArg } from "./cli-args";
@@ -189,7 +189,7 @@ async function auditPaper(): Promise<AuditReport> {
       } catch {
         continue;
       }
-      const parsed = BlockSchema.safeParse(block);
+      const parsed = parseBlock(block);
       if (!parsed.success || !block) continue;
 
       const mdPath = join(chapterDir, `${name}.md`);

@@ -455,6 +455,16 @@ function readIndex(store: Store, rootTree: string): { state: "ok"; index?: QaInd
 }
 
 /**
+ * The entry key a `skipped` target names. A full key is kept as it is: a PR
+ * skipped onto main's entry maps to `main/<sha>`, and prefixing that with the
+ * PR's own parent would name `pr/<n>/main/<sha>`, which never exists. A bare
+ * sha is under `parent`.
+ */
+function skippedKey(parent: string, target: string): string {
+  return /^(main|pr\/\d+)\//.test(target) ? target : `${parent}/${target}`;
+}
+
+/**
  * Find a fallback entry on `rootTree` when `sha` was skipped or not recorded.
  * Checks `index.json`'s `skipped` mapping first, then falls back to git history
  * via `repoRoot` to find the most recent recorded commit on that branch.
@@ -471,7 +481,7 @@ function findSkippedTarget(
     const key = `${parent}/${sha}`;
     const target = idx.index.skipped[key] ?? idx.index.skipped[sha];
     if (target) {
-      const targetKey = target.startsWith(`${parent}/`) ? target : `${parent}/${target}`;
+      const targetKey = skippedKey(parent, target);
       if (store.lookup(rootTree, targetKey)) return targetKey;
     }
   }
@@ -488,7 +498,7 @@ function findSkippedTarget(
           if (idx.state === "ok" && idx.index?.skipped) {
             const mapped = idx.index.skipped[targetKey] ?? idx.index.skipped[ancestor];
             if (mapped) {
-              const mappedKey = mapped.startsWith(`${parent}/`) ? mapped : `${parent}/${mapped}`;
+              const mappedKey = skippedKey(parent, mapped);
               if (store.lookup(rootTree, mappedKey)) return mappedKey;
             }
           }
@@ -515,7 +525,7 @@ function findSkippedTargetForPrefix(
     for (const [k, v] of Object.entries(idx.index.skipped)) {
       const kSha = k.startsWith(`${parent}/`) ? k.slice(parent.length + 1) : k;
       if (kSha.startsWith(prefix)) {
-        const targetKey = v.startsWith(`${parent}/`) ? v : `${parent}/${v}`;
+        const targetKey = skippedKey(parent, v);
         if (store.lookup(rootTree, targetKey) && !matches.includes(targetKey)) {
           matches.push(targetKey);
         }

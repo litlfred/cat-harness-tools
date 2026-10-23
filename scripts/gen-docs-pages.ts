@@ -35,7 +35,9 @@
 import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { join, dirname, relative, resolve, posix } from "node:path";
+import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
+import { join, dirname, relative, resolve, posix, sep } from "node:path";
+import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
 import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
@@ -232,6 +234,40 @@ let storedAbsent = 0;
  * the rendered artefact. A narrative node resolves to its `.md`. A node with
  * neither is a bare heading and has nothing to edit.
  */
+/**
+ * The repository and path an edit link names, from the DECLARATIONS rather
+ * than the checkout — bean `5o5c`, owner ruling C (2026-10-22).
+ *
+ * The page is generated inside whichever checkout mounts this instance — the
+ * index, a content layer's own checkout, a bare clone — and `REPO_WEB` is that
+ * checkout's `origin`. Stamping it as `data-repo` made the same block render
+ * three ways, and the rendered line is a msgid in the translation catalogues,
+ * so every foreign root saw the catalogue as obsolete. It was also wrong where
+ * it differed: `docs/source/…` is instance-relative, so
+ * `litlfred/folio-assistant` + that path named a file the index does not hold.
+ *
+ * The owning instance is the one whose root holds the file, and its
+ * `repository` is the repo the link names; the path is relative to that root.
+ * A file no declaring instance holds keeps the checkout's own repository.
+ */
+export function declaredEditLocation(target: string): { source: string; repo?: string } {
+  // `editTarget` answers instance-relative, except for a `../` asset, which it
+  // already made checkout-relative; whichever exists is the file.
+  const inInstance = resolve(INSTANCE_ROOT, target);
+  const abs = existsSync(inInstance) ? inInstance : resolve(repoRootFor(INSTANCE_ROOT), target);
+  const owner = instanceRepositoryEntries()
+    .filter((e) => abs === e.root || abs.startsWith(e.root + sep))
+    .sort((a, b) => b.root.length - a.root.length)[0];
+  if (owner === undefined) return { source: target };
+  return { source: relative(owner.root, abs).replace(/\\/g, "/"), repo: owner.repository };
+}
+
+let instanceEntries: InstanceRepository[] | undefined;
+function instanceRepositoryEntries(): InstanceRepository[] {
+  instanceEntries ??= instanceRepositories(repoRootFor(INSTANCE_ROOT)).entries;
+  return instanceEntries;
+}
+
 export function editTarget(page: WebPage, node: WebPageNode): string | null {
   if (node.asset) {
     const src = node.asset.source;
@@ -764,9 +800,10 @@ function emitNode(page: WebPage, node: WebPageNode): string[] {
     // The QA icons ride the same line as Edit: both are per-node affordances
     // about THIS node, and a second row would separate them for no reason.
     const qa = qaIcons(page, node);
+    const at = declaredEditLocation(target);
     out.push(
       // The shared recipe (bean v433): facts on the link, href built by edit-links.js.
-      `${markdownEditLink({ repo: repoOf(REPO_WEB) }, { source: target, text: `${EDIT_GLYPH} Edit`, className: "fa-node-edit", title: `Edit ${target}` })}${qa}`,
+      `${markdownEditLink({ repo: repoOf(REPO_WEB) }, { ...at, text: `${EDIT_GLYPH} Edit`, className: "fa-node-edit", title: `Edit ${at.source}` })}${qa}`,
     );
     out.push("");
   }
@@ -1274,6 +1311,7 @@ function beanFile(id: string): string | undefined {
  */
 function processHierarchy(): Record<string, string[]> {
   const out: Record<string, string[]> = {};
+  const globalTasks = new Set<string>();
   // SORTED, and it is load-bearing rather than tidy — `workflowFiles` sorts,
   // and that guarantee is why this reads it rather than a directory.
   // `readdirSync` under Bun returns RAW DIRECTORY ORDER: on ext4 that is a
@@ -1302,6 +1340,9 @@ function processHierarchy(): Record<string, string[]> {
     // `\bid=` rather than a fixed position, because attribute order is the
     // author's choice: this file writes `id` first and `isExecutable` last,
     // another may not.
+    // A layer's global tasks (owner, 2026-10-20, "a1"): a call to one is a
+    // shared STEP, not a sub-process, so it is no edge of this hierarchy.
+    for (const g of xml.matchAll(GLOBAL_TASK_ELEMENT)) globalTasks.add(g[1]!);
     const id = /<(?:\w+:)?process\b[^>]*\bid="([^"]+)"/.exec(xml)?.[1];
     if (!id) continue;
     const calls = new Set<string>();
@@ -1329,6 +1370,7 @@ function processHierarchy(): Record<string, string[]> {
     }
     out[id] = [...calls].sort();
   }
+  for (const id of Object.keys(out)) out[id] = out[id]!.filter((c) => !globalTasks.has(c));
   return out;
 }
 

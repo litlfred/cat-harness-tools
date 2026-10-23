@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { countCatalogue, languageName, otherInstances, share, statusPage } from "../gen-translation-status.ts";
+import { countCatalogue, languageName, localeOfficiality, localeStatuses, officialityLabel, otherInstances, share, statusPage } from "../gen-translation-status.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 
 /** A minimal catalogue header — every real `.po` opens with one. */
@@ -331,7 +331,64 @@ describe("translation status visualiser wireframe findings (bgrz)", () => {
     const html = statusPage({ locales: sampleLocales, changedAt: "2026-10-09", scope: "cat-harness/translations" });
     const colHeaders = html.match(/<th\s+scope="col"[^>]*>/g) ?? [];
     const rowHeaders = html.match(/<th\s+scope="row"[^>]*>/g) ?? [];
-    expect(colHeaders.length).toBe(6);
+    expect(colHeaders.length).toBe(7);
     expect(rowHeaders.length).toBe(sampleLocales.length);
+  });
+});
+
+describe("officiality per locale, from BOTH records (bean cat-tools-bbnd)", () => {
+  const po = (official?: string) =>
+    `msgid ""\nmsgstr ""\n"Content-Type: text/plain; charset=UTF-8\\n"\n${official ? `"X-Folio-Official: ${official}\\n"\n` : ""}\nmsgid "a"\nmsgstr "b"\n`;
+  const locale = (files: Record<string, string>) => {
+    const dir = mkdtempSync(join(tmpdir(), "tr-off-"));
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+    return dir;
+  };
+
+  test("silence on both sides is unofficial, which is the state everywhere today", () => {
+    expect(localeOfficiality(locale({ "a.po": po() }))).toEqual({ state: "unofficial", officialCatalogues: 0, findings: 0 });
+  });
+
+  test("status.json official, named, and every catalogue agreeing is official", () => {
+    const o = localeOfficiality(locale({
+      "a.po": po("yes"),
+      "status.json": JSON.stringify({ official: true, signedOffBy: "Dr. A", signedOffAt: "2026-10-01" }),
+    }));
+    expect(o).toEqual({ state: "official", signedOffBy: "Dr. A", signedOffAt: "2026-10-01", officialCatalogues: 1, findings: 0 });
+    expect(officialityLabel(o)).toBe("official, signed off by Dr. A on 2026-10-01");
+  });
+
+  test("a catalogue claiming official with no status.json is a DISAGREEMENT, never official", () => {
+    const o = localeOfficiality(locale({ "a.po": po("yes"), "b.po": po() }));
+    expect(o.state).toBe("disagree");
+    expect(o.findings).toBe(1);
+    expect(officialityLabel(o)).toContain("records disagree");
+  });
+
+  test("each catalogue is listed with its counts and its own header, for the per-row drawer", () => {
+    const root = mkdtempSync(join(tmpdir(), "tr-files-"));
+    mkdirSync(join(root, "fr"));
+    writeFileSync(join(root, "fr", "a.po"), po("yes"));
+    writeFileSync(join(root, "fr", "b.po"), po());
+    const [fr] = localeStatuses(root);
+    expect(fr!.files!.map((f) => [f.path, f.translated, f.official ?? null])).toEqual([["a.po", 1, "yes"], ["b.po", 1, null]]);
+  });
+
+  test("an unreadable status.json is could-not-determine, not unofficial", () => {
+    expect(localeOfficiality(locale({ "a.po": po(), "status.json": "{not json" })).state).toBe("unreadable");
+  });
+
+  test("the status table carries a signed-off column with the state as data", () => {
+    const html = statusPage({
+      locales: [{
+        locale: "fr", templates: 1, catalogues: 1, entries: 1, translated: 1, fuzzy: 0, untranslated: 0, unreadable: [],
+        officiality: { state: "unofficial", officialCatalogues: 0, findings: 0 },
+      }],
+      changedAt: "2026-10-20",
+      scope: "x/translations",
+    });
+    expect(html).toContain('data-fa-tr-locale="fr"');
+    expect(html).toContain('data-fa-tr-officiality="unofficial"');
+    expect(html).toContain("not signed off");
   });
 });

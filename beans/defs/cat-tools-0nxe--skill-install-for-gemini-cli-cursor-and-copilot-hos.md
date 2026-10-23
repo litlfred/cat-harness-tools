@@ -1,5 +1,6 @@
 ---
 # cat-tools-0nxe
+$schema: bean/1.0.0
 title: 'Skill install for Gemini CLI, Cursor and Copilot hosts (x4mt follow-up) — verify formats first'
 status: draft
 type: task

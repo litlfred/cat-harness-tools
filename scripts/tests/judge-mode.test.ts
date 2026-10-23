@@ -45,6 +45,7 @@ import { checkMethodologyEvidence, judgeMethodologyEvidence } from "../check-met
 import { checkLanes, judgeLaneDocumentation } from "../check-lane-documentation.ts";
 import { judgeKgExport } from "../kg-export.ts";
 import { coverage, judgeAvatarCoverage, trashDerivationPresent } from "../check-avatar-coverage.ts";
+import { renderAvatarsCss } from "../gen-avatars-css.ts";
 import {
   healthProducerCurrent,
   interactionProfilesRead,
@@ -478,24 +479,10 @@ describe("kg:export:judge", () => {
 });
 
 describe("check:avatar-coverage", () => {
-  test("CORRUPTED: an instance whose avatars.css carries no trash rule → exit 1", () => {
-    const root = tmp("avatars");
-    try {
-      mkdirSync(join(root, "pages"), { recursive: true });
-      writeFileSync(
-        join(root, "thing.json"),
-        JSON.stringify({
-          name: "thing",
-          description: "fixture",
-          directories: [{ id: "d", path: "pages/", graphTypologies: ["docs"], description: "fixture" }],
-        }),
-      );
-      const c = coverage(root);
-      expect(trashDerivationPresent(root)).toBe(false);
-      expect(exitOf(judgeAvatarCoverage(c, trashDerivationPresent(root)))).toBe(1);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  test("CORRUPTED: a stylesheet that carries no trash rule → exit 1", () => {
+    const css = renderAvatarsCss().replaceAll('[data-fa-trash="true"]', "");
+    expect(trashDerivationPresent(css)).toBe(false);
+    expect(exitOf(judgeAvatarCoverage(coverage(INSTANCE_ROOT), trashDerivationPresent(css)))).toBe(1);
   });
 
   // A kind with no art cannot be planted through a fixture DECLARATION without
@@ -510,7 +497,7 @@ describe("check:avatar-coverage", () => {
       missing: [...c.missing, { kind: "zzz-kind-with-no-art", where: "schemas/avatars.ts", note: "planted" }],
     };
     expect(exitOf(judgeAvatarCoverage(corrupted, true))).toBe(1);
-    expect(exitOf(judgeAvatarCoverage(c, trashDerivationPresent(INSTANCE_ROOT)))).toBe(0);
+    expect(exitOf(judgeAvatarCoverage(c, trashDerivationPresent()))).toBe(0);
   });
 
   test("an empty required set is UNKNOWN (2), never full coverage", () => {

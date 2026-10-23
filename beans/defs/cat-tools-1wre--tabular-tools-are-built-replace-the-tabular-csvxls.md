@@ -1,5 +1,6 @@
 ---
 # cat-tools-1wre
+$schema: bean/1.0.0
 title: 'Tabular tools are built: replace the tabular-csv/xlsx STUB declarations and fix the stub check that no longer exists (eief follow-up a)'
 status: completed
 type: task

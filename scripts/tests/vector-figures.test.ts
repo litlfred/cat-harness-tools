@@ -31,6 +31,7 @@ import {
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const AGENT = { kind: "agent", id: "claude", model: "not-disclosed", session: "https://claude.ai/code/session_test" };
@@ -85,7 +86,7 @@ describe("the extractor assigns no role — the schema refuses one", () => {
 
   test("`shows` and a narrative need somebody to have looked", () => {
     expect(VectorFigureSchema.safeParse({ ...rendered(3, ["1"]), shows: ["1"] }).success).toBe(false);
-    const narrative = { text: "x", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" };
+    const narrative = [{ text: "x", lang: "en", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" }];
     expect(VectorFigureSchema.safeParse({ ...rendered(3, ["1"]), narrative }).success).toBe(false);
   });
 
@@ -122,7 +123,7 @@ describe("a role arrives by inspection, through apply-image-verdicts", () => {
     expect(f.basis).toMatchObject({ method: "inspection", by: AGENT, saw: "an architecture diagram", page: 34 });
     expect(f.shows).toEqual(["3"]);
     // A draft, never confirmed — only a human confirms (schemas/narrative.ts).
-    expect(f.narrative?.state).toBe("draft");
+    expect(f.narrative && narrativeFor(f.narrative).state).toBe("draft");
   });
 
   test("a render with no verdict is reported unjudged, and a verdict with no render is orphaned", () => {
@@ -182,7 +183,7 @@ function inspected(page: number, shows: string[]) {
     role: "figure",
     basis: { method: "inspection", by: AGENT, at: "2026-10-03", saw: "a flow diagram", page },
     shows,
-    narrative: { text: "A flow.", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" },
+    narrative: [{ text: "A flow.", lang: "en", state: "draft", drafted_by: AGENT, drafted_at: "2026-10-03" }],
   };
 }
 

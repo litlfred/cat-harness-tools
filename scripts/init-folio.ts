@@ -49,6 +49,7 @@ import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS } from "../src/builtin-adapters";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
@@ -192,7 +193,7 @@ function platformDir(assistant: string): string {
 }
 
 /**
- * Where the platform's CODE sits: `src/`, `content/pipeline/`, `scripts/`,
+ * Where the platform's CODE sits: `src/`, `pipeline/`, `scripts/`,
  * `viewer/`. It moved from `cat-harness/` to this layer in 70lx, and a folio
  * scaffolded afterwards still ran it from `cat-harness/`, where nothing is
  * any more (bean `cat-tools-yylt`). `platformDir` stays for what cat-harness
@@ -549,7 +550,10 @@ export function newFolioIndex(slug: string, config: Record<string, unknown> = {}
  * differently. One file holds the coupling; moving the platform is a one-line
  * edit here rather than a sweep over the whole corpus.
  */
-function builderShim(assistant: string): string {
+function builderShim(assistant: string, contentType: string): string {
+  // The vocabulary modules this folio's profile needs (the science layer's
+  // `mathpaper` for a paper): their builders are theirs, not cat-harness's.
+  const vocabularies = vocabularyModulesFor(contentType).map((m) => `${reexportLine(assistant, m)}\n`).join("");
   return `/**
  * Re-export of folio-assistant's content-object builders.
  *
@@ -562,7 +566,7 @@ function builderShim(assistant: string): string {
  */
 
 export * from "../../${platformDir(assistant)}/schemas/builders";
-`;
+${vocabularies}`;
 }
 
 function typesShim(assistant: string): string {
@@ -744,8 +748,8 @@ todos/                    people's outstanding items (mounted likewise)
 \`\`\`sh
 bun run ${toolsDir(assistant)}/src/index.ts --stdio --repo .   # the MCP server
 bun run ${toolsDir(assistant)}/src/index.ts --check-deps       # what's installed
-bun run ${toolsDir(assistant)}/content/pipeline/qa-sweep.ts folio  # QA every block
-bun run ${toolsDir(assistant)}/content/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
+bun run ${toolsDir(assistant)}/pipeline/qa-sweep.ts folio  # QA every block
+bun run ${toolsDir(assistant)}/pipeline/gen-block-jsonld.ts   # every block's KG node (--check: current?)
 \`\`\`
 
 Every block is a knowledge-graph node: its \`.jsonld\` is committed beside it,
@@ -1633,10 +1637,12 @@ function writePublishContext(s: Scaffold, enclosing: string | null): void {
   result.notes.push(
     o.iriBase === undefined
       ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
-          "will skip with a notice until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
+          "will skip with a warning until one is: add \"iriBase\": \"https://<owner>.github.io/<repo>/\" to " +
           `${instanceDeclarationFilename(o.slug)}.`
       : `JSON-LD context: .github/workflows/publish-context.yml publishes ${o.iriBase}ns/context/v1.jsonld to gh-pages on ` +
-          "every push to main, creating gh-pages on its first run. After that run, switch GitHub Pages on once: " +
+          "every push to main, but only once this instance holds at least one .jsonld document: the context binds the " +
+          "prefixes its documents use, so with none every run skips with a warning and creates no gh-pages. A new " +
+          "instance holds none yet. After the first run that publishes, switch GitHub Pages on once: " +
           "Settings -> Pages -> Deploy from a branch: gh-pages, / (root).",
   );
 }
@@ -1704,7 +1710,7 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
 
   // 2. The builder shim — the one place the platform path is written down.
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-  write("folio/schema/builders.ts", builderShim(assistant));
+  write("folio/schema/builders.ts", builderShim(assistant, o.contentType));
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
   write("folio/schema/types.ts", typesShim(assistant));
 

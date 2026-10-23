@@ -1,5 +1,6 @@
 ---
 # folio-assistant-xxku
+$schema: bean/1.0.0
 title: 'Flushable containers: a named store with a buffer limit, an over-full badge, and three flush actions'
 status: completed
 type: feature
@@ -7,7 +8,6 @@ parent: folio-assistant-1xhc
 created_at: 2026-09-19T12:07:49Z
 updated_at: 2026-10-07T17:30:00Z
 ---
-
 
 **In one sentence:** generalise `fsh-guts`'s flush behaviour into a *flushable
 container* — a named store with a declared buffer limit, an over-full badge and

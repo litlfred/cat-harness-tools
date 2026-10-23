@@ -33,6 +33,7 @@ import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { workflowFiles } from "../known-skills.js";
+import { processDiagrams } from "../../src/workflow/process-model.js";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
@@ -40,7 +41,7 @@ const REPO = repoRootFor(INSTANCE_ROOT);
 const BOOTSTRAP = join(REPO, "bootstrap");
 
 const diagrams = (root: string): string[] =>
-  workflowFiles(root).filter((f) => f.endsWith(".bpmn"));
+  processDiagrams(workflowFiles(root)); // a shared global-tasks file is not a diagram to run or draw
 
 describe("bootstrap is where the checker looks for it", () => {
   test("`bootstrap/` is at the REPOSITORY root, not under the instance root", () => {

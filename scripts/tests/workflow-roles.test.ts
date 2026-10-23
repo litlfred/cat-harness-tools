@@ -11,11 +11,14 @@
 import { describe, expect, test } from "bun:test";
 import { join, basename } from "node:path";
 
-import { loadProcessModel } from "../../src/workflow/process-model.js";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 import { enabled, startInstance, describe as renderInstance } from "../../src/workflow/instance.js";
 import { readRoleGraph, resolveRoleSkills } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+
+// A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
+const CORPUS_TIMEOUT = 60_000;
 
 const ROOT = join(HARNESS_ROOT);
 const graph = readRoleGraph(join(ROOT, "scenarios"));
@@ -71,7 +74,7 @@ describe("enabled() joins a lane to its declared role", () => {
 describe("every activity in every diagram is performed by a declared role", () => {
   test("no enabled step in any process would report an unbound lane", async () => {
     const unbound: string[] = [];
-    for (const f of workflowFiles(ROOT).filter((f) => f.endsWith(".bpmn")).map((p) => basename(p))) {
+    for (const f of processDiagrams(workflowFiles(ROOT)).map((p) => basename(p))) {
       const model = await loadProcessModel(workflowFile(ROOT, f));
       for (const lane of model.lanes) {
         const role = graph!.roles.find(
@@ -81,5 +84,5 @@ describe("every activity in every diagram is performed by a declared role", () =
       }
     }
     expect(unbound).toEqual([]);
-  });
+  }, CORPUS_TIMEOUT);
 });

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-s36s
+$schema: bean/1.0.0
 title: 'SWEEP COVERAGE: a corpus sweep that silently under-matches reports a clean corpus — found while sweeping for exactly that'
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-23T22:14:41Z
 updated_at: 2026-09-23T22:14:57Z
 parent: folio-assistant-1xhc
 ---
-
 
 Four findings this session had prescribed actions that could not clear them —
 `o5qj`, `thux`, `vq8g`, `7umv`. Four is a class, so `generalise-the-fix` Move 1.2

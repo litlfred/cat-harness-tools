@@ -8,9 +8,10 @@
  * anyone asking again.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   buildReport,
@@ -18,7 +19,9 @@ import {
   invariantTokens,
   measureBlock,
   mergeCriteria,
+  readPrior,
 } from "./translation-block-qa.ts";
+import { clearQaCache, publishQa, type QaStoreOptions } from "../scripts/qa-store.ts";
 
 function inTmp(run: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), "trans-qa-"));
@@ -391,4 +394,102 @@ describe("the glossary is a reading rule, not a mute button", () => {
     expect(m.missingAcronyms).toHaveLength(1);
     expect(m.missingAcronyms[0]).toContain("WHO");
   });
+});
+
+/* ── Bean 8wj1: the prior comes from the store, so the working copy cannot move a stored check ── */
+
+const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
+function gitIn(cwd: string, ...args: string[]): void {
+  const r = spawnSync("git", [...NOGPG, ...args], { cwd, encoding: "utf-8" });
+  if (r.status !== 0) throw new Error(`git ${args.join(" ")} → ${r.status}\n${r.stderr}`);
+}
+
+const report = (note: string) => JSON.stringify({ $schema: "translation-qa/v1", note, criteria: {} });
+
+/** A checkout whose results-tree sidecar `rel` is published to qa-reports `main/<sha>` as `published`. */
+function storeFixture(base: string, rel: string, published: string | undefined) {
+  const bare = join(base, "remote.git");
+  gitIn(base, "init", "-q", "--bare", "-b", "main", bare);
+  gitIn(bare, "config", "uploadpack.allowFilter", "true");
+  gitIn(bare, "config", "uploadpack.allowAnySHA1InWant", "true");
+  const work = join(base, "work");
+  mkdirSync(work);
+  gitIn(work, "init", "-q", "-b", "main");
+  const store = (n: string): QaStoreOptions => ({
+    repoRoot: work,
+    remote: `file://${bare}`,
+    branch: "qa-reports",
+    storeDir: join(base, `${n}.store.git`),
+    sleep: () => {},
+    log: () => {},
+  });
+  const out = join(work, rel);
+  if (published !== undefined) {
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, published);
+    publishQa({ ref: `main/${"a".repeat(40)}`, roots: [dirname(out)] }, store("writer"));
+    rmSync(out);
+    clearQaCache();
+  }
+  return { work, out, store };
+}
+
+describe("readPrior (bean 8wj1)", () => {
+  const REL = "inst/test/results/translation-qa/x.fr.translation-qa.json";
+
+  test("without a ref it is the working copy, present or absent", () => {
+    inTmp((dir) => {
+      const p = join(dir, "x.json");
+      writeFileSync(p, report("disk"));
+      const hit = readPrior(p, p, undefined);
+      expect(hit.ok && (hit.doc as unknown as { note: string }).note).toBe("disk");
+      const none = readPrior(undefined, p, undefined);
+      expect(none.ok && none.doc).toBeUndefined();
+    });
+  });
+
+  test(
+    "with a ref the branch decides, and a different working copy is ignored",
+    () => {
+      inTmp((dir) => {
+        const { out, store } = storeFixture(dir, REL, report("branch"));
+        mkdirSync(dirname(out), { recursive: true });
+        writeFileSync(out, report("disk"));
+        const r = readPrior(out, out, "main", store("reader"));
+        expect(r.ok).toBe(true);
+        if (r.ok) {
+          expect((r.doc as unknown as { note: string }).note).toBe("branch");
+          expect(r.from).toBe(`qa-reports:main/${"a".repeat(40)}`);
+        }
+      });
+    },
+    60_000,
+  );
+
+  test(
+    "a sidecar the branch lacks has no prior, even with one on disk",
+    () => {
+      inTmp((dir) => {
+        const { out, store } = storeFixture(dir, REL, report("branch"));
+        const other = out.replace("x.fr", "y.fr");
+        mkdirSync(dirname(other), { recursive: true });
+        writeFileSync(other, report("disk"));
+        const r = readPrior(other, other, "main", store("reader"));
+        expect(r.ok && r.doc).toBeUndefined();
+      });
+    },
+    60_000,
+  );
+
+  test(
+    "a branch that cannot be read refuses rather than reading as no prior",
+    () => {
+      inTmp((dir) => {
+        const { out, store } = storeFixture(dir, REL, undefined);
+        const r = readPrior(undefined, out, "main", { ...store("reader"), remote: "file:///no/such/remote.git" });
+        expect(r.ok).toBe(false);
+      });
+    },
+    60_000,
+  );
 });

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-yqc4
+$schema: bean/1.0.0
 title: 'CI observability: a failing e2e job is opaque to anyone who cannot reach the log host'
 status: completed
 type: task
@@ -8,7 +9,6 @@ created_at: 2026-10-03T13:56:51Z
 updated_at: 2026-10-07T14:15:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 ## Brief
 

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-d6bw
+$schema: bean/1.0.0
 title: 'Skills, processes and docs: QA lives on qa-reports — update every skill, BPMN and page that says test/results is committed'
 status: completed
 type: task
@@ -76,4 +77,3 @@ Branch `d6bw-qa-reports-skills`, worktree `agent-a70932b891e633e4f`, on top of `
 - `recordUntainted` still writes agent entries into the derived sidecar. The next writer, or `qa:attestations:migrate`, moves them.
 - `kg:audit:check` still fails on a stale sidecar. That is 3.1a.
 - Whether to keep `domain-fencing` and `methodology-adoption`'s historical mentions as they are.
-

@@ -39,8 +39,10 @@ function of the gate names alone, so the N shards of one side are disjoint and
 their union is the whole set; unset, or `1/1`, is the whole set, as before.
 The workflow gives each shard its own machine and checkout, so shards never
 race; within a shard, `GATE_JOBS` > 1 runs gates side by side, and a gate whose
-script runs `publish-check.ts` (it hashes the whole tree around its writer) runs
-alone after the pool drains, so a neighbour's write is never blamed on it. The skipped gates and the
+script holds the whole tree for its run (`TREE_TOOLS`: publish-check.ts hashes it
+around its writer, the standalone probes copy it or `git init` inside it), or
+runs a script that does (`skill:register:check` runs `subgraph:jsonld:check`),
+runs alone after the pool drains, so a neighbour's write is never blamed on it. The skipped gates and the
 `--record`ed results go in shard 1 only, so a merged side holds each once.
 Beside <out.json> the run writes `gates-shard.json` -- the shard, `N`, the size
 of the whole set, and the names it ran -- from which the compare job proves
@@ -63,7 +65,8 @@ and one whose prerequisite file is absent at the root (`PREREQUISITE_FILES`).
 
 A gate whose input this runner DOES have is given it instead
 (`SUPPLIED_INPUTS`): `check:corpus-gate` gets `--since $GATE_DIFF_BASE`, the
-PR's diff base, and `check:test-budgets` the junit report at `$GATE_JUNIT`
+PR's diff base, `translation:catalogue:check` gets `--base` the same commit,
+and `check:test-budgets` the junit report at `$GATE_JUNIT`
 that the tests step wrote. Either is skipped, with its reason, only on a side
 that holds no such input.
 
@@ -219,6 +222,18 @@ def corpus_gate_input(env):
     return ["--since", base], None
 
 
+def catalogue_input(env):
+    # `--base`, two dots, never the script's `origin/main...HEAD` default: the
+    # root is checked out at depth 1-2, and a three-dot range needs a merge base
+    # that clone does not have, so the bare gate exited 2 ("could not
+    # determine") on every layer PR (smart-immunizations#66, run 39619275196).
+    base = env.get("GATE_DIFF_BASE", "").strip()
+    if not base:
+        return None, ("needs --base <sha>, and this run has no PR diff in the root's own history "
+                      "(layer mode swaps the caller in without its .git; GATE_DIFF_BASE is unset)")
+    return ["--base", base], None
+
+
 def junit_cases(path):
     """The number of <testcase> elements in a junit report, or None when it will not read."""
     import xml.etree.ElementTree as ET
@@ -245,6 +260,7 @@ def test_budgets_input(env):
 SUPPLIED_INPUTS = {
     "check:corpus-gate": corpus_gate_input,
     "check:test-budgets": test_budgets_input,
+    "translation:catalogue:check": catalogue_input,
 }
 
 
@@ -413,21 +429,103 @@ def read_timings(path):
     return out or None
 
 
+# The tools that hold the whole tree for the length of a run, by file name:
+# a script whose body runs one, or that runs a script that does, is "alone".
+# A list of HARNESS tools, not of any repository's gates (like GRAPH_GATES).
+TREE_TOOLS = {
+    # Hashes every file of every instance before and after its writer and
+    # calls any committed file that moved stale.
+    "publish-check.ts": "hashes the tree around its writer",
+    # Copies the layer's closure, found by `instanceRootsIn` over the shared
+    # tree, then tests the copy: a file a neighbour is writing, or an instance
+    # a neighbour has hidden, is what it tests.
+    "check-standalone.ts": "copies the closure out of the shared tree",
+    # `git init`s bootstrap/ and bootstrap-tools/ IN the shared tree for its
+    # whole run. `instanceRootsIn` skips a directory with its own `.git`, so
+    # every neighbour that discovers instances meanwhile sees no bootstrap:
+    # check:cat-harness-standalone then copies a closure without it and five
+    # `render-exemption.test.ts` tests fail (measured, folio-assistant index).
+    "rehearse-bootstrap-standalone.ts": "git-inits bootstrap/ in the shared tree",
+}
+
+# What a script source runs through the runner: it spawns `bun run cat ...`
+# (`spawnSync("bun", ["run", "cat", ...args])`), and the names it passes are
+# its STEPS' `verify` lists (skill-register.ts, kind-register.ts). Read with
+# comments and strings told apart, so a name in a comment is not a call.
+_SOURCE_TOKEN = re.compile(r"""("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|/\*.*?\*/|//[^\n]*""", re.S)
+_SPAWNS_RUNNER = re.compile(r"""["']run["']\s*,\s*["']cat["']""")
+_VERIFY_LIST = re.compile(r"\bverify\s*:\s*\[([^\]]*)\]")
+_QUOTED = re.compile(r"""["']([^"'\s]+)["']""")
+_BODY_CALL = re.compile(r"\bbun run cat ([\w:.-]+)")
+
+
+def _code_of(path):
+    """A TypeScript source with its comments removed, or "" when unreadable."""
+    try:
+        with open(path) as f:
+            src = f.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return _SOURCE_TOKEN.sub(lambda m: m.group(1) or " ", src)
+
+
+def invoked_scripts(root, base, body):
+    """Script names a script body runs through the runner: `bun run cat <name>`
+    in the body itself, and the `verify` names of any `.ts` it runs whose code
+    spawns the runner. `base` is the declaring instance's directory."""
+    names = set(_BODY_CALL.findall(body))
+    try:
+        words = shlex.split(body)
+    except ValueError:
+        words = body.split()
+    for w in words:
+        if not w.endswith(".ts"):
+            continue
+        for d in (root, os.path.join(root, base)):
+            code = _code_of(os.path.join(d, w))
+            if code:
+                if _SPAWNS_RUNNER.search(code):
+                    for listed in _VERIFY_LIST.findall(code):
+                        names.update(_QUOTED.findall(listed))
+                break
+    return names
+
+
 def tree_snapshotting(root):
-    """Gate names whose script runs `publish-check.ts`, which hashes every file
-    of every instance before and after its writer and calls any committed file
-    that moved stale. Under `GATE_JOBS` > 1 a neighbour gate that writes a
-    committed file inside that window (`check:avatar-coverage` rewrites
+    """Gate names that run alone, after the pool drains: those whose script
+    runs a `TREE_TOOLS` tool, directly or through the scripts it runs.
+
+    Under `GATE_JOBS` > 1 a neighbour gate that writes a committed file inside
+    publish-check's window (`check:avatar-coverage` rewrites
     `avatar-coverage.qa-results.json`) is blamed on the writer, so the verdict
     depends on scheduling (smart-immunizations#61, run 38824729436: head red,
-    base green, same pins). These run alone, after the pool drains."""
-    out = set()
-    for n, p in instances_in(root).items():
+    base green, same pins). The direct body is not enough: `skill:register:check`
+    runs `subgraph:jsonld:check`, and `kind:register:check` runs
+    `avatars:css:check` and its siblings, each a publish-check, from inside
+    their own process -- pooled, they wrote cat-harness/ns/subgraph/v1.jsonld
+    beside other gates, and shards rebalanced from recorded timings gave the
+    same pins different verdicts (smart-immunizations#65, run 39474513021
+    against 39478293845; folio-assistant-core#166, run 39475237100:
+    `kind:register:check` "1 stale artefact", green alone). So the set is the
+    fixed point of "runs a tree tool, or runs a script that is alone",
+    over every instance's declared scripts."""
+    known = instances_in(root)
+    bodies = {}  # (instance, script) -> (directory, body)
+    by_name = {}  # script -> [(instance, script)], every instance declaring it
+    for n, p in known.items():
         pkg = read_json(os.path.join(root, p, "package.json")) or {}
         for s, body in {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}.items():
-            if "publish-check" in str(body):
-                out.add(f"{n}:{s}")
-    return out
+            bodies[(n, s)] = (p, str(body))
+            by_name.setdefault(s, []).append((n, s))
+    alone = {k for k, (_, body) in bodies.items() if any(t[:-3] in body for t in TREE_TOOLS)}
+    calls = {k: invoked_scripts(root, p, body) for k, (p, body) in bodies.items()}
+    grew = True
+    while grew:
+        names = {s for _, s in alone}
+        new = {k for k in bodies if k not in alone and calls[k] & names}
+        alone |= new
+        grew = bool(new)
+    return {f"{n}:{s}" for n, s in alone}
 
 
 # ── The CI cone (bean `4rbc`, cat-harness-tools#398) ─────────────────────

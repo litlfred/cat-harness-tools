@@ -1,11 +1,12 @@
 ---
 # folio-assistant-zzmr
+$schema: bean/1.0.0
 title: 'KG: the knowledge graph''s own structure, declaration and publication'
 status: in-progress
 type: epic
 priority: normal
 created_at: 2026-09-19T11:43:44Z
-updated_at: 2026-10-04T15:12:15Z
+updated_at: 2026-10-20T17:47:11Z
 parent: folio-assistant-vuip
 ---
 

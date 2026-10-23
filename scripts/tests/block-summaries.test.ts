@@ -92,7 +92,7 @@ describe("the sidecar validates, and refuses records that mean nothing", () => {
     block: "library/doc/blocks/prose-a",
     source: "sections/a.md",
     source_hash: "a".repeat(64),
-    narrative: { text: "x", state: "draft", drafted_by: AGENT },
+    narrative: [{ text: "x", lang: "en", state: "draft", drafted_by: AGENT }],
     ...over,
   });
   const doc = (summaries: unknown[]) => ({ $schema: "folio-block-summaries/v1", entry: "doc", summaries });
@@ -114,7 +114,7 @@ describe("the sidecar validates, and refuses records that mean nothing", () => {
   });
 
   test("an agent draft with no model is refused — inherited from the attribution schema", () => {
-    const n = { text: "x", state: "draft", drafted_by: { kind: "agent", id: "c" } };
+    const n = [{ text: "x", lang: "en", state: "draft", drafted_by: { kind: "agent", id: "c" } }];
     expect(BlockSummariesSidecarSchema.safeParse(doc([{ ...rec(), narrative: n }])).success).toBe(false);
   });
 
@@ -212,8 +212,27 @@ describe("an agent cannot write `confirmed`", () => {
     expect(() => record({ ...f, drafted_by: { kind: "agent", id: "x" } as never }, root)).toThrow(/model/);
     record(f, root);
     const doc = JSON.parse(readFileSync(join(root, "library", "doc", SUMMARIES_FILE), "utf-8"));
-    expect(doc.summaries[0].narrative.state).toBe("draft");
-    expect(doc.summaries[0].narrative.drafted_by.model).toBe("test-model");
+    // A one-entry list naming its language, the form the store was migrated to (e1lo).
+    expect(doc.summaries[0].narrative).toHaveLength(1);
+    expect(doc.summaries[0].narrative[0].state).toBe("draft");
+    expect(doc.summaries[0].narrative[0].lang).toBe("en");
+    expect(doc.summaries[0].narrative[0].drafted_by.model).toBe("test-model");
+  });
+
+  test("record stores the language a draft names, else the file's, else en (e1lo)", () => {
+    const langOf = (f: Parameters<typeof record>[0], root: string) => {
+      record(f, root);
+      return JSON.parse(readFileSync(join(root, "library", "doc", SUMMARIES_FILE), "utf-8")).summaries[0].narrative[0].lang;
+    };
+    const a = fixture({ a: "Alpha." });
+    const fa: Parameters<typeof record>[0] = { ...draftFor(a.root, ["a"]), lang: "fr" };
+    expect(langOf(fa, a.root)).toBe("fr");
+    const b = fixture({ a: "Alpha." });
+    const fb = draftFor(b.root, ["a"]);
+    expect(langOf({ ...fb, lang: "fr", drafts: fb.drafts.map((d) => ({ ...d, lang: "pt-BR" })) }, b.root)).toBe("pt-BR");
+    const c = fixture({ a: "Alpha." });
+    const fc: Parameters<typeof record>[0] = { ...draftFor(c.root, ["a"]), lang: "not a tag" };
+    expect(() => record(fc, c.root)).toThrow();
   });
 
   test("record refuses a hash that no longer matches — it summarised something else", () => {
@@ -252,7 +271,7 @@ describe("the queue leaves out blocks that already have a current summary", () =
     decide(queue(root)[0]!, "reject", { by: HUMAN, reason: "wrong", root });
     record(draftFor(root, ["a"], "A better summary."), root);
     const [rec] = JSON.parse(readFileSync(join(entry, SUMMARIES_FILE), "utf-8")).summaries;
-    expect(rec.narrative.state).toBe("draft");
+    expect(rec.narrative[0].state).toBe("draft");
     expect(rec.superseded[0].rejection_reason).toBe("wrong");
   });
 
@@ -351,7 +370,7 @@ describe("the real backlog — not vacuous, and it adds up", () => {
         const blocksDir = join(lib, slug, "blocks");
         if (!existsSync(blocksDir)) continue;
         const sc = join(lib, slug, SUMMARIES_FILE);
-        const recs = new Map<string, { source_hash: string; narrative: { state: string } }>(
+        const recs = new Map<string, { source_hash: string; narrative: { state: string } | { state: string }[] }>(
           existsSync(sc) ? JSON.parse(readFileSync(sc, "utf-8")).summaries.map((r: { block: string }) => [r.block, r]) : [],
         );
         for (const f of readdirSync(blocksDir)) {
@@ -363,7 +382,7 @@ describe("the real backlog — not vacuous, and it adds up", () => {
           prose++;
           const r = recs.get(b["@id"]);
           const h = createHash("sha256").update(body).digest("hex");
-          if (r && r.source_hash === h && (r.narrative.state === "draft" || r.narrative.state === "confirmed")) summarised++;
+          if (r && r.source_hash === h && [r.narrative].flat().every((n) => n.state === "draft" || n.state === "confirmed")) summarised++;
         }
       }
     }

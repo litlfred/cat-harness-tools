@@ -1,5 +1,6 @@
 ---
 # folio-assistant-mjl3
+$schema: bean/1.0.0
 title: 'artefact-verification.json merges are CORRECTLY refused and must stay refused: it reads like a generated sidecar, has no writer, and carries authored reasons'
 status: completed
 type: task
@@ -62,4 +63,3 @@ _2026-10-07T04:31:18Z_ — Claimed by claude/mjl3-close-landed-artefact-verifica
 ## Evidence
 - Landed on `main` in commit `832a7f354698fdeb3cfd5a1f66604d710c4ece97`: declared `id: "artefact-verification"` in `cat-harness/scripts/merge-conflict-patterns.ts` as a named refusal with `strategy: "refuse"`, explaining the two facts (READ_ONLY in `task-io.ts`, authored prose reasons) and referencing bean `mjl3`.
 - Tested in `cat-harness/scripts/tests/merge-base.test.ts` (`artefact-verification.json refuses BY NAME, which an unclassified path does not`), re-verified passing via `bun test cat-harness/scripts/tests/merge-base.test.ts -t "artefact-verification.json refuses BY NAME"`.
-

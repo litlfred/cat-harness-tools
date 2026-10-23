@@ -115,6 +115,7 @@ import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -1313,6 +1314,104 @@ export function markerAtPath(repoRoot: string, path: string): MountMarker | unde
   return allMarkers(repoRoot).find(({ marker }) => marker.path === want)?.marker;
 }
 
+/**
+ * A graph `state-mount` determined ABSENT from this checkout (bean `x5e0`).
+ *
+ * `absent` (owner, 2026-10-14: "Report as absent") is decided only at mount
+ * time, by asking the remote whether it carries the graph's namespace; a
+ * reader runs offline and cannot ask again. Without a record it sees the same
+ * empty path as a graph nobody mounted, and reports "could not determine" for
+ * a graph that is, determinably, not this checkout's. The record is that
+ * answer, kept beside the mount markers in this worktree's git-dir and never
+ * committed. It is named `<key>.absent`, not `.json`, so `mountedIds` and
+ * `allMarkers` never read it as a mount.
+ */
+export interface AbsenceRecord {
+  $schema: typeof ABSENCE_RECORD_SCHEMA;
+  id: string;
+  key: string;
+  /** The declared, repository-relative path. */
+  path: string;
+  /** The mounted instance that declared the graph. */
+  declaredBy: string;
+  /** The remote it was judged absent against; a different origin is a different question. */
+  origin: string;
+  reason: string;
+}
+
+export const ABSENCE_RECORD_SCHEMA = "cat-harness/branch-absence/v1";
+
+function absencePath(repoRoot: string, key: string): string {
+  return markerPath(repoRoot, key).replace(/\.json$/, ".absent");
+}
+
+/**
+ * The checkout's `origin` as configured, normalised, or `""` when it has
+ * none. One remote has several spellings: CI's state-mount step rewrites
+ * `origin` to its `.git` form for the mount and puts it back after, so a
+ * record made during the mount must still match the reader's origin. A
+ * trailing `.git` and `/` are not part of which repository it is.
+ */
+export function originUrl(repoRoot: string): string {
+  // The CONFIGURED url, not `git remote get-url`: that applies `insteadOf`,
+  // and CI's mount runs under a rewrite of GitHub to local mirrors
+  // (layer-pr-checks' state-pin.sh), so the record would name a mirror path
+  // no reader outside that step ever sees.
+  const r = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: repoRoot, encoding: "utf-8" });
+  return r.status === 0 ? normaliseOrigin(r.stdout) : "";
+}
+
+/** `https://host/o/r.git/` and `https://host/o/r` are one remote. */
+export function normaliseOrigin(url: string): string {
+  return url.trim().replace(/\/+$/, "").replace(/\.git$/, "");
+}
+
+/** Record `loc` as determined absent from this checkout. */
+export function recordAbsence(repoRoot: string, loc: Pick<TipLocation, "id" | "key" | "path">, declaredBy: string, reason: string): void {
+  const key = locationKey(loc);
+  const rec: AbsenceRecord = { $schema: ABSENCE_RECORD_SCHEMA, id: loc.id, key, path: loc.path.replace(/^\/+|\/+$/g, ""), declaredBy, origin: originUrl(repoRoot), reason };
+  const p = absencePath(repoRoot, key);
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, JSON.stringify(rec, null, 2) + "\n");
+}
+
+/** Forget any absence recorded for `loc`: every mount attempt asks the question afresh. */
+export function clearAbsence(repoRoot: string, loc: Pick<TipLocation, "id" | "key">): void {
+  rmSync(absencePath(repoRoot, locationKey(loc)), { force: true });
+}
+
+/**
+ * The absence recorded for the declared `path` (or, failing that, a bare `id`),
+ * when it was judged against THIS checkout's current origin. A record made
+ * against another origin answers nothing: the question was about that remote.
+ */
+export function absenceAt(repoRoot: string, path: string, id?: string): AbsenceRecord | undefined {
+  // No git directory (a standalone rehearsal's copy) means no mount has run
+  // here, so nothing was recorded: the reader's own not-mounted answer stands.
+  let dir: string;
+  try {
+    dir = dirname(markerPath(repoRoot, "x"));
+  } catch {
+    return undefined;
+  }
+  if (!existsSync(dir)) return undefined;
+  const want = path.replace(/^\/+|\/+$/g, "");
+  const origin = originUrl(repoRoot);
+  let byId: AbsenceRecord | undefined;
+  for (const n of readdirSync(dir).filter((f) => f.endsWith(".absent")).sort()) {
+    let rec: AbsenceRecord;
+    try {
+      rec = JSON.parse(readFileSync(join(dir, n), "utf-8")) as AbsenceRecord;
+    } catch {
+      continue;
+    }
+    if (rec.$schema !== ABSENCE_RECORD_SCHEMA || normaliseOrigin(rec.origin) !== origin) continue;
+    if (rec.path === want) return rec;
+    if (id !== undefined && rec.id === id) byId ??= rec;
+  }
+  return byId;
+}
+
 /** The keys mounted in THIS worktree, one marker each — what `state:push` sends, declared or not. */
 export function mountedIds(repoRoot: string = gitTopLevel()): string[] {
   const dir = dirname(markerPath(repoRoot, "x"));
@@ -1676,6 +1775,8 @@ export function mountMassDeletionReason(id: string | TipLocation, opts: MountOpt
 export type ContentAt =
   | { state: "present"; dir: string; via: "checkout" | "mount" }
   | { state: "not-mounted"; dir: string; branch: string; reason: string }
+  /** Determined not this checkout's at mount time ({@link absenceAt}), unlike `not-mounted`, which no mount has answered. */
+  | { state: "absent"; dir: string; branch: string; reason: string }
   | { state: "undeclared"; reason: string };
 
 export function contentAt(id: string, repoRoot: string = gitTopLevel()): ContentAt {
@@ -1692,6 +1793,8 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
         const resolved = resolveMarkerInto(repoRoot, m);
         if (resolved.ok) return { state: "present", dir: resolved.abs, via: "mount" };
       }
+      const absent = absenceAt(repoRoot, repoRelative(repoRoot, d.absPath), id);
+      if (absent) return { state: "absent", dir, branch: at.branch, reason: `${id} is absent from this checkout: ${absent.reason}` };
       return {
         state: "not-mounted",
         dir,
@@ -1705,11 +1808,17 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
 
 /**
  * For a CLI that reads `id`'s content: exit 2 ("could not determine") with
- * the reason when the content is kept on a branch and not mounted here.
+ * the reason when the content is kept on a branch and not mounted here; exit
+ * not applicable (`lib/not-applicable.ts`) when a mount determined it absent
+ * from this checkout.
  * A command-line entry point only — a library caller asks {@link contentAt}.
  */
 export function exitUnlessMounted(id: string, tool: string, repoRoot: string = gitTopLevel()): void {
   const at = contentAt(id, repoRoot);
+  // Not applicable, and said so (bean `x5e0`): the graph is determinably not
+  // this checkout's, so there is nothing to read or write. The convention's
+  // exit lets `derive:publish` excuse this writer's artefacts and go on.
+  if (at.state === "absent") exitNotApplicable(tool, at.reason);
   if (at.state !== "not-mounted") return;
   console.error(`::error::${tool}: could not determine — ${at.reason}. Reading ${at.dir} as it stands would report an empty ${id} as a clean one.`);
   process.exit(2);

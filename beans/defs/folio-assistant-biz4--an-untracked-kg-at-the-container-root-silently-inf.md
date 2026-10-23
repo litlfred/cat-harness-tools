@@ -1,11 +1,12 @@
 ---
 # folio-assistant-biz4
+$schema: bean/1.0.0
 title: An untracked _kg/ at the container root silently inflates local detangle counts — 229 becomes 1443, and the gate reads as a code defect
 status: completed
 type: task
 priority: normal
 created_at: 2026-09-26T11:26:16Z
-updated_at: 2026-09-27T09:37:00Z
+updated_at: 2026-10-20T17:47:11Z
 parent: folio-assistant-1xhc
 blocked_by:
     - folio-assistant-xd1g
@@ -307,4 +308,3 @@ removing another session's untracked files is not PR #1465's call. The
 regeneration in that PR was done with the directory moved aside, so its six
 committed artefacts are what CI writes — verified by the two hard gates going
 green on the push.
-

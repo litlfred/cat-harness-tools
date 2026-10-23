@@ -13,6 +13,7 @@ import { basename, resolve } from "node:path";
 
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { workflowFiles } from "../../scripts/known-skills.js";
+import { processDiagrams } from "./process-model.js";
 
 /**
  * The instances whose diagrams these tools can run: every dependency in
@@ -47,8 +48,8 @@ export function processFiles(repoRoot: string): string[] {
   // Root first, so its file claims the stem; a dependency's same-named
   // diagram is then shadowed rather than listed twice.
   for (const r of [...processRoots(repoRoot)].reverse()) {
-    for (const f of workflowFiles(r)) {
-      if (!f.endsWith(".bpmn")) continue;
+    // A layer's shared global-tasks file holds no process to start.
+    for (const f of processDiagrams(workflowFiles(r))) {
       const stem = basename(f, ".bpmn");
       if (!seen.has(stem)) seen.set(stem, f);
     }

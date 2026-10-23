@@ -56,13 +56,14 @@ import {
   isArchiveMimetype,
 } from "@litlfred/cat-harness/schemas/archive-contents.ts";
 import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/attribution.ts";
-import { NarrativeSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import {
   TABULAR_RECORDS_SCHEMA_ID,
   TabularRecordsSchema,
   isTabularMimetype,
 } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/vector-labels.ts";
 import {
@@ -74,6 +75,16 @@ import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
+
+/**
+ * A slot's state(s) for a one-line detail: one state for the single form,
+ * `lang:state` per entry for a list (bean `cat-tools-e1lo`, stage 3).
+ */
+function slotStates(slot: NarrativeSlot): string {
+  return narrativesOfSlot(slot)
+    .map((n) => (n.lang ? `${n.lang}:${n.state}` : n.state))
+    .join(", ");
+}
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
@@ -301,6 +312,9 @@ export function heldSources(dir: string, sidecars: Iterable<string>): Set<string
 export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["paged", STRUCTURE_FILENAME],
   ["tabular", "tabular.jsonld"],
+  // The CSVW record that replaces v1 for delimited and workbook sources, and
+  // carries the same `source` block (bean `urat`, owner ruling 2026-10-20).
+  ["tabular", TABULAR_CSVW_FILENAME],
   ["archive", "contents.jsonld"],
   // Recorded, text withheld by licence — `referenced-source.py`, bean `scfh`.
   ["referenced", "referenced.json"],
@@ -476,7 +490,7 @@ export function vectorFigureReach(
   const rendered = figures.filter((x) => x.file !== null);
   const inspected = rendered.filter((x) => x.basis.method === "inspection");
   const shownSet = new Set(
-    inspected.filter((x) => x.narrative?.text).flatMap((x) => x.shows ?? []),
+    inspected.filter((x) => x.narrative !== undefined && narrativesOfSlot(x.narrative).some((n) => n.text)).flatMap((x) => x.shows ?? []),
   );
   const candidateSet = new Set(
     rendered.filter((x) => x.basis.method === "assembly").flatMap((x) => x.captionLabels),
@@ -793,7 +807,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
       // A `narrative` key that `narrativesIn` could not parse is a DEFECT,
       // not an absence — reported rather than skipped, which is what the
       // old `safeParse` branch was for and must not be lost in the move.
-      if ("narrative" in doc && !NarrativeSchema.safeParse(doc.narrative).success) {
+      if ("narrative" in doc && !NarrativeSlotSchema.safeParse(doc.narrative).success) {
         bad.push(`${name}: narrative will not parse`);
       }
     }
@@ -863,13 +877,41 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     // re-running would not have helped.
     const src = sourceBlockOf(dir);
     const mime = src?.mimetype_sniffed;
-    if (!has("tabular.jsonld")) {
+    if (has(TABULAR_CSVW_FILENAME)) {
+      // The CSVW record (bean `urat`). It must carry the `source` the rest of
+      // this check reads, or the entry has no technical metadata at all.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(join(dir, TABULAR_CSVW_FILENAME), "utf-8"));
+      } catch (e) {
+        parsed = undefined;
+        out.push({ name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} unparseable: ${String(e)}` });
+      }
+      if (parsed !== undefined) {
+        const r = TabularCsvwSchema.safeParse(parsed);
+        out.push(
+          !r.success
+            ? {
+                name: "tabular-records",
+                state: "unmet",
+                detail: `${TABULAR_CSVW_FILENAME} is not ${TABULAR_CSVW_SCHEMA_ID}: ${r.error.issues[0]?.message ?? "invalid"}`,
+              }
+            : !r.data.source
+              ? { name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} carries no source block — re-run the tabular rung` }
+              : {
+                  name: "tabular-records",
+                  state: "met",
+                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative ? slotStates(r.data.narrative) : "absent"}`,
+                },
+        );
+      }
+    } else if (!has("tabular.jsonld")) {
       out.push(
         isTabularMimetype(mime)
           ? {
               name: "tabular-records",
               state: "unmet",
-              detail: `declares ${mime} but no tabular.jsonld — run scripts/tabular-records.py`,
+              detail: `declares ${mime} but no tabular record (${TABULAR_CSVW_FILENAME}; tabular.jsonld for ODS) — re-run the ingest's tabular rung`,
             }
           : {
               name: "tabular-records",
@@ -891,7 +933,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           name: "tabular-records",
           state: r.success ? "met" : "unmet",
           detail: r.success
-            ? `${r.data.n_sheets} sheet(s), ${r.data.header_vocabulary.length} header(s), narrative ${r.data.narrative.state}`
+            ? `${r.data.n_sheets} sheet(s), ${r.data.header_vocabulary.length} header(s), narrative ${slotStates(r.data.narrative)}`
             : `tabular.jsonld is not ${TABULAR_RECORDS_SCHEMA_ID}: ${r.error.issues[0]?.message ?? "invalid"}`,
         });
       }
@@ -1163,7 +1205,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
         } else {
           const describable = parsed.images.filter((i) => DESCRIBABLE_ROLES.includes(i.role));
           const undescribed = describable.filter(
-            (i) => (i.narrative?.state ?? "not-authored") === "not-authored",
+            (i) => i.narrative === undefined || narrativesOfSlot(i.narrative).every((n) => n.state === "not-authored"),
           );
           // An `undetermined` ROLE is the third state one level down: nobody
           // has judged what this image is, so whether it needs describing is

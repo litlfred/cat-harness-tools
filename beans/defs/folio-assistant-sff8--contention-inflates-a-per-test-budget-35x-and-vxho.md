@@ -1,5 +1,6 @@
 ---
 # folio-assistant-sff8
+$schema: bean/1.0.0
 title: Contention inflates a per-test budget ~35x, and vxho fixed ONE of 505 files — two more just failed on main
 status: completed
 type: bug
@@ -8,7 +9,6 @@ created_at: 2026-09-26T03:31:40Z
 updated_at: 2026-10-07T17:38:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 Measured 2026-09-26 on a clean checkout of `main` at `0ef9543ccf3`, while
 starting unrelated work. `bun test` **exited 1**:

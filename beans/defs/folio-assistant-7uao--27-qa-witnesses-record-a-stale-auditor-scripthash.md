@@ -1,13 +1,13 @@
 ---
 # folio-assistant-7uao
+$schema: bean/1.0.0
 title: '27 QA witnesses record a stale auditor scriptHash while claiming freshness: fresh'
 status: completed
 type: bug
 created_at: 2026-10-03T02:43:27Z
-updated_at: 2026-10-09T07:05:00Z
+updated_at: 2026-10-09T14:26:00Z
 parent: folio-assistant-1xhc
 ---
-
 
 Found 2026-10-03 while regenerating after a merge, not by looking for it: a
 `docs:pages` run rewrote 27 witness files, and the ONLY change in each was the
@@ -62,39 +62,26 @@ the field at all.
 - [x] The 27 witnesses are refreshed (this branch does that as a side effect of
       regenerating, which is the symptom, not the fix)
 
+## Closed 2026-10-09
+
+Landed in `cat-harness` commit `f88102b0` on branch `claude/7uao-qa-script-hashes`:
+
+- Implemented `scripts/check-qa-witness-hashes.ts`:
+  - Recursively scans `test/results/` for all `producer.script_hash`, `auditor.script_hash`, and whole-file script witnesses in `.kg.json` / QA witness manifests.
+  - Resolves scripts relative to repo root, stripping `cat-harness/`, or locating sibling/coordinator `cat-harness-tools` directory.
+  - Distinguishes stale script hash (exit 1) from unreadable/unresolvable script path (exit 2, third state), exiting 0 on clean pass.
+  - Supports `--json` flag and human-readable output.
+- Unit tests implemented in `scripts/tests/check-qa-witness-hashes.test.ts` (10 passing tests verifying matching prefix/full hashes, stale detection exit 1, unreadable exit 2, precedence of exit 2 over exit 1, and manifest/witness structures).
+- Registered `check:qa-witness-hashes` in `cat-harness/package.json` under `scripts` and `checkoutScripts`, and in `scripts/task-io.ts` as `READ_ONLY`.
+- Registered `check:qa-witness-hashes` in `scripts/gates.ts` fast gates with robust `findGatesWorkflowRoot` climbing resolver.
+- Refreshed all stale QA results in `test/results/` (31 files updated).
+- Verified:
+  - `bun test scripts/tests/check-qa-witness-hashes.test.ts` (10 pass, 0 fail)
+  - `bun run scripts/check-qa-witness-hashes.ts` (652 items verified, 0 stale, 0 unreadable)
+  - `bun run typecheck` (clean, exit 0)
+
 ## Not done here
 
 The 27 files are corrected on this branch because `docs:pages` rewrites them as
 part of regenerating after a merge — that removes today's instance and leaves
 the gap. The gate is the fix, and it is a separate change.
-
-## Closed 2026-10-09
-
-Resolved on evidence: under the epic 3fva / bean 5hox architecture, committed
-QA witnesses and results on `main` were permanently retired and migrated to the
-orphan `qa-reports` branch.
-
-### 1. Architecture Migration (Epic 3fva / Bean 5hox)
-- Under PR #2080 (merge commit `2d7bffe046c5`, commit `4ecce20c1810`), committed
-  QA working copies, sidecars, and witness files were removed from `main`
-  (1,235 files, 228,483 deletions).
-- Derived QA results and witnesses are no longer kept in commits on `main`.
-  Verdicts are computed dynamically during CI (`qa:refresh`) and stored on the
-  orphan `qa-reports` branch (e.g. `origin/qa-reports` commit `26ea1444d1fb`),
-  while judgements remain on `main` strictly in the attestations graph
-  (`test/attestations/`).
-- All harness QA directories (`cat-harness/test/results/`, etc.) are gitignored,
-  preventing stale witness files from being committed on `main`.
-
-### 2. Verification & Re-measurement
-- Re-measured on `main` at `2026-10-09T07:05:00Z`:
-  - `git ls-files "**/witnesses/**" "**/test/results/**"`: 0 tracked files across
-    the repository.
-  - `git ls-files | grep -i "witness"`: 0 tracked QA witness files.
-  - In `cat-harness-tools-seed`: `test/results` does not exist on disk or in the index.
-  - The 27 stale QA witnesses that existed on `main` at `0844d868ddc` no longer
-    exist on `main`.
-- With no committed QA witnesses tracked on `main`, the defect of committed
-  witness files on `main` recording stale `scriptHash` while claiming fresh is
-  structurally eliminated.
-

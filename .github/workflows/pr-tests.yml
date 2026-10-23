@@ -17,9 +17,24 @@
 # cat-harness main committed then read as stale, and `library-readmes` failed
 # on main and on every PR for a reason no PR here could fix.
 #
+# Two layers above this one are put at main too, because this repository's
+# main moves with theirs (#510). Which instances are taken at main is listed in
+# `test/pr-tests-mains.json`, with the reasons: test material may name a layer
+# above this one, and this workflow, which is not test material, names none
+# (check:reference-direction).
+#
 # Many tests already fail on main. Rather than skipping them, the `tests` job
 # runs the whole suite twice, on main and on the PR, and fails only on tests the
 # PR newly breaks. The step summary lists every failure, old and new.
+#
+# The same two runs also run the INDEX's own gates over the composed root
+# (owner, 2026-10-23, item 2: a layer PR merges only on a green index run with
+# it pinned). The index lints every mounted instance with this layer's eslint
+# config and typechecks every instance; #385 passed every check here and
+# failed the index's lint once pinned. Which gates is data,
+# `.github/scripts/layer-pr-checks/root-gates.json`, shared with
+# `layer-pr-checks.yml`; the `index-gates` job judges them error by error, so
+# one already red on main still fails the PR that adds an error to it.
 #
 # NO E2E JOB, and why (bean cat-tools-g9m3, Done-when 3). The Playwright suite
 # (`bun run cat test:e2e`, 83 `*.e2e.ts` specs under `test/` on 2026-10-12) cannot be run
@@ -63,17 +78,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      cat-harness: ${{ steps.pin.outputs.cat-harness }}
-      bootstrap-tools: ${{ steps.pin.outputs.bootstrap-tools }}
-      bootstrap: ${{ steps.pin.outputs.bootstrap }}
+      # `name:sha` pairs, space-separated, for every instance
+      # test/pr-tests-mains.json lists; `mains-key` is their digest, for the
+      # cache keys.
+      mains: ${{ steps.pin.outputs.mains }}
+      mains-key: ${{ steps.pin.outputs.mains-key }}
       index: ${{ steps.pin.outputs.index }}
     steps:
+      - name: Read which instances are taken at main
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: test/pr-tests-mains.json
+          sparse-checkout-cone-mode: false
       - id: pin
         run: |
           set -euo pipefail
-          echo "cat-harness=$(git ls-remote https://github.com/litlfred/cat-harness refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "bootstrap-tools=$(git ls-remote https://github.com/litlfred/bootstrap-tools refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
-          echo "bootstrap=$(git ls-remote https://github.com/litlfred/bootstrap refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
+          mains=""
+          for name in $(python3 -c 'import json; print(" ".join(json.load(open("test/pr-tests-mains.json"))["mains"]))'); do
+            sha="$(git ls-remote "https://github.com/litlfred/$name" refs/heads/main | cut -f1)"
+            test -n "$sha" || { echo "::error::no main for $name"; exit 1; }
+            mains="$mains $name:$sha"
+          done
+          mains="${mains# }"
+          echo "mains=$mains" >> "$GITHUB_OUTPUT"
+          echo "mains-key=$(printf '%s' "$mains" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
           echo "index=$(git ls-remote https://github.com/litlfred/folio-assistant refs/heads/main | cut -f1)" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -85,7 +113,7 @@ jobs:
     steps:
       - &checkout-index
         name: Check out the folio-assistant index
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ needs.pin.outputs.index }}
@@ -100,7 +128,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -113,17 +141,17 @@ jobs:
           CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
-        # cat-harness and the closure its main is generated with: all three at
-        # the commits the pin job read (see the header).
-        name: Use cat-harness, bootstrap-tools and bootstrap main, at the pinned commits
+        # cat-harness and the closure its main is generated with, and the two
+        # layers this repository's main moves with: all at the commits the pin
+        # job read (see the header).
+        name: Use cat-harness main, and the instances it moves with, at the pinned commits
         if: steps.base-cache.outputs.cache-hit != 'true'
         env:
-          CAT_HARNESS: ${{ needs.pin.outputs.cat-harness }}
-          BOOTSTRAP_TOOLS: ${{ needs.pin.outputs.bootstrap-tools }}
-          BOOTSTRAP: ${{ needs.pin.outputs.bootstrap }}
+          MAINS: ${{ needs.pin.outputs.mains }}
         run: |
           set -euo pipefail
-          for pair in "cat-harness:$CAT_HARNESS" "bootstrap-tools:$BOOTSTRAP_TOOLS" "bootstrap:$BOOTSTRAP"; do
+          test -n "$MAINS" || { echo "::error::the pin job read no mains"; exit 1; }
+          for pair in $MAINS; do
             name="${pair%%:*}" sha="${pair#*:}"
             test -n "$sha" || { echo "::error::no pinned commit for $name"; exit 1; }
             rm -rf "fa/$name"
@@ -133,7 +161,7 @@ jobs:
             rm -rf "fa/$name/.git"
           done
       - name: Check out the PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: src
       - &swap
@@ -168,10 +196,12 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
+      - name: Keep the PR's root-gate runner, so both sides run the same one
+        run: cp -r src/.github/scripts/layer-pr-checks judge
       - &base-side
         # Both sides check out the PR's merge commit; the base side steps to its
         # first parent, the main it merges into. Never `pull_request.base.sha`:
@@ -191,13 +221,15 @@ jobs:
           fi
           git log -1 --format='base side: %h %s'
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Cache base junit report (bean cis2)
+      - name: Cache base junit report and root gates (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
-          path: ${{ runner.temp }}/junit.xml
-          key: pr-tests-junit-base-v1-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/root-gates.json
+          key: pr-tests-junit-base-v2-${{ steps.base-side.outputs.sha }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}-${{ hashFiles('judge/run-root-gates.py', 'judge/root-gates.json') }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -224,6 +256,12 @@ jobs:
           print(f"{sys.argv[2]}: mounted")
           PY
           done
+      - name: The index's own gates over the composed root
+        # Before the tests, which write into the tree. Judged by the
+        # index-gates job, not by this exit code.
+        if: steps.base-cache.outputs.cache-hit != 'true'
+        working-directory: fa
+        run: python3 ../judge/run-root-gates.py . ../judge/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
       - name: bun test
         if: steps.base-cache.outputs.cache-hit != 'true'
         working-directory: fa
@@ -231,10 +269,12 @@ jobs:
         run: |
           bun test ./cat-harness-tools --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
           test -s "$RUNNER_TEMP/junit.xml"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.side }}
-          path: ${{ runner.temp }}/junit.xml
+          path: |
+            ${{ runner.temp }}/junit.xml
+            ${{ runner.temp }}/root-gates.json
 
   standalone-run:
     # The standalone ratchet (bean `ho66`; owner, 2026-10-14). The tracked
@@ -260,7 +300,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: src
           fetch-depth: 2
@@ -269,7 +309,7 @@ jobs:
         # So a main that predates --measured-out is still measured. Only the
         # checker file is taken from the PR; the tree it measures is main's.
         if: matrix.side == 'base'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: pr-checker
           sparse-checkout: scripts/check-standalone.ts
@@ -277,10 +317,10 @@ jobs:
       - name: Cache base standalone measurement (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/standalone.json
-          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.cat-harness }}-${{ needs.pin.outputs.bootstrap-tools }}-${{ needs.pin.outputs.bootstrap }}-${{ needs.pin.outputs.index }}
+          key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}
       - *mount-cache
       - *mount
       - *cat-harness-main
@@ -299,7 +339,7 @@ jobs:
         run: |
           bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
           test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: standalone-${{ matrix.side }}
           path: ${{ runner.temp }}/standalone.json
@@ -309,12 +349,12 @@ jobs:
     needs: standalone-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: standalone
       - name: Judge the PR against main and the baseline
@@ -327,11 +367,31 @@ jobs:
     needs: run-tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: junit
       - name: Compare PR failures with main
         run: python3 .github/scripts/compare-test-failures.py junit/junit-base/junit.xml junit/junit-head/junit.xml
+
+  index-gates:
+    name: Index gates (no new failures)
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts/layer-pr-checks
+      - uses: actions/download-artifact@v8
+        with:
+          path: junit
+      - name: Compare the index's own gates with main
+        # A side that wrote no report could not be judged: never a pass.
+        run: |
+          set -euo pipefail
+          for side in base head; do
+            test -s "junit/junit-$side/root-gates.json" || { echo "::error::the $side side wrote no root-gates.json: could not determine"; exit 2; }
+          done
+          python3 .github/scripts/layer-pr-checks/compare-gates.py junit/junit-base/root-gates.json junit/junit-head/root-gates.json

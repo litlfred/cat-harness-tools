@@ -88,5 +88,10 @@ if (import.meta.main) {
     `backoff: attempt ${attempt} — waiting ${(ms / 1000).toFixed(1)}s ` +
       `(doubling from ${baseMs / 1000}s, capped at ${capMs / 1000}s before jitter of [0.5, 1.5))`,
   );
-  await new Promise((r) => setTimeout(r, ms));
+  // A pending timer keeps the process alive until it fires, which is the whole
+  // wait. Not `await`: a top-level await makes this an ASYNC module, and
+  // `qa-store.ts` imports the constants above, so every graph that reaches it
+  // (the qa-checkers, through `qa-utils` -> `qa-results`) could no longer be
+  // `require()`d — `harness-config`'s plugin-table load failed on exactly that.
+  setTimeout(() => {}, ms);
 }

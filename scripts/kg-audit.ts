@@ -130,7 +130,9 @@ import {
 } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { ANYONE, ODRL_ACTIONS, readPolicies, readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
-import { loadProcessModel, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
+import { readQaTree } from "./qa-store.ts";
+import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
+import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
 import { raciBreaches, raciRowsOf, type RaciBreachKind } from "./raci-chart.js";
 import { loadDecisionTable, possibleOutcomes } from "../src/workflow/decision-table.js";
@@ -151,7 +153,7 @@ import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
 import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
-import { checkoutActors, checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { checkoutActors, checkoutRoleGraph, neededActors } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
@@ -464,12 +466,22 @@ interface LoadedProcess {
   error?: string;
 }
 
+/** The shared global-tasks files `loadProcesses` passed by, for `global-task-shared`. */
+const globalTaskFiles: string[] = [];
+
 async function loadProcesses(): Promise<LoadedProcess[]> {
   // Every declared knowledge-graph directory, via the same helper the other
   // consumers use, so none of them can disagree about where diagrams live.
   const files = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
   const out: LoadedProcess[] = [];
   for (const file of files) {
+    // A layer's shared global-tasks file holds no process (owner, 2026-10-20,
+    // "a1"); its tasks are audited through the calls to them, and
+    // `global-task-shared` asks whether each is actually shared.
+    if (isGlobalTasksFile(readFileSync(file, "utf-8"))) {
+      globalTaskFiles.push(file);
+      continue;
+    }
     try {
       out.push({ file, model: await loadProcessModel(file) });
     } catch (e) {
@@ -1845,7 +1857,23 @@ function proseNamesResolve(): KgCriterionEntry {
  */
 function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> {
   // declared-path-literal: the conventional fallback when no declaration names the directory
-  const r = checkTestRuns(root, ownDirectoryById(root, "qa", "test/results"), skills);
+  const resultsDir = ownDirectoryById(root, "qa", "test/results");
+  const r = checkTestRuns(root, resultsDir, skills, () => {
+    if (!against) return { looked: false, files: [] };
+    const storage = qaStorageOf(resultsDir);
+    if (!storage) return { looked: false, files: [] };
+    const tree = readQaTree(against, resultsDir, { branch: storage, repoRoot: REPO_ROOT });
+    if (tree.state !== "hit") return { looked: false, files: [] };
+    const prefix = tree.prefix ? `${tree.prefix}/` : "";
+    const files: { where: string; text: string }[] = [];
+    for (const [p, text] of [...tree.files.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      const relToResults = prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p;
+      if (!relToResults.includes("/") && relToResults.endsWith(".test-run.json")) {
+        files.push({ where: relative(root, join(resultsDir, relToResults)), text });
+      }
+    }
+    return { looked: true, files };
+  });
   // Only a DECLARED `qa` directory that is absent is unknown. An instance that
   // declares none (bootstrap, …) has no results to read, and its
   // missing conventional directory is a determined "no runs": `n/a`.
@@ -2220,6 +2248,7 @@ function auditGraph(
   skills: Set<string>,
   stories: UserStoryGraph | undefined,
   badSatisfies: KgFinding[],
+  unsharedGlobalTasks: KgFinding[],
 ): KgQaReport {
   const reachable = manifestSkills();
   for (const s of servableSkills()) reachable.add(s);
@@ -2369,6 +2398,9 @@ function auditGraph(
     null,
     {
       "skill-has-entry-point": entry(orphans),
+      // A report entry (`minor`): the spec's rule for global tasks, asked of
+      // the files that hold them. `n/a` for a graph that declares none.
+      "global-task-shared": entry(unsharedGlobalTasks, globalTaskFiles.length > 0),
       // `unknown` when there is no role graph: with no roles declared, every
       // skill looks unmodelled and the count would be the whole corpus — a
       // number that says nothing about the corpus and everything about the
@@ -2683,11 +2715,16 @@ const refUnjudgeable = (ref: string): boolean =>
   layeringUndetermined && !resolvableSkills.has(ref);
 // The CHECKOUT's actors on the platform's own run: a dependent may extend an
 // actor by id with the roles and capabilities it takes on there (placement
-// PR0b). `--instance` audits that instance alone, as before.
+// PR0b). On `--instance`, the actors THAT instance may name: the platform's,
+// every instance it needs, and its own. Reading the platform's alone reported
+// a downstream's own actors (the IHE ITI VHL Sharer, Receiver) as undeclared
+// on every requirement and role that names them.
 const actors =
   corpusScopeFor(root) === "checkout"
     ? checkoutActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
-    : readActors(ACTOR_DIR, readPolicyGrants(POLICY_DIR));
+    : INSTANCE_RUN
+      ? neededActors(root, ACTOR_DIR, readPolicyGrants(POLICY_DIR))
+      : readActors(ACTOR_DIR, readPolicyGrants(POLICY_DIR));
 
 let graph: RoleGraph | undefined;
 let graphError: string | undefined;
@@ -2839,7 +2876,7 @@ const requirements = readRequirements();
 const satisfiers = readSatisfiers();
 reports.push(...auditRequirements(requirements, actors, satisfiers));
 reports.push(...auditSkills());
-reports.push(auditGraph(graph, processes, actors, skills, stories, danglingSatisfies(requirements, satisfiers)));
+reports.push(auditGraph(graph, processes, actors, skills, stories, danglingSatisfies(requirements, satisfiers), globalTaskSharedFindings(await Promise.all(globalTaskFiles.map(loadGlobalTasks)), processes, root)));
 reports.push(...auditTools(INSTANCE_RUN ? root : undefined));
 reports.push(...auditFolioBlocks(root));
 

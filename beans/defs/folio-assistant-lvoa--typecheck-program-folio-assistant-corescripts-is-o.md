@@ -1,11 +1,12 @@
 ---
 # folio-assistant-lvoa
+$schema: bean/1.0.0
 title: 'TYPECHECK PROGRAM: folio-assistant-core/scripts is outside it — 33 files, and every instance-boundary move adds more while typecheck stays green'
 status: completed
 type: bug
 priority: high
 created_at: 2026-09-30T11:13:35Z
-updated_at: 2026-10-10T15:44:45Z
+updated_at: 2026-10-10T15:54:05Z
 parent: folio-assistant-1xhc
 ---
 
@@ -138,9 +139,4 @@ ride on the bean that found it.
 
 ## Summary of Changes
 
-Done in cat-harness-tools (the store that owns this bean after the separation):
-
-- **Gate + denominator:** `test/typecheck-coverage.test.ts` walks every `.ts/.mts/.cts/.tsx` (filesystem, since CI mounts without `.git`) and puts each in one of three states: *covered* (named by an `include` glob), *exempt* (named by an `exclude` — a written decision), *unnamed* (fails, naming the file). It logs the denominator: `1583 covered, 82 exempt, 0 unnamed` on 2026-10-10.
-- **The two omissions here closed:** `playwright.config.ts` and `id-lookup/**/*.d.ts` were unnamed; both typecheck clean and are now in `include`.
-- **.e2e.ts answered:** excluded on purpose — Playwright transpiles without checking. Measured in a scratch program: 9 type errors in 7 files (fixture literals typed looser than the props they feed). Recorded in the test's header.
-- **folio-assistant-core/scripts:** that directory now lives in its own repository (`litlfred/folio-assistant-core`), which has **no tsconfig at all** — its 78 scripts are typechecked by nobody. That half is not fixable from this repository; it was handed to the coordinating session to file in folio-assistant-core's own store.
+Mirror copy. Owned by litlfred/cat-harness-tools, where lane B of drain ml9h closed it in PR cat-harness-tools#59: a coverage test fails when a .ts file is outside the typecheck (1583 covered, 82 excluded with a reason, 0 missing). The folio-assistant-core half (that repo has no tsconfig, so its 78 scripts/*.ts are typechecked by nobody) is carried by a new bean in that store.

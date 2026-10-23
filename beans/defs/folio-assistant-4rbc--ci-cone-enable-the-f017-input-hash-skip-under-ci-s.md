@@ -1,11 +1,12 @@
 ---
 # folio-assistant-4rbc
+$schema: bean/1.0.0
 title: 'CI cone: enable the f017 input-hash skip under CI, seeded from main''s last green run'
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-07T19:39:28Z
-updated_at: 2026-10-07T22:34:12Z
+updated_at: 2026-10-20T16:49:14Z
 parent: folio-assistant-hfag
 ---
 
@@ -152,3 +153,15 @@ The owner paused CI and rendering during the separation (~20:50Z), so everything
 ## 2026-10-07T22:34:11Z: owner ruling — merge as tooling, CI wiring deferred
 
 After the measurement above (net ~10 s per PR; tracing `kg:audit*` costs main minutes), the owner chose option 1 of 3 ("go on all", 2026-10-07 ~22:30Z): **merge the cone tooling, the two defect fixes (tracer-flips-verdict, build-output-read-as-instance) and the rule text, without wiring `ci-cone` into code-quality-gates.yml.** This bean stays open: its goal "enable in CI" is unmet until `kg:audit*` and `skill:register:check` can be recorded (see "What would make it pay").
+
+## 2026-10-20T12:00:00Z: wired into CI, closed
+
+The deferred CI wiring shipped in `litlfred/cat-harness-tools#411` (squash `32a5d8b`). `layer-pr-checks.yml` asks `ci-cone.ts decide-all` once per shard, records a cone skip as SKIPPED with its sha (never a pass), and records cone runs on a push to the caller's main. The 11 caller PRs that add `push: main` are tracked in `litlfred/cat-harness-tools#414`. Session https://claude.ai/code/session_01NVW1gLKTQrfffUSgD3GCd5.
+
+## From this store's earlier copy (store reconciliation, 2026-10-22)
+
+*2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Summary of Changes
+
+_2026-10-20T16:49:14Z_ — Store reconciliation: status `in-progress` → `completed`, mirroring the folio-assistant store's copy (`cat/cat-harness/beans`), which closed it at 2026-10-20T12:00:00Z with the note above (copied verbatim). Re-verified here on cat-harness-tools `main`: `32a5d8b` (#411) is on main, `.github/scripts/layer-pr-checks/run-gates.py` calls `ci-cone.ts decide-all` once, and `layer-pr-checks.yml` documents the cone skip as "SKIPPED — inputs unchanged since <sha>", never a pass. This was the only open copy in this store whose status differed from its live copy. Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr.

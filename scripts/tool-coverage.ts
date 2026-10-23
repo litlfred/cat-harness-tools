@@ -70,7 +70,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { tools } from "../tools/discover.js";
-import { loadProcessModel } from "../src/workflow/process-model.js";
+import { isGlobalTasksFile, loadProcessModel } from "../src/workflow/process-model.js";
 import { isSkillMd, kgRoots, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
@@ -293,6 +293,9 @@ export async function triage(): Promise<SkillTriage[]> {
   for (const d of bpmnDirs()) {
     for (const f of readdirSync(join(ROOT, d))) {
       if (!f.endsWith(".bpmn")) continue;
+      // A layer's global-tasks file holds no process: its tasks' skills reach
+      // this triage through the call activities that name them.
+      if (isGlobalTasksFile(readFileSync(join(ROOT, d, f), "utf-8"))) continue;
       try {
         const m = await loadProcessModel(join(ROOT, d, f));
         for (const n of m.nodes.values()) {

@@ -1,5 +1,6 @@
 ---
 # folio-assistant-12ws
+$schema: bean/1.0.0
 title: 'ONE NAME, TWO MEANINGS: check-l1-complete declares a local instanceRootFor that contradicts the exported one'
 status: completed
 type: task
@@ -58,4 +59,3 @@ _2026-10-07T04:33:08Z_ — Claimed by claude/12ws-rename-library-root-for — pu
 - Added unit tests for `libraryRootFor` in `cat-harness/scripts/tests/ingest-and-l1.test.ts`.
 - Verified all 79 tests in `ingest-and-l1.test.ts` pass, plus `archive-contents.test.ts` and `tabular-records.test.ts`.
 - Checked eslint cleanly.
-

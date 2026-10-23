@@ -376,7 +376,7 @@ describe("workflow templates (52dz)", () => {
       // ...and the substitution happened: the platform path the caller chose
       // is the one the QA sweep runs from.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain(
-        "vendor/fa/cat-harness-tools/content/pipeline/qa-sweep.ts",
+        "vendor/fa/cat-harness-tools/pipeline/qa-sweep.ts",
       );
       // GitHub's own `${{ … }}` expressions survive substitution untouched.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep-nightly.yml"), "utf-8")).toContain(

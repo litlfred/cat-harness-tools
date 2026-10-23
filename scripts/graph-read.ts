@@ -66,6 +66,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 import { resolveSubgraphSource, type ResolvedSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { absenceAt } from "./branch-store.ts";
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
 
 export type GraphReadFrom = "checkout" | "mount";
@@ -114,6 +115,14 @@ export type GraphRead =
        * trustworthy path to report.
        */
       path?: string;
+      /**
+       * Set when a mount DETERMINED the graph absent from this checkout (bean
+       * `x5e0`; owner, 2026-10-14: "Report as absent"), as opposed to nobody
+       * having mounted it. Still a refusal, so a reader that has not decided
+       * what absence means for it keeps stopping; one that has (a gate that
+       * is then not applicable) asks this.
+       */
+      absent?: true;
     }
   | { state: "undeclared"; id: string; reason: string };
 
@@ -226,7 +235,11 @@ export function graphReadPath(id: string, repoRoot: string): GraphRead {
       // here, so HERE is the store. `check:declared-dirs` reports the
       // inconsistency; a reader's job meanwhile is to read the real files.
       return { state: "ok", at: absPath, from: "checkout", id, path: declaredPath, notCutOver: true };
-    case "unmounted":
+    case "unmounted": {
+      const absent = absenceAt(repoRoot, declaredPath, id);
+      if (absent) {
+        return { state: "refused", id, path: declaredPath, absent: true, reason: `"${id}" is absent from this checkout: ${absent.reason}` };
+      }
       return {
         state: "refused",
         id,
@@ -236,6 +249,7 @@ export function graphReadPath(id: string, repoRoot: string): GraphRead {
           `Mount it (\`bun run cat state:mount\`). Reading ${relative(repoRoot, absPath).split(sep).join("/")} instead ` +
           `would report an EMPTY graph, and "nothing here" is not "could not reach it" — ${t.detail}`,
       };
+    }
   }
 }
 

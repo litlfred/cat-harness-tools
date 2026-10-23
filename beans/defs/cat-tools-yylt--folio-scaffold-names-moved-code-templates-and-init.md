@@ -1,5 +1,6 @@
 ---
 # cat-tools-yylt
+$schema: bean/1.0.0
 title: 'FOLIO SCAFFOLD NAMES MOVED CODE: templates and init-folio wire new folios to <assistant>/cat-harness/{src,content,scripts,viewer}, which moved to cat-harness-tools in 70lx'
 status: completed
 type: bug

@@ -96,7 +96,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Check out the judging scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ inputs.tools-ref }}
@@ -105,13 +105,13 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Check out the head commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.head-sha }}
           path: caller
       - name: Check out the index (layer mode)
         if: inputs.mode == 'layer'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ inputs.index-ref }}
@@ -136,8 +136,11 @@ jobs:
           digest="$(bun ci/scripts/judge-tree.ts digest --lock "$LOCK" --caller "$CALLER" --caller-dir caller --sha "$HEAD_SHA")" || exit 2
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "tree digest for $REPO@$HEAD_SHA: $digest"
-          out="$(bun ci/scripts/judge-tree.ts check --digest "$digest" --repo "$REPO" --sha "$HEAD_SHA")"
-          code=$?
+          # `|| code=$?`: under Actions' `bash -e` a failing assignment ended
+          # the step here, so a red or undetermined verdict lost its output,
+          # its summary and its annotation below.
+          code=0
+          out="$(bun ci/scripts/judge-tree.ts check --digest "$digest" --repo "$REPO" --sha "$HEAD_SHA")" || code=$?
           echo "$out"
           { echo "### Verdict check"; echo; echo "$out"; } >> "$GITHUB_STEP_SUMMARY"
           if [ "$code" -ne 0 ]; then

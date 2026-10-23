@@ -1,12 +1,13 @@
 ---
 # cat-tools-bbnd
+$schema: bean/1.0.0
 title: 'Translation info drawer: open more translation detail from every translation warning — blocks, pages, (sub)graphs, locales'
-status: todo
+status: completed
 type: feature
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T17:26:18Z
-updated_at: 2026-10-10T17:26:18Z
+updated_at: 2026-10-20T17:20:00Z
 ---
 
 Owner, 2026-10-10: *"i want to see in the translations warning somewhere the ability to open panel w/ more translation info. needs to be integrated in a few places … see it on content blocks, on a harnessed (sub)graph, etc."* Analysed the same day (folio-assistant-core lane C session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco).
@@ -76,3 +77,66 @@ per-sub-graph drawer (option 2) can be added later without undoing this.
 - [ ] **The drawer itself** is not started. It needs new data in the page head
   (`head_custom.html` and the generators) and a built site to verify in both
   colour schemes, and the lane C container cannot build the composed site.
+
+
+## Progress 2026-10-20 (lane C, on the owner's "do translation drawer")
+
+Three PRs:
+- **cat-harness-tools#466:** the projection gains per-locale `officiality`
+  from both records, computed by the officiality gate's reader. It also names
+  its own `page`. The status table gains a signed-off column and
+  `data-fa-tr-locale` rows.
+- **cat-harness#377:** the drawer.
+  - **Page scope:** a `Translation details` button in the badge row opens a
+    `fa-qa-panel` drawer. It shows this page's facts and this site's per-locale
+    strings, fuzzy count and signed-off state, with a link to the status page.
+    The unverified-translation warning opens the same drawer.
+  - **Block scope:** every `TR` panel gains, per locale, whether its verdict is
+    stale or current, and the locale's signed-off state.
+  - **Loading:** `head_custom.html` publishes `statusSrc`, a path only. A 404
+    reads "publishes no translation status"; any other failure reads "could
+    not load".
+- **cat-harness-tools#467:** `translation-drawer.e2e.ts`, 12 tests across both
+  colour schemes. All pass against the drawer and fail against main.
+
+Done-when:
+- [x] One drawer component serves the block and page scopes. The (sub)graph
+  scope is per instance, ruled 2026-10-11: every page of an instance, its
+  landing included, opens the same instance-wide site section. The locale
+  scope is the site table's rows. All of it is mounted by JS from a data
+  hook.
+- [x] Integrated on content blocks, document pages, the instance landing and
+  the translation-status visualiser. Each row has a Details drawer listing its
+  catalogues with counts and `X-Folio-Official`, from the projection's new
+  per-locale `files`.
+- [x] Officiality is read from both the PO headers and `status.json`, and
+  `check:translation-officiality` fails when they disagree (#102).
+- [x] A stale translation says so in the drawer: the block scope, from witness
+  freshness, and the page state `stale`.
+- [x] e2e: opening the drawer on a block and on a page shows its facts in both
+  colour schemes.
+
+**Folio pages, measured on core main.**
+- `build-document-site.ts` writes themed pages (`layout: default`), so the
+  theme's `head_custom.html` already emits `fa-translation-meta` and
+  `docs-ui.js`. Folio document pages get the drawer with no core change. Their
+  site section reads "publishes no translation status" until the folio runs
+  `gen-translation-status`.
+- `build-library-site.ts` writes standalone HTML with no theme, no badge row
+  and no `docs-ui.js`. A drawer there needs those pages themed first. That is
+  a change to how the library site is rendered, tracked on
+  `folio-core-shsz`, not a data hook.
+
+## Completed 2026-10-20 (lane C)
+
+All five done-whens are ticked, and every PR that delivered them has merged:
+cat-harness#377 (the drawer), cat-harness-tools#466 (the officiality projection)
+and #467 (the e2e).
+
+**Library pages are out of scope by construction, not left open.**
+`build-library-site.ts` writes its pages under `en/` only. A library entry is a
+frozen source document, and nothing translates it, so a library page carries no
+translation and no translation warning for a drawer to open from. Theming those
+pages would give the drawer nothing to show. If the library is ever translated,
+that becomes its own bean, and the page would pick up the drawer through the
+theme the way document pages already do. `folio-core-shsz` closes with this.

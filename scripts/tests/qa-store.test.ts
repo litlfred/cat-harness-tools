@@ -627,6 +627,26 @@ describe("skipping unchanged QA results (folio-assistant-he8h)", () => {
     }
   }, T);
 
+  test("a PR skipped onto main's entry resolves to main's entry, not to one under the PR", () => {
+    // A PR whose first entry matches main's is recorded as
+    // `skipped["pr/<n>/<sha>"] = "main/<sha>"`. The target already names its
+    // parent; prefixing it with the PR's would look up `pr/<n>/main/<sha>`,
+    // which never exists, and every reader of a no-content PR would miss.
+    const f = fixture();
+    expect(publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("ci")).state).toBe("published");
+    const p2 = publishQa({ ref: `pr/7/${SHA_B}`, roots: [RESULTS] }, f.container("ci"));
+    expect(p2.state).toBe("skipped");
+    expect(p2.reason).toContain(`unchanged from main/${SHA_A}`);
+
+    const reader = f.container("reader");
+    const tree = readQaTree(`pr/7/${SHA_B}`, RESULTS, reader);
+    expect(tree.state).toBe("hit");
+    if (tree.state === "hit") expect(tree.key).toBe(`main/${SHA_A}`);
+    const qa = readQa(`pr/7/${SHA_B}`, `${RESULTS}/kg-qa/skills/a.kg-qa.json`, reader);
+    expect(qa.state).toBe("hit");
+    if (qa.state === "hit") expect(qa.key).toBe(`main/${SHA_A}`);
+  }, T);
+
   test("force: true forces publish even if content is unchanged", () => {
     const f = fixture();
     publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("ci"));

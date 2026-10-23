@@ -38,14 +38,14 @@ import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from
 import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/folio-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
 import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/declared-nodes.js";
-import { typedBlockKinds } from "@litlfred/cat-harness/schemas/constraints.js";
+import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.js";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -133,6 +133,13 @@ export interface FamilySweep {
   counts: Record<string, { nodes: number; checked: number; parsed: number; state: string }>;
   /** A tag on disk the map does not name — the map claimed completeness. */
   unmapped: { tag: string; example: string }[];
+  /**
+   * A tag the map does not name, met ONLY inside a checkout-built
+   * `builtAtPublish` path: a projection of another instance's graph (the byte
+   * copies under `docs/assets/library/jsonld/`, bean `8pzh`), whose nodes are
+   * judged where their source is declared. Reported, never a failure.
+   */
+  projected?: { tag: string; example: string }[];
   /** A family whose reference does not resolve. */
   unresolvable: { tag: string; reason: string }[];
   /** A node that fails its family's Zod schema. */
@@ -193,7 +200,9 @@ export interface FamilySweep {
  * because a broken symlink is a fact about the tree and not a reason to stop.
  */
 function jsonFiles(dir: string): string[] {
-  const listed = gitCorpus(dir, ["*.json"]);
+  // `.jsonld` too: a library's manifest, sections and blocks are JSON-LD, and
+  // are routed by the class they instantiate (cat-harness's library-nodes.ts).
+  const listed = gitCorpus(dir, ["*.json", "*.jsonld"]);
   if (listed !== undefined) return listed;
 
   // Fallback for a directory git cannot answer about — a temp fixture, or a
@@ -213,7 +222,7 @@ function jsonFiles(dir: string): string[] {
     } catch {
       return []; // dangling symlink, or a race: not readable is not a crash
     }
-    return isDir ? jsonFiles(p) : p.endsWith(".json") ? [p] : [];
+    return isDir ? jsonFiles(p) : p.endsWith(".json") || p.endsWith(".jsonld") ? [p] : [];
   });
 }
 
@@ -232,7 +241,14 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   // and the library map must not call that kind's run contexts and work lists
   // "unmapped" (folio-assistant#2529).
   const declaredDirs: { abs: string; kinds: readonly string[] }[] = [];
+  // The checkout-built `builtAtPublish` paths of every instance: what they
+  // hold is computed over OTHER instances, so a family met only there is the
+  // projected instance's (see `FamilySweep.projected`).
+  const checkoutBuilt: string[] = [];
   for (const inst of instanceRootsIn(join(root, ".."))) {
+    for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
+      if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path).replace(/\/+$/, "") + (b.path.endsWith("/") ? "/" : ""));
+    }
     for (const e of readDeclaration(inst)?.directories ?? []) {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
@@ -259,9 +275,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
     if (!def.nodeSchemas) continue;
     const fams = await resolveNodeSchemas(kind, root);
     const byTag = new Map(fams.map((f) => [f.tag, f]));
-    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [] };
+    const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
+    const inProjection = (file: string): boolean => checkoutBuilt.some((d) => file === d || (d.endsWith("/") && file.startsWith(d)));
     // WHERE TO READ, not where the declaration points. A graph kept at a branch
     // tip is read at its mount, and when nothing is mounted there is no
     // directory to read at all — which is a different answer from an empty one.
@@ -333,8 +350,14 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         } catch {
           continue; // not a node; a malformed file is another check's finding
         }
-        const tag = (node as { $schema?: unknown } | null)?.$schema;
+        // `nodeFamilyTag` also reads a `structure.json`'s `_schema`, and a JSON-LD
+        // node's class. Either is routed only when this kind lists it, as is any
+        // tag of a `.jsonld` file, so what the sweep did not read before stays
+        // unread rather than becoming an unmapped family.
+        const tag = nodeFamilyTag(node);
         if (typeof tag !== "string") continue;
+        const optIn = (node as { $schema?: unknown }).$schema === undefined || file.endsWith(".jsonld");
+        if (optIn && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
         const inner = innermostKinds(file);
         if (inner !== undefined && !inner.includes(kind)) continue;
@@ -342,6 +365,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
         const rel = relative(join(root, ".."), file);
+        if (!fam && inProjection(file)) {
+          if (!s.projected!.some((u) => u.tag === tag)) s.projected!.push({ tag, example: rel });
+          continue;
+        }
         if (!fam) {
           if (!s.unmapped.some((u) => u.tag === tag)) s.unmapped.push({ tag, example: rel });
           continue;
@@ -351,7 +378,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         c.nodes++;
         if (fam.state !== "resolved") continue;
         c.checked++;
-        const r = fam.schema.safeParse(stripAnnotations(node));
+        const r = fam.schema.safeParse(familyBody(node));
         if (r.success) c.parsed++;
         else into.invalid.push({ file: rel, issue: `${r.error.issues[0]?.path.join(".")}: ${r.error.issues[0]?.message}` });
       }
@@ -423,6 +450,8 @@ async function main(): Promise<number> {
       console.log(`  ✗ EXAMINED NOTHING — ${f.kind} declares nodeSchemas and no node was found`);
       familyFail = true;
     }
+    for (const u of f.projected ?? [])
+      console.log(`  · ${u.tag}: another instance's node in a checkout-built projection (e.g. ${u.example}), judged where its source is declared`);
     for (const u of f.unmapped) console.log(`  ✗ unmapped family ${u.tag} (e.g. ${u.example})`);
     for (const u of f.unresolvable) console.log(`  ✗ ${u.tag}: ${u.reason}`);
     if (f.unmapped.length || f.unresolvable.length) familyFail = true;
@@ -492,12 +521,24 @@ async function main(): Promise<number> {
     // hold the typed kinds against — said, never read as a pass.
     console.log("\n· block kinds not examined: standalone, no checkout holds the instances that declare them");
   } else {
-    const typed = new Set(typedBlockKinds());
+    // BlockSchema's kinds and every typed vocabulary module's: a layer above
+    // cat-harness types its own kinds, so a composition without it neither
+    // discovers nor types them.
+    let typedKinds: string[];
+    try {
+      typedKinds = allTypedBlockKinds();
+    } catch (e) {
+      // A module that breaks the contract would leave its kinds untyped and
+      // every block of them failing validation: a finding, not a crash.
+      console.log(`\n✗ a typed vocabulary module could not be loaded: ${(e as Error).message}`);
+      return 1;
+    }
+    const typed = new Set(typedKinds);
     const untyped = [...discovered].filter((k) => !typed.has(k));
     const undiscovered = [...typed].filter((k) => !discovered.has(k));
     console.log(`\n${discovered.size} block kind(s) discovered from block-kinds/ nodes`);
     if (untyped.length || undiscovered.length) {
-      for (const k of untyped) console.log(`  ✗ block kind "${k}" is declared by a node but no BlockSchema member types it`);
+      for (const k of untyped) console.log(`  ✗ block kind "${k}" is declared by a node but neither BlockSchema nor a vocabulary module types it`);
       for (const k of undiscovered) console.log(`  ✗ block kind "${k}" is typed by BlockSchema but no block-kinds/ node declares it`);
       return 1;
     }
@@ -519,6 +560,7 @@ async function main(): Promise<number> {
       if (inst === undefined || !existsSync(join(inst, n.vocabulary))) missingModules.push(`${n.adapter}: ${n.vocabulary} (declared by ${file})`);
     }
     console.log(`\n${vocabularies.size} content-adapter vocabular(ies) discovered from content-adapters/ nodes`);
+    for (const v of loadedVocabularies()) console.log(`  · ${v.adapter}: ${v.schemas.size} kind(s) typed by its vocabulary module (${relative(REPO_ROOT ?? resolve(HARNESS_ROOT, ".."), v.module)})`);
     if (orphanKinds.length || missingModules.length) {
       for (const k of orphanKinds) console.log(`  ✗ block kind "${k.kind}" names adapter "${k.adapter}", which no content-adapters/ node declares`);
       for (const m of missingModules) console.log(`  ✗ vocabulary module not found — ${m}`);

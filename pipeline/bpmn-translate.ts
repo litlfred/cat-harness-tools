@@ -10,8 +10,9 @@
  *
  * ## What is translatable, and what is emphatically not
  *
- * Translatable: the `name` attribute of a process, lane, activity, gateway,
- * event or sequence flow, and the text of a `<documentation>` element. These
+ * Translatable: the `name` attribute of a process, lane, activity, global
+ * task, gateway, event or sequence flow, and the text of a `<documentation>`
+ * element. These
  * are the strings a reader sees in the rendered diagram.
  *
  * NOT translatable, and the reason each would break something:
@@ -43,6 +44,9 @@ import type { PotEntry } from "./pot-extract.js";
 const NAMED = new RegExp(
   "<(?:bpmn:)?(?:process|lane|task|serviceTask|userTask|manualTask|scriptTask|" +
     "sendTask|receiveTask|businessRuleTask|callActivity|subProcess|" +
+    // BPMN 2.0's global tasks: a layer's shared steps, named once in the
+    // file that holds no process (owner, 2026-10-20, "a1").
+    "globalTask|globalUserTask|globalScriptTask|globalManualTask|globalBusinessRuleTask|" +
     "startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|" +
     "exclusiveGateway|parallelGateway|inclusiveGateway|eventBasedGateway|" +
     "sequenceFlow|participant|collaboration)\\b[^>]*?\\sname=\"([^\"]*)\"",

@@ -62,8 +62,28 @@ export function testRunFiles(dir: string): string[] {
 /** At most this many violations are listed per run; the count is always given. */
 const SHOWN = 3;
 
-export function checkTestRuns(root: string, resultsDir: string, knownSkills: Set<string>): TestRunConformance {
+export interface TestRunStoreFallback {
+  looked: boolean;
+  files: { where: string; text: string }[];
+}
+
+export function checkTestRuns(
+  root: string,
+  resultsDir: string,
+  knownSkills: Set<string>,
+  storeFallback?: () => TestRunStoreFallback,
+): TestRunConformance {
   const out: TestRunConformance = { unresolved: [], nonconforming: [], unchecked: [], checked: 0, runs: 0, looked: existsSync(resultsDir) };
+  let entries: { where: string; text: string }[] = [];
+  if (out.looked) {
+    entries = testRunFiles(resultsDir).map((file) => ({ where: relative(root, file), text: readFileSync(file, "utf-8") }));
+  } else if (storeFallback) {
+    const fb = storeFallback();
+    if (fb.looked) {
+      out.looked = true;
+      entries = fb.files;
+    }
+  }
   if (!out.looked) return out;
   const contracts = skillContracts(root);
   const schemaCache = new Map<string, ZodType | Error>();
@@ -82,10 +102,9 @@ export function checkTestRuns(root: string, resultsDir: string, knownSkills: Set
     return schemaCache.get(f);
   };
 
-  for (const file of testRunFiles(resultsDir)) {
+  for (const { where, text } of entries) {
     out.runs++;
-    const where = relative(root, file);
-    const parsed = TestRunSchema.safeParse(JSON.parse(readFileSync(file, "utf-8")));
+    const parsed = TestRunSchema.safeParse(JSON.parse(text));
     if (!parsed.success) {
       out.unresolved.push({ where, detail: `does not parse as a test run: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
       continue;

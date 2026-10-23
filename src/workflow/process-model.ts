@@ -32,7 +32,7 @@
  */
 
 import { BpmnModdle } from "bpmn-moddle";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
 import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/role-graph.js";
@@ -366,8 +366,92 @@ export interface ProcessNode {
   documentation?: string;
   /** For a call activity: the process it expands into. */
   calledElement?: string;
+  /**
+   * For a call activity that calls a GLOBAL TASK rather than a process: the
+   * step the layer shares, which this node runs as.
+   *
+   * BPMN 2.0's reusable task (`globalTask`, `globalUserTask`,
+   * `globalScriptTask`, `globalManualTask`, `globalBusinessRuleTask`) is a
+   * root element outside every process, held in the layer's one shared
+   * `.bpmn` that holds no process, and named by bare id in `calledElement`
+   * exactly as a process is (owner, 2026-10-20, "a1 b1 c1"). The node is
+   * then an ordinary step: `type` is the task type the global kind runs as
+   * ({@link GLOBAL_TASK_TYPES}), `name`, `documentation` and every extension
+   * (the Skill above all) come from the global task unless the call states
+   * its own, the lane stays the call's, and `calledElement` is NOT set — a
+   * global task expands into nothing, so every reader that treats
+   * `calledElement` as "a sub-process implements this" would otherwise
+   * skip the one place the step's Skill is named.
+   */
+  globalTask?: GlobalTaskRef;
+  /**
+   * The values a call gives a global task's declared inputs, by input name
+   * (owner, 2026-10-20, "c1": a global task may take parameters, such as
+   * the label a tracking issue carries). Standard BPMN: the global task's
+   * `ioSpecification` declares each `dataInput`; the call activity's own
+   * `ioSpecification` repeats it, as BPMN requires a call's inputs to match
+   * the callable element's, and a `dataInputAssociation` with an
+   * `assignment` gives it its value. Absent when the step takes none.
+   */
+  inputs?: Record<string, string>;
   incoming: string[];
   outgoing: string[];
+}
+
+/** Where a call activity's global task is, and what kind of task it is. */
+export interface GlobalTaskRef {
+  /** The global task's id, as the call names it. */
+  id: string;
+  /** Its BPMN type as bpmn-moddle names it, e.g. `bpmn:GlobalUserTask`. */
+  type: string;
+  /** The file that defines it. */
+  source: string;
+  /** Its own name, before any name the call gives the step. */
+  name: string;
+}
+
+/**
+ * BPMN 2.0's global task types, as bpmn-moddle names them, and the task type
+ * a call to each runs as. There is no global service, send or receive task in
+ * the standard. A script or business-rule task is performed without a person,
+ * as a service task is; a manual task is performed by a person, as a user
+ * task is — so `fulfilmentKindsForBpmnType` reads the same answer for a shared
+ * step as for the task it replaced.
+ */
+export const GLOBAL_TASK_TYPES: Readonly<Record<string, string>> = {
+  "bpmn:GlobalTask": "bpmn:Task",
+  "bpmn:GlobalUserTask": "bpmn:UserTask",
+  "bpmn:GlobalManualTask": "bpmn:UserTask",
+  "bpmn:GlobalScriptTask": "bpmn:ServiceTask",
+  "bpmn:GlobalBusinessRuleTask": "bpmn:ServiceTask",
+};
+
+/** A global task's element name in the XML, any prefix: `globalTask`, `globalUserTask`, … */
+export const GLOBAL_TASK_ELEMENT = /<(?:[\w.-]+:)?global(?:User|Script|Manual|BusinessRule)?Task\b[^>]*?\sid="([^"]+)"/g;
+
+/** Whether a `.bpmn` source holds a `<bpmn:process>`. */
+export function holdsProcess(xml: string): boolean {
+  return /<(?:[\w.-]+:)?process\b[^>]*?\sid="/.test(xml);
+}
+
+/**
+ * Whether a `.bpmn` source is a layer's shared global-tasks file: global
+ * tasks and no process. Every tool that reads a `.bpmn` as a process asks
+ * this first and passes such a file by — it holds the steps several
+ * processes share, and each is read through the calls to it (owner,
+ * 2026-10-20, "a1").
+ */
+export function isGlobalTasksFile(xml: string): boolean {
+  return !holdsProcess(xml) && new RegExp(GLOBAL_TASK_ELEMENT.source).test(xml);
+}
+
+/**
+ * The `.bpmn` files among `files` that hold a process: every one but a
+ * layer's shared global-tasks file, which a tool that loads diagrams as
+ * processes passes by ({@link isGlobalTasksFile}).
+ */
+export function processDiagrams(files: readonly string[]): string[] {
+  return files.filter((f) => f.endsWith(".bpmn") && !isGlobalTasksFile(readFileSync(f, "utf-8")));
 }
 
 export interface ProcessFlow {
@@ -1145,6 +1229,13 @@ interface ModdleElement {
     }[];
   };
   calledElement?: string;
+  /** BPMN's `ioSpecification`: a global task's declared inputs, and a call's matching ones. */
+  ioSpecification?: { dataInputs?: { id: string; name?: string }[] };
+  /** A call's `dataInputAssociation`s: an `assignment` gives a declared input its value. */
+  dataInputAssociations?: {
+    targetRef?: { id?: string };
+    assignment?: { from?: { body?: string }; to?: { body?: string } }[];
+  }[];
   sourceRef?: { id: string };
   targetRef?: { id: string };
   flowElements?: ModdleElement[];
@@ -1189,6 +1280,61 @@ export function findInModel(
  * which rewrites a fixture see the previous run's answer.
  */
 function processIndex(dir: string): Map<string, string> {
+  return idIndex(dir, /<(?:bpmn:)?process\b[^>]*?\sid="([^"]+)"/g);
+}
+
+/**
+ * Every global task id declared under `dir`, recursively, mapped to its file
+ * — the {@link processIndex} walk, for BPMN's reusable tasks.
+ */
+function globalTaskIndex(dir: string): Map<string, string> {
+  return idIndex(dir, GLOBAL_TASK_ELEMENT);
+}
+
+/**
+ * Where a called global task lives in the calling diagram's OWN instance:
+ * its declared `processes` directories. Never a dependency's — a layer's
+ * global tasks are shared within that layer only (owner, 2026-10-20, "c1").
+ */
+function ownInstanceGlobalTaskIndex(dir: string): Map<string, string> {
+  const out = new Map<string, string>();
+  let dirs: string[];
+  try {
+    const own = findInstanceRoot(dir);
+    if (own === undefined || own === null) return out;
+    dirs = directoriesForGraph(own, "processes");
+  } catch {
+    return out;
+  }
+  for (const d of dirs) {
+    if (!existsSync(d)) continue;
+    for (const [id, home] of globalTaskIndex(d)) if (!out.has(id)) out.set(id, home);
+  }
+  return out;
+}
+
+/**
+ * A diagram's text, read once per (path, mtime, size).
+ *
+ * The id indexes above walk every `.bpmn` of an instance, and a corpus pass
+ * loads each diagram once, so the same files were read once per diagram per
+ * index. With the global-task index (owner, 2026-10-20, "a1 b1 c1") that was
+ * twice per diagram, and the corpus convention test went over its 5 s budget.
+ * Keyed on the file's mtime and size, so a fixture a test rewrites is read
+ * again: the reason {@link processIndex} is not cached by directory still holds.
+ */
+const bpmnText = new Map<string, { mtimeMs: number; size: number; xml: string }>();
+function readBpmnCached(path: string): string {
+  const st = statSync(path);
+  const hit = bpmnText.get(path);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.xml;
+  const xml = readFileSync(path, "utf-8");
+  if (bpmnText.size > 4096) bpmnText.clear();
+  bpmnText.set(path, { mtimeMs: st.mtimeMs, size: st.size, xml });
+  return xml;
+}
+
+function idIndex(dir: string, pattern: RegExp): Map<string, string> {
   const out = new Map<string, string>();
   // RECURSIVE since placement PR3 (bean `63wl`): a declared `processes/`
   // directory groups its diagrams by concern (`processes/sdlc/`,
@@ -1200,8 +1346,8 @@ function processIndex(dir: string): Map<string, string> {
   const walk = (d: string): void => {
     const entries = readdirSync(d, { withFileTypes: true });
     for (const e of entries.filter((x) => x.isFile() && x.name.endsWith(".bpmn")).sort((a, b) => a.name.localeCompare(b.name))) {
-      const xml = readFileSync(join(d, e.name), "utf-8");
-      for (const m of xml.matchAll(/<(?:bpmn:)?process\b[^>]*?\sid="([^"]+)"/g)) {
+      const xml = readBpmnCached(join(d, e.name));
+      for (const m of xml.matchAll(new RegExp(pattern.source, "g"))) {
         if (!out.has(m[1]!)) out.set(m[1]!, join(d, e.name));
       }
     }
@@ -1369,6 +1515,127 @@ export function normaliseOwnExtensions(root: unknown): void {
 }
 
 /**
+ * `loadProcessModel` over a file that holds a layer's shared global tasks
+ * and no process. A reader listing diagrams passes such a file by with
+ * {@link isGlobalTasksFile} before loading; this class lets one that did not
+ * tell the case apart from a broken diagram.
+ */
+export class GlobalTasksFile extends UnsupportedBpmn {}
+
+/** Parsed global-tasks files, keyed by their text, so a fixture rewritten on disk is never answered from a stale parse. */
+const globalTaskFiles = new Map<string, Promise<ModdleElement>>();
+
+/** One global task as a reader lists it: what it is, the Skill it names, the inputs it declares. */
+export interface GlobalTaskDef {
+  id: string;
+  /** The name on the element, with the `[skill]` line stripped. */
+  name: string;
+  /** BPMN type as bpmn-moddle names it, e.g. `bpmn:GlobalUserTask`. */
+  type: string;
+  /** The task type a call to it runs as ({@link GLOBAL_TASK_TYPES}). */
+  runsAs: string;
+  source: string;
+  documentation?: string;
+  skills: string[];
+  /** The names of its declared `dataInput`s, which every call gives a value. */
+  inputs: string[];
+}
+
+/**
+ * Every global task `file` defines — the read a tool makes of a layer's
+ * shared global-tasks file in place of {@link loadProcessModel}, which
+ * refuses it ({@link GlobalTasksFile}).
+ */
+export async function loadGlobalTasks(file: string): Promise<GlobalTaskDef[]> {
+  const defs = await parseGlobalTaskFile(file);
+  return (defs.rootElements ?? [])
+    .filter((e) => e.$type in GLOBAL_TASK_TYPES)
+    .map((g) => ({
+      id: g.id,
+      name: cleanName(g.name) || g.id,
+      type: g.$type,
+      runsAs: GLOBAL_TASK_TYPES[g.$type]!,
+      source: file,
+      documentation: g.documentation?.[0]?.text?.replace(...DOC_WS).trim() || undefined,
+      skills: (g.extensionElements?.values ?? []).filter((v) => v.$type === "folio:skill" && v.ref).map((v) => v.ref!),
+      inputs: (g.ioSpecification?.dataInputs ?? []).map((d) => d.name ?? d.id),
+    }));
+}
+
+/** The global task `id` defined in `file`, with our extensions normalised. */
+async function readGlobalTask(file: string, id: string): Promise<ModdleElement> {
+  const g = ((await parseGlobalTaskFile(file)).rootElements ?? []).find((e) => e.id === id && e.$type in GLOBAL_TASK_TYPES);
+  if (!g) throw new UnsupportedBpmn(`${basename(file)}: ${id} is indexed as a global task and is not one`);
+  return g;
+}
+
+function parseGlobalTaskFile(file: string): Promise<ModdleElement> {
+  const xml = readFileSync(file, "utf-8");
+  let parsed = globalTaskFiles.get(xml);
+  if (!parsed) {
+    if (globalTaskFiles.size > 64) globalTaskFiles.clear();
+    parsed = (async () => {
+      const out = await new BpmnModdle().fromXML(xml);
+      const { warnings } = partitionTolerated(out.warnings);
+      if (warnings.length > 0) {
+        throw new UnsupportedBpmn(`${basename(file)}: ${warnings.length} parse warning(s) — ${warnings.map((w: unknown) => String(w)).join("; ")}`);
+      }
+      normaliseOwnExtensions(out.rootElement);
+      return out.rootElement as unknown as ModdleElement;
+    })();
+    globalTaskFiles.set(xml, parsed);
+  }
+  return parsed;
+}
+
+/** The global task's documentation, then the call's own as a second paragraph. */
+function sharedDocumentation(g: ModdleElement, call: ModdleElement): { text?: string }[] | undefined {
+  const text = [g, call].map((e) => e.documentation?.[0]?.text?.trim()).filter((t): t is string => !!t);
+  return text.length ? [{ text: text.join("\n\n") }] : undefined;
+}
+
+/**
+ * The step a call to global task `g` runs as: the global task's type
+ * ({@link GLOBAL_TASK_TYPES}), name, documentation and extensions, with the
+ * call's own id, its own name when it gives one, its own documentation as a
+ * paragraph after the global task's (what this use adds to the shared step),
+ * and its own extensions added after the global task's. And the values the call gives
+ * the global task's declared inputs — every one, and no other, or the
+ * diagram does not load: a shared step run without its label is not the step
+ * on the diagram.
+ */
+function asSharedStep(call: ModdleElement, g: ModdleElement, bpmnPath: string): { el: ModdleElement; inputs?: Record<string, string> } {
+  const where = `${basename(bpmnPath)}: ${call.id} calls global task ${g.id}`;
+  const declared = (g.ioSpecification?.dataInputs ?? []).map((d) => d.name ?? d.id);
+  const nameOf = new Map((call.ioSpecification?.dataInputs ?? []).map((d) => [d.id, d.name ?? d.id]));
+  const given: Record<string, string> = {};
+  for (const a of call.dataInputAssociations ?? []) {
+    const target = a.targetRef?.id;
+    const name = target === undefined ? undefined : nameOf.get(target);
+    const value = a.assignment?.[0]?.from?.body;
+    if (name === undefined) throw new UnsupportedBpmn(`${where}: a dataInputAssociation targets ${target ?? "nothing"}, which is not one of the call's own dataInputs`);
+    if (value === undefined) throw new UnsupportedBpmn(`${where}: input "${name}" is associated with no assignment value`);
+    given[name] = value.trim();
+  }
+  const missing = declared.filter((n) => !(n in given));
+  if (missing.length) throw new UnsupportedBpmn(`${where}, which declares input(s) ${missing.join(", ")}, and gives none of them a value`);
+  const extra = Object.keys(given).filter((n) => !declared.includes(n));
+  if (extra.length) throw new UnsupportedBpmn(`${where}, which declares no input(s) ${extra.join(", ")}`);
+  return {
+    el: {
+      ...g,
+      $type: GLOBAL_TASK_TYPES[g.$type]!,
+      id: call.id,
+      name: call.name || g.name,
+      documentation: sharedDocumentation(g, call),
+      extensionElements: { values: [...(g.extensionElements?.values ?? []), ...(call.extensionElements?.values ?? [])] },
+      calledElement: undefined,
+    },
+    ...(declared.length ? { inputs: given } : {}),
+  };
+}
+
+/**
  * The moddle warnings a diagram may raise BY DESIGN under the 2026-10-16
  * lane / role / skill model, separated from the ones that still refuse a load.
  *
@@ -1424,7 +1691,7 @@ export async function loadProcessModel(
    * rebuild them. Created fresh by every top-level call: nothing outlives a
    * load, so a test that rewrites a fixture still sees its own disk.
    */
-  homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string> }> = new Map(),
+  homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string>; globals?: Map<string, string> }> = new Map(),
 ): Promise<ProcessModel> {
   const moddle = new BpmnModdle();
   const parsed = await moddle.fromXML(readFileSync(bpmnPath, "utf-8"));
@@ -1440,7 +1707,15 @@ export async function loadProcessModel(
 
   const defs = rootElement as unknown as ModdleElement;
   const proc = (defs.rootElements ?? []).find((e) => e.$type === "bpmn:Process");
-  if (!proc) throw new UnsupportedBpmn(`${basename(bpmnPath)}: no bpmn:Process`);
+  if (!proc) {
+    if ((defs.rootElements ?? []).some((e) => e.$type in GLOBAL_TASK_TYPES)) {
+      throw new GlobalTasksFile(
+        `${basename(bpmnPath)}: holds no bpmn:Process — it is a layer's shared global tasks, read through the ` +
+          `call activities that call them (isGlobalTasksFile)`,
+      );
+    }
+    throw new UnsupportedBpmn(`${basename(bpmnPath)}: no bpmn:Process`);
+  }
 
   const elements = proc.flowElements ?? [];
 
@@ -1537,8 +1812,28 @@ export async function loadProcessModel(
   const nodes = new Map<string, ProcessNode>();
   const flows = new Map<string, ProcessFlow>();
 
+  // The indexes a call resolves against, built once for this load: a
+  // process first (sibling files, then the instance, then its dependencies,
+  // below), and failing a process in this instance, a global task of the
+  // same instance (owner, 2026-10-20, "a1 b1 c1").
+  const index = processIndex(dirname(bpmnPath));
+  const here = homes.get(dirname(bpmnPath)) ?? {};
+  homes.set(dirname(bpmnPath), here);
+  const shared = new Map<string, { el: ModdleElement; ref: GlobalTaskRef; inputs?: Record<string, string> }>();
   for (const el of elements) {
-    if (el.$type === "bpmn:SequenceFlow") continue;
+    if (el.$type !== "bpmn:CallActivity" || !el.calledElement) continue;
+    const id = el.calledElement;
+    if (index.has(id) || (here.own ??= ownInstanceProcessIndex(dirname(bpmnPath))).has(id)) continue;
+    const home = (here.globals ??= new Map([...ownInstanceGlobalTaskIndex(dirname(bpmnPath)), ...globalTaskIndex(dirname(bpmnPath))])).get(id);
+    if (!home) continue;
+    const g = await readGlobalTask(home, id);
+    shared.set(el.id, { ...asSharedStep(el, g, bpmnPath), ref: { id, type: g.$type, source: home, name: cleanName(g.name) || id } });
+  }
+
+  for (const raw of elements) {
+    if (raw.$type === "bpmn:SequenceFlow") continue;
+    const step = shared.get(raw.id);
+    const el = step?.el ?? raw;
     const ext = el.extensionElements?.values ?? [];
     nodes.set(el.id, {
       id: el.id,
@@ -1591,6 +1886,8 @@ export async function loadProcessModel(
       decisionRef: ext.find((v) => v.$type === "folio:decision" && v.ref)?.ref,
       documentation: el.documentation?.[0]?.text?.replace(...DOC_WS).trim() || undefined,
       calledElement: el.calledElement,
+      ...(step ? { globalTask: step.ref } : {}),
+      ...(step?.inputs ? { inputs: step.inputs } : {}),
       incoming: [],
       outgoing: [],
     });
@@ -1815,9 +2112,6 @@ export async function loadProcessModel(
   // A CYCLE is not legitimate and is refused here rather than at run time:
   // an interpreter that enters A → B → A settles forever.
   const children = new Map<string, ProcessModel>();
-  const index = processIndex(dirname(bpmnPath));
-  const here = homes.get(dirname(bpmnPath)) ?? {};
-  homes.set(dirname(bpmnPath), here);
   const path = [...seen, proc.id];
   for (const node of nodes.values()) {
     if (!node.calledElement) continue;
