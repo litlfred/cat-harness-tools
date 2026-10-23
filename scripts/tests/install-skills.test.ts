@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { INSTALLED_MARKER, ownedInstalls, planInstall, readChecklistSkill, renderInstalled, type SourceSkill } from "../install-skills.ts";
+import { HOSTS, INSTALLED_MARKER, ownedInstalls, planInstall, readChecklistSkill, renderInstalled, type SourceSkill } from "../install-skills.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "install-skills-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -123,5 +123,24 @@ describe("readChecklistSkill (bean folio-assistant-cy4p)", () => {
   it("ignores a .checklist.md that bpmn-checklist.ts did not write, and any other file", () => {
     expect(readChecklistSkill(skillFile("p/processes/hand.checklist.md", "# my own list\n"))).toBeUndefined();
     expect(readChecklistSkill(skillFile("p/processes/notes.md", CHECKLIST))).toBeUndefined();
+  });
+});
+
+describe("hosts (bean cat-tools-0nxe)", () => {
+  it("every host reads <dir>/<name>/SKILL.md natively, each from its own documented directory", () => {
+    expect(HOSTS).toEqual({
+      claude: ".claude/skills",
+      antigravity: ".agents/skills",
+      gemini: ".gemini/skills",
+      cursor: ".cursor/skills",
+      copilot: ".github/skills",
+    });
+  });
+
+  it("a name Cursor would refuse (not lowercase letters, digits and hyphens) is skipped with the reason", () => {
+    const bad = skillFile("d/skills/Bad_Name.md", "---\nname: Bad_Name\ndescription: d\n---\nx\n");
+    const plan = planInstall(tmp, [{ name: "Bad_Name", file: bad, instance: tmp, prefix: "cat" }]);
+    expect(plan.files.size).toBe(0);
+    expect(plan.skipped[0]!.reason).toMatch(/Cursor requires/);
   });
 });
