@@ -450,6 +450,7 @@
     "kg:export:check": "bun run cat-harness-tools/scripts/kg-export.ts --check",
     "subgraph:jsonld": "bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts",
     "subgraph:jsonld:check": "bun run cat-harness-tools/scripts/publish-check.ts subgraph:jsonld",
+    "harness:state": "bun run cat-harness-tools/scripts/harness-state.ts",
     "slice:sqlite": "bun run cat-harness-tools/scripts/gen-slice-sqlite.ts",
     "slice:sqlite:check": "bun run cat-harness-tools/scripts/publish-check.ts slice:sqlite",
     "slice:sqlite:vendor": "bun run cat-harness-tools/scripts/vendor-sqlite-wasm.ts",
