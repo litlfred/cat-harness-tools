@@ -11,7 +11,7 @@ import { join } from "path";
 import {
   loadRelaxations,
   PolicyError,
-} from "../../src/workflow/gate";
+} from "../../../src/workflow/gate";
 
 describe("reading the package policy files", () => {
   test("a relaxation with no reason does not load", () => {

@@ -14,23 +14,23 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { loadProcessModel, type ProcessModel } from "../../src/workflow/process-model.js";
-import { complete, enabled, startInstance, type InstanceState } from "../../src/workflow/instance.js";
+import { loadProcessModel, type ProcessModel } from "../../../src/workflow/process-model.js";
+import { complete, enabled, startInstance, type InstanceState } from "../../../src/workflow/instance.js";
 import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
 import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import {
   auditTestPlanExitCriteria,
-} from "../test-plan-audit.js";
+} from "../../test-plan-audit.js";
 import {
   resolvePlanExitCriteriaDmn,
   evaluatePlanExitCriteria,
   completeExitCriteriaGateway,
-} from "../test-plan-execution.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+} from "../../test-plan-execution.js";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const WF = join(ROOT, "processes", "sdlc");
-const FIXTURE_TINY = join(import.meta.dir, "fixtures/test-plan-execution/tiny.test-plan.json");
+const FIXTURE_TINY = join(import.meta.dir, "../fixtures/test-plan-execution/tiny.test-plan.json");
 
 const CUSTOM_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"

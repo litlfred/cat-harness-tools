@@ -9,8 +9,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resolveBeanGraphNode } from "../beans.ts";
-import { report, workflowInstances } from "../workflow-instances.ts";
+import { resolveBeanGraphNode } from "../../beans.ts";
+import { report, workflowInstances } from "../../workflow-instances.ts";
 
 const roots: string[] = [];
 afterEach(() => {

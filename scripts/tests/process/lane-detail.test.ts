@@ -23,7 +23,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { laneDetail } from "../gen-processes-viz.js";
+import { laneDetail } from "../../gen-processes-viz.js";
 import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 
 const GRAPH: RoleGraph = {
@@ -176,7 +176,7 @@ describe("the real corpus", () => {
     // sweep. Deliberately NOT asserting a corpus-wide zero for `dangling` —
     // that is `kg:audit`'s verdict, and an assertion here another branch can
     // invalidate is a tripwire rather than a guard.
-    const { processRows } = await import("../gen-processes-viz.js");
+    const { processRows } = await import("../../gen-processes-viz.js");
     const lanes = (await processRows()).flatMap((r) => r.laneDetails);
     expect(lanes.length).toBeGreaterThan(50);
     const bound = lanes.filter((l) => l.binding === "bound");
@@ -190,7 +190,7 @@ describe("the real corpus", () => {
     // Pins that the closure matters in practice rather than only in the
     // fixture above. Measured 2026-09-23: `adjudication.bpmn`'s `Adjudicator`
     // resolves 14 skills, `content-block-review` among them via `reviewer`.
-    const { processRows } = await import("../gen-processes-viz.js");
+    const { processRows } = await import("../../gen-processes-viz.js");
     const lanes = (await processRows()).flatMap((r) => r.laneDetails);
     expect(lanes.some((l) => l.roleSkills.some((s) => s.depth > 0))).toBe(true);
   }, 30_000);

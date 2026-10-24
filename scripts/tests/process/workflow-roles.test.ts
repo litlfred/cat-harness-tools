@@ -11,12 +11,12 @@
 import { describe, expect, test } from "bun:test";
 import { join, basename } from "node:path";
 
-import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
-import { enabled, startInstance, describe as renderInstance } from "../../src/workflow/instance.js";
+import { loadProcessModel, processDiagrams } from "../../../src/workflow/process-model.js";
+import { enabled, startInstance, describe as renderInstance } from "../../../src/workflow/instance.js";
 import { readRoleGraph, resolveRoleSkills } from "@litlfred/cat-harness/schemas/role-graph.js";
 import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
-import { workflowFile, workflowFiles } from "../known-skills.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { workflowFile, workflowFiles } from "../../known-skills.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
 const CORPUS_TIMEOUT = 60_000;

@@ -17,7 +17,7 @@
  * exact.
  */
 import { describe, test, expect } from "bun:test";
-import { keepPrimaryPlane, svgName } from "../../scripts/bpmn-render";
+import { keepPrimaryPlane, svgName } from "../../../scripts/bpmn-render";
 
 const plane = (id: string) =>
   `<bpmndi:BPMNDiagram id="${id}"><bpmndi:BPMNPlane bpmnElement="P${id}"/></bpmndi:BPMNDiagram>`;

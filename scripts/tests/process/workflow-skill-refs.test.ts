@@ -17,9 +17,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, basename } from "node:path";
-import { loadProcessModel, isActivity, processDiagrams } from "../../src/workflow/process-model.ts";
-import { knownSkills as canonicalKnownSkills, workflowFile, workflowFiles } from "../known-skills.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { loadProcessModel, isActivity, processDiagrams } from "../../../src/workflow/process-model.ts";
+import { knownSkills as canonicalKnownSkills, workflowFile, workflowFiles } from "../../known-skills.js";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
 const CORPUS_TIMEOUT = 60_000;

@@ -25,8 +25,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { extractBpmn } from "../../pipeline/bpmn-translate.js";
-import { checkLanes } from "../check-lane-documentation.js";
+import { extractBpmn } from "../../../pipeline/bpmn-translate.js";
+import { checkLanes } from "../../check-lane-documentation.js";
 import { BpmnModdle } from "bpmn-moddle";
 
 /** A moddle element, as far as counting lanes needs one. */
@@ -63,7 +63,7 @@ async function moddleLaneCount(xml: string): Promise<number | null> {
   return n;
 }
 
-const REPO = resolve(import.meta.dir, "..", "..", "..");
+const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
 
 function bpmnFiles(root: string): string[] {
   const out: string[] = [];
