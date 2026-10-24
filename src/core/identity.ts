@@ -17,6 +17,7 @@
  * | `github` | {@link githubIdentity}: a token's `GET /user`, or `GITHUB_ACTOR` in Actions | GitHub |
  * | `gitlab` | `GITLAB_USER_LOGIN`, set by GitLab CI for the user who started the pipeline | GitLab, in CI only |
  * | `claude` | `CLAUDE_CODE_USER_EMAIL`, the agent host's signed-in account | the agent host |
+ * | any | `CAT_HARNESS_PERSON`: `provider:handle`, comma-separated | nobody: self-asserted, per session |
  * | `git` | `git config user.email`, then `user.name` | nobody: self-asserted |
  * | any | the user-level config's `identities` | nobody: self-asserted, per machine |
  *
@@ -35,6 +36,20 @@
  * file is the normal case and reads as empty; an unreadable one is reported,
  * never silently treated as empty.
  *
+ * ## Several people, several accounts, several hosts
+ *
+ * One machine shared by several people: each has their own home directory,
+ * so each has their own user-level store. One session shared, or a shared
+ * login: `CAT_HARNESS_PERSON` names who is typing for this session only, and
+ * is put first among the self-asserted answers. One person with several
+ * accounts on a provider: list each in the store; every one is a match key.
+ * When the keys match more than one person on record, the reader applies the
+ * strictest of their profiles, never the first one found.
+ *
+ * Which agent host runs the session is reported too ({@link detectAgentHosts}).
+ * A host that passes no account to a command gets a note saying so, so "nobody
+ * vouched" reads as a property of the host and not as a fault.
+ *
  * @module folio-assistant/core/identity
  */
 
@@ -43,6 +58,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { detectAgentHosts, type AgentHost } from "./agent-host.js";
 import { githubIdentity, type GithubIdentity } from "./github-auth.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -109,6 +125,8 @@ export interface IdentityResolution {
   /** The GitHub resolver's own answer, kept whole: permissions read it. */
   github: GithubIdentity;
   userConfig: UserConfigRead;
+  /** The agent hosts whose markers are set: usually one, none outside an agent. */
+  hosts: AgentHost[];
   /** Sources that were asked and could not answer, in words. */
   notes: string[];
 }
@@ -154,6 +172,10 @@ export async function resolveIdentities(opts: {
   }
   if (env.CLAUDE_CODE_USER_EMAIL) add({ provider: "claude", handle: env.CLAUDE_CODE_USER_EMAIL, via: "CLAUDE_CODE_USER_EMAIL", vouched: true });
 
+  const person = parsePersons(env.CAT_HARNESS_PERSON);
+  for (const i of person.ok) add({ ...i, via: "CAT_HARNESS_PERSON", vouched: false });
+  for (const bad of person.bad) notes.push(`CAT_HARNESS_PERSON: \`${bad}\` is not provider:handle`);
+
   const userConfig = readUserConfig(env, opts.home);
   if (userConfig.state === "ok") {
     for (const i of userConfig.config.identities ?? []) add({ provider: i.provider, handle: i.handle, via: userConfig.path, vouched: false });
@@ -166,7 +188,24 @@ export async function resolveIdentities(opts: {
   if (email) add({ provider: "git", handle: email, via: "git config user.email", vouched: false });
   if (name) add({ provider: "git", handle: name, via: "git config user.name", vouched: false });
 
-  return { identities: out, github, userConfig, notes };
+  const hosts = detectAgentHosts(env);
+  for (const h of hosts.filter((h) => !h.exposesIdentity)) {
+    notes.push(`${h.id}: the host passes no account to a command; who is typing comes from a forge token, CAT_HARNESS_PERSON, ${userConfigPath(env, opts.home)} or the git author`);
+  }
+
+  return { identities: out, github, userConfig, hosts, notes };
+}
+
+/** `CAT_HARNESS_PERSON`: `provider:handle[,provider:handle…]`, blanks ignored. */
+export function parsePersons(value: string | undefined): { ok: { provider: string; handle: string }[]; bad: string[] } {
+  const ok: { provider: string; handle: string }[] = [];
+  const bad: string[] = [];
+  for (const part of (value ?? "").split(",").map((p) => p.trim()).filter(Boolean)) {
+    const at = part.indexOf(":");
+    if (at > 0 && at < part.length - 1) ok.push({ provider: part.slice(0, at), handle: part.slice(at + 1) });
+    else bad.push(part);
+  }
+  return { ok, bad };
 }
 
 /**
