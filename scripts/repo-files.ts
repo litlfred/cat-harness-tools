@@ -12,7 +12,7 @@
  *
  * Measured, not hypothetical (bean `bgle`, 2026-09-19): while building
  * `iurf`, two new files — `scripts/gen-themes-css.ts` and
- * `scripts/tests/theme-tokens.test.ts` — both hardcoded the site root. A full
+ * `scripts/tests/ui/theme-tokens.test.ts` — both hardcoded the site root. A full
  * `bun test` before committing reported **0 fail**, because the gate could not
  * see them. The same suite on CI, after the commit, reported the failure. The
  * earliest possible detection was a red CI cycle on PR #405.
