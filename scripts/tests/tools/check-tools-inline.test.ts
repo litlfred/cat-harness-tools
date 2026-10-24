@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { declaredToolsDirs, inlineToolFindings } from "../check-tools.js";
+import { declaredToolsDirs, inlineToolFindings } from "../../check-tools.js";
 
 describe("inline Tool declarations are a finding", () => {
   test("the barrel is reported, the folder Tool is not", () => {

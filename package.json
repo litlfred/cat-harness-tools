@@ -646,8 +646,6 @@
     "qa:sweep": "bun run cat-harness-tools/pipeline/qa-sweep.ts",
     "latex:preflight": "bun run cat-harness-tools/pipeline/latex-preflight.ts",
     "latex:overfull": "bun run cat-harness-tools/pipeline/latex-overfull-report.ts",
-    "latex:validate": "bun run cat-harness-tools/pipeline/validate-tex.ts",
-    "latex:audit-source": "bun run cat-harness-tools/pipeline/audit-tex-source.ts",
     "render:headless-qc": "bun run cat-harness-tools/scripts/headless-render-qc.ts",
     "latex:compile": "cat-harness-tools/scripts/latexmk-compile.sh",
     "lean:build-all": "cat-harness-tools/scripts/lean-build-all.sh",

@@ -14,17 +14,17 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { tools } from "../../tools/discover.js";
+import { tools } from "../../../tools/discover.js";
 import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
 import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
-import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../check-tools.js";
-import { knownSkills as canonicalKnownSkills } from "../known-skills.js";
-import { buildExport } from "../kg-export.js";
-import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../harness-schema-export.js";
+import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../../check-tools.js";
+import { knownSkills as canonicalKnownSkills } from "../../known-skills.js";
+import { buildExport } from "../../kg-export.js";
+import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../../harness-schema-export.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
-import { hostSchemaBase } from "../lib/host-schema.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
+import { hostSchemaBase } from "../../lib/host-schema.ts";
 
 const BASE = "https://example.invalid/fa";
 /** Where the host's schemas sit under `BASE`: its own directory, `<base>/<name>` (#676). */

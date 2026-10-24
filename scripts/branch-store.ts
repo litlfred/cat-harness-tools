@@ -315,6 +315,11 @@ function keptAt(inst: string, repoRoot: string, d: ResolvedDirectory): { branch:
     // tree at a pinned version — retrieved by its Tool, kept on no branch here.
     case "npm":
       return undefined;
+    // HYDRATED metadata (bean `mo75` G2) is another instance's published
+    // `index.hydrated.jsonld` at a pin: `remote-mount` lays it down and locks
+    // it, and no branch here keeps it.
+    case "hydrated":
+      return undefined;
     default: {
       const unknown: never = src;
       throw new BranchStoreUsageError(`directory ${d.id} has a source kind this store does not know: ${JSON.stringify(unknown)}`);

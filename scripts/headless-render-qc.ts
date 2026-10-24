@@ -26,7 +26,7 @@ const OUT_DIR = join(REPO_ROOT, "build", "render-qc");
 const SAVE_SCREENSHOTS = process.argv.includes("--screenshot");
 
 if (!existsSync(PAPER_JSON)) {
-  console.error("No paper.json found. Run: bun run cat-harness-tools/pipeline/export-json.ts");
+  console.error("No paper.json found. Run: bun run folio-assistant-sci/pipeline/export-json.ts");
   process.exit(2);
 }
 

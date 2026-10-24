@@ -28,7 +28,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { declaredScripts, scriptFor, triage } from "../tool-coverage.ts";
+import { declaredScripts, scriptFor, triage } from "../../tool-coverage.ts";
 
 const rows = await triage();
 const scripts = declaredScripts();
