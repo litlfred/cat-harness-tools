@@ -156,6 +156,11 @@ export interface QaManifest {
   written_at: string;
   producer?: { run?: string; gates?: string };
   /**
+   * Content-addressed reference to the `folio-run-context/v1` record under
+   * which this QA store entry was produced (owner C1 = (a), bean `3sbm`).
+   */
+  runContext?: { sha256: string };
+  /**
    * What `qa:refresh` said of the working copy this entry was built from (bean
    * `3hk4`): `tracked` (the commit's own committed copy) or `computed` (the
    * declared writers ran into an empty tree), and the files per writer. Absent

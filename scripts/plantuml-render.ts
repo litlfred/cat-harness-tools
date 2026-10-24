@@ -15,7 +15,10 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+
+import { HARNESS_ROOT } from "./lib/roots.ts";
+import { loadToolReleases, releaseArtefactPath } from "./tool-releases.ts";
 
 /** A PlantUML / Mermaid / HTML id: no hyphen, dot, slash or space. */
 export function safeId(s: string): string {
@@ -136,6 +139,36 @@ export const PLANTUML = {
   sha256: "cb42e3272fedecc0ed20ee0c9cef31873d1c42a489043971038631d357f467e6",
 };
 
+/**
+ * Look up the declared `plantuml` tool-release record from `tool-releases/`,
+ * falling back to {@link PLANTUML} if no declared directory is reachable.
+ */
+export function resolvePlantumlRelease(root?: string): {
+  version: string;
+  url: string;
+  sha256: string;
+  cachedPath?: string;
+} {
+  try {
+    const dir = root ? resolve(root, "tool-releases") : resolve(HARNESS_ROOT, "tool-releases");
+    const dirs = existsSync(dir) ? [dir] : [resolve(HARNESS_ROOT, "tool-releases")];
+    const loaded = loadToolReleases(dirs, HARNESS_ROOT);
+    const rel = loaded.releases.find((r) => r.release.name === "plantuml")?.release;
+    if (rel && rel.source.type === "url") {
+      const artefact = releaseArtefactPath(rel);
+      return {
+        version: rel.version,
+        url: rel.source.url,
+        sha256: rel.digest.digest,
+        ...(artefact ? { cachedPath: artefact } : {}),
+      };
+    }
+  } catch {
+    // Fall back to the pinned constant when running outside a checkout with tool-releases/.
+  }
+  return PLANTUML;
+}
+
 export const sha256 = (text: string | Buffer) => createHash("sha256").update(text).digest("hex");
 const STAMP = /<!-- puml-sha256: ([0-9a-f]{64}) -->/;
 
@@ -145,9 +178,13 @@ export function svgStamp(svgPath: string): string | null {
   return STAMP.exec(readFileSync(svgPath, "utf8"))?.[1] ?? null;
 }
 
-/** The pinned PlantUML jar: `PLANTUML_JAR`, else a verified download into the user cache. */
+/** The pinned PlantUML jar: `PLANTUML_JAR`, else the tool-releases cache or a verified download into the user cache. */
 async function plantumlJar(): Promise<string | null> {
   if (process.env.PLANTUML_JAR) return process.env.PLANTUML_JAR;
+  const resolved = resolvePlantumlRelease();
+  if (resolved.cachedPath && existsSync(resolved.cachedPath) && sha256(readFileSync(resolved.cachedPath)) === resolved.sha256) {
+    return resolved.cachedPath;
+  }
   const jar = join(homedir(), ".cache", "folio-assistant", `plantuml-${PLANTUML.version}.jar`);
   if (existsSync(jar)) return jar;
   const res = await fetch(PLANTUML.url).catch(() => null);
