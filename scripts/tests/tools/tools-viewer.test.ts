@@ -32,10 +32,10 @@ import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { baseDocsDir } from "../compose-docs.js";
-import { page, pageRelPath, skillIds, toolRows } from "../gen-tools-viz.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
-import { PAGE_LOCALE } from "../viewer-declarations.js";
+import { baseDocsDir } from "../../compose-docs.js";
+import { page, pageRelPath, skillIds, toolRows } from "../../gen-tools-viz.js";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { PAGE_LOCALE } from "../../viewer-declarations.js";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

@@ -8,11 +8,11 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { project, buildArgv, unmetRequirement, recordInvocation } from "../../src/mcp/project.js";
+import { project, buildArgv, unmetRequirement, recordInvocation } from "../../../src/mcp/project.js";
 import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { toolTypeIri, isInjectionSafe, TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { ToolInvocationSchema } from "@litlfred/cat-harness/schemas/tool-invocation.js";
-import { tools } from "../../tools/discover.js";
+import { tools } from "../../../tools/discover.js";
 
 const B = "https://example.invalid/fa";
 const t = (n: Parameters<typeof toolTypeIri>[1]): string => toolTypeIri(B, n);
@@ -215,7 +215,7 @@ describe("mcp projection", () => {
     // the registrar is worse than no node, because the next check trusts it.
     // `mcp:capture` mounts the real registrars, so this compares against the
     // Zod shapes rather than against the source text.
-    const { captureTools } = await import("../capture-mcp-tools.js");
+    const { captureTools } = await import("../../capture-mcp-tools.js");
     const { tools: served, problems } = await captureTools();
     expect(problems).toEqual([]);
 

@@ -12,9 +12,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { discoverTools } from "../../tools/discover.js";
-import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { discoverTools } from "../../../tools/discover.js";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const TOOL_TS = resolve(HARNESS_ROOT, "schemas", "tool.ts");
 

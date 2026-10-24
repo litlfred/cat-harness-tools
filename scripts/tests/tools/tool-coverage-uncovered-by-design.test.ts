@@ -25,7 +25,7 @@ import {
   type SkillTriage,
   staleAnnotations,
   uncoveredByDesign,
-} from "../tool-coverage.js";
+} from "../../tool-coverage.js";
 
 describe("the table is well formed", () => {
   test("every entry carries a non-trivial reason", () => {
