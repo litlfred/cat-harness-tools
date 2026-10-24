@@ -946,6 +946,12 @@ export function kgData(doc: { "@id": string; "@context": unknown; "@graph": unkn
   const fts: SqlValue[][] = [];
   let odd = 0;
   for (const n of graph) {
+    // A one-release tombstone (`kg-export` §"Whose nodes"; `migrationTombstones`)
+    // is a forwarding address for a consumer of the published DOCUMENT: no
+    // `@type`, no text, only `isReplacedBy`/`sameAs`. Search has nothing to
+    // find in it, and the #603 move gives every subject one, which doubled
+    // this slice (4.5 MB to 8.3 MB, bean `0exf`). The document keeps them.
+    if (n["@type"] === undefined && n.deprecated === true) continue;
     const types = ([] as unknown[]).concat(n["@type"] ?? []).map((t) => curie(String(t)));
     const link = plan.links.get(n["@id"]);
     nodes.push({
