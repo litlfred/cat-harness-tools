@@ -936,3 +936,105 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     }
   });
 });
+
+describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {
+  // o/nest: `nn` declares `skills/` at the top level, and `skills/skills.json`
+  // declares `voices/` from within it (beans `cmsl`, `1g4s`) — the shape of
+  // cat-harness's own `voices`. Before G3 both planners built their id map
+  // from `<name>.json` alone and refused `voices` as "not declared".
+  const BASE = "https://example.org";
+  let nest: { bare: string; sha: string };
+  let nUrl: (r: string) => string;
+
+  beforeAll(() => {
+    nest = bareRepo(base, "nest", {
+      "nn/nn.json": decl("nn", {
+        livesAt: { repository: "o/nest", path: "nn" },
+        directories: [
+          { id: "tools", path: "tools/", graphTypologies: ["tools"] },
+          { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+          { id: "docs", path: "docs/", graphTypologies: ["docs"] },
+        ],
+      }),
+      "nn/skills/skills.json": { directories: [{ id: "voices", path: "voices", subgraph: true, graphTypologies: ["skills"] }] },
+      "nn/skills/s/s.md": "# s\n",
+      "nn/skills/voices/v.md": "# v\n",
+      "nn/tools/a/a.ts": "export const a = 1;\n",
+      "nn/docs/readme.md": "# nn\n",
+      // `mm`: the harness's OWN default names a nested id
+      "mm/mm.json": decl("mm", {
+        livesAt: { repository: "o/nest", path: "mm" },
+        mountDefaults: { directories: ["voices"] },
+        directories: [{ id: "skills", path: "skills/", graphTypologies: ["skills"] }],
+      }),
+      "mm/skills/skills.json": { directories: [{ id: "voices", path: "voices", subgraph: true, graphTypologies: ["skills"] }] },
+      "mm/skills/s/s.md": "# s\n",
+      "mm/skills/voices/v.md": "# v\n",
+      "nn/docs/subgraph/nn/skills/voices/index.hydrated.jsonld": {
+        "@context": `${BASE}/ns/subgraph/v1.jsonld`,
+        "@id": `${BASE}/subgraph/nn/skills/voices/`,
+        "@type": "Subgraph",
+        name: "skills/voices",
+        path: "skills/voices/",
+      },
+    });
+    nUrl = (r) => {
+      if (r !== "o/nest") throw new Error(`no fixture for ${r}`);
+      return `file://${nest.bare}`;
+    };
+  });
+
+  function ndown(mount: object, harness = "nn"): string {
+    const root = join(base, `ndown-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness, repository: "o/nest", ref: nest.sha, ...consentFor(nest.sha), ...mount }] }) });
+    return root;
+  }
+
+  test("N1. files: a nested id mounts its own path alone, and the lock and check agree", () => {
+    const root = ndown({ overrides: { nn: { directories: ["voices"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(r.plan.outcomes.find((x) => x.instance === "nn")!.state).toBe("mounted");
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/s"))).toBe(false);
+    expect(existsSync(join(root, "nn/tools"))).toBe(false);
+    expect(readLock(root).instances.find((i) => i.instance === "nn")!.directories).toEqual([
+      expect.objectContaining({ id: "voices", path: "nn/skills/voices", upstreamPath: "nn/skills/voices" }),
+    ]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
+  test("N2. files: a nested id beside a top-level one, through the harness's own `mountDefaults` too", () => {
+    const root = ndown({ overrides: { nn: { directories: ["tools", "voices"] } } });
+    mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(existsSync(join(root, "nn/tools/a/a.ts"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/s"))).toBe(false);
+    const own = ndown({}, "mm");
+    mountRemote({ instanceRoot: own, urlFor: nUrl });
+    expect(existsSync(join(own, "mm/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(own, "mm/skills/s"))).toBe(false);
+  });
+
+  test("N3. hydrated: a nested id lays down its own published file, as a `hydrated` source for its nested path", () => {
+    const root = ndown({ overrides: { nn: { hydrated: true, directories: ["voices"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(r.plan.outcomes.find((x) => x.instance === "nn")!.state).toBe("mounted");
+    expect(JSON.parse(readFileSync(join(root, "nn/skills/voices/index.hydrated.jsonld"), "utf-8"))["@id"]).toBe(`${BASE}/subgraph/nn/skills/voices/`);
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(false);
+    const planned = r.plan.instances.find((i) => i.instance === "nn")!.directories[0]!;
+    expect(planned).toMatchObject({ id: "voices", path: "nn/skills/voices", upstreamPath: "nn/docs/subgraph/nn/skills/voices" });
+    expect(planned.hydrated).toMatchObject({ kind: "hydrated", harness: "nn", subgraph: "skills/voices" });
+  });
+
+  test("N4. an id declared nowhere — not in `<name>.json`, not from within — is refused at plan time and says where it looked", () => {
+    for (const hydrated of [false, true]) {
+      const root = ndown({ overrides: { nn: { hydrated, directories: ["voices", "choir"] } } });
+      const o = planRemote({ instanceRoot: root, urlFor: nUrl }).outcomes.find((x) => x.instance === "nn")!;
+      expect(o.state).toBe("could-not-determine");
+      expect(o.detail).toContain("`choir` named for mounting but not declared");
+      expect(o.detail).toContain("neither in its declaration nor from within");
+    }
+  });
+});

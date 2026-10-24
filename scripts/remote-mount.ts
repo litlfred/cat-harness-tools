@@ -97,6 +97,30 @@
  * never an empty "mounted". No `<name>.json` is laid down and the lock marks
  * the instance `hydrated` (`schemas/remote-mount.ts` says why).
  *
+ * Absent, it is NOT `mountDefaults.directories`, on purpose. That list is the
+ * harness's answer to "which FILES does a downstream want unless it says
+ * otherwise"; a hydrated mount asks the question before that one — what is
+ * there to choose from — and is the "hydrated metadata first" half of bean
+ * `mo75` ("…then a chosen set"). Narrowing the metadata to the file default
+ * would hide exactly the subgraphs a reader is deciding whether to add, and
+ * costs nothing to show: each is one file of descriptions, not code.
+ *
+ * ## Named ids: declared, or declared FROM WITHIN (bean `mo75` G3)
+ *
+ * An id in `overrides.<instance>.directories` or `mountDefaults.directories`
+ * is looked up in the instance's `<name>.json` first, and — only when it is
+ * not there — among the directories it declares from within one of its own
+ * (`skills/skills.json` naming `voices/`, beans `cmsl`, `1g4s`), resolved at
+ * the pin by `upstream-directories.ts` through cat-harness's
+ * `instanceDirectories`: the resolver bean `2j2r` moved every on-disk reader
+ * to, so a remote plan and a local one agree on what an id names. A nested id
+ * mounts its own path (`skills/voices/` alone, or its published hydrated
+ * file); naming it beside its parent mounts nothing twice that the digest
+ * would count differently, since every digest is taken after every copy. The
+ * DEFAULT list (nothing named) stays the top-level entries: each already
+ * holds what is declared within it — its files, or, hydrated, its nested
+ * subgraphs inline (`hasSubgraph`).
+ *
  * ## It never discards work
  *
  * A mounted directory whose bytes no longer hash to the lock is left exactly
@@ -137,6 +161,7 @@ import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
+import { upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -442,6 +467,28 @@ function mountedState(v: TrustVerdict): "mounted" | "unverified-approver" {
 }
 
 /**
+ * The id → directory map a planner resolves named ids through (bean `mo75`
+ * G3): `<name>.json`'s own entries, and — only when a named id is not among
+ * them — the entries the instance declares FROM WITHIN, read at the pin by
+ * {@link upstreamDirectories} through cat-harness's `instanceDirectories`.
+ * An id that is in neither, or a nesting that could not be read, comes back
+ * as the refusal's wording, never as a silently shorter list.
+ */
+function directoriesById(
+  tree: RemoteTree,
+  found: { root: string; file: string; decl: UpstreamDeclaration },
+  named: readonly string[],
+): { byId: Map<string, UpstreamDirectory> } | { unknown: string[]; why: string } {
+  const byId = new Map<string, UpstreamDirectory>(found.decl.directories.map((d) => [d.id, d]));
+  if (named.every((id) => byId.has(id))) return { byId };
+  const nested = upstreamDirectories(tree, found.root, found.file);
+  if (nested.ok) for (const d of nested.directories) if (!byId.has(d.id)) byId.set(d.id, d);
+  const unknown = named.filter((id) => !byId.has(id));
+  if (unknown.length === 0) return { byId };
+  return { unknown, why: nested.ok ? "neither in its declaration nor from within a directory it declares" : `not in its declaration, and what it declares from within was not read: ${nested.detail}` };
+}
+
+/**
  * Plan one instance as HYDRATED metadata (bean `mo75` G2): each chosen
  * directory becomes its published `index.hydrated.jsonld` at the pin. See the
  * module header, §"Hydrated". Its `needs` are not followed: metadata imports
@@ -468,12 +515,12 @@ function planHydrated(a: {
   if (!docs) {
     return { outcome: { instance: q.name, state: "missing", path, detail: `\`${q.name}\` at ${at} declares no \`docs\` directory, so it publishes no subgraph files to mount hydrated` } };
   }
-  const byId = new Map(decl.directories.map((d) => [d.id, d]));
   const ids = named ?? decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
-  const unknown = ids.filter((id) => !byId.has(id));
-  if (unknown.length) {
-    return { outcome: { instance: q.name, state: "could-not-determine", detail: `\`${unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)}` } };
+  const lookup = directoriesById(tree, found, ids);
+  if ("unknown" in lookup) {
+    return { outcome: { instance: q.name, state: "could-not-determine", detail: `\`${lookup.unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)} — ${lookup.why}` } };
   }
+  const { byId } = lookup;
   const directories: PlannedDirectory[] = [];
   const notPublished: string[] = [];
   /** The pin's package, once a directory's file was not in the tree (G2b). */
@@ -683,7 +730,6 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
         continue;
       }
 
-      const byId = new Map(decl.directories.map((d) => [d.id, d]));
       const whole = override?.whole ?? decl.mountDefaults?.whole === true;
       // The entry's own `hydrated` is its harness's; an override decides for any instance.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
@@ -712,15 +758,16 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
         : override?.directories ??
         decl.mountDefaults?.directories ??
         decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
-      const unknown = ids.filter((id) => !byId.has(id));
-      if (unknown.length) {
+      const lookup = directoriesById(tree, found, ids);
+      if ("unknown" in lookup) {
         plan.outcomes.push({
           instance: q.name,
           state: "could-not-determine",
-          detail: `\`${unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)}`,
+          detail: `\`${lookup.unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)} — ${lookup.why}`,
         });
         continue;
       }
+      const { byId } = lookup;
       const directories: PlannedDirectory[] = [];
       if (!whole) for (const id of ids) {
         const d = byId.get(id)!;
