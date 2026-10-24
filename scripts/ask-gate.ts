@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
 /**
+ * @module scripts/ask-gate
+ * @covers none — a Claude Code hook, not a graph writer
+ *
  * The asking rule as a gate on decision cards, failing open. Bean `hajp`.
  *
  * `ask-well.sh` reminds on every card and can't see what came before it. On
