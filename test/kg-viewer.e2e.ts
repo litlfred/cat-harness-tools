@@ -50,8 +50,9 @@ const STUB = artefactStubFor(join(HARNESS_ROOT));
 // so the artefacts under test are the ones the deploy actually emits rather
 // than a stand-in that could agree with the test and disagree with what ships.
 //
-// The viewer lives one level DOWN from the graph — `_kg/<stub>/index.html`
-// reading `../<stub>.jsonld` — mirroring the published layout, where
+// The viewer lives at `_kg/<stub>/index.html` reading `../<stub>/<stub>.jsonld`
+// (the document's site path, under its instance's own directory since #603
+// decision 1b) — mirroring the published layout, where
 // `<base>/<stub>/` is the directory that makes the extensionless
 // `<base>/<stub>` a page Pages can serve. Driving the real relative path is
 // the point: a viewer that resolved its document correctly in a flat fixture
@@ -86,7 +87,7 @@ type Kg = {
  * release) is a forwarding address the viewer leaves out, as the export
  * leaves it out of `counts`, so the page's node count is the rest.
  */
-const KG_RAW = JSON.parse(readFileSync(`_kg/${STUB}.jsonld`, "utf-8")) as Kg;
+const KG_RAW = JSON.parse(readFileSync(`_kg/${STUB}/${STUB}.jsonld`, "utf-8")) as Kg;
 const KG: Kg = { ...KG_RAW, "@graph": KG_RAW["@graph"].filter((n) => n.deprecated !== true) };
 
 test.describe("kg viewer", () => {
@@ -208,7 +209,9 @@ test.describe("kg viewer", () => {
     // `satisfies` is an @id-coerced term, so its values render as buttons.
     await page.locator(".detail td .link").first().click();
     await expect(page.locator(".detail h3")).not.toHaveText(String(before));
-    await expect(page.locator(".detail .iri")).toContainText("#");
+    // The target is a skill, at its subject page: `<doc dir>/skill/<id>`
+    // (cat-harness-tools#603), not a fragment of the graph document.
+    await expect(page.locator(".detail .iri")).toContainText("/skill/");
   });
 
   test("back-links are computed, so a node says what points AT it", async ({ page }) => {
@@ -251,7 +254,7 @@ test.describe("kg viewer", () => {
     // pass over a viewer that ships differently.
     //
     // The copy sits one directory deeper, which is also why it works at all:
-    // the page fetches `../<stub>.jsonld` RELATIVE to itself, the property the
+    // the page fetches `../<stub>/<stub>.jsonld` RELATIVE to itself, the property the
     // deployed layout depends on. A page that resolved its document any other
     // way would read the real graph from here and fail.
     const dir = "_kg/fixtures";
@@ -259,7 +262,7 @@ test.describe("kg viewer", () => {
     copyFileSync(`_kg/${STUB}/index.html`, `${dir}/${STUB}/index.html`);
     const NS = "https://litlfred.github.io/folio-assistant/ns#";
     writeFileSync(
-      `${dir}/${STUB}.jsonld`,
+      `${dir}/${STUB}/${STUB}.jsonld`,
       JSON.stringify({
         "@context": { "@version": 1.1, id: "@id", type: "@type", name: "http://www.w3.org/2000/01/rdf-schema#label" },
         "@id": "https://example.invalid/fixture.jsonld",
@@ -300,16 +303,16 @@ test.describe("kg viewer", () => {
     // declaration would be a second answer to a question already answered,
     // and the one that breaks on a preview.
     //
-    // The path is `../<stub>.jsonld`, not a bare sibling name: the
-    // viewer lives one level down at `_kg/<stub>/index.html` and the graph sits
-    // in the parent. That layout changed under this branch, and these two tests
+    // The path is `../<stub>/<stub>.jsonld`, not a bare sibling name: the
+    // page climbs to the site root and descends the document's own path,
+    // which is under the instance's directory since #603 decision 1b. That layout changed under this branch, and these two tests
     // kept passing locally against a STALE `_kg/` while failing in CI — which
     // is the same class of defect as the one this PR fixes in `qa-panel`, so it
     // is worth saying out loud: `_kg/` is gitignored build output, and a suite
     // run against a leftover copy of it is not evidence about what ships.
     await page.goto(PAGE);
     const src = page.locator("#meta a").first();
-    await expect(src).toHaveAttribute("href", `../${STUB}.jsonld`);
+    await expect(src).toHaveAttribute("href", `../${STUB}/${STUB}.jsonld`);
     // A name that says what it gets you: "JSON-LD" alone names a syntax.
     await expect(src).toHaveAttribute("aria-label", /Download this graph as JSON-LD/);
     // And it actually resolves — from the PAGE's own directory, the way a

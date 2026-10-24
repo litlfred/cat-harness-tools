@@ -47,13 +47,13 @@ describe("loadBlockModuleSync", () => {
   test("loads a block synchronously, with the fields the builder validated", () => {
     const p = write(
       "plain.ts",
-      `import { proposition } from ${BUILDERS};\n` +
-        `export default proposition({ label: "prop:plain", title: "T", ` +
-        `statement: "s", uses: ["def:a", "def:b"] });\n`,
+      `import { remark } from ${BUILDERS};\n` +
+        `export default remark({ label: "rem:plain", title: "T", ` +
+        `uses: ["def:a", "def:b"] });\n`,
     );
     const loaded = loadBlockModuleSync(p);
-    expect(loaded?.kind).toBe("proposition");
-    expect(loaded?.label).toBe("prop:plain");
+    expect(loaded?.kind).toBe("remark");
+    expect(loaded?.label).toBe("rem:plain");
     expect(loaded?.uses).toEqual(["def:a", "def:b"]);
   });
 
@@ -72,44 +72,44 @@ describe("the textual read and the module disagree", () => {
   test("a computed label is invisible to the regex and found by the loader", () => {
     const p = write(
       "computed-label.ts",
-      `import { proposition } from ${BUILDERS};\n` +
-        `const LBL = "prop:computed";\n` +
-        `export default proposition({ label: LBL, title: "T", statement: "s" });\n`,
+      `import { remark } from ${BUILDERS};\n` +
+        `const LBL = "rem:computed";\n` +
+        `export default remark({ label: LBL, title: "T" });\n`,
     );
     // No string literal follows `label:`, so the regex finds nothing and the
     // block is yielded by no QA tool at all.
     expect(readBlockManifest(p)).toBeUndefined();
-    expect(loadBlockModuleSync(p)?.label).toBe("prop:computed");
-    expect(labels()).toContain("prop:computed");
+    expect(loadBlockModuleSync(p)?.label).toBe("rem:computed");
+    expect(labels()).toContain("rem:computed");
   });
 
   test("an earlier `label:` makes the regex return the WRONG label", () => {
     const p = write(
       "label-not-first.ts",
-      `import { proposition } from ${BUILDERS};\n` +
+      `import { remark } from ${BUILDERS};\n` +
         `const meta = { label: "not-the-block" };\n` +
-        `export default proposition({ label: "prop:real", title: "T", ` +
-        `statement: "s", tags: [meta.label] });\n`,
+        `export default remark({ label: "rem:real", title: "T", ` +
+        `tags: [meta.label] });\n`,
     );
     // Not a miss — a confident wrong answer, which is what keys a sidecar and a
     // graph node to a label the block does not have.
     expect(readBlockManifest(p)?.label).toBe("not-the-block");
-    expect(loadBlockModuleSync(p)?.label).toBe("prop:real");
+    expect(loadBlockModuleSync(p)?.label).toBe("rem:real");
 
     const seen = labels();
-    expect(seen).toContain("prop:real");
+    expect(seen).toContain("rem:real");
     expect(seen).not.toContain("not-the-block");
   });
 
   test("a label the schema rejects is reported instead of being yielded as a node", () => {
     const p = write(
       "bad-prefix.ts",
-      `import { proposition } from ${BUILDERS};\n` +
-        `export default proposition({ label: "theorem:x", title: "T", statement: "s" });\n`,
+      `import { remark } from ${BUILDERS};\n` +
+        `export default remark({ label: "remark:x", title: "T" });\n`,
     );
     // The regex is happy; the builder is not. Today that label becomes a graph
     // node no edge can resolve.
-    expect(readBlockManifest(p)?.label).toBe("theorem:x");
+    expect(readBlockManifest(p)?.label).toBe("remark:x");
     expect(() => loadBlockModuleSync(p)).toThrow();
 
     const failures: string[] = [];
@@ -119,7 +119,7 @@ describe("the textual read and the module disagree", () => {
     // Reported, but still walked — dropping it would trade a loud problem for a
     // silent coverage hole.
     expect(seen.map((b) => b.ts)).toContain(p);
-    expect(seen.find((b) => b.ts === p)?.label).toBe("theorem:x");
+    expect(seen.find((b) => b.ts === p)?.label).toBe("remark:x");
   });
 });
 
@@ -144,21 +144,21 @@ describe("verification does not widen what gets executed", () => {
       join(ch, "audit-script.ts"),
       `import { writeFileSync } from "fs";\n` +
         `writeFileSync(${JSON.stringify(marker)}, "ran");\n` +
-        "const ok = parse(`export default proposition({ label: \"prop:x\" });`);\n" +
+        "const ok = parse(`export default remark({ label: \"rem:x\" });`);\n" +
         `export default ok;\n`,
     );
 
     const seen = [...walkBlocks(root, { verify: true, onLoadFailure: () => {} })];
     expect(existsSync(marker)).toBe(false);
-    expect(seen.map((b) => b.label)).not.toContain("prop:x");
+    expect(seen.map((b) => b.label)).not.toContain("rem:x");
   });
 });
 
 describe("verification is the default, and `verify: false` is the escape hatch", () => {
   test("the default verifies", () => {
     const seen = [...walkBlocks(root, { onLoadFailure: () => {} })].map((b) => b.label);
-    expect(seen).toContain("prop:real");
-    expect(seen).toContain("prop:computed");
+    expect(seen).toContain("rem:real");
+    expect(seen).toContain("rem:computed");
     expect(seen).not.toContain("not-the-block");
   });
 
@@ -169,6 +169,6 @@ describe("verification is the default, and `verify: false` is the escape hatch",
     // `verify-block-walk.ts`, needs a way back.
     const seen = [...walkBlocks(root, { verify: false })].map((b) => b.label);
     expect(seen).toContain("not-the-block");
-    expect(seen).not.toContain("prop:computed");
+    expect(seen).not.toContain("rem:computed");
   });
 });

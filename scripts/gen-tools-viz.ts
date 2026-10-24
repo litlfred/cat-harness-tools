@@ -75,14 +75,18 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { detectRepoUrl } from "../src/core/git-refs.js";
 import { discoverTools, toolsOf } from "../tools/discover.ts";
 import { baseDocsDir } from "./compose-docs.js";
 import { kgRoots } from "./known-skills.js";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
+import { qaResultHref, siteLinkKey } from "./qa-result-link.ts";
+import { qaStorageOf } from "./qa-results.ts";
 import { pageParts, renderedByOf, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
@@ -117,6 +121,10 @@ export interface ToolRow {
   readonly satisfies: string[];
   readonly inputs: number;
   readonly outputs: number;
+  /** Where this Tool's latest `kg-qa` verdict lives on `qa-reports` (`qa-result-link.ts`, bean `tdir`). */
+  readonly qaHref?: string;
+  /** The verdict read from the `kg-qa` sidecar when on disk (`pass`, `fail`, `warn`, `unknown`), or `undefined` when not on disk. */
+  readonly qaVerdict?: string;
 }
 
 /** A `satisfies` entry, however it was written. */
@@ -127,19 +135,160 @@ function skillId(s: unknown): string {
 }
 
 /**
+ * The forge URL for `repo`: detected from `origin`, else the harness's declared
+ * repository (`gen-library-viz`'s fallback for git-less checkouts).
+ */
+function repoWebFor(repo: string, inst = join(repo, "cat-harness")): string | undefined {
+  const detected = detectRepoUrl(repo);
+  if (detected) return detected;
+  try {
+    const d = (existsSync(inst) ? readDeclaration(inst) : undefined) as
+      | { livesAt?: { repository?: string }; repository?: string }
+      | undefined;
+    const slug = d?.livesAt?.repository ?? d?.repository;
+    return slug ? `https://github.com/${slug}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read a `kg-qa/v1` sidecar's verdict when the file is on disk (`pass`, `fail`,
+ * `warn`, `unknown`, `n/a`), or `undefined` when it is absent or unreadable.
+ *
+ * `undefined` is a third state: when `qa-reports` has not been fetched into the
+ * local tree, the page still links the Tool's verdict on `qa-reports` via
+ * `qa-result-link.ts` rather than fabricating a pass or hiding the link.
+ */
+function readSidecarVerdict(sidecarPath: string): string | undefined {
+  if (!existsSync(sidecarPath)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(sidecarPath, "utf-8")) as {
+      overall_verdict?: unknown;
+      totals?: { pass?: number; fail?: number; warn?: number; unknown?: number; "n/a"?: number };
+      criteria?: Record<string, { result?: string }>;
+    };
+    if (typeof raw.overall_verdict === "string" && raw.overall_verdict.length > 0) {
+      return raw.overall_verdict;
+    }
+    const t = raw.totals ?? {};
+    let fail = t.fail ?? 0;
+    let warn = t.warn ?? 0;
+    let unknown = t.unknown ?? 0;
+    let pass = t.pass ?? 0;
+    if (raw.totals === undefined && raw.criteria) {
+      for (const c of Object.values(raw.criteria)) {
+        if (c.result === "fail") fail++;
+        else if (c.result === "warn") warn++;
+        else if (c.result === "unknown") unknown++;
+        else if (c.result === "pass") pass++;
+      }
+    }
+    if (fail > 0) return "fail";
+    if (warn > 0) return "warn";
+    if (unknown > 0) return "unknown";
+    if (pass > 0) return "pass";
+    return "n/a";
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolve each Tool's `kg-qa` sidecar address (`qaResultLinkFor`) and on-disk
+ * verdict (`readSidecarVerdict`), keyed by Tool `id`.
+ */
+function toolQaResolver(
+  repo: string,
+  opts: { instanceRoot?: string; key?: string } = {},
+): (toolId: string) => { qaHref?: string; qaVerdict?: string } {
+  const harnessRoot = join(repo, "cat-harness");
+  const key = opts.key ?? siteLinkKey();
+  const rawPairs: { inst: string; toolsDir: string }[] = [];
+  if (opts.instanceRoot !== undefined) {
+    try {
+      const td = instanceDirectoryForGraph(opts.instanceRoot, KIND);
+      if (td) rawPairs.push({ inst: resolve(opts.instanceRoot), toolsDir: td });
+    } catch {
+      // Unreadable declaration; no QA resolution.
+    }
+  } else {
+    let roots: readonly string[] = [];
+    try {
+      roots = instanceRootsIn(repo);
+    } catch {
+      roots = [];
+    }
+    for (const r of roots) {
+      try {
+        const td = instanceDirectoryForGraph(r, KIND);
+        if (td) rawPairs.push({ inst: resolve(r), toolsDir: td });
+      } catch {
+        // Skip unreadable sibling.
+      }
+    }
+  }
+  const pairs: { inst: string; toolsDir: string; qaTree: string; storedOn: string | undefined }[] = [];
+  for (const p of rawPairs) {
+    try {
+      const qaHome = kgQaHomeFor(
+        p.inst,
+        existsSync(harnessRoot) && p.inst !== resolve(harnessRoot) ? harnessRoot : undefined,
+      );
+      const qaTree = join(qaHome.root, KG_QA_DIRNAME);
+      let storedOn: string | undefined;
+      try {
+        storedOn = qaStorageOf(qaTree, repo);
+      } catch {
+        storedOn = undefined;
+      }
+      pairs.push({ ...p, qaTree, storedOn });
+    } catch {
+      // Skip instance whose QA home cannot be resolved.
+    }
+  }
+  const repoWeb = repoWebFor(repo, existsSync(harnessRoot) ? harnessRoot : pairs[0]?.inst);
+  return (toolId: string) => {
+    if (!toolId || pairs.length === 0) return {};
+    const owner =
+      pairs.find((p) => existsSync(join(p.toolsDir, toolId))) ??
+      pairs.find((p) => p.inst === resolve(harnessRoot)) ??
+      pairs[0]!;
+    try {
+      const sidecar = kgQaSidecarPath(owner.inst, owner.toolsDir, toolId, owner.qaTree);
+      const repoPath = relative(repo, resolve(sidecar)).split(sep).join("/");
+      const link = qaResultHref({ repoWeb, repoPath, storedOn: owner.storedOn, key });
+      const qaVerdict = readSidecarVerdict(sidecar);
+      return {
+        ...(link.href !== undefined ? { qaHref: link.href } : {}),
+        ...(qaVerdict !== undefined ? { qaVerdict } : {}),
+      };
+    } catch {
+      return {};
+    }
+  };
+}
+
+/**
  * The Tool nodes, reduced.
  *
  * Exported so the reduction is testable without the markdown: the `satisfies`
  * join is the part worth pinning, and a test that went through the rendered
  * table would be testing the table.
  */
-export function toolRows(defs: readonly unknown[]): ToolRow[] {
+export function toolRows(
+  defs: readonly unknown[],
+  repo = REPO,
+  opts: { instanceRoot?: string; key?: string } = {},
+): ToolRow[] {
+  const qaFor = toolQaResolver(repo, opts);
   return defs
     .map((d) => {
       const t = d as Record<string, unknown>;
       const io = (t.io ?? {}) as { inputs?: unknown[]; outputs?: unknown[] };
+      const id = String(t.id ?? "");
       return {
-        id: String(t.id ?? ""),
+        id,
         title: String(t.title ?? t.id ?? ""),
         description: String(t.description ?? ""),
         install: Object.keys((t.install ?? {}) as object).sort(),
@@ -147,6 +296,7 @@ export function toolRows(defs: readonly unknown[]): ToolRow[] {
         satisfies: ((t.satisfies ?? []) as unknown[]).map(skillId).sort(),
         inputs: io.inputs?.length ?? 0,
         outputs: io.outputs?.length ?? 0,
+        ...qaFor(id),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id, "en"));
@@ -257,7 +407,7 @@ export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: str
     const p = declarationPathIn(inst);
     const name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
     if (!name) continue;
-    const rows = toolRows(toolsOf(inst));
+    const rows = toolRows(toolsOf(inst), repo, { instanceRoot: inst });
     if (rows.length === 0) empty.push(name);
     else subjects.push({ name, rows });
   }
@@ -475,7 +625,7 @@ export function page(
     );
   }
 
-  b.push("## Every tool", "", "| tool | what it does | invoked | satisfies | i/o |", "|---|---|---|---|---|");
+  b.push("## Every tool", "", "| tool | what it does | invoked | satisfies | i/o | qa |", "|---|---|---|---|---|---|");
   for (const r of rows) {
     const sat = r.satisfies.length
       ? r.satisfies
@@ -485,9 +635,14 @@ export function page(
           })
           .join("<br>")
       : "**—**";
+    const qa = r.qaHref
+      ? `[\`${cell(r.qaVerdict ?? "qa-reports")}\`](${r.qaHref})`
+      : r.qaVerdict
+        ? `\`${cell(r.qaVerdict)}\``
+        : "**—**";
     b.push(
       `| <a id="${cell(r.id)}"></a>[\`${cell(r.id)}\`](#${cell(r.id)})<br>${cell(r.title)} | ${cell(r.description)} | ` +
-        `${r.invoke.map(badge).join(" ")} | ${sat} | ${r.inputs} in / ${r.outputs} out |`,
+        `${r.invoke.map(badge).join(" ")} | ${sat} | ${r.inputs} in / ${r.outputs} out | ${qa} |`,
     );
   }
   b.push("");

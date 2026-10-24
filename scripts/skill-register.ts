@@ -629,6 +629,38 @@ export function stepsToRun(
   return { run: steps.filter((s) => !s.readsQaCopy), deferred: steps.filter((s) => s.readsQaCopy) };
 }
 
+/**
+ * The environment variable a CI workflow sets to the check scripts its OWN
+ * gates will run over this same tree (comma-separated), so a writing run here
+ * does not ask them a second time. Owner, 2026-10-23 (option A): in a layer
+ * PR's `derive:publish`, `uml:overview` builds the QA working copy, whose
+ * `skill:register` step re-ran nine checks (~190 s measured) that the PR's
+ * gate shards run anyway.
+ */
+export const VERIFIED_BY_GATES_ENV = "CAT_SKILL_REGISTER_VERIFIED_BY_GATES";
+
+/**
+ * Of the steps this run performs, the ones it verifies and the ones whose
+ * verify it leaves to the run's gates ({@link VERIFIED_BY_GATES_ENV}). Leaves
+ * nothing to the gates unless ALL hold: this is the writing path (never
+ * `--check`, whose verifies ARE the gate), `CI` is set and true, and the step's
+ * verify is one script that the variable names. Locally every step is
+ * verified, as before. A step left to the gates is reported `ran: false`,
+ * never as current.
+ */
+export function verifyHere(
+  steps: readonly Step[],
+  checking: boolean,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): { verify: Step[]; byGates: Step[] } {
+  const ci = (env.CI ?? "").trim().toLowerCase();
+  const inCi = ci !== "" && ci !== "0" && ci !== "false";
+  const named = new Set((env[VERIFIED_BY_GATES_ENV] ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+  if (checking || !inCi || named.size === 0) return { verify: [...steps], byGates: [] };
+  const left = (s: Step) => s.verify.length === 1 && named.has(s.verify[0]!);
+  return { verify: steps.filter((s) => !left(s)), byGates: steps.filter(left) };
+}
+
 /** Scripts named here that `package.json` does not declare. */
 export function missingScripts(runner: string = RUNNER_ROOT): string[] {
   // A step's first argument is what `bun run` resolves; anything after it is a
@@ -1025,15 +1057,22 @@ async function main(): Promise<number> {
   // writing ones run after them, one at a time, in STEPS order.
   const table = scriptsOf(RUNNER_ROOT);
   const writes = (s: Step): boolean => /publish-check\.ts/.test(table[s.verify[0]!] ?? "");
-  const codes: number[] = new Array(active.length);
-  await Promise.all(active.map(async (s, i) => (writes(s) ? undefined : (codes[i] = await verifyQuietly(s.verify)))));
-  for (const [i, s] of active.entries()) if (writes(s)) codes[i] = await verifyQuietly(s.verify);
+  // In CI, the checks the run's own gates ask over this tree are left to them.
+  const { verify: asked, byGates } = verifyHere(active, checking);
+  const codes: number[] = new Array(asked.length);
+  await Promise.all(asked.map(async (s, i) => (writes(s) ? undefined : (codes[i] = await verifyQuietly(s.verify)))));
+  for (const [i, s] of asked.entries()) if (writes(s)) codes[i] = await verifyQuietly(s.verify);
   for (const s of deferred) {
     // Listed, not run: `ran: false`, never a pass (see {@link writeReport}).
     verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: false });
     if (!flags.json) console.log(`  – ${s.verify.join(" ")}  (not run: it reads the QA working copy this run is part of building; ${BUILDING_ENV}=1)`);
   }
-  for (const [i, s] of active.entries()) {
+  for (const s of byGates) {
+    // Listed, not run here: this CI run's gates ask it over the same tree.
+    verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: false });
+    if (!flags.json) console.log(`  – ${s.verify.join(" ")}  (not run here: this CI run's gates ask it; ${VERIFIED_BY_GATES_ENV})`);
+  }
+  for (const [i, s] of asked.entries()) {
     const rc = codes[i]!;
     verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: true, current: rc === 0 });
     if (!flags.json) console.log(`${rc === 0 ? "  ✓" : "  ✗"} ${s.verify.join(" ")}`);
@@ -1126,9 +1165,13 @@ async function main(): Promise<number> {
 
   if (red.length > 0 || problems > 0) return 1;
 
+  // Never "current" for a step left to the gates (bean `dh4f`).
   console.log(
-    `\n✓ ${STEPS.length} artefact(s) current, ${f.skills} skill(s) across ${f.packages} ` +
-      `package(s) declared. Commit them with the skill.\n`,
+    byGates.length === 0
+      ? `\n✓ ${STEPS.length} artefact(s) current, ${f.skills} skill(s) across ${f.packages} ` +
+          `package(s) declared. Commit them with the skill.\n`
+      : `\n✓ ${asked.length} artefact(s) verified current here, ${byGates.length} left to this CI run's gates; ` +
+          `${f.skills} skill(s) across ${f.packages} package(s) declared.\n`,
   );
   return 0;
 }

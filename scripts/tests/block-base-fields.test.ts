@@ -35,6 +35,7 @@ import { describe, test, expect } from "bun:test";
 import { z } from "zod";
 import { BlockBaseSchema, BlockSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/types.ts";
+import { vocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 
 /**
  * `BlockSchema` is `z.discriminatedUnion(...).superRefine(...)`, and its
@@ -56,7 +57,16 @@ import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/types.ts";
  * The runtime checks below are what establish the shape — including the first
  * test, which fails unless every `BLOCK_KINDS` member turns up here.
  */
-const options = BlockSchema.options as unknown as z.ZodObject<z.ZodRawShape>[];
+const builtIn = BlockSchema.options as unknown as z.ZodObject<z.ZodRawShape>[];
+
+/**
+ * The schemas a block is actually parsed with: `BlockSchema`'s members and
+ * every discovered vocabulary module's (`vocabulary-modules.ts`), a module's
+ * taking precedence for a kind both type — exactly `blockSchemaFor`'s rule.
+ * Since cat-harness#419 the science layer's kinds are typed by its module, not
+ * by `BlockSchema`, so reading the union alone would leave them untested.
+ */
+const fromModules = vocabularies().flatMap((v) => [...v.schemas.values()]) as unknown as z.ZodObject<z.ZodRawShape>[];
 
 const shapeOf = (schema: z.ZodObject<z.ZodRawShape>) => Object.keys(schema.shape);
 
@@ -65,10 +75,14 @@ const kindOf = (schema: z.ZodObject<z.ZodRawShape>): string => {
   return lit.value;
 };
 
+const moduleKinds = new Set(fromModules.map(kindOf));
+const options = [...builtIn.filter((s) => !moduleKinds.has(kindOf(s))), ...fromModules];
+
 describe("block schemas vs BlockBaseSchema", () => {
   test("the union reaches every kind, so nothing escapes the check below", () => {
-    // Without this, a kind added to BLOCK_KINDS but not to the union would
-    // simply not be tested — the exact way the previous defects survived.
+    // Without this, a kind added to BLOCK_KINDS but typed by neither the union
+    // nor a vocabulary module would simply not be tested — the exact way the
+    // previous defects survived.
     expect(options.map(kindOf).sort()).toEqual([...BLOCK_KINDS].sort());
   });
 

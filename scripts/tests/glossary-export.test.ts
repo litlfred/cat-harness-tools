@@ -34,11 +34,13 @@ import {
   LEDGER_SCHEMA,
   buildGlossary,
   glossaryIri,
+  legacyGlossaryDocuments,
   liveLedgerEntry,
   readLanes,
   type Ledger,
 } from "../glossary-export.ts";
 import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/glossary-ledger.ts";
+import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -92,16 +94,17 @@ describe("the corpus it is actually run against", () => {
     // with the graph's `performedBy` links.
     const roleIds = concepts(doc)
       .map((c) => c["@id"] as string)
-      .filter((i) => i.includes("#role/"));
+      .filter((i) => i.includes("/role/"));
     expect(roleIds.length).toBeGreaterThan(0);
-    for (const i of roleIds) expect(i).toMatch(/\.jsonld#role\/[^/]+$/);
+    // A path, not a fragment of the instance document (#603).
+    for (const i of roleIds) expect(i).toMatch(/^[^#]*\/role\/[^/#]+$/);
   });
 
   test("ten names for one pipeline are ten altLabels, not ten terms", () => {
     // The measurement that corrected the bean's recorded mapping: 85 distinct
     // lane names resolve to 36 roles, and `build-pipeline` alone is named ten
     // ways. A concept per lane name would have copied one definition onto ten.
-    const bp = concepts(doc).find((c) => c["@id"]?.toString().endsWith("#role/build-pipeline"));
+    const bp = concepts(doc).find((c) => c["@id"]?.toString().endsWith("/role/build-pipeline"));
     expect(bp).toBeDefined();
     expect((bp!.altLabel as string[]).length).toBeGreaterThanOrEqual(5);
     // ...and the definition is authored once, in `roles.json`.
@@ -128,7 +131,7 @@ describe("the corpus it is actually run against", () => {
     const ids = new Set(concepts(doc).map((c) => c["@id"] as string));
     for (const u of usages(doc)) {
       expect(ids.has(u.ofConcept as string)).toBe(true);
-      expect(String(u.inProcess)).toMatch(/#process\//);
+      expect(String(u.inProcess)).toMatch(/^[^#]*\/process\/[^/#]+$/);
     }
   });
 
@@ -161,7 +164,7 @@ describe("the corpus it is actually run against", () => {
     expect(report.undrawn.length).toBeGreaterThan(0);
     const ids = new Set(concepts(doc).map((c) => c["@id"] as string));
     for (const r of report.undrawn) {
-      expect([...ids].some((i) => i.endsWith(`#role/${r}`))).toBe(true);
+      expect([...ids].some((i) => i.endsWith(`/role/${r}`))).toBe(true);
     }
   });
 
@@ -314,13 +317,55 @@ describe("retirement — reported, never deleted", () => {
 
 describe("glossaryIri", () => {
   test("it is derived from the document PATH, not rebuilt from the stub", () => {
-    // Bean `dyd3`: the host publishes at `<stub>.jsonld` and a foreign
-    // instance at `<stub>/<stub>.jsonld`. A caller that recomposes the path
-    // gets the host's answer for every instance.
+    // Bean `dyd3`: a document's path decides it, wherever that is — the
+    // host's root `<stub>.jsonld` until #603 decision 1b, and every layer's
+    // `<name>/<stub>.jsonld` since. A caller that recomposes the path gets
+    // one instance's answer for every instance.
     expect(glossaryIri("https://x.test", "cat-harness.jsonld")).toBe("https://x.test/cat-harness-glossary.jsonld");
     expect(glossaryIri("https://x.test/", "bootstrap/bootstrap.jsonld")).toBe(
       "https://x.test/bootstrap/bootstrap-glossary.jsonld",
     );
+  });
+});
+
+// #603 decision 1b (owner, 2026-10-23): the host's glossary moved under
+// `<site>/<name>/` with its graph document. The old root address forwards.
+describe("the host glossary's old root address", () => {
+  const BASE = "https://x.test/site";
+  test("forwards the document and each lane usage, for one release", () => {
+    const { doc } = buildGlossary({ baseUrl: BASE });
+    expect(String(doc["@id"])).toBe(`${BASE}/cat-harness/cat-harness-glossary.jsonld`);
+    const site = mkdtempSync(join(tmpdir(), "glossary-legacy-"));
+    try {
+      const moved = legacyGlossaryDocuments(doc, join(site, "cat-harness", "cat-harness-glossary.jsonld"), undefined, BASE)!;
+      expect(moved.oldIri).toBe(`${BASE}/cat-harness-glossary.jsonld`);
+      const old = JSON.parse(readFileSync(join(site, "cat-harness-glossary.jsonld"), "utf-8")) as Record<string, unknown>;
+      expect([old["@id"], old.deprecated, old.isReplacedBy, old.sameAs]).toEqual([moved.oldIri, true, doc["@id"], doc["@id"]]);
+      const us = usages(doc);
+      expect(us.length).toBeGreaterThan(0);
+      expect(moved.count).toBe(us.length);
+      const stones = new Map((old["@graph"] as Node[]).map((t) => [String(t.isReplacedBy), String(t["@id"])]));
+      for (const u of us) {
+        const id = String(u["@id"]);
+        expect(stones.get(id)).toBe(id.replace(`${BASE}/cat-harness/cat-harness.jsonld#`, `${BASE}/cat-harness.jsonld#`));
+      }
+      // Anywhere but the published path, the site root is unknown: nothing.
+      expect(legacyGlossaryDocuments(doc, join(site, "x.jsonld"), undefined, BASE)).toBeUndefined();
+    } finally {
+      rmSync(site, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("an old-layout --out names the same site (placedOut)", () => {
+  test("the old root path is read as the site root; the new path and any other are kept", () => {
+    const P = "cat-harness/cat-harness.jsonld";
+    const L = "cat-harness.jsonld";
+    expect(placedOut("./_site/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: true });
+    expect(placedOut("./_site/cat-harness/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: false });
+    expect(placedOut("/tmp/x/doc.jsonld", P, L)).toEqual({ out: "/tmp/x/doc.jsonld", moved: false });
+    // A foreign instance has no old address: nothing is moved.
+    expect(placedOut("./_site/cat-harness.jsonld", P, undefined)).toEqual({ out: "./_site/cat-harness.jsonld", moved: false });
   });
 });
 

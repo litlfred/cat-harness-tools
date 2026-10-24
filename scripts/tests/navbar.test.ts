@@ -31,7 +31,7 @@ import {
   type NavGroup,
   type NavbarModel,
 } from "../lib/navbar.js";
-import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, injectRail, wantsLinkedRail, railModel, withNavbarRow } from "../lib/harness-rail.js";
+import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, expandRail, injectRail, railDataJson, railPageOf, wantsLinkedRail, railModel, withNavbarRow } from "../lib/harness-rail.js";
 import { injectRailOnce } from "../lib/rail-once.js";
 import { NAVBAR_CSS, documentIndexOf, visualiserLabelOf } from "../lib/navbar.js";
 import { thinPageHtml } from "../thin-page.js";
@@ -694,10 +694,22 @@ describe("the document index — `documentIndexOf`", () => {
     expect(read).not.toContain("data-fa-visualiser-nav");
     const bad = `<script type="application/json" data-fa-visualiser-nav>not json</script>`;
     expect(injectRailOnce(page(`${bad}<h2 id="a">A</h2>`), opts)!).toContain(bad);
-    // Railed from shared data, the page keeps the menu once: in `#fa-rail`.
-    const shared = injectRailOnce(page(`${decl}<h2 id="a">A</h2>`), { ...opts, emitRailData: () => {} })!;
-    expect(shared).not.toContain("data-fa-visualiser-nav");
-    expect(shared).toContain('"documentIndex"');
+    // Railed from shared data, the page carries the menu not at all: the
+    // declared menu is the same on every page of a guide, so it goes in the
+    // shared file, and two pages of one guide share ONE file.
+    const files = new Map<string, string>();
+    const emit = { ...opts, emitRailData: (f: string, b: string) => void files.set(f, b) };
+    const one = injectRailOnce(page(`${decl}<h2 id="a">A</h2>`), { ...emit, here: "/one.html" })!;
+    const two = injectRailOnce(page(`${decl}<h2 id="b">B</h2>`), { ...emit, here: "/two.html" })!;
+    expect(one).not.toContain("data-fa-visualiser-nav");
+    expect(railPageOf(one)!.documentIndex).toBeUndefined();
+    expect(files.size).toBe(1);
+    expect(railPageOf(two)!.data).toBe(railPageOf(one)!.data);
+    const read2 = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    expect(region(expandRail(one, read2), "fa-nav-graphs")).toContain('href="#node-x"');
+    // A headings index is the page's own, and stays in the page.
+    const headed = injectRailOnce(page(`<h2 id="a">A</h2><h2 id="b">B</h2>`), emit)!;
+    expect(railPageOf(headed)!.documentIndex).toBeDefined();
   });
 });
 

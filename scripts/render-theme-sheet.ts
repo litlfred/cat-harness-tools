@@ -69,6 +69,7 @@ import { avatarClip, dataUri } from "./render-avatar-crops.js";
 import { declaredContributions } from "./ensure-landing-sticky.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { siteTarget } from "./lib/site-target.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.ts";
 
 /** The AAA floor. A value below it is not a worse theme; it is a failing one. */
@@ -400,7 +401,9 @@ export function buildViz(root: string): { path: string; md: string; themes: numb
   const route = declaredPageRoute(root, VIEWER_TOOL);
   if (route === undefined) return undefined;
   const repoRoot = repoRootFor(root);
-  const site = resolve(root, siteDirFor(root));
+  // `--site`: the Tool declares a `site` input, so a site build can have the
+  // viewer written into the site it is building rather than this harness's docs.
+  const site = siteTarget(resolve(root, siteDirFor(root)));
   // An image is linked only where the site publishes it; anything else is
   // reported as unread on the page rather than linked to a 404.
   const srcFor = (instanceRoot: string): ImageSource => (img) => {

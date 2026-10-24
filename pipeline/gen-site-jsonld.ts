@@ -50,7 +50,6 @@ import {
   SITE_PAGE_TYPES,
   SITE_NARRATIVE_TYPES,
   SITE_ASSET_TYPES,
-  siteIri,
 } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
 import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
@@ -59,7 +58,7 @@ import { detectRepoUrl } from "../src/core/git-refs.js";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
-import { docsSources, type DocsSource } from "../scripts/lib/docs-sources.ts";
+import { docsSources, sourceSiteNodePath, type DocsSource } from "../scripts/lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 const BASE_SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
@@ -132,8 +131,7 @@ let SITE_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
  * PUBLISHED. A source above the base is composed into the site under its
  * instance's name, and so are the documents beside its pages.
  */
-const pageIri = (slug: string, node?: string): string =>
-  `${CUR.base ? "" : `${CUR.instance}/`}${node === undefined ? siteIri(slug) : siteIri(slug, node)}`;
+const pageIri = (slug: string, node?: string): string => sourceSiteNodePath(CUR, slug, node);
 
 /** The source directory as its instance spells it — `docs/source` for the base. */
 const srcRel = (): string => relative(CUR.root, SRC_DIR).split("\\").join("/");

@@ -48,6 +48,7 @@ import {
 import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { subjectHref } from "./lib/subject-pages.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 /**
@@ -173,9 +174,10 @@ const presentations = await checkoutProcessPresentations(ROOT);
 const SITE_UP = `${relative(OUT_DIR, join(ROOT, siteDirFor(ROOT))).split("\\").join("/")}/`;
 
 /**
- * Where a call activity should take a reader who clicks it.
+ * Where a call activity should take a reader who clicks it: the called
+ * process's own page, `<doc dir>/process/P` (#603), where one is published.
  *
- * DERIVED from the pages, never authored on the process: the page section
+ * Otherwise DERIVED from the pages, never authored on the process: the page section
  * whose `asset.source` names the called diagram, or — when none does, or more
  * than one — the called process's own generated page
  * (`process-presentations.ts`). The process names no page; the page names
@@ -189,7 +191,15 @@ function subprocessLinks(xml: string): Map<string, string> {
     if (!id || !called) continue;
     const home = processHome.get(called);
     if (!home) continue;
-    out.set(id, SITE_UP + processTarget(home, presentations.get(processFile.get(called)!)));
+    // The called process's own page, its subject IRI (owner, 2026-10-23: "the
+    // info button/icons in the bpmn rendering should point to those new
+    // IRIs", #603) — where its instance's graph publishes one; else its page
+    // section or diagram page, as before.
+    out.set(
+      id,
+      subjectHref(resolve(ROOT, processFile.get(called)!), "process", called) ??
+        SITE_UP + processTarget(home, presentations.get(processFile.get(called)!)),
+    );
   }
   return out;
 }

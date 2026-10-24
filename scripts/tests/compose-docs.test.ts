@@ -552,22 +552,29 @@ describe("the cut, on the REAL tree", () => {
     // declared visualisers are also drawn under `<name>/<visualiser>/`, in the
     // base layer, and a cut that stubs the instance's docs rightly keeps them.
     const stubbedNames = new Set(cut.carried.filter((d) => !d.carry).map((d) => d.instance.instance));
+    // An instance with its own IG site gets NO stub: its IG build answers
+    // `/<instance>/` (smart-base, whose docs pages compose beside its IG).
+    const stubCount = cut.carried.filter((d) => !d.carry && !d.instance.igSite).length;
     const theirs = Object.entries(all.suppliedBy).filter(([k, by]) => stubbedNames.has(by) && stubbed.some((u) => k.startsWith(u))).length;
     // A stubbed instance whose docs are ONE page (folio-assistant-core's, since
     // bean c5fm) is replaced by exactly one stub, so the cut cannot shrink the
     // tree: assert that it does not grow it either, the same answer the
     // composes-none case above gives. Otherwise the cut must remove pages.
-    if (theirs === stubbed.length) {
+    if (theirs === stubCount) {
       expect(nCut).toBe(nAll);
     } else {
-      expect(theirs).toBeGreaterThan(stubbed.length);
+      expect(theirs).toBeGreaterThan(stubCount);
     }
-    expect(nCut).toBeLessThanOrEqual(nAll - theirs + stubbed.length);
+    expect(nCut).toBeLessThanOrEqual(nAll - theirs + stubCount);
 
     // ...and what remains in place of each stubbed instance is its stub, not a
     // hole. A 404 where a tile links is the `pb04` defect this replaces.
     for (const d of cut.carried.filter((x) => !x.carry)) {
       const stub = join(b, d.instance.under, "index.md");
+      if (d.instance.igSite) {
+        expect(existsSync(stub)).toBe(false);
+        continue;
+      }
       expect(existsSync(stub)).toBe(true);
       expect(readFileSync(stub, "utf-8")).toContain("not built into this preview");
     }

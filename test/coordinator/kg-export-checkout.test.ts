@@ -81,7 +81,9 @@ describe("a package's id is declared, not derived from its path", () => {
         const links = (n as { inPackage?: Array<string | { "@id": string }> }).inPackage ?? [];
         return links.some((l) => (typeof l === "string" ? l : l["@id"]) === pkgIri);
       })
-      .map((n) => String(n["@id"]).split("#").pop()!);
+      // `<kind>/<id>`, the tail of a subject path (#603) — or of a fragment,
+      // the form before it.
+      .map((n) => String(n["@id"]).replace(/^.*[#/]([^/#]+\/[^/#]+)$/, "$1"));
 
   // WITNESS RETARGETED TWICE, and the second time is the lesson landing.
   //
@@ -109,7 +111,8 @@ describe("a package's id is declared, not derived from its path", () => {
   const WITNESS = "who-iris";
   const checkoutPackages = (): Array<Record<string, unknown>> =>
     (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>).filter((n) => n["@type"] === termIri("SkillPackage"));
-  const witness = () => checkoutPackages().find((x) => String(x["@id"]).endsWith(`#package/${WITNESS}`));
+  // A subject path since #603: `<doc dir>/package/<name>`.
+  const witness = () => checkoutPackages().find((x) => String(x["@id"]).endsWith(`/package/${WITNESS}`));
 
   test("a package is named by its manifest, not by its directory", () => {
     const p = witness();
