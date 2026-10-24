@@ -285,7 +285,9 @@ describe.skipIf(!HAS_SMART_TRUST_REF)("smart-trust, referenced in smart-base's l
   test("is a valid referenced record of a PUBLICATION, with the identity of the IG the index describes", () => {
     expect(rec.materialization.state).toBe("referenced");
     expect(rec.source).toMatchObject({ kind: "published", canonical: ig.canonicalBase, package_id: ig.packageId });
-    expect(rec.identity.version).toBe(rec.source.version);
+    const src = rec.source;
+    if (!("version" in src)) throw new Error("the record's source is not a publication");
+    expect(rec.identity.version).toBe(src.version);
   });
   test("holds nothing of the IG and passes the L1 gate", () => {
     for (const d of ["sections", "blocks", "images"]) expect(existsSync(join(dir, d))).toBe(false);
