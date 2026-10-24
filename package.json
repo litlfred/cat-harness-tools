@@ -129,6 +129,7 @@
     "check:avatar-instances": "bun run cat-harness-tools/scripts/check-avatar-instances.ts",
     "check:avatar-coverage": "bun run cat-harness-tools/scripts/check-avatar-coverage.ts",
     "check:avatar-coverage:check": "bun run cat-harness-tools/scripts/check-avatar-coverage.ts --check",
+    "check:unlinked-beans": "bun run cat-harness-tools/scripts/unlinked-beans.ts",
     "check:landing-instance": "bun run cat-harness-tools/scripts/check-landing-instance.ts",
     "check:index-ignores": "bun run cat-harness-tools/scripts/check-index-ignores.ts",
     "check:bean-bodies": "bun run cat-harness-tools/scripts/check-bean-bodies.ts",

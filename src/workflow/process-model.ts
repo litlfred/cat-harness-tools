@@ -950,6 +950,15 @@ function codeList(raw: string | undefined, elId: string, attr: string, why: stri
   return codes;
 }
 
+/**
+ * One `BpmnModdle` for every load. Building one compiles the BPMN package's
+ * type registry, which was about a fifth of a corpus pass when it was done per
+ * diagram (bean `sff8`, measured 2026-10-24). It holds TYPES, never a parse:
+ * each `fromXML` builds a fresh tree, so nothing a load mutates
+ * (`normaliseOwnExtensions`) is seen by the next one.
+ */
+const sharedModdle = new BpmnModdle();
+
 /** Code lists by instance root — loaded once, since every diagram of an instance shares them. */
 const codeListCache = new Map<string, Promise<Map<string, CodeList>>>();
 
@@ -1298,19 +1307,109 @@ function globalTaskIndex(dir: string): Map<string, string> {
  */
 function ownInstanceGlobalTaskIndex(dir: string): Map<string, string> {
   const out = new Map<string, string>();
-  let dirs: string[];
-  try {
-    const own = findInstanceRoot(dir);
-    if (own === undefined || own === null) return out;
-    dirs = directoriesForGraph(own, "processes");
-  } catch {
-    return out;
-  }
-  for (const d of dirs) {
+  for (const d of instanceLayout(dir).own) {
     if (!existsSync(d)) continue;
     for (const [id, home] of globalTaskIndex(d)) if (!out.has(id)) out.set(id, home);
   }
   return out;
+}
+
+/**
+ * Where an instance's diagrams live: its own declared `processes`
+ * directories, and each dependency's, nearest dependency first. LAYOUT only
+ * — paths, never a parsed model (`normaliseOwnExtensions` mutates a model in
+ * place, which is why `fallbackRolesBySkill` is a pass and not a cache).
+ *
+ * `own` is `[]` when no declaration owns the directory or its own
+ * directories cannot be resolved; `deps` is `[]` when the dependencies
+ * cannot be ordered, and leaves out a dependency whose directories cannot be
+ * resolved — the answers the three index builders gave on their own.
+ */
+interface InstanceLayout {
+  own: string[];
+  deps: string[][];
+}
+
+/**
+ * {@link InstanceLayout}s by instance root, each held with the signature it
+ * was computed under.
+ *
+ * Bean `sff8`. Resolving the layout re-reads every declaration in the
+ * checkout (`orderedDependencies` → `instanceRootsIn` → `findDeclarationFile`),
+ * and `ownInstanceProcessIndex`, `dependencyProcessIndex` and
+ * `ownInstanceGlobalTaskIndex` each did it once per DIAGRAM. Measured
+ * 2026-10-24 over 101 diagrams: one `loadProcessModel` pass ~7 s, 49 % of it
+ * in that discovery and 28 % in XML parsing. Every diagram of an instance
+ * shares one answer, so it is computed once per instance root.
+ *
+ * Keyed, like {@link readBpmnCached}, on what would change the answer: the
+ * instance root's listing and each `*.json` in it (path, mtime, size — the
+ * declaration among them), the listing of the directory above it (the
+ * checkout a nested instance's siblings are discovered in), and the same
+ * `*.json` signature of every dependency root. A fixture that adds an
+ * instance root, or rewrites a declaration, is resolved again.
+ */
+const layouts = new Map<string, { sig: string; depSig: string; depRoots: string[]; layout: InstanceLayout }>();
+
+/** A directory's entry names and the (mtime, size) of each `*.json` in it — cheap: a readdir and a stat per json. */
+function dirSignature(dir: string, withJson: boolean): string {
+  let names: string[];
+  try {
+    names = readdirSync(dir).sort();
+  } catch {
+    return "\0unreadable";
+  }
+  if (!withJson) return names.join("\0");
+  return names
+    .map((n) => {
+      if (!n.endsWith(".json")) return n;
+      try {
+        const st = statSync(join(dir, n));
+        return `${n}@${st.mtimeMs}:${st.size}`;
+      } catch {
+        return `${n}@?`;
+      }
+    })
+    .join("\0");
+}
+
+function instanceLayout(dir: string): InstanceLayout {
+  let own: string | undefined;
+  try {
+    own = findInstanceRoot(dir);
+  } catch {
+    return { own: [], deps: [] };
+  }
+  if (own === undefined || own === null) return { own: [], deps: [] };
+  const sig = `${dirSignature(own, true)}\n${dirSignature(dirname(own), false)}`;
+  const hit = layouts.get(own);
+  if (hit && hit.sig === sig && hit.depSig === hit.depRoots.map((r) => dirSignature(r, true)).join("\n")) {
+    return hit.layout;
+  }
+  let ownDirs: string[] = [];
+  try {
+    ownDirs = directoriesForGraph(own, "processes");
+  } catch {
+    ownDirs = [];
+  }
+  let depRoots: string[] = [];
+  try {
+    depRoots = orderedDependencies(own).map((d) => d.rootPath).reverse();
+  } catch {
+    depRoots = [];
+  }
+  const deps: string[][] = [];
+  for (const root of depRoots) {
+    try {
+      deps.push(directoriesForGraph(root, "processes"));
+    } catch {
+      continue;
+    }
+  }
+  const layout = { own: ownDirs, deps };
+  if (layouts.size > 256) layouts.clear();
+  layouts.set(own, { sig, depSig: depRoots.map((r) => dirSignature(r, true)).join("\n"), depRoots, layout });
+  return layout;
 }
 
 /**
@@ -1371,15 +1470,7 @@ function idIndex(dir: string, pattern: RegExp): Map<string, string> {
  */
 function ownInstanceProcessIndex(dir: string): Map<string, string> {
   const out = new Map<string, string>();
-  let dirs: string[];
-  try {
-    const own = findInstanceRoot(dir);
-    if (own === undefined || own === null) return out;
-    dirs = directoriesForGraph(own, "processes");
-  } catch {
-    return out;
-  }
-  for (const d of dirs) {
+  for (const d of instanceLayout(dir).own) {
     if (!existsSync(d)) continue;
     for (const [id, home] of processIndex(d)) if (!out.has(id)) out.set(id, home);
   }
@@ -1411,21 +1502,7 @@ function ownInstanceProcessIndex(dir: string): Map<string, string> {
  */
 function dependencyProcessIndex(dir: string): Map<string, string> {
   const out = new Map<string, string>();
-  let roots: string[];
-  try {
-    const own = findInstanceRoot(dir);
-    if (own === undefined || own === null) return out;
-    roots = orderedDependencies(own).map((d) => d.rootPath).reverse();
-  } catch {
-    return out;
-  }
-  for (const root of roots) {
-    let dirs: string[];
-    try {
-      dirs = directoriesForGraph(root, "processes");
-    } catch {
-      continue;
-    }
+  for (const dirs of instanceLayout(dir).deps) {
     for (const d of dirs) {
       if (!existsSync(d)) continue;
       for (const [id, home] of processIndex(d)) if (!out.has(id)) out.set(id, home);
@@ -1693,8 +1770,7 @@ export async function loadProcessModel(
    */
   homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string>; globals?: Map<string, string> }> = new Map(),
 ): Promise<ProcessModel> {
-  const moddle = new BpmnModdle();
-  const parsed = await moddle.fromXML(readFileSync(bpmnPath, "utf-8"));
+  const parsed = await sharedModdle.fromXML(readFileSync(bpmnPath, "utf-8"));
   const { rootElement } = parsed;
   const { warnings, unresolvedPartitions } = partitionTolerated(parsed.warnings);
   normaliseOwnExtensions(rootElement);
