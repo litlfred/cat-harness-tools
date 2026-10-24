@@ -215,8 +215,8 @@ describe("bootstrapVocabularyPath resolves from both the index root and the cat-
       const out = buildVocabularyOne(tmp, "bootstrap");
       expect(out.kind).toBe("built");
       if (out.kind !== "built") return;
-      expect(out.url).toBe("https://litlfred.github.io/bootstrap/0.1.0/ns");
-      expect(out.paths).toEqual(["0.1.0/ns", "0.1.0/ns.jsonld", "0.1.0/ns.json"]);
+      expect(out.url).toBe("https://litlfred.github.io/bootstrap/v0/ns");
+      expect(out.paths).toEqual(["v0/ns", "v0/ns.jsonld", "v0/ns.json"]);
       expect(out.terms).toBeGreaterThan(0);
     } finally {
       rmSync(tmp, { recursive: true, force: true });

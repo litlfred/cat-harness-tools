@@ -186,14 +186,32 @@ function contextOnly(doc: Record<string, unknown>): boolean {
 
 /**
  * A loader that never touches the network: a context URL under our published
- * base resolves to the file at the same path in the tree being verified, and
- * anything else is refused — a document that needs the network to be
- * understood is a finding, not something to fetch at deploy time.
+ * base, or under one of the run's own `bases`, resolves to the file at the
+ * same path in the tree being verified, and anything else is refused — a
+ * document that needs the network to be understood is a finding, not
+ * something to fetch at deploy time.
+ *
+ * The longest base wins, so a staging preview's `--base …/STAGING/<slug>`
+ * maps its URLs onto the tree rather than under a `STAGING/<slug>/` directory
+ * the tree does not have. A staging run given no `--base` still mints under
+ * its preview address (`kg-export --base-url`), so a URL whose direct path is
+ * missing and whose rest begins `STAGING/<slug>/` is tried without that
+ * prefix: the preview's tree is the site's root, not a copy nested under it.
  */
-export function localLoader(dir: string) {
-  const base = CONTENT_CONTEXT_URL.slice(0, CONTENT_CONTEXT_URL.indexOf("/ns/content/"));
+export function localLoader(dir: string, bases: readonly string[] = []) {
+  const published = CONTENT_CONTEXT_URL.slice(0, CONTENT_CONTEXT_URL.indexOf("/ns/content/"));
+  const roots = [...new Set([published, ...bases].map((b) => b.replace(/\/+$/, "")))].sort((a, b) => b.length - a.length);
+  const inTree = (url: string): string | undefined => {
+    const root = roots.find((b) => url.startsWith(`${b}/`));
+    if (root === undefined) return undefined;
+    const rest = url.slice(root.length + 1);
+    const direct = join(dir, rest);
+    if (existsSync(direct)) return direct;
+    const staged = /^STAGING\/[^/]+\/(.+)$/.exec(rest);
+    return staged ? join(dir, staged[1]!) : direct;
+  };
   return async (url: string) => {
-    const p = url.startsWith(`${base}/`) ? join(dir, url.slice(base.length + 1)) : undefined;
+    const p = inTree(url);
     // An EXTERNAL context we hold, pinned by sha256 (the `linked-data` voice,
     // `ld-no-context-fetched-at-run-time`): served from the copy, refused on
     // drift, never fetched. PROV-JSONLD's is the first (bean `9y9j`).
@@ -231,7 +249,7 @@ export const JSONLD_EXPAND: Verifier = {
     "Does every JSON-LD document of ours expand under a real processor with no warning — no " +
     "property dropped, no relative IRI, no context that fails to load?",
   async run(dir, ctx) {
-    const loader = localLoader(dir);
+    const loader = localLoader(dir, ctx.bases);
     const findings: Finding[] = [];
     let checked = 0;
     let outOfScope = 0;
@@ -345,7 +363,7 @@ export const JSONLD_OBJECT_LINKS: Verifier = {
     "Does every value under an object property of ours expand to a link — or is it a literal the " +
     "author declared explicitly, because the node has no release address?",
   async run(dir, ctx) {
-    const loader = localLoader(dir);
+    const loader = localLoader(dir, ctx.bases);
     const byContext = new Map<string, Set<string>>();
     const findings: Finding[] = [];
     let checked = 0;
@@ -443,7 +461,7 @@ export const JSONLD_OWN_BASE: Verifier = {
     "Does every document of ours that names a remote context carrying @base state its own @base " +
     "inline, rather than lean on one a conforming processor ignores?",
   async run(dir, ctx) {
-    const loader = localLoader(dir);
+    const loader = localLoader(dir, ctx.bases);
     const carriesBase = new Map<string, boolean>();
     const findings: Finding[] = [];
     let checked = 0;

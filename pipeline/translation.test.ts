@@ -287,7 +287,7 @@ describe("isTranslatable — a single ideograph is a word (bean `6b8u`)", () => 
     expect(isTranslatable("42 — 7")).toBe(false);
   });
 
-  test("it admits EXACTLY the eight cells measured, and no more", () => {
+  test("it admits EXACTLY the cells measured, and no more", () => {
     // Anti-scope-creep, over the real corpus. If a later change widens the rule,
     // this is where the widening shows up rather than in a msgid count nobody
     // reads. Counted over table cells, which is where the bean found the defect.
@@ -322,7 +322,9 @@ describe("isTranslatable — a single ideograph is a word (bean `6b8u`)", () => 
       }
     }
     expect([...admitted.keys()].sort()).toEqual(["否", "是"]);
-    expect([...admitted.values()].reduce((a, b) => a + b, 0)).toBe(8);
+    // 6 since moves M6–M8 took two of the eight measured cells up to
+    // folio-assistant-core with the pages that hold them.
+    expect([...admitted.values()].reduce((a, b) => a + b, 0)).toBe(6);
   });
 });
 
@@ -792,7 +794,8 @@ describe("injectMarkdown preserves document structure", () => {
     }
     // Anti-vacuity, both ways: the loop must have run, and it must have actually
     // collapsed something on every pair rather than passing by doing nothing.
-    expect(pairs).toBeGreaterThanOrEqual(60);
+    // 55 since moves M6–M8 took pages, and their catalogues, up a layer.
+    expect(pairs).toBeGreaterThanOrEqual(55);
     expect(collapsed).toBe(pairs);
   });
 });

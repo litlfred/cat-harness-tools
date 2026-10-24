@@ -27,7 +27,7 @@
  *
  * Owner, 2026-10-15 ("D1"). An instance that holds its vocabulary as
  * `ns.jsonld` at its root (bootstrap) has it staged at the extensionless `ns`
- * and `<version>/ns`: `ns` is a FILE there, so `ns/context/v1.jsonld` cannot
+ * and `v<major>/ns`: `ns` is a FILE there, so `ns/context/v1.jsonld` cannot
  * sit under it, and a static host cannot serve both. Staging both was the
  * `ENOTDIR` `check:bootstrap-standalone` met after `derive:publish`, and the
  * collision bootstrap's `gh-pages` would meet. Such an instance's context goes
@@ -39,7 +39,7 @@
  *
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
  *   `<dir>/<dir>.json` — never by importing the layer above.
- * - An instance's OWN namespace (`<stub>` → `…/<stub>/0.1.0/ns#`) is implicit:
+ * - An instance's OWN namespace (`<stub>` → `…/<stub>/v0/ns#`) is implicit:
  *   it comes from cat-harness's `ownPrefixTable` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,

@@ -228,7 +228,8 @@ describe("the witness tree the site publishes, against the pages that fetch from
   it("finds this checkout's generated badge pages — a filter over nothing would pass", () => {
     // The guard on the guard: the CLI passes these pages, so an empty list
     // would judge every witness tree clean.
-    expect(badgePages().length).toBeGreaterThan(5);
+    // 2 since moves M6–M8 took the other badge pages up to folio-assistant-core.
+    expect(badgePages().length).toBeGreaterThanOrEqual(2);
   });
 });
 

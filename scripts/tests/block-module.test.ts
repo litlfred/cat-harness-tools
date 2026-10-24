@@ -38,13 +38,19 @@ beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "blockmod-"));
   mkdirSync(join(root, "ch1"), { recursive: true });
 
-  block("ch1", "t1", `import { theorem } from "__BUILDERS__";
-export default theorem({ label: "thm:t1", title: "T", statement: "s", uses: ["def:d1"] });
+  // The fixtures are cat-harness's OWN kinds, built with its own builders: the
+  // loader is generic machinery, and the science layer's kinds (`theorem`,
+  // `proof`, …) and their builders moved up to that layer (cat-harness#419),
+  // which this layer may not name.
+  block("ch1", "r1", `import { remark } from "__BUILDERS__";
+export default remark({ label: "rem:r1", title: "R", uses: ["def:d1"] });
 `);
-  // The three kinds the audits' twelve-kind regex could not see.
-  block("ch1", "p1", `import { proof } from "__BUILDERS__";
-export default proof({ label: "prf:p1", title: "P", of: "thm:t1", statement: "s" });
+  // A block with no uses[] at all.
+  block("ch1", "e1", `import { example } from "__BUILDERS__";
+export default example({ label: "ex:e1", title: "E", interprets: "rem:r1" });
 `);
+  // Two of the three kinds the audits' twelve-kind regex could not see; the
+  // third, `proof`, is the science layer's now.
   block("ch1", "a1", `import { algorithm } from "__BUILDERS__";
 export default algorithm({ label: "alg:a1", title: "A", statement: "s", steps: ["one"], uses: ["thm:t1"] });
 `);
@@ -53,35 +59,35 @@ export default table({ label: "tbl:tb1", title: "Tb", caption: "c", data: { head
 `);
   // Not a block: a chapter manifest. Legitimately skipped.
   block("ch1", "ch1", `import { chapter } from "__BUILDERS__";
-export default chapter({ title: "Ch", sections: [{ title: "S", blocks: ["t1"] }] });
+export default chapter({ title: "Ch", sections: [{ title: "S", blocks: ["r1"] }] });
 `);
   // A dependency's kind (smart-base's `persona`): a block only when the
   // caller passes the contributed kinds.
   block("ch1", "pers1", `export default { kind: "persona", label: "pers:p1", title: "P" };
 `);
   // A block that throws on import. Must be REPORTED, not skipped.
-  block("ch1", "broken", `import { theorem } from "__BUILDERS__";
-export default theorem({ label: "NOT-A-VALID-PREFIX", title: "B", statement: "s" });
+  block("ch1", "broken", `import { remark } from "__BUILDERS__";
+export default remark({ label: "NOT-A-VALID-PREFIX", title: "B" });
 `);
 });
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 describe("loadBlocksUnder sees every block kind", () => {
-  test("finds proof, algorithm and table — the three the regex missed", async () => {
+  test("finds algorithm and table — kinds the regex missed — and the rest", async () => {
     const { blocks } = await loadBlocksUnder(root);
-    expect(blocks.has("prf:p1")).toBe(true);
     expect(blocks.has("alg:a1")).toBe(true);
     expect(blocks.has("tbl:tb1")).toBe(true);
-    expect(blocks.has("thm:t1")).toBe(true);
+    expect(blocks.has("rem:r1")).toBe(true);
+    expect(blocks.has("ex:e1")).toBe(true);
   });
 
   test("reads uses[] from the validated object, not from source text", async () => {
     const { blocks } = await loadBlocksUnder(root);
-    expect(blocks.get("thm:t1")!.uses).toEqual(["def:d1"]);
+    expect(blocks.get("rem:r1")!.uses).toEqual(["def:d1"]);
     expect(blocks.get("alg:a1")!.uses).toEqual(["thm:t1"]);
     // Absent uses[] is [], not undefined.
-    expect(blocks.get("prf:p1")!.uses).toEqual([]);
+    expect(blocks.get("ex:e1")!.uses).toEqual([]);
   });
 
   test("a chapter manifest is skipped, not reported as a failure", async () => {
@@ -110,11 +116,11 @@ describe("loadBlocksUnder and contributed kinds", () => {
 
 describe("loadBlockModule", () => {
   test("rejects a label the schema would reject", async () => {
-    // The regex accepted `label: "theorem:x"` — any string. The builder
-    // does not: a theorem's label must start with `thm:`. A graph keyed
+    // The regex accepted `label: "remark:x"` — any string. The builder
+    // does not: a remark's label must start with `rem:`. A graph keyed
     // on labels that cannot exist has edges that cannot resolve.
-    const p = block("ch1", "badlabel", `import { theorem } from "__BUILDERS__";
-export default theorem({ label: "theorem:x", title: "T", statement: "s" });
+    const p = block("ch1", "badlabel", `import { remark } from "__BUILDERS__";
+export default remark({ label: "remark:x", title: "T" });
 `);
     await expect(loadBlockModule(p)).rejects.toThrow();
     rmSync(p, { force: true });
@@ -122,11 +128,10 @@ export default theorem({ label: "theorem:x", title: "T", statement: "s" });
 });
 
 describe("verifyEditedBlock — the write path stops trusting the splice", () => {
-  const SRC = `import { theorem } from "${BUILDERS}";
-export default theorem({
-  label: "thm:v1",
+  const SRC = `import { remark } from "${BUILDERS}";
+export default remark({
+  label: "rem:v1",
   title: "V",
-  statement: "s",
   uses: ["def:a", "def:b"],
 });
 `;
@@ -154,7 +159,7 @@ export default theorem({
     // The concrete old bug: `/uses:\s*\[[\s\S]*?\]/` had no word
     // boundary, so on a block with an earlier field it rewrote that one
     // and left uses[] alone. Here the label is clobbered instead.
-    const edited = SRC.replace(`label: "thm:v1"`, `label: "thm:other"`);
+    const edited = SRC.replace(`label: "rem:v1"`, `label: "rem:other"`);
     const v = await verifyEditedBlock(target, edited, ["def:a", "def:b"]);
     expect(v.ok).toBe(false);
     if (v.ok) return;
@@ -162,14 +167,14 @@ export default theorem({
   });
 
   test("rejects an edit that no longer parses", async () => {
-    const v = await verifyEditedBlock(target, `export default theorem({ label:`, ["def:a"]);
+    const v = await verifyEditedBlock(target, `export default remark({ label:`, ["def:a"]);
     expect(v.ok).toBe(false);
     if (v.ok) return;
     expect(v.reason).toContain("does not load");
   });
 
   test("rejects an edit the schema refuses", async () => {
-    const edited = SRC.replace(`label: "thm:v1"`, `label: "nonsense"`);
+    const edited = SRC.replace(`label: "rem:v1"`, `label: "nonsense"`);
     const v = await verifyEditedBlock(target, edited, ["def:a", "def:b"]);
     expect(v.ok).toBe(false);
   });

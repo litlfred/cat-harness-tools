@@ -21,7 +21,7 @@ afterEach(() => {
 
 const XML = (reviewName = "Review the draft") => `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/0.1.0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
                   id="Defs" targetNamespace="urn:test">
   <bpmn:process id="Process_Review" name="Review">
     <bpmn:startEvent id="Start" name="A draft exists"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent>

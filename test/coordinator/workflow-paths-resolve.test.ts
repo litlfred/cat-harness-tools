@@ -105,7 +105,9 @@ const TOKEN = new RegExp(
   // outing — a real broken path, in a workflow already on the list. A guard
   // that misses the shape it was written for is worse than none, so this is
   // the one place to be generous.
-  String.raw`(?<![\w/\-])\.?/?((?:${MOVED.join("|")})/[\w./*\-]*)`,
+  // `*` too: `*/test/results/witnesses` is a glob over every instance's
+  // tree, not the root path it ends in.
+  String.raw`(?<![\w/\-*])\.?/?((?:${MOVED.join("|")})/[\w./*\-]*)`,
   "g",
 );
 

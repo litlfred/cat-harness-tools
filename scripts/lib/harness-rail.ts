@@ -261,11 +261,15 @@ export function wantsLinkedRail(html: string): boolean {
  */
 export function injectRail(html: string, o: RailOptions): string | undefined {
   const label = o.visualiserLabel ?? visualiserLabelOf(html) ?? RAIL_SECTION_LABELS.onThisPage;
-  const documentIndex = o.documentIndex ?? visualiserNavOf(html, label) ?? documentIndexOf(html, label);
+  // A DECLARED index (`data-fa-visualiser-nav`) is the same on every page of
+  // one guide, so with shared data it goes in the shared file, not the page
+  // (bean gp2f: ~4 KB off every IG page). A headings index is the page's own.
+  const declared = o.documentIndex ? undefined : visualiserNavOf(html, label);
+  const documentIndex = o.documentIndex ?? declared ?? documentIndexOf(html, label);
   const root = o.assetRoot ?? o.toRoot;
   const chrome = o.chromeRoot ?? root;
   if (o.emitRailData) {
-    const railed = withSharedRail(html, o, root, documentIndex);
+    const railed = withSharedRail(html, o, root, documentIndex, declared !== undefined);
     return railed === undefined
       ? undefined
       : withNavbarRow(railed, o.navbarRow, {
@@ -443,6 +447,8 @@ export interface RailShared {
   pages?: readonly NavItem[];
   harnesses?: readonly NavItem[];
   homeLabel?: string;
+  /** A document index every page of a guide shares — its declared IG menu. A page's own wins. */
+  documentIndex?: NavGroup;
 }
 
 /** What is the page's own, carried in its `#fa-rail` block. */
@@ -472,7 +478,7 @@ function contentHash(s: string): string {
 }
 
 /** The shared data as text, with the caller's root replaced by {@link RAIL_ROOT}. */
-export function railSharedJson(o: RailOptions, root: string): string {
+export function railSharedJson(o: RailOptions, root: string, documentIndex?: NavGroup): string {
   const shared: RailShared = {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -481,6 +487,7 @@ export function railSharedJson(o: RailOptions, root: string): string {
     ...(o.pages && o.pages.length > 0 ? { pages: o.pages } : {}),
     ...(o.harnesses ? { harnesses: o.harnesses } : {}),
     ...(o.homeLabel ? { homeLabel: o.homeLabel } : {}),
+    ...(documentIndex ? { documentIndex } : {}),
   };
   // Every root-relative value the caller composed starts `<root>/`; put the
   // placeholder there so the SAME data serves a page at any depth.
@@ -523,7 +530,7 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
       links,
       ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
-      ...(page.documentIndex ? { documentIndex: page.documentIndex } : {}),
+      ...((page.documentIndex ?? shared.documentIndex) ? { documentIndex: page.documentIndex ?? shared.documentIndex } : {}),
     }),
   );
 }
@@ -531,13 +538,20 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
 const PENDING = 'data-fa-rail="pending"';
 
 /** Inject the page block, the placeholder `<nav>` and the three links; emit the shared data. */
-function withSharedRail(html: string, o: RailOptions, root: string, documentIndex: NavGroup | undefined): string | undefined {
+function withSharedRail(
+  html: string,
+  o: RailOptions,
+  root: string,
+  documentIndex: NavGroup | undefined,
+  shareIndex: boolean,
+): string | undefined {
   if (hasRail(html)) return undefined;
   const body = bodyTag(html);
   if (!body) return undefined;
-  const asset = railDataAsset(railSharedJson(o, root));
+  const asset = railDataAsset(railSharedJson(o, root, shareIndex ? documentIndex : undefined));
   o.emitRailData!(asset.file, asset.body);
-  const page = { data: asset.name, ...(o.here ? { here: o.here } : {}), ...(documentIndex ? { documentIndex } : {}) };
+  const own = shareIndex ? undefined : documentIndex;
+  const page = { data: asset.name, ...(o.here ? { here: o.here } : {}), ...(own ? { documentIndex: own } : {}) };
   const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const block =
     `<script type="application/json" id="${RAIL_PAGE_ID}" data-fa-root="${esc(root)}" data-fa-to-root="${esc(o.toRoot)}">` +

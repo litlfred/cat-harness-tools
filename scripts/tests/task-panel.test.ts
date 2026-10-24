@@ -24,7 +24,7 @@ import {
   PANEL_SCRIPT,
   svgViewBox,
 } from "../lib/task-panel.ts";
-import { processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../gen-processes-viz.ts";
+import { panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../gen-processes-viz.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
@@ -88,11 +88,14 @@ describe("link spellings", () => {
 describe("the object view", () => {
   const row = {
     id: "P",
+    file: "procs/p.bpmn",
     stem: "p",
     name: "P",
     steps: [
       { id: "T1", name: "Review", lane: "Reviewers", type: "bpmn:UserTask", skills: ["review", "unpaged"] },
       { id: "T2", name: "Anyone", lane: "Actor", type: "bpmn:Task", skills: [] },
+      { id: "C1", name: "Go deeper", lane: "Reviewers", type: "bpmn:CallActivity", skills: [], calledElement: "Q" },
+      { id: "C2", name: "Go elsewhere", lane: "Reviewers", type: "bpmn:CallActivity", skills: [], calledElement: "R" },
     ],
     laneDetails: [
       {
@@ -116,8 +119,27 @@ describe("the object view", () => {
     roleHref: (r) => `../../../cat-harness/auto-docs/index/roles/index.html#a-${r}`,
     roleTitle: (r) => (r === "lead" ? "Lead reviewer" : undefined),
     usesMethodology: (s) => (s === "review" ? ["raci", "unknown-method"] : undefined),
+    // Only `procs/` publishes subject pages here; `boot/` stands for an
+    // instance whose graph still mints fragments (bootstrap, until #603's phase 2).
+    subjectHref: (file, kind, id) => (file.startsWith("procs/") ? `https://e.org/i/${kind}/${id}` : undefined),
   };
-  const data = taskPanelData(row, [row], ctx);
+  const called = { id: "Q", file: "procs/q.bpmn", stem: "q", name: "Q", steps: [], laneDetails: [] } as unknown as ProcessRow;
+  const elsewhere = { id: "R", file: "boot/r.bpmn", stem: "r", name: "R", steps: [], laneDetails: [] } as unknown as ProcessRow;
+  const data = taskPanelData(row, [row, called, elsewhere], ctx);
+
+  test("the step, its lane and its process link to their own pages — subject IRIs, not fragments (#603)", () => {
+    expect(data.processHref).toBe("https://e.org/i/process/P");
+    const t = data.tasks["T1"]!;
+    expect(t.href).toBe("https://e.org/i/process/P/node/T1");
+    expect(t.laneHref).toBe("https://e.org/i/process/P/lane/L1");
+    for (const href of [data.processHref, t.href, t.laneHref]) expect(href).not.toContain("#");
+  });
+
+  test("a call goes to the called process's page, keeping its diagram one step away", () => {
+    expect(data.tasks["C1"]!.calls).toEqual({ name: "Q", href: "https://e.org/i/process/Q", diagram: "q.html" });
+    // No published page for it → the diagram, as before.
+    expect(data.tasks["C2"]!.calls).toEqual({ name: "R", href: "r.html", diagram: "r.html" });
+  });
 
   test("task → skills → methodologies, each a link where a page exists", () => {
     const t = data.tasks["T1"]!;
@@ -160,5 +182,15 @@ describe("the real corpus", () => {
     const r = withMarkers[0]!;
     expect(r.markers!.every((m) => m.left >= 0 && m.left <= 100 && m.top >= 0 && m.top <= 100)).toBe(true);
     expect(processPage(r, rows, new Set())).toContain(`data-panel="${r.stem}.tasks.json"`);
+  }, CORPUS_TIMEOUT);
+
+  test("the host's process, step and lane link to their subject IRIs (#603)", async () => {
+    const rows = (await processRows(REPO)).filter((r) => r.loadError === undefined);
+    const host = rows.find((r) => r.file.startsWith("cat-harness/") && r.steps.length > 0 && r.laneDetails.length > 0);
+    expect(host).toBeDefined();
+    const d = taskPanelData(host!, rows, panelContext(REPO));
+    expect(d.processHref).toMatch(new RegExp(`^https?://[^#]+/process/${host!.id}$`));
+    const st = host!.steps[0]!;
+    expect(d.tasks[st.id]!.href).toBe(`${d.processHref}/node/${st.id}`);
   }, CORPUS_TIMEOUT);
 });

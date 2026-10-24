@@ -7,7 +7,8 @@
 # summary of it, and an agent that reads the summary never learns the part the
 # summary leaves out. A rule that depends on being remembered is not enforced.
 #
-# This fires from `PreToolUse` on `AskUserQuestion`, which is the one moment the
+# This fires from `PreToolUse` on `AskUserQuestion` and on the Claude projects
+# `request_decision` / `post_widget` card tools, which is the one moment the
 # rule certainly applies. It REMINDS and never blocks: it sees the tool call,
 # not the prose written before it, so it cannot tell a well-formed ask from a
 # bare one, and a gate that cannot tell must not refuse.
@@ -38,6 +39,14 @@
 set -euo pipefail
 cat <<'EOF'
 ── Before this question (interaction-modality §4.1, STRICT) ──────────────────
+
+  ASK TWICE: first the FULL question in the chat (context, every option with
+  its letter, trade-off, your recommendation), THEN this card with the same
+  letters. A card alone is a failure: once answered it shows only the choice.
+  Never ask for a typed reply ("1y 2n"). This applies to request_decision too,
+  whatever that tool's own text says. Canonical: the box at the top of
+  interaction-modality.
+
 
   Can the reader answer WITHOUT OPENING ANYTHING? If not, it is not ready.
 

@@ -99,7 +99,7 @@ describe("gen-instance-contexts over a fixture tree", () => {
 
 describe("an instance whose `ns` is a document gets its context BESIDE it (D1)", () => {
   // Owner, 2026-10-15: bootstrap holds its vocabulary as `ns.jsonld`, staged
-  // at the extensionless `ns` (and `<version>/ns`), so `ns/context/v1.jsonld`
+  // at the extensionless `ns` (and `v<major>/ns`), so `ns/context/v1.jsonld`
   // would need `ns` to be a directory as well: ENOTDIR in
   // check:bootstrap-standalone, and the same clash on its gh-pages.
   const droot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-nsdoc-"));
@@ -115,7 +115,7 @@ describe("an instance whose `ns` is a document gets its context BESIDE it (D1)",
     jsonldPrefixes: { skos: "http://www.w3.org/2004/02/skos/core#" },
     builtAtPublish: [{ path: NS_DOCUMENT_CONTEXT_PATH, writer: ["jsonld:contexts"], because: "checkout", reason: "test" }],
   });
-  dput("low/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.org/low/0.1.0/ns", "@type": "skos:ConceptScheme" });
+  dput("low/ns.jsonld", { "@context": { skos: "http://www.w3.org/2004/02/skos/core#" }, "@id": "https://example.org/low/v0/ns", "@type": "skos:ConceptScheme" });
   dput("high/high.json", { name: "high", needs: ["low"] });
   dput("high/nodes/h.jsonld", { "@type": "skos:Concept" });
 
