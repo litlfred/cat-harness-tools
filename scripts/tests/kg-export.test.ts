@@ -40,6 +40,7 @@ import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
+import { hostSchemaBase } from "../lib/host-schema.ts";
 import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
@@ -393,7 +394,8 @@ describe("kg export", () => {
     expect(exportIdentity({ baseUrl: BASE }).docIri).toBe(`${BASE}/${decl.name}/${stub}.jsonld`);
     expect(exportIdentity({ baseUrl: BASE }).docPath).toBe(`${decl.name}/${stub}.jsonld`);
     expect(exportIdentity({ baseUrl: BASE }).legacyDocIri).toBe(`${BASE}/${stub}.jsonld`);
-    expect(buildDeclarationSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/${stub}.schema.json`);
+    // Its schemas beside it, under the same directory (#676).
+    expect(buildDeclarationSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/${decl.name}/${stub}.schema.json`);
 
     // THE OTHER HALF OF THIS TEST WAS REVERSED BY THE OWNER, 2026-09-21, and
     // the reasoning is worth keeping rather than just the new assertion.
@@ -743,7 +745,16 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`${s}/${s}.jsonld`);
       out.add(`${s}/${s}.json`);
     }
-    for (const c of buildSkillIoContracts({ baseUrl: BASE })) out.add(c.published.split("\\").join("/"));
+    // The host's schemas sit under its directory since #676, beside its
+    // document; each old root address holds its one-release tombstone, which
+    // the same step writes, so both are published.
+    const hostDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
+    for (const p of [`${stub}.schema.json`, "tool.schema.json", "tool-types.schema.json"]) out.add(`${hostDir}${p}`);
+    for (const c of buildSkillIoContracts({ baseUrl: BASE })) {
+      const rel = c.published.split("\\").join("/");
+      out.add(rel);
+      out.add(`${hostDir}${rel}`);
+    }
     // A Process's `depiction` (bean `ax6r`): the SVGs `render:bpmn` commits
     // into the site's `assets/`, which Jekyll serves as they sit. Read from the
     // DIRECTORY, not from the nodes — a depiction naming a file that is not
@@ -755,7 +766,10 @@ describe("every self-URL the export publishes resolves to something published", 
     // One JSON Schema per shared I/O type (bean `tdir`), which the deploy's
     // `harness-schema-export --out-dir ./_site` writes beside
     // `tool-types.schema.json`. A port's `schema` names one of these.
-    for (const n of Object.keys(TOOL_TYPES)) out.add(`tool-types/${n}.schema.json`);
+    for (const n of Object.keys(TOOL_TYPES)) {
+      out.add(`tool-types/${n}.schema.json`);
+      out.add(`${hostDir}tool-types/${n}.schema.json`);
+    }
     const toolDir = join(HARNESS_ROOT, "tools");
     // Beside the document, so under `<name>/` since #603 decision 1b; the
     // old root `tools/<id>.jsonld` holds each one's tombstone for a release.
@@ -1709,7 +1723,8 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
       const node = nodes.get(c.skill);
       if (node === undefined || c.input === undefined || isExternalContract(c.input)) continue;
       if (resolve(c.instanceRoot) === HOST) {
-        expect(node.inputSchema).toStartWith(`${BASE}/skills/`);
+        // Under the host's own directory since #676.
+        expect(node.inputSchema).toStartWith(`${hostSchemaBase(BASE)}/skills/`);
         continue;
       }
       if (!publishesInstanceSchema(c.instanceRoot)) continue;
@@ -1725,7 +1740,8 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
   test("the host's document conformsTo its own declaration schema, by the $id the schema export mints with the same base", () => {
     expect(EXPORT.conformsTo).toBe(buildDeclarationSchema().$id as string);
     expect(EXPORT_CANONICAL.conformsTo).toBe(buildDeclarationSchema({ baseUrl: BASE }).$id as string);
-    expect(EXPORT_CANONICAL.conformsTo).toBe(`${BASE}/${artefactStub(readDeclaration(HOST)!)}.schema.json`);
+    // Beside the document, under the host's own directory (#676).
+    expect(EXPORT_CANONICAL.conformsTo).toBe(`${BASE}/${readDeclaration(HOST)!.name}/${artefactStub(readDeclaration(HOST)!)}.schema.json`);
     // A preview links the preview's copy, never the canonical one.
     expect(EXPORT_ALT.conformsTo).toBe(buildDeclarationSchema({ baseUrl: ALT_BASE }).$id as string);
     expect(EXPORT_ALT.conformsTo).toStartWith(`${ALT_BASE}/`);

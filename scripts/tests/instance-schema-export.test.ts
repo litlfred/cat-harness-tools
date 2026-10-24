@@ -38,6 +38,7 @@ import {
 import { instanceExportPlan } from "../instance-exports.js";
 import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../kg-export.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { hostSchemaBase } from "../lib/host-schema.ts";
 import { INSTANCE, checkoutHolding, inAggregate } from "../../test/support/checkout.js";
 
 const SITE = "https://site.example/pub";
@@ -145,7 +146,8 @@ describe("the host's schema outputs are unchanged by the generalisation", () => 
       // exactly as before the generalisation.
       expect(c.source.split("\\").join("/")).toBe(`schemas/skills/${c.skill}/${c.io}.schema.json`);
       expect(c.published.split("\\").join("/")).toBe(`skills/${c.skill}/${c.io}.schema.json`);
-      expect(c.schema.$id).toBe(skillIoIri(base, c.skill, c.io));
+      // Under the host's own directory since #676, beside its document.
+      expect(c.schema.$id).toBe(skillIoIri(hostSchemaBase(base), c.skill, c.io));
       // Byte-for-byte means key ORDER too: the computed `$id` replaces the
       // stored one in place. A first draft of the no-base fix moved it to the
       // end and changed every published host contract; this is what caught it.

@@ -42,19 +42,21 @@ import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js"
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { toolsFromFolders } from "@litlfred/cat-harness/schemas/tool-folders.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 
 /**
  * The base the I/O type IRIs are minted against when the caller names none:
  * the HARNESS's declared `canonicalUrl`, because the tool-type vocabulary is
- * the harness's and is published once, at its base — the same answer
- * `discover.ts` passes every instance's `tools()`. An empty base would mint
- * relative IRIs, which the Tool schema refuses at load (measured standalone).
+ * the harness's and is published once, under its own directory at its base
+ * (`hostSchemaBase`, #676) — the same answer `discover.ts` passes every
+ * instance's `tools()`. An empty base would mint relative IRIs, which the
+ * Tool schema refuses at load (measured standalone).
  */
 function harnessBase(): string {
   const p = declarationPathIn(HARNESS_ROOT);
   if (p === undefined || !existsSync(p)) return "";
   try {
-    return (JSON.parse(readFileSync(p, "utf-8")) as { canonicalUrl?: string }).canonicalUrl ?? "";
+    return hostSchemaBase((JSON.parse(readFileSync(p, "utf-8")) as { canonicalUrl?: string }).canonicalUrl ?? "");
   } catch {
     return "";
   }
