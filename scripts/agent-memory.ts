@@ -113,6 +113,9 @@ export const CLAUDE_MEMORY_LINE_BUDGET = 200;
 export const ANTIGRAVITY_SKILL_BYTE_BUDGET = 24_000;
 export const ANTIGRAVITY_RULE_BYTE_BUDGET = 24_000;
 export const AGENTS_MD_BYTE_BUDGET = 32_768;
+/** Per-agent vendor definition files (bean `31ni`): Copilot's limit is the vendor's, the rest the harness's cap. */
+export const VENDOR_AGENT_BYTE_BUDGET = 32_768;
+export const COPILOT_AGENT_CHAR_BUDGET = 30_000;
 
 const LABELS = new Set<string>(MEMORY_LABELS);
 
@@ -683,6 +686,8 @@ export function fitNodesToByteBudget(
 export interface TargetDropRecord {
   target: string;
   budgetBytes: number;
+  /** What `budgetBytes` counts; bytes unless said (Copilot counts characters). */
+  unit?: "bytes" | "chars";
   dropped: readonly MemoryNode[];
 }
 
@@ -696,7 +701,7 @@ export function droppedTargetNodesReport(records: readonly TargetDropRecord[]): 
   const rows = real
     .map((r) => {
       const items = r.dropped.map((d) => `[${d.label.toUpperCase()}] ${d.id} (${d.summary})`).join("; ");
-      return `  ${r.target} (budget ${r.budgetBytes} bytes): ${r.dropped.length} dropped — ${items}`;
+      return `  ${r.target} (budget ${r.budgetBytes} ${r.unit ?? "bytes"}): ${r.dropped.length} dropped — ${items}`;
     })
     .join("\n");
   return (
@@ -713,15 +718,15 @@ export interface AgentMemoryTargetDef {
   pathPattern: string;
   scope: "per-agent" | "all-agents" | "repo-wide";
   delivery: "marked-region" | "whole-file";
-  budget: { unit: "lines" | "bytes"; limit: number };
+  budget: { unit: "lines" | "bytes" | "chars"; limit: number };
 }
 
 /**
  * Active assembler targets and their budgets (bean `31ni`).
  *
- * Per-agent vendor targets for Gemini CLI (`4682`), OpenAI Codex CLI (`5zs1`),
- * Cursor (`uvfs`), and GitHub Copilot (`xxh4`) remain parked per the owner's
- * 2026-10-20 ruling.
+ * The per-agent definition targets for Gemini CLI (`4682`), OpenAI Codex
+ * (`5zs1`), Cursor (`uvfs`) and GitHub Copilot (`xxh4`) are written by
+ * `agent-memory-vendors.ts` (owner lifted the hold, 2026-10-24).
  */
 export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
   {
@@ -756,6 +761,38 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
     delivery: "marked-region",
     budget: { unit: "bytes", limit: AGENTS_MD_BYTE_BUDGET },
   },
+  {
+    id: "gemini-agent",
+    vendor: "Gemini CLI",
+    pathPattern: ".gemini/agents/<agent>.md",
+    scope: "per-agent",
+    delivery: "whole-file",
+    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+  },
+  {
+    id: "codex-agent",
+    vendor: "OpenAI Codex",
+    pathPattern: ".codex/agents/<agent>.toml",
+    scope: "per-agent",
+    delivery: "whole-file",
+    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+  },
+  {
+    id: "cursor-agent",
+    vendor: "Cursor",
+    pathPattern: ".cursor/agents/<agent>.md",
+    scope: "per-agent",
+    delivery: "whole-file",
+    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+  },
+  {
+    id: "copilot-agent",
+    vendor: "GitHub Copilot",
+    pathPattern: ".github/agents/<agent>.agent.md",
+    scope: "per-agent",
+    delivery: "whole-file",
+    budget: { unit: "chars", limit: COPILOT_AGENT_CHAR_BUDGET },
+  },
 ];
 
 // ── Antigravity target (bean `fkqa`) ────────────────────────────
@@ -769,9 +806,8 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
  *
  * Antigravity has no per-agent memory like Claude's `memory: project`, so each
  * agent's memory is published as one skill the agent model sees by name and
- * description and reads when relevant. The owner's ruling (2026-10-06): this
- * vendor is implemented; Gemini CLI, Copilot, Codex and Cursor are beaned
- * (`31ni`) and not.
+ * description and reads when relevant. Gemini CLI, Copilot, Codex and Cursor
+ * get per-agent definition files instead (`agent-memory-vendors.ts`, bean `31ni`).
  */
 export const ANTIGRAVITY_SKILLS_DIR = join(repoRootFor(ROOT), ".agents", "skills");
 
@@ -1197,6 +1233,21 @@ if (import.meta.main) {
     });
   }
   if (agentsMdResult.state === "written" && check) stale++;
+
+  const { syncVendorAgents, VENDOR_TARGETS } = await import("./agent-memory-vendors.ts");
+  for (const r of syncVendorAgents(!check)) {
+    const t = VENDOR_TARGETS.find((x) => x.id === r.target)!;
+    const rel = `${t.dir.slice(repoRootFor(ROOT).length + 1)}/${t.fileName(r.agent)}`;
+    const note =
+      r.state === "no-definition"
+        ? `no .claude/agents/${r.agent}.md — nothing to carry, left alone`
+        : `${r.entries} entries (${r.size} ${t.budget.unit}, ${t.vendor} agent)`;
+    console.log(`  ${r.state.padEnd(11)} ${rel.padEnd(28)} ${note}`);
+    if (r.dropped.length > 0) {
+      targetDropRecords.push({ target: rel, budgetBytes: t.budget.limit, unit: t.budget.unit, dropped: r.dropped });
+    }
+    if (r.state === "written" && check) stale++;
+  }
 
   const dropped: { agent: string; entries: string[] }[] = [];
   for (const r of results) {

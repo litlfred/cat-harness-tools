@@ -707,6 +707,7 @@ describe("every self-URL the export publishes resolves to something published", 
       // `ns/` is a directory holding the content context. There is
       // deliberately no file at `ns`, and no all-layers union inside it any
       // more (retired 2026-09-30) — each layer's vocabulary is `<stub>/ns`.
+      // declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
       "ns/content/v1.jsonld",
       // The generated stylesheets, reached because `themes-css` and
       // `avatars-css` DECLARE them through `maintains` and the export publishes

@@ -25,8 +25,8 @@ import {
   voiceExcludesCriterion,
 } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/voices.ts";
-import { criterionDefHash } from "../../pipeline/qa-utils";
-import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
+import { criterionDefHash } from "../../../pipeline/qa-utils";
+import { writeInstanceConfig } from "../../../test/support/instance-fixture.js";
 
 describe("criterionVoices", () => {
   test("absent means NOT voice-scoped — the opposite default from profiles", () => {

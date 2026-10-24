@@ -21,7 +21,7 @@ import {
   repoOf,
   stale,
   type SessionRow,
-} from "../../src/sessions/staleness.ts";
+} from "../../../src/sessions/staleness.ts";
 
 const NOW = new Date("2026-09-21T12:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
