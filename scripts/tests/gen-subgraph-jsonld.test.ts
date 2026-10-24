@@ -42,6 +42,8 @@ import {
   type PayloadLink,
 } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { toolsOf } from "../../tools/discover.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 /** This instance's published document: its own nodes are fragments of it. */
@@ -118,6 +120,29 @@ describe("gen-subgraph-jsonld", () => {
     expect([...indexMembers("skills/sdlc/")].sort()).toEqual(expected);
     const hydrated = read("skills/sdlc/", SUBGRAPH_HYDRATED_FILE);
     expect([...hydratedMembers(hydrated)].sort()).toEqual(expected);
+  });
+
+  test("tools/ is a named subgraph: every Tool of this instance, one fetch, each in its own folder (bean mo75 G1)", () => {
+    // The oracle is discovery's own list, not the plan: which Tools this
+    // instance defines, and the IRI kg-export gives each.
+    const expected = toolsOf(ROOT).map((t) => toolIri(HOST_DOC, t.id)).sort();
+    expect(expected.length).toBeGreaterThan(0);
+    expect(read("", SUBGRAPH_INDEX_FILE).hasSubgraph).toContain(iriOf("tools/"));
+    const tools = read("tools/", SUBGRAPH_INDEX_FILE);
+    expect(tools["@id"]).toBe(iriOf("tools/"));
+    expect(tools.holdsGraph).toEqual([expect.stringMatching(/graphTypology\/tools$/)]);
+    const hydrated = read("tools/", SUBGRAPH_HYDRATED_FILE);
+    const whole = [...hydratedMembers(hydrated)].filter((id) => expected.includes(id)).sort();
+    expect(whole).toEqual(expected);
+    expect([...indexMembers("tools/")].filter((id) => expected.includes(id)).sort()).toEqual(expected);
+    // No Tool is left at the root, which has no hydrated file.
+    const rootIds = ((read("", SUBGRAPH_INDEX_FILE).hasMember ?? []) as Array<{ "@id": string }>).map((m) => m["@id"]);
+    expect(rootIds.filter((id) => expected.includes(id))).toEqual([]);
+    // `<tools dir>/<id>/<id>.ts`: the folder is the Tool's own subgraph.
+    const [first] = toolsOf(ROOT);
+    const own = read(`tools/${first!.id}/`, SUBGRAPH_HYDRATED_FILE);
+    expect((own.hasMember as Array<Record<string, unknown>>).map((m) => m["@id"])).toContain(toolIri(HOST_DOC, first!.id));
+    expect((own.hasMember as Array<Record<string, unknown>>).find((m) => m.name === first!.id)?.invoke).toBeDefined();
   });
 
   test("the hydrated file carries whole nodes; the index carries pointers", () => {

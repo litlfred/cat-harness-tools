@@ -244,6 +244,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["check:lane-documentation", "lane-documentation"],
       ["check:methodology-evidence", "methodology-evidence"],
       ["check:avatar-coverage", "avatar-coverage"],
+      ["check:unlinked-beans", "unlinked-beans"],
       ["kg:export", "kg-export"],
     ] as const
   ).map(([script, stem]): QaWriter => ({
@@ -277,7 +278,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     // runs `skills:docs`, which reads the todo graph, and check:harness-state
     // judges the issue-marks, merge-queue, session-survey, todo-feedback and
     // board-positions graphs; all of them live on state branches.
-    ...(script === "skill:register" || script === "check:harness-state" ? { readsState: true as const } : {}),
+    // check:unlinked-beans (bean `w2hn`) reads the beans graph and its workflow instances.
+    ...(script === "skill:register" || script === "check:harness-state" || script === "check:unlinked-beans" ? { readsState: true as const } : {}),
     because: "a whole-artefact review; its writer form writes the sidecar",
   })),
   {
