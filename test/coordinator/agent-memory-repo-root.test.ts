@@ -15,7 +15,7 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -26,6 +26,7 @@ import {
 import {
   AGENT_MEMORY_DIR,
   AGENTS_MD_BYTE_BUDGET,
+  AGENTS_MD_FILE,
   ANTIGRAVITY_RULE_BYTE_BUDGET,
   ANTIGRAVITY_RULE_FILE,
   ANTIGRAVITY_SKILL_BYTE_BUDGET,
@@ -211,7 +212,11 @@ describe("Antigravity workspace rule target (bean fkqa)", () => {
 
   test("the repo-wide AGENTS.md target is gated and drops no entries", () => {
     const res = syncAgentsMd(false);
-    expect(["unchanged", "no-markers"]).toContain(res.state);
+    // A layer checked out alone (the standalone probe) has no aggregate root,
+    // so there is no repo-wide AGENTS.md to assemble: `missing` is the honest
+    // state there. Where the file exists it must be current or unmarked.
+    const expected = existsSync(AGENTS_MD_FILE) ? ["unchanged", "no-markers"] : ["missing"];
+    expect(expected).toContain(res.state);
     expect(res.dropped).toEqual([]);
     if (res.state === "unchanged") {
       expect(res.bytes).toBeLessThanOrEqual(AGENTS_MD_BYTE_BUDGET);
