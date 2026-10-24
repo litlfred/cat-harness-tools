@@ -1547,8 +1547,12 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
       todos: [],
       now: NOW,
       drawingFor: () => "../../assets/img/workflows/crdm.svg",
+      processPageFor: () => "../../processes/crdm.html",
     });
     expect(drawn).toContain('data-wv-svg="../../assets/img/workflows/crdm.svg"');
+    // Back to the process's own page, from the header and from the diagram's caption.
+    expect(drawn).toContain('<a href="../../processes/crdm.html" title="the process page"><code>Process_CRDM</code></a>');
+    expect(drawn).toContain('Process <a href="../../processes/crdm.html"><code>Process_CRDM</code></a>');
     expect(drawn).toContain('data-wv-tokens="[&quot;A_Step&quot;]"');
     expect(drawn).toContain("which is not on disk; drawn from <code>crdm.bpmn</code>");
   });

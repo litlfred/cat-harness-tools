@@ -296,7 +296,7 @@ export interface NamedTodo {
 }
 
 /** Every process id an instance runs, its children included. */
-function processIdsOf(s: InstanceState): Set<string> {
+export function processIdsOf(s: InstanceState): Set<string> {
   const out = new Set([s.processId]);
   for (const c of Object.values(s.children ?? {})) for (const p of processIdsOf(c)) out.add(p);
   return out;
@@ -355,5 +355,28 @@ export function beanPositions(beans: readonly Pick<BeanNode, "id">[], instances:
     const f = finished.get(b.id);
     out.set(b.id, r ? { state: "running", instances: r } : f ? { state: "finished", instances: f } : { state: "none", reason: NO_INSTANCE_REASON });
   }
+  return out;
+}
+
+/**
+ * An instance page as another page links it: which store it is in, the
+ * processes it runs, and its site-relative route (`visualiserRoute`). Links
+ * and counts only — never a position, which lives in the instance file.
+ */
+export interface InstanceLink {
+  store: string;
+  id: string;
+  status?: string;
+  /** The instance's process and every subprocess in its `children`. */
+  processIds: string[];
+  /** Site-relative, from the declared route helpers. */
+  route: string;
+}
+
+/** The instance pages that run each process id — itself or as a subprocess — sorted by id. */
+export function instancesByProcess(links: readonly InstanceLink[]): Map<string, InstanceLink[]> {
+  const out = new Map<string, InstanceLink[]>();
+  for (const l of links) for (const p of new Set(l.processIds)) out.set(p, [...(out.get(p) ?? []), l]);
+  for (const list of out.values()) list.sort((a, b) => a.store.localeCompare(b.store) || a.id.localeCompare(b.id));
   return out;
 }

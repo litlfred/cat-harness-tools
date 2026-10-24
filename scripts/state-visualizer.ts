@@ -147,7 +147,7 @@ import {
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
-import { ROUTE_SEGMENT } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readBeans, type BeanNode } from "./beans.ts";
@@ -172,7 +172,9 @@ import {
   STUCK_AFTER_DAYS,
   stuckStatesOf,
   todosNamedBy,
+  processIdsOf,
   type BeanPosition,
+  type InstanceLink,
   type DiagramLevel,
   type StuckState,
   type TodoLike,
@@ -193,6 +195,7 @@ import {
   visualiserPageDir,
   withRenderedBy,
   withRenderedByFrontMatter,
+  visualiserSitePath,
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -1537,6 +1540,8 @@ export interface WorkflowInstanceView {
   now: Date;
   /** The published drawing for a `.bpmn` path, page-relative, or undefined when none is published. */
   drawingFor: (bpmn: string) => string | undefined;
+  /** The processes viewer's page for a `.bpmn` path, page-relative, or undefined when none is declared. */
+  processPageFor?: (bpmn: string) => string | undefined;
 }
 
 /** The workflow pages' own styles: the token and the steps done, over the published drawing. */
@@ -1579,10 +1584,65 @@ const WV_SCRIPT = `<script>
 })();
 </script>`;
 
+/** A process id, linked to its page in the processes viewer where there is one. */
+function processLink(id: string, href: string | undefined): string {
+  return href ? `<a href="${esc(href)}" title="the process page"><code>${esc(id)}</code></a>` : `<code>${esc(id)}</code>`;
+}
+
+/** The sub-graph route of an instance page under its store's page: `<store>/workflows/<id>`. */
+export function workflowSubgraph(store: string, id: string): string {
+  return `${store}/workflows/${id}`;
+}
+
+/**
+ * Every workflow instance page this generator draws in the checkout at
+ * `root`, as other pages link it (the processes viewer, bean `v49e`
+ * follow-up: "how does a user navigate there? from processes/?"). The same
+ * selection `drawWorkflows` makes — a per-instance beans visualiser covering
+ * `workflow-state`, a readable store, an id that is a URL segment — so a link
+ * never names a page that run does not write. Routes are site-relative, from
+ * `visualiserRoute`. `unread` names the stores that could not be read here,
+ * whose instances are unknown rather than none.
+ */
+export function workflowInstanceLinks(root: string = ROOT): { links: InstanceLink[]; unread: string[] } {
+  const decl = readDeclaration(root);
+  if (!decl) return { links: [], unread: [] };
+  const harness = decl.name ?? basename(root);
+  const out: InstanceLink[] = [];
+  const unread: string[] = [];
+  const viewers = (decl.visualisers ?? []).filter(
+    (v) => v.renderedBy === VIEWER_TOOL && v.subgraphs === "instance" && (v.coversKinds ?? []).includes("workflow-state"),
+  );
+  for (const v of viewers) {
+    const { beans, subjects } = perInstanceSubjects(v, root, harness);
+    if (!beans) continue;
+    for (const s of subjects) {
+      const read = readSubjectBeans(s.instanceRoot);
+      if (!("beans" in read) || read.beans === null) {
+        // Not drawn by `drawWorkflows` either; named so a reader is not told "none".
+        if ("unreachable" in read) unread.push(s.name);
+        continue;
+      }
+      for (const r of readInstances(filesIn(storePartDirs(s.absPath, "workflow-state"), ".json"))) {
+        if (!("state" in r) || !ROUTE_SEGMENT.test(r.state.id)) continue;
+        out.push({
+          store: s.name,
+          id: r.state.id,
+          ...(r.state.status ? { status: r.state.status } : {}),
+          processIds: [...processIdsOf(r.state)],
+          route: visualiserRoute(pageParts({ harness, visualiser: v.id, subgraph: workflowSubgraph(s.name, r.state.id) })),
+        });
+      }
+    }
+  }
+  return { links: out, unread };
+}
+
 /** One diagram level: the drawing, or why there is none, and the position as words either way. */
-function levelFigure(level: DiagramLevel, drawing: string | undefined, label: string): string {
+function levelFigure(level: DiagramLevel, drawing: string | undefined, label: string, processPage?: string): string {
+  const name = processPage ? `<a href="${esc(processPage)}"><code>${esc(level.processId)}</code></a>` : `<code>${esc(level.processId)}</code>`;
   const words =
-    `<p class="sv-sub">${esc(label)} <code>${esc(level.processId)}</code>` +
+    `<p class="sv-sub">${esc(label)} ${name}` +
     (level.phase.length > 0 ? ` inside ${level.phase.map((p) => `<code>${esc(p)}</code>`).join(" ▸ ")}` : "") +
     ` — token at ${level.tokens.length > 0 ? level.tokens.map((t) => `<code>${esc(t)}</code>`).join(", ") : "<strong>no step</strong>"}` +
     `; ${level.done.length} other step(s) in its history (drawn with a solid red outline and dashed, respectively).</p>`;
@@ -1608,7 +1668,9 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
   const states = stuckStatesOf(s, v.beans ?? [], v.now, endNodesOf(model));
   const levels = diagramLevels(s, model);
   const diagrams = levels
-    .map((l, i) => levelFigure(l, l.source ? v.drawingFor(l.source) : undefined, i === 0 ? "Process" : "Subprocess"))
+    .map((l, i) =>
+      levelFigure(l, l.source ? v.drawingFor(l.source) : undefined, i === 0 ? "Process" : "Subprocess", l.source ? v.processPageFor?.(l.source) : undefined),
+    )
     .join("");
   const source =
     "missing" in v.model
@@ -1676,7 +1738,7 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
     body:
       `<style>\n${WV_CSS}\n</style>` +
       `<h1 id="workflow-${esc(s.id)}">Workflow: ${esc(s.id)}</h1>` +
-      `<p class="sv-sub"><code>${esc(s.processId)}</code> · ${esc(s.status ?? "no status recorded")} · subject <code>${esc(s.subject ?? "")}</code>` +
+      `<p class="sv-sub">${processLink(s.processId, model ? v.processPageFor?.(model.source) : undefined)} · ${esc(s.status ?? "no status recorded")} · subject <code>${esc(s.subject ?? "")}</code>` +
       ` · started ${esc(s.startedAt ?? "not recorded")} · last moved ${esc(lastMoved(s) ?? "not recorded")}` +
       ` · <a href="../../">${esc(v.store)}'s work plan</a> · <a href="../">every instance in it</a></p>` +
       `<p><strong>Where it is:</strong> ${position.length > 0 ? position.map((p) => `<code>${esc(p)}</code>`).join(", ") : "no step holds a token"}</p>` +
@@ -2510,6 +2572,19 @@ async function modelFor(inst: InstanceState, roots: readonly string[]): Promise<
   }
 }
 
+/**
+ * The processes viewer's page directory on this site, from its declared
+ * route (`visualiserSitePath`), or undefined when no harness declares one.
+ * Its per-diagram pages are `<stem>.html` there (`gen-processes-viz.ts`).
+ */
+function processesPageDir(): string | undefined {
+  try {
+    return join(SITE, dirname(visualiserSitePath(ROOT, "processes-viewer").rel));
+  } catch {
+    return undefined;
+  }
+}
+
 /** Each instance's diagram in one bean store, by instance id — loaded once, read by every page of it. */
 async function workflowModelsOf(s: InstanceSubject): Promise<Map<string, ModelRead>> {
   const out = new Map<string, ModelRead>();
@@ -2653,7 +2728,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
   const ids: string[] = [];
   for (const r of flows) {
     if (!("state" in r) || !ROUTE_SEGMENT.test(r.state.id)) continue;
-    const pageDir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser, subgraph: `${s.name}/workflows/${r.state.id}` }));
+    const pageDir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser, subgraph: workflowSubgraph(s.name, r.state.id) }));
     ids.push(r.state.id);
     const html = workflowInstancePage({
       instance: r.state,
@@ -2665,6 +2740,10 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
       drawingFor: (bpmn) => {
         const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
         return existsSync(svg) ? relative(pageDir, svg).split(sep).join("/") : undefined;
+      },
+      processPageFor: (bpmn) => {
+        const dir = processesPageDir();
+        return dir === undefined ? undefined : relative(pageDir, join(dir, `${basename(bpmn, ".bpmn")}.html`)).split(sep).join("/");
       },
     });
     emit(join(pageDir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));

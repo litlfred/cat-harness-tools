@@ -16,7 +16,9 @@ import {
   diagramLevels,
   endNodesOf,
   GATE_REFUSALS,
+  instancesByProcess,
   lastMoved,
+  processIdsOf,
   NO_INSTANCE_REASON,
   readInstances,
   STUCK_AFTER_DAYS,
@@ -204,5 +206,24 @@ describe("the join: position, beans, todos", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("the process → instance join the processes viewer links by", () => {
+  test("an instance counts for its own process and every subprocess in its children, completed ones included", () => {
+    const grandchild = inst({ id: "g", processId: "Process_G", status: "completed" });
+    const child = inst({ id: "c", processId: "Process_C", tokens: ["Call_G"], children: { Call_G: grandchild } });
+    expect([...processIdsOf(inst({ tokens: ["Call_C"], children: { Call_C: child } }))].sort()).toEqual(["Process_C", "Process_G", "Process_P"]);
+  });
+
+  test("links group by process, sorted by store then id, and a process twice in one instance is listed once", () => {
+    const by = instancesByProcess([
+      { store: "s2", id: "b", processIds: ["Process_P"], route: "en/h/beans/s2/workflows/b/" },
+      { store: "s1", id: "z", processIds: ["Process_P", "Process_C", "Process_C"], route: "en/h/beans/s1/workflows/z/" },
+      { store: "s1", id: "a", processIds: ["Process_C"], route: "en/h/beans/s1/workflows/a/", status: "completed" },
+    ]);
+    expect(by.get("Process_P")!.map((l) => `${l.store}/${l.id}`)).toEqual(["s1/z", "s2/b"]);
+    expect(by.get("Process_C")!.map((l) => `${l.store}/${l.id}`)).toEqual(["s1/a", "s1/z"]);
+    expect(by.get("Process_Q")).toBeUndefined();
   });
 });
