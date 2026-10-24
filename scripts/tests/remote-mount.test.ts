@@ -15,7 +15,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -1036,5 +1036,202 @@ describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {
       expect(o.detail).toContain("`choir` named for mounting but not declared");
       expect(o.detail).toContain("neither in its declaration nor from within");
     }
+  });
+});
+
+describe("Tools chosen by id, mounted runnable (bean `mo75` G3; owner, 2026-10-24)", () => {
+  // o/tl is the layer stack, shrunk: `kit` (bootstrap-tools: mounted whole),
+  // `def` (cat-harness: the Tool DEFINITIONS, `tools/<id>/<id>.ts`, plus
+  // their published Tools metadata) and `impl` (cat-harness-tools: the code
+  // the definitions invoke). Each implementation reaches the layers below it
+  // the way the real one does: a relative import inside its own layer, and a
+  // PACKAGE import (`@o/def/…`, `@o/kit/…`) across layers.
+  const BASE = "https://example.org";
+  const tool = (id: string, invoke: object) => ({
+    "@id": `${BASE}/subgraph/def/tools/${id}/`,
+    "@type": "Subgraph",
+    name: `tools/${id}`,
+    path: `tools/${id}/`,
+    hasMember: [{ "@id": `${BASE}/def/tools/${id}.jsonld`, "@type": "Tool", name: id, description: `Tool ${id}`, invoke }],
+  });
+  const INVOKE: Record<string, object> = {
+    alpha: { inProcess: { module: "src/alpha.ts" }, mcp: { tool: "alpha" } },
+    beta: { shell: "bun run cat beta:run" },
+    gamma: { inProcess: { module: "src/gamma.ts" } },
+    delta: { shell: "gh pr list" },
+    broken: { inProcess: { module: "src/broken.ts" } },
+    stray: { inProcess: { module: "src/stray.ts" } },
+  };
+  const metadata = (ids: string[]) => ({
+    "@context": `${BASE}/ns/subgraph/v1.jsonld`,
+    "@id": `${BASE}/subgraph/def/tools/`,
+    "@type": "Subgraph",
+    name: "tools",
+    path: "tools/",
+    hasSubgraph: ids.map((id) => tool(id, INVOKE[id] ?? { manual: true })),
+  });
+  /** A Tool definition the way cat-harness writes one: a factory, through the folder's shared helper. */
+  const definition = (id: string) =>
+    `import { defineTool } from "../../schemas/tool.ts";\nimport { described } from "../lib.ts";\nexport default () => defineTool({ id: "${id}", description: described("${id}") });\n`;
+  let tl: { bare: string; sha: string };
+  let bad: { bare: string; sha: string };
+  let tUrl: (r: string) => string;
+
+  const layers = (extra: Record<string, string | object> = {}, tools = ["alpha", "beta", "gamma", "delta"]): Record<string, string | object> => ({
+    "kit/kit.json": decl("kit", { livesAt: { repository: "o/tl", path: "kit" }, mountDefaults: { whole: true }, directories: [{ id: "kit-schemas", path: "schemas/", graphTypologies: ["code"] }] }),
+    "kit/package.json": { name: "@o/kit", private: true },
+    "kit/schemas/graph.ts": "export const edge = (a: string, b: string): string => `${a}->${b}`;\n",
+    "def/def.json": decl("def", {
+      needs: ["kit"],
+      livesAt: { repository: "o/tl", path: "def" },
+      directories: [
+        { id: "tools", path: "tools/", graphTypologies: ["tools"] },
+        { id: "schemas", path: "schemas/", graphTypologies: ["code"] },
+        { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+        { id: "docs", path: "docs/", graphTypologies: ["docs"] },
+      ],
+    }),
+    "def/package.json": { name: "@o/def", private: true, exports: { "./*.js": "./*.ts", "./*": "./*" } },
+    "def/schemas/tool.ts": 'import { stamp } from "./util.ts";\nexport const defineTool = <T extends { id: string }>(t: T): T & { stamped: string } => ({ ...t, stamped: stamp(t.id) });\n',
+    "def/schemas/util.ts": "export const stamp = (s: string): string => `def:${s}`;\n",
+    "def/tools/lib.ts": "export const described = (id: string): string => `the ${id} Tool`;\n",
+    ...Object.fromEntries(tools.map((id) => [`def/tools/${id}/${id}.ts`, definition(id)])),
+    "def/skills/s/s.md": "# s\n",
+    "def/docs/readme.md": "# def\n",
+    "def/docs/subgraph/def/tools/index.hydrated.jsonld": metadata(tools),
+    "impl/impl.json": decl("impl", {
+      needs: ["def", "kit"],
+      livesAt: { repository: "o/tl", path: "impl" },
+      directories: [
+        { id: "impl-src", path: "src/", graphTypologies: ["code"] },
+        { id: "impl-scripts", path: "scripts/", graphTypologies: ["code"] },
+        { id: "impl-ui", path: "ui/", graphTypologies: ["code"] },
+        { id: "impl-tools", path: "tools/", graphTypologies: ["tools"] },
+      ],
+    }),
+    "impl/package.json": { name: "@o/impl", private: true, checkoutScripts: { "beta:run": "bun run impl/scripts/beta.ts" } },
+    "impl/src/alpha.ts": 'import { stamp } from "@o/def/schemas/util.js";\nimport { shared } from "../scripts/shared.ts";\nexport const alpha = (): string => stamp(shared("alpha"));\n',
+    "impl/src/gamma.ts": 'import { edge } from "@o/kit/schemas/graph.js";\nexport const gamma = (): string => edge("gamma", "kit");\n',
+    "impl/scripts/beta.ts": 'import { shared } from "./shared.ts";\nexport const beta = (): string => shared("beta");\n',
+    "impl/scripts/shared.ts": "export const shared = (s: string): string => `shared:${s}`;\n",
+    "impl/ui/page.ts": "export const page = 1;\n",
+    "impl/tools/own/own.ts": "export default () => ({ id: \"own\" });\n",
+    ...extra,
+  });
+
+  beforeAll(() => {
+    tl = bareRepo(base, "tl", layers());
+    // Two Tools whose code cannot arrive whole: `broken` imports a file the pin
+    // does not hold, `stray` a file outside every declared directory.
+    bad = bareRepo(
+      base,
+      "tlbad",
+      layers(
+        {
+          "impl/src/broken.ts": 'import { gone } from "../scripts/gone.ts";\nexport const broken = gone;\n',
+          "impl/src/stray.ts": 'import { loose } from "../loose.ts";\nexport const stray = loose;\n',
+          "impl/loose.ts": "export const loose = 1;\n",
+        },
+        ["alpha", "broken", "stray"],
+      ),
+    );
+    const map: Record<string, string> = { "o/tl": `file://${tl.bare}`, "o/tlbad": `file://${bad.bare}` };
+    tUrl = (r) => {
+      const u = map[r];
+      if (!u) throw new Error(`no fixture for ${r}`);
+      return u;
+    };
+  });
+
+  function tdown(harness: string, repo: { sha: string }, repository: string, mount: object): string {
+    const root = join(base, `tdown-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness, repository, ref: repo.sha, ...consentFor(repo.sha), ...mount }] }) });
+    return root;
+  }
+
+  test("T1. load the Tools metadata (hydrated), choose three Tools by id, materialise them: each arrives with definition, implementation and closure, and loads", async () => {
+    // 1. Load the metadata: no code arrives.
+    const meta = tdown("def", tl, "o/tl", { hydrated: true, overrides: { def: { directories: ["tools"] } } });
+    const read = mountRemote({ instanceRoot: meta, urlFor: tUrl, install: false });
+    expect(read.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("mounted");
+    expect(existsSync(join(meta, "def/tools/alpha"))).toBe(false);
+    const hydrated = JSON.parse(readFileSync(join(meta, "def/tools/index.hydrated.jsonld"), "utf-8")) as {
+      hasSubgraph: Array<{ hasMember: Array<{ name: string; invoke: Record<string, unknown> }> }>;
+    };
+
+    // 2. Review and choose: the three whose metadata says they run code of a layer.
+    const chosen = hydrated.hasSubgraph
+      .flatMap((s) => s.hasMember)
+      .filter((t) => t.invoke.inProcess !== undefined || String(t.invoke.shell ?? "").startsWith("bun run cat "))
+      .map((t) => t.name);
+    expect(chosen).toEqual(["alpha", "beta", "gamma"]);
+
+    // 3. Materialise exactly those, runnable.
+    const root = tdown("impl", tl, "o/tl", { overrides: { def: { tools: chosen } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+    const state = Object.fromEntries(r.plan.outcomes.map((o) => [o.instance, o.state]));
+    expect(state).toEqual({ impl: "mounted", def: "mounted", kit: "mounted" });
+    expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("Tools `alpha` (def/tools/alpha/alpha.ts + impl/src/alpha.ts)");
+
+    // The directories the closure touches, whole — and nothing else.
+    const dirs = (i: string) => readLock(root).instances.find((x) => x.instance === i)!.directories.map((d) => d.id).sort();
+    expect(dirs("def")).toEqual(["schemas", "tools"]);
+    expect(dirs("impl")).toEqual(["impl-scripts", "impl-src"]);
+    expect(dirs("kit")).toEqual(["*"]);
+    for (const absent of ["def/skills", "def/docs", "impl/ui", "impl/tools"]) expect(existsSync(join(root, absent))).toBe(false);
+    // Directory granularity: a Tool folder is not a declared directory, so an
+    // unchosen Tool's folder comes with `tools/` (owner's ruling 3).
+    expect(existsSync(join(root, "def/tools/delta/delta.ts"))).toBe(true);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    // It loads: the workspace links a root install would make, then each
+    // definition and each implementation, imported from the mounted bytes.
+    mkdirSync(join(root, "node_modules/@o"), { recursive: true });
+    for (const p of ["kit", "def", "impl"]) symlinkSync(join(root, p), join(root, "node_modules/@o", p));
+    for (const id of chosen) {
+      const def = (await import(join(root, `def/tools/${id}/${id}.ts`))) as { default: () => { id: string; stamped: string; description: string } };
+      expect(def.default()).toEqual({ id, description: `the ${id} Tool`, stamped: `def:${id}` });
+    }
+    expect(((await import(join(root, "impl/src/alpha.ts"))) as { alpha: () => string }).alpha()).toBe("def:shared:alpha");
+    expect(((await import(join(root, "impl/scripts/beta.ts"))) as { beta: () => string }).beta()).toBe("shared:beta");
+    expect(((await import(join(root, "impl/src/gamma.ts"))) as { gamma: () => string }).gamma()).toBe("gamma->kit");
+  });
+
+  test("T2. a Tool with no implementation layer brings its definition only, and names what it runs", () => {
+    const root = tdown("impl", tl, "o/tl", { overrides: { def: { tools: ["delta"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("runs `gh pr list`");
+    expect(readLock(root).instances.find((x) => x.instance === "impl")!.directories).toEqual([]);
+    expect(existsSync(join(root, "impl/src"))).toBe(false);
+  });
+
+  test("T3. an id the metadata does not hold, an import that names nothing and a file in no declared directory are refused — and nothing of the entry is mounted", () => {
+    const unknown = tdown("impl", tl, "o/tl", { overrides: { def: { tools: ["alpha", "omega"] } } });
+    const u = mountRemote({ instanceRoot: unknown, urlFor: tUrl, install: false });
+    expect(u.plan.outcomes.find((o) => o.instance === "def")).toMatchObject({ state: "missing" });
+    expect(u.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("`omega` named for mounting but in none of `def`'s published Tools metadata");
+    expect(existsSync(join(unknown, "def"))).toBe(false);
+    expect(existsSync(join(unknown, "impl"))).toBe(false);
+
+    for (const [id, says] of [
+      ["broken", "impl/src/broken.ts imports `../scripts/gone.ts`, which names no file at the pin"],
+      ["stray", "impl/loose.ts is in no directory `impl` declares"],
+    ] as const) {
+      const root = tdown("impl", bad, "o/tlbad", { overrides: { def: { tools: [id] } } });
+      const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+      expect(r.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("missing");
+      expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain(says);
+      expect(r.plan.outcomes.find((o) => o.instance === "impl")!.state).toBe("missing");
+      expect(existsSync(join(root, "impl/src"))).toBe(false);
+    }
+  });
+
+  test("T4. `tools` with `hydrated` is refused at plan time: metadata brings no code", () => {
+    const root = tdown("def", tl, "o/tl", { overrides: { def: { hydrated: true, tools: ["alpha"] } } });
+    const p = planRemote({ instanceRoot: root, urlFor: tUrl });
+    expect(p.outcomes.find((o) => o.instance === "def")).toMatchObject({ state: "could-not-determine" });
+    expect(p.outcomes.find((o) => o.instance === "def")!.detail).toContain("`tools` and `hydrated` both asked for");
   });
 });
