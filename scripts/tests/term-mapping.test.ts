@@ -175,6 +175,43 @@ describe("termState — the one place the record becomes a per-term answer (bean
   });
 });
 
+describe("rows are keyed by scheme file as well as scheme id (bean wvzp)", () => {
+  // `kg-tools` is the id of every instance's Tool extraction. Two files whose
+  // schemes share an id AND a term id must still get one answer each.
+  const at = (id: string, file: string, terms: unknown[]) => ({ id, terms, file }) as never;
+  const CH = "glossary/generated/cat-harness/kg-tools.glossary.json";
+  const FH = "glossary/generated/fhir-harness/kg-tools.glossary.json";
+  const schemes = [
+    scheme("platform", [authored("Policy")]),
+    at("kg-tools", CH, [candidate("policy")]),
+    at("kg-tools", FH, [candidate("Policy"), candidate("Wombat")]),
+  ];
+  const results = resolveSkos(candidates(schemes), skosIndex(schemes));
+  const rows = perScheme(results, "skos", [{ target: "skos", consulted: ["platform"], via: "local" }]);
+
+  test("one shared scheme id gives one row per file", () => {
+    const tools = rows.filter((r) => r.scheme === "kg-tools");
+    expect(tools.map((r) => r.file)).toEqual([CH, FH]);
+    expect(tools.map((r) => [r.mapped, r.unmapped])).toEqual([[1, 0], [1, 1]]);
+  });
+
+  test("a term id in two files' schemes is resolved, not unknown", () => {
+    expect(termState(rows, "kg-tools", "skos", "policy", CH).state).toBe("mapped");
+    expect(termState(rows, "kg-tools", "skos", "policy", FH).state).toBe("mapped");
+    expect(termState(rows, "kg-tools", "skos", "wombat", FH).state).toBe("unmapped");
+    expect(termState(rows, "kg-tools", "skos", "wombat", CH).state).toBe("unmapped");
+  });
+
+  test("without a file, the shared scheme id is still ambiguous", () => {
+    expect(termState(rows, "kg-tools", "skos", "policy").state).toBe("unknown");
+  });
+
+  test("every mapping names its scheme's file and still satisfies the record schema", () => {
+    for (const m of results) expect(TermMappingSchema.safeParse(m).success).toBe(true);
+    expect(results.map((m) => m.file)).toEqual([CH, FH, FH]);
+  });
+});
+
 describe("the fhir half resolves against a PUBLISHED IG AT A VERSION", () => {
   // Owner, 2026-09-30, choosing between two assertions that can disagree:
   // "this code is in the published base IG at version X", not "this code is

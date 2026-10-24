@@ -216,17 +216,27 @@ export function skosIndex(schemes: GlossScheme[]): Map<string, ConceptMatch[]> {
 }
 
 /** Candidates, which are what the check is ABOUT. */
-export function candidates(schemes: GlossScheme[]): { term: GlossTerm; scheme: string }[] {
+/** A candidate term, with the scheme it came from and that scheme's file. */
+export interface Candidate {
+  term: GlossTerm;
+  scheme: string;
+  /** Absent only for a caller that built candidates by hand without one. */
+  file?: string;
+}
+
+export function candidates(schemes: GlossScheme[]): Candidate[] {
   return schemes.flatMap((s) =>
-    s.terms.filter((t) => t.status !== "authored").map((term) => ({ term, scheme: s.id })),
+    s.terms
+      .filter((t) => t.status !== "authored")
+      .map((term) => ({ term, scheme: s.id, ...(s.file ? { file: s.file } : {}) })),
   );
 }
 
 export function resolveSkos(
-  cands: { term: GlossTerm; scheme: string }[],
+  cands: Candidate[],
   idx: Map<string, ConceptMatch[]>,
 ): TermMapping[] {
-  return cands.map(({ term, scheme }) => {
+  return cands.map(({ term, scheme, file }) => {
     const key = normaliseLabel(term.prefLabel);
     const hits = idx.get(key) ?? [];
     const exactHit = hits.filter((h) => h.predicate === "skos:exactMatch");
@@ -235,6 +245,7 @@ export function resolveSkos(
     return {
       term: term.id,
       scheme,
+      ...(file ? { file } : {}),
       target: "skos" as const,
       exact,
       concept,
@@ -260,14 +271,15 @@ export function resolveSkos(
  * only field the two share. A code match would be a coincidence of spelling.
  */
 export function resolveFhir(
-  cands: { term: GlossTerm; scheme: string }[],
+  cands: Candidate[],
   pinned: PinnedTerminology | string,
 ): TermMapping[] {
   if (typeof pinned === "string") {
     // No snapshot: undetermined WITH the reason, never `unmapped`.
-    return cands.map(({ term, scheme }) => ({
+    return cands.map(({ term, scheme, file }) => ({
       term: term.id,
       scheme,
+      ...(file ? { file } : {}),
       target: "fhir" as const,
       exact: "undetermined" as const,
       concept: "undetermined" as const,
@@ -288,7 +300,7 @@ export function resolveFhir(
       },
     ]);
   }
-  return cands.map(({ term, scheme }) => {
+  return cands.map(({ term, scheme, file }) => {
     const hits = idx.get(normaliseLabel(term.prefLabel)) ?? [];
     // `closeMatch`, never `exactMatch`: a label matching a code's display
     // means the two are about the same thing, not that the glossary term IS
@@ -297,6 +309,7 @@ export function resolveFhir(
     return {
       term: term.id,
       scheme,
+      ...(file ? { file } : {}),
       target: "fhir" as const,
       exact: "unmapped" as const,
       concept: (hits.length ? "mapped" : "unmapped") as MatchState,
@@ -439,6 +452,14 @@ export interface MappedTerm {
  */
 export interface SchemeState {
   scheme: string;
+  /**
+   * The scheme's glossary file, repository-relative (bean `wvzp`, owner
+   * ruling B, 2026-10-24: a clean break now, the proper key worked out under
+   * GOAL 1). A row is keyed by (file, target), because a scheme id alone is
+   * shared across instances: `kg-tools` is every instance's Tool extraction.
+   * Absent only when the mappings it was built from named no file.
+   */
+  file?: string;
   target: string;
   mapped: number;
   unmapped: number;
@@ -481,14 +502,20 @@ export function termState(
   scheme: string,
   target: string,
   term: string,
+  file?: string,
 ): TermStateAnswer {
-  const rows = states.filter((s) => s.scheme === scheme && s.target === target);
+  // With a file, a row of another file is not a candidate answer; without
+  // one, every row for the scheme id is, and two of them are ambiguous.
+  const rows = states.filter(
+    (s) => s.scheme === scheme && s.target === target && (file === undefined || s.file === file),
+  );
+  const which = file === undefined ? `scheme \`${scheme}\`` : `scheme \`${scheme}\` in \`${file}\``;
   if (rows.length !== 1) {
     return {
       state: "unknown",
       why: rows.length
-        ? `${rows.length} rows for scheme \`${scheme}\` on \`${target}\`, so the record is ambiguous`
-        : `no row for scheme \`${scheme}\` on \`${target}\``,
+        ? `${rows.length} rows for ${which} on \`${target}\`, so the record is ambiguous`
+        : `no row for ${which} on \`${target}\``,
     };
   }
   const row = rows[0]!;
@@ -511,15 +538,21 @@ export function perScheme(
 ): SchemeState[] {
   const of = ms.filter((m) => m.target === target);
   const reason = scope.find((s) => s.target === target)?.unreachable_reason;
-  const schemes = [...new Set(of.map((m) => m.scheme))].sort();
-  return schemes.map((scheme) => {
-    const rows = of.filter((m) => m.scheme === scheme);
+  // One row per (scheme, file): a scheme id is shared across instances
+  // (bean `wvzp`), and folding their files into one row mixed their terms.
+  const keyOf = (m: TermMapping) => `${m.scheme}\0${m.file ?? ""}`;
+  const keys = [...new Map(of.map((m) => [keyOf(m), m] as const)).entries()]
+    .map(([k, m]) => ({ k, scheme: m.scheme, file: m.file }))
+    .sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0));
+  return keys.map(({ k, scheme, file }) => {
+    const rows = of.filter((m) => keyOf(m) === k);
     const n = (k: MatchState) => rows.filter((r) => r.concept === k).length;
     const unmapped = n("unmapped");
     const undetermined = n("undetermined");
     const byTerm = (a: { term: string }, b: { term: string }) => (a.term < b.term ? -1 : a.term > b.term ? 1 : 0);
     return {
       scheme,
+      ...(file ? { file } : {}),
       target,
       mapped: n("mapped"),
       unmapped,
