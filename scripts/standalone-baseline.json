@@ -94,7 +94,7 @@
         "scripts/tests/implementing-path.test.ts > in this checkout > every Tool module and every check:tools path resolves today",
         "scripts/tests/sdlc/index-config-gates.test.ts > check:index-ignores > this repository's own block agrees with its index, and its landing is cat-harness",
         "scripts/tests/infrastructure.test.ts > (load-time error) ENOENT: no such file or directory, open '.gitignore'",
-        "scripts/tests/ingest-and-l1.test.ts > the verdict as a committed sidecar > the committed verdicts for the real corpus are current — or, when not committed, ABSENT and never current",
+        "scripts/tests/library/ingest-and-l1.test.ts > the verdict as a committed sidecar > the committed verdicts for the real corpus are current — or, when not committed, ABSENT and never current",
         "scripts/tests/init-folio.test.ts > a scaffold says what it stands on (zmdo) > a contentless instance stands on cat-harness, and reaches its skills through the stack",
         "scripts/tests/init-folio.test.ts > workflow templates (52dz) > every platform file a scaffolded folio runs EXISTS in the index (bean cat-tools-yylt)",
         "scripts/tests/instance-declaration-gate.test.ts > the exporter's IRI rule (the one the real gate injects) > an instance with its own canonicalUrl sits at <canonicalUrl>/<stub>.jsonld — no doubled segment",
