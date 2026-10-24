@@ -294,10 +294,16 @@ const SCRIPT = `
   function commentEl(c) {
     var d = el("div", null, "comment");
     var r = c.review || {};
+    d.setAttribute("data-status", c.status || "");
+    d.setAttribute("data-kind", r.kind || "");
     d.appendChild(el("span", (r.kind || "comment") + ", " + c.status, "kind"));
     d.appendChild(el("span", (r.reviewer || "?") + " as " + (r.role || "reviewer") + ": "));
     d.appendChild(el("span", c.summary));
     if (r.anchoredFrom && r.anchoredFrom.length) d.appendChild(el("span", " (made on " + r.anchoredFrom.join(", ") + ")", "muted"));
+    if (r.decision) {
+      if (/^https?:\\/\\//.test(r.decision)) { d.appendChild(el("span", " (")); var da = el("a", "decision"); da.href = r.decision; d.appendChild(da); d.appendChild(el("span", ")")); }
+      else d.appendChild(el("span", " (decision: " + r.decision + ")", "muted"));
+    }
     if (r.commentUrl) { d.appendChild(el("span", " ")); var a = el("a", "read on the pull request"); a.href = r.commentUrl; d.appendChild(a); }
     // Deciding it is a pull-request comment too (bean 423d, owner 2026-10-15):
     // the page is static and writes nothing. The words offered are the moves
@@ -436,6 +442,40 @@ const SCRIPT = `
   viewAll.value = loadView();
   if (viewAll.value !== loadView()) viewAll.value = "";
   viewAll.addEventListener("change", function () { saveView(viewAll.value); applyView(viewAll.value); });
+
+  var COMMENT_FILTERS = [
+    ["", "All comments"],
+    ["open-addressed", "Open and addressed"],
+    ["status:open", "Open"],
+    ["status:addressed", "Addressed"],
+    ["status:resolved", "Resolved"],
+    ["status:adjudicated", "Adjudicated"],
+    ["status:withdrawn", "Withdrawn"],
+    ["kind:defect", "Defects"],
+    ["kind:question", "Questions"],
+    ["kind:suggestion", "Suggestions"],
+    ["kind:editorial", "Editorial"]
+  ];
+  var commentFilter = document.getElementById("comment-filter");
+  COMMENT_FILTERS.forEach(function (f) { var o = el("option", f[1]); o.value = f[0]; commentFilter.appendChild(o); });
+  function applyCommentFilter(f, announce) {
+    var boxes = list.querySelectorAll(".comments");
+    var shownCount = 0;
+    var totalCount = 0;
+    for (var i = 0; i < boxes.length; i++) {
+      var cs = boxes[i].querySelectorAll(".comment");
+      var boxShown = 0;
+      for (var j = 0; j < cs.length; j++) {
+        totalCount++;
+        var ok = matchesCommentFilter(cs[j].getAttribute("data-status") || "", cs[j].getAttribute("data-kind") || "", f);
+        cs[j].hidden = !ok;
+        if (ok) { boxShown++; shownCount++; }
+      }
+      boxes[i].hidden = !boxShown;
+    }
+    if (announce) status.textContent = "Showing " + shownCount + " of " + totalCount + " review comment(s).";
+  }
+  commentFilter.addEventListener("change", function () { applyCommentFilter(commentFilter.value, true); });
 
   function get(url) {
     return fetch(url).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
@@ -609,6 +649,7 @@ const SCRIPT = `
       }
       if (!txt && cs.changes.length) summary.textContent += " No change text on this build, so only the views of the pages" + (visualFile ? " and the pictures" : "") + " are available.";
       applyView(viewAll.value);
+      applyCommentFilter(commentFilter.value, false);
       // The heat map (qbfi), above the list it indexes.
       var heat = computeHeat({ changes: cs.changes, comments: rc ? rc.comments : null, blocks: blocksFile, qa: qaFile ? qaFile.blocks : null, verdicts: rc && Array.isArray(rc.verdicts) ? rc.verdicts : null });
       if (heat.rows.length) {
@@ -693,6 +734,18 @@ export function reviewSiteRoot(pathname: string, locales: readonly string[]): st
 }
 
 /**
+ * Whether a review comment with `status` and `kind` passes `filter` on the
+ * review page (bean `423d`). Self-contained: embedded in the page via `toString()`.
+ */
+export function matchesCommentFilter(status: string, kind: string, filter: string): boolean {
+  if (!filter) return true;
+  if (filter === "open-addressed") return status === "open" || status === "addressed";
+  if (filter.indexOf("status:") === 0) return status === filter.slice(7);
+  if (filter.indexOf("kind:") === 0) return kind === filter.slice(5);
+  return true;
+}
+
+/**
  * The review page. Static: all of its data is fetched when it is opened.
  *
  * `root` is the site root relative to the page, for the one link written into
@@ -727,7 +780,7 @@ export function reviewPageHtml(root: string = "../../"): string {
   <button type="button" id="nextu">Next unreviewed (u)</button>
   <a id="all-documents" href="${root}index.html">All documents</a>
 </div>
-<div class="viewrow"><label for="view">Show every change as</label> <select id="view"></select></div>
+<div class="viewrow"><label for="view">Show every change as</label> <select id="view"></select> <label for="comment-filter">Show comments</label> <select id="comment-filter"></select></div>
 <section aria-labelledby="rendered-h"><h2 id="rendered-h">Rendered pages this change alters</h2><div id="rendered" class="muted">Loading the rendered impact…</div></section>
 <div id="heat" class="heatwrap" tabindex="0" role="region" aria-label="Heat map: where to look first"></div>
 <div id="changes"></div>
@@ -736,6 +789,7 @@ export function reviewPageHtml(root: string = "../../"): string {
 <script>
 var LOCALES = ${JSON.stringify(PUBLISHED_LOCALES).replace(/</g, "\\u003c")};
 var reviewSiteRoot = ${reviewSiteRoot.toString()};
+var matchesCommentFilter = ${matchesCommentFilter.toString()};
 var RENDERERS = ${JSON.stringify(DIFF_RENDERERS).replace(/</g, "\\u003c")};
 var wordDiff = ${wordDiff.toString()};
 var cleanRendered = ${cleanRendered.toString()};
