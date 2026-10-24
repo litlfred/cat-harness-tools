@@ -607,7 +607,7 @@ describe("a contentless instance (mer2)", () => {
     expect(decl.iriBase).toBe("https://litlfred.github.io/new-layer/");
     // An iriBase without a version breaks releaseIris, and with it the IG publish.
     expect(decl.version).toBe("0.1.0");
-    expect(releaseIris(decl)?.agent).toBe("https://litlfred.github.io/new-layer/0.1.0/");
+    expect(releaseIris(decl)?.agent).toBe("https://litlfred.github.io/new-layer/v0/");
     expect(r.notes.join("\n")).toContain("Deploy from a branch: gh-pages, / (root)");
   });
 

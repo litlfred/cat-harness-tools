@@ -479,7 +479,7 @@ function instanceDeclaration(o: MaybeFolio): string {
       // Where its IRIs are minted and its context is published (bean
       // folio-assistant-63q4). Only when known: an invented address is worse
       // than none. With a `version` beside it, always: `releaseIris` mints
-      // `<iriBase><version>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
+      // `<iriBase>v<major>/` and refuses an iriBase without a MAJOR.MINOR.PATCH
       // one ("an iriBase needs a MAJOR.MINOR.PATCH version to mint against"),
       // which is how two restored DAK IG
       // declarations broke their IG publish on 2026-10-15.
