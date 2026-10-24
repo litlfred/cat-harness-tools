@@ -24,8 +24,11 @@ import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContra
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
+import { hostSchemaBase } from "../../lib/host-schema.ts";
 
 const BASE = "https://example.invalid/fa";
+/** Where the host's schemas sit under `BASE`: its own directory, `<base>/<name>` (#676). */
+const HOST = hostSchemaBase(BASE);
 
 /**
  * The INSTANCE root, not `process.cwd()`.
@@ -117,10 +120,10 @@ describe("tools", () => {
     expect(contracts.length).toBeGreaterThan(0);
     for (const c of contracts) {
       const id = c.schema.$id as string;
-      expect(id).toBe(skillIoIri(BASE, c.skill, c.io));
+      expect(id).toBe(skillIoIri(HOST, c.skill, c.io));
       // The published path must be exactly what the IRI's tail says, or the
       // deploy writes the file somewhere the identity does not name.
-      expect(`${BASE}/${c.published}`).toBe(id);
+      expect(`${HOST}/${c.published}`).toBe(id);
     }
   });
 
@@ -183,8 +186,9 @@ describe("tools", () => {
   });
 
   test("the generated schemas carry an absolute $id", () => {
-    expect(buildToolSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/tool.schema.json`);
-    expect(buildToolTypes({ baseUrl: BASE }).$id).toBe(`${BASE}/tool-types.schema.json`);
+    // Under the host's own directory, beside its document (#676).
+    expect(buildToolSchema({ baseUrl: BASE }).$id).toBe(`${BASE}/cat-harness/tool.schema.json`);
+    expect(buildToolTypes({ baseUrl: BASE }).$id).toBe(`${BASE}/cat-harness/tool-types.schema.json`);
   });
 
   test("each type is its own document, whose $id is the IRI a port names (bean tdir)", () => {
@@ -193,8 +197,8 @@ describe("tools", () => {
     const combined = buildToolTypes({ baseUrl: BASE }).$defs as Record<string, Record<string, unknown>>;
     for (const [path, doc] of files) {
       const name = toolTypeNameOf(path)!;
-      expect(doc.$id).toBe(toolTypeDocumentIri(BASE, name));
-      expect(doc.$id).toBe(`${BASE}/${path}`);
+      expect(doc.$id).toBe(toolTypeDocumentIri(HOST, name));
+      expect(doc.$id).toBe(`${HOST}/${path}`);
       // The same Zod, printed twice: the body is the combined document's.
       const { $schema: _a, $id: _b, title: _c, ...body } = doc;
       const { $schema: _d, ...inline } = combined[name];
@@ -263,8 +267,10 @@ describe("tools", () => {
       for (const port of [...io.inputs, ...io.outputs]) {
         // Minted by toolTypeIri against the staging base, whichever form it
         // has in this phase (fragment now, per-type document next; bean tdir).
-        expect(port.schema.startsWith(`${STAGING}/tool-types`)).toBe(true);
-        expect(port.schema).toBe(toolTypeIri(STAGING, toolTypeNameOf(port.schema)!));
+        // Under the host's directory at that base (#676), where the schema
+        // export writes the vocabulary.
+        expect(port.schema.startsWith(`${hostSchemaBase(STAGING)}/tool-types`)).toBe(true);
+        expect(port.schema).toBe(toolTypeIri(hostSchemaBase(STAGING), toolTypeNameOf(port.schema)!));
       }
     }
   });
@@ -273,7 +279,7 @@ describe("tools", () => {
     const B = "https://example.invalid/other";
     for (const t of tools(B)) {
       for (const p of [...t.io.inputs, ...t.io.outputs]) {
-        expect(p.schema.startsWith(`${B}/tool-types`)).toBe(true);
+        expect(p.schema.startsWith(`${hostSchemaBase(B)}/tool-types`)).toBe(true);
       }
     }
   });
