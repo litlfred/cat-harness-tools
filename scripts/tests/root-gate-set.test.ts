@@ -182,6 +182,6 @@ describe("qa:refresh in a content root", () => {
 
   test("the writers that read state graphs say so", () => {
     const reads = QA_WRITERS.filter((w) => w.readsState).map((w) => w.id).sort();
-    expect(reads).toEqual(["check:harness-state", "docs:pages", "skill:register"]);
+    expect(reads).toEqual(["check:harness-state", "check:unlinked-beans", "docs:pages", "skill:register"]);
   });
 });
