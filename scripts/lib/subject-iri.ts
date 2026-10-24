@@ -33,7 +33,7 @@
  * Every kind a subject IRI may carry. {@link subjectIri} refuses any other.
  *
  * Its first job is gone: the host's document sat at the site root, so the set
- * had to tell another instance's `…/folio-assistant-core/skill/x` from a kind.
+ * had to tell another instance's `…/<instance>/skill/x` from a kind.
  * Since 2026-10-23 every layer's document, the host's included, sits at
  * `<site>/<instance>/<stub>.jsonld` with its subjects beside it (owner: one
  * rule for every layer; subjects beside their document), so no instance
