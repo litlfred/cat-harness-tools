@@ -150,7 +150,8 @@ import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js"
 import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
-import { isOpen, readBeans, type BeanNode } from "./beans.ts";
+import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
+import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
 import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
 import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
 import { graphReadPath } from "./graph-read.ts";
@@ -1442,6 +1443,7 @@ export function beanStorePartsSection(storeAbs: string, view?: WorkflowViewConte
       : (view ? workflowViewLead(view) : "") +
         `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th>${view ? "<th>stuck</th>" : ""}</tr></thead><tbody>${flowRows}</tbody></table>`) +
     (view ? beanPositionSection(view.beans, instances) : "") +
+    (view?.unlinked ?? "") +
     queue +
     surveys +
     marks,
@@ -1459,6 +1461,8 @@ export interface WorkflowViewContext {
   now: Date;
   /** Each instance's end events, by instance id, where its diagram was found. */
   ends?: ReadonlyMap<string, ReadonlySet<string>>;
+  /** The store's unlinked-beans QA section (bean `folio-assistant-w2hn`), rendered by `unlinked-beans.ts`. */
+  unlinked?: string;
 }
 
 /** A row's stuck states as words — a state is told by its WORD, never by hue. */
@@ -2714,6 +2718,31 @@ const hubs: string[] = [];
 // so every page of one run measures against the same instant and says which.
 const NOW = new Date();
 const todosForView = readViewTodos();
+// Bean `folio-assistant-w2hn`: the diagrams' ids and every store's instances,
+// read once; each store page then classifies and groups its own beans.
+const unlinkedInputs = mine.some((x) => x.subgraphs === "instance")
+  ? { diagrams: declaredDiagramIds(REPO_ROOT), instances: allInstances(beanStores(REPO_ROOT)) }
+  : undefined;
+/** A bean store's unlinked-beans section, or nothing when its beans could not be read. */
+function unlinkedSection(s: InstanceSubject): string {
+  const read = readSubjectBeans(s.instanceRoot);
+  if (!unlinkedInputs || !("beans" in read) || read.beans === null) return "";
+  try {
+    const archived = readArchivedBeans(s.instanceRoot);
+    const r = unlinkedReport({
+      store: s.name,
+      beans: beanInputs(s.instanceRoot, read.beans),
+      archived: beanInputs(s.instanceRoot, archived ?? []),
+      archiveDeclared: archived !== null,
+      instances: unlinkedInputs.instances,
+      ids: unlinkedInputs.diagrams.ids,
+      diagrams: unlinkedInputs.diagrams,
+    });
+    return unlinkedSectionHtml(r);
+  } catch (e) {
+    return `<p class="sv-sub">Open beans tied to no BPMN task: <strong>could not determine</strong> (${esc(e instanceof Error ? e.message : String(e))}).</p>`;
+  }
+}
 /**
  * A bean store's workflow pages (bean `folio-assistant-v49e`): one per
  * instance at `<store page>/workflows/<id>/`, and the hub listing them.
@@ -2768,7 +2797,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
     const models = beans ? await workflowModelsOf(s) : undefined;
     const html = beans
-      ? beansSubjectPage(v, s, subjects, readSubjectBeans(s.instanceRoot), { now: NOW, ends: endsOf(models!) })
+      ? beansSubjectPage(v, s, subjects, readSubjectBeans(s.instanceRoot), { now: NOW, ends: endsOf(models!), unlinked: unlinkedSection(s) })
       : code
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
         : memory
