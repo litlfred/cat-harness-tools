@@ -80,6 +80,7 @@
     "scripts/partition/instance-rules.ts::schemas/themes.ts",
     "scripts/partition/instance-rules.ts::schemas/tile-count.ts",
     "scripts/partition/instance-rules.ts::schemas/todo-graph.ts",
+    "scripts/partition/instance-rules.ts::schemas/tool-id.ts",
     "scripts/partition/instance-rules.ts::schemas/tool-invocation.ts",
     "scripts/partition/instance-rules.ts::schemas/tool-run.ts",
     "scripts/partition/instance-rules.ts::schemas/tool-types.ts",
