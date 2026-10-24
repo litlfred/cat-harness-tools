@@ -48,6 +48,8 @@ import {
   mergeReviewsPage,
   mergeReviewsSection,
   VIEWER_TOOL,
+  workflowInstancePage,
+  workflowHubPage,
 } from "../state-visualizer.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -1433,6 +1435,136 @@ describe("merge reviews (bean w8jq)", () => {
       expect(unknown).not.toContain("No adversarial review verdict");
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the workflow view: per-instance pages and the store's stuck column (bean folio-assistant-v49e)", () => {
+  const NOW = new Date("2026-10-24T00:00:00Z");
+  const bean = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    file: `defs/${id}.md`,
+    title: `bean ${id}`,
+    status: "in-progress",
+    type: "task",
+    priority: "normal",
+    parent: "",
+    blocking: [],
+    createdAt: "2026-09-01T00:00:00Z",
+    updatedAt: "2026-09-02T00:00:00Z",
+    body: "",
+    ...over,
+  });
+  const stale = {
+    $schema: "folio-workflow-instance/v1",
+    id: "crdm--x-ab12",
+    processId: "Process_CRDM",
+    source: "gone/crdm.bpmn",
+    subject: "x-ab12",
+    bean: "x-ab12",
+    status: "running",
+    tokens: ["A_Step"],
+    arrivals: {},
+    history: [{ at: "2026-09-01T00:00:00Z", node: "Start", note: "<started>" }],
+    startedAt: "2026-09-01T00:00:00Z",
+    updatedAt: "2026-09-01T00:00:00Z",
+  };
+
+  function storeWith(files: Record<string, unknown>): string {
+    const store = mkdtempSync(join(tmpdir(), "bean-store-"));
+    writeFileSync(
+      join(store, "beans.json"),
+      JSON.stringify({ name: "x", directories: [{ id: "workflows", path: "workflows", graphTypologies: ["workflow-state"] }] }),
+    );
+    mkdirSync(join(store, "workflows"));
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(store, "workflows", name), typeof body === "string" ? body : JSON.stringify(body));
+    return store;
+  }
+
+  test("with a view, each instance links its page and carries its stuck states; the third state is stated", () => {
+    const store = storeWith({ "crdm--x-ab12.json": stale });
+    try {
+      const html = beanStorePartsSection(store, { beans: [bean("x-ab12"), bean("x-cd34")] as never, now: NOW });
+      expect(html).toContain('<a href="workflows/crdm--x-ab12/"><code>crdm--x-ab12</code></a>');
+      expect(html).toContain("<th>stuck</th>");
+      expect(html).toContain("enabled-not-taken");
+      expect(html).toContain("Refused gates: <strong>not-recorded</strong>");
+      expect(html).toContain("Where this store's beans sit in a process — 2 bean(s)");
+      expect(html).toContain('<span class="sv-count-v">1</span><span class="sv-count-k">no instance recorded</span>');
+      expect(html).toContain("<code>x-cd34</code>");
+      expect(html).toContain("That is a third state, not an empty diagram");
+      // Without a view the section is as it was: no column, no links.
+      const plain = beanStorePartsSection(store);
+      expect(plain).not.toContain("<th>stuck</th>");
+      expect(plain).not.toContain('href="workflows/');
+    } finally {
+      rmSync(store, { recursive: true, force: true });
+    }
+  });
+
+  test("an instance page states position, stuck states, the not-recorded gate and a missing diagram in words", () => {
+    const html = workflowInstancePage({
+      instance: stale as never,
+      store: "cat-harness",
+      model: { missing: "`gone/crdm.bpmn` is not on disk, and no diagram in the checkout declares `Process_CRDM`", recorded: "gone/crdm.bpmn" },
+      beans: [bean("x-ab12", { body: "This is blocked on the owner." })] as never,
+      todos: [{ id: "t-1", summary: "about it", status: "open", processes: ["Process_CRDM"] }],
+      now: NOW,
+      drawingFor: () => undefined,
+    });
+    expect(html).toContain("<strong>Where it is:</strong> <code>A_Step</code>");
+    expect(html).toContain("Stuck states — 2");
+    expect(html).toContain("enabled-not-taken");
+    expect(html).toContain("blocked-without-expiry");
+    expect(html).toContain("<strong>Diagram not found</strong>");
+    expect(html).toContain("the position is given in words only");
+    expect(html).toContain("The steps that act on the bean are unknown: the diagram was not found.");
+    expect(html).toContain("Todos it names — 1");
+    expect(html).toContain("tagged with Process_CRDM");
+    expect(html).toContain("&lt;started&gt;");
+    expect(html).toContain("render_with_liquid: false");
+    expect(html).toContain(GENERATED_BY);
+  });
+
+  test("a published drawing is fetched by the page and keyed on the token's BPMN id", () => {
+    const html = workflowInstancePage({
+      instance: stale as never,
+      store: "cat-harness",
+      model: { missing: "x", recorded: "gone/crdm.bpmn" },
+      beans: null,
+      todos: [],
+      now: NOW,
+      drawingFor: () => "../../assets/img/workflows/crdm.svg",
+    });
+    // No model: the level has no source, so no drawing is asked for.
+    expect(html).not.toContain('<figure class="wv-diagram"');
+    const model = { id: "Process_CRDM", source: "/r/crdm.bpmn", nodes: new Map(), children: new Map() };
+    const drawn = workflowInstancePage({
+      instance: stale as never,
+      store: "cat-harness",
+      model: { model: model as never, source: "crdm.bpmn", recorded: "gone/crdm.bpmn", moved: true },
+      beans: null,
+      todos: [],
+      now: NOW,
+      drawingFor: () => "../../assets/img/workflows/crdm.svg",
+      processPageFor: () => "../../processes/crdm.html",
+    });
+    expect(drawn).toContain('data-wv-svg="../../assets/img/workflows/crdm.svg"');
+    // Back to the process's own page, from the header and from the diagram's caption.
+    expect(drawn).toContain('<a href="../../processes/crdm.html" title="the process page"><code>Process_CRDM</code></a>');
+    expect(drawn).toContain('Process <a href="../../processes/crdm.html"><code>Process_CRDM</code></a>');
+    expect(drawn).toContain('data-wv-tokens="[&quot;A_Step&quot;]"');
+    expect(drawn).toContain("which is not on disk; drawn from <code>crdm.bpmn</code>");
+  });
+
+  test("the hub lists every instance, an unreadable one with its reason", () => {
+    const store = storeWith({ "crdm--x-ab12.json": stale, "broken.json": "{" });
+    try {
+      const html = workflowHubPage("cat-harness", store, { beans: [bean("x-ab12")] as never, now: NOW });
+      expect(html).toContain('<a href="crdm--x-ab12/"><code>crdm--x-ab12</code></a>');
+      expect(html).toContain("<code>broken.json</code></td><td colspan=\"5\">not readable JSON");
+    } finally {
+      rmSync(store, { recursive: true, force: true });
     }
   });
 });

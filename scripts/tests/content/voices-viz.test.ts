@@ -18,13 +18,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readVoicesGraph, type VoicesGraph } from "../voices-graph.ts";
-import { projection, viewerHtml } from "../gen-voices-viz.ts";
-import { unscopedSelectors } from "../lib/themed-page.ts";
-import { shippedVoices, overlaySeverityOf } from "../../pipeline/voice-criteria.ts";
-import { overlayCriterionId } from "../../pipeline/voice-criteria.ts";
+import { readVoicesGraph, type VoicesGraph } from "../../voices-graph.ts";
+import { projection, viewerHtml } from "../../gen-voices-viz.ts";
+import { unscopedSelectors } from "../../lib/themed-page.ts";
+import { shippedVoices, overlaySeverityOf } from "../../../pipeline/voice-criteria.ts";
+import { overlayCriterionId } from "../../../pipeline/voice-criteria.ts";
 import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 /** The repository root — `repoRootFor` takes an INSTANCE root and is `dirname`. */

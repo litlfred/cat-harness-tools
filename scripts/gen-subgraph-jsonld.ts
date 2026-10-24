@@ -11,9 +11,17 @@
  *
  * Every directory under each of this instance's declared knowledge-graph
  * directories (`kgDirectories(…, "instance")`: today `skills/`, `scenarios/`
- * and `processes/`), nested ones included — so `skills/` and `skills/sdlc/`
- * are both subgraphs, and the second is a child of the first. Above them is the
- * ROOT, the harness instance itself, whose IRI is `<BASE_URL>/subgraph/<HARNESS>/`.
+ * and `processes/`) and under each framed instance's declared `tools` graph
+ * ({@link subgraphDirectories}), nested ones included — so `skills/` and
+ * `skills/sdlc/` are both subgraphs, and the second is a child of the first.
+ * Above them is the ROOT, the harness instance itself, whose IRI is
+ * `<BASE_URL>/subgraph/<HARNESS>/`.
+ *
+ * `tools/` is here for bean `mo75` G1 (owner, 2026-10-09, Option C of
+ * `docs/proposals/semantic-subgraphs-2026-10-09.md`: *"load the tools/skills
+ * metadata, review the skills description and then materialize a set of
+ * Tools"*). Until then every Tool node fell to the root, which has no
+ * hydrated file, so there was no Tools metadata to load in one fetch.
  *
  * ## Membership is containment, and every node lands exactly once
  *
@@ -27,7 +35,11 @@
  *   tree, `<BASE_URL>/subgraph/<ITS NAME>/…`, by the same containment rule
  *   over its declared directories (bean `ax6r`) — a path outside them falls
  *   to that instance's root.
- * - Everything else — schemas, tools, roles, graph typologies — is a direct member
+ * - A Tool node has no source path: it is placed by the folder convention
+ *   (`schemas/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
+ *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
+ *   else the `tools/` directory itself.
+ * - Everything else — schemas, roles, graph typologies — is a direct member
  *   of its own harness's ROOT.
  *
  * ## Each instance is framed from its OWN export (bean `4ak5` item 2)
@@ -108,7 +120,7 @@
  * docs workflows, beside `ns/content/v1.jsonld`).
  *
  * @module scripts/gen-subgraph-jsonld
- * @covers computed — the subgraphs are every directory under `kgDirectories(instance)`
+ * @covers computed — the subgraphs are every directory under `kgDirectories(instance)` and the declared `tools` graphs
  */
 
 import { createHash } from "node:crypto";
@@ -117,7 +129,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import jsonld from "jsonld";
 import { buildContext, buildExport, graphTypologyId } from "./kg-export.js";
 import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js";
-import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
@@ -498,6 +510,35 @@ export function framedInstances(root: string = ROOT): string[] {
   return [own, ...[...out].sort()];
 }
 
+/** The graph typology whose directories hold Tool nodes (`schemas/tool-folders.ts`). */
+const TOOLS_GRAPH = "tools";
+
+/**
+ * Every directory this build heads a subgraph tree at: the knowledge-graph
+ * directories the corpus reaches (`kgDirectories`), then each framed
+ * instance's declared `tools` directories (bean `mo75` G1). Same shape as
+ * `kgDirectories`, so {@link planSubgraphs} walks both one way.
+ *
+ * Not folded into `kgDirectories`: that list is also the SKILL corpus's, and a
+ * `tools/` directory holds `.ts` definitions, not skill bodies. Only the
+ * instances {@link framedInstances} names are asked, because only their
+ * exports are framed — a `tools/` tree for an unframed instance would be a
+ * tree of empty subgraphs.
+ */
+export function subgraphDirectories(root: string = ROOT): Array<{ id: string; path: string; absPath: string }> {
+  const out = kgDirectories(root, corpusScopeFor(root)).map((d) => ({ id: d.id, path: d.path, absPath: d.absPath }));
+  for (const inst of framedInstances(root)) {
+    const ids = new Map(instanceDirectories(inst).map((d) => [resolve(inst, d.path), d.id]));
+    for (const abs of instanceDirectoriesForGraph(inst, TOOLS_GRAPH)) {
+      if (!existsSync(abs)) continue;
+      const id = ids.get(resolve(abs));
+      if (id === undefined) continue; // declared FROM WITHIN another entry: its parent's tree already walks it
+      out.push({ id, path: relative(root, abs).replace(/\\/g, "/"), absPath: abs });
+    }
+  }
+  return out;
+}
+
 const PATH_KEYS = ["instructionsPath", "module", "sourcePath", "path"] as const;
 
 function pathOf(n: Node): string | undefined {
@@ -588,7 +629,7 @@ export function planSubgraphs(
     }
     return declOf.get(inst);
   };
-  const kgDirs = kgDirectories(opts.root, corpusScopeFor(opts.root)).flatMap((d) => {
+  const kgDirs = subgraphDirectories(opts.root).flatMap((d) => {
     const inst = findInstanceRoot(d.absPath);
     if (inst === undefined) {
       problems.push(`${d.absPath}: no instance declaration above this knowledge-graph directory`);
@@ -652,8 +693,31 @@ export function planSubgraphs(
   };
   /** Where a node's paths are relative to: the instance that exported it. */
   const exportedFrom = (id: string): string => resolve(opts.rootOf?.get(id) ?? opts.root);
-  /** A node with no path and no parent: its own instance's root. */
-  const homeOf = (id: string): SubgraphEntry => harnessRoots.get(exportedFrom(id)) ?? root;
+  /**
+   * A Tool's home (bean `mo75` G1): its own instance's `tools/<id>/` folder,
+   * else that `tools/` directory, else — no `tools` graph walked — its root.
+   */
+  const toolsTops = new Map<string, string[]>();
+  for (const d of kgDirs) {
+    if (!d.graphTypologies.includes(TOOLS_GRAPH)) continue;
+    toolsTops.set(d.inst, [...(toolsTops.get(d.inst) ?? []), slash(resolve(d.absPath))]);
+  }
+  const toolType = termIri("Tool");
+  const toolHome = (n: Node): SubgraphEntry | undefined => {
+    if (!([] as unknown[]).concat(n["@type"]).includes(toolType)) return undefined;
+    const name = typeof n.name === "string" ? n.name : undefined;
+    for (const top of toolsTops.get(exportedFrom(String(n["@id"]))) ?? []) {
+      const own = name === undefined ? undefined : byDir.get(slash(join(top, name)));
+      if (own !== undefined) return own;
+    }
+    const first = toolsTops.get(exportedFrom(String(n["@id"])))?.[0];
+    return first === undefined ? undefined : byDir.get(first);
+  };
+  /** A node with no path and no parent: a Tool's folder, else its own instance's root. */
+  const homeOf = (id: string): SubgraphEntry => {
+    const n = nodes.get(id);
+    return (n && toolHome(n)) ?? harnessRoots.get(exportedFrom(id)) ?? root;
+  };
 
   // Place by path.
   const placed = new Map<string, SubgraphEntry>();

@@ -16,9 +16,9 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
-const SCRIPTS_DIR = resolve(import.meta.dir, "..");
+const SCRIPTS_DIR = resolve(import.meta.dir, "..", "..");
 const PIN_FILE = join(HARNESS_ROOT, ".bun-version");  // bean 70lx: the pin stayed with the harness
 const INSTALL_SH = join(SCRIPTS_DIR, "install-bun.sh");
 const INSTALL_BAT = join(SCRIPTS_DIR, "install-bun.bat");
