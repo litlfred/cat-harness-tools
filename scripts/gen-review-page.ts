@@ -229,7 +229,18 @@ const SCRIPT = `
     }
     return doc + "/index.html";
   }
+  // A ChangeSet whose blocks are not a folio's says where each one is on the
+  // site itself: \`page\` (site-relative; "" when the block is on no page,
+  // such as an IG's source file) and \`anchor\` (the element id, when it is not
+  // the label). An IG's preview writes them (fhir-harness ig-review-data).
+  function safePage(p) {
+    return /^[A-Za-z0-9._\\/-]+$/.test(p) && p.split("/").every(function (s) { return s && !/^\\.+$/.test(s); });
+  }
   function href(base, at, label) {
+    if (at && typeof at.page === "string") {
+      if (!at.page || !safePage(at.page)) return null;
+      return base + at.page + (at.anchor ? "#" + encodeURIComponent(at.anchor) : "");
+    }
     var doc = docOf(at);
     return doc == null ? null : base + docPage(doc) + "#" + encodeURIComponent(label);
   }

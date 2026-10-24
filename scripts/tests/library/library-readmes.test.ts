@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { itemFacts, plan } from "../library-readmes.ts";
+import { itemFacts, plan } from "../../library-readmes.ts";
 import { splice } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 
 describe("an item's facts come from its manifest", () => {

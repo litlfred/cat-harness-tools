@@ -20,20 +20,20 @@
  * `test/library-entry-iri-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
-import { EDIT_LINKS_RUNTIME } from "../../src/core/edit-links.ts";
+import { EDIT_LINKS_RUNTIME } from "../../../src/core/edit-links.ts";
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { ADDRESS_JS } from "../lib/library-address.ts";
-import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER_JS, viewerHtml } from "../gen-library-viz.ts";
+import { ADDRESS_JS } from "../../lib/library-address.ts";
+import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER_JS, viewerHtml } from "../../gen-library-viz.ts";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
 import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { checkEntry } from "../check-l1-complete.ts";
+import { checkEntry } from "../../check-l1-complete.ts";
 import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
-import { declaredPageRoute } from "../viewer-declarations.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { declaredPageRoute } from "../../viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = resolve(HARNESS, "..");
