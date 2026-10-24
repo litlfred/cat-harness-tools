@@ -2781,6 +2781,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
   const { owned } = orphanSubjectPages(hubDir, ids, carriesMarker(GENERATED_BY));
   return check && builtAtPublishHere(join(hubDir, "x", "index.html")) ? [] : owned.map((name) => relative(SITE, join(hubDir, name)));
 }
+const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
   if (kinds.length === 0 || unread.length > 0) {
@@ -2803,7 +2804,10 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
         : memory
           ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
           : instanceSubjectPage(v, s, subjects);
-    emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+    // ANOTHER instance's page depends on which instances the checkout mounts,
+    // so it is built at publish wherever this layer is mounted, listed or not:
+    // a downstream index adds instances no list here can name (Uganda #15).
+    if (!(check && s.name !== ownName)) emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
     if (beans) subjectOrphans.push(...drawWorkflows(v.id, s, dir, models!));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
