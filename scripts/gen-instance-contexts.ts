@@ -288,6 +288,7 @@ function ownerOf(abs: string, decls: readonly InstanceDecl[]): InstanceDecl | un
 function isExcluded(abs: string, owner: InstanceDecl, doc: unknown): boolean {
   const rel = relative(owner.root, abs).split(sep).join("/");
   if (rel === owner.contextPath) return true;
+  // declared-path-literal: `ns/` relative to ANY instance's own root (this tests every instance's context files); cat-harness's `ns/` declaration names one instance's directory, not this convention.
   return rel.startsWith("ns/") && isContextDocument(doc);
 }
 
