@@ -426,6 +426,10 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
       "antigravity-skill",
       "antigravity-rule",
       "agents-md",
+      "gemini-agent",
+      "codex-agent",
+      "cursor-agent",
+      "copilot-agent",
     ]);
     expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "claude-agent-memory")?.budget).toEqual({
       unit: "lines",
