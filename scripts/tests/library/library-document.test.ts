@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../lib/library-document.ts";
+import { extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));

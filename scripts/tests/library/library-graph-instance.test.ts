@@ -7,8 +7,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { instanceOf } from "../library-graph.ts";
-import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { instanceOf } from "../../library-graph.ts";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 const made: string[] = [];
 afterEach(() => {
