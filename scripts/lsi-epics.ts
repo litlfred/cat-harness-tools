@@ -30,7 +30,7 @@
  * is a coin toss — and says so.
  *
  *   bun run cat lsi:epics [--out <file.md>]
- *   bun run cat lsi:near "<planned bean title>" [--body "<text>"]
+ *   bun run cat lsi:near "<planned bean title>" [--body "<text>"] [--graphs blocks,lean-decl] [--root lean-decl=<dir>]
  *   bun run cat lsi:epics --method ca        # the parallel track (correspondence analysis)
  *   LSI_DUMP=<file.json> bun run cat lsi:epics  # per-bean agreement, for a PAIRED comparison
  */
@@ -43,6 +43,8 @@ import { declaredGraphs } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { buildCa } from "../pipeline/ca";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { formatNearAcross, nearAcross, parseNearAcrossArgs } from "../pipeline/lsi-near-across";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -218,20 +220,30 @@ if (import.meta.main) {
     const v = foldIn(ix, text);
     if (v.every((x) => x === 0)) {
       console.log(`no term of ${JSON.stringify(title)} is in the bean vocabulary — nothing to compare (this is not "no duplicate")`);
-      process.exit(0);
+    } else {
+      const hits = ix.unitIds
+        .map((id) => ({ b: byId.get(id)!, cos: cosineVectors(v, unitVector(ix, id)!) }))
+        .sort((a, b) => b.cos - a.cos)
+        .slice(0, Number(process.env.LSI_NEAR_TOP ?? 5));
+      console.log(`nearest beans to ${JSON.stringify(title)} (latent cosine; READ any >= ${NEAR_READ} before creating):`);
+      for (const { b, cos } of hits)
+        console.log(`  ${cos.toFixed(2)}${cos >= NEAR_READ ? " ←" : "  "} ${b.short.padEnd(5)} ${b.status.padEnd(11)} ${b.type.padEnd(8)} ${b.title.slice(0, 90)}`);
+      const cents = new Map<string, Float64Array>();
+      for (const [e, ids] of members) cents.set(e, centroid(ix, ids));
+      const [best, second] = rankEpics(ix, v, cents);
+      const tag = best.cosine < FIT_FLOOR ? "no epic fits — a new one?" : best.cosine - second.cosine < MARGIN_FLOOR ? `ambiguous vs ${second.epic.replace(/^folio-assistant-/, "")}` : "";
+      console.log(`closest epic: ${best.epic.replace(/^folio-assistant-/, "")} ${byId.get(best.epic)!.title.split(":")[0]} (${best.cosine.toFixed(2)}) ${tag}`);
     }
-    const hits = ix.unitIds
-      .map((id) => ({ b: byId.get(id)!, cos: cosineVectors(v, unitVector(ix, id)!) }))
-      .sort((a, b) => b.cos - a.cos)
-      .slice(0, Number(process.env.LSI_NEAR_TOP ?? 5));
-    console.log(`nearest beans to ${JSON.stringify(title)} (latent cosine; READ any >= ${NEAR_READ} before creating):`);
-    for (const { b, cos } of hits)
-      console.log(`  ${cos.toFixed(2)}${cos >= NEAR_READ ? " ←" : "  "} ${b.short.padEnd(5)} ${b.status.padEnd(11)} ${b.type.padEnd(8)} ${b.title.slice(0, 90)}`);
-    const cents = new Map<string, Float64Array>();
-    for (const [e, ids] of members) cents.set(e, centroid(ix, ids));
-    const [best, second] = rankEpics(ix, v, cents);
-    const tag = best.cosine < FIT_FLOOR ? "no epic fits — a new one?" : best.cosine - second.cosine < MARGIN_FLOOR ? `ambiguous vs ${second.epic.replace(/^folio-assistant-/, "")}` : "";
-    console.log(`closest epic: ${best.epic.replace(/^folio-assistant-/, "")} ${byId.get(best.epic)!.title.split(":")[0]} (${best.cosine.toFixed(2)}) ${tag}`);
+    // ── The other declared graphs (bean `ec2a` step 3, owner decision A) ──
+    // One list per graph, each scored in its own space, never merged with the
+    // beans above or with each other. `--graphs` limits them; `beans` in that
+    // list means the list above, which always prints.
+    const { graphs, roots } = parseNearAcrossArgs(process.argv.slice(2));
+    const others = graphs?.filter((g) => g !== "beans");
+    if (others === undefined || others.length > 0) {
+      const { results, problems } = await nearAcross(text, { checkoutRoot: repoRootFor(HARNESS_ROOT), ...(others ? { graphs: others } : {}), roots, top: Number(process.env.LSI_NEAR_TOP ?? 5) });
+      for (const line of formatNearAcross(results, problems)) console.log(line);
+    }
     process.exit(0);
   }
 

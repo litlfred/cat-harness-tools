@@ -54,7 +54,7 @@
  * The obvious reading of this report is wrong, so it is stated before the usage.
  * In the loaded run of 2026-09-27 that timed out three tests, **four**
  * default-budget cases exceeded 5000 ms. The fourth,
- * `tests/tools.test.ts:204` at **5.22 s**, declares no budget anywhere in its file
+ * `tests/tools/tools.test.ts:204` at **5.22 s**, declares no budget anywhere in its file
  * and **passed** — in that run and again at 4.23 s in the next.
  *
  * So junit's `time` and the quantity bun charges against the timeout are not the
