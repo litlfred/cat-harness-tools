@@ -139,6 +139,7 @@
     "check:bean-parent-prose:check": "bun run cat-harness-tools/scripts/check-bean-parent-prose.ts --check",
     "check:bean-blocks": "bun run cat-harness-tools/scripts/check-bean-blocks.ts",
     "check:bean-archive": "bun run cat-harness-tools/scripts/check-bean-archive.ts",
+    "check:bean-calls": "bun run cat-harness-tools/scripts/check-bean-lifecycle-calls.ts",
     "check:bean-restates-skill": "bun run cat-harness-tools/scripts/check-bean-restates-skill.ts",
     "check:ci-health": "bun run cat-harness-tools/scripts/check-ci-health.ts",
     "secrets:check": "bun run cat-harness-tools/scripts/secrets-check.ts",

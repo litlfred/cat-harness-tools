@@ -9,16 +9,27 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { extractBpmn, injectBpmn } from "../../../pipeline/bpmn-translate.ts";
 import { parsePo } from "../../../pipeline/po-inject.ts";
 import { loadProcessModel, isActivity } from "../../../src/workflow/process-model.ts";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { workflowFile } from "../../known-skills.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SRC = join(ROOT, "processes/sdlc/bean-lifecycle.bpmn");
+// Bean `m8gz` moved the check, create, whose and claim steps into
+// `bean-open.bpmn`; `bean-lifecycle.bpmn` carries them until that lands.
+// Found by file name through the declarations, wherever they are placed.
+const SRC = (() => {
+  try {
+    return workflowFile(ROOT, "bean-open.bpmn");
+  } catch {
+    return workflowFile(ROOT, "bean-lifecycle.bpmn");
+  }
+})();
+const SRC_REL = relative(ROOT, SRC);
 
 /** A PO translating a handful of the diagram's msgids. */
 function poFor(pairs: [string, string][]): string {
@@ -32,13 +43,13 @@ describe("bpmn translation end to end", () => {
     const before = await loadProcessModel(SRC);
 
     // Translate every label the extractor offers, so nothing is left to luck.
-    const entries = extractBpmn(xml, "processes/sdlc/bean-lifecycle.bpmn");
+    const entries = extractBpmn(xml, SRC_REL);
     expect(entries.length).toBeGreaterThan(5);
     const po = poFor(entries.map((e) => [e.msgid, `[fr] ${e.msgid}`] as [string, string]));
 
     const out = injectBpmn(xml, parsePo(po));
     const dir = mkdtempSync(join(tmpdir(), "bpmn-fr-"));
-    const path = join(dir, "bean-lifecycle.bpmn");
+    const path = join(dir, "diagram.bpmn");
     writeFileSync(path, out);
     try {
       const after = await loadProcessModel(path);
