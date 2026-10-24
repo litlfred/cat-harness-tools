@@ -73,6 +73,7 @@
     "test/review-budget.e2e.ts",
     "test/review-diff.e2e.ts",
     "test/review-heat.e2e.ts",
+    "test/review-ig-links.e2e.ts",
     "test/review-nav.e2e.ts",
     "test/review-visual.e2e.ts",
     "test/schema-overview-filter.e2e.ts",
