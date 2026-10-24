@@ -24,6 +24,7 @@ import { z } from "zod";
 import { decide, unscopedGrants, type RequestScope } from "@litlfred/cat-harness/schemas/odrl.js";
 import { accessContext, type AccessContext, type Principal } from "../core/access.js";
 import { GITHUB_ROLE_ACTOR, githubPrincipalFor, principalFromGithub, type GithubIdentity } from "../core/github-auth.js";
+import type { AgentHost } from "../core/agent-host.js";
 import { qualified, resolveIdentities, type Identity } from "../core/identity.js";
 import { authorizeTask, describeVerdict } from "../workflow/authorize.js";
 
@@ -51,7 +52,7 @@ export function grainNote(id: GithubIdentity): string {
 }
 
 /** The answer, as markdown. Pure: the GitHub identity and the policies are inputs. */
-export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInput, others: readonly Identity[] = []): string {
+export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInput, others: readonly Identity[] = [], hosts: readonly AgentHost[] = []): string {
   const lines: string[] = ["# Who is asking", ""];
   const gh = principalFromGithub(id);
 
@@ -83,6 +84,14 @@ export function whoami(ctx: AccessContext, id: GithubIdentity, input: WhoamiInpu
     lines.push(
       `- **Also seen** (for preferences only, never for permissions): ` +
         rest.map((o) => `\`${qualified(o)}\` (${o.vouched ? `vouched, ${o.via}` : `self-asserted, ${o.via}`})`).join("; ") +
+        ".",
+    );
+  }
+
+  if (hosts.length) {
+    lines.push(
+      `- **Agent host:** ` +
+        hosts.map((h) => `${h.name} (\`${h.marker}\`; ${h.exposesIdentity ? "passes the person's account" : "passes no account"})`).join("; ") +
         ".",
     );
   }
@@ -156,7 +165,7 @@ export function registerAuthTools(server: McpServer, repoRoot: string): void {
     async (input) => {
       const { identity: id } = await githubPrincipalFor(repoRoot, process.env);
       const all = await resolveIdentities({ env: process.env, repo: id.repo, cwd: repoRoot });
-      return { content: [{ type: "text" as const, text: whoami(accessContext(repoRoot), id, input, all.identities) }] };
+      return { content: [{ type: "text" as const, text: whoami(accessContext(repoRoot), id, input, all.identities, all.hosts) }] };
     },
   );
 }

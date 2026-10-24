@@ -25,17 +25,32 @@ import {
 } from "@litlfred/cat-harness/schemas/memory.js";
 import { EMPTY_NOTE_TAGS } from "@litlfred/cat-harness/schemas/carried-note.js";
 import {
+  AGENT_MEMORY_TARGETS,
+  AGENTS_MD_BEGIN,
+  AGENTS_MD_BYTE_BUDGET,
+  AGENTS_MD_END,
+  ANTIGRAVITY_RULE_BYTE_BUDGET,
+  ANTIGRAVITY_SKILL_BYTE_BUDGET,
   BEGIN,
+  CLAUDE_MEMORY_LINE_BUDGET,
   END,
   DEFAULT_ANTIGRAVITY_RULE_TEMPLATE,
   droppedEntryReport,
+  droppedTargetNodesReport,
   entriesPastBudget,
+  lowestPriorityFirst,
   parseMemoryFile,
   readMemoryNodes,
+  rebaseAgentsMdLinks,
   rebaseRuleLinks,
+  renderAgentsMdSection,
   renderAntigravityRule,
+  renderAntigravitySkillWithBudget,
+  repoWideMemory,
   slugify,
+  spliceAgentsMdRegion,
   spliceRegion,
+  syncAgentsMd,
   syncAntigravityRule,
 } from "../agent-memory.js";
 
@@ -375,6 +390,207 @@ describe("Antigravity workspace rule (bean fkqa)", () => {
       writeFileSync(rulePath, "no markers");
       const r3 = syncAntigravityRule(false, nodes, 24_000, rulePath);
       expect(r3.state).toBe("no-markers");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () => {
+  const makeNode = (
+    id: string,
+    label: "stable" | "trap" | "baseline",
+    agent?: string,
+    extra: Partial<Record<string, unknown>> = {},
+  ) =>
+    MemoryNodeSchema.parse({
+      id,
+      summary: `summary for ${id}`,
+      comment: `comment for ${id}`,
+      createdAt: "2026-10-06T12:00:00Z",
+      label,
+      tags: {
+        ...EMPTY_NOTE_TAGS,
+        references: agent ? [{ kind: "agent", id: agent }] : [],
+      },
+      $schema: MEMORY_SCHEMA_TAG,
+      ...(label === "baseline"
+        ? { measured: { command: "bun test", date: "2026-10-06", result: "0 failures" } }
+        : {}),
+      ...extra,
+    });
+
+  test("AGENT_MEMORY_TARGETS declares all active targets with explicit budgets", () => {
+    expect(AGENT_MEMORY_TARGETS.map((t) => t.id)).toEqual([
+      "claude-agent-memory",
+      "antigravity-skill",
+      "antigravity-rule",
+      "agents-md",
+    ]);
+    expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "claude-agent-memory")?.budget).toEqual({
+      unit: "lines",
+      limit: CLAUDE_MEMORY_LINE_BUDGET,
+    });
+    expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "antigravity-skill")?.budget).toEqual({
+      unit: "bytes",
+      limit: ANTIGRAVITY_SKILL_BYTE_BUDGET,
+    });
+    expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "antigravity-rule")?.budget).toEqual({
+      unit: "bytes",
+      limit: ANTIGRAVITY_RULE_BYTE_BUDGET,
+    });
+    expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "agents-md")?.budget).toEqual({
+      unit: "bytes",
+      limit: AGENTS_MD_BYTE_BUDGET,
+    });
+  });
+
+  test("repoWideMemory selects only live nodes with no agent reference", () => {
+    const withSkillRefOnly = MemoryNodeSchema.parse({
+      id: "repo-skill-ref",
+      summary: "repo-wide with skill reference",
+      comment: "applies everywhere",
+      createdAt: "2026-10-06T12:00:00Z",
+      label: "stable",
+      tags: {
+        ...EMPTY_NOTE_TAGS,
+        references: [{ kind: "skill", id: "agent-memory" }],
+      },
+      $schema: MEMORY_SCHEMA_TAG,
+    });
+    const nodes = [
+      makeNode("repo-1", "stable", undefined),
+      withSkillRefOnly,
+      makeNode("agent-1", "trap", "ci-health-watcher"),
+      makeNode("repo-archived", "stable", undefined, { archived: true }),
+    ];
+    expect(repoWideMemory(nodes).map((n) => n.id)).toEqual(["repo-1", "repo-skill-ref"]);
+  });
+
+  test("lowestPriorityFirst orders baseline -> trap -> stable, oldest createdAt first", () => {
+    const nodes = [
+      makeNode("s-old", "stable", undefined, { createdAt: "2026-01-01T00:00:00Z" }),
+      makeNode("t-new", "trap", undefined, { createdAt: "2026-06-01T00:00:00Z" }),
+      makeNode("t-old", "trap", undefined, { createdAt: "2026-02-01T00:00:00Z" }),
+      makeNode("b-new", "baseline", undefined, { createdAt: "2026-09-01T00:00:00Z" }),
+      makeNode("b-old", "baseline", undefined, { createdAt: "2026-03-01T00:00:00Z" }),
+    ];
+    expect(lowestPriorityFirst(nodes).map((n) => n.id)).toEqual([
+      "b-old",
+      "b-new",
+      "t-old",
+      "t-new",
+      "s-old",
+    ]);
+  });
+
+  test("renderAntigravitySkillWithBudget enforces byte budget and reports dropped nodes", () => {
+    const nodes = [
+      makeNode("s1", "stable", "agent-one", { comment: "stable lesson ".repeat(20) }),
+      makeNode("t1", "trap", "agent-one", { comment: "trap lesson ".repeat(20) }),
+      makeNode("b1", "baseline", "agent-one", { comment: "baseline lesson ".repeat(20) }),
+    ];
+    const res = renderAntigravitySkillWithBudget("agent-one", nodes, 900);
+    expect(res.dropped.length).toBeGreaterThan(0);
+    expect(res.dropped[0]!.id).toBe("b1");
+    expect(res.bytes).toBeLessThanOrEqual(900);
+  });
+
+  test("droppedTargetNodesReport returns null when empty and names dropped nodes per target", () => {
+    expect(droppedTargetNodesReport([])).toBeNull();
+    expect(
+      droppedTargetNodesReport([{ target: "AGENTS.md", budgetBytes: 32_768, dropped: [] }]),
+    ).toBeNull();
+
+    const b1 = makeNode("b1", "baseline", undefined);
+    const report = droppedTargetNodesReport([
+      { target: "AGENTS.md", budgetBytes: 32_768, dropped: [b1] },
+    ]);
+    expect(report).not.toBeNull();
+    expect(report).toContain("AGENTS.md (budget 32768 bytes): 1 dropped");
+    expect(report).toContain("[BASELINE] b1 (summary for b1)");
+    expect(report).toContain("never silent truncation");
+  });
+
+  test("rebaseAgentsMdLinks rebases ../skills/ links to cat-harness/skills/", () => {
+    const raw = "Read [`agent-memory.md`](../skills/conduct/conduct-core/agent-memory.md).";
+    expect(rebaseAgentsMdLinks(raw)).toBe(
+      "Read [`agent-memory.md`](cat-harness/skills/conduct/conduct-core/agent-memory.md).",
+    );
+  });
+
+  test("spliceAgentsMdRegion supports both cat-harness:agent-memory and folio:memory markers", () => {
+    const withCatMarkers = `# AGENTS.md\n\n${AGENTS_MD_BEGIN}\nold\n${AGENTS_MD_END}\n\nFooter\n`;
+    const out1 = spliceAgentsMdRegion(withCatMarkers, "### STABLE — fact")!;
+    expect(out1).toContain("### STABLE — fact");
+    expect(out1).not.toContain("old");
+    expect(out1).toContain("Footer");
+
+    const emptyOut = spliceAgentsMdRegion(withCatMarkers, "")!;
+    expect(emptyOut).toContain(`${AGENTS_MD_BEGIN}\n${AGENTS_MD_END}`);
+
+    const withFolioMarkers = `# AGENTS.md\n\n${BEGIN}\nold\n${END}\n`;
+    expect(spliceAgentsMdRegion(withFolioMarkers, "### TRAP — watch out")).toContain(
+      "### TRAP — watch out",
+    );
+
+    expect(spliceAgentsMdRegion("# AGENTS.md without markers\n", "body")).toBeUndefined();
+  });
+
+  test("renderAgentsMdSection renders only repo-wide live nodes and drops lowest-priority over budget", () => {
+    const template = `# AGENTS.md\n\n${AGENTS_MD_BEGIN}\n${AGENTS_MD_END}\n`;
+    const nodes = [
+      makeNode("rw-stable", "stable", undefined, {
+        comment: "See [`skill`](../skills/conduct/skill.md). " + "stable ".repeat(15),
+      }),
+      makeNode("rw-trap", "trap", undefined, { comment: "trap ".repeat(15) }),
+      makeNode("rw-baseline", "baseline", undefined, { comment: "baseline ".repeat(15) }),
+      makeNode("scoped-only", "stable", "ci-health-watcher"),
+      makeNode("rw-archived", "stable", undefined, { archived: true }),
+    ];
+
+    const full = renderAgentsMdSection(nodes, template, 32_768);
+    expect(full.dropped).toEqual([]);
+    expect(full.entries).toBe(3);
+    expect(full.body).toContain("### STABLE — summary for rw-stable");
+    expect(full.body).toContain("](cat-harness/skills/conduct/skill.md)");
+    expect(full.body).toContain("### TRAP — summary for rw-trap");
+    expect(full.body).toContain("### BASELINE — summary for rw-baseline");
+    expect(full.body).not.toContain("scoped-only");
+    expect(full.body).not.toContain("rw-archived");
+
+    const tight = renderAgentsMdSection(nodes, template, 450);
+    expect(tight.dropped.length).toBeGreaterThan(0);
+    expect(tight.dropped[0]!.id).toBe("rw-baseline");
+    expect(tight.bytes).toBeLessThanOrEqual(450);
+  });
+
+  test("syncAgentsMd handles missing, no-markers, written, and unchanged states", () => {
+    const dir = mkdtempSync(join(tmpdir(), "agents-md-sync-"));
+    const agentsPath = join(dir, "AGENTS.md");
+    try {
+      const nodes = [makeNode("rw-1", "stable", undefined)];
+
+      // 1. Missing file -> missing (never created out of thin air)
+      const rMissing = syncAgentsMd(true, nodes, 32_768, agentsPath);
+      expect(rMissing.state).toBe("missing");
+      expect(existsSync(agentsPath)).toBe(false);
+
+      // 2. File without markers -> no-markers (left untouched)
+      writeFileSync(agentsPath, "# AGENTS.md\nNo markers here.\n");
+      const rNoMarkers = syncAgentsMd(true, nodes, 32_768, agentsPath);
+      expect(rNoMarkers.state).toBe("no-markers");
+
+      // 3. File with markers -> written on first sync, unchanged on second
+      writeFileSync(agentsPath, `# AGENTS.md\n\n${AGENTS_MD_BEGIN}\n${AGENTS_MD_END}\n`);
+      const rWritten = syncAgentsMd(true, nodes, 32_768, agentsPath);
+      expect(rWritten.state).toBe("written");
+      expect(rWritten.entries).toBe(1);
+      expect(rWritten.dropped).toEqual([]);
+
+      const rUnchanged = syncAgentsMd(false, nodes, 32_768, agentsPath);
+      expect(rUnchanged.state).toBe("unchanged");
+      expect(rUnchanged.entries).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
