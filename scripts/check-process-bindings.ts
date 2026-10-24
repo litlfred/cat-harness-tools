@@ -59,7 +59,7 @@
  * bun run cat check:process-bindings --shrink   # lower the baseline after a fix
  * ```
  *
- * Tested with planted violations in `tests/check-process-bindings.test.ts`.
+ * Tested with planted violations in `tests/process/check-process-bindings.test.ts`.
  *
  * @module scripts/check-process-bindings
  * @covers processes, skills
