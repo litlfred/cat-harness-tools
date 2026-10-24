@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { coverStateOf } from "../library-covers.ts";
-import { avatarOf, COVER_FILENAME } from "../library-graph.ts";
+import { coverStateOf } from "../../library-covers.ts";
+import { avatarOf, COVER_FILENAME } from "../../library-graph.ts";
 
 describe("an entry's cover is page 1 of its held PDF (owner, 2026-10-16)", () => {
   const repo = mkdtempSync(join(tmpdir(), "lib-cover-"));

@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { entryGraphFiles, entryGraphSitePath } from "../lib/library-entry-graphs.ts";
+import { entryGraphFiles, entryGraphSitePath } from "../../lib/library-entry-graphs.ts";
 
 const made: string[] = [];
 afterAll(() => {

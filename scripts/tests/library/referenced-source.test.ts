@@ -22,10 +22,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
-import { checkEntry, entryKind } from "../check-l1-complete.ts";
+import { checkEntry, entryKind } from "../../check-l1-complete.ts";
 
-const SCRIPT = resolve(import.meta.dir, "../referenced-source.py");
-const GEN = resolve(import.meta.dir, "../../pipeline/gen-library-jsonld.ts");
+const SCRIPT = resolve(import.meta.dir, "../../referenced-source.py");
+const GEN = resolve(import.meta.dir, "../../../pipeline/gen-library-jsonld.ts");
 const made: string[] = [];
 afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
