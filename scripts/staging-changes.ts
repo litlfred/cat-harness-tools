@@ -50,7 +50,7 @@
  *
  * @module cat-harness-tools/scripts/staging-changes
  * @covers none — it reports what a preview changed and judges no declared
- * graph; its logic is covered by `scripts/tests/staging-changes.test.ts`
+ * graph; its logic is covered by `scripts/tests/sdlc/staging-changes.test.ts`
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
