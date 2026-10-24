@@ -396,6 +396,7 @@
     "docs:harness:check": "bun run cat-harness-tools/scripts/publish-check.ts docs:harness",
     "docs:pages": "bun run cat-harness-tools/scripts/gen-docs-pages.ts",
     "docs:pages:check": "bun run cat-harness-tools/scripts/publish-check.ts docs:pages",
+    "eval:bpmn-forced-vs-managed": "bun run cat-harness-tools/scripts/eval-bpmn-forced-vs-managed.ts",
     "eval:crdm-detect": "bun run cat-harness-tools/scripts/eval-crdm-detect.ts",
     "external-schemas": "bun run cat-harness-tools/scripts/external-schemas.ts",
     "external-schemas:check": "bun run cat-harness-tools/scripts/external-schemas.ts --check",
