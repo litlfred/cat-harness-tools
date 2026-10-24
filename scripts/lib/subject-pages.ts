@@ -32,7 +32,7 @@ function servingDocIri(instanceRoot: string): string | undefined {
     let doc: string | undefined;
     try {
       const host = key === resolve(HARNESS_ROOT);
-      // An instance minting against its OWN `canonicalUrl` (smart-base:
+      // An instance minting against its OWN `canonicalUrl` (e.g. one whose canonical is
       // `http://smart.who.int/base`) gets its pages written on THIS site
       // under `<name>/`, at a path its IRIs do not name — so a link to its
       // IRI would leave the site for a host that serves nothing. It keeps

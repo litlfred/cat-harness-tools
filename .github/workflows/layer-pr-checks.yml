@@ -93,7 +93,7 @@
 # The records above were made against the index, the lower layers and the
 # branch-kept graphs as main's push pinned them. A PR pinned them NOW, so
 # every gate that reads a lower layer or a graph that moved since read
-# "changed" and ran (smart-base job 120514169054: 3 of 70 gates skipped). So
+# "changed" and ran (a content layer's job 120514169054: 3 of 70 gates skipped). So
 # on a PR's first attempt the run takes those pins from the newest record a
 # push kept, the record's pin time for the index and the lower layers and its
 # graph tips, when that record is at most `record-pin-max-hours` old. Only
