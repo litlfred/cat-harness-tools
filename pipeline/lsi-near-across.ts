@@ -112,7 +112,7 @@ export function discoverLsiUnitProviders(checkoutRoot: string): { providers: Dis
     const name = typeof raw.name === "string" ? raw.name : relative(checkoutRoot, root);
     const parsed = LsiUnitProviderDeclarationSchema.array().safeParse(raw.lsiUnitProviders);
     if (!parsed.success) {
-      problems.push(`${name}: \`lsiUnitProviders\` is malformed (${parsed.error.issues.map((i) => i.message).join("; ")})`);
+      problems.push(`${name}: \`lsiUnitProviders\` is malformed (${parsed.error.issues.map((i: { message: string }) => i.message).join("; ")})`);
       continue;
     }
     for (const p of parsed.data as LsiUnitProviderDeclaration[]) {
