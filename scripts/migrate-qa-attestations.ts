@@ -59,12 +59,14 @@ import {
   attestationKeyForDerived,
   attestationPathFor,
   CRITERIA_FAMILIES,
+  criteriaAttestationsHome,
   entryIdentity,
   isAsciiEscaped,
   KG_JUDGEMENT_FIELDS,
   kgAttestationTrees,
   KG_QA_SIDECAR_SUFFIX as KG_SIDECAR_SUFFIX,
   QA_ATTESTATIONS_SCHEMA,
+  readAttestationFile,
   readCriteriaAttestations,
   serialiseAttestations,
   splitCriteria,
@@ -297,11 +299,26 @@ export function migrateCriteria(instanceRoot: string, opts: { check?: boolean; d
 
   for (const { key, att, asciiEscape } of pending.values()) {
     const read = readCriteriaAttestations(instanceRoot, key);
-    if (read.state === "corrupt" || read.state === "unknown") {
-      report.unreadable.push(`${relative(instanceRoot, read.path)}: ${read.reason}`);
-      continue;
+    let movedSubject = false;
+    let held: CriteriaMap = {};
+    if (read.state === "hit") {
+      held = structuredClone(read.criteria);
+    } else if (read.state === "corrupt" || read.state === "unknown") {
+      // A store file moved with its content directory (`git mv docs/source/... site-docs/source/...`)
+      // still carries its old `subject.path` header until rewritten. If the file parses cleanly and
+      // matches `key.family` and `key.locale`, treat its stale header as a pending migration rather
+      // than an unreadable file so `qa:attestations:migrate` repairs it in place.
+      const raw = read.state === "corrupt" ? readAttestationFile(read.path, criteriaAttestationsHome(instanceRoot).storeRoot) : undefined;
+      const rawLocale = raw?.state === "hit" && raw.file.family === "translation-qa" ? raw.file.locale : undefined;
+      if (raw?.state === "hit" && raw.file.family === key.family && rawLocale === key.locale && raw.file.subject.path !== key.subject) {
+        movedSubject = true;
+        held = structuredClone((raw.file as unknown as { criteria: CriteriaMap }).criteria);
+        report.missing.push(`${relative(instanceRoot, read.path)} subject.path`);
+      } else {
+        report.unreadable.push(`${relative(instanceRoot, read.path)}: ${read.reason}`);
+        continue;
+      }
     }
-    const held: CriteriaMap = read.state === "hit" ? structuredClone(read.criteria) : {};
     let added = 0;
     for (const [cid, list] of Object.entries(att)) {
       const into = (held[cid] ??= []);
@@ -316,7 +333,7 @@ export function migrateCriteria(instanceRoot: string, opts: { check?: boolean; d
         into.push(e);
       }
     }
-    if (added === 0 || opts.check || opts.dryRun) continue;
+    if ((added === 0 && !movedSubject) || opts.check || opts.dryRun) continue;
     report.added += added;
     if (writeCriteriaAttestations(instanceRoot, key, held, { asciiEscape })) report.storeFilesWritten++;
   }

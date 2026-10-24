@@ -400,7 +400,7 @@
     "docs:pages": "bun run cat-harness-tools/scripts/gen-docs-pages.ts",
     "docs:pages:check": "bun run cat-harness-tools/scripts/publish-check.ts docs:pages",
     "eval:crdm-detect": "bun run cat-harness-tools/scripts/eval-crdm-detect.ts",
-    "external-schemas": "bun run cat-harness-tools/scripts/external-schemas.ts",
+    "external-schemas": "bun run cat-harness-tools/scripts/external-schemas.ts --write",
     "external-schemas:check": "bun run cat-harness-tools/scripts/external-schemas.ts --check",
     "external-schemas:viz": "bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts",
     "external-schemas:viz:check": "bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts --check",

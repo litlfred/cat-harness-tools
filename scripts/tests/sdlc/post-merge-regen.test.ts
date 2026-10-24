@@ -526,4 +526,90 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       done();
     }
   });
+
+  test("publish-check style checks and checks waiting on another writer's builtAtPublish output are classified as builtAtPublishChecks", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      let themesBuilt = false;
+      let pagesBuilt = false;
+      const runner: Runner = (script) => {
+        // `node-kind:pages:check` runs `publish-check.ts node-kind:pages`, writing on the first check call
+        if (script === "node-kind:pages:check") {
+          mkdirSync(join(repo, "inst/out/pages"), { recursive: true });
+          writeFileSync(join(repo, "inst/out/pages/index.html"), "<p>built</p>");
+          const wasBuilt = pagesBuilt;
+          pagesBuilt = true;
+          return wasBuilt;
+        }
+        if (script === "themes:css:check") return themesBuilt;
+        if (script === "themes:css") {
+          writeFileSync(join(repo, "inst", PUBLISH_FILE), "{}");
+          themesBuilt = true;
+          return true;
+        }
+        // `check:navbar-consistency:check` reads `PUBLISH_FILE` built by `themes:css`
+        if (script === "check:navbar-consistency:check") return themesBuilt;
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [
+          { check: "node-kind:pages:check", writer: "node-kind:pages" },
+          { check: "themes:css:check", writer: "themes:css" },
+          { check: "check:navbar-consistency:check", writer: "check:navbar-consistency" },
+        ],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual([
+        "node-kind:pages:check",
+        "themes:css:check",
+        "check:navbar-consistency:check",
+      ]);
+      expect(report.exitCode).toBe(0);
+    } finally {
+      done();
+    }
+  });
+
+  test("instance scoping: another layer's committed move in the composed index is not reported stale for the caller instance", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      mkdirSync(join(repo, "other"), { recursive: true });
+      writeFileSync(join(repo, "other", COMMITTED), "other-before\n");
+      let built = false;
+      const runner: Runner = (script) => {
+        if (script === "glossary:pot:check") return built;
+        if (script === "glossary:pot") {
+          writeFileSync(join(repo, "other", COMMITTED), "other-after\n");
+          built = true;
+          return true;
+        }
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        instance: "inst",
+        pairs: [{ check: "glossary:pot:check", writer: "glossary:pot" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls, "inst"),
+        git: quietGit(["other/notes.txt"]),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual(["glossary:pot:check"]);
+      expect(report.exitCode).toBe(0);
+    } finally {
+      done();
+    }
+  });
 });
