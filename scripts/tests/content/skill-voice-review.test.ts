@@ -17,10 +17,10 @@ import {
   verdictProblems,
   type SkillVoice,
   type VoiceReview,
-} from "../skill-voice-review.ts";
+} from "../../skill-voice-review.ts";
 
 import { checkoutRootFor, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = instanceRootsIn(repoRootFor(ROOT)).length ? repoRootFor(ROOT) : checkoutRootFor(ROOT);
