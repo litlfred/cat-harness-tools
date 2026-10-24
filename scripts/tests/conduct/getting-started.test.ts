@@ -30,10 +30,10 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
-import { classify, scanRepo } from "../scan-repo-content.js";
-import { derivePagesUrl, parseRemote } from "../pages-bootstrap.js";
-import { gitFixtureRepo } from "../../test/support/git-fixture.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { classify, scanRepo } from "../../scan-repo-content.js";
+import { derivePagesUrl, parseRemote } from "../../pages-bootstrap.js";
+import { gitFixtureRepo } from "../../../test/support/git-fixture.js";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
