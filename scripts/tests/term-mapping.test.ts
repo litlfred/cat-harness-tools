@@ -36,7 +36,7 @@ import {
   type SchemeState,
 } from "../check-term-mapping.ts";
 
-const scheme = (id: string, terms: unknown[]) => ({ id, terms, file: `${id}.glossary.json` }) as never;
+const scheme = (id: string, terms: unknown[], instance = "i") => ({ id, terms, instance }) as never;
 const authored = (prefLabel: string, over: Record<string, unknown> = {}) => ({
   id: prefLabel.toLowerCase().replace(/\s+/g, "-"),
   prefLabel,
@@ -135,80 +135,86 @@ describe("exactConcepts names WHICH concept was exact (bean 5yhm, SKOS publish)"
 });
 
 describe("termState — the one place the record becomes a per-term answer (bean 5yhm)", () => {
+  const S = { instance: "i", scheme: "s" };
   const row = (over: Record<string, unknown> = {}): SchemeState =>
-    ({ scheme: "s", target: "fhir", mapped: 0, unmapped: 0, undetermined: 0, mappedTerms: [], ...over }) as SchemeState;
+    ({ instance: "i", scheme: "s", target: "fhir", mapped: 0, unmapped: 0, undetermined: 0, mappedTerms: [], ...over }) as SchemeState;
 
   test("mapped carries exact and the concepts", () => {
     const st = [row({ mapped: 1, mappedTerms: [{ term: "a", exact: false, concepts: ["u"], exactConcepts: [] }] })];
-    expect(termState(st, "s", "fhir", "a")).toEqual({ state: "mapped", exact: false, concepts: ["u"] });
+    expect(termState(st, S, "fhir", "a")).toEqual({ state: "mapped", exact: false, concepts: ["u"] });
   });
 
   test("an all-undetermined row answers undetermined with its reason — never unmapped", () => {
     const st = [row({ undetermined: 3, reason: "host refused" })];
-    expect(termState(st, "s", "fhir", "z")).toEqual({ state: "undetermined", reason: "host refused" });
+    expect(termState(st, S, "fhir", "z")).toEqual({ state: "undetermined", reason: "host refused" });
   });
 
   test("a mixed row reads its list; without one it answers unknown", () => {
-    expect(termState([row({ unmapped: 1, undetermined: 1, undeterminedTerms: ["b"] })], "s", "fhir", "b").state).toBe(
+    expect(termState([row({ unmapped: 1, undetermined: 1, undeterminedTerms: ["b"] })], S, "fhir", "b").state).toBe(
       "undetermined",
     );
-    expect(termState([row({ unmapped: 1, undetermined: 1, undeterminedTerms: ["b"] })], "s", "fhir", "a").state).toBe(
+    expect(termState([row({ unmapped: 1, undetermined: 1, undeterminedTerms: ["b"] })], S, "fhir", "a").state).toBe(
       "unmapped",
     );
-    expect(termState([row({ unmapped: 1, undetermined: 1 })], "s", "fhir", "a").state).toBe("unknown");
+    expect(termState([row({ unmapped: 1, undetermined: 1 })], S, "fhir", "a").state).toBe("unknown");
   });
 
   test("no row, or two rows, is unknown", () => {
-    expect(termState([], "s", "fhir", "a").state).toBe("unknown");
-    expect(termState([row({ unmapped: 1 }), row({ unmapped: 1 })], "s", "fhir", "a").state).toBe("unknown");
+    expect(termState([], S, "fhir", "a").state).toBe("unknown");
+    expect(termState([row({ unmapped: 1 }), row({ unmapped: 1 })], S, "fhir", "a").state).toBe("unknown");
   });
 
   test("perScheme names undetermined terms ONLY when a row is mixed", () => {
     const ms = [
-      { term: "a", scheme: "s", target: "fhir", exact: "unmapped", concept: "unmapped" },
-      { term: "b", scheme: "s", target: "fhir", exact: "undetermined", concept: "undetermined", undetermined_reason: "r" },
+      { term: "a", instance: "i", scheme: "s", target: "fhir", exact: "unmapped", concept: "unmapped" },
+      { term: "b", instance: "i", scheme: "s", target: "fhir", exact: "undetermined", concept: "undetermined", undetermined_reason: "r" },
     ] as never;
     const [mixed] = perScheme(ms, "fhir", []);
     expect(mixed!.undeterminedTerms).toEqual(["b"]);
-    expect(termState([mixed!], "s", "fhir", "a").state).toBe("unmapped");
-    expect(termState([mixed!], "s", "fhir", "b").state).toBe("undetermined");
+    expect(termState([mixed!], S, "fhir", "a").state).toBe("unmapped");
+    expect(termState([mixed!], S, "fhir", "b").state).toBe("undetermined");
   });
 });
 
-describe("rows are keyed by scheme file as well as scheme id (bean wvzp)", () => {
-  // `kg-tools` is the id of every instance's Tool extraction. Two files whose
-  // schemes share an id AND a term id must still get one answer each.
-  const at = (id: string, file: string, terms: unknown[]) => ({ id, terms, file }) as never;
-  const CH = "glossary/generated/cat-harness/kg-tools.glossary.json";
-  const FH = "glossary/generated/fhir-harness/kg-tools.glossary.json";
+describe("rows are keyed by (instance, scheme) (beans wvzp, q3n9)", () => {
+  // `kg-tools` is the id of every instance's Tool extraction. Two instances
+  // whose schemes share an id AND a term id must still get one answer each
+  // (owner ruling A on q3n9, 2026-10-24: the instance is the scheme's owner).
   const schemes = [
     scheme("platform", [authored("Policy")]),
-    at("kg-tools", CH, [candidate("policy")]),
-    at("kg-tools", FH, [candidate("Policy"), candidate("Wombat")]),
+    scheme("kg-tools", [candidate("policy")], "cat-harness"),
+    scheme("kg-tools", [candidate("Policy"), candidate("Wombat")], "fhir-harness"),
   ];
   const results = resolveSkos(candidates(schemes), skosIndex(schemes));
   const rows = perScheme(results, "skos", [{ target: "skos", consulted: ["platform"], via: "local" }]);
+  const CH = { instance: "cat-harness", scheme: "kg-tools" };
+  const FH = { instance: "fhir-harness", scheme: "kg-tools" };
 
-  test("one shared scheme id gives one row per file", () => {
+  test("one shared scheme id gives one row per instance", () => {
     const tools = rows.filter((r) => r.scheme === "kg-tools");
-    expect(tools.map((r) => r.file)).toEqual([CH, FH]);
+    expect(tools.map((r) => r.instance)).toEqual(["cat-harness", "fhir-harness"]);
     expect(tools.map((r) => [r.mapped, r.unmapped])).toEqual([[1, 0], [1, 1]]);
   });
 
-  test("a term id in two files' schemes is resolved, not unknown", () => {
-    expect(termState(rows, "kg-tools", "skos", "policy", CH).state).toBe("mapped");
-    expect(termState(rows, "kg-tools", "skos", "policy", FH).state).toBe("mapped");
-    expect(termState(rows, "kg-tools", "skos", "wombat", FH).state).toBe("unmapped");
-    expect(termState(rows, "kg-tools", "skos", "wombat", CH).state).toBe("unmapped");
+  test("a term id in two instances' schemes is resolved, not unknown", () => {
+    expect(termState(rows, CH, "skos", "policy").state).toBe("mapped");
+    expect(termState(rows, FH, "skos", "policy").state).toBe("mapped");
+    expect(termState(rows, FH, "skos", "wombat").state).toBe("unmapped");
+    expect(termState(rows, CH, "skos", "wombat").state).toBe("unmapped");
   });
 
-  test("without a file, the shared scheme id is still ambiguous", () => {
-    expect(termState(rows, "kg-tools", "skos", "policy").state).toBe("unknown");
+  test("an instance with no such scheme has no row, so it is unknown rather than borrowing another's", () => {
+    expect(termState(rows, { instance: "who-iris", scheme: "kg-tools" }, "skos", "policy").state).toBe("unknown");
   });
 
-  test("every mapping names its scheme's file and still satisfies the record schema", () => {
+  test("every mapping names its scheme's instance and still satisfies the record schema", () => {
     for (const m of results) expect(TermMappingSchema.safeParse(m).success).toBe(true);
-    expect(results.map((m) => m.file)).toEqual([CH, FH, FH]);
+    expect(results.map((m) => m.instance)).toEqual(["cat-harness", "fhir-harness", "fhir-harness"]);
+  });
+
+  test("a mapping with no instance is refused: the key is not optional", () => {
+    const { instance: _, ...bare } = results[0]!;
+    expect(TermMappingSchema.safeParse(bare).success).toBe(false);
   });
 });
 
@@ -226,7 +232,7 @@ describe("the fhir half resolves against a PUBLISHED IG AT A VERSION", () => {
 
   test("a display match is `concept: mapped` and cites system#code at the version", () => {
     const [m] = resolveFhir(
-      [{ term: candidate("targeted client communication") as never, scheme: "s" }],
+      [{ term: candidate("targeted client communication") as never, instance: "i", scheme: "s" }],
       pinned,
     );
     expect(m!.concept).toBe("mapped");
@@ -238,14 +244,14 @@ describe("the fhir half resolves against a PUBLISHED IG AT A VERSION", () => {
     // A glossary label matching a code's display means the two are ABOUT the
     // same thing, not that the term IS that code. Claiming exactness across
     // vocabularies is the overreach `vocabulary-authority` prevents.
-    const [m] = resolveFhir([{ term: candidate("ValueSet") as never, scheme: "s" }], pinned);
+    const [m] = resolveFhir([{ term: candidate("ValueSet") as never, instance: "i", scheme: "s" }], pinned);
     expect(m!.matches?.[0]?.predicate).toBe("skos:closeMatch");
     expect(m!.exact).toBe("unmapped");
   });
 
   test("a miss against a PRESENT snapshot is `unmapped`, not undetermined", () => {
     // The pin is here and was consulted, so the answer is a real negative.
-    const [m] = resolveFhir([{ term: candidate("wombat") as never, scheme: "s" }], pinned);
+    const [m] = resolveFhir([{ term: candidate("wombat") as never, instance: "i", scheme: "s" }], pinned);
     expect(m!.concept).toBe("unmapped");
     expect(m!.undetermined_reason).toBeUndefined();
   });
@@ -253,7 +259,7 @@ describe("the fhir half resolves against a PUBLISHED IG AT A VERSION", () => {
 
 describe("undetermined is never unmapped", () => {
   test("no pinned snapshot yields undetermined WITH a reason", () => {
-    const [m] = resolveFhir([{ term: candidate("x") as never, scheme: "s" }], "host refused");
+    const [m] = resolveFhir([{ term: candidate("x") as never, instance: "i", scheme: "s" }], "host refused");
     expect(m!.exact).toBe("undetermined");
     expect(m!.concept).toBe("undetermined");
     expect(m!.undetermined_reason).toBe("host refused");
@@ -262,21 +268,21 @@ describe("undetermined is never unmapped", () => {
 
   test("undetermined with NO reason is refused by the schema", () => {
     const r = TermMappingSchema.safeParse({
-      term: "t", scheme: "s", target: "fhir", exact: "undetermined", concept: "undetermined",
+      term: "t", instance: "i", scheme: "s", target: "fhir", exact: "undetermined", concept: "undetermined",
     });
     expect(r.success).toBe(false);
   });
 
   test("`mapped` with nothing named is refused", () => {
     const r = TermMappingSchema.safeParse({
-      term: "t", scheme: "s", target: "skos", exact: "mapped", concept: "mapped",
+      term: "t", instance: "i", scheme: "s", target: "skos", exact: "mapped", concept: "mapped",
     });
     expect(r.success).toBe(false);
   });
 
   test("exact-mapped with concept-unmapped is unreachable and refused", () => {
     const r = TermMappingSchema.safeParse({
-      term: "t", scheme: "s", target: "skos", exact: "mapped", concept: "unmapped",
+      term: "t", instance: "i", scheme: "s", target: "skos", exact: "mapped", concept: "unmapped",
       matches: [{ uri: "u", predicate: "skos:exactMatch", via: "t", scheme: "s" }],
     });
     expect(r.success).toBe(false);
