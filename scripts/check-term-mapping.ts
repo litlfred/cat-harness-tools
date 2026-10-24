@@ -15,10 +15,17 @@
  *     one and unmapped in the other without contradiction.
  *
  *   * A RESOLVER THAT CANNOT BE REACHED RETURNS `undetermined`, WITH ITS
- *     REASON — never `unmapped`. In this checkout that is not hypothetical:
- *     the network policy refuses `api.openconceptlab.org:443`, so every
- *     `fhir` row is undetermined and says so, while `skos` resolves locally
- *     and returns real verdicts.
+ *     REASON — never `unmapped`. Before `who-smart-base@v1.0.0` was pinned
+ *     (2026-09-30, bean `ejug`), cloud sessions were refused
+ *     `api.openconceptlab.org:443` by proxy policy (`403 to CONNECT`), and a
+ *     direct connected-agent probe on 2026-10-24 (`q7ds`) confirmed that
+ *     `api.openconceptlab.org` (`v2.3.234-3e606025`) itself refuses anonymous
+ *     reads with HTTP 403 (`"Authentication required. Anonymous API access is
+ *     disabled."`). With `who-smart-base@v1.0.0` snapshotted offline in
+ *     `cat-harness/external-schemas/who-smart-base.terminology.json` (12 code
+ *     systems, 585 concepts), both `skos` and `fhir` resolve locally and return
+ *     determined verdicts (`0 undetermined`), while an absent or unusable
+ *     snapshot still returns `undetermined` with its reason.
  *
  *   * IT REPORTS AND NEVER GRADES. No ratio, no threshold, no exit code that
  *     depends on how many mapped. An unmapped candidate may be a term this
