@@ -197,6 +197,41 @@ describe("the documents this platform actually publishes", () => {
   });
 });
 
+describe("a staging preview's own context URLs resolve to its tree", () => {
+  // A staging export mints under `<published>/STAGING/<slug>` (`kg-export
+  // --base-url`), so its subject documents name a context there, while the
+  // preview's tree is the site's root: the file is `<dir>/bootstrap-tools/…`,
+  // never `<dir>/STAGING/<slug>/bootstrap-tools/…`.
+  const PUBLISHED = CONTENT_CONTEXT_URL.slice(0, CONTENT_CONTEXT_URL.indexOf("/ns/content/"));
+  const STAGED = `${PUBLISHED}/STAGING/feature-x`;
+  const CTX = "bootstrap-tools/bootstrap-tools.context.jsonld";
+  const tree = () => site({ [CTX]: { "@context": { label: "http://www.w3.org/2000/01/rdf-schema#label" } } });
+  const subject = { "@context": `${STAGED}/${CTX}`, "@id": `${STAGED}/subject/x`, label: "x" };
+
+  test("with no --base, a STAGING/<slug>/ URL whose direct path is missing is read without that prefix", async () => {
+    const r = await localLoader(tree())(`${STAGED}/${CTX}`);
+    expect(r.document).toHaveProperty("@context");
+    expect(await expandFindings(subject, localLoader(tree()))).toEqual([]);
+  });
+
+  test("with the preview's --base, the longest base maps its URLs onto the tree", async () => {
+    const r = await localLoader(tree(), [PUBLISHED, STAGED])(`${STAGED}/${CTX}`);
+    expect(r.document).toHaveProperty("@context");
+  });
+
+  test("the whole verifier passes the staged subject document", async () => {
+    const dir = site({ [CTX]: { "@context": { label: "http://www.w3.org/2000/01/rdf-schema#label" } }, "subject/x.jsonld": subject });
+    const { exit, results } = await verify(dir, JSONLD, { bases: [PUBLISHED] });
+    expect(results[0]!.findings).toEqual([]);
+    expect(results[0]!.checked).toBe(1);
+    expect(exit).toBe(0);
+  });
+
+  test("a context the tree does not hold is still refused, staged or not", async () => {
+    await expect(localLoader(tree())(`${STAGED}/nowhere/x.context.jsonld`)).rejects.toThrow(/refused to fetch/);
+  });
+});
+
 describe("a document published at our address is ours, whatever vocabulary it speaks — bean 7h1c", () => {
   const INSTANCE = join(HARNESS_ROOT);
   const BASE = declaredBase(INSTANCE)!;
