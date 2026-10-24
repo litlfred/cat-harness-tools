@@ -95,7 +95,7 @@ describe("this layer's own Tool nodes are served from this layer", () => {
  * that DECLARES it, and stays that way when the code moves (owner, split plan
  * "Trap 1"): the loader finds the module in the one instance that implements
  * the declarer through its own `needs`. Same fixture shape as
- * `cat-harness-tools/scripts/tests/implementing-path.test.ts`.
+ * `cat-harness-tools/scripts/tests/tools/implementing-path.test.ts`.
  */
 describe("a declared module resolves through the implementing instance (70lx)", () => {
   const made: string[] = [];

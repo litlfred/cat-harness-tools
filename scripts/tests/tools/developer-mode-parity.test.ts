@@ -12,7 +12,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { measureToolParity, formatParityReport } from "../check-tool-parity.js";
+import { measureToolParity, formatParityReport } from "../../check-tool-parity.js";
 import {
   TopologySchema,
   DEVELOPER_MODE_TOPOLOGY,
@@ -36,13 +36,13 @@ import {
   WorkflowCapabilityRefusalError,
   type ModelConfig,
   type ModelCapabilities,
-} from "../../src/workflow/model-capabilities.js";
+} from "../../../src/workflow/model-capabilities.js";
 import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { loadProcessModel } from "../../src/workflow/process-model.js";
-import { startInstance, complete } from "../../src/workflow/instance.js";
-import { workflowFile } from "../known-skills.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { loadProcessModel } from "../../../src/workflow/process-model.js";
+import { startInstance, complete } from "../../../src/workflow/instance.js";
+import { workflowFile } from "../../known-skills.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 
