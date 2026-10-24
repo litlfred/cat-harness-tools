@@ -77,9 +77,9 @@ export function sectionsOf(entry: KindEntry, entries: readonly KindEntry[]): Doc
     const parent: string | undefined = cur.kind.extends;
     if (!parent) break;
     // The parent its own instance declares, else the one other instance that does.
-    const here = cur.instance;
-    const own = entries.find((e) => e.instance === here && e.kind.id === parent);
-    const r = own ?? resolveKind(entries, parent);
+    const here: string = cur.instance;
+    const own: KindEntry | undefined = entries.find((e) => e.instance === here && e.kind.id === parent);
+    const r: KindEntry | { error: string } = own ?? resolveKind(entries, parent);
     cur = "error" in r ? undefined : r;
   }
   const out: DocumentKind["sections"] = [];
