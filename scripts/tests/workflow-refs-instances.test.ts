@@ -27,13 +27,13 @@
  *
  * @module cat-harness/scripts/tests/workflow-refs-instances
  */
-import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { workflowFiles } from "../../known-skills.js";
-import { processDiagrams } from "../../../src/workflow/process-model.js";
+import { workflowFiles } from "../known-skills.js";
+import { processDiagrams } from "../../src/workflow/process-model.js";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;

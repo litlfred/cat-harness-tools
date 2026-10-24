@@ -11,14 +11,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, basename, sep } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { workflowFiles } from "../../known-skills.js";
-import { processDiagrams } from "../../../src/workflow/process-model.js";
-import { checkoutProcessPresentations, processTarget, type Presentation } from "../../process-presentations.js";
-import { sourceForPermalink } from "../../lib/jekyll-permalink.ts";
-import { HARNESS_ROOT } from "../../lib/roots.ts";
-import { subjectHref } from "../../lib/subject-pages.ts";
-import { docsSources } from "../../lib/docs-sources.ts";
-import { PAGE_LOCALE } from "../../viewer-declarations.ts";
+import { workflowFiles } from "../known-skills.js";
+import { processDiagrams } from "../../src/workflow/process-model.js";
+import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";
+import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
+import { subjectHref } from "../lib/subject-pages.ts";
+import { docsSources } from "../lib/docs-sources.ts";
+import { PAGE_LOCALE } from "../viewer-declarations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));

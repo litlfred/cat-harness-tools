@@ -170,7 +170,7 @@
         "scripts/tests/workflow-injection.test.ts > a step output CARRIES whatever the step put in it (bean `6bhf`) > the real corpus is parsed, not skipped — an empty map would make this gate vacuous",
         "scripts/tests/process/workflow-overlay.test.ts > the repository root — what the MCP server starts at by default > reaches the dependencies' diagrams, sample-import among them",
         "scripts/tests/process/workflow-overlay.test.ts > the repository root — what the MCP server starts at by default > workflow_list no longer reports none",
-        "scripts/tests/process/workflow-refs-instances.test.ts > bootstrap is where the checker looks for it > a DEPENDENCY instance's diagrams are reached — the gap is bootstrap alone",
+        "scripts/tests/workflow-refs-instances.test.ts > bootstrap is where the checker looks for it > a DEPENDENCY instance's diagrams are reached — the gap is bootstrap alone",
         "scripts/tests/workflow-yaml.test.ts > (load-time error) ENOENT: no such file or directory, scandir 'workflows'",
         "src/tools/beans-prime.test.ts > beans-prime's fallback reads the declared store > the declared bean-defs directory primes the real beans",
         "src/tools/beans-prime.test.ts > beans-prime's fallback reads the declared store > the old spelling primed the README alone — the defect this replaced",

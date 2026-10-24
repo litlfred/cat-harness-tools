@@ -11,16 +11,16 @@
  *
  * @module scripts/tests/process-index
  */
-import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../../check-process-index.ts";
-import { firstSentence } from "../../kg-export.ts";
-import { subgraphOutDir } from "../../gen-subgraph-jsonld.ts";
+import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";
+import { firstSentence } from "../kg-export.ts";
+import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { inAggregate } from "../../../test/support/checkout.ts";
+import { inAggregate } from "../../test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;
 const REPO = repoRootFor(HARNESS);

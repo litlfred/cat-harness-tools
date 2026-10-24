@@ -34,12 +34,12 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { baseDocsDir } from "../../compose-docs.js";
-import { page, pageRelPath, processRows, skillToProcesses } from "../../gen-processes-viz.js";
+import { baseDocsDir } from "../compose-docs.js";
+import { page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.ts";
-import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
-import { PAGE_LOCALE, pageParts } from "../../viewer-declarations.js";
+import { PAGE_LOCALE, pageParts } from "../viewer-declarations.js";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

@@ -114,7 +114,7 @@
     "scripts/tests/methodologies-viz.test.ts::methodologies/swot.md",
     "scripts/tests/options-analysis-trigger.test.ts::processes/sdlc/options-analysis.bpmn",
     "scripts/tests/pair-claims.test.ts::schemas/types.ts",
-    "scripts/tests/process/process-presentations.test.ts::processes/ui/ingest-theme.bpmn",
+    "scripts/tests/process-presentations.test.ts::processes/ui/ingest-theme.bpmn",
     "scripts/tests/python-deps.test.ts::schemas/python-deps.ts",
     "scripts/tests/remote-packages-honest-docs.test.ts::schemas/skill-package.ts",
     "scripts/tests/sidecar-relocation.test.ts::skills/kg/kg-core/corpus-grep.md",
