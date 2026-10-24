@@ -1,6 +1,6 @@
 /**
  * Verification for bean folio-assistant-3025:
- * folio-paper-adapter 44 of 47 skills modelled into roles.
+ * folio-paper-adapter skills modelled into roles (44 of 47 when it was written).
  *
  * Asserts:
  * 1. The 3 paper roles (lean-authoring-agent, proof-review-agent, compute-authoring-agent)
@@ -57,7 +57,7 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     }
   });
 
-  test("all 47 skills in folio-paper-adapter are accounted for (bound or consulted: true)", () => {
+  test("every skill in folio-paper-adapter is accounted for (bound or consulted: true)", () => {
     // Locate folio-paper-adapter package manifest
     const manifestCandidates = [
       join(COORDINATOR, "folio-assistant-sci", "skills", "content", "folio-paper-adapter", "package-manifest.json"),
@@ -70,7 +70,10 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as { skills: string[] };
-    expect(manifest.skills.length).toBe(47);
+    // No fixed count: the package grows as skills move up into it (47 when bean
+    // 3025 was verified, 53 after the Lean move, bean syiq). What this test owns
+    // is that none of them is unbound, asserted below.
+    expect(manifest.skills.length).toBeGreaterThan(0);
 
     // Locate sci scenarios/roles.json extensions
     const sciRolesPathCandidates = [
