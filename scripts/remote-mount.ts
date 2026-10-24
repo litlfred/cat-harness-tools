@@ -136,6 +136,7 @@ import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } 
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
+import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -251,6 +252,12 @@ export interface PlannedDirectory {
   upstreamPath: string;
   /** Set when the directory is mounted as hydrated metadata: its per-directory source (bean `mo75` G2). */
   hydrated?: HydratedSource;
+  /**
+   * Hydrated, and the pin's git tree holds no file for it: the pin's subgraph
+   * index PACKAGE does (bean `mo75` G2b). `file` is the verified, unpacked
+   * copy to lay down; the rest goes in the lock.
+   */
+  package?: { url: string; sha256: string; member: string; file: string };
 }
 
 export interface PlannedInstance {
@@ -274,6 +281,8 @@ export interface PlannedInstance {
   hydrated?: true;
   /** Hydrated, directories not named: the declared directories the pin publishes no hydrated file for. */
   notPublished?: string[];
+  /** Hydrated: what the pin's subgraph index package answered, when it was looked for and held nothing usable. */
+  packageNote?: string;
 }
 
 export type InstanceOutcome =
@@ -313,6 +322,11 @@ export interface RemoteMountOptions {
   discardEdits?: boolean;
   /** How `owner/repo` becomes a fetch URL — tests serve local bare repositories. */
   urlFor?: UrlFor;
+  /**
+   * How a subgraph index package's release-asset URL is fetched (bean `mo75`
+   * G2b). Default: as it stands, through `CAT_MOUNT_URL_PREFIX` when set.
+   */
+  packageUrlFor?: PackageUrlFor;
   /**
    * `staging` mounts for a preview and needs neither signature nor consent
    * (owner, 2026-10-07: "staging doesnt need signature"). Anything else is a
@@ -441,6 +455,8 @@ function planHydrated(a: {
   path: string;
   named: string[] | undefined;
   whole: boolean | undefined;
+  /** The pin's subgraph index package for this harness, fetched at most once (bean `mo75` G2b). */
+  pkgFor: (harness: string) => SubgraphIndexFetch;
 }): { instance: PlannedInstance } | { outcome: InstanceOutcome } {
   const { q, tree, found, path, named } = a;
   const { decl } = found;
@@ -460,6 +476,8 @@ function planHydrated(a: {
   }
   const directories: PlannedDirectory[] = [];
   const notPublished: string[] = [];
+  /** The pin's package, once a directory's file was not in the tree (G2b). */
+  let looked: SubgraphIndexFetch | undefined;
   for (const id of ids) {
     const d = byId.get(id)!;
     let pub: string;
@@ -470,14 +488,21 @@ function planHydrated(a: {
       notPublished.push(id);
       continue;
     }
-    if (!named) {
-      let held = false;
-      try {
-        held = tree.entry(`${pub}/${SUBGRAPH_HYDRATED_FILE}`)?.kind === "blob";
-      } catch {
-        held = false;
-      }
-      if (!held) {
+    let held = false;
+    try {
+      held = tree.entry(`${pub}/${SUBGRAPH_HYDRATED_FILE}`)?.kind === "blob";
+    } catch {
+      held = false;
+    }
+    // Not in the tree: the pin's subgraph index PACKAGE (bean `mo75` G2b) —
+    // where a harness that builds its subgraph files at publish puts them.
+    let fromPackage: PlannedDirectory["package"];
+    if (!held) {
+      const pkg = (looked = a.pkgFor(decl.name));
+      const entry = pkg.state === "ok" ? pkg.hydrated.get(strip(d.path)) : undefined;
+      if (pkg.state === "ok" && entry) {
+        fromPackage = { url: pkg.pkg.tarballUrl, sha256: pkg.sha256, member: entry.path, file: join(pkg.root, ...entry.path.split("/")) };
+      } else if (!named) {
         notPublished.push(id);
         continue;
       }
@@ -486,7 +511,14 @@ function planHydrated(a: {
     if (!src.success) {
       return { outcome: { instance: q.name, state: "could-not-determine", path, detail: `\`${id}\` is not a hydrated source: ${src.error.issues[0]?.message ?? "invalid"}` } };
     }
-    directories.push({ id, path: joinRel(path, d.path), upstreamPath: pub, hydrated: src.data });
+    directories.push({ id, path: joinRel(path, d.path), upstreamPath: pub, hydrated: src.data, ...(fromPackage ? { package: fromPackage } : {}) });
+  }
+  // Said whenever the package was looked for and did not answer, so a
+  // missing file is never reported without where else it was sought.
+  const pkgNote = looked && looked.state !== "ok" ? `; the pin's subgraph index package: ${looked.state} — ${looked.detail}` : "";
+  if (directories.length === 0 && looked && looked.state !== "ok" && looked.state !== "absent") {
+    // A package that failed to fetch, or failed its checks, is never an empty layer.
+    return { outcome: { instance: q.name, state: looked.state === "refused" ? "missing" : "could-not-determine", path, detail: `\`${q.name}\` at ${at}: no ${SUBGRAPH_HYDRATED_FILE} in its git tree${pkgNote}` } };
   }
   if (directories.length === 0) {
     const built = (decl.builtAtPublish ?? []).some((b) => strip(b.path.replace(/^\.\//, "")) === strip(joinRel(strip(docs.path), "subgraph")));
@@ -497,7 +529,8 @@ function planHydrated(a: {
         path,
         detail:
           `\`${q.name}\` at ${at} holds no ${SUBGRAPH_HYDRATED_FILE} under \`${joinRel(found.root, strip(docs.path), "subgraph", decl.name)}/\` for any directory it declares` +
-          (built ? ` — its declaration builds \`${strip(docs.path)}/subgraph/\` at publish (\`builtAtPublish\`), so no commit of it carries one` : ""),
+          (built ? ` — its declaration builds \`${strip(docs.path)}/subgraph/\` at publish (\`builtAtPublish\`), so no commit of it carries one` : "") +
+          pkgNote,
       },
     };
   }
@@ -515,6 +548,7 @@ function planHydrated(a: {
       assets: [],
       hydrated: true,
       ...(notPublished.length ? { notPublished } : {}),
+      ...(pkgNote ? { packageNote: pkgNote.replace(/^; /, "") } : {}),
     },
   };
 }
@@ -524,7 +558,7 @@ function planHydrated(a: {
  * declarations; writes nothing. The trees stay open in `trees` for
  * {@link mountRemote} to check out from; {@link planRemote} closes them.
  */
-function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>): Plan {
+function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>, packages: Map<string, SubgraphIndexFetch> = new Map()): Plan {
   const ds = downstreamOf(opts);
   const plan: Plan = { instanceRoot: ds.instanceRoot, downstream: ds.name, mounts: ds.mounts, approvers: ds.approvers, instances: [], outcomes: [] };
   if (ds.mounts.length === 0) return plan;
@@ -554,6 +588,21 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       trees.set(key, t);
     }
     return t;
+  };
+
+  /** One fetch per (repository, pin, harness); `packages` keeps them for {@link mountRemote}. */
+  const pkgAt = (repository: string, sha: string) => (harness: string): SubgraphIndexFetch => {
+    const key = `${repository}@${sha}#${harness}`;
+    let f = packages.get(key);
+    if (!f) {
+      try {
+        f = fetchSubgraphIndex({ repository, ref: sha, harness, urlFor: opts.packageUrlFor });
+      } catch (e) {
+        f = { state: "could-not-determine", pkg: { name: "", version: "", tag: "", tarball: "", record: "", tarballUrl: "", recordUrl: "" }, detail: (e as Error).message };
+      }
+      packages.set(key, f);
+    }
+    return f;
   };
 
   const seen = new Map<string, { repository: string; sha: string }>();
@@ -639,7 +688,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       // The entry's own `hydrated` is its harness's; an override decides for any instance.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
       if (hydrated) {
-        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole });
+        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha) });
         if ("outcome" in h) plan.outcomes.push(h.outcome);
         else plan.instances.push(h.instance);
         continue;
@@ -754,10 +803,12 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
 /** Resolve the closure and close every fetched tree. Writes nothing. */
 export function planRemote(opts: RemoteMountOptions = {}): Plan {
   const trees = new Map<string, RemoteTree>();
+  const packages = new Map<string, SubgraphIndexFetch>();
   try {
-    return resolveClosure(opts, trees);
+    return resolveClosure(opts, trees, packages);
   } finally {
     for (const t of trees.values()) t.close();
+    for (const f of packages.values()) if (f.state === "ok") f.close();
   }
 }
 
@@ -865,8 +916,9 @@ export interface MountReport {
 /** Plan, fetch, lay each planned instance down, write the lock. */
 export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
   const trees = new Map<string, RemoteTree>();
+  const packages = new Map<string, SubgraphIndexFetch>();
   try {
-    const plan = resolveClosure(opts, trees);
+    const plan = resolveClosure(opts, trees, packages);
     const lockFile = join(plan.instanceRoot, mountLockFilename(plan.downstream));
     const excluded: string[] = [];
     if (plan.mounts.length === 0) return { plan, lockFile, excluded };
@@ -948,7 +1000,8 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         const work = tree.checkout([
           p.declarationFile,
           // Hydrated: the one published file, never the subgraph directory around it.
-          ...p.directories.map((d) => (p.hydrated ? `${d.upstreamPath}/${SUBGRAPH_HYDRATED_FILE}` : d.upstreamPath === "." ? "*" : `${d.upstreamPath}/`)),
+          // From the package (G2b): not in the tree, so not checked out.
+          ...p.directories.filter((d) => !d.package).map((d) => (p.hydrated ? `${d.upstreamPath}/${SUBGRAPH_HYDRATED_FILE}` : d.upstreamPath === "." ? "*" : `${d.upstreamPath}/`)),
           ...(p.assets ?? []).map((a) => joinRel(p.upstreamRoot, a)),
         ]);
         // The digest leaves `node_modules/` out so an install cannot make a
@@ -1000,7 +1053,9 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           if (!p.hydrated) writeFileSync(join(target, `${p.instance}.json`), declText);
           const built = builtAtPublishDirectories(declText);
           if (p.hydrated) for (const d of p.directories) {
-            const src = join(work, d.upstreamPath, SUBGRAPH_HYDRATED_FILE);
+            // The package's copy was verified when it was fetched (G2b); it
+            // still answers to the same schema and IRI check below.
+            const src = d.package ? d.package.file : join(work, d.upstreamPath, SUBGRAPH_HYDRATED_FILE);
             if (!existsSync(src)) {
               absent.push(d.id);
               continue;
@@ -1045,7 +1100,13 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           for (const d of p.directories) {
             if (absent.includes(d.id) || skipped.includes(d.id)) continue;
             if (p.hydrated && !existsSync(join(plan.instanceRoot, d.path, SUBGRAPH_HYDRATED_FILE))) continue;
-            dirs.push({ id: d.id, path: d.path, upstreamPath: d.upstreamPath, ...digestOf(join(plan.instanceRoot, d.path)) });
+            dirs.push({
+              id: d.id,
+              path: d.path,
+              upstreamPath: d.upstreamPath,
+              ...digestOf(join(plan.instanceRoot, d.path)),
+              ...(d.package ? { package: { url: d.package.url, sha256: d.package.sha256, member: d.package.member } } : {}),
+            });
           }
           for (const a of p.assets ?? []) {
             if (absent.includes(`asset ${a}`)) continue;
@@ -1072,7 +1133,8 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           ...(p.hydrated ? { hydrated: true as const } : {}),
         });
         const files = dirs.reduce((n, d) => n + d.files, 0) + assets.length;
-        const what = p.hydrated ? `hydrated metadata (${SUBGRAPH_HYDRATED_FILE}) of ` : "";
+        const fromPkg = dirs.filter((d) => d.package).length;
+        const what = p.hydrated ? `hydrated metadata (${SUBGRAPH_HYDRATED_FILE}${fromPkg ? `, ${fromPkg} from the pin's subgraph index package` : ""}) of ` : "";
         plan.outcomes.push({
           instance: p.instance,
           state: absent.length || invalid.length || ignored === "not-ignored" ? "missing" : mountedState(trust),
@@ -1085,6 +1147,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
                 ].filter(Boolean).join("; ") + " — the rest is mounted"
               : `${what}${dirs.length} director${dirs.length === 1 ? "y" : "ies"}, ${files} file(s) from ${p.repository}@${p.sha.slice(0, 12)}; basis: ${trust.detail}`) +
             (p.notPublished?.length ? `; not published at the pin, so not mounted: ${p.notPublished.join(", ")}` : "") +
+            (p.packageNote && (absent.length || p.notPublished?.length) ? `; ${p.packageNote}` : "") +
             (ignored === "not-ignored" ? ` — but \`${p.path}/\` is NOT ignored: the committed .gitignore index-mounts block does not cover it` : ""),
         });
       } catch (e) {
@@ -1132,6 +1195,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     return { plan, lockFile, excluded };
   } finally {
     for (const t of trees.values()) t.close();
+    for (const f of packages.values()) if (f.state === "ok") f.close();
   }
 }
 

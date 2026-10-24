@@ -630,6 +630,7 @@
     "openapi:ingest:rendered": "bun run cat-harness-tools/openapi/scripts/ingest-openapi-rendered.ts",
     "site:instance": "bun run cat-harness-tools/scripts/build-instance-site.ts",
     "pack:tarball": "bun run cat-harness-tools/scripts/pack-tarball.ts",
+    "subgraph-index:pack": "bun run cat-harness-tools/scripts/subgraph-index-package.ts",
     "kg:retrieve:npm": "bun run cat-harness-tools/scripts/kg-retrieve-npm.ts",
     "archimate:validate": "bun run cat-harness-tools/archimate/scripts/check-archimate.ts",
     "archimate:pages": "bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts",
