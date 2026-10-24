@@ -9,7 +9,7 @@
  * `remote-mount.test.ts`). Nothing here imports above cat-harness either, so
  * it runs in a standalone cat-harness checkout: the GATES' formatting, the
  * folded scanners in cat-harness-tools and this monorepo's own index are
- * tested in `cat-harness-tools/scripts/tests/index-config-gates.test.ts`.
+ * tested in `cat-harness-tools/scripts/tests/sdlc/index-config-gates.test.ts`.
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

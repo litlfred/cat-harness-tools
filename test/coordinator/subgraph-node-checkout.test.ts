@@ -1,6 +1,6 @@
 /**
  * `subgraph-node` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/subgraph-node.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/kg/subgraph-node.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads the root-declared graphs
  * (`todos/`, `beans/`) among every adopting publisher, which only the checkout
  * holds. Standing alone, cat-harness has none of it, and

@@ -101,3 +101,34 @@ describe("resolveIdentities", () => {
 test("match keys: each handle bare (interaction.json's key form) and as provider:handle", () => {
   expect(matchKeys([{ provider: "gitlab", handle: "ann", via: "x", vouched: true }]).sort()).toEqual(["ann", "gitlab:ann"]);
 });
+
+describe("several people, several accounts, several hosts", () => {
+  test("CAT_HARNESS_PERSON names who is typing this session, self-asserted, before the store", async () => {
+    const h = home();
+    userConfig(h, JSON.stringify({ identities: [{ provider: "gitlab", handle: "ann" }] }));
+    const r = await resolveIdentities({ env: { CAT_HARNESS_PERSON: "gitlab:bob, nope" }, home: h, git: noGit });
+    expect(r.identities.map(qualified)).toEqual(["gitlab:bob", "gitlab:ann"]);
+    expect(r.identities[0]).toMatchObject({ via: "CAT_HARNESS_PERSON", vouched: false });
+    expect(r.notes.some((n) => n.includes("`nope` is not provider:handle"))).toBe(true);
+  });
+
+  test("several accounts on one provider are each a match key", async () => {
+    const h = home();
+    userConfig(h, JSON.stringify({ identities: [{ provider: "gitlab", handle: "ann" }, { provider: "gitlab", handle: "ann-work" }] }));
+    const r = await resolveIdentities({ env: {}, home: h, git: noGit });
+    expect(matchKeys(r.identities)).toEqual(expect.arrayContaining(["gitlab:ann", "gitlab:ann-work", "ann", "ann-work"]));
+  });
+
+  test("a host that passes no account is reported, with a note saying where the person comes from instead", async () => {
+    const r = await resolveIdentities({ env: { GEMINI_CLI: "1" }, home: home(), git: noGit });
+    expect(r.hosts).toEqual([{ id: "gemini-cli", name: "Gemini CLI", marker: "GEMINI_CLI", exposesIdentity: false }]);
+    expect(r.notes.some((n) => n.startsWith("gemini-cli: the host passes no account"))).toBe(true);
+  });
+
+  test("Claude Code's account is read and its host gets no 'no account' note", async () => {
+    const r = await resolveIdentities({ env: { CLAUDECODE: "1", CLAUDE_CODE_USER_EMAIL: "ann@example.org" }, home: home(), git: noGit });
+    expect(r.hosts.map((h) => h.id)).toEqual(["claude-code"]);
+    expect(r.identities.map(qualified)).toContain("claude:ann@example.org");
+    expect(r.notes.some((n) => n.startsWith("claude-code:"))).toBe(false);
+  });
+});

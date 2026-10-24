@@ -59,12 +59,9 @@ function skillFile(name: string): string {
 }
 
 describe("living deck: every claim about the KG still holds", () => {
-  test("slide 1 — the layers page lists all five SMART layers", () => {
-    const t = read(join(H, "docs/source/fhir-fhir-content/the-three-layers.md"));
-    for (const l of ["**L1** Narrative", "**L2** Operational", "**L3** Machine readable", "L4 Executable", "L5 Dynamic"]) {
-      expect(t).toContain(l);
-    }
-  });
+  // Slide 1's claim (the layers page lists all five SMART layers) moved to
+  // smart-base/scripts/who-smart-content-types.test.ts with the section it
+  // reads, which is now smart-base's (bean p9bu).
 
   test("slide 6 — the lifecycle process still has the six lanes and eight tasks shown", () => {
     const x = read(workflowFile(H, "content-lifecycle.bpmn"));
@@ -91,17 +88,16 @@ describe("living deck: every claim about the KG still holds", () => {
   // generator and the DAK vocabulary (bean 1335). Core no longer imports
   // either, so a core test asserting them would be core importing a harness.
 
-  test("slide 4 — the ingested SMART Base index still holds 25 StructureDefinition pages", () => {
-    const ids = new Set<string>();
-    const walk = (d: string) => {
-      for (const e of readdirSync(d, { withFileTypes: true })) {
-        const p = join(d, e.name);
-        if (e.isDirectory()) walk(p);
-        else for (const m of read(p).matchAll(/"StructureDefinition-[A-Za-z]*/g)) ids.add(m[0]);
-      }
+  // The index is built from SMART Base's source at publish (fhir-harness#124),
+  // not ingested once from the published site, so it holds the logical models
+  // the source has now. The slide's 25 are the published set of 2026-09-30;
+  // the claim that still holds is that the index carries at least those.
+  test("slide 4 — the SMART Base index holds at least the 25 logical models the slide shows", () => {
+    const ix = JSON.parse(read(join(REPO, "smart-base/fhir-artifact-index/index.json"))) as {
+      artifacts: { resourceType: string; category?: string }[];
     };
-    walk(join(REPO, "smart-base/fhir-artifact-index"));
-    expect(ids.size).toBe(25);
+    const models = ix.artifacts.filter((a) => a.resourceType === "StructureDefinition" && a.category === "Structures: Logical Models");
+    expect(models.length).toBeGreaterThanOrEqual(25);
   });
 
   test("slide 10 — the taxonomy still uses smart-kg as its example, and says it is its own repository", () => {

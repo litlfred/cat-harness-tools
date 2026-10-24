@@ -27,6 +27,8 @@ import { AGENT_SURFACE_GENERATORS, checkRemote, exitCode, mountRemote, planRemot
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { packSubgraphIndex } from "../subgraph-index-package.ts";
 
 function git(cwd: string, ...args: string[]): string {
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
@@ -676,5 +678,261 @@ describe("a changed lock re-renders the agent surface", () => {
   // spawn of a missing file — a failure at re-pin time rather than here.
   test("every agent-surface generator exists beside remote-mount.ts", () => {
     for (const g of AGENT_SURFACE_GENERATORS) expect(existsSync(join(import.meta.dir, "..", g)), g).toBe(true);
+  });
+});
+
+describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () => {
+  // o/hy holds two instances. `hh` publishes ONE hydrated file, for `tools`
+  // (and a child's, which must not travel); its `skills` and `docs` publish
+  // none, and its code must not arrive. `hb` publishes a file under the
+  // wrong IRI. o/np builds its subgraph files at publish, so no pin of it
+  // carries one — the state of every litlfred harness on 2026-10-24.
+  const BASE = "https://example.org";
+  const hydratedFile = (harness: string, sub: string, iriSub = sub) => ({
+    "@context": `${BASE}/ns/subgraph/v1.jsonld`,
+    "@id": `${BASE}/subgraph/${harness}/${iriSub}/`,
+    "@type": "Subgraph",
+    name: sub,
+    path: `${sub}/`,
+    hasMember: [{ "@id": `${BASE}/tool/a`, "@type": "Tool", description: "Tool a" }],
+  });
+  const dirs = [
+    { id: "tools", path: "tools/", graphTypologies: ["tools"] },
+    { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+    { id: "docs", path: "docs/", graphTypologies: ["docs"] },
+    { id: "state", path: "state/", graphTypologies: ["code"], source: { kind: "branch", branch: "cat/hh/state", keyedBy: "tip" } },
+  ];
+  const builtAtPublish = [{ path: "docs/subgraph/", writer: ["subgraph:jsonld"], because: "checkout", reason: "generated" }];
+  let hy: { bare: string; sha: string };
+  let np: { bare: string; sha: string };
+  let hUrl: (r: string) => string;
+
+  beforeAll(() => {
+    hy = bareRepo(base, "hy", {
+      "hh/hh.json": decl("hh", { livesAt: { repository: "o/hy", path: "hh" }, directories: dirs }),
+      "hh/tools/a/a.ts": "export const a = 1;\n",
+      "hh/skills/s/s.md": "# s\n",
+      "hh/docs/readme.md": "# hh\n",
+      "hh/docs/subgraph/hh/tools/index.hydrated.jsonld": hydratedFile("hh", "tools"),
+      "hh/docs/subgraph/hh/tools/index.jsonld": { "@context": `${BASE}/ns/subgraph/v1.jsonld`, "@id": `${BASE}/subgraph/hh/tools/` },
+      "hh/docs/subgraph/hh/tools/a/index.hydrated.jsonld": hydratedFile("hh", "tools/a"),
+      "hb/hb.json": decl("hb", { livesAt: { repository: "o/hy", path: "hb" }, directories: dirs.slice(0, 1).concat(dirs[2]!) }),
+      "hb/docs/subgraph/hb/tools/index.hydrated.jsonld": hydratedFile("hb", "tools", "elsewhere"),
+    });
+    np = bareRepo(base, "np", {
+      "np.json": decl("np", { directories: dirs.slice(0, 3), builtAtPublish }),
+      "tools/a/a.ts": "export const a = 1;\n",
+      "docs/readme.md": "# np\n",
+    });
+    const map: Record<string, string> = { "o/hy": `file://${hy.bare}`, "o/np": `file://${np.bare}` };
+    hUrl = (r) => {
+      const u = map[r];
+      if (!u) throw new Error(`no fixture for ${r}`);
+      return u;
+    };
+  });
+
+  /** A downstream declaring one hydrated-capable mount of `harness`. */
+  function hdown(harness: string, repo: { sha: string }, repository: string, mount: object): string {
+    const root = join(base, `hdown-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness, repository, ref: repo.sha, ...consentFor(repo.sha), ...mount }] }) });
+    return root;
+  }
+
+  test("H1. `hydrated: true` on the entry lays down only the published index.hydrated.jsonld — no code, no child file, no declaration", () => {
+    const root = hdown("hh", hy, "o/hy", { hydrated: true });
+    const r = mountRemote({ instanceRoot: root, urlFor: hUrl });
+    const o = r.plan.outcomes.find((x) => x.instance === "hh")!;
+    expect(o.state).toBe("mounted");
+    expect(o.detail).toContain("hydrated metadata");
+    // the others are named, not silently dropped
+    expect(o.detail).toMatch(/not published at the pin, so not mounted: skills, docs|not published at the pin, so not mounted: docs, skills/);
+
+    expect(JSON.parse(readFileSync(join(root, "hh/tools/index.hydrated.jsonld"), "utf-8"))["@id"]).toBe(`${BASE}/subgraph/hh/tools/`);
+    expect(existsSync(join(root, "hh/tools/a"))).toBe(false);
+    expect(existsSync(join(root, "hh/tools/index.jsonld"))).toBe(false);
+    expect(existsSync(join(root, "hh/skills"))).toBe(false);
+    expect(existsSync(join(root, "hh/hh.json"))).toBe(false);
+    // nothing discovers a code-less instance there, and the overlay offers none
+    expect(instanceRootsIn(root)).toEqual([root]);
+    expect(mountedInstanceRoots(root).has("hh")).toBe(false);
+
+    const inst = readLock(root).instances.find((i) => i.instance === "hh")!;
+    expect(inst.hydrated).toBe(true);
+    expect(inst.directories).toEqual([expect.objectContaining({ id: "tools", path: "hh/tools", upstreamPath: "hh/docs/subgraph/hh/tools", files: 1 })]);
+    expect(inst.declaration.file).toBe("hh.json");
+
+    // the per-directory answer is a `hydrated` SubgraphSource naming this Tool (l4ay, j9cs)
+    const planned = r.plan.instances.find((i) => i.instance === "hh")!.directories[0]!;
+    expect(resolveSubgraphSource({ id: planned.id, path: planned.path, source: planned.hydrated })).toMatchObject({ kind: "hydrated", harness: "hh", subgraph: "tools", ref: hy.sha, tool: "remote-mount" });
+
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    // edited metadata is reported like edited files
+    writeFileSync(join(root, "hh/tools/index.hydrated.jsonld"), "{}\n");
+    const c = checkRemote({ instanceRoot: root });
+    expect(c.state).toBe("missing");
+    expect(c.outcomes.find((x) => x.instance === "hh")!.detail).toContain("hh/tools/ modified");
+  });
+
+  test("H2. an override chooses the subgraphs; a named one the pin does not publish is missing, the rest mounted", () => {
+    const root = hdown("hh", hy, "o/hy", { overrides: { hh: { hydrated: true, directories: ["tools", "skills"] } } });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl }).plan.outcomes.find((x) => x.instance === "hh")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("skills");
+    expect(o.detail).toContain("no index.hydrated.jsonld published there");
+    expect(existsSync(join(root, "hh/tools/index.hydrated.jsonld"))).toBe(true);
+    // `hydrated: false` on the override opts back into files
+    const files = hdown("hh", hy, "o/hy", { hydrated: true, overrides: { hh: { hydrated: false, directories: ["tools"] } } });
+    mountRemote({ instanceRoot: files, urlFor: hUrl });
+    expect(existsSync(join(files, "hh/tools/a/a.ts"))).toBe(true);
+    expect(existsSync(join(files, "hh/hh.json"))).toBe(true);
+  });
+
+  test("H3. a pin that publishes no hydrated file is missing, and says the files are built at publish — never an empty 'mounted'", () => {
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const r = mountRemote({ instanceRoot: root, urlFor: hUrl });
+    const o = r.plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("builtAtPublish");
+    expect(existsSync(join(root, "np"))).toBe(false);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("missing");
+  });
+
+  test("H4. a hydrated file declaring another subgraph's IRI is refused, not held as the one asked for", () => {
+    const root = hdown("hb", hy, "o/hy", { hydrated: true });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl }).plan.outcomes.find((x) => x.instance === "hb")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("it was fetched for");
+    expect(existsSync(join(root, "hb/tools"))).toBe(false);
+  });
+
+  test("H5. `whole` and `hydrated` together are refused at plan time", () => {
+    const root = hdown("hh", hy, "o/hy", { overrides: { hh: { hydrated: true, whole: true } } });
+    const o = planRemote({ instanceRoot: root, urlFor: hUrl }).outcomes.find((x) => x.instance === "hh")!;
+    expect(o.state).toBe("could-not-determine");
+    expect(o.detail).toContain("keep one");
+  });
+
+  test("H6. the lock replays on a fresh clone: the one file again, still no declaration, then current", () => {
+    const src = hdown("hh", hy, "o/hy", { hydrated: true });
+    mountRemote({ instanceRoot: src, urlFor: hUrl });
+    const fresh = join(base, `hfresh-${++n}`);
+    mkdirSync(fresh, { recursive: true });
+    git(fresh, "init", "-q", "-b", "main");
+    writeFileSync(join(fresh, "index.lock.json"), readFileSync(join(src, "index.lock.json")));
+    writeFileSync(join(fresh, "down.json"), readFileSync(join(src, "down.json")));
+    const srv = join(base, `hsrv-${n}`, "o");
+    mkdirSync(srv, { recursive: true });
+    spawnSync("ln", ["-s", hy.bare, join(srv, "hy")]);
+    const prev = process.env.CAT_MOUNT_URL_PREFIX;
+    process.env.CAT_MOUNT_URL_PREFIX = `file://${dirname(srv)}`;
+    try {
+      expect(replayLocks(fresh, false).outcomes.map((o) => [o.instance, o.state])).toEqual([["hh", "mounted"]]);
+      expect(readFileSync(join(fresh, "hh/tools/index.hydrated.jsonld"))).toEqual(readFileSync(join(src, "hh/tools/index.hydrated.jsonld")));
+      expect(existsSync(join(fresh, "hh/hh.json"))).toBe(false);
+      expect(existsSync(join(fresh, "hh/tools/a"))).toBe(false);
+      expect(replayLocks(fresh, true).outcomes.every((o) => o.state === "current")).toBe(true);
+      expect(checkRemote({ instanceRoot: fresh }).state).toBe("mounted");
+    } finally {
+      if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
+      else process.env.CAT_MOUNT_URL_PREFIX = prev;
+    }
+  });
+  // ── G2b: the index files come from the pin's subgraph index PACKAGE ──────
+
+  /** Publish `harness`'s package for `repo@sha`, holding `files` under docs/subgraph/<harness>/. */
+  function publish(harness: string, repository: string, sha: string, files: Record<string, object>): string {
+    const root = join(base, `pkg-src-${++n}`);
+    write(root, { [`${harness}.json`]: decl(harness, { directories: dirs.slice(0, 3) }) });
+    for (const [rel, body] of Object.entries(files)) write(root, { [`docs/subgraph/${harness}/${rel}`]: body });
+    const out = join(base, `pkg-out-${n}`);
+    packSubgraphIndex({ root, repository, ref: sha, outDir: out });
+    return out;
+  }
+  const serveFrom = (dir: string) => (url: string) => `file://${join(dir, url.split("/").pop()!)}`;
+
+  test("H7. a pin whose tree holds no index file (builtAtPublish) mounts it from the pin's package, and the lock says so", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools"), "tools/index.jsonld": { "@id": `${BASE}/subgraph/np/tools/` } });
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const r = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(out) });
+    const o = r.plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("mounted");
+    expect(o.detail).toContain("1 from the pin's subgraph index package");
+    expect(o.detail).toMatch(/not published at the pin, so not mounted: (skills, docs|docs, skills)/);
+    expect(JSON.parse(readFileSync(join(root, "np/tools/index.hydrated.jsonld"), "utf-8"))["@id"]).toBe(`${BASE}/subgraph/np/tools/`);
+    expect(existsSync(join(root, "np/tools/index.jsonld"))).toBe(false);
+    expect(existsSync(join(root, "np/np.json"))).toBe(false);
+
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    const dir = readLock(root).instances.find((i) => i.instance === "np")!.directories[0]!;
+    // the CANONICAL url, never the fixture's — so a replay anywhere fetches the same asset
+    expect(dir).toMatchObject({ id: "tools", path: "np/tools", upstreamPath: "docs/subgraph/np/tools", files: 1, package: { url: pkg.tarballUrl, member: "docs/subgraph/np/tools/index.hydrated.jsonld" } });
+    expect(dir.package!.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
+  test("H8. a package file declaring another subgraph's IRI is refused like a tree file; no package at all keeps G2's answer, naming where it looked", () => {
+    const bad = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools", "elsewhere") });
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(bad) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("it was fetched for");
+    expect(existsSync(join(root, "np/tools"))).toBe(false);
+
+    const none = hdown("np", np, "o/np", { hydrated: true });
+    const p = mountRemote({ instanceRoot: none, urlFor: hUrl, packageUrlFor: serveFrom(join(base, "no-such-release")) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(p.state).toBe("missing");
+    expect(p.detail).toContain("builtAtPublish");
+    expect(p.detail).toContain("subgraph index package: absent");
+  });
+
+  test("H9. a package that fails its checks is never an empty layer", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    writeFileSync(join(out, pkg.tarball), "not the published bytes");
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(out) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("subgraph index package: refused");
+    expect(existsSync(join(root, "np"))).toBe(false);
+  });
+
+  test("H10. the lock replays a package-sourced directory on a fresh clone: same bytes, refused if they change", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
+    const src = hdown("np", np, "o/np", { hydrated: true });
+    mountRemote({ instanceRoot: src, urlFor: hUrl, packageUrlFor: serveFrom(out) });
+    const fresh = join(base, `hfresh-${++n}`);
+    mkdirSync(fresh, { recursive: true });
+    git(fresh, "init", "-q", "-b", "main");
+    writeFileSync(join(fresh, "index.lock.json"), readFileSync(join(src, "index.lock.json")));
+    writeFileSync(join(fresh, "down.json"), readFileSync(join(src, "down.json")));
+    // CAT_MOUNT_URL_PREFIX serves the repository AND its release assets, as github.com does.
+    const srv = join(base, `hsrv-${n}`);
+    mkdirSync(join(srv, "o"), { recursive: true });
+    spawnSync("ln", ["-s", np.bare, join(srv, "o", "np")]);
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    const rel = join(srv, "o", "np", "releases", "download", pkg.tag);
+    mkdirSync(rel, { recursive: true });
+    writeFileSync(join(rel, pkg.tarball), readFileSync(join(out, pkg.tarball)));
+    const prev = process.env.CAT_MOUNT_URL_PREFIX;
+    process.env.CAT_MOUNT_URL_PREFIX = `file://${srv}`;
+    try {
+      expect(replayLocks(fresh, false).outcomes.map((o) => [o.instance, o.state])).toEqual([["np", "mounted"]]);
+      expect(readFileSync(join(fresh, "np/tools/index.hydrated.jsonld"))).toEqual(readFileSync(join(src, "np/tools/index.hydrated.jsonld")));
+      expect(existsSync(join(fresh, "np/np.json"))).toBe(false);
+      expect(replayLocks(fresh, true).outcomes.every((o) => o.state === "current")).toBe(true);
+      // re-published bytes under the same name are not the lock's
+      rmSync(join(fresh, "np"), { recursive: true, force: true });
+      writeFileSync(join(rel, pkg.tarball), "other bytes");
+      const again = replayLocks(fresh, false).outcomes.find((o) => o.instance === "np")!;
+      expect(again.state).toBe("could-not-determine");
+      expect(again.detail).toContain("refused");
+      expect(existsSync(join(fresh, "np/tools/index.hydrated.jsonld"))).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
+      else process.env.CAT_MOUNT_URL_PREFIX = prev;
+    }
   });
 });

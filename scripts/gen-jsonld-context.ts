@@ -26,6 +26,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 // file is served at `CONTENT_CONTEXT_URL`. The 2026-09-20 content/ -> folio/
 // excision renamed it by mistake — a published, dereferenceable URL, which
 // moving breaks every consumer of the context. Left as `content`.
+// declared-path-literal: the path is fixed by the published `CONTENT_CONTEXT_URL` (see above); moving it with the declaration would break every consumer of the context.
 const OUT = join(resolve(HARNESS_ROOT), "ns", "content", "v1.jsonld");
 
 function main(): number {
