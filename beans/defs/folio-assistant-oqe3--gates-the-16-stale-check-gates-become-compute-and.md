@@ -6,7 +6,7 @@ status: todo
 type: feature
 priority: high
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-22T16:44:30Z
+updated_at: 2026-10-23T17:05:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -78,6 +78,50 @@ Done-when:
 
 _2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Owner ruling 2026-10-16 (item 1): lift the stale blocks on claimed beans whose blocker is closed; the claim itself is untouched. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
 
+_2026-10-22T16:46:00Z_ — Claim released in a stale-claims sweep by lane B2 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr), applied here by the coordinator. The coordinator's standard: release only on evidence, and never a claim from the last 48 hours. What was checked:
+- No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The only later ones are a blocker withdrawal (10-06) and a store reconciliation (10-16), and neither is work.
+- No remote branch in any of the three repositories names this bean.
+- The holding branch `qa-3hk4-oqe3` was local only and has no remote.
+
+The unticked Done-when boxes above are what remains. Back to `todo` so a sibling session is not misled. Nothing was deleted. The tools-store copy matches: litlfred/cat-harness-tools#558.
+
+## 2026-10-23: batch 1 (litlfred/cat-harness-tools#618, issue #617)
+
+The work was not lost. The 2026-10-02 local-branch work reached `main` through the arc merge (folio-assistant `acf7d0ea1`), and the 70lx split carried it into cat-harness-tools. `judgeSidecarTree`, `gradedKgFindings` and `--against main` on `kg:audit:check`, `kg:audit:all:check` and `translation:block-qa:check` are all on `main` today. Bean `4l4d` is completed.
+
+Re-measured on cat-harness-tools `main` 51ce679, in a composed checkout with cat-harness `main`. cat-harness still commits `test/results/` (1476 files), although it declares the directory `storage`. Two gates were red on `main` itself with the files present: `lsi:skills:check` (`skills.lsi.json` stale) and `kg:detangle:check` (seven `*.detangle.json` stale). Both are 3.1b. Detangle is one of the most-changed stored trees: 105 file changes since 10-09.
+
+PR #618 (draft) makes both gates compute and judge. In a stored tree, a stale or orphaned copy is advisory. `--against main` reports the stored record, and a missing entry is UNKNOWN and not gated. Exit codes before and after:
+
+| gate | main, present | main, absent | #618, present | #618, absent |
+|---|---|---|---|---|
+| `lsi:skills:check` | 1 | 0 | 0 | 0 |
+| `kg:detangle:check` | 1 | 0 | 0 | 0 |
+
+Remaining, as the next batches:
+- **Batch 2 (proposed):** `check:term-mapping`, `check:reference-direction:check` and `check:harness-state:check` already judge and accept `--against`, but their package scripts do not pass `--against main`.
+- `skill:register:check`'s chain: its `lsi:skills:check` step is green after #618. Not re-measured end to end.
+- Group B, waiting for a `main/` entry: `lsi:viz:check` (green on main with the files present), `uml:overview:check`, `check:qa-reviewer-permission`, `check:orphan-verdicts`, `check:kind-validators:require-all`, `check:declared-paths`.
+- `docs:pages:check` and `uml:overview:check` now run through `publish-check.ts` (owner B1). `check:ci-invocations` is unblocked now that 4l4d is done. None of these has been re-measured.
+- `check:version-bump`, `check:published-instance-exports`, `translation:catalogue:check --base` (CI only) and `check:prov-qaqc` (not a reader).
+- Done-when item 1 still needs a full `bun run cat gates` run with `test/results/` absent. Caution for whoever runs it: `uml:overview:check` (publish-check) and `gates --list` start writers (`qa:working-copy`, `qa:refresh`, `skill:register`) that rewrite `test/results/`. Run it in a throwaway copy.
+
+Session https://claude.ai/code/session_01NVW1gLKTQrfffUSgD3GCd5.
+
+## 2026-10-23: batch 2 (litlfred/cat-harness-tools#622, issue #621)
+
+The owner said go. `check:term-mapping`, `check:reference-direction:check` and `check:harness-state:check` now pass `--against main` in their package scripts. A new test, `judge-gates-against.test.ts`, pins `--against main` on all 11 judge gates. The PR is independent of #618.
+
+Measured locally:
+- term-mapping: 0 → 0.
+- harness-state: 2 → 2. Its health family stays UNKNOWN until qa-reports holds a health report.
+- reference-direction: 0 (UNKNOWN) → 1, with 83 new pairs against `main/0907d88`. They are probably an artefact of my local composition. CI already runs this command.
+
+The owner kept the `-merge` marking in `gitattributes.test.ts`. Still remaining: everything after batch 2 in the list above.
+
+## Kept from cat-harness-tools' copy (copy sync, 2026-10-24)
+
+These notes were only in this copy. The newer copy from the bean branch is above them.
 
 *2026-10-22T16:46:00Z* — Claim released (stale-claims sweep, coordinator standard: on evidence, nothing claimed in the last 48h; lane A, session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr). Checked:
 - No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The latest are a blocker withdrawal on 10-06 and a store reconciliation on 10-16, neither of which is work.
