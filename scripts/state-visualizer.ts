@@ -137,6 +137,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import {
   graphTypologiesOfLayer,
+  instanceRootsIn,
   isStateGraph,
   readDeclaration,
   repoRootFor,
@@ -157,7 +158,28 @@ import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/session-surve
 import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
 import { BoardSchema } from "@litlfred/cat-harness/schemas/board.ts";
 import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/board-positions.ts";
-import { parseTodoFile, TODO_ROOT } from "./todos.ts";
+import { parseTodoFile, readTodos, TODO_ROOT } from "./todos.ts";
+import {
+  beanPositions,
+  beansNamedBy,
+  beanStepsOf,
+  diagramLevels,
+  endNodesOf,
+  GATE_REFUSALS,
+  lastMoved,
+  NO_INSTANCE_REASON,
+  readInstances,
+  STUCK_AFTER_DAYS,
+  stuckStatesOf,
+  todosNamedBy,
+  type BeanPosition,
+  type DiagramLevel,
+  type StuckState,
+  type TodoLike,
+} from "./workflow-view.ts";
+import { positionOf, type InstanceState } from "../src/workflow/instance.js";
+import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
+import { workflowFiles } from "./known-skills.js";
 import type { z } from "zod";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
@@ -1375,7 +1397,7 @@ function filesIn(dirs: readonly string[], ext: string): string[] {
  * linked from their rows. Where an instance is is read from its own `tokens`;
  * this page keeps no second idea of position.
  */
-export function beanStorePartsSection(storeAbs: string): string {
+export function beanStorePartsSection(storeAbs: string, view?: WorkflowViewContext): string {
   const notes = filesIn(storePartDirs(storeAbs, "bean-notes"), ".md");
   const noteRows = notes
     .map((f) => {
@@ -1383,22 +1405,24 @@ export function beanStorePartsSection(storeAbs: string): string {
       return `<tr><td><code>${esc(bean)}</code></td><td>${esc(date)}</td><td>${esc(branch.join("--"))}</td></tr>`;
     })
     .join("");
-  const flows = filesIn(storePartDirs(storeAbs, "workflow-state"), ".json");
+  const flows = readInstances(filesIn(storePartDirs(storeAbs, "workflow-state"), ".json"));
+  // The stuck column and the per-instance links only where the page was given
+  // the context to compute them (bean `folio-assistant-v49e`): without the
+  // store's beans and a reference time the column would be a guess.
   const flowRows = flows
-    .map((f) => {
-      let w: { id?: string; processId?: string; status?: string; tokens?: unknown; bean?: string } = {};
-      try {
-        w = JSON.parse(readFileSync(f, "utf-8"));
-      } catch {
-        return `<tr><td><code>${esc(basename(f))}</code></td><td colspan="4">not readable JSON</td></tr>`;
-      }
-      const at = Array.isArray(w.tokens) ? w.tokens.map(String).join(", ") : "";
+    .map((r) => {
+      if ("bad" in r) return `<tr><td><code>${esc(basename(r.file))}</code></td><td colspan="${view ? 5 : 4}">${esc(r.bad)}</td></tr>`;
+      const w = r.state;
+      const at = w.tokens.map(String).join(", ");
+      const id = view && ROUTE_SEGMENT.test(w.id) ? `<a href="workflows/${esc(w.id)}/"><code>${esc(w.id)}</code></a>` : `<code>${esc(w.id)}</code>`;
+      const stuck = view ? `<td>${stuckCell(stuckStatesOf(w, view.beans, view.now, view.ends?.get(w.id)))}</td>` : "";
       return (
-        `<tr><td><code>${esc(w.id ?? basename(f, ".json"))}</code></td><td>${esc(w.processId ?? "")}</td>` +
-        `<td>${esc(w.status ?? "")}</td><td>${esc(at)}</td><td>${esc(w.bean ?? "")}</td></tr>`
+        `<tr><td>${id}</td><td>${esc(w.processId ?? "")}</td>` +
+        `<td>${esc(w.status ?? "")}</td><td>${esc(at)}</td><td>${esc(w.bean ?? "")}</td>${stuck}</tr>`
       );
     })
     .join("");
+  const instances = flows.flatMap((r) => ("state" in r ? [r.state] : []));
   const queue = mergeQueueSection(filesIn(storePartDirs(storeAbs, "merge-queue"), ".json"));
   const surveys = sessionSurveySection(filesIn(storePartDirs(storeAbs, "session-survey"), ".json"));
   const marks = sweepMarkSection(filesIn(storePartDirs(storeAbs, "sweep-marks"), ".json"));
@@ -1412,11 +1436,286 @@ export function beanStorePartsSection(storeAbs: string): string {
     `<h2 class="sv-h2" id="workflow-state">Workflow instances — ${flows.length}</h2>` +
     (flows.length === 0
       ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
-      : `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th></tr></thead><tbody>${flowRows}</tbody></table>`) +
+      : (view ? workflowViewLead(view) : "") +
+        `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th>${view ? "<th>stuck</th>" : ""}</tr></thead><tbody>${flowRows}</tbody></table>`) +
+    (view ? beanPositionSection(view.beans, instances) : "") +
     queue +
     surveys +
     marks,
   ).join("\n");
+}
+
+/**
+ * What the workflow view (bean `folio-assistant-v49e`) needs beyond a store's
+ * files: the store's beans, for the bean-side stuck states, and the reference
+ * time the age-based ones are measured against. Given by the caller, so the
+ * section renders the same for the same inputs.
+ */
+export interface WorkflowViewContext {
+  beans: readonly BeanNode[];
+  now: Date;
+  /** Each instance's end events, by instance id, where its diagram was found. */
+  ends?: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+/** A row's stuck states as words — a state is told by its WORD, never by hue. */
+function stuckCell(states: readonly StuckState[]): string {
+  if (states.length === 0) return "none found";
+  return [...new Set(states.map((x) => x.kind))].map((k) => `<span class="sv-tag is-stuck">${esc(k)}</span>`).join(" ");
+}
+
+/** The sentence above the instance table: what "stuck" was measured against, and what is not recorded. */
+function workflowViewLead(view: WorkflowViewContext): string {
+  return (
+    `<p class="sv-sub">Each instance opens its own view: the diagram with the token highlighted, the history, and ` +
+    `the beans and todos its steps name. <strong>stuck</strong> lists the states read from committed data, ages ` +
+    `measured at ${esc(view.now.toISOString())} (when this page was built) against a ${STUCK_AFTER_DAYS}-day ` +
+    `threshold. Refused gates: <strong>${GATE_REFUSALS.state}</strong> — ${esc(GATE_REFUSALS.why)}</p>`
+  );
+}
+
+/**
+ * Every bean of the store against the instance set, in three states — named by
+ * a running instance, only by finished ones, or by NONE. The third is the
+ * common case (bean `v49e`: 2 instances against 232 beans), so it is a state
+ * with a reason and a list, never an empty lane or a zero.
+ */
+function beanPositionSection(beans: readonly BeanNode[], instances: readonly InstanceState[]): string {
+  const pos = beanPositions(beans, instances);
+  const of = (state: BeanPosition["state"]) => beans.filter((b) => pos.get(b.id)?.state === state);
+  const running = of("running");
+  const finished = of("finished");
+  const none = of("none");
+  const known = new Set(beans.map((b) => b.id));
+  const elsewhere = [...new Set(instances.flatMap(beansNamedBy))].filter((id) => !known.has(id)).sort();
+  const named = (list: readonly BeanNode[]) =>
+    list
+      .map((b) => {
+        const p = pos.get(b.id);
+        const ins = p && p.state !== "none" ? p.instances.map((i) => (ROUTE_SEGMENT.test(i) ? `<a href="workflows/${esc(i)}/">${esc(i)}</a>` : esc(i))).join(", ") : "";
+        return `<tr><td><code>${esc(b.id)}</code></td><td>${esc(b.title)}</td><td>${esc(b.status)}</td><td>${ins}</td></tr>`;
+      })
+      .join("");
+  const table = (list: readonly BeanNode[]) =>
+    `<table><thead><tr><th>bean</th><th>title</th><th>status</th><th>instance</th></tr></thead><tbody>${named(list)}</tbody></table>`;
+  const openNone = none.filter(isOpen);
+  return (
+    `<h2 class="sv-h2" id="bean-position">Where this store's beans sit in a process — ${beans.length} bean(s)</h2>` +
+    `<ul class="sv-counts">` +
+    `<li class="sv-count"><span class="sv-count-v">${running.length}</span><span class="sv-count-k">in an instance not completed</span></li>` +
+    `<li class="sv-count"><span class="sv-count-v">${finished.length}</span><span class="sv-count-k">only in finished ones</span></li>` +
+    `<li class="sv-count"><span class="sv-count-v">${none.length}</span><span class="sv-count-k">no instance recorded</span></li>` +
+    `</ul>` +
+    (running.length > 0 ? table(running) : "") +
+    (finished.length > 0 ? `<details><summary>${finished.length} bean(s) named only by finished instances</summary>${table(finished)}</details>` : "") +
+    `<p class="sv-sub"><strong>No instance recorded</strong> for ${none.length} bean(s): ${esc(NO_INSTANCE_REASON)}. ` +
+    `That is a third state, not an empty diagram — there is no position to draw.</p>` +
+    (openNone.length > 0
+      ? `<details><summary>${openNone.length} open bean(s) with no instance recorded</summary>` +
+        `<ul>${openNone.map((b) => `<li><code>${esc(b.id)}</code> ${esc(b.title)} (${esc(b.status)})</li>`).join("")}</ul></details>`
+      : "") +
+    (elsewhere.length > 0
+      ? `<p class="sv-sub">Named by an instance here and <strong>not in this store</strong>: ${elsewhere.map((id) => `<code>${esc(id)}</code>`).join(", ")}.</p>`
+      : "")
+  );
+}
+
+/** The diagram an instance level was drawn from, as the page needs it. */
+export type ModelRead =
+  | { model: ProcessModel; source: string; recorded: string; moved: boolean }
+  | { missing: string; recorded: string };
+
+/** One instance's view, and everything it is drawn from. */
+export interface WorkflowInstanceView {
+  instance: InstanceState;
+  /** The bean store's instance name — the page's subgraph segment. */
+  store: string;
+  model: ModelRead;
+  /** The store's beans, or null when the store could not be read. */
+  beans: readonly BeanNode[] | null;
+  todos: readonly TodoLike[];
+  now: Date;
+  /** The published drawing for a `.bpmn` path, page-relative, or undefined when none is published. */
+  drawingFor: (bpmn: string) => string | undefined;
+}
+
+/** The workflow pages' own styles: the token and the steps done, over the published drawing. */
+const WV_CSS = `.wv-diagram { margin: 0.6rem 0 1.2rem; overflow-x: auto; }
+.wv-diagram svg { max-width: 100%; height: auto; }
+.wv-diagram .wv-token .djs-visual > :first-child { stroke: #c62828 !important; stroke-width: 5px !important; }
+.wv-diagram .wv-done .djs-visual > :first-child { stroke-dasharray: 6 3; }
+.sv-tag.is-stuck { border: 1px solid currentColor; border-radius: 4px; padding: 0 0.3rem; }`;
+
+/**
+ * Inlines each published drawing and marks the steps by their BPMN ids. The
+ * drawing is fetched rather than embedded, so the page stays thin and the
+ * drawing stays the one `render:bpmn` publishes; links inside it are written
+ * relative to the SVG file, so they are re-anchored to its URL here.
+ */
+const WV_SCRIPT = `<script>
+(function () {
+  document.querySelectorAll("[data-wv-svg]").forEach(function (f) {
+    var url = new URL(f.getAttribute("data-wv-svg"), document.baseURI);
+    fetch(url).then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); }).then(function (text) {
+      var svg = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
+      if (!svg || svg.nodeName.toLowerCase() !== "svg") return;
+      svg.querySelectorAll("script").forEach(function (s) { s.remove(); });
+      svg.querySelectorAll("a").forEach(function (a) {
+        ["href", "xlink:href"].forEach(function (k) {
+          var h = a.getAttribute(k);
+          if (h) a.setAttribute(k, new URL(h, url).href);
+        });
+      });
+      var mark = function (attr, cls) {
+        JSON.parse(f.getAttribute(attr) || "[]").forEach(function (id) {
+          svg.querySelectorAll('[data-element-id="' + CSS.escape(id) + '"]').forEach(function (e) { e.classList.add(cls); });
+        });
+      };
+      mark("data-wv-done", "wv-done");
+      mark("data-wv-tokens", "wv-token");
+      f.replaceChildren(document.importNode(svg, true));
+    }).catch(function () {});
+  });
+})();
+</script>`;
+
+/** One diagram level: the drawing, or why there is none, and the position as words either way. */
+function levelFigure(level: DiagramLevel, drawing: string | undefined, label: string): string {
+  const words =
+    `<p class="sv-sub">${esc(label)} <code>${esc(level.processId)}</code>` +
+    (level.phase.length > 0 ? ` inside ${level.phase.map((p) => `<code>${esc(p)}</code>`).join(" ▸ ")}` : "") +
+    ` — token at ${level.tokens.length > 0 ? level.tokens.map((t) => `<code>${esc(t)}</code>`).join(", ") : "<strong>no step</strong>"}` +
+    `; ${level.done.length} other step(s) in its history (drawn with a solid red outline and dashed, respectively).</p>`;
+  if (drawing === undefined) {
+    return words + `<p class="sv-sub">No drawing of ${level.source ? `<code>${esc(level.source)}</code>` : "this process"} is published, so the position is given in words only.</p>`;
+  }
+  return (
+    words +
+    `<figure class="wv-diagram" data-wv-svg="${esc(drawing)}" data-wv-tokens="${esc(JSON.stringify(level.tokens))}" data-wv-done="${esc(JSON.stringify(level.done))}">` +
+    `<p><a href="${esc(drawing)}">The drawing</a> — the highlighted step needs JavaScript; the position above does not.</p></figure>`
+  );
+}
+
+/**
+ * `<base>/<harness>/beans/<store>/workflows/<instance>/` — one running
+ * workflow instance: its diagram with the token highlighted (each running
+ * subprocess followed in), its stuck states as states, the beans and todos
+ * it names, and its history. Bean `folio-assistant-v49e`.
+ */
+export function workflowInstancePage(v: WorkflowInstanceView): string {
+  const s = v.instance;
+  const model = "model" in v.model ? v.model.model : undefined;
+  const states = stuckStatesOf(s, v.beans ?? [], v.now, endNodesOf(model));
+  const levels = diagramLevels(s, model);
+  const diagrams = levels
+    .map((l, i) => levelFigure(l, l.source ? v.drawingFor(l.source) : undefined, i === 0 ? "Process" : "Subprocess"))
+    .join("");
+  const source =
+    "missing" in v.model
+      ? `<p class="sv-sub"><strong>Diagram not found</strong>: ${esc(v.model.missing)}. The position below is the instance's own record.</p>`
+      : v.model.moved
+        ? `<p class="sv-sub">The instance records <code>${esc(v.model.recorded)}</code>, which is not on disk; drawn from <code>${esc(v.model.source)}</code>, the file that declares <code>${esc(s.processId)}</code> now.</p>`
+        : "";
+
+  const stuck =
+    `<h2 class="sv-h2" id="stuck">Stuck states — ${states.length}</h2>` +
+    (states.length === 0
+      ? `<p class="sv-sub">None found in committed data${s.status === "completed" ? " — the instance is completed" : ""}.</p>`
+      : `<ul>${states.map((x) => `<li><span class="sv-tag is-stuck">${esc(x.kind)}</span> ${describe(x.detail)}</li>`).join("")}</ul>`) +
+    `<p class="sv-sub">Measured at ${esc(v.now.toISOString())}, when this page was built; a token unmoved for more than ` +
+    `${STUCK_AFTER_DAYS} days is <code>enabled-not-taken</code>. Refused gates: <strong>${GATE_REFUSALS.state}</strong> — ${esc(GATE_REFUSALS.why)}</p>`;
+
+  const byId = new Map((v.beans ?? []).map((b) => [b.id, b]));
+  const steps = model ? beanStepsOf(model) : [];
+  const beanRows = beansNamedBy(s)
+    .map((id) => {
+      const b = byId.get(id);
+      const role = id === s.bean ? "the instance's bean" : "carried";
+      return `<tr><td><code>${esc(id)}</code></td><td>${b ? esc(b.title) : v.beans === null ? "store not readable" : "not in this store"}</td><td>${b ? esc(b.status) : ""}</td><td>${role}</td></tr>`;
+    })
+    .join("");
+  const beans =
+    `<h2 class="sv-h2" id="beans">Beans it names</h2>` +
+    (beanRows === ""
+      ? `<p class="sv-sub">This instance names no bean (no <code>bean</code>, no <code>carriedBeans</code>).</p>`
+      : `<table><thead><tr><th>bean</th><th>title</th><th>status</th><th>how</th></tr></thead><tbody>${beanRows}</tbody></table>`) +
+    (model === undefined
+      ? `<p class="sv-sub">The steps that act on the bean are unknown: the diagram was not found.</p>`
+      : steps.length === 0
+        ? `<p class="sv-sub">No step of this diagram carries a <code>folio:bean</code> operation.</p>`
+        : `<p class="sv-sub">Steps that act on it (<code>folio:bean op</code>):</p><ul>${steps
+            .map((x) => `<li><code>${esc(x.op)}</code> at <code>${esc([...x.phase, x.node].join(" ▸ "))}</code> ${esc(x.name)}${s.tokens.includes(x.node) ? " — <strong>the token is here</strong>" : ""}</li>`)
+            .join("")}</ul>`);
+
+  const todos = todosNamedBy(s, v.todos);
+  const todoPart =
+    `<h2 class="sv-h2" id="todos">Todos it names — ${todos.length}</h2>` +
+    (todos.length === 0
+      ? `<p class="sv-sub">No todo is tagged with this instance's processes or steps, or references a bean it names.</p>`
+      : `<table><thead><tr><th>todo</th><th>summary</th><th>status</th><th>why</th></tr></thead><tbody>${todos
+          .map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${esc(t.summary)}</td><td>${esc(t.status)}</td><td>${esc(t.why)}</td></tr>`)
+          .join("")}</tbody></table>`);
+
+  const NOTE_MAX = 400;
+  const history =
+    `<h2 class="sv-h2" id="history">History — ${s.history.length} step(s)</h2>` +
+    (s.history.length === 0
+      ? `<p class="sv-sub">No step recorded.</p>`
+      : `<table><thead><tr><th>at</th><th>step</th><th>outcome</th><th>actor</th><th>note</th></tr></thead><tbody>${s.history
+          .map((h) => {
+            const note = h.note ?? "";
+            const shown = note.length > NOTE_MAX ? `${note.slice(0, NOTE_MAX)}… (${note.length - NOTE_MAX} more characters in the instance file)` : note;
+            return `<tr><td>${esc(h.at ?? "")}</td><td><code>${esc(h.node)}</code></td><td>${esc(h.outcome ?? "")}</td><td>${esc(h.actor ?? "")}</td><td>${esc(shown)}</td></tr>`;
+          })
+          .join("")}</tbody></table>`);
+
+  const position = positionOf(s);
+  return page({
+    title: `${s.id} — workflow`,
+    noLiquid: true,
+    body:
+      `<style>\n${WV_CSS}\n</style>` +
+      `<h1 id="workflow-${esc(s.id)}">Workflow: ${esc(s.id)}</h1>` +
+      `<p class="sv-sub"><code>${esc(s.processId)}</code> · ${esc(s.status ?? "no status recorded")} · subject <code>${esc(s.subject ?? "")}</code>` +
+      ` · started ${esc(s.startedAt ?? "not recorded")} · last moved ${esc(lastMoved(s) ?? "not recorded")}` +
+      ` · <a href="../../">${esc(v.store)}'s work plan</a> · <a href="../">every instance in it</a></p>` +
+      `<p><strong>Where it is:</strong> ${position.length > 0 ? position.map((p) => `<code>${esc(p)}</code>`).join(", ") : "no step holds a token"}</p>` +
+      stuck +
+      `<h2 class="sv-h2" id="diagram">Diagram</h2>` +
+      source +
+      diagrams +
+      beans +
+      todoPart +
+      history +
+      WV_SCRIPT,
+  });
+}
+
+/** `<base>/<harness>/beans/<store>/workflows/` — the store's instances, each linking its own view. */
+export function workflowHubPage(store: string, storeAbs: string, view: WorkflowViewContext): string {
+  return page({
+    title: `${store} — workflows`,
+    body:
+      `<h1 id="workflows-${esc(store)}">Workflows: ${esc(store)}</h1>` +
+      `<p class="sv-sub"><a href="../">${esc(store)}'s work plan</a></p>` +
+      wrapRaw(workflowHubBody(storeAbs, view)).join("\n"),
+  });
+}
+
+function workflowHubBody(storeAbs: string, view: WorkflowViewContext): string {
+  const flows = readInstances(filesIn(storePartDirs(storeAbs, "workflow-state"), ".json"));
+  const rows = flows
+    .map((r) => {
+      if ("bad" in r) return `<tr><td><code>${esc(basename(r.file))}</code></td><td colspan="5">${esc(r.bad)}</td></tr>`;
+      const w = r.state;
+      const id = ROUTE_SEGMENT.test(w.id) ? `<a href="${esc(w.id)}/"><code>${esc(w.id)}</code></a>` : `<code>${esc(w.id)}</code>`;
+      return `<tr><td>${id}</td><td>${esc(w.processId)}</td><td>${esc(w.status ?? "")}</td><td>${esc(positionOf(w).join(", "))}</td><td>${esc(w.bean ?? "")}</td><td>${stuckCell(stuckStatesOf(w, view.beans, view.now, view.ends?.get(w.id)))}</td></tr>`;
+    })
+    .join("");
+  return flows.length === 0
+    ? `<p class="sv-sub">No BPMN instance recorded in this store.</p>`
+    : workflowViewLead(view).replace("Each instance opens", "Each instance below opens") +
+        `<table><thead><tr><th>id</th><th>process</th><th>status</th><th>at</th><th>bean</th><th>stuck</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 /**
@@ -1946,6 +2245,7 @@ export function beansSubjectPage(
   s: InstanceSubject,
   subjects: readonly InstanceSubject[],
   read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
+  view?: Omit<WorkflowViewContext, "beans">,
 ): string {
   const title = vis.title ?? "Beans";
   const others = subjects
@@ -1989,7 +2289,7 @@ export function beansSubjectPage(
           `<tbody>${rows}</tbody></table>`) +
       // Only beside a store that was read: an unreadable one is unknown, and
       // its parts would read as zero (bean `folio-assistant-750a`).
-      beanStorePartsSection(s.absPath);
+      beanStorePartsSection(s.absPath, view === undefined ? undefined : { ...view, beans: all });
   }
   return page({
     title: `${s.name} — ${title}`,
@@ -2155,7 +2455,76 @@ export function codeSubjectPage(
   });
 }
 
-if (import.meta.main) main();
+/**
+ * The checkout's todos, as the workflow view joins them; none when the todo
+ * graph is not readable here, which the page reports as "no todo is tagged"
+ * only because a todo it cannot read names nothing it can show.
+ */
+function readViewTodos(): TodoLike[] {
+  try {
+    return readTodos().map((t) => t as unknown as TodoLike);
+  } catch {
+    return [];
+  }
+}
+
+let processFiles: Map<string, string> | undefined;
+/** Process id → the `.bpmn` declaring it, over every instance in the checkout; built once. */
+function processFileOf(processId: string): string | undefined {
+  if (processFiles === undefined) {
+    processFiles = new Map();
+    for (const inst of instanceRootsIn(REPO_ROOT)) {
+      for (const f of workflowFiles(inst)) {
+        if (!f.endsWith(".bpmn")) continue;
+        let xml: string;
+        try {
+          xml = readFileSync(f, "utf-8");
+        } catch {
+          continue;
+        }
+        for (const m of xml.matchAll(/<bpmn:process\s+id="([^"]+)"/g)) if (!processFiles.has(m[1]!)) processFiles.set(m[1]!, f);
+      }
+    }
+  }
+  return processFiles.get(processId);
+}
+
+/**
+ * The diagram an instance runs: its recorded `source`, resolved against each
+ * root in turn (an instance records it relative to the root that saved it),
+ * else the file that declares its `processId` now — said so on the page,
+ * because a moved diagram is a fact a reader needs. Never a guess beyond that.
+ */
+async function modelFor(inst: InstanceState, roots: readonly string[]): Promise<ModelRead> {
+  const recorded = inst.source ?? "";
+  const at = recorded === "" ? undefined : roots.map((r) => resolve(r, recorded)).find((p) => existsSync(p));
+  const file = at ?? processFileOf(inst.processId);
+  if (file === undefined) {
+    return { missing: `${recorded ? `\`${recorded}\` is not on disk` : "no source is recorded"}, and no diagram in the checkout declares \`${inst.processId}\``, recorded };
+  }
+  try {
+    const model = await loadProcessModel(file);
+    return { model, source: relative(REPO_ROOT, file).split(sep).join("/"), recorded, moved: at === undefined };
+  } catch (e) {
+    return { missing: `\`${relative(REPO_ROOT, file)}\` could not be loaded (${e instanceof Error ? e.message.split("\n")[0] : String(e)})`, recorded };
+  }
+}
+
+/** Each instance's diagram in one bean store, by instance id — loaded once, read by every page of it. */
+async function workflowModelsOf(s: InstanceSubject): Promise<Map<string, ModelRead>> {
+  const out = new Map<string, ModelRead>();
+  for (const r of readInstances(filesIn(storePartDirs(s.absPath, "workflow-state"), ".json"))) {
+    if ("state" in r) out.set(r.state.id, await modelFor(r.state, [s.instanceRoot, dirname(s.absPath), REPO_ROOT]));
+  }
+  return out;
+}
+
+/** The end events of each loaded diagram, for the stuck column. */
+function endsOf(models: ReadonlyMap<string, ModelRead>): Map<string, Set<string>> {
+  return new Map([...models].map(([id, m]) => [id, endNodesOf("model" in m ? m.model : undefined)]));
+}
+
+if (import.meta.main) await main();
 
 /**
  * Generate every dashboard, or check them.
@@ -2164,7 +2533,7 @@ if (import.meta.main) main();
  * already use it — so that a test can import the pure resolver above without
  * this writing into the real site directory as a side effect of the import.
  */
-function main(): void {
+async function main(): Promise<void> {
 // Viewers RESOLVED from the pages (#1168 B7a-2b).
 const declRead = readDeclaration(ROOT);
 // The CHECKOUT's state graphs too (placement PR0, bean `ejye`): `beans`,
@@ -2266,6 +2635,44 @@ for (const g of graphs) {
 // empty page.
 const subjectOrphans: string[] = [];
 const hubs: string[] = [];
+// The reference time of every age-based stuck state (bean `v49e`), read once
+// so every page of one run measures against the same instant and says which.
+const NOW = new Date();
+const todosForView = readViewTodos();
+/**
+ * A bean store's workflow pages (bean `folio-assistant-v49e`): one per
+ * instance at `<store page>/workflows/<id>/`, and the hub listing them.
+ * Returns the store's orphaned instance pages, site-relative.
+ */
+function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string, models: ReadonlyMap<string, ModelRead>): string[] {
+  const read = readSubjectBeans(s.instanceRoot);
+  if (!("beans" in read) || read.beans === null) return [];
+  const view: WorkflowViewContext = { beans: read.beans, now: NOW, ends: endsOf(models) };
+  const flows = readInstances(filesIn(storePartDirs(s.absPath, "workflow-state"), ".json"));
+  const hubDir = join(storeDir, "workflows");
+  const ids: string[] = [];
+  for (const r of flows) {
+    if (!("state" in r) || !ROUTE_SEGMENT.test(r.state.id)) continue;
+    const pageDir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser, subgraph: `${s.name}/workflows/${r.state.id}` }));
+    ids.push(r.state.id);
+    const html = workflowInstancePage({
+      instance: r.state,
+      store: s.name,
+      model: models.get(r.state.id) ?? { missing: "not loaded", recorded: r.state.source ?? "" },
+      beans: read.beans,
+      todos: todosForView,
+      now: NOW,
+      drawingFor: (bpmn) => {
+        const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
+        return existsSync(svg) ? relative(pageDir, svg).split(sep).join("/") : undefined;
+      },
+    });
+    emit(join(pageDir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+  }
+  if (flows.length > 0) emit(join(hubDir, "index.html"), withRenderedByFrontMatter(workflowHubPage(s.name, s.absPath, view), VIEWER_TOOL));
+  const { owned } = orphanSubjectPages(hubDir, ids, carriesMarker(GENERATED_BY));
+  return check && builtAtPublishHere(join(hubDir, "x", "index.html")) ? [] : owned.map((name) => relative(SITE, join(hubDir, name)));
+}
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
   if (kinds.length === 0 || unread.length > 0) {
@@ -2280,14 +2687,16 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   }
   for (const s of subjects) {
     const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
+    const models = beans ? await workflowModelsOf(s) : undefined;
     const html = beans
-      ? beansSubjectPage(v, s, subjects)
+      ? beansSubjectPage(v, s, subjects, readSubjectBeans(s.instanceRoot), { now: NOW, ends: endsOf(models!) })
       : code
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
         : memory
           ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
           : instanceSubjectPage(v, s, subjects);
     emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+    if (beans) subjectOrphans.push(...drawWorkflows(v.id, s, dir, models!));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
   // state, and neither is `code`), so its hub is drawn here, listing the
