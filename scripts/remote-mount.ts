@@ -121,6 +121,27 @@
  * holds what is declared within it — its files, or, hydrated, its nested
  * subgraphs inline (`hasSubgraph`).
  *
+ * ## Tools: chosen by id, mounted runnable (bean `mo75` G3)
+ *
+ * `overrides.<instance>.tools` names Tools that instance declares. Each is
+ * brought RUNNABLE — its definition, its implementation and their import
+ * closure — as the declared directories that closure touches, and with
+ * `tools` named anywhere in an entry, that entry's instances mount those
+ * directories (plus any their override names) instead of their default list.
+ * A `whole` instance stays whole. The owner's rulings and why each is so are
+ * in `tool-closure.ts`, which computes it; this file only plans with it:
+ *
+ * - each chosen Tool's `invoke` is read from the declaring instance's
+ *   published `tools` metadata (`index.hydrated.jsonld`) at the pin — the
+ *   tree, else the pin's subgraph index package, exactly as a hydrated mount
+ *   reads it — because the plan runs before the trust gate and must not
+ *   execute a definition to learn what it runs;
+ * - a Tool that cannot be brought whole (not declared, not in the metadata,
+ *   an import that names nothing, a closure file in no declared directory)
+ *   makes the declaring instance `missing` (`could-not-determine` when a
+ *   fetch failed) and every instance of its entry unmounted with it: a
+ *   half-brought Tool is the state the rulings exist to prevent.
+ *
  * ## It never discards work
  *
  * A mounted directory whose bytes no longer hash to the lock is left exactly
@@ -140,7 +161,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
-import { checkoutRootFor, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
@@ -161,6 +182,7 @@ import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
+import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
 
 /**
@@ -308,6 +330,8 @@ export interface PlannedInstance {
   notPublished?: string[];
   /** Hydrated: what the pin's subgraph index package answered, when it was looked for and held nothing usable. */
   packageNote?: string;
+  /** The Tools this instance's override chose, as brought (bean `mo75` G3): said in its outcome. */
+  tools?: ResolvedTool[];
 }
 
 export type InstanceOutcome =
@@ -504,10 +528,15 @@ function planHydrated(a: {
   whole: boolean | undefined;
   /** The pin's subgraph index package for this harness, fetched at most once (bean `mo75` G2b). */
   pkgFor: (harness: string) => SubgraphIndexFetch;
+  /** Tools the override chose; refused here, since metadata brings no code. */
+  tools?: readonly string[];
 }): { instance: PlannedInstance } | { outcome: InstanceOutcome } {
   const { q, tree, found, path, named } = a;
   const { decl } = found;
   const at = `${q.repository}@${q.sha.slice(0, 12)}`;
+  if (a.tools?.length) {
+    return { outcome: { instance: q.name, state: "could-not-determine", path, detail: "`tools` and `hydrated` both asked for: a chosen Tool is mounted runnable, with its code, and a hydrated mount brings none — read the metadata hydrated, then name the Tools on a files mount" } };
+  }
   if (a.whole === true) {
     return { outcome: { instance: q.name, state: "could-not-determine", path, detail: "`whole` and `hydrated` both asked for: one mounts every file and the other none — keep one" } };
   }
@@ -652,6 +681,8 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
     return f;
   };
 
+  /** Every instance laid down as files, with the tree and declaration it was planned from — for the Tool closure. */
+  const reached = new Map<string, { tree: RemoteTree; found: { root: string; file: string; text: string; decl: UpstreamDeclaration }; whole: boolean; via: RemoteMount }>();
   const seen = new Map<string, { repository: string; sha: string }>();
   for (const m of ds.mounts) {
     const queue: Array<{ name: string; repository: string; sha: string; pinnedBy: LockedInstance["pinnedBy"] }> = [
@@ -734,11 +765,12 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       // The entry's own `hydrated` is its harness's; an override decides for any instance.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
       if (hydrated) {
-        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha) });
+        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools });
         if ("outcome" in h) plan.outcomes.push(h.outcome);
         else plan.instances.push(h.instance);
         continue;
       }
+      if (!hydrated) reached.set(q.name, { tree, found, whole, via: m });
       if (whole) {
         plan.instances.push({
           instance: q.name,
@@ -753,9 +785,13 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
           assets: [],
         });
       }
+      // With Tools chosen anywhere in this entry, the Tool closure picks the
+      // directories (applyToolChoices, below) and the default list does not.
+      const choosesTools = Object.values(m.overrides ?? {}).some((o) => o.tools?.length);
       const ids = whole
         ? []
         : override?.directories ??
+        (choosesTools ? [] : undefined) ??
         decl.mountDefaults?.directories ??
         decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
       const lookup = directoriesById(tree, found, ids);
@@ -844,7 +880,221 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       }
     }
   }
+  applyToolChoices(plan, reached, local, pkgAt);
   return plan;
+}
+
+/** The ids of a declaration's directories whose graph typologies include `tools`. */
+function toolDirectoriesOf(decl: UpstreamDeclaration): UpstreamDeclaration["directories"] {
+  return decl.directories.filter((d) => {
+    const kinds = (d as Record<string, unknown>).graphTypologies;
+    return Array.isArray(kinds) && kinds.includes("tools");
+  });
+}
+
+/**
+ * Each chosen Tool's published node at the pin, by id: the declaring
+ * instance's `tools` metadata (`index.hydrated.jsonld`), from the tree when a
+ * commit carries it, else from the pin's subgraph index package — the reading
+ * {@link planHydrated} does, held to the same schema and IRI.
+ */
+function toolNodesAt(
+  tree: RemoteTree,
+  found: { root: string; decl: UpstreamDeclaration },
+  toolDir: string,
+  pkgFor: (harness: string) => SubgraphIndexFetch,
+): { ok: true; nodes: Map<string, Record<string, unknown>> } | { ok: false; state: "missing" | "could-not-determine"; detail: string } {
+  const { decl } = found;
+  const docs = decl.directories.find((d) => d.id === "docs");
+  if (!docs) return { ok: false, state: "missing", detail: `\`${decl.name}\` declares no \`docs\` directory, so it publishes no Tools metadata to read each Tool's \`invoke\` from` };
+  const sub = strip(toolDir);
+  const pub = joinRel(found.root, publishedSubgraphDir(docs.path, decl.name, sub));
+  let text = tree.readText(`${pub}/${SUBGRAPH_HYDRATED_FILE}`);
+  let where = `${pub}/${SUBGRAPH_HYDRATED_FILE} at ${tree.sha.slice(0, 12)}`;
+  if (text === undefined) {
+    const pkg = pkgFor(decl.name);
+    const entry = pkg.state === "ok" ? pkg.hydrated.get(sub) : undefined;
+    if (pkg.state !== "ok" || !entry) {
+      return {
+        ok: false,
+        state: pkg.state === "could-not-determine" ? "could-not-determine" : "missing",
+        detail: `no Tools metadata for \`${sub}/\` at ${tree.sha.slice(0, 12)}: not in the git tree, and the pin's subgraph index package ${pkg.state === "ok" ? "holds none for it" : `is ${pkg.state} — ${pkg.detail}`}`,
+      };
+    }
+    text = readFileSync(join(pkg.root, ...entry.path.split("/")), "utf-8");
+    where = `${entry.path} in ${pkg.pkg.tarballUrl}`;
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    return { ok: false, state: "missing", detail: `${where} is not JSON: ${(e as Error).message}` };
+  }
+  const parsed = SubgraphHydratedSchema.safeParse(json);
+  if (!parsed.success) return { ok: false, state: "missing", detail: `${where} is not a valid hydrated subgraph file: ${parsed.error.issues[0]?.message}` };
+  if (!parsed.data["@id"].endsWith(`/subgraph/${decl.name}/${sub}/`)) return { ok: false, state: "missing", detail: `${where} declares itself \`${parsed.data["@id"]}\`, not \`…/subgraph/${decl.name}/${sub}/\`` };
+  const nodes = new Map<string, Record<string, unknown>>();
+  const visit = (n: { hasMember?: unknown[]; hasSubgraph?: unknown[] }): void => {
+    for (const m of (n.hasMember ?? []) as Array<Record<string, unknown>>) {
+      // `Tool`, or a compacted / expanded form of it (`cat-harness:Tool`, as kg-export writes it).
+      const types = ([] as unknown[]).concat(m["@type"] ?? []);
+      if (typeof m.name === "string" && types.some((t) => typeof t === "string" && /(?:^|[:/#])Tool$/.test(t))) nodes.set(m.name, m);
+    }
+    for (const c of (n.hasSubgraph ?? []) as Array<{ hasMember?: unknown[]; hasSubgraph?: unknown[] }>) if (c && typeof c === "object") visit(c);
+  };
+  visit(parsed.data as { hasMember?: unknown[]; hasSubgraph?: unknown[] });
+  return { ok: true, nodes };
+}
+
+/**
+ * Bring each override's chosen `tools` runnable (module note, §"Tools"):
+ * read each Tool's `invoke` from its published metadata, walk the closure of
+ * definition and implementation with bootstrap-tools' `importClosure`
+ * (`tool-closure.ts`), and narrow each instance of the entry to the declared
+ * directories that closure touches plus the ones its override names.
+ */
+function applyToolChoices(
+  plan: Plan,
+  reached: Map<string, { tree: RemoteTree; found: { root: string; file: string; text: string; decl: UpstreamDeclaration }; whole: boolean; via: RemoteMount }>,
+  local: Map<string, string>,
+  pkgAt: (repository: string, sha: string) => (harness: string) => SubgraphIndexFetch,
+): void {
+  const choosing = plan.mounts.filter((m) => Object.values(m.overrides ?? {}).some((o) => o.tools?.length));
+  if (choosing.length === 0) return;
+
+  // Every instance the closure may reach: those laid down as files, and the ones this checkout holds.
+  const instances: ClosureInstance[] = [];
+  for (const [name, r] of reached) {
+    const p = plan.instances.find((i) => i.instance === name);
+    if (!p) continue;
+    const nested = upstreamDirectories(r.tree, r.found.root, r.found.file);
+    // A nesting this checkout cannot read leaves the top-level list, which
+    // over-mounts (a parent for its nested child) and never under-mounts.
+    const dirs = (nested.ok ? nested.directories : r.found.decl.directories).filter(
+      (d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage }) && !strip(d.path).split("/").includes(".."),
+    );
+    let manifest: ClosureInstance["manifest"];
+    try {
+      const t = r.tree.readText(joinRel(r.found.root, "package.json"));
+      manifest = t === undefined ? undefined : (JSON.parse(t) as ClosureInstance["manifest"]);
+    } catch {
+      manifest = undefined;
+    }
+    instances.push({
+      instance: name,
+      path: p.path,
+      whole: r.whole,
+      needs: r.found.decl.needs ?? [],
+      directories: dirs,
+      files: [r.found.root ? r.found.file.slice(r.found.root.length + 1) : r.found.file, ...p.assets, "package.json"],
+      ...(manifest ? { manifest } : {}),
+      source: { tree: r.tree, root: r.found.root },
+    });
+  }
+  for (const [name, root] of local) {
+    let decl: ReturnType<typeof readDeclaration>;
+    try {
+      decl = readDeclaration(root);
+    } catch {
+      continue;
+    }
+    let dirs: UpstreamDirectory[] = [];
+    try {
+      dirs = instanceDirectories(root).map((d) => ({ id: d.id, path: d.path }));
+    } catch {
+      dirs = (decl?.directories ?? []).map((d) => ({ id: d.id, path: d.path }));
+    }
+    let manifest: ClosureInstance["manifest"];
+    try {
+      manifest = existsSync(join(root, "package.json")) ? (JSON.parse(readFileSync(join(root, "package.json"), "utf-8")) as ClosureInstance["manifest"]) : undefined;
+    } catch {
+      manifest = undefined;
+    }
+    instances.push({ instance: name, path: relative(plan.instanceRoot, root) || ".", whole: true, needs: decl?.needs ?? [], directories: dirs, files: [], ...(manifest ? { manifest } : {}), source: { disk: root } });
+  }
+
+  for (const m of choosing) {
+    const failures: Array<{ instance: string; state: "missing" | "could-not-determine"; detail: string }> = [];
+    const choices: ToolChoice[] = [];
+    for (const [name, o] of Object.entries(m.overrides ?? {})) {
+      if (!o.tools?.length) continue;
+      const r = reached.get(name);
+      if (!r || !plan.instances.some((i) => i.instance === name)) {
+        // Hydrated, skipped, local or not reached: it said why already, or this says it.
+        if (!plan.outcomes.some((x) => x.instance === name)) failures.push({ instance: name, state: "missing", detail: `\`tools\` named for \`${name}\`, which this mount does not lay down as files` });
+        else if (local.has(name)) failures.push({ instance: name, state: "missing", detail: `\`tools\` named for \`${name}\`, which this checkout holds itself: its Tools are already here` });
+        continue;
+      }
+      const toolDirs = toolDirectoriesOf(r.found.decl);
+      const invokes = new Map<string, Record<string, unknown> | undefined>();
+      for (const d of toolDirs) {
+        const got = toolNodesAt(r.tree, r.found, d.path, pkgAt(r.tree.repository, r.tree.sha));
+        if (!got.ok) {
+          failures.push({ instance: name, state: got.state, detail: got.detail });
+          continue;
+        }
+        for (const [id, node] of got.nodes) {
+          const inv = node.invoke;
+          invokes.set(id, inv && typeof inv === "object" ? (inv as Record<string, unknown>) : undefined);
+        }
+      }
+      if (failures.some((f) => f.instance === name)) continue;
+      const unknown = o.tools.filter((id) => !invokes.has(id));
+      if (unknown.length) {
+        failures.push({ instance: name, state: "missing", detail: `Tool${unknown.length === 1 ? "" : "s"} \`${unknown.join("`, `")}\` named for mounting but in none of \`${name}\`'s published Tools metadata at ${r.tree.sha.slice(0, 12)} (${toolDirs.map((d) => `\`${strip(d.path)}/\``).join(", ") || "it declares no `tools` directory"})` });
+        continue;
+      }
+      choices.push({ instance: name, toolDirs: toolDirs.map((d) => d.path), tools: o.tools.map((id) => ({ id, invoke: invokes.get(id) })) });
+    }
+
+    const result = failures.length ? undefined : toolClosure(instances, choices);
+    if (result) {
+      // An instance of ANOTHER entry the closure needs a directory of must already bring it.
+      for (const [name, ids] of result.directories) {
+        const p = plan.instances.find((i) => i.instance === name)!;
+        if (reached.get(name)?.via === m) continue;
+        const have = p.directories.map((d) => d.path);
+        const inst = instances.find((i) => i.instance === name)!;
+        for (const id of ids) {
+          const want = joinRel(p.path, inst.directories.find((d) => d.id === id)!.path);
+          if (!have.some((h) => want === h || want.startsWith(`${h}/`))) result.problems.push(`the closure needs \`${name}\`'s \`${id}\`, which its own mount entry (\`${reached.get(name)!.via.harness}\`) does not bring`);
+        }
+      }
+      for (const pr of result.problems) failures.push({ instance: choices[0]?.instance ?? m.harness, state: "missing", detail: pr });
+    }
+
+    if (failures.length) {
+      const declarers = [...new Set(failures.map((f) => f.instance))];
+      for (const d of declarers) {
+        const mine = failures.filter((f) => f.instance === d);
+        plan.outcomes.push({ instance: d, state: mine.some((f) => f.state === "could-not-determine") ? "could-not-determine" : "missing", detail: `the chosen Tools cannot be brought runnable, so nothing of \`${m.harness}\`'s entry is mounted: ${mine.map((f) => f.detail).join("; ")}` });
+      }
+      for (const p of plan.instances.filter((i) => reached.get(i.instance)?.via === m)) {
+        if (!declarers.includes(p.instance)) {
+          plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `not mounted: its directories are what the chosen Tools' closure touches, and that closure did not resolve (${declarers.map((d) => `see \`${d}\``).join(", ")})` });
+        }
+      }
+      plan.instances = plan.instances.filter((i) => reached.get(i.instance)?.via !== m);
+      continue;
+    }
+
+    for (const p of plan.instances) {
+      const r = reached.get(p.instance);
+      if (!r || r.via !== m || r.whole || p.hydrated) continue;
+      const inst = instances.find((i) => i.instance === p.instance)!;
+      const touched = result!.directories.get(p.instance) ?? [];
+      const have = new Set(p.directories.map((d) => d.id));
+      for (const id of touched) {
+        if (have.has(id)) continue;
+        const d = inst.directories.find((x) => x.id === id)!;
+        p.directories.push({ id, path: joinRel(p.path, d.path), upstreamPath: joinRel(r.found.root, d.path) });
+      }
+    }
+    for (const c of choices) {
+      const p = plan.instances.find((i) => i.instance === c.instance);
+      if (p) p.tools = result!.tools.filter((t) => t.instance === c.instance);
+    }
+  }
 }
 
 /** Resolve the closure and close every fetched tree. Writes nothing. */
@@ -1193,6 +1443,9 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
                   invalid.length ? `not mounted: ${invalid.join("; ")}` : "",
                 ].filter(Boolean).join("; ") + " — the rest is mounted"
               : `${what}${dirs.length} director${dirs.length === 1 ? "y" : "ies"}, ${files} file(s) from ${p.repository}@${p.sha.slice(0, 12)}; basis: ${trust.detail}`) +
+            (p.tools?.length
+              ? `; Tools ${p.tools.map((t) => `\`${t.id}\` (${[t.definition, ...t.implementation].join(" + ")}${t.runtime ? `; runs \`${t.runtime}\`` : ""})`).join(", ")} with their import closure`
+              : "") +
             (p.notPublished?.length ? `; not published at the pin, so not mounted: ${p.notPublished.join(", ")}` : "") +
             (p.packageNote && (absent.length || p.notPublished?.length) ? `; ${p.packageNote}` : "") +
             (ignored === "not-ignored" ? ` — but \`${p.path}/\` is NOT ignored: the committed .gitignore index-mounts block does not cover it` : ""),
