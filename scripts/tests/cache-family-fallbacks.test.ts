@@ -26,7 +26,13 @@ import { resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
-/** Newest first: the name a script writes when nothing exists, then its legacy names in resolution order. */
+/**
+ * Newest first: the name a script writes when nothing exists, then the names it
+ * had before. The old names are being retired (bean `oycs`, 2026-10-24), so a
+ * script may list the new name alone or with a leading run of the old ones;
+ * either way the new name comes first and the order never changes. This holds
+ * on both sides of fhir-harness#150, so the layers can merge in either order.
+ */
 const FAMILIES = {
   "fhir-ast": {
     names: ["cat/fhir-harness/fhir-ast", "cat-fhir-ast", "fhir-ast"],
@@ -34,28 +40,17 @@ const FAMILIES = {
   },
 } as const;
 
-const esc = (n: string) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-/** Index of the first whole-token occurrence of `name` in `text`, or -1. */
-function tokenAt(text: string, name: string): number {
-  const m = new RegExp(`(?<![\\w/-])${esc(name)}(?![\\w.-])`).exec(text);
-  return m ? m.index : -1;
-}
-
-describe("cache scripts carry the same built-in fallback names, in the same order", () => {
+describe("cache scripts carry the built-in family names newest first, and none unknown", () => {
   for (const [family, { names, files }] of Object.entries(FAMILIES)) {
     for (const file of files) {
-      test(`${file}: every ${family} name, newest first`, () => {
+      test(`${file}: its ${family} fallback list is a newest-first prefix of the known names`, () => {
         const text = readFileSync(resolve(REPO, file), "utf-8");
-        const at = names.map((n) => tokenAt(text, n));
-        for (const [i, n] of names.entries()) expect(at[i], `${file} names ${n}`).toBeGreaterThanOrEqual(0);
+        const m = /for p in ((?:"[^"]+"\s*)+); do/.exec(text);
+        expect(m, `${file} writes its list as one \`for p in "…"; do\` literal`).not.toBeNull();
+        const listed = [...m![1]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!.replace(/\/$/, ""));
+        expect(listed.length).toBeGreaterThanOrEqual(1);
+        expect(listed).toEqual(names.slice(0, listed.length));
       });
     }
   }
-
-  // The order matters where the list is written as one literal. Pinned on the
-  // literal a reader would copy: ig-cache.sh's.
-  test("ig-cache.sh's fallback list is newest first", () => {
-    const text = readFileSync(resolve(REPO, "fhir-harness/scripts/ig-cache.sh"), "utf-8");
-    expect(text).toContain('for p in "cat/fhir-harness/fhir-ast/" "cat-fhir-ast/" "fhir-ast/"; do');
-  });
 });

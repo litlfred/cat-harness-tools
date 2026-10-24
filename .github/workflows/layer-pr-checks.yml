@@ -649,6 +649,9 @@ jobs:
         # read them (owner's session 01Pc8v, 2026-10-14: declaration-resolution
         # was red only because neither was done).
         working-directory: fa
+        env:
+          # ig-index:build reads each IG's GitHub releases.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Both sides mount at the tips the pin step read once for the run
@@ -673,6 +676,22 @@ jobs:
             '
           )
           git remote set-url origin "$origin"
+          # An IG instance commits no artefact index (fhir-harness#124): its
+          # fhir-artifact-index/ files are built from the IG's AST by
+          # `ig-index:build`, which the IG pages below read. Built only when an
+          # IG instance on disk is missing its index, so a root whose IGs still
+          # commit theirs pays nothing.
+          missing="$(find . -mindepth 2 -maxdepth 3 -type d -name fhir-artifact-index -not -path './node_modules/*' \
+            -exec sh -c '[ -f "$1/index.json" ] || echo "$1"' _ {} \; | head -n 5 || true)"
+          # The script list is read into a variable and grepped as a
+          # here-string, not piped: with pipefail, `grep -q` exiting early
+          # SIGPIPEs `cut`, and the condition reads false (as in #661).
+          scripts="$(bun cat-harness-tools/scripts/run-script.ts --list 2>/dev/null | cut -f1 || true)"
+          if [ -n "$missing" ] && grep -qx 'ig-index:build' <<<"$scripts"; then
+            echo "IG artefact indexes missing:"; echo "$missing"
+            bun cat-harness-tools/scripts/run-script.ts ig-index:build \
+              || echo "::warning::ig-index:build failed: the IG pages and the gates that read the indexes see them missing on this side"
+          fi
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi

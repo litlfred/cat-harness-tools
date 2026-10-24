@@ -46,6 +46,7 @@ beforeAll(() => {
     "b-ig",
     ["c-base"],
     [
+      // declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
       { path: "ns/context/v1.jsonld", writer: ["shared:contexts"], because: "checkout" },
       { path: "docs/", writer: ["ig:pages"], because: "checkout", directory: "b-ig-docs" },
     ],

@@ -15,11 +15,11 @@
 import { describe, expect, test } from "bun:test";
 import { dirname, join } from "node:path";
 
-import { checkVoiceSkills, restatements } from "../check-voice-skills.ts";
-import { readVoicesGraph } from "../voices-graph.ts";
+import { checkVoiceSkills, restatements } from "../../check-voice-skills.ts";
+import { readVoicesGraph } from "../../voices-graph.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 
-const REPO = repoRootFor(join(import.meta.dir, "..", ".."));
+const REPO = repoRootFor(join(import.meta.dir, "..", "..", ".."));
 
 /** A rule of the shape the checker reads. */
 const RULE = {

@@ -21,6 +21,7 @@ const put = (rel: string, value: unknown): void => {
 put("base/base.json", { name: "base", needs: [], jsonldPrefixes: { dcterms: "http://purl.org/dc/terms/", skos: "http://www.w3.org/2004/02/skos/core#" } });
 put("top/top.json", { name: "top", needs: ["base"], jsonldPrefixes: { bibo: "http://purl.org/ontology/bibo/", fabio: "http://purl.org/spar/fabio/" } });
 put("empty/empty.json", { name: "empty", needs: ["base"] });
+// declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
 put("declared/declared.json", { name: "declared", needs: ["base"], builtAtPublish: [{ path: "ns/context/v1.jsonld", writer: ["jsonld:contexts"], because: "checkout", reason: "test" }] });
 
 // base: speaks skos (inside an array) and dcterms only inside its own context file, which must not count.
