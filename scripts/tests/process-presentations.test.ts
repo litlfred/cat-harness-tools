@@ -11,7 +11,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, basename, sep } from "node:path";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { workflowFiles, workflowFile } from "../known-skills.js";
+import { workflowFiles } from "../known-skills.js";
 import { processDiagrams } from "../../src/workflow/process-model.js";
 import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
@@ -135,8 +135,8 @@ describe("this repository, right now", () => {
   test("no diagram names a page — the link is the page's to declare", () => {
     const named = workflowFiles(ROOT)
       .filter((f) => f.endsWith(".bpmn"))
-      .map((p) => basename(p))
-      .filter((f) => /<[\w.-]+:link\b[^>]*\bhref=/.test(readFileSync(workflowFile(ROOT, f), "utf-8")));
+      .filter((p) => /<[\w.-]+:link\b[^>]*\bhref=/.test(readFileSync(p, "utf-8")))
+      .map((p) => basename(p));
     expect(named).toEqual([]);
   });
 });
