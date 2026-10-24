@@ -1623,7 +1623,7 @@
               downloadFile(data.files[0].name, data.files[0].content, 'application/x-tex');
             } else {
               // Create a shell script that recreates the directory structure
-              let script = '#!/bin/bash\n# QOU LaTeX source — extract and compile with: bash this_file.sh\n# Or just copy the files below.\n\n';
+              let script = `#!/bin/bash\n# ${paper?.id || 'Folio'} LaTeX source — extract and compile with: bash this_file.sh\n# Or just copy the files below.\n\n`;
               let fileIdx = 0;
               for (const f of data.files) {
                 const dir = f.name.includes('/') ? f.name.substring(0, f.name.lastIndexOf('/')) : '';
@@ -1635,7 +1635,7 @@
                 fileIdx++;
               }
               script += '\necho "Files extracted. Compile with: latexmk -pdf main.tex"\n';
-              downloadFile('qou-latex-source.sh', script, 'application/x-sh');
+              downloadFile(`${paper?.id || 'folio'}-latex-source.sh`, script, 'application/x-sh');
             }
           } catch (e) {
             alert('TeX export failed: ' + e.message);
@@ -5932,7 +5932,9 @@
       try {
         const r = await fetch(`/api/folio?_=1${branchParam()}`);
         const data = r.ok ? await r.json() : null;
-        const id = data?.papers?.[0]?.id || 'quantum-observable-universe';
+        // The folio's own first paper: the viewer names no folio of its own.
+        const id = data?.papers?.[0]?.id;
+        if (!id) return;
         const pr = await fetch(`/api/paper?id=${encodeURIComponent(id)}${branchParam()}`);
         if (pr.ok) {
           const p = await pr.json();
@@ -6339,7 +6341,7 @@
         if (!paper) await loadDefaultPaper();
         else scrollToLabel(slug);
       } else {
-        // Check for paper-id/label format: #/view/quantum-observable-universe/prose:foo
+        // Check for paper-id/label format: #/view/my-paper/prose:foo
         const slashIdx = slug.indexOf('/');
         if (slashIdx > 0) {
           const paperId = slug.slice(0, slashIdx);
@@ -6362,7 +6364,8 @@
         try {
           const r = await fetch(`/api/folio?_=1${branchParam()}`);
           const data = r.ok ? await r.json() : null;
-          const id = data?.papers?.[0]?.id || 'quantum-observable-universe';
+          const id = data?.papers?.[0]?.id;
+          if (!id) throw new Error('the folio lists no paper');
           const pr = await fetch(`/api/paper?id=${encodeURIComponent(id)}${branchParam()}`);
           if (pr.ok) {
             const p = await pr.json();
@@ -6840,10 +6843,13 @@
         const r = await fetch(`/api/folio?_=1${branchParam()}`);
         if (!r.ok) throw new Error(`${r.status}`);
         const data = await r.json();
-        const id = data.papers?.[0]?.id || 'quantum-observable-universe';
+        const id = data.papers?.[0]?.id;
+        if (!id) throw new Error('the folio lists no paper');
         await loadPaper(id);
-      } catch {
-        await loadPaper('quantum-observable-universe');
+      } catch (e) {
+        // No fallback paper: a viewer that guessed one would show the wrong
+        // folio's content as if it were this one's.
+        console.warn(`[folio] no default paper to load: ${e?.message || e}`);
       }
     }
 

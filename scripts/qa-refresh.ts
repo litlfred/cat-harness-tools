@@ -220,7 +220,9 @@ export const QA_WRITERS: readonly QaWriter[] = [
   {
     id: "docs:pages",
     run: ["docs:pages"],
-    writes: [`${R}/witnesses/**`],
+    // `*/test/results`, as for check:l1-complete: since #609 docs:pages writes each
+    // mounted instance's witnesses under that instance's own test/results/ (qaAssetDirOf).
+    writes: [`*/test/results/witnesses/**`],
     // declared-path-literal: the docs projections it regenerates beside the witnesses (bean `72a8`), measured from the 2026-10-07 restore log.
     rewrites: ["cat-harness/docs/assets/beans/*.json", "cat-harness/docs/assets/qa/*.json"],
     // Measured in smart-ra 2026-10-15: `skills:docs` reads the todo graph and exits 1 when it is unmounted.
@@ -242,6 +244,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["check:lane-documentation", "lane-documentation"],
       ["check:methodology-evidence", "methodology-evidence"],
       ["check:avatar-coverage", "avatar-coverage"],
+      ["check:unlinked-beans", "unlinked-beans"],
       ["kg:export", "kg-export"],
     ] as const
   ).map(([script, stem]): QaWriter => ({
@@ -275,7 +278,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     // runs `skills:docs`, which reads the todo graph, and check:harness-state
     // judges the issue-marks, merge-queue, session-survey, todo-feedback and
     // board-positions graphs; all of them live on state branches.
-    ...(script === "skill:register" || script === "check:harness-state" ? { readsState: true as const } : {}),
+    // check:unlinked-beans (bean `w2hn`) reads the beans graph and its workflow instances.
+    ...(script === "skill:register" || script === "check:harness-state" || script === "check:unlinked-beans" ? { readsState: true as const } : {}),
     because: "a whole-artefact review; its writer form writes the sidecar",
   })),
   {

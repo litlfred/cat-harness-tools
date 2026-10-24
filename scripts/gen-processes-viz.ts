@@ -91,6 +91,8 @@ import { processPresentations, type Presentation } from "./process-presentations
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { workflowInstanceLinks } from "./state-visualizer.ts";
+import { instancesByProcess, type InstanceLink } from "./workflow-view.ts";
 import { siteArg, sitePageAt } from "./lib/site-target.ts";
 import {
   autoDocsRowId,
@@ -669,7 +671,7 @@ const esc = (s: string): string => s.replace(/\|/g, "\\|");
  * wherever the target resolves"). Empty by default, so a caller that has not
  * looked renders every skill as code, as this table did before.
  */
-export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string> = new Set()): string {
+export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string> = new Set(), instances: InstancesRead = NO_INSTANCES): string {
   const ok = rows.filter((r) => r.loadError === undefined);
   const broken = rows.filter((r) => r.loadError !== undefined);
   const byGroup = new Map<string, number>();
@@ -713,13 +715,23 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
       "45 of 62 were in that state before these pages existed (bean `ooq3`).",
   );
   L.push("");
-  L.push("| process | steps | undocumented steps |");
-  L.push("|---|---|---|");
+  L.push(
+    "**Running instances** links each workflow instance's own page — the diagram with its token, its " +
+      "stuck states, its beans and todos — for every instance running this process or calling it as a " +
+      "subprocess. Links and counts only: where an instance IS lives in its file under `beans/workflows/`.",
+  );
+  L.push("");
+  L.push("| process | steps | undocumented steps | running instances |");
+  L.push("|---|---|---|---|");
   for (const r of ok) {
     const undoc = r.steps.filter((st) => !st.documentation).length;
-    L.push(`| [${esc(r.name)}](${r.stem}.html) | ${r.activities} | ${undoc || "—"} |`);
+    L.push(`| [${esc(r.name)}](${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id)} |`);
   }
   L.push("");
+  if (instances.unread.length > 0) {
+    L.push(`Instances of ${instances.unread.map((x) => `\`${x}\``).join(", ")} could not be read in this build, so "none recorded" above does not cover them.`);
+    L.push("");
+  }
 
   L.push("## What runs this skill?");
   L.push("");
@@ -856,6 +868,37 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   return `${L.join("\n")}\n`;
 }
 
+/** The workflow instances a page links, by process id, and the stores that could not be read. */
+export interface InstancesRead {
+  byProcess: ReadonlyMap<string, readonly InstanceLink[]>;
+  unread: readonly string[];
+}
+
+export const NO_INSTANCES: InstancesRead = { byProcess: new Map(), unread: [] };
+
+/** The instance links, as {@link page} and {@link processPage} take them. */
+export function instancesRead(read: { links: readonly InstanceLink[]; unread: readonly string[] }): InstancesRead {
+  return { byProcess: instancesByProcess(read.links), unread: read.unread };
+}
+
+/**
+ * The instances running process `id` (itself, or as a subprocess), as links
+ * to their pages: the not-completed ones first, the finished ones counted
+ * after. Each href is the site root ({@link up}) and the declared route the
+ * instance page is drawn at — never a hand-written chain of `../`.
+ */
+export function instancesCell(instances: InstancesRead, id: string, root: string = up()): string {
+  const all = instances.byProcess.get(id) ?? [];
+  if (all.length === 0) return "none recorded";
+  const link = (l: InstanceLink): string => `[\`${esc(l.id)}\`](${root}${l.route})`;
+  const running = all.filter((l) => l.status !== "completed");
+  const finished = all.filter((l) => l.status === "completed");
+  return [
+    running.length > 0 ? running.map(link).join(", ") : "none running",
+    ...(finished.length > 0 ? [`${finished.length} finished: ${finished.map(link).join(", ")}`] : []),
+  ].join("; ");
+}
+
 /**
  * One page per process — the surface `process-diagram-published` asks for.
  *
@@ -878,6 +921,7 @@ export function processPage(
   rows: readonly ProcessRow[],
   skillPages: ReadonlySet<string>,
   presentedOn: readonly Presentation[] = [],
+  instances: InstancesRead = NO_INSTANCES,
 ): string {
   const byId = new Map(rows.map((r) => [r.id, r]));
   const skill = (s: string): string =>
@@ -969,6 +1013,7 @@ export function processPage(
     }`,
   );
   if (skillPages.has(row.stem)) L.push(`- **Skill:** ${skill(row.stem)}`);
+  L.push(`- **Running instances:** ${instancesCell(instances, row.id)}`);
   L.push("");
 
   L.push("## Lanes — who acts");
@@ -1061,8 +1106,11 @@ export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
   skillPages: ReadonlySet<string> = skillPagesOf(repo),
+  // Read by default, as `skillPages` is: the committed instances are an input
+  // of the page, so a caller that omits them gets the page the generator writes.
+  instances: InstancesRead = instancesRead(workflowInstanceLinks()),
 ): string {
-  return withRenderedByFrontMatter(page(rows, skillPages), VIEWER_TOOL);
+  return withRenderedByFrontMatter(page(rows, skillPages, instances), VIEWER_TOOL);
 }
 
 if (import.meta.main) {
@@ -1085,7 +1133,10 @@ if (import.meta.main) {
     process.exit(1);
   }
   const skillPages = skillPagesOf(REPO);
-  const html = publishedIndex(rows, REPO, skillPages);
+  // The workflow instances each diagram runs in (bean `v49e`): links to their
+  // pages, read from the committed instance files the state visualiser draws.
+  const instances = instancesRead(workflowInstanceLinks());
+  const html = publishedIndex(rows, REPO, skillPages, instances);
   // Which page sections present each diagram, keyed repository-relative so it
   // matches `row.file` — a page spells its source relative to its OWN instance.
   const presented = new Map<string, Presentation[]>();
@@ -1098,7 +1149,7 @@ if (import.meta.main) {
   const pages = new Map<string, string>([[out, html]]);
   const ctx = panelContext(REPO, skillPages);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
-    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file)));
+    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances));
     // The ⓘ panel's data, fetched by the page only when a marker is opened.
     if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx), null, 1)}\n`);
   }

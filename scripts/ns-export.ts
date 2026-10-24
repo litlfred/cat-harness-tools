@@ -704,6 +704,7 @@ if (import.meta.main) {
   mkdirSync(dirname(out!), { recursive: true });
   writeFileSync(out!, `${JSON.stringify(doc, null, 2)}\n`);
   if (outDir) {
+    // declared-path-literal: `ns` is an output FILE name here (the extensionless namespace document under the site's outDir), not the `ns/` directory.
     writeFileSync(join(outDir, "ns"), `${JSON.stringify(doc, null, 2)}\n`);
     writeFileSync(join(outDir, "ns.json"), `${JSON.stringify(doc, null, 2)}\n`);
   }

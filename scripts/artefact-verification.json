@@ -148,6 +148,7 @@
     "ingest:ig:check": "NOT YET ASSESSED — seeded by --write-baseline so the gate fails on a NEW artefact kind rather than on the backlog. Replace with what verifies this artefact for its consumer, or with the reason nothing does."
   },
   "unchecked": {
-    "cat-harness-tools/scripts/lsi.ts": "Its `check` SUBCOMMAND (`lsi:skills:check`) verifies the index, which is a different artefact; the `lsi-need-an-index.qa-results.json` sidecar is written by the `audit` subcommand (`lsi:audit`) on every run and compared by nothing, so a stale copy surfaces only as `bun run cat gates`'s tree guard. Assessed in bean v556 only this far."
+    "cat-harness-tools/scripts/lsi.ts": "Its `check` SUBCOMMAND (`lsi:skills:check`) verifies the index, which is a different artefact; the `lsi-need-an-index.qa-results.json` sidecar is written by the `audit` subcommand (`lsi:audit`) on every run and compared by nothing, so a stale copy surfaces only as `bun run cat gates`'s tree guard. Assessed in bean v556 only this far.",
+    "cat-harness-tools/scripts/unlinked-beans.ts": "A WARNING-only report by the owner's ruling (bean `w2hn`, 2026-10-24: a bean tied to no BPMN task is \"not failure\"), so it has no judge form to run with --check: a gate over it would fail a build on a warning. Its sidecar is a derived `qa` result that `qa:refresh` regenerates (QA_WRITERS) and `qa-publish` stores on `qa-reports`; the computation is pure (`unlinkedReport`) and covered by `scripts/tests/unlinked-beans.test.ts`."
   }
 }
