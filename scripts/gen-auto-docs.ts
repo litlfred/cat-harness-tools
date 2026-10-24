@@ -90,6 +90,7 @@ import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import {
   findDeclarationFile,
   instanceRootsIn,
+  isExemptFrom,
   readDeclaration,
   repoRootFor,
   resolveDirectories,
@@ -509,11 +510,29 @@ function bpmnishFiles(ext: string, nameRe: RegExp): AutoDocItem[] {
   return dedupeByPath(items);
 }
 
+function skillsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; path: string }> {
+  const out = new Map<string, { id: string; absPath: string; path: string }>();
+  for (const d of declaredDirectories("skills")) out.set(d.absPath, d);
+  for (const instance of instanceRootsIn(REPO)) {
+    const decl = readDeclaration(instance);
+    if (!decl || isExemptFrom(decl, "visualiser")) continue;
+    for (const e of decl.directories ?? []) {
+      if (!e.id || !e.path || e.scope === "repository") continue;
+      if (!(e.graphTypologies ?? []).includes("skills")) continue;
+      const absPath = join(instance, e.path);
+      if (!existsSync(absPath) || out.has(absPath)) continue;
+      out.set(absPath, { id: e.id, absPath, path: relative(REPO, absPath).split("\\").join("/") });
+    }
+  }
+  return [...out.values()].sort((a, b) => a.id.localeCompare(b.id, "en"));
+}
+
 export const TYPES: AutoDocType[] = [
   {
     id: "index/skills",
     title: "Skills",
     graph: "skills",
+    directories: skillsDirectoriesAcrossInstances,
     extracts: "every skill markdown file, with the description it declares in its own front matter",
     collect(): AutoDocItem[] {
       // `skillMdDirs()`, NOT a recursive walk of the declared directories.
@@ -527,21 +546,29 @@ export const TYPES: AutoDocType[] = [
       // whatever is under them, so this asks the same function rather than
       // re-deriving the rule and disagreeing by seven.
       const items: AutoDocItem[] = [];
-      for (const parts of skillMdDirs(ROOT, corpusScopeFor(ROOT))) {
-        const dir = join(ROOT, ...parts);
-        if (!existsSync(dir)) continue;
-        for (const f of readdirSync(dir)) {
-          if (!f.endsWith(".md")) continue;
-          const abs = join(dir, f);
-          // Per FILE, not per directory: admitting a package says the
-          // directory holds skills, never that everything in it is one.
-          if (!isSkillMd(abs)) continue;
-          const desc = frontMatterDescription(readFileSync(abs, "utf-8"));
-          items.push({
-            path: relative(REPO, abs).split("\\").join("/"),
-            name: basename(f, ".md"),
-            summary: desc ? firstSentence(desc) : undefined,
-          });
+      const roots: Array<[string, string[][]]> = [[ROOT, skillMdDirs(ROOT, corpusScopeFor(ROOT))]];
+      for (const instance of instanceRootsIn(REPO)) {
+        const decl = readDeclaration(instance);
+        if (!decl || isExemptFrom(decl, "visualiser")) continue;
+        roots.push([instance, skillMdDirs(instance, "instance")]);
+      }
+      for (const [base, dirs] of roots) {
+        for (const parts of dirs) {
+          const dir = join(base, ...parts);
+          if (!existsSync(dir)) continue;
+          for (const f of readdirSync(dir)) {
+            if (!f.endsWith(".md")) continue;
+            const abs = join(dir, f);
+            // Per FILE, not per directory: admitting a package says the
+            // directory holds skills, never that everything in it is one.
+            if (!isSkillMd(abs)) continue;
+            const desc = frontMatterDescription(readFileSync(abs, "utf-8"));
+            items.push({
+              path: relative(REPO, abs).split("\\").join("/"),
+              name: basename(f, ".md"),
+              summary: desc ? firstSentence(desc) : undefined,
+            });
+          }
         }
       }
       return dedupeByPath(items);
