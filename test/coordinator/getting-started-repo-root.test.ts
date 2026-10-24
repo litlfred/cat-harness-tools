@@ -1,6 +1,6 @@
 /**
  * The Pages-address check of THIS repository's configuration, moved here from
- * `cat-harness/scripts/tests/getting-started.test.ts` (owner, 2026-10-06:
+ * `cat-harness-tools/scripts/tests/conduct/getting-started.test.ts` (owner, 2026-10-06:
  * "Throwaway repository, plus moving the real-repo checks"). It expects this
  * checkout's `origin` to derive `https://litlfred.github.io/folio-assistant/`,
  * which is a fact about this repository rather than about the derivation:
