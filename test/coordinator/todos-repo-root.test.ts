@@ -28,6 +28,26 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { workflowFiles } from "../../scripts/known-skills.js";
 import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 
+/**
+ * The checkout's diagrams as the real parser reads them — each one's process id
+ * and the processes it calls, in `processDiagrams` order — loaded ONCE at module
+ * scope for the two published-hierarchy tests below.
+ *
+ * Bean `sff8`. Each of those tests walked the whole corpus through
+ * `loadProcessModel` for the same answer, two corpus passes charged one apiece
+ * to a 5000 ms budget. Only the derived ids and edges are kept, never a model.
+ */
+const CORPUS: ReadonlyArray<{ id: string; calls: string[] }> = await (async () => {
+  const out: Array<{ id: string; calls: string[] }> = [];
+  for (const f of processDiagrams(workflowFiles(ROOT, "checkout"))) {
+    const m = await loadProcessModel(f);
+    const calls = new Set<string>();
+    for (const n of m.nodes.values()) if (n.calledElement) calls.add(n.calledElement);
+    out.push({ id: m.id, calls: [...calls].sort() });
+  }
+  return out;
+})();
+
 describe("the declaration and the directory agree", () => {
   test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {
     // It was the ROOT instance's from placement PR0 (bean `ejye`): `todos/`
@@ -136,7 +156,7 @@ describe("the published process hierarchy", () => {
       readFileSync(INDEX, "utf8"),
     ) as { processes: Record<string, string[]>; items: Array<{ tags: { processes: string[] } }> };
 
-  test("no PHANTOM edge — the real parser is the oracle for the generator's regex", async () => {
+  test("no PHANTOM edge — the real parser is the oracle for the generator's regex", () => {
     // The reverse of the test above, and it was failing silently.
     // `processHierarchy()` matched `/calledElement="([^"]+)"/g` over the WHOLE
     // XML, so `upstream-version-adoption.bpmn` — which documents itself with
@@ -154,12 +174,7 @@ describe("the published process hierarchy", () => {
     // real parser: it is async and pulls in bpmn-moddle, which is exactly why
     // the GENERATOR does not use it and why a test can.
     const expected: Record<string, string[]> = {};
-    for (const f of processDiagrams(workflowFiles(ROOT, "checkout"))) {
-      const m = await loadProcessModel(f);
-      const calls = new Set<string>();
-      for (const n of m.nodes.values()) if (n.calledElement) calls.add(n.calledElement);
-      expected[m.id] = [...calls].sort();
-    }
+    for (const { id, calls } of CORPUS) expected[id] = calls;
     const published = index().processes;
     // Compared as whole objects rather than key by key: a diff naming the
     // process and both edge lists is what makes a failure here readable, and
@@ -167,7 +182,7 @@ describe("the published process hierarchy", () => {
     expect(published).toEqual(expected);
   });
 
-  test("the key order is the diagrams' sorted FILENAMES, not the directory's own order", async () => {
+  test("the key order is the diagrams' sorted FILENAMES, not the directory's own order", () => {
     // Reproducibility, and it is not theoretical. `processHierarchy` builds
     // this object by walking `processes/`, and `readdirSync` under Bun
     // returns RAW directory order — on ext4, a hash of each filename against
@@ -199,9 +214,7 @@ describe("the published process hierarchy", () => {
     // so `Process_Translation` was missing from BOTH sides and the assertion
     // passed over a hole. Deriving from the same SOURCE is the rule; deriving
     // from the same IMPLEMENTATION is how a test blesses a bug.
-    const bpmn = processDiagrams(workflowFiles(ROOT, "checkout"));
-    const expected: string[] = [];
-    for (const f of bpmn) expected.push((await loadProcessModel(f)).id);
+    const expected: string[] = CORPUS.map((d) => d.id);
     expect(expected.length).toBeGreaterThan(5);
     expect(Object.keys(index().processes)).toEqual(expected);
   });

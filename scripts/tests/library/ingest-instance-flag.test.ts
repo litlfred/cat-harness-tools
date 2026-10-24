@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { resolveInstanceRoot } from "../ingest-document.ts";
+import { resolveInstanceRoot } from "../../ingest-document.ts";
 
 function instance(name: string): string {
   const root = mkdtempSync(join(tmpdir(), "ingest-instance-"));
