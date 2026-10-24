@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { recordedUndetermined } from "../ingest-document.ts";
+import { recordedUndetermined } from "../../ingest-document.ts";
 
 describe("recordedUndetermined", () => {
   test("exit 2 with a sidecar written by THIS step is a recorded answer", () => {

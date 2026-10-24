@@ -18,9 +18,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { orphanAvatars } from "../gen-library-viz.ts";
-import { readEntryBlocks } from "../library-graph.ts";
-import { withheldReason } from "../lib/withheld.ts";
+import { orphanAvatars } from "../../gen-library-viz.ts";
+import { readEntryBlocks } from "../../library-graph.ts";
+import { withheldReason } from "../../lib/withheld.ts";
 
 /** A library root holding one entry with a prose block and a figure. */
 function plant(withheld: boolean): string {

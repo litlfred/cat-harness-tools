@@ -13,7 +13,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { libraryEntries } from "./library-dirs.ts";
+import { libraryEntries } from "../library-dirs.ts";
 
 import {
   KIND_SIDECAR,
@@ -32,9 +32,9 @@ import {
   ENTRY_DIRECTORIES,
   ENTRY_SIDECARS,
   libraryRootFor,
-} from "../check-l1-complete.ts";
-import { resolveQaLocation } from "../qa-store.ts";
-import { NARRATIVE_BEARING } from "../narratives.ts";
+} from "../../check-l1-complete.ts";
+import { resolveQaLocation } from "../../qa-store.ts";
+import { NARRATIVE_BEARING } from "../../narratives.ts";
 import {
   OCR_THRESHOLD_CHARS,
   ingestMode,
@@ -44,11 +44,11 @@ import {
   usableOutlineEntries,
   withDerivedArms,
   withKnownTitle,
-} from "../ingest-document.ts";
+} from "../../ingest-document.ts";
 import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { pathToFileURL } from "node:url";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 
 const made: string[] = [];
@@ -626,7 +626,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     expect(ingestMode(["--promote"])).toBe("promote");
     expect(ingestMode(["uploads/x.pdf", "--promote"])).toBe("promote");
     // And the arms must NOT re-run on a promote: staging already holds them.
-    const src = readFileSync(new URL("../ingest-document.ts", import.meta.url).pathname, "utf-8");
+    const src = readFileSync(new URL("../../ingest-document.ts", import.meta.url).pathname, "utf-8");
     expect(src).toContain('ingestMode(argv) === "promote" ? [] : plan.steps');
   });
 
@@ -715,7 +715,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // The whole mechanism is which directory `-o` receives. If a step is ever
     // handed the library again, the document is filed before anything can
     // refuse it and this gate becomes decoration.
-    const src = readFileSync(new URL("../ingest-document.ts", import.meta.url).pathname, "utf-8");
+    const src = readFileSync(new URL("../../ingest-document.ts", import.meta.url).pathname, "utf-8");
     // The staging LIBRARY ROOT, not the entry directory. `planFor`'s third
     // argument is what `libraryRoot()` returns, and every arm creates
     // `<lib>/<slug>/` beneath it. Passing the entry directory produced
@@ -803,7 +803,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // find, and this repository's own guard rejects a dot-prefixed segment. A
     // staging tree holding a REFUSED document is exactly what somebody comes
     // looking for.
-    const src = readFileSync(new URL("../ingest-document.ts", import.meta.url).pathname, "utf-8");
+    const src = readFileSync(new URL("../../ingest-document.ts", import.meta.url).pathname, "utf-8");
     expect(src).toContain('"ingest-staging"');
     expect(src).not.toContain('".ingest-staging"');
   });
@@ -826,7 +826,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // Without this a promoted entry failed `gen-library-jsonld --check` (37
     // stale nodes on the 2026-10-06 run) and named the staging tree's
     // instance, so the path was four commands, two of them corpus-wide.
-    const src = readFileSync(new URL("../ingest-document.ts", import.meta.url).pathname, "utf-8");
+    const src = readFileSync(new URL("../../ingest-document.ts", import.meta.url).pathname, "utf-8");
     const built = src.indexOf("buildEntryNodes(slug, staging, out)");
     expect(built).toBeGreaterThan(0);
     // Built before the copy, so an unbuildable entry is refused, not half-filed.

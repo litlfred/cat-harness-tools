@@ -20,12 +20,12 @@ import {
   titleMissing,
   usableSourceTitle,
   yearOf,
-} from "../check-library-qa.ts";
-import { readLibraryGraph, type LibraryEntry } from "../library-graph.ts";
+} from "../../check-library-qa.ts";
+import { readLibraryGraph, type LibraryEntry } from "../../library-graph.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 
-const REPO = repoRootFor(join(import.meta.dir, "..", ".."));
+const REPO = repoRootFor(join(import.meta.dir, "..", "..", ".."));
 
 /**
  * A REAL structure of the given variant, taken from the corpus and edited.
