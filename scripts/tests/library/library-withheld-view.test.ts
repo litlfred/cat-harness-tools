@@ -14,8 +14,8 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { WITHHELD_VIEW_JS } from "../lib/library-withheld-view.ts";
-import { VIEWER_JS } from "../gen-library-viz.ts";
+import { WITHHELD_VIEW_JS } from "../../lib/library-withheld-view.ts";
+import { VIEWER_JS } from "../../gen-library-viz.ts";
 
 interface View {
   blockBody(b: unknown, e: unknown): string;
