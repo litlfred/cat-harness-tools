@@ -9,7 +9,7 @@
  *
  * @module scripts/tests/bean-drain
  */
-import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -215,11 +215,17 @@ const noPulls: GitHub = {
 describe("claimCheck end to end", () => {
   // The claim commit is made as whoever runs the tool. A CI runner has no git
   // identity configured, so give the claimant one: the cloud agent.
-  const saved = { ...process.env };
-  for (const k of ["AUTHOR", "COMMITTER"]) {
-    process.env[`GIT_${k}_NAME`] = "Claude";
-    process.env[`GIT_${k}_EMAIL`] = "noreply@anthropic.com";
-  }
+  // Set in beforeAll, not in the describe body: bun runs every test file in
+  // one process and collects describe bodies up front, so an assignment here
+  // would leak into other files' tests.
+  const saved: Record<string, string | undefined> = {};
+  beforeAll(() => {
+    for (const k of ["AUTHOR", "COMMITTER"]) for (const f of ["NAME", "EMAIL"]) saved[`GIT_${k}_${f}`] = process.env[`GIT_${k}_${f}`];
+    for (const k of ["AUTHOR", "COMMITTER"]) {
+      process.env[`GIT_${k}_NAME`] = "Claude";
+      process.env[`GIT_${k}_EMAIL`] = "noreply@anthropic.com";
+    }
+  });
   afterAll(() => {
     for (const k of ["AUTHOR", "COMMITTER"]) for (const f of ["NAME", "EMAIL"]) {
       const key = `GIT_${k}_${f}`;
