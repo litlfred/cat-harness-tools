@@ -182,3 +182,44 @@ describe("wireframe fixes (qbfm)", () => {
   });
 });
 
+/**
+ * Bean `folio-assistant-tdir`: a Tool's page links its QA verdict on
+ * `qa-reports` via `qa-result-link.ts` (never `blob/main/`).
+ */
+describe("a Tool's page links its QA verdict (tdir)", () => {
+  const KEY = "main/0123456789abcdef0123456789abcdef01234567";
+  const qaCell = (md: string, toolId: string): string =>
+    md
+      .split("\n")
+      .find((l) => l.startsWith(`| <a id="${toolId}">`))!
+      .split(/(?<!\\)\|/)[6]!;
+
+  it("links every Tool row to its qa-reports verdict, never blob/main", () => {
+    const html = page(rows, skillIds(REPO));
+    expect(html).toContain("| tool | what it does | invoked | satisfies | i/o | qa |");
+    for (const r of rows) {
+      expect(r.qaHref).toBeDefined();
+      expect(r.qaHref).toContain("/blob/cat/cat-harness/qa-reports/");
+      expect(r.qaHref).not.toContain("/blob/main/");
+      expect(qaCell(html, r.id)).toContain(`(${r.qaHref})`);
+    }
+  });
+
+  it("addresses each Tool's kg-qa sidecar under the qa-reports entry key when known", () => {
+    const keyed = toolRows(tools(), REPO, { key: KEY });
+    for (const r of keyed) {
+      expect(r.qaHref).toContain(`/blob/cat/cat-harness/qa-reports/${KEY}/`);
+      expect(r.qaHref).toEndWith(`/${r.id}.kg-qa.json`);
+    }
+  });
+
+  it("renders the sidecar verdict as the link label when present, and qa-reports when not fetched locally", () => {
+    const sample = rows[0]!;
+    const withPass = [{ ...sample, qaVerdict: "pass" }];
+    const withoutLocal = [{ ...sample, qaVerdict: undefined }];
+    expect(qaCell(page(withPass, skillIds(REPO)), sample.id)).toContain(`[\`pass\`](${sample.qaHref})`);
+    expect(qaCell(page(withoutLocal, skillIds(REPO)), sample.id)).toContain(`[\`qa-reports\`](${sample.qaHref})`);
+  });
+});
+
+
