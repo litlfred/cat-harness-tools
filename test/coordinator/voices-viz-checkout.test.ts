@@ -1,6 +1,6 @@
 /**
  * `voices-viz` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/voices-viz.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/content/voices-viz.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each draws the voices folio-assistant-sci,
  * smart-base and who-iris ship, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects

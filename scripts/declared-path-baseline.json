@@ -124,7 +124,7 @@
     "scripts/tests/process/translate-bpmn-e2e.test.ts::processes/sdlc/bean-lifecycle.bpmn",
     "scripts/tests/uml-overview-orphans.test.ts::docs/uml/overview/cat-harness.md",
     "scripts/tests/uml-overview-orphans.test.ts::uml/overview/cat-harness.mmd",
-    "scripts/tests/voices-viz.test.ts::skills/authoring/authoring-core/technical-documentation.md",
+    "scripts/tests/content/voices-viz.test.ts::skills/authoring/authoring-core/technical-documentation.md",
     "src/upstream/pins.test.ts::docs/_config.yml",
     "tools/avatars-css/avatars-css.ts::schemas/avatars.ts",
     "tools/cat-harness-schema/cat-harness-schema.ts::schemas/cat-harness.ts",

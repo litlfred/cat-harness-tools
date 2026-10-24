@@ -18,8 +18,8 @@ import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
 import { list, mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
-import { MEMORY_DIRS } from "../agent-memory.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { MEMORY_DIRS } from "../../agent-memory.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

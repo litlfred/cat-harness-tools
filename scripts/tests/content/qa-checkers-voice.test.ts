@@ -25,7 +25,7 @@ import {
   checkEditorializing,
   checkScholarlyDefault,
   checkWallSide,
-} from "../../pipeline/qa-checkers-voice.ts";
+} from "../../../pipeline/qa-checkers-voice.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "qa-voice-"));
 let seq = 0;
@@ -377,7 +377,7 @@ describe("checkScholarlyDefault — a wrap continuation is not a sentence start"
 import {
   checkStatusLeak,
   checkAuthorNotesPollution,
-} from "../../pipeline/qa-checkers-voice.ts";
+} from "../../../pipeline/qa-checkers-voice.ts";
 
 const leak = (line: string) => checkStatusLeak(tmp("leak.md", line)).result;
 const notes = (line: string) => checkAuthorNotesPollution(tmp("notes.md", line)).result;

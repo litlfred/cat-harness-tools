@@ -91,6 +91,7 @@ describe("Done-when (1): path → gate map declared as data, read by gates.ts", 
     expect(isFhirIgPath("ig-ast/models.json")).toBe(true);
     expect(isFhirIgPath("other/doc.md")).toBe(false);
 
+    // declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
     expect(isKgPath("ns/content/v1.jsonld")).toBe(true);
     expect(isKgPath("schemas/node.ts")).toBe(true);
     expect(isKgPath("skills/math/skill.json")).toBe(true);
