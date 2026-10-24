@@ -11,8 +11,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { nonEntryDirs } from "../lib/library-entry-graphs.ts";
-import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { nonEntryDirs } from "../../lib/library-entry-graphs.ts";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 const roots: string[] = [];
 afterEach(() => {

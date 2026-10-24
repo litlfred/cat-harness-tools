@@ -30,7 +30,7 @@
  * is a coin toss — and says so.
  *
  *   bun run cat lsi:epics [--out <file.md>]
- *   bun run cat lsi:near "<planned bean title>" [--body "<text>"]
+ *   bun run cat lsi:near "<planned bean title>" [--body "<text>"] [--graphs blocks,lean-decl] [--root lean-decl=<dir>]
  *   bun run cat lsi:epics --method ca        # the parallel track (correspondence analysis)
  *   LSI_DUMP=<file.json> bun run cat lsi:epics  # per-bean agreement, for a PAIRED comparison
  */
@@ -43,6 +43,8 @@ import { declaredGraphs } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { buildCa } from "../pipeline/ca";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { formatNearAcross, nearAcross, parseNearAcrossArgs } from "../pipeline/lsi-near-across";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -56,9 +58,12 @@ function beanDefDirs(): string[] {
   return graph.directories.filter((d) => d.graphTypologies.includes("bean-defs")).map((d) => join(store, d.path));
 }
 /** Below this best-cosine an item fits no epic: a candidate for a NEW one. */
-const FIT_FLOOR = 0.3;
+export const FIT_FLOOR = 0.3;
 /** Best minus runner-up below this: ambiguous, a person decides. */
-const MARGIN_FLOOR = 0.05;
+export const MARGIN_FLOOR = 0.05;
+/** The index every consumer of this module builds over the beans, unless the
+ *  environment overrides it: rank 100, log-entropy, the fixed seed. */
+export const BEAN_LSI_OPTS = { k: 100, weighting: "log-entropy", seed: 1990 } as const;
 /** `--near`: a hit this close is worth reading before creating. House
  *  number, measured 2026-09-29: a REWORDED title for the known duplicate pair
  *  `3ozg`/`rmcf` scored 0.72-0.75 against both (a title is short against a
@@ -96,10 +101,19 @@ function loadBeans(): Bean[] {
   });
 }
 
-const OPEN = new Set(["todo", "in-progress", "draft"]);
+/** The statuses this module treats as open work: `draft` included, as a proposal is for work not yet started too. */
+export const OPEN: ReadonlySet<string> = new Set(["todo", "in-progress", "draft"]);
 
-function epicOf(b: Bean, byId: Map<string, Bean>): string | undefined {
-  let cur: Bean | undefined = b;
+/** What the epic chain needs of a bean: its id, its type and its `parent:`. */
+export interface EpicChainNode {
+  id: string;
+  type: string;
+  parent?: string;
+}
+
+/** The nearest epic ABOVE `b` on its `parent:` chain, or `undefined`. */
+export function epicOf<B extends EpicChainNode>(b: B, byId: ReadonlyMap<string, B>): string | undefined {
+  let cur: B | undefined = b;
   const seen = new Set<string>();
   while (cur && !seen.has(cur.id)) {
     seen.add(cur.id);
@@ -129,8 +143,35 @@ interface Item {
   lastCommit?: string;
 }
 
-function rankEpics(ix: LsiIndex, v: Float64Array, cents: Map<string, Float64Array>) {
+export function rankEpics(ix: LsiIndex, v: Float64Array, cents: Map<string, Float64Array>) {
   return [...cents].map(([e, c]) => ({ epic: e, cosine: cosineVectors(v, c) })).sort((a, b) => b.cosine - a.cosine);
+}
+
+/**
+ * Each open epic's members: the epic itself and every bean whose chain
+ * reaches it. The classes the latent evidence ranks a bean against.
+ */
+export function epicMembers<B extends EpicChainNode & { status: string }>(beans: readonly B[]): Map<string, string[]> {
+  const byId = new Map(beans.map((b) => [b.id, b]));
+  const members = new Map<string, string[]>(beans.filter((b) => b.type === "epic" && OPEN.has(b.status)).map((e) => [e.id, [e.id]]));
+  for (const b of beans) {
+    const e = epicOf(b, byId);
+    if (e && members.has(e)) members.get(e)!.push(b.id);
+  }
+  return members;
+}
+
+/**
+ * One bean's epics, best first, by cosine to each epic's centroid with the
+ * bean itself left OUT of every centroid — a bean already filed under an
+ * epic would otherwise vote for its own home.
+ */
+export function rankEpicsForBean(ix: LsiIndex, members: ReadonlyMap<string, readonly string[]>, id: string): Array<{ epic: string; cosine: number }> {
+  const v = unitVector(ix, id);
+  if (!v) return [];
+  const cents = new Map<string, Float64Array>();
+  for (const [e, ids] of members) cents.set(e, centroid(ix, ids.filter((i) => i !== id)));
+  return rankEpics(ix, v, cents);
 }
 
 if (import.meta.main) {
@@ -155,17 +196,13 @@ if (import.meta.main) {
   const methodIdx = process.argv.indexOf("--method");
   const method = methodIdx > 0 ? process.argv[methodIdx + 1] : "lsi";
   const unitsIn = beans.map((b) => ({ id: b.id, text: b.text }));
-  const kOpt = Number(process.env.LSI_K ?? 100);
+  const kOpt = Number(process.env.LSI_K ?? BEAN_LSI_OPTS.k);
   const ix =
     method === "ca"
       ? buildCa(unitsIn, { k: kOpt, alpha: Number(process.env.CA_ALPHA ?? 1), weighting: (process.env.LSI_W as "raw" | "tfidf" | "log-entropy") ?? "raw", seed: 1990 })
-      : buildLsi(unitsIn, { k: kOpt, weighting: (process.env.LSI_W as "raw" | "tfidf" | "log-entropy") ?? "log-entropy", seed: 1990 });
+      : buildLsi(unitsIn, { k: kOpt, weighting: (process.env.LSI_W as "raw" | "tfidf" | "log-entropy") ?? BEAN_LSI_OPTS.weighting, seed: BEAN_LSI_OPTS.seed });
 
-  const members = new Map<string, string[]>(epics.map((e) => [e.id, [e.id]]));
-  for (const b of beans) {
-    const e = epicOf(b, byId);
-    if (e && members.has(e)) members.get(e)!.push(b.id);
-  }
+  const members = epicMembers(beans);
 
   // ── `--near "<title>"`: the semantic half of check-before-create ──
   //
@@ -183,20 +220,30 @@ if (import.meta.main) {
     const v = foldIn(ix, text);
     if (v.every((x) => x === 0)) {
       console.log(`no term of ${JSON.stringify(title)} is in the bean vocabulary — nothing to compare (this is not "no duplicate")`);
-      process.exit(0);
+    } else {
+      const hits = ix.unitIds
+        .map((id) => ({ b: byId.get(id)!, cos: cosineVectors(v, unitVector(ix, id)!) }))
+        .sort((a, b) => b.cos - a.cos)
+        .slice(0, Number(process.env.LSI_NEAR_TOP ?? 5));
+      console.log(`nearest beans to ${JSON.stringify(title)} (latent cosine; READ any >= ${NEAR_READ} before creating):`);
+      for (const { b, cos } of hits)
+        console.log(`  ${cos.toFixed(2)}${cos >= NEAR_READ ? " ←" : "  "} ${b.short.padEnd(5)} ${b.status.padEnd(11)} ${b.type.padEnd(8)} ${b.title.slice(0, 90)}`);
+      const cents = new Map<string, Float64Array>();
+      for (const [e, ids] of members) cents.set(e, centroid(ix, ids));
+      const [best, second] = rankEpics(ix, v, cents);
+      const tag = best.cosine < FIT_FLOOR ? "no epic fits — a new one?" : best.cosine - second.cosine < MARGIN_FLOOR ? `ambiguous vs ${second.epic.replace(/^folio-assistant-/, "")}` : "";
+      console.log(`closest epic: ${best.epic.replace(/^folio-assistant-/, "")} ${byId.get(best.epic)!.title.split(":")[0]} (${best.cosine.toFixed(2)}) ${tag}`);
     }
-    const hits = ix.unitIds
-      .map((id) => ({ b: byId.get(id)!, cos: cosineVectors(v, unitVector(ix, id)!) }))
-      .sort((a, b) => b.cos - a.cos)
-      .slice(0, Number(process.env.LSI_NEAR_TOP ?? 5));
-    console.log(`nearest beans to ${JSON.stringify(title)} (latent cosine; READ any >= ${NEAR_READ} before creating):`);
-    for (const { b, cos } of hits)
-      console.log(`  ${cos.toFixed(2)}${cos >= NEAR_READ ? " ←" : "  "} ${b.short.padEnd(5)} ${b.status.padEnd(11)} ${b.type.padEnd(8)} ${b.title.slice(0, 90)}`);
-    const cents = new Map<string, Float64Array>();
-    for (const [e, ids] of members) cents.set(e, centroid(ix, ids));
-    const [best, second] = rankEpics(ix, v, cents);
-    const tag = best.cosine < FIT_FLOOR ? "no epic fits — a new one?" : best.cosine - second.cosine < MARGIN_FLOOR ? `ambiguous vs ${second.epic.replace(/^folio-assistant-/, "")}` : "";
-    console.log(`closest epic: ${best.epic.replace(/^folio-assistant-/, "")} ${byId.get(best.epic)!.title.split(":")[0]} (${best.cosine.toFixed(2)}) ${tag}`);
+    // ── The other declared graphs (bean `ec2a` step 3, owner decision A) ──
+    // One list per graph, each scored in its own space, never merged with the
+    // beans above or with each other. `--graphs` limits them; `beans` in that
+    // list means the list above, which always prints.
+    const { graphs, roots } = parseNearAcrossArgs(process.argv.slice(2));
+    const others = graphs?.filter((g) => g !== "beans");
+    if (others === undefined || others.length > 0) {
+      const { results, problems } = await nearAcross(text, { checkoutRoot: repoRootFor(HARNESS_ROOT), ...(others ? { graphs: others } : {}), roots, top: Number(process.env.LSI_NEAR_TOP ?? 5) });
+      for (const line of formatNearAcross(results, problems)) console.log(line);
+    }
     process.exit(0);
   }
 
@@ -233,9 +280,8 @@ if (import.meta.main) {
   const rows = items.map((it) => {
     const self = it.kind === "bean" ? byShort.get(it.key)!.id : undefined;
     const cents = new Map<string, Float64Array>();
-    for (const [e, ids] of members) cents.set(e, centroid(ix, ids.filter((i) => i !== self)));
-    const v = self ? unitVector(ix, self)! : foldIn(ix, it.text);
-    const ranked = rankEpics(ix, v, cents);
+    if (!self) for (const [e, ids] of members) cents.set(e, centroid(ix, ids));
+    const ranked = self ? rankEpicsForBean(ix, members, self) : rankEpics(ix, foldIn(ix, it.text), cents);
     const [best, second] = ranked;
     const toExplicit = it.explicit ? ranked.find((r) => r.epic === it.explicit)?.cosine : undefined;
     return { ...it, best, second, margin: best.cosine - (second?.cosine ?? 0), toExplicit };

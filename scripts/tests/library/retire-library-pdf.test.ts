@@ -12,9 +12,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDocumentNodes } from "../../pipeline/gen-library-jsonld.ts";
+import { buildDocumentNodes } from "../../../pipeline/gen-library-jsonld.ts";
 
-const SCRIPT = join(new URL("..", import.meta.url).pathname, "retire-library-pdf.py");
+const SCRIPT = join(new URL("../..", import.meta.url).pathname, "retire-library-pdf.py");
 const made: string[] = [];
 afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });

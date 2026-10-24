@@ -20,7 +20,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // The site root is `siteDirFor`'s ANSWER, never the literal `docs` —
 // `site-dir-single-answer` refuses a hardcoded one, and it caught this file
