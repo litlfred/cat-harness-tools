@@ -163,8 +163,11 @@ export const PAGE_SIZE = 4096;
  * REPORTED by a build, not gated: the beans slice grows with every session,
  * and a gate would turn every open PR red the day it crossed the line, for a
  * change nobody made. The measurement in the manifest is what a person reads.
+ * Raised from 5 MB to 10 MB by the owner on 2026-10-24 ("Raise to 10 MB"),
+ * when the whole-repo KG slice reached 8.3 MB (issue #733). Shrinking that
+ * slice is bean `0exf`.
  */
-export const SIZE_BUDGET_BYTES = 5 * 1024 * 1024;
+export const SIZE_BUDGET_BYTES = 10 * 1024 * 1024;
 
 /** The repository root a source `file` is relative to. */
 export const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
