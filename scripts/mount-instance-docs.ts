@@ -228,6 +228,12 @@ export interface Mountable {
  * and the sibling keeps the kind route. With no same-kind sibling nothing
  * changes — a lone root still publishes at both routes.
  *
+ * **Same-kind siblings that keep the kind route get a route each.** Left
+ * over after that yield, two or more directories of one kind would all claim
+ * `/<kind>/<instance>/`. Each is published at `/<kind>/<instance>/<dir>/`
+ * instead, named by its own directory, and nothing answers at the shared
+ * route.
+ *
  * With several renderable kinds and none marked, the root is returned as
  * UNDETERMINED. The deterministic order still picks one, because a site has to
  * serve something at that URL — but the caller reports that nobody chose it,
@@ -266,8 +272,18 @@ export function withRoutes<T extends Mountable>(
   // declares the same kind — see the rule above.
   const yieldsKindRoute = (m: T): boolean =>
     m.instanceRoot && found.some((o) => o !== m && o.name === m.name && o.kind === m.kind && !o.instanceRoot);
+  // Several directories of one instance that still share a kind route after
+  // the yield above would all claim `/<kind>/<instance>/`, and the walk
+  // refuses every one but the first. Each then takes its own sub-route,
+  // `/<kind>/<instance>/<directory>/`, and none takes the shared one: picking
+  // one would be the alphabet choosing again. (cat-harness-tools#681 declared
+  // `ui/` and `viewer/` beside `id-lookup/`, all `code`, and every site that
+  // mounted cat-harness-tools stopped publishing.)
+  const sharesKindRoute = (m: T): boolean =>
+    found.filter((o) => o.name === m.name && o.kind === m.kind && !yieldsKindRoute(o)).length > 1;
+  const kindRoute = (m: T): string => (sharesKindRoute(m) ? `${m.kind}/${m.name}/${posix.basename(m.dir.split(sep).join("/"))}` : `${m.kind}/${m.name}`);
   const candidates = found.flatMap((m) => {
-    const byKind = yieldsKindRoute(m) ? [] : [{ ...m, route: `${m.kind}/${m.name}` }];
+    const byKind = yieldsKindRoute(m) ? [] : [{ ...m, route: kindRoute(m) }];
     if (rooted.has(m.name) || rootTaken.has(m.name)) return byKind;
     // A declared root waits for its own entry rather than letting whichever
     // kind comes first claim the route.

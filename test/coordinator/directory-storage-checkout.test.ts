@@ -1,6 +1,6 @@
 /**
  * `directory-storage` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/directory-storage.test.ts` (bean `7zz1`, owner
+ * `cat-harness-tools/scripts/tests/kg/directory-storage.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the aggregate root's
  * `.gitignore` and asks git at the checkout root, which only the checkout
  * holds. Standing alone, cat-harness has none of it, and
