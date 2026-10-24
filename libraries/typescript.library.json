@@ -19,6 +19,6 @@
     "scripts/check-test-budgets.ts",
     "scripts/libraries.ts",
     "scripts/schema-graph.ts",
-    "scripts/tests/viewer-script.test.ts"
+    "scripts/tests/ui/viewer-script.test.ts"
   ]
 }

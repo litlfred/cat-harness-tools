@@ -26,7 +26,7 @@
     "scripts/state-visualizer.ts",
     "scripts/test-run-conformance.ts",
     "scripts/tests/block-base-fields.test.ts",
-    "scripts/tests/gen-node-kind-pages.test.ts",
+    "scripts/tests/ui/gen-node-kind-pages.test.ts",
     "scripts/validate-skills.ts",
     "src/issue-watch/seen-comments.ts",
     "src/mcp/project.ts",
