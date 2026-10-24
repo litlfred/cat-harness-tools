@@ -164,6 +164,7 @@ import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type 
 import { subgraphIri } from "./subgraph-node.js";
 import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
 import { placedOut, siteRootOf } from "./lib/moved-document.ts";
+import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -1199,7 +1200,8 @@ function collectSkills(
     if (isExternalContract(ref)) return ref;
     if (resolve(instanceRoot) !== own) return publishedContract(instanceRoot, ref);
     const m = new RegExp(`^${SKILL_IO_DIR}/([^/]+)/(input|output)\\.schema\\.json$`).exec(ref);
-    return m ? skillIoIri(base, m[1]!, m[2]!) : undefined;
+    // Under the host's own directory, where `harness-schema-export` writes it (#676).
+    return m ? skillIoIri(hostSchemaBase(base), m[1]!, m[2]!) : undefined;
   };
   for (const c of skillContracts(root, scope).values()) {
     const s = get(c.skill);

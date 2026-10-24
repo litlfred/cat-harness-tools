@@ -31,7 +31,7 @@ if (import.meta.main && process.argv.includes("--all")) {
   // the same reason as below.
   const r = await resolveIdentities({ env: process.env, cwd: process.cwd() });
   if (process.argv.includes("--json")) {
-    console.log(JSON.stringify({ identities: r.identities, userConfig: r.userConfig.state, notes: r.notes }, null, 2));
+    console.log(JSON.stringify({ identities: r.identities, hosts: r.hosts, userConfig: r.userConfig.state, notes: r.notes }, null, 2));
   } else {
     for (const k of matchKeys(r.identities)) console.log(k);
   }

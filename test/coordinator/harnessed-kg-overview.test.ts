@@ -91,17 +91,16 @@ describe("living deck: every claim about the KG still holds", () => {
   // generator and the DAK vocabulary (bean 1335). Core no longer imports
   // either, so a core test asserting them would be core importing a harness.
 
-  test("slide 4 — the ingested SMART Base index still holds 25 StructureDefinition pages", () => {
-    const ids = new Set<string>();
-    const walk = (d: string) => {
-      for (const e of readdirSync(d, { withFileTypes: true })) {
-        const p = join(d, e.name);
-        if (e.isDirectory()) walk(p);
-        else for (const m of read(p).matchAll(/"StructureDefinition-[A-Za-z]*/g)) ids.add(m[0]);
-      }
+  // The index is built from SMART Base's source at publish (fhir-harness#124),
+  // not ingested once from the published site, so it holds the logical models
+  // the source has now. The slide's 25 are the published set of 2026-09-30;
+  // the claim that still holds is that the index carries at least those.
+  test("slide 4 — the SMART Base index holds at least the 25 logical models the slide shows", () => {
+    const ix = JSON.parse(read(join(REPO, "smart-base/fhir-artifact-index/index.json"))) as {
+      artifacts: { resourceType: string; category?: string }[];
     };
-    walk(join(REPO, "smart-base/fhir-artifact-index"));
-    expect(ids.size).toBe(25);
+    const models = ix.artifacts.filter((a) => a.resourceType === "StructureDefinition" && a.category === "Structures: Logical Models");
+    expect(models.length).toBeGreaterThanOrEqual(25);
   });
 
   test("slide 10 — the taxonomy still uses smart-kg as its example, and says it is its own repository", () => {

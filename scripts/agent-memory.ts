@@ -760,7 +760,8 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
     scope: "repo-wide",
     delivery: "marked-region",
     budget: { unit: "bytes", limit: AGENTS_MD_BYTE_BUDGET },
-  },  {
+  },
+  {
     id: "gemini-agent",
     vendor: "Gemini CLI",
     pathPattern: ".gemini/agents/<agent>.md",
@@ -805,9 +806,8 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
  *
  * Antigravity has no per-agent memory like Claude's `memory: project`, so each
  * agent's memory is published as one skill the agent model sees by name and
- * description and reads when relevant. The owner's ruling (2026-10-06): this
- * vendor is implemented; Gemini CLI, Copilot, Codex and Cursor are beaned
- * (`31ni`) and not.
+ * description and reads when relevant. Gemini CLI, Copilot, Codex and Cursor
+ * get per-agent definition files instead (`agent-memory-vendors.ts`, bean `31ni`).
  */
 export const ANTIGRAVITY_SKILLS_DIR = join(repoRootFor(ROOT), ".agents", "skills");
 
