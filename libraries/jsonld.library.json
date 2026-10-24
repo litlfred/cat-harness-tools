@@ -22,9 +22,9 @@
     "scripts/publish-verify.ts",
     "scripts/tests/gen-subgraph-jsonld.test.ts",
     "scripts/tests/kg-export.test.ts",
-    "scripts/tests/publish-verify.test.ts",
+    "scripts/tests/kg/vocab-mapping-apply.test.ts",
+    "scripts/tests/sdlc/publish-verify.test.ts",
     "scripts/tests/todo-graph.test.ts",
-    "scripts/tests/vocab-mapping-apply.test.ts",
     "test/coordinator/prov-jsonld-checkout.test.ts"
   ]
 }
