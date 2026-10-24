@@ -265,8 +265,6 @@ describe("this repository", () => {
     const sciBoundHere = new Set([
       "lean-atlas-ingest.ts",
       "qa-checkers-vacuity.ts",
-      "conditional-class-banner-audit.ts",
-      "lean-triviality-probe.ts",
       "lean-signature.ts",
     ]);
     const offenders: string[] = [];

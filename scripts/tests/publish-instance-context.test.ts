@@ -124,7 +124,9 @@ function fakeApi(routes: Array<[string, { status: number; json?: unknown }]>) {
 }
 
 const CTX = '{\n  "@context": {}\n}\n';
-const PATH = "/repos/o/r/contents/ns/context/v1.jsonld";
+// declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
+const CTX_PATH = "ns/context/v1.jsonld";
+const PATH = `/repos/o/r/contents/${CTX_PATH}`;
 const b64 = (s: string) => Buffer.from(s).toString("base64");
 
 describe("publish", () => {
@@ -133,7 +135,7 @@ describe("publish", () => {
       ["GET /repos/o/r/branches/gh-pages", { status: 200 }],
       [`GET ${PATH}?ref=gh-pages`, { status: 200, json: { sha: "s1", encoding: "base64", content: b64(CTX) } }],
     ]);
-    expect((await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX })).kind).toBe("unchanged");
+    expect((await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX })).kind).toBe("unchanged");
     expect(calls.some((c) => c.method !== "GET")).toBe(false);
   });
 
@@ -143,7 +145,7 @@ describe("publish", () => {
       [`GET ${PATH}?ref=gh-pages`, { status: 200, json: { sha: "s1", encoding: "base64", content: b64("old") } }],
       [`PUT ${PATH}`, { status: 200 }],
     ]);
-    const out = await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX, sha: "abcdef0123456789" });
+    const out = await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX, sha: "abcdef0123456789" });
     expect(out.kind).toBe("updated");
     const body = calls.at(-1)!.body as Record<string, string>;
     expect(body).toMatchObject({ branch: "gh-pages", sha: "s1", content: b64(CTX) });
@@ -156,7 +158,7 @@ describe("publish", () => {
       [`GET ${PATH}?ref=gh-pages`, { status: 404 }],
       [`PUT ${PATH}`, { status: 201 }],
     ]);
-    expect((await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX })).kind).toBe("updated");
+    expect((await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX })).kind).toBe("updated");
     expect((calls.at(-1)!.body as Record<string, unknown>).sha).toBeUndefined();
   });
 
@@ -168,7 +170,7 @@ describe("publish", () => {
       [`GET ${PATH}?ref=gh-pages`, { status: 200, json: { sha: "s2", encoding: "base64", content: b64("older") } }],
       [`PUT ${PATH}`, { status: 200 }],
     ]);
-    expect((await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX })).kind).toBe("updated");
+    expect((await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX })).kind).toBe("updated");
   });
 
   test("an absent gh-pages becomes an orphan branch with .nojekyll, the context and the placeholder index", async () => {
@@ -178,10 +180,10 @@ describe("publish", () => {
       ["POST /repos/o/r/git/commits", { status: 201, json: { sha: "c1c1c1c1" } }],
       ["POST /repos/o/r/git/refs", { status: 201 }],
     ]);
-    const out = await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX });
+    const out = await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX });
     expect(out.kind).toBe("created-branch");
     const tree = (calls[1]!.body as { tree: Array<{ path: string; content: string }> }).tree;
-    expect(Object.fromEntries(tree.map((e) => [e.path, e.content]))).toEqual({ ".nojekyll": "", "index.html": PLACEHOLDER_HTML, "ns/context/v1.jsonld": CTX });
+    expect(Object.fromEntries(tree.map((e) => [e.path, e.content]))).toEqual({ ".nojekyll": "", "index.html": PLACEHOLDER_HTML, [CTX_PATH]: CTX });
     expect((calls[2]!.body as { parents: unknown[] }).parents).toEqual([]);
     expect(calls[3]!.body).toEqual({ ref: "refs/heads/gh-pages", sha: "c1c1c1c1" });
   });
@@ -195,12 +197,12 @@ describe("publish", () => {
       [`GET ${PATH}?ref=gh-pages`, { status: 404 }],
       [`PUT ${PATH}`, { status: 201 }],
     ]);
-    expect((await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX })).kind).toBe("updated");
+    expect((await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX })).kind).toBe("updated");
   });
 
   test("a failed read of the branch is a failure, never a guess", async () => {
     const { api } = fakeApi([["GET /repos/o/r/branches/gh-pages", { status: 403, json: { message: "Resource not accessible" } }]]);
-    const out = await publishFile(api, { repo: "o/r", path: "ns/context/v1.jsonld", content: CTX });
+    const out = await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX });
     expect(out).toEqual({ kind: "failed", detail: expect.stringContaining("HTTP 403") });
   });
 });

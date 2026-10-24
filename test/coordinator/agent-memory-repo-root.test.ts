@@ -15,7 +15,7 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -25,13 +25,18 @@ import {
 } from "@litlfred/cat-harness/schemas/memory.js";
 import {
   AGENT_MEMORY_DIR,
+  AGENTS_MD_BYTE_BUDGET,
+  AGENTS_MD_FILE,
   ANTIGRAVITY_RULE_BYTE_BUDGET,
   ANTIGRAVITY_RULE_FILE,
+  ANTIGRAVITY_SKILL_BYTE_BUDGET,
   agentNames,
   parseMemoryFile,
   readMemoryNodes,
   renderEntries,
+  syncAgentsMd,
   syncAll,
+  syncAntigravity,
   syncAntigravityRule,
 } from "../../scripts/agent-memory.js";
 
@@ -192,5 +197,29 @@ describe("Antigravity workspace rule target (bean fkqa)", () => {
     expect(text).toContain("## platform-boundary-guard");
     expect(text).toContain("### STABLE —");
     expect(text).toContain("### TRAP —");
+  });
+
+  test("every Antigravity workspace skill is current and within its byte budget", () => {
+    for (const r of syncAntigravity(false)) {
+      expect({ agent: r.agent, state: r.state, dropped: r.dropped }).toEqual({
+        agent: r.agent,
+        state: "unchanged",
+        dropped: [],
+      });
+      expect(r.bytes).toBeLessThanOrEqual(ANTIGRAVITY_SKILL_BYTE_BUDGET);
+    }
+  });
+
+  test("the repo-wide AGENTS.md target is gated and drops no entries", () => {
+    const res = syncAgentsMd(false);
+    // A layer checked out alone (the standalone probe) has no aggregate root,
+    // so there is no repo-wide AGENTS.md to assemble: `missing` is the honest
+    // state there. Where the file exists it must be current or unmarked.
+    const expected = existsSync(AGENTS_MD_FILE) ? ["unchanged", "no-markers"] : ["missing"];
+    expect(expected).toContain(res.state);
+    expect(res.dropped).toEqual([]);
+    if (res.state === "unchanged") {
+      expect(res.bytes).toBeLessThanOrEqual(AGENTS_MD_BYTE_BUDGET);
+    }
   });
 });

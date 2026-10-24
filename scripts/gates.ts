@@ -1688,6 +1688,12 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     }),
   ),
   {
+    script: "check:unlinked-beans",
+    kind: "report",
+    reason:
+      "WRITES its QA sidecar and is a WARNING by the owner's ruling (bean `w2hn`, 2026-10-24: a bean tied to no BPMN task is \"not failure\"), so it has no gating form; `qa:refresh` runs it as a writer of the `qa` tree",
+  },
+  {
     script: "check:upload-names",
     kind: "report",
     reason:
