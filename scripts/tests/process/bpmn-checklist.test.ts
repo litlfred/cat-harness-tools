@@ -11,8 +11,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
-import { checklistFor, defaultOutDir, orphanChecklists, placementOf, renderAll } from "../bpmn-checklist.ts";
+import { loadProcessModel } from "../../../src/workflow/process-model.ts";
+import { checklistFor, defaultOutDir, orphanChecklists, placementOf, renderAll } from "../../bpmn-checklist.ts";
 
 const dirs: string[] = [];
 afterEach(() => {

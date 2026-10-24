@@ -18,8 +18,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { complete, enabled, startInstance } from "../../src/workflow/instance";
-import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-model";
+import { complete, enabled, startInstance } from "../../../src/workflow/instance";
+import { loadProcessModel, UnsupportedBpmn } from "../../../src/workflow/process-model";
 
 describe("a call activity resolves to the process it names", () => {
   test("a call activity naming a process no file defines stays opaque", async () => {

@@ -33,7 +33,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
 

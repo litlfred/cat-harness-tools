@@ -1,6 +1,6 @@
 /**
  * `workflow-skill-refs` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/workflow-skill-refs.test.ts` (bean `7zz1`, owner
+ * `cat-harness-tools/scripts/tests/process/workflow-skill-refs.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each resolves every instance's
  * declared diagrams, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects

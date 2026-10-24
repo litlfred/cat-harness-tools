@@ -17,7 +17,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadProcessModel, partitionTolerated } from "../../src/workflow/process-model.ts";
+import { loadProcessModel, partitionTolerated } from "../../../src/workflow/process-model.ts";
 
 const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns#";
 
