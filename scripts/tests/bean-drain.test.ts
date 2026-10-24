@@ -213,6 +213,21 @@ const noPulls: GitHub = {
 };
 
 describe("claimCheck end to end", () => {
+  // The claim commit is made as whoever runs the tool. A CI runner has no git
+  // identity configured, so give the claimant one: the cloud agent.
+  const saved = { ...process.env };
+  for (const k of ["AUTHOR", "COMMITTER"]) {
+    process.env[`GIT_${k}_NAME`] = "Claude";
+    process.env[`GIT_${k}_EMAIL`] = "noreply@anthropic.com";
+  }
+  afterAll(() => {
+    for (const k of ["AUTHOR", "COMMITTER"]) for (const f of ["NAME", "EMAIL"]) {
+      const key = `GIT_${k}_${f}`;
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
   const opts = (copies: string[], gh: GitHub = noPulls) => ({ copies, repos: [], minePrs: [], agents: DEFAULT_AGENTS, me: ME, windowMs: 24 * H, dryRun: false, gh, now: () => new Date() });
 
   test("a free bean is claimed by a plain commit on BOTH copies, without touching the checkout", () => {
@@ -226,6 +241,7 @@ describe("claimCheck end to end", () => {
       expect(text).toMatch(/^status: in-progress$/m);
       expect(text).toContain(ME.session);
       expect(sh(w, "log", "-1", "--format=%(trailers:key=Claude-Session,valueonly)", "FETCH_HEAD").trim()).toBe(ME.session);
+      expect(sh(w, "log", "-1", "--format=%an <%ae>", "FETCH_HEAD").trim()).toBe(CLOUD);
       expect(sh(w, "rev-parse", "--abbrev-ref", "HEAD").trim()).toBe("my-feature");
     }
   });
