@@ -2,11 +2,11 @@
 # folio-assistant-d308
 $schema: bean/1.0.0
 title: 'CODE DISPENSATION: 868 code files → 13 Tool nodes, each bound to a BPMN task'
-status: in-progress
+status: completed
 type: epic
 priority: normal
 created_at: 2026-09-20T04:08:50Z
-updated_at: 2026-10-22T14:01:00Z
+updated_at: 2026-10-24T14:55:00Z
 parent: folio-assistant-zzmr
 ---
 
@@ -383,4 +383,4 @@ the highest), then the six that need a folio to prove.
 
 ## All 6 checkboxes met (2026-10-22)
 
-All 28 child beans of `d308` are now closed (`27 completed`, `1 scrapped` `8t6r`), with `v7bg` (`Task_Publish`, including `cat-harness/tools/kg-viewer/kg-viewer.ts` from `cat-harness#406`) re-pinned on `folio-assistant` `main` in `#2614`/`#2616` and closed. Every chosen group has its Tool node(s) declared across `cat-harness` (175 tools), `folio-assistant-core` (33), `folio-assistant-sci` (9), `fhir-harness` (6), and `smart-base` (4). Kept `status: in-progress` until `epic-under-epic:folio-assistant-d308` is removed from `cat-harness-tools/scripts/bean-parents-baseline.json` (which otherwise fails `check-bean-parents.ts` when `d308` closes).
+All 28 child beans of `d308` are now closed (`27 completed`, `1 scrapped` `8t6r`), with `v7bg` (`Task_Publish`, including `cat-harness/tools/kg-viewer/kg-viewer.ts` from `cat-harness#406`) re-pinned on `folio-assistant` `main` in `#2614`/`#2616` and closed. Every chosen group has its Tool node(s) declared across `cat-harness` (175 tools), `folio-assistant-core` (33), `folio-assistant-sci` (9), `fhir-harness` (6), and `smart-base` (4), and `epic-under-epic:folio-assistant-d308` is retired from `cat-harness-tools/scripts/bean-parents-baseline.json`.
