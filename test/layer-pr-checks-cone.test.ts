@@ -7,7 +7,7 @@
  * and in record mode runs the candidates through `ci-cone.ts run`. Here
  * `GATE_CONE_CLI` replaces ci-cone.ts with a stub that answers from a JSON
  * spec, so these test the wiring only: the tracer and the exact-match decision
- * are ci-cone.ts's own, tested in `scripts/tests/ci-cone.test.ts`. Then
+ * are ci-cone.ts's own, tested in `scripts/tests/sdlc/ci-cone.test.ts`. Then
  * `merge-shards.py`, `compare-gates.py` and `merge-cone.py` on what it wrote.
  *
  * @module test/layer-pr-checks-cone.test
