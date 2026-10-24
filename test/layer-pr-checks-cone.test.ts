@@ -362,6 +362,40 @@ describe("compare-gates.py with cone-skipped gates", () => {
   });
 });
 
+describe("compare-gates.py with a gate main did not run", () => {
+  function compare(base: object, head: object): { status: number | null; out: string } {
+    const d = mkdtempSync(join(tmpdir(), "absent-compare-"));
+    writeFileSync(join(d, "base.json"), JSON.stringify(base));
+    writeFileSync(join(d, "head.json"), JSON.stringify(head));
+    const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
+    const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
+    return { status: r.status, out: r.stdout };
+  }
+
+  test("not applicable (78) on head, absent on base: listed, not counted", () => {
+    const r = compare({}, { g: { command: "c", exit: 78, tail: "NOT APPLICABLE" } });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("| `g` | — | 78 | not applicable here; main did not run it, so not counted |");
+  });
+
+  test("could not determine (2) on head, absent on base: listed, not counted", () => {
+    const r = compare({}, { g: { command: "c", exit: 2, tail: "?" } });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("could not determine; main did not run it, so not counted");
+  });
+
+  test("a plain failure on head, absent on base, is still NEW", () => {
+    const r = compare({}, { g: { command: "c", exit: 1, tail: "boom" } });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("NEW FAILURE");
+  });
+
+  test("not applicable (78) on head where base passed is still NEW", () => {
+    const r = compare({ g: { command: "c", exit: 0, tail: "" } }, { g: { command: "c", exit: 78, tail: "" } });
+    expect(r.status).toBe(1);
+  });
+});
+
 describe("merge-cone.py", () => {
   function shards(...files: (object | undefined)[]): string {
     const results = mkdtempSync(join(tmpdir(), "cone-records-"));

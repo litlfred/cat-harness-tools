@@ -20,7 +20,7 @@ import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typol
 
 import { checkLayoutNorms, pairKey, readBaseline } from "../../check-layout-norms.ts";
 
-const INSTANCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const INSTANCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
 
 /** A throwaway repository with one instance declaring `dirs`. */

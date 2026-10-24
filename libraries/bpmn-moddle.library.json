@@ -17,7 +17,7 @@
   "shim": "types/bpmn-moddle.d.ts",
   "usedBy": [
     "scripts/lib/task-panel.ts",
-    "scripts/tests/lane-extraction-parity.test.ts",
+    "scripts/tests/process/lane-extraction-parity.test.ts",
     "src/workflow/process-model.ts"
   ]
 }
