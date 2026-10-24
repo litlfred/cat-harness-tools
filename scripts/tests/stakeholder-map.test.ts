@@ -15,21 +15,34 @@ import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
+const TODO_MANAGER = "skills/sdlc/sdlc-core/todo-manager.md";
+
+/**
+ * The map for one changed skill, built ONCE at module scope and read by every
+ * test below that asks about that skill.
+ *
+ * Bean `sff8`. `stakeholderMap` loads every diagram in the corpus, and six
+ * tests each asked it the same question, so this file paid six corpus passes
+ * for one answer and each of them was charged to its own 5000 ms budget. The
+ * answer is a plain value nothing mutates; the README case asks a different
+ * question and keeps its own call.
+ */
+const TODO_MAP = await stakeholderMap(ROOT, [TODO_MANAGER]);
 
 describe("stakeholder map", () => {
-  test("a changed skill resolves to its name and path", async () => {
-    const map = await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]);
+  test("a changed skill resolves to its name and path", () => {
+    const map = TODO_MAP;
     expect(map.skills.map((s) => s.name)).toEqual(["todo-manager"]);
     expect(map.skills[0].path).toContain("todo-manager.md");
     expect(map.untraced).toEqual([]);
   });
 
-  test("roles come from the LANES reached, and every one resolves in the registry", async () => {
+  test("roles come from the LANES reached, and every one resolves in the registry", () => {
     // Until 2026-09-20 this read each skill's own `roles:` front matter, and
     // "Roles reached: collaborator, owner" named two things that were in no
     // registry — 260 of 325 annotations resolved against nothing, and the
     // report gave no way to tell those from a real role. Bean `qif9`.
-    const map = await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]);
+    const map = TODO_MAP;
     expect(map.roles.length).toBeGreaterThan(0);
     const declared = new Set(
       (readRoleGraph(join(ROOT, "scenarios"))?.roles ?? []).map((r) => r.id),
@@ -42,8 +55,8 @@ describe("stakeholder map", () => {
     }
   });
 
-  test("a lane binding no declared role is UNDETERMINED, not silently roleless", async () => {
-    const map = await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]);
+  test("a lane binding no declared role is UNDETERMINED, not silently roleless", () => {
+    const map = TODO_MAP;
     // A lane binds by its own `<folio:role ref>` (#1168); one with no ref, or a
     // ref to no declared role, binds nothing.
     const declared = new Set((readRoleGraph(join(ROOT, "scenarios"))?.roles ?? []).map((r) => r.id));
@@ -57,8 +70,8 @@ describe("stakeholder map", () => {
     }`).toBe(`${unbound.length > 0 ? "unbound lanes exist" : "every lane binds"}: reported=true`);
   });
 
-  test("a changed skill reaches the process lanes accountable for using it", async () => {
-    const map = await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]);
+  test("a changed skill reaches the process lanes accountable for using it", () => {
+    const map = TODO_MAP;
     // The work-plan lane appears in several processes; the point is that the
     // mapping produces LANES, which is the half CODEOWNERS could never give.
     expect(map.lanes.length).toBeGreaterThan(0);
@@ -76,15 +89,15 @@ describe("stakeholder map", () => {
     expect(map.notDetermined.join(" ")).toContain("unknown impact");
   });
 
-  test("the undetermined part is always reported, even on a clean mapping", async () => {
-    const map = await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]);
+  test("the undetermined part is always reported, even on a clean mapping", () => {
+    const map = TODO_MAP;
     expect(map.notDetermined.length).toBeGreaterThan(0);
     // The people half is never answered mechanically.
     expect(map.notDetermined[0]).toContain("does not guess");
   });
 
-  test("the report names the lanes and the undetermined section", async () => {
-    const text = formatStakeholderMap(await stakeholderMap(ROOT, ["skills/sdlc/sdlc-core/todo-manager.md"]));
+  test("the report names the lanes and the undetermined section", () => {
+    const text = formatStakeholderMap(TODO_MAP);
     expect(text).toContain("Process lanes reached");
     expect(text).toContain("NOT DETERMINED");
   });
