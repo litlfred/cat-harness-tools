@@ -21,9 +21,9 @@ import { join } from "node:path";
 import { RunContextSchema, runContextRef } from "@litlfred/cat-harness/schemas/run-context.ts";
 import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
 
-import { knownTitle, withKnownTitle, type Plan } from "../ingest-document.ts";
+import { knownTitle, withKnownTitle, type Plan } from "../../ingest-document.ts";
 
-const SCRIPTS = join(import.meta.dir, "..");
+const SCRIPTS = join(import.meta.dir, "..", "..");
 const py = (code: string, cwd: string) =>
   Bun.spawnSync(["python3", "-c", code], { cwd, env: { ...process.env, PYTHONPATH: SCRIPTS } });
 const has = (bin: string) => Bun.spawnSync(["sh", "-c", `command -v ${bin}`]).exitCode === 0;

@@ -30,13 +30,13 @@ import {
   notHeldHtml,
   VIEWER_JS,
   viewPanelHtml,
-} from "../gen-library-viz.ts";
-import { entryGraphSitePath } from "../lib/library-entry-graphs.ts";
+} from "../../gen-library-viz.ts";
+import { entryGraphSitePath } from "../../lib/library-entry-graphs.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import type { LibraryGraph } from "../library-graph.ts";
-import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, viewKindOf } from "../lib/library-source.ts";
-import { readEntryDocument } from "../lib/library-document.ts";
-import { MARKER as PDF_MARKER, VIEWER_PATH } from "../pdf-viewer.ts";
+import type { LibraryGraph } from "../../library-graph.ts";
+import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, viewKindOf } from "../../lib/library-source.ts";
+import { readEntryDocument } from "../../lib/library-document.ts";
+import { MARKER as PDF_MARKER, VIEWER_PATH } from "../../pdf-viewer.ts";
 
 const SITE = "/site";
 const DATA = join(SITE, "assets", "library");

@@ -10,9 +10,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { initFolio } from "../init-folio";
-import { HARNESS_ROOT } from "../lib/roots.ts";
-import { nest, sectionBody } from "../seed-folio-from-library";
+import { initFolio } from "../../init-folio";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { nest, sectionBody } from "../../seed-folio-from-library";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 const dirs: string[] = [];
