@@ -275,13 +275,17 @@ describe.skipIf(!HAS_SMART_TRUST_REF)("smart-trust, referenced in smart-base's l
   const rec = ReferencedSourceSchema.parse(JSON.parse(readFileSync(join(dir, "referenced.json"), "utf-8")));
   const ig = JSON.parse(readFileSync(join(REPO, "smart-trust", "fhir-artifact-index", "index.json"), "utf-8")) as {
     packageId: string;
-    version: string;
     canonicalBase: string;
   };
-  test("is a valid referenced record of a PUBLICATION, matching the index it was read from", () => {
+  // The record names the PUBLICATION as read on its `read_at` date. The index
+  // beside it is built from the IG's source at publish (fhir-harness#124), so
+  // it shares the publication's identity (canonical, package id) but not its
+  // version, which moves with the source. The version is checked against the
+  // record's own identity.
+  test("is a valid referenced record of a PUBLICATION, with the identity of the IG the index describes", () => {
     expect(rec.materialization.state).toBe("referenced");
-    expect(rec.source).toMatchObject({ kind: "published", canonical: ig.canonicalBase, package_id: ig.packageId, version: ig.version });
-    expect(rec.identity.version).toBe(ig.version);
+    expect(rec.source).toMatchObject({ kind: "published", canonical: ig.canonicalBase, package_id: ig.packageId });
+    expect(rec.identity.version).toBe(rec.source.version);
   });
   test("holds nothing of the IG and passes the L1 gate", () => {
     for (const d of ["sections", "blocks", "images"]) expect(existsSync(join(dir, d))).toBe(false);
