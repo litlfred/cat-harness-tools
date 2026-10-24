@@ -123,7 +123,7 @@ function provenancePhrase(v: VoiceProfile): string {
  * One criterion per voice.
  *
  * Every field except `description` matches what the hand-written entries
- * carried, and `scripts/tests/voice-criteria.test.ts` asserts that against the
+ * carried, and `scripts/tests/content/voice-criteria.test.ts` asserts that against the
  * four this repository ships rather than trusting it.
  */
 export function voiceOverlayCriteria(instanceRoot: string): QaCriterionDefinition[] {

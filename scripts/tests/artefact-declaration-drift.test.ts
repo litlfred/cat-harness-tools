@@ -55,6 +55,7 @@ describe("artefactDeclarationDrift", () => {
     const { unproduced } = artefactDeclarationDrift([]);
     const flagged = unproduced.map((u) => u.artefact);
     expect(flagged).not.toContain("cat-harness/ns.jsonld");
+    // declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
     expect(flagged).not.toContain("ns/content/v1.jsonld");
   });
 

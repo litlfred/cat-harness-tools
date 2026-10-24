@@ -218,6 +218,7 @@ export function localLoader(dir: string, bases: readonly string[] = []) {
     if (url === PROV_JSONLD_CONTEXT_URL) {
       return { contextUrl: null, documentUrl: url, document: heldProvJsonldContext(resolve(dirname(HARNESS_ROOT))) };
     }
+    // declared-path-literal: this file IS `CONTENT_CONTEXT_URL`, a published, dereferenceable URL; its path is fixed by that URL, not by where a declaration may move `ns/`.
     const fallback = url === CONTENT_CONTEXT_URL ? resolve(HARNESS_ROOT, "ns", "content", "v1.jsonld") : instanceContextFiles().get(url);
     const file = p && existsSync(p) ? p : fallback;
     if (!file) throw new Error(`refused to fetch ${url}: not in the tree being verified`);
