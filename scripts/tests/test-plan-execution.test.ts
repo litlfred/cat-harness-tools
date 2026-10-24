@@ -23,6 +23,7 @@ import { join, resolve } from "node:path";
 
 import { loadProcessModel, type ProcessModel } from "../../src/workflow/process-model";
 import { complete, enabled, startInstance, type InstanceState } from "../../src/workflow/instance";
+import { CLOSE_DONE, OPEN_NEW_BEAN, openNewBean, walkSteps } from "../lib/bean-open-close-walk.ts";
 import { evaluate, loadDecisionTable } from "../../src/workflow/decision-table";
 import { readRoleGraph, readActors } from "@litlfred/cat-harness/schemas/role-graph.ts";
 import { ActorDefinitionSchema, sutRefFor } from "@litlfred/cat-harness/schemas/skill-package.ts";
@@ -127,6 +128,8 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
   /** workflow_start → workflow_next/complete up to the certification gateway. */
   function toGateway(id: string): InstanceState {
     const s = startInstance(model, { id, subject: `${plan.id}@${plan.version}`, bean: "folio-assistant-3o5b" });
+    // Bean m8gz: the process opens its bean first, through Process_BeanOpen.
+    openNewBean(model, s, { actor: "fixture" });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       expect(at(s)).toEqual([step]);
       complete(model, s, step, { actor: "fixture" });
@@ -139,12 +142,19 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     const roles = readRoleGraph(join(ROOT, "scenarios"))!;
     const s = startInstance(model, { id: "roles", subject: "fixture" });
     const seen: Record<string, string | undefined> = {};
-    for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
+    const own = ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"].map((n) => [n] as const);
+    for (const [step, outcome] of [...OPEN_NEW_BEAN, ["GW_BeanYours", "claimed"] as const, ...own]) {
       const e = enabled(model, s, roles)[0]!;
       seen[e.node] = e.role;
-      complete(model, s, step);
+      complete(model, s, step, outcome === undefined ? {} : { outcome });
     }
     expect(seen).toEqual({
+      // Process_BeanOpen's own lane; the caller's gateway after it is the requester's.
+      Open_CheckExists: "authoring-agent",
+      Open_Exists: "authoring-agent",
+      Open_Create: "authoring-agent",
+      Open_Claim: "authoring-agent",
+      GW_BeanYours: "test-requester",
       A_Request: "test-requester",
       A_ResolvePlan: "tester",
       A_BindData: "tester",
@@ -159,6 +169,8 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     for (const n of model.nodes.values()) {
       if (n.kind !== "activity") continue;
       expect(n.skills.length).toBeGreaterThan(0);
+      // OPEN and CLOSE carry their bean ops inside (bean m8gz), not on the call.
+      if (n.calledElement === "Process_BeanOpen" || n.calledElement === "Process_BeanClose") continue;
       expect(n.workPlanOp).toBeDefined();
     }
     expect(model.decisions.get("GW_ExitCriteria")?.id).toBe("Decision_TestCertification");
@@ -188,6 +200,7 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
 
     expect(at(s)).toEqual(["A_FileCertification"]);
     complete(model, s, "A_FileCertification");
+    walkSteps(model, s, CLOSE_DONE);
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).toContain("End_Certified");
   });
@@ -198,6 +211,7 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     complete(model, s, "GW_ExitCriteria", { facts: factsFrom(run, report, "agree") });
     expect(at(s)).toEqual(["A_RecordRefusal"]);
     complete(model, s, "A_RecordRefusal");
+    walkSteps(model, s, CLOSE_DONE);
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).not.toContain("Call_Sign");
   });
@@ -208,6 +222,7 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     complete(model, s, "GW_ExitCriteria", { facts: factsFrom(run, report, "disagree") });
     expect(at(s)).toEqual(["A_RecordUndetermined"]);
     complete(model, s, "A_RecordUndetermined");
+    walkSteps(model, s, CLOSE_DONE);
     expect(s.status).toBe("completed");
   });
 

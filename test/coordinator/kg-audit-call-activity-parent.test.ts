@@ -37,9 +37,12 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
 
     const car = ingestion!.criteria["call-activity-resolves"];
     expect(car.result).toBe("pass");
-    expect(car.findings.length).toBe(2);
-    expect(car.findings.some((f) => f.detail === 'calls "Process_Ingestion", hosted by instance "cat-harness".')).toBe(true);
-    expect(car.findings.some((f) => f.detail === 'calls "Process_IngestTheme", hosted by instance "cat-harness".')).toBe(true);
+    // Bean m8gz: it also calls the harness's OPEN and CLOSE, as every process
+    // that works a bean does.
+    expect(car.findings.length).toBe(4);
+    for (const called of ["Process_Ingestion", "Process_IngestTheme", "Process_BeanOpen", "Process_BeanClose"]) {
+      expect(car.findings.some((f) => f.detail === `calls "${called}", hosted by instance "cat-harness".`)).toBe(true);
+    }
   }, 30_000);
 
   test("a call activity whose targets are all local resolves as a PASS with empty findings", async () => {
@@ -52,10 +55,12 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
 
     const data = JSON.parse(out);
     const reports = data.reports as { subject: { id: string }; criteria: Record<string, { result: string; findings: unknown[] }> }[];
-    const lifecycle = reports.find((r) => r.subject.id === "Process_Lifecycle");
-    expect(lifecycle).toBeDefined();
+    // Process_Lifecycle was the example until bean m8gz gave it OPEN and CLOSE
+    // calls, which the harness hosts; public-comment calls only its own layer.
+    const local = reports.find((r) => r.subject.id === "Process_PublicComment");
+    expect(local).toBeDefined();
 
-    const car = lifecycle!.criteria["call-activity-resolves"];
+    const car = local!.criteria["call-activity-resolves"];
     expect(car.result).toBe("pass");
     expect(car.findings).toEqual([]);
   }, 30_000);

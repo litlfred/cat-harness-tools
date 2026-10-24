@@ -1509,6 +1509,12 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "SUBSUMED by `skill:register:check`, which CI runs: this is the same script with `--declarations-only`, which asks the declaration half and leaves out the chain checks (`STEPS`), so the gate performs this one's entire job besides. It exists for ONE caller, `regen-after-merge` via `pair-cover.ts` (bean `8qyc`): when every chain check is already asked in the same pool, the full gate would ask them a second time, so the pool asks the residual instead. As a CI step it would duplicate a subset of a step CI already runs",
   },
   {
+    script: "check:bean-calls",
+    kind: "covered-by",
+    reason:
+      "SUBSUMED by `check:workflow-refs`, which CI runs: that gate calls the same `beanCallFindings` over the same diagrams and fails on the same findings, so this one's entire job is done there. Kept as a script so the rule — claim, resolve and archive only inside Process_BeanOpen and Process_BeanClose, and every bean-working process calling both — can be asked on its own while a diagram is being redrawn. Bean `m8gz`",
+  },
+  {
     script: "split:baseline:check",
     kind: "report",
     reason:

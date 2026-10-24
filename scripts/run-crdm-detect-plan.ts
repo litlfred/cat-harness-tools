@@ -47,6 +47,7 @@ import {
 import { detect, type Verdict } from "../src/crdm/detect-signals.ts";
 import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { complete, enabled, startInstance, type InstanceState } from "../src/workflow/instance.ts";
+import { openNewBean } from "./lib/bean-open-close-walk.ts";
 import { saveInstance } from "../src/workflow/store.ts";
 import { completeExitCriteriaGateway } from "./test-plan-execution.ts";
 import { renderTestReport, testReportBadge } from "./render-test-report.ts";
@@ -220,6 +221,9 @@ if (import.meta.main) {
     A_WriteRun: `run ${runId} → ${join("test/results", dirname(testReportPath(report)))}`,
     A_ReExecuteSample: `checker ${sample.checker} on ${sample.sampled.length} sampled case(s)${sample.disagreements.length ? `; disagrees on ${sample.disagreements.join(", ")}` : ""}`,
   };
+  // Bean m8gz: the process opens its bean first (Process_BeanOpen), so the
+  // walk takes OPEN's common path before the steps this driver annotates.
+  state = openNewBean(model, state, { actor: TESTER.actor });
   for (const step of Object.keys(notes)) {
     const at = enabled(model, state).map((e) => e.node);
     if (!at.includes(step)) throw new Error(`expected ${step} to be enabled, found ${at.join(", ") || "nothing"}`);

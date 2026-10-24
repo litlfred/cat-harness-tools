@@ -16,6 +16,7 @@ import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup } from "@litlfre
 import { detect } from "../../src/crdm/detect-signals.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
 import { complete, enabled, startInstance } from "../../src/workflow/instance.ts";
+import { openNewBean } from "../lib/bean-open-close-walk.ts";
 import { completeExitCriteriaGateway } from "../test-plan-execution.ts";
 import { SUT, TESTER, checkSample, exitFacts, measure, verdictsFor, type CorpusItem } from "../run-crdm-detect-plan.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -99,7 +100,7 @@ describe("the untainted checker", () => {
 describe("through test-plan-execution.bpmn", () => {
   test("the plan's own DMN routes to the CERTIFIER's user task — the process does not certify itself", async () => {
     const model = await loadProcessModel(join(sdlc(), "test-plan-execution.bpmn"));
-    let s = startInstance(model, { id: "ff09-test", subject: plan.id });
+    let s = openNewBean(model, startInstance(model, { id: "ff09-test", subject: plan.id }), { actor: TESTER.actor });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       s = complete(model, s, step, { actor: TESTER.actor });
     }
@@ -111,7 +112,7 @@ describe("through test-plan-execution.bpmn", () => {
 
   test("FALSIFICATION: a checker that disagrees is undetermined, not certified", async () => {
     const model = await loadProcessModel(join(sdlc(), "test-plan-execution.bpmn"));
-    let s = startInstance(model, { id: "ff09-test-2", subject: plan.id });
+    let s = openNewBean(model, startInstance(model, { id: "ff09-test-2", subject: plan.id }), { actor: TESTER.actor });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       s = complete(model, s, step, { actor: TESTER.actor });
     }

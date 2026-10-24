@@ -432,7 +432,8 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       //
       // Looked up through the subprocess tree, not in the top-level process:
       // once a diagram is decomposed the bean-marked steps live in its phases
-      // (`A_Close` carries `op="resolve"` and sits in CRDM's close-out), and a
+      // (`Close_Complete` carries `op="resolve"` and sits in Process_BeanClose,
+      // which every bean-touching process calls — bean `m8gz`), and a
       // lookup that only knew the parent would find nothing and perform nothing
       // — silently, which is the worst way for a work-plan write to stop.
       // `instanceCompleted` stays the PARENT's status on purpose: a bean is
