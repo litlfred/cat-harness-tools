@@ -6,7 +6,7 @@ status: in-progress
 type: task
 priority: normal
 created_at: 2026-10-02T16:39:55Z
-updated_at: 2026-10-22T14:07:00Z
+updated_at: 2026-10-23T16:20:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -86,5 +86,49 @@ The owner chose option A: *"tiny html w/ dynamic load from json(ld) KG"*. For IG
 - **litlfred/ihris switch PR.** It moves the iHRIS 5 IG to the thin path. Measured over its 182 artefact pages: **168.2 KB → 5.5 KB** mean with the linked rail. That meets the "sampled IG page ≤ 20 KB" criterion for artefact pages of an IG that opts in.
 - **Still open:**
   - the IG's own narrative pages and the artifacts/toc pages, which keep the full chrome;
-  - smart-trust and smart-immunizations, which have not opted in yet;
+  - ~~smart-trust and smart-immunizations, which have not opted in yet;~~ done: thin became the default (2026-10-12), see 2026-10-23 below;
   - phases B–E for every other page.
+
+## 2026-10-23 — smart-trust and smart-immunizations are on thin artefact pages (thread "smart IG harnessing", https://claude.ai/code/session_01AW61nue34oLGoENwjCNcSA)
+No opt-in is needed any more: `gen-ig-pages` writes thin pages by default since 2026-10-12 (`--full-pages` is the opt-out), and both IGs publish through the fhir-harness IG route. Measured from the gh-pages trees (2026-10-22 publishes):
+
+| IG | artefact pages | mean | max | root .html mean | `en/` .html mean |
+|---|---|---|---|---|---|
+| smart-trust (ba8613e) | 1,404 | 4.9 KB | 13.2 KB | 40.2 KB (50 pages) | 69.8 KB (264) |
+| smart-immunizations (b72436f) | 1,955 | 6.5 KB | 13.8 KB | 16.1 KB (57 pages) | 69.8 KB (266) |
+
+Artefact pages meet "sampled IG page ≤ 20 KB". Still heavy: the narrative/root pages and the platform's `en/`, `cat-harness/` and `folio-assistant-core/` pages, which are phases B–E.
+
+## 2026-10-23 — remaining phases re-measured; tiles and navbar row shared (thread "Page weight", https://claude.ai/code/session_01Uvn1s3VyR7rQ8fmLkLH2AN)
+Measured on folio-assistant gh-pages `1ad53fa` (STAGING excluded): 351 MiB, 4,606 HTML pages, 107 MiB of HTML.
+- **C and D are already done by other work.** No sampled page carries `site-footer` twice or an inlined `side-bar`; pages carry a small `#fa-rail` block and load the shared `assets/navbar/rail-<hash>.js`.
+- **What is left on a platform page** (`en/cat-harness/qa/cat-harness/`, 42 KB): `<meta name="fa-tiles">` 12.5 KB, `#fa-navbar-row` 2.5 KB, the mermaid loader 2.5 KB (on every page), the theme's icon sprite ~3.8 KB, page content ~10 KB.
+- **IG narrative pages** (`smart-trust/*.html`, 50 pages): median 20.2 KB. The IG menu is in each page twice: the `data-fa-visualiser-nav` block (2.9 KB) and the rail's `documentIndex` (3.7 KB); `#fa-navbar-row` is inlined (2.5 KB).
+- **Done on branch** cat-harness `claude/gp2f-shared-head-data` (8f3a9a4): one Liquid-rendered `assets/js/harness-data.js` fills the empty tiles meta and navbar-row island (the `data-fa-row-src` contract); the mermaid loader is emitted only when the content holds `language-mermaid`. Local build: 60.1 → 43.9 KB per page; Chromium at 1280/390 draws the same 30 tiles and 7 row icons. Estimated saving ~21 MiB of HTML.
+- **Split agreed with the "Preview storage" thread (bean g196):** g196 owns the `?v=` content-hash filter and moving `rail-<hash>.js`/`row-<hash>.js` to constant paths; this bean owns moving per-page data out.
+- **Still open:** the IG menu duplicate; the icon sprite (B, needs theme template overrides); `shareNavbarRow` on all railed pages once g196 gives the row file a constant path.
+
+## 2026-10-23 (later) — PRs open; icon sprite deferred
+- **litlfred/cat-harness#434:** the tiles list and navbar row move to a shared `harness-data.js`, and mermaid is loaded only on pages with a diagram. It saves about 16 KB per Jekyll page.
+- **litlfred/cat-harness-tools#602:** `injectRailOnce` (new `lib/rail-once.ts`) drops the `data-fa-visualiser-nav` block once the rail has read it. It saves about 2.9 KB per IG narrative page, which brings the smart-trust median from about 20.2 KB to about 17 KB.
+  - Lesson, now in the module's doc comment: `lib/navbar.ts` and `lib/harness-rail.ts` are bundled into cat-harness's committed `navbar.js`. Any edit to them changes the minified names, so `navbar-assets.test.ts` fails unless cat-harness is regenerated in step. Keep server-only rail behaviour out of those two files. Check with `gen-navbar-assets.ts --check` under the pinned Bun (`cat-harness/.bun-version`).
+- **B (icon sprite):** owner's pick, 2026-10-23, "Skip it for now". The net saving is about 3 KB per page, because each `<use>` reference grows. It needs either overrides of the theme's default layout, icons include and search header, or a post-build pass. Not planned.
+- **Still to do after deploy:** re-measure the site total and a sampled IG page against the `1ad53fa` baseline.
+
+## 2026-10-23 (evening) — measured after deploy; IG menu shared (thread "Page weight", https://claude.ai/code/session_01Uvn1s3VyR7rQ8fmLkLH2AN)
+#602 and #434 are deployed: cat-harness `bda1867` is pinned through folio-assistant#2668 (main `63c89b1`), gh-pages `d5a9825`. Compared with the `1ad53fa` baseline, STAGING excluded:
+
+| | before (`1ad53fa`) | after (`d5a9825`) |
+|---|---|---|
+| site total | 350.9 MiB, 13,432 files | 333.7 MiB, 14,215 files |
+| all HTML | 107.1 MiB, 4,606 pages | 94.8 MiB, 5,240 pages |
+| the same 4,575 pages | 104.8 MiB | 81.3 MiB (−22%) |
+| `en/` median (same 411 pages) | 40.9 KB | 25.1 KB |
+| `reference/` median (same 407 pages) | 49.0 KB | 32.3 KB |
+| `smart-trust/` median (2,194 pages) | 15.7 KB | 12.9 KB |
+| smart-trust narrative median | 20.2 KB | 16.9 KB |
+
+- The tiles meta is now `content=""` with `data-fa-src="harness-data"`; `harness-data.js` fills it.
+- **Done criterion "sampled IG page ≤ 20 KB": met** (smart-trust narrative median 16.9 KB, artefact pages ~5 KB).
+- **Option A (owner's pick, 2026-10-23): the IG menu moves into the shared rail file.** litlfred/cat-harness#468 (regenerated `navbar.js`, which reads `page.documentIndex ?? shared.documentIndex`) merges first; litlfred/cat-harness-tools#644 then stops writing a declared menu into each page's `#fa-rail`. That is about 4 KB more off every IG narrative page. #644's one red check (`navbar-assets.test.ts`) clears once #468 is on main.
+- **Still open:** merging #468 then #644 (waiting on the owner's OK, since the merge window ended); `shareNavbarRow` on all railed pages once g196 gives the row file a constant path; g196 drops `?v` from the `harness-data.js` tag.

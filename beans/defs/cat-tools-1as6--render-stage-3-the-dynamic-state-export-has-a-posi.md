@@ -80,3 +80,5 @@ or test reads a dynamic-state document, so no filename is minted. Left `todo`;
 re-measure when a dynamic-state visualiser opens a PR.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+*2026-10-24T14:25:00Z* — Re-measured at cat-harness-tools `46c1625` (session https://claude.ai/code/session_01RzLVMhhApyXYiw4bb9RwG8). `state.jsonld` and `kg-dynamic` still occur only in `scripts/render-pipeline.ts`. No open PR adds a dynamic-state visualiser. Still blocked on box 1, so it is left `todo`.
