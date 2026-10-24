@@ -11,8 +11,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { extractBpmn, injectBpmn, decodeLabel } from "../../pipeline/bpmn-translate.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { extractBpmn, injectBpmn, decodeLabel } from "../../../pipeline/bpmn-translate.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const XML = readFileSync(join(ROOT, "processes/process/crdm-requirements.bpmn"), "utf-8");

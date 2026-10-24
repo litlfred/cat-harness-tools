@@ -10,19 +10,19 @@
 import { describe, expect, test } from "bun:test";
 
 import { readdirSync } from "node:fs";
-import { workflowDir } from "../../src/workflow/store.ts";
+import { workflowDir } from "../../../src/workflow/store.ts";
 
-import { roleOf } from "../../src/core/handover-screen.ts";
-import { processFiles } from "../../src/workflow/process-files.ts";
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { roleOf } from "../../../src/core/handover-screen.ts";
+import { processFiles } from "../../../src/workflow/process-files.ts";
+import { loadProcessModel } from "../../../src/workflow/process-model.ts";
 import {
   registerWorkflowTools,
   WORKFLOW_COMPLETE_HANDOVER,
   WORKFLOW_INSTANCE_ID,
   WORKFLOW_NODE_ID,
   WORKFLOW_OUTCOME,
-} from "../../src/tools/workflow.ts";
-import { HARNESS_ROOT, REPO_ROOT } from "../lib/roots.ts";
+} from "../../../src/tools/workflow.ts";
+import { HARNESS_ROOT, REPO_ROOT } from "../../lib/roots.ts";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
 

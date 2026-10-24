@@ -14,8 +14,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { processFiles, processRoots, registerWorkflowTools } from "../../src/tools/workflow.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { processFiles, processRoots, registerWorkflowTools } from "../../../src/tools/workflow.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const CAT_HARNESS = HARNESS_ROOT;
 const REPO = resolve(CAT_HARNESS, "..");

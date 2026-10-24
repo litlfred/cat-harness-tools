@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { GENERATED_BY } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

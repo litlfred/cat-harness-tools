@@ -10,12 +10,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { extractBpmn, injectBpmn } from "../../pipeline/bpmn-translate.ts";
-import { parsePo } from "../../pipeline/po-inject.ts";
-import { loadProcessModel, isActivity } from "../../src/workflow/process-model.ts";
+import { extractBpmn, injectBpmn } from "../../../pipeline/bpmn-translate.ts";
+import { parsePo } from "../../../pipeline/po-inject.ts";
+import { loadProcessModel, isActivity } from "../../../src/workflow/process-model.ts";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SRC = join(ROOT, "processes/sdlc/bean-lifecycle.bpmn");
