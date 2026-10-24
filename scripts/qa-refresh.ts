@@ -220,7 +220,9 @@ export const QA_WRITERS: readonly QaWriter[] = [
   {
     id: "docs:pages",
     run: ["docs:pages"],
-    writes: [`${R}/witnesses/**`],
+    // `*/test/results`, as for check:l1-complete: since #609 docs:pages writes each
+    // mounted instance's witnesses under that instance's own test/results/ (qaAssetDirOf).
+    writes: [`*/test/results/witnesses/**`],
     // declared-path-literal: the docs projections it regenerates beside the witnesses (bean `72a8`), measured from the 2026-10-07 restore log.
     rewrites: ["cat-harness/docs/assets/beans/*.json", "cat-harness/docs/assets/qa/*.json"],
     // Measured in smart-ra 2026-10-15: `skills:docs` reads the todo graph and exits 1 when it is unmounted.
