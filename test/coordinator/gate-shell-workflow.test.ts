@@ -1,6 +1,6 @@
 /**
  * `gate-shell` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/gate-shell.test.ts` (bean `7zz1`): they read
+ * `cat-harness-tools/scripts/tests/sdlc/gate-shell.test.ts` (bean `7zz1`): they read
  * `.github/workflows/code-quality-gates.yml`, which only the checkout holds.
  * Standing alone, cat-harness has no workflows, and
  * `check:cat-harness-standalone` collects every test in that layer. The

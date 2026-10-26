@@ -129,6 +129,12 @@
 # draft run's green check would stand on the head. merge-guard's check 5
 # reads that run, and it would pass a PR that never ran its tests and gates.
 #
+# A draft's verdict is reported as "Draft fast tier only (not the full
+# checks)", never as "No new failures (tests and gates)". So a head that was
+# a draft has no green "No new failures" until the full tier has run on it,
+# and a merge made seconds after `ready_for_review` cannot read the draft's
+# green as the full verdict.
+#
 # Everything every caller would otherwise repeat is decided here: the instance
 # is the calling repository's name, the folio-assistant ref is `index-ref`'s
 # default, the judging scripts are at main, and one run per PR is kept
@@ -676,14 +682,18 @@ jobs:
             '
           )
           git remote set-url origin "$origin"
-          # An IG instance commits no artefact index (fhir-harness#124): its
+          # An IG instance commits no artefact index: its
           # fhir-artifact-index/ files are built from the IG's AST by
           # `ig-index:build`, which the IG pages below read. Built only when an
           # IG instance on disk is missing its index, so a root whose IGs still
           # commit theirs pays nothing.
           missing="$(find . -mindepth 2 -maxdepth 3 -type d -name fhir-artifact-index -not -path './node_modules/*' \
-            -exec sh -c '[ -f "$1/index.json" ] || echo "$1"' _ {} \; | head -n 5)"
-          if [ -n "$missing" ] && { bun cat-harness-tools/scripts/run-script.ts --list 2>/dev/null || true; } | cut -f1 | grep -qx 'ig-index:build'; then
+            -exec sh -c '[ -f "$1/index.json" ] || echo "$1"' _ {} \; | head -n 5 || true)"
+          # The script list is read into a variable and grepped as a
+          # here-string, not piped: with pipefail, `grep -q` exiting early
+          # SIGPIPEs `cut`, and the condition reads false (as in #661).
+          scripts="$(bun cat-harness-tools/scripts/run-script.ts --list 2>/dev/null | cut -f1 || true)"
+          if [ -n "$missing" ] && grep -qx 'ig-index:build' <<<"$scripts"; then
             echo "IG artefact indexes missing:"; echo "$missing"
             bun cat-harness-tools/scripts/run-script.ts ig-index:build \
               || echo "::warning::ig-index:build failed: the IG pages and the gates that read the indexes see them missing on this side"
@@ -1279,7 +1289,11 @@ jobs:
   # PR side. It joins main's shards, keeps main's answer, the gate seconds and
   # the cone's records for the PRs, and is red only when that join fails.
   compare:
-    name: No new failures (tests and gates)
+    # A draft under `draft-fast-tier` reports under its own name, never as
+    # "No new failures": that green was read as the full verdict when a draft
+    # was marked ready and merged before the full run reported
+    # (fhir-harness#167 and #169, 2026-10-24).
+    name: ${{ (inputs.draft-fast-tier && github.event.pull_request.draft == true) && 'Draft fast tier only (not the full checks)' || 'No new failures (tests and gates)' }}
     needs: [prepare-head, prepare-base, run]
     if: ${{ !cancelled() && github.event.action != 'closed' }}
     runs-on: ubuntu-latest

@@ -52,6 +52,7 @@ import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
 import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
 /**
  * Where an instance keeps its skills' I/O contracts: `<root>/schemas/skills/`.
@@ -111,8 +112,9 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
 
   return {
     ...schema,
-    // Absolute or absent — never relative. See the module note.
-    ...(base ? { $id: renderingPath(base, `${stub}.schema.json`) } : {}),
+    // Absolute or absent — never relative. See the module note. Under the
+    // host's own directory since #676 (#603 decision 1b), beside its document.
+    ...(base ? { $id: renderingPath(hostSchemaBase(base), `${stub}.schema.json`) } : {}),
     title: "CatHarness declaration",
     description:
       "The root declaration every instance carries as `<name>.json`: what it is called, " +
@@ -142,7 +144,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
   }
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
-    ...(base ? { $id: renderingPath(base, "tool-types.schema.json") } : {}),
+    ...(base ? { $id: renderingPath(hostSchemaBase(base), "tool-types.schema.json") } : {}),
     title: "Tool I/O types",
     description:
       "The shared types a Tool's io.inputs/io.outputs reference by absolute IRI. " +
@@ -189,7 +191,9 @@ export function buildToolTypeFiles(opts: SchemaExportOptions = {}): Array<[strin
       {
         $schema: "http://json-schema.org/draft-07/schema#",
         // Absolute or absent, as everywhere in this module.
-        ...(base ? { $id: toolTypeDocumentIri(base, name) } : {}),
+        // Under the host's directory (#676); a port mints its IRI against the
+        // same base (`tools/discover.ts`), so the two cannot drift.
+        ...(base ? { $id: toolTypeDocumentIri(hostSchemaBase(base), name) } : {}),
         title: name,
         ...body,
       },
@@ -204,7 +208,7 @@ export function buildToolSchema(opts: SchemaExportOptions = {}): Record<string, 
   const schema = namedJsonSchema(ToolDefinitionSchema, "ToolDefinition");
   return {
     ...schema,
-    ...(base ? { $id: renderingPath(base, "tool.schema.json") } : {}),
+    ...(base ? { $id: renderingPath(hostSchemaBase(base), "tool.schema.json") } : {}),
     title: "Tool definition",
     description:
       "One concrete way to exercise a skill. A skill states a capability generically; " +
@@ -262,7 +266,12 @@ export interface SkillIoContract {
  */
 export function buildSkillIoContracts(opts: SchemaExportOptions = {}): SkillIoContract[] {
   const root = opts.root ?? ROOT;
-  const base = (opts.schemaBase ?? opts.baseUrl ?? readDeclaration(ROOT)?.canonicalUrl ?? "").replace(/\/+$/, "");
+  // A foreign instance's base is passed in (`schemaBase`); the host's is its
+  // own directory under the site, `hostSchemaBase` (#676).
+  const base =
+    opts.schemaBase !== undefined
+      ? opts.schemaBase.replace(/\/+$/, "")
+      : hostSchemaBase(opts.baseUrl ?? readDeclaration(ROOT)?.canonicalUrl ?? "");
   const dir = contractsDir(root);
   if (!existsSync(dir)) return [];
 
@@ -303,13 +312,25 @@ export function buildSkillIoContracts(opts: SchemaExportOptions = {}): SkillIoCo
  * somebody hand-edited an identity — and a generator that quietly papers over
  * that is how the next 44 go bad without anyone seeing it.
  */
-export function staleSkillIoIds(opts: SchemaExportOptions = {}): Array<{ source: string; stored: string; expected: string }> {
+export function staleSkillIoIds(
+  opts: SchemaExportOptions = {},
+  { acceptLegacy = true }: { acceptLegacy?: boolean } = {},
+): Array<{ source: string; stored: string; expected: string }> {
   const bad: Array<{ source: string; stored: string; expected: string }> = [];
+  // The host's contracts' address before #676 moved them under its own
+  // directory. A stored `$id` still naming it is accepted for the one release
+  // the root tombstones cover, so the committed contracts (cat-harness) and
+  // this layer can be re-pinned in either order. `--write-ids` does not
+  // accept it, so it rewrites them. Drop with the tombstones.
+  const legacyBase =
+    acceptLegacy && opts.schemaBase === undefined ? (opts.baseUrl ?? readDeclaration(ROOT)?.canonicalUrl ?? "").replace(/\/+$/, "") : "";
   for (const c of buildSkillIoContracts(opts)) {
     const expected = c.schema.$id as string | undefined;
     if (expected === undefined) continue; // No canonicalUrl declared — nothing to check against.
     const stored = JSON.parse(readFileSync(join(opts.root ?? ROOT, c.source), "utf-8")).$id as string | undefined;
-    if (stored !== expected) bad.push({ source: c.source, stored: stored ?? "(none)", expected });
+    if (stored === expected) continue;
+    if (legacyBase && stored === skillIoIri(legacyBase, c.skill, c.io)) continue;
+    bad.push({ source: c.source, stored: stored ?? "(none)", expected });
   }
   return bad;
 }
@@ -421,12 +442,24 @@ export function artefactDeclarationDrift(produced: readonly string[]): {
 } {
   const declared = declaredArtefacts();
   const producedSet = new Set(produced);
-  const undeclared = produced.filter((a) => !declared.has(a)).sort();
+  // For one release (#676), a Tool may still declare a host schema at its old
+  // site-root path: cat-harness's `maintains` and this layer are re-pinned in
+  // either order. The old path names the moved file. Drop with the tombstones.
+  const movedFrom = new Map<string, string>();
+  for (const a of produced) {
+    const old = legacyHostSchemaPath(a);
+    if (old !== undefined) movedFrom.set(old, a);
+  }
+  const isDeclared = (a: string): boolean => {
+    const old = legacyHostSchemaPath(a);
+    return declared.has(a) || (old !== undefined && declared.has(old));
+  };
+  const undeclared = produced.filter((a) => !isDeclared(a)).sort();
   const unproduced: Array<{ artefact: string; tool: string }> = [];
   const missingSource: Array<{ artefact: string; tool: string; source: string }> = [];
   for (const [artefact, d] of declared) {
     // Only this command's own artefacts: see the note above on the narrowing.
-    if (d.producedBy === SELF_INVOCATION && !producedSet.has(artefact)) {
+    if (d.producedBy === SELF_INVOCATION && !producedSet.has(artefact) && !movedFrom.has(artefact)) {
       unproduced.push({ artefact, tool: d.tool });
     }
     if (!existsSync(join(ROOT, d.source))) {
@@ -442,7 +475,7 @@ export function artefactDeclarationDrift(produced: readonly string[]): {
 
 export function writeSkillIoIds(opts: SchemaExportOptions = {}): string[] {
   const written: string[] = [];
-  for (const { source, stored, expected } of staleSkillIoIds(opts)) {
+  for (const { source, stored, expected } of staleSkillIoIds(opts, { acceptLegacy: false })) {
     const abs = join(opts.root ?? ROOT, source);
     const doc = JSON.parse(readFileSync(abs, "utf-8")) as Record<string, unknown>;
     if (stored === "(none)" && !("$id" in doc)) {
@@ -469,13 +502,52 @@ export function writeSkillIoIds(opts: SchemaExportOptions = {}): string[] {
  *
  * Instance artefact takes the instance's name; vocabulary documents take the
  * vocabulary's. See `buildToolTypes`.
+ *
+ * Each name is SITE-relative, `<name>/<file>`: the host's schemas sit under its
+ * own directory, beside its document, since #676 (#603 decision 1b), and a
+ * Tool's `maintains.artefact` is site-relative too (`cat-harness/ns.jsonld`).
  */
 export function schemaFiles(stub: string, baseUrl?: string): Array<[string, Record<string, unknown>]> {
   return [
-    [`${stub}.schema.json`, buildDeclarationSchema({ baseUrl })],
-    ["tool.schema.json", buildToolSchema({ baseUrl })],
-    ["tool-types.schema.json", buildToolTypes({ baseUrl })],
+    [hostSchemaPath(`${stub}.schema.json`), buildDeclarationSchema({ baseUrl })],
+    [hostSchemaPath("tool.schema.json"), buildToolSchema({ baseUrl })],
+    [hostSchemaPath("tool-types.schema.json"), buildToolTypes({ baseUrl })],
   ];
+}
+
+/**
+ * The one-release tombstone at each host schema's old site-root address
+ * (#676; #603 decision 1b, decision 5a: one per old address).
+ *
+ * `[old site-relative path, tombstone]` for each document `published` lists,
+ * as `[site-relative path now, document]`. The old `$id` is the new one with
+ * the host's segment taken out, so a preview's tombstones name the preview's
+ * documents. A document with no `$id` (no base) gets none: there is no address
+ * to forward from. The combined type vocabulary forwards each `$defs` entry to
+ * its per-type document, which a port named as `…#/$defs/<Name>` before the move.
+ */
+export function schemaTombstones(
+  published: ReadonlyArray<readonly [string, Record<string, unknown>]>,
+  stamp: Record<string, unknown> = {},
+): Array<[string, Record<string, unknown>]> {
+  const out: Array<[string, Record<string, unknown>]> = [];
+  const typeDocs = new Map<string, string>();
+  for (const [path, doc] of published) {
+    const m = /(?:^|\/)tool-types\/([A-Za-z][A-Za-z0-9]*)\.schema\.json$/.exec(path);
+    if (m && typeof doc.$id === "string") typeDocs.set(m[1]!, doc.$id);
+  }
+  for (const [path, doc] of published) {
+    const old = legacyHostSchemaPath(path);
+    const newIri = doc.$id;
+    if (old === undefined || typeof newIri !== "string" || !newIri.endsWith(`/${path}`)) continue;
+    const site = newIri.slice(0, newIri.length - path.length);
+    const defs =
+      old === "tool-types.schema.json"
+        ? Object.fromEntries(Object.keys((doc.$defs ?? {}) as Record<string, unknown>).flatMap((n) => (typeDocs.has(n) ? [[n, typeDocs.get(n)!]] : [])))
+        : {};
+    out.push([old, movedSchema(`${site}${old}`, newIri, doc.title, defs, stamp)]);
+  }
+  return out;
 }
 
 // ── EVERY OTHER INSTANCE'S SCHEMA — `<site>/<stub>/schema/` (bean `4ak5` item 1) ──
@@ -939,39 +1011,58 @@ const outDir = arg("--out-dir") ?? join(repoRootFor(ROOT), "_kg");
   // makes, and it is why both use the one key.
   const staging = stagingFields();
 
+  // Every document under the host's own directory, `<out>/<name>/…` (#676),
+  // by site-relative path. `--out-dir` is the SITE root, as before: the deploy
+  // passes `./_site`, so its step needs no change.
+  const write = (path: string, doc: Record<string, unknown>): string => {
+    const out = join(outDir, path);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify({ ...doc, ...staging }, null, 2) + "\n");
+    return out;
+  };
+
   const files = schemaFiles(stub, baseUrl);
   for (const [name, schema] of files) {
-    const out = join(outDir, name);
-    writeFileSync(out, JSON.stringify({ ...schema, ...staging }, null, 2) + "\n");
+    const out = write(name, schema);
     console.log(`${relative(ROOT, out)}`);
     console.log(`  $id  ${schema.$id ?? "(none — no canonicalUrl declared)"}`);
   }
 
   // One document per shared type, at the IRI each port names (bean `tdir`).
-  const typeFiles = buildToolTypeFiles({ baseUrl });
-  for (const [name, schema] of typeFiles) {
-    const out = join(outDir, name);
-    mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, JSON.stringify({ ...schema, ...staging }, null, 2) + "\n");
-  }
-  console.log(`${relative(ROOT, join(outDir, "tool-types"))}/  (${typeFiles.length} type(s))`);
+  const typeFiles = buildToolTypeFiles({ baseUrl }).map(([name, schema]): [string, Record<string, unknown>] => [
+    hostSchemaPath(name),
+    schema,
+  ]);
+  for (const [name, schema] of typeFiles) write(name, schema);
+  console.log(`${relative(ROOT, join(outDir, hostSchemaPath("tool-types")))}/  (${typeFiles.length} type(s))`);
   console.log(`  $id  ${typeFiles[0]?.[1].$id ?? "(none — no canonicalUrl declared)"}  …`);
 
   // The per-skill I/O contracts, published at the `$id` each one claims.
+  // The contracts are stamped too. They are the artefacts a Tool node's
+  // `io.*.schema` dereferences to, so "which build is this contract from" is
+  // the question with the most riding on it, not the least.
   const contracts = buildSkillIoContracts({ baseUrl });
-  for (const c of contracts) {
-    const out = join(outDir, c.published);
-    mkdirSync(dirname(out), { recursive: true });
-    // The contracts are stamped too. They are the artefacts a Tool node's
-    // `io.*.schema` dereferences to, so "which build is this contract from" is
-    // the question with the most riding on it, not the least.
-    writeFileSync(out, JSON.stringify({ ...c.schema, ...staging }, null, 2) + "\n");
-  }
+  const contractFiles = contracts.map((c): [string, Record<string, unknown>] => [
+    hostSchemaPath(c.published.split("\\").join("/")),
+    c.schema,
+  ]);
+  for (const [name, schema] of contractFiles) write(name, schema);
   if (contracts.length > 0) {
     console.log(
-      `${relative(ROOT, join(outDir, "skills"))}/  ` +
+      `${relative(ROOT, join(outDir, hostSchemaPath("skills")))}/  ` +
         `(${contracts.length} contract(s) across ${new Set(contracts.map((c) => c.skill)).size} skill(s))`,
     );
     console.log(`  $id  ${contracts[0].schema.$id ?? "(none — no canonicalUrl declared)"}  …`);
   }
+
+  // The old site-root addresses, each a one-release tombstone forwarding to
+  // the moved document (#676). Written with the stamp folded in, not by
+  // `write`, which would stamp them a second time.
+  const tombs = schemaTombstones([...files, ...typeFiles, ...contractFiles], staging);
+  for (const [old, doc] of tombs) {
+    const out = join(outDir, old);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
+  }
+  if (tombs.length > 0) console.log(`${tombs.length} tombstone(s) at the old site-root addresses (one release, #676)`);
 }

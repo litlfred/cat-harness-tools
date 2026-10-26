@@ -1,6 +1,6 @@
 /**
  * A memory entry's agent `references` name a declared subagent — held against
- * the WHOLE CHECKOUT, moved here from `cat-harness/scripts/tests/memory-refs.test.ts`
+ * the WHOLE CHECKOUT, moved here from `cat-harness-tools/scripts/tests/conduct/memory-refs.test.ts`
  * (bean `ho66`, owner ruling 2026-10-06 "Top-level instance"). The subagents
  * are declared under the aggregate root's `.claude/agents/`, which a
  * standalone cat-harness does not hold, so there every reference read as

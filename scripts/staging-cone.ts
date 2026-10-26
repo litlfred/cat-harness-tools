@@ -39,10 +39,10 @@
  * @module cat-harness/scripts/staging-cone
  * @covers none — it computes over declarations and code, and judges nothing
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
-import { specifiersOf } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
+import { importClosure as walkImports } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { downstreamOf, type Edge, judge, readTree, renderingOrder } from "./check-derived-from.ts";
 
@@ -65,15 +65,6 @@ export interface Closure {
 
 /** What a computed `import()` can load. */
 const MODULE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs|json)$/;
-
-const EXTENSIONS = ["", ".ts", ".tsx", ".js", ".mjs"];
-
-/** Resolve a relative specifier the way Bun does for this repo: as written, then `.js` → `.ts`, then by extension. */
-function resolveSpecifier(fromAbs: string, spec: string): string | undefined {
-  const base = resolve(dirname(fromAbs), spec);
-  const candidates = [base, base.replace(/\.js$/, ".ts"), ...EXTENSIONS.map((e) => base + e), join(base, "index.ts")];
-  return candidates.find((c) => existsSync(c) && statSync(c).isFile());
-}
 
 /**
  * Computed `import()` sites whose targets are declared somewhere readable,
@@ -101,34 +92,29 @@ function tsFilesUnder(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** The repo-relative files `entry` imports, transitively, itself included. */
+/**
+ * The repo-relative files `entry` imports, transitively, itself included.
+ *
+ * The walk is bootstrap-tools' `importClosure`, the one closure walker
+ * (owner, 2026-10-24, bean `mo75` G3: the gate, the remote mount and this
+ * cone share it). This function only says what the cone makes of it: a bare
+ * import is out of the repository's cone, and a computed `import()` whose
+ * targets are declared ({@link DECLARED_COMPUTED_IMPORTS}) is walked like an
+ * import.
+ */
 export function importClosure(entry: string, repoRoot: string): Closure {
-  const files = new Set<string>();
-  const queue = [resolve(repoRoot, entry)];
-  let doubt: string | undefined;
-  let computed: string | undefined;
-  while (queue.length > 0) {
-    const abs = queue.pop()!;
-    const rel = relative(repoRoot, abs);
-    if (files.has(rel)) continue;
-    if (!existsSync(abs)) {
-      doubt ??= `${rel} does not exist`;
-      continue;
-    }
-    files.add(rel);
-    const src = readFileSync(abs, "utf-8");
-    if (/\bimport\s*\(\s*[^"'\s)]/.test(src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ""))) {
-      const declared = DECLARED_COMPUTED_IMPORTS[rel];
-      if (declared) for (const t of declared(repoRoot)) queue.push(resolve(repoRoot, t));
-      else computed ??= `${rel} imports a computed path`;
-    }
-    for (const spec of specifiersOf(src)) {
-      if (!spec.startsWith(".")) continue; // bare → node_modules, out of the repo's cone
-      const hit = resolveSpecifier(abs, spec);
-      if (hit === undefined) doubt ??= `${rel} imports ${spec}, which does not resolve`;
-      else queue.push(hit);
-    }
-  }
+  const rel = (abs: string): string => relative(repoRoot, abs);
+  const walk = walkImports([resolve(repoRoot, entry)], {
+    declaredEdges: (abs) => (DECLARED_COMPUTED_IMPORTS[rel(abs)]?.(repoRoot) ?? []).map((t) => resolve(repoRoot, t)),
+  });
+  const files = new Set(walk.files.map(rel));
+  const undeclared = walk.computed.map(rel).filter((f) => DECLARED_COMPUTED_IMPORTS[f] === undefined);
+  const doubt = walk.missing.length
+    ? `${rel(walk.missing[0]!)} does not exist`
+    : walk.unresolved.length
+      ? `${rel(walk.unresolved[0]!.from)} imports ${walk.unresolved[0]!.specifier}, which does not resolve`
+      : undefined;
+  const computed = undeclared.length ? `${undeclared[0]} imports a computed path` : undefined;
   return { files, ...(doubt ? { doubt } : {}), ...(computed ? { computed } : {}) };
 }
 

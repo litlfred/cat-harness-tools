@@ -19,6 +19,7 @@
  * is reported as one — `kind: "commit"` with its pinned SHA — and never
  * followed silently: the caller decides whether that pin names another tree.
  */
+import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -97,6 +98,31 @@ export class RemoteTree {
   /** Every file under the commit, for a size denominator. */
   countFiles(): number {
     return git(["ls-tree", "-r", "--name-only", "FETCH_HEAD"], this.dir).split("\n").filter(Boolean).length;
+  }
+
+  private fileSet: Set<string> | undefined;
+
+  /**
+   * Every file path the commit holds (gitlinks excluded), listed once from
+   * the trees — no blob is fetched. A closure walker asks "is this a file"
+   * hundreds of times; one listing answers all of them (bean `mo75` G3).
+   */
+  files(): Set<string> {
+    if (!this.fileSet) {
+      // A large tree's listing (cat-harness: ~40k entries) overflows
+      // spawnSync's default 1 MiB buffer, which fails with no exit status.
+      const r = spawnSync("git", ["ls-tree", "-r", "FETCH_HEAD"], { cwd: this.dir, encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
+      if (r.status !== 0) throw new Error(`git ls-tree -r FETCH_HEAD failed: ${(r.stderr ?? "").trim() || r.error?.message || `exit ${r.status}`}`);
+      this.fileSet = new Set(
+        r.stdout
+          .split("\n")
+          .filter(Boolean)
+          .map(parseLsTree)
+          .filter((e) => e.kind === "blob")
+          .map((e) => e.path),
+      );
+    }
+    return this.fileSet;
   }
 
   /** A blob's bytes as text; fetches that one blob. `undefined` when `path` is not a file. */
