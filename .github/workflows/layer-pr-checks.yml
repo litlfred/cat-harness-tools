@@ -1292,7 +1292,7 @@ jobs:
     # A draft under `draft-fast-tier` reports under its own name, never as
     # "No new failures": that green was read as the full verdict when a draft
     # was marked ready and merged before the full run reported
-    # (fhir-harness#167 and #169, 2026-10-24).
+    # (https://github.com/litlfred/fhir-harness/pull/167 and #169, 2026-10-24).
     name: ${{ (inputs.draft-fast-tier && github.event.pull_request.draft == true) && 'Draft fast tier only (not the full checks)' || 'No new failures (tests and gates)' }}
     needs: [prepare-head, prepare-base, run]
     if: ${{ !cancelled() && github.event.action != 'closed' }}
