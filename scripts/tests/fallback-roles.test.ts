@@ -19,6 +19,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   SCANNED,
+  checkoutCapabilityFacts,
   declaredCapabilities,
   declaredCapabilityFacts,
   declaredRoles,
@@ -27,6 +28,7 @@ import {
   fallbackUses,
   transitivelyRequires,
 } from "../check-fallback-roles.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -145,7 +147,11 @@ describe("the scan", () => {
 });
 
 describe("the capability-level fallback, and the contradiction it exposed", () => {
-  const facts = declaredCapabilityFacts(ROOT);
+  /** The platform's own registry — what the id-set helper below is compared against. */
+  const own = declaredCapabilityFacts(ROOT);
+  // The whole checkout's: a capability is declared by the instance its
+  // subject belongs to, and the Lean pair is no longer the platform's.
+  const facts = checkoutCapabilityFacts(repoRootFor(ROOT));
 
   test("`fallbackTo` is declared ONCE, on the capability it is a property of", () => {
     // Five skill modules each carried `fallbackCapabilityId: "lean-mcp"`.
@@ -210,7 +216,7 @@ describe("the capability-level fallback, and the contradiction it exposed", () =
   });
 
   test("the id-set helper still agrees with the facts map", () => {
-    expect(declaredCapabilities(ROOT)).toEqual(new Set(facts.keys()));
+    expect(declaredCapabilities(ROOT)).toEqual(new Set(own.keys()));
   });
 });
 
