@@ -65,6 +65,14 @@ export interface GateResult {
   detail: string;
 }
 
+/** Machine-readable output of `security:gate --json`, optionally referencing its `folio-run-context/v1` record (`C1 = (a)`). */
+export interface SecurityGateReport {
+  $schema: "folio-security-gate/v1";
+  results: GateResult[];
+  blocked: boolean;
+  runContext?: { sha256: string };
+}
+
 /** The security checks, each a `package.json` script, in the order a reader meets them. */
 export const SECURITY_CHECKS: ReadonlyArray<{ script: string; blocking: boolean; guards: string }> = [
   { script: "check:workflow-injection", blocking: true, guards: "`${{ }}` reaching a run:/script: block" },
