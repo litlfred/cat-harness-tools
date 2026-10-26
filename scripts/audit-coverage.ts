@@ -744,19 +744,26 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
     }
   }
 
-  const instances = instanceRootsIn(repo);
+  // Each instance's directories, resolved ONCE rather than once per kind. The
+  // resolution does not depend on the kind, and it was the run's cost: about
+  // 50 ms per pass over the checkout's instances, repeated for each of ~90
+  // kinds, so most of a `coverage()` call (measured 2026-10-26: 6.5 s, of
+  // which under 1 s was the gates, the universe and the census). An instance
+  // whose declaration will not resolve is skipped here as it was in the loop.
+  const dirsByInstance: ResolvedDirectory[][] = [];
+  for (const inst of instanceRootsIn(repo)) {
+    try {
+      dirsByInstance.push(resolveDirectories([{ name: "(local)", root: inst, own: true }]));
+    } catch {
+      continue;
+    }
+  }
   const rows: KindCoverage[] = [];
   for (const kind of kinds) {
     // `directoriesForGraph`, kept whole rather than reduced to paths, so the
     // census can see which directories are STORED (`storage`, bean `16ei`).
     const resolved = new Map<string, Pick<ResolvedDirectory, "id" | "absPath" | "storage">>();
-    for (const inst of instances) {
-      let dirsForInst;
-      try {
-        dirsForInst = resolveDirectories([{ name: "(local)", root: inst, own: true }]);
-      } catch {
-        continue;
-      }
+    for (const dirsForInst of dirsByInstance) {
       for (const d of dirsForInst) {
         if (d.graphTypologies.includes(kind as never) && !resolved.has(d.absPath)) resolved.set(d.absPath, d);
       }
