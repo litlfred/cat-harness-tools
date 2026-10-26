@@ -179,29 +179,32 @@ describe("real repository measurement", () => {
     // facts than cat-harness's own do: lean-toolchain (folio-assistant-sci's
     // lean-docs-publish and authoring-a-paper), release-management
     // (fhir-harness's ig-incremental-build) and review-comments
-    // (folio-assistant-core's content-change-review) — 14 there, 17 standing
-    // alone. So the bound is 17 and may only fall, and every finding must be
-    // one of the 17 known: a NEW unconsumed fact fails here in either setting.
+    // (folio-assistant-core's content-change-review) — 13 there, 16 standing
+    // alone. So the bound is 16 and may only fall, and every finding must be
+    // one of the 16 known: a NEW unconsumed fact fails here in either setting.
+    // `git-push` left the list when cat-harness's own copy-into-folio.bpmn
+    // began probing it as a write capability.
     const KNOWN = new Set([
       // capabilities
-      "fhir-validator", "git-push", "ig-publisher", "jekyll", "lean-toolchain", "sushi-compiler",
+      "fhir-validator", "ig-publisher", "jekyll", "lean-toolchain", "sushi-compiler",
       // permissions
       "approval-authority", "clinical-validation", "content-authoring", "first-pass-review",
       "perform-task", "project-governance", "qa-reporting", "release-authorization",
       "release-management", "review-comments", "sme-coordination",
     ]);
-    expect(res.findings.length).toBeLessThanOrEqual(17);
+    expect(res.findings.length).toBeLessThanOrEqual(16);
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
     // Unconsumed in either setting: no process mounted anywhere consumes these yet.
-    for (const w of ["git-push", "jekyll", "sushi-compiler", "ig-publisher", "fhir-validator",
+    for (const w of ["jekyll", "sushi-compiler", "ig-publisher", "fhir-validator",
       "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
       "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
       expect(findingsWhere).toContain(w);
     }
 
     // The consumed facts MUST NOT be reported as findings:
-    // signing-api, admin-settings, role-management, adjudication, translation
+    // signing-api, admin-settings, role-management, adjudication, translation, git-push
+    expect(findingsWhere).not.toContain("git-push");
     expect(findingsWhere).not.toContain("signing-api");
     expect(findingsWhere).not.toContain("admin-settings");
     expect(findingsWhere).not.toContain("role-management");
