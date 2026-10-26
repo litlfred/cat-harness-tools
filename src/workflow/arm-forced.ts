@@ -46,6 +46,12 @@ export interface BankCase {
   facts: {
     exitCriteria: Record<string, unknown>;
     signingRoute?: Record<string, unknown>;
+    /**
+     * The branch to take at each gateway that has no DMN table (the bean-open
+     * and bean-close gateways): those are chosen, not computed, so the case
+     * names the choice a correct agent makes.
+     */
+    gatewayOutcomes?: Record<string, string>;
   };
   expected: {
     canonicalPath: string[];
@@ -173,8 +179,11 @@ export function runForcedCase(
   const postSubprocessSkills: string[] = [];
   const skippableAheadNodes = new Set<string>(["GW_ExitCriteria", "Gateway_SigningRoute"]);
 
+  // A bound on turns, not a budget: every case's canonical path plus its
+  // refusals fits well inside it.
+  const maxTurns = 4 * bankCase.expected.canonicalPath.length;
   let safetyGuard = 0;
-  while (state.status === "running" && safetyGuard < 32) {
+  while (state.status === "running" && safetyGuard < maxTurns) {
     safetyGuard += 1;
     const open: Enabled[] = enabled(model, state, roleGraph);
     if (open.length === 0) break;
@@ -199,19 +208,21 @@ export function runForcedCase(
     // Determine what the agent attempts on this turn:
     // If there was no refusal on the immediately preceding turn for this step and
     // the proposal queue has an item, try the agent's next proposed step first.
+    // After a refusal the RUNNER, not an agent, submits the enabled node: the
+    // simulated agent has no way to read the refusal and choose again.
     const canTryProposal = lastRefusalError === undefined && proposalQueue.length > 0;
+    const isComputed = current.kind === "decision" && current.computed !== undefined;
     const candidate: ProposedStep = canTryProposal
       ? proposalQueue.shift()!
-      : {
-          node: current.node,
-          useFacts: current.kind === "decision" && current.computed !== undefined,
-        };
+      : current.kind === "decision" && !isComputed
+        ? { node: current.node, outcome: bankCase.facts.gatewayOutcomes?.[current.node] }
+        : { node: current.node, useFacts: isComputed };
 
     totalTurns += 1;
     promptTokens += estimateTokens(turnPromptPayload);
 
     const attemptPayload =
-      current.kind === "decision" && candidate.node === current.node && candidate.useFacts !== false
+      isComputed && candidate.node === current.node && candidate.useFacts !== false
         ? { node: candidate.node, facts: factsForGateway(candidate.node, bankCase) }
         : { node: candidate.node, outcome: candidate.outcome };
     completionTokens += estimateTokens(JSON.stringify(attemptPayload));
@@ -223,7 +234,7 @@ export function runForcedCase(
           outcome: candidate.outcome,
           actor: current.role ?? "agent",
         });
-      } else if (current.kind === "decision" && candidate.node === current.node) {
+      } else if (isComputed && candidate.node === current.node) {
         state = complete(model, state, candidate.node, {
           facts: factsForGateway(candidate.node, bankCase),
           actor: current.role ?? "agent",

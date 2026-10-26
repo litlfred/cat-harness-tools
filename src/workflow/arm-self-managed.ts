@@ -21,7 +21,7 @@
 import { resolveRoleSkills, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import type { ProcessModel } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
-import type { ArmCaseMetrics, ArmSummaryMetrics, BankCase, ProposedStep } from "./arm-forced.js";
+import type { ArmCaseMetrics, ArmSummaryMetrics, BankCase } from "./arm-forced.js";
 
 function estimateTokens(payload: string): number {
   return Math.max(1, Math.ceil(Buffer.byteLength(payload, "utf-8") / 4));
@@ -123,7 +123,10 @@ function findNodeModel(
 }
 
 function deriveSelfManagedTerminalNode(executedPath: readonly string[]): string {
-  const lastStep = executedPath[executedPath.length - 1];
+  // The bean-close steps (`Close_*`) follow every end that finishes the bean;
+  // the verdict is read from the step before them.
+  const work = executedPath.filter((s) => !s.startsWith("Close_"));
+  const lastStep = work[work.length - 1];
   if (!lastStep) return "unknown";
   if (
     lastStep === "A_FileCertification" ||
@@ -189,6 +192,9 @@ export function runSelfManagedCase(
         for (const s of childOnlySkills) {
           activeSkills.delete(s);
         }
+      }
+      for (const s of nodeObj?.skills ?? []) {
+        activeSkills.add(s);
       }
     } else {
       for (const s of nodeObj?.skills ?? []) {

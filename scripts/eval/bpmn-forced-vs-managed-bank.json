@@ -3,7 +3,8 @@
   "bankId": "bpmn-forced-vs-managed-v1",
   "diagram": "processes/sdlc/test-plan-execution.bpmn",
   "subprocessDiagram": "processes/sdlc/qa-report-signing.bpmn",
-  "description": "Independent task bank for bean folio-assistant-502c comparing Arm 1 (forced along a BPMN by the token machine) against Arm 2 (self-managed with the full diagram in context) on test-plan-execution.bpmn and its called subprocess qa-report-signing.bpmn.",
+  "beanDiagrams": ["processes/sdlc/bean-open.bpmn", "processes/sdlc/bean-close.bpmn"],
+  "description": "Independent task bank for bean folio-assistant-502c comparing Arm 1 (forced along a BPMN by the token machine) against Arm 2 (self-managed with the full diagram in context) on test-plan-execution.bpmn and the processes it calls: qa-report-signing.bpmn, and bean-open.bpmn / bean-close.bpmn around the work (bean m8gz). Each case's agentProposal is a SIMULATED agent: a hand-written step script that both arms replay. It exercises the runner and the engine's refusals; it is not a model, and results produced with it are not evidence about model behaviour.",
   "cases": [
     {
       "id": "case-01-certified-api-disciplined",
@@ -23,10 +24,21 @@
         "signingRoute": {
           "reach": "internet",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -41,7 +53,10 @@
           "Task_ApiSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -50,6 +65,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -64,7 +84,10 @@
           { "node": "Task_ApiSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -86,10 +109,21 @@
         "signingRoute": {
           "reach": "air-gapped",
           "signingApiConfigured": false
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -104,7 +138,10 @@
           "Task_HumanSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -113,6 +150,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -127,7 +169,10 @@
           { "node": "Task_HumanSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -145,10 +190,21 @@
           "checker": "agree",
           "failedCases": 2,
           "passedCases": 10
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -156,7 +212,10 @@
           "A_WriteRun",
           "A_ReExecuteSample",
           "GW_ExitCriteria:refused",
-          "A_RecordRefusal"
+          "A_RecordRefusal",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Refused",
         "exitOutcome": "refused",
@@ -165,6 +224,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -172,7 +236,10 @@
           { "node": "A_WriteRun" },
           { "node": "A_ReExecuteSample" },
           { "node": "GW_ExitCriteria", "useFacts": true, "outcome": "refused" },
-          { "node": "A_RecordRefusal" }
+          { "node": "A_RecordRefusal" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -190,10 +257,21 @@
           "checker": "disagree",
           "failedCases": 0,
           "passedCases": 12
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -201,7 +279,10 @@
           "A_WriteRun",
           "A_ReExecuteSample",
           "GW_ExitCriteria:undetermined",
-          "A_RecordUndetermined"
+          "A_RecordUndetermined",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Undetermined",
         "exitOutcome": "undetermined",
@@ -210,6 +291,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -217,7 +303,10 @@
           { "node": "A_WriteRun" },
           { "node": "A_ReExecuteSample" },
           { "node": "GW_ExitCriteria", "useFacts": true, "outcome": "undetermined" },
-          { "node": "A_RecordUndetermined" }
+          { "node": "A_RecordUndetermined" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -239,10 +328,21 @@
         "signingRoute": {
           "reach": "internet",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -257,7 +357,10 @@
           "Task_ApiSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -266,6 +369,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -279,7 +387,10 @@
           { "node": "Task_ApiSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -301,10 +412,21 @@
         "signingRoute": {
           "reach": "internet",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -312,7 +434,10 @@
           "A_WriteRun",
           "A_ReExecuteSample",
           "GW_ExitCriteria:refused",
-          "A_RecordRefusal"
+          "A_RecordRefusal",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Refused",
         "exitOutcome": "refused",
@@ -321,6 +446,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -335,7 +465,10 @@
           { "node": "Task_ApiSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -357,10 +490,21 @@
         "signingRoute": {
           "reach": "internet",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -375,7 +519,10 @@
           "Task_ApiSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -384,6 +531,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -393,7 +545,10 @@
           { "node": "GW_ExitCriteria", "useFacts": true, "outcome": "certified" },
           { "node": "A_RecordCertification" },
           { "node": "Call_Sign" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -415,10 +570,21 @@
         "signingRoute": {
           "reach": "air-gapped",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -433,7 +599,10 @@
           "Task_HumanSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -442,6 +611,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -455,7 +629,10 @@
           { "node": "Task_ApiSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -473,10 +650,21 @@
           "checker": "agree",
           "failedCases": 0,
           "passedCases": 8
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -484,7 +672,10 @@
           "A_WriteRun",
           "A_ReExecuteSample",
           "GW_ExitCriteria:undetermined",
-          "A_RecordUndetermined"
+          "A_RecordUndetermined",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Undetermined",
         "exitOutcome": "undetermined",
@@ -493,6 +684,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": false,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -500,7 +696,10 @@
           { "node": "A_WriteRun" },
           { "node": "A_ReExecuteSample" },
           { "node": "GW_ExitCriteria", "useFacts": true, "outcome": "undetermined" },
-          { "node": "A_RecordUndetermined" }
+          { "node": "A_RecordUndetermined" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     },
@@ -522,10 +721,21 @@
         "signingRoute": {
           "reach": "internet",
           "signingApiConfigured": true
+        },
+        "gatewayOutcomes": {
+          "Open_Exists": "yes",
+          "Open_Owner": "mine / unclaimed",
+          "GW_BeanYours": "claimed",
+          "Close_Outcome": "done"
         }
       },
       "expected": {
         "canonicalPath": [
+          "Open_CheckExists",
+          "Open_Exists:yes",
+          "Open_Owner:mine / unclaimed",
+          "Open_Claim",
+          "GW_BeanYours:claimed",
           "A_Request",
           "A_ResolvePlan",
           "A_BindData",
@@ -540,7 +750,10 @@
           "Task_ApiSign",
           "Task_RecordAttestation",
           "Task_StoreSigned",
-          "A_FileCertification"
+          "A_FileCertification",
+          "Close_Outcome:done",
+          "Close_Complete",
+          "Close_Archive"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -549,6 +762,11 @@
       "agentProposal": {
         "retainSubprocessOverlayOnExit": true,
         "proposedSteps": [
+          { "node": "Open_CheckExists" },
+          { "node": "Open_Exists", "outcome": "yes" },
+          { "node": "Open_Owner", "outcome": "mine / unclaimed" },
+          { "node": "Open_Claim" },
+          { "node": "GW_BeanYours", "outcome": "claimed" },
           { "node": "A_Request" },
           { "node": "A_ResolvePlan" },
           { "node": "A_BindData" },
@@ -563,7 +781,10 @@
           { "node": "Task_ApiSign" },
           { "node": "Task_RecordAttestation" },
           { "node": "Task_StoreSigned" },
-          { "node": "A_FileCertification" }
+          { "node": "A_FileCertification" },
+          { "node": "Close_Outcome", "outcome": "done" },
+          { "node": "Close_Complete" },
+          { "node": "Close_Archive" }
         ]
       }
     }

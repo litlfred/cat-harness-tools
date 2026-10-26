@@ -135,9 +135,11 @@ describe("bean 502c — forced along a BPMN vs managing it (two-arm experiment)"
       rmSync(tempDir, { recursive: true, force: true });
     }
 
-    const beansDir = directoryForGraph(HARNESS_ROOT, "beans");
-    if (!beansDir) throw new Error("beans directory not declared");
-    expect(() => writeForcedVsManagedOutputs(result, beansDir, HARNESS_ROOT)).toThrow(
+    // A graph directory inside HARNESS_ROOT: the guard judges paths relative to
+    // the root it is given, and `beans` is declared at the checkout root, outside it.
+    const processesDir = directoryForGraph(HARNESS_ROOT, "processes");
+    if (!processesDir) throw new Error("processes directory not declared");
+    expect(() => writeForcedVsManagedOutputs(result, processesDir, HARNESS_ROOT)).toThrow(
       /resolves inside declared graph directory/,
     );
   });

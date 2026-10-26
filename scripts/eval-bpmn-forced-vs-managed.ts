@@ -22,6 +22,14 @@
  *   skipped mandatory steps, invalid gateway assertions, subprocess bypasses,
  *   and context overlay leaks.
  *
+ * **The agent here is simulated.** No model is called: each bank case's
+ * `agentProposal.proposedSteps` is a hand-written script both arms replay, and
+ * after a refusal the forced arm's runner submits the enabled node itself.
+ * Token counts are `ceil(bytes / 4)` of the payloads the runner builds, and
+ * wall time is the runner's own. The output exercises the harness and the
+ * engine's refusals; it is not evidence about how a model behaves, and a run
+ * that is meant to be must replace the script with model calls.
+ *
  * Per `deployment-topologies.md` §2 and `benchmarking-mode` (bean `wp49`),
  * benchmark outputs default to `build/benchmarks/bpmn-forced-vs-managed/` and
  * are guarded by `assertBenchmarkOutputPath` so they never land in declared
@@ -145,6 +153,8 @@ export async function evaluateForcedVsManaged(opts?: {
   const childDiagramPath = join(processesDir, "sdlc", "qa-report-signing.bpmn");
   const certDmnPath = join(processesDir, "sdlc", "decisions", "test-certification.dmn");
   const signingDmnPath = join(processesDir, "sdlc", "decisions", "signing-route.dmn");
+  const beanOpenPath = join(processesDir, "sdlc", "bean-open.bpmn");
+  const beanClosePath = join(processesDir, "sdlc", "bean-close.bpmn");
   const rolesPath = join(scenariosDir, "roles.json");
   const bankPath = join(TOOLS_ROOT, "scripts", "eval", "bpmn-forced-vs-managed-bank.json");
 
@@ -173,10 +183,12 @@ export async function evaluateForcedVsManaged(opts?: {
   const forcedSummary = summarizeForcedArm(forcedCases);
   const selfManagedSummary = summarizeSelfManagedArm(selfManagedCases);
 
-  // Shared data basis: identical across both arms (diagram + child diagram + DMNs + roles + task bank)
+  // Shared data basis: identical across both arms (diagram + called diagrams + DMNs + roles + task bank)
   const dataInputs = [
     toPosixRelative(TOOLS_ROOT, mainDiagramPath),
     toPosixRelative(TOOLS_ROOT, childDiagramPath),
+    toPosixRelative(TOOLS_ROOT, beanOpenPath),
+    toPosixRelative(TOOLS_ROOT, beanClosePath),
     toPosixRelative(TOOLS_ROOT, certDmnPath),
     toPosixRelative(TOOLS_ROOT, signingDmnPath),
     toPosixRelative(TOOLS_ROOT, rolesPath),
