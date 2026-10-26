@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { reviewPageHtml, reviewSiteRoot } from "../gen-review-page.js";
+import { matchesCommentFilter, reviewPageHtml, reviewSiteRoot } from "../gen-review-page.js";
 
 const html = reviewPageHtml();
 
@@ -60,6 +60,14 @@ describe("review page", () => {
     expect(html).toContain("Orphaned: the block these were made on is gone");
     expect(html).toContain("Tags that could not be read or applied");
     expect(html).toContain('"block: " + c.label');
+  });
+
+  test("lists, filters and resolves comments, and shows the recorded Decision (423d)", () => {
+    expect(html).toContain('<select id="comment-filter">');
+    expect(html).toContain("var matchesCommentFilter = ");
+    expect(html).toContain('"resolve: " + c.id');
+    expect(html).toContain('"decision: " + w');
+    expect(html).toContain("r.decision");
   });
 
   test("embeds the tested renderers and the registry, not copies of them (d903)", () => {
@@ -126,5 +134,22 @@ describe("reviewSiteRoot — the site root from the review page's own path (#252
   test("runs in the page as embedded: no TypeScript survives toString()", () => {
     const fn = new Function(`return (${reviewSiteRoot.toString()});`)() as typeof reviewSiteRoot;
     expect(fn("/x/en/review/", L)).toBe("../../");
+  });
+});
+
+describe("matchesCommentFilter — filtering review comments on the page (423d)", () => {
+  test("all comments pass an empty filter; open-addressed keeps active ones", () => {
+    expect(matchesCommentFilter("resolved", "defect", "")).toBe(true);
+    expect(matchesCommentFilter("open", "question", "open-addressed")).toBe(true);
+    expect(matchesCommentFilter("addressed", "defect", "open-addressed")).toBe(true);
+    expect(matchesCommentFilter("resolved", "defect", "open-addressed")).toBe(false);
+  });
+
+  test("filters by exact status or kind, and runs as embedded via toString()", () => {
+    const fn = new Function(`return (${matchesCommentFilter.toString()});`)() as typeof matchesCommentFilter;
+    expect(fn("resolved", "defect", "status:resolved")).toBe(true);
+    expect(fn("open", "defect", "status:resolved")).toBe(false);
+    expect(fn("open", "defect", "kind:defect")).toBe(true);
+    expect(fn("open", "question", "kind:defect")).toBe(false);
   });
 });
