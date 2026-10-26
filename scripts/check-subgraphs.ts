@@ -80,6 +80,7 @@ import {
   subgraphTree,
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+import type { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -287,9 +288,26 @@ function linkTargets(raw: string): string[] {
  */
 /** A link destination as a path: percent-decoded, or unchanged if the escapes are malformed. */
 /** A typology whose pages a renderable PARENT publishes — `within` a renderable one. */
-function publishedByParent(g: string): boolean {
-  const parent = defaultGraphTypologies.get(g)?.within;
-  return parent !== undefined && isRenderable(parent);
+function publishedByParent(g: string, registry: GraphTypologyRegistry): boolean {
+  const parent = registry.get(g)?.within;
+  return parent !== undefined && isRenderable(parent, registry);
+}
+
+/**
+ * Do the links of a directory of these kinds address the PUBLISHED tree
+ * rather than this one? A renderable kind's do; so do a kind `within` a
+ * renderable one ({@link publishedByParent}) and a kind whose markdown is
+ * shown on a published page (`shownOnPublishedPages`: an IG annex appended
+ * to its host page, smart-immunizations#81). Those links go to
+ * `siteResolved`; judging them from the page that shows them is the kind
+ * owner's gate (fhir-harness's `check:ig-annex-links`), since only it knows
+ * which page that is.
+ *
+ * Read through a cast so this compiles against a cat-harness pinned before
+ * cat-harness#618 added the field; an older registry simply never sets it.
+ */
+export function addressesPublishedTree(kinds: readonly string[], registry: GraphTypologyRegistry = defaultGraphTypologies): boolean {
+  return kinds.some((g) => isRenderable(g, registry) || publishedByParent(g, registry) || (registry.get(g) as { shownOnPublishedPages?: boolean } | undefined)?.shownOnPublishedPages === true);
 }
 
 export function decodeLinkTarget(target: string): string {
@@ -449,7 +467,8 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
           // docs graph's named groups (bean `xka5`), `proposals` and
           // `requirements` are not sites of their own, but their pages are docs
           // pages on the docs site, so their links address the same tree.
-          const renderable = owner.graphTypologies.some((g) => isRenderable(g) || publishedByParent(g));
+          // A kind whose markdown a published page SHOWS (an IG annex) is the same case.
+          const renderable = addressesPublishedTree(owner.graphTypologies);
           // A DERIVED graph's links came from the SOURCE document rather than
           // from an author here — see `derivedLinks`. Tested after
           // `renderable` only because no kind is currently both; if one ever

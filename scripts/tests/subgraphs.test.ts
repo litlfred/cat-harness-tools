@@ -30,7 +30,8 @@ import {
   siteDirFor,
   subgraphTree,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
+import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -244,5 +245,30 @@ describe("the `../` too many count is COMPUTED (bean `syrl`)", () => {
     expect(existsSync(siteDir), `${siteDir} must exist or this asserts nothing`).toBe(true);
     const { siteResolved } = REAL;
     expect(overDeepLinks(ROOT, siteResolved).map((l) => `${l.from} -> ${l.target}`)).toEqual([]);
+  });
+});
+
+describe("a kind whose markdown a published page SHOWS addresses the published tree (smart-immunizations#81)", () => {
+  // An IG annex is appended to its host page, so `business-processes.html#…`
+  // in `annexes/` names the page the IG renders, not a file beside it.
+  const reg = new GraphTypologyRegistry({
+    site: { renderable: true, holds: "content", summary: "a site" },
+    group: { renderable: false, within: "site", holds: "content", summary: "a group of the site's pages" },
+    // Cast: the field is cat-harness#618's, absent from an older pinned GraphTypologyDef.
+    annex: { renderable: false, shownOnPublishedPages: true, holds: "content", summary: "markdown appended to a page" } as GraphTypologyDef,
+    data: { renderable: false, holds: "content", summary: "nothing shows it" },
+  });
+
+  test("renderable, within a renderable kind, and shown on a published page each do", () => {
+    expect(addressesPublishedTree(["site"], reg)).toBe(true);
+    expect(addressesPublishedTree(["group"], reg)).toBe(true);
+    expect(addressesPublishedTree(["annex"], reg)).toBe(true);
+    expect(addressesPublishedTree(["data", "annex"], reg)).toBe(true);
+  });
+
+  test("a kind that says none of the three does not, so its unresolved links stay dangling", () => {
+    expect(addressesPublishedTree(["data"], reg)).toBe(false);
+    expect(addressesPublishedTree([], reg)).toBe(false);
+    expect(addressesPublishedTree(["unknown"], reg)).toBe(false);
   });
 });
