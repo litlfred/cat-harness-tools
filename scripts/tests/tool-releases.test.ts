@@ -58,6 +58,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/jre-17.tar.gz" },
     digest: { algorithm: "sha256", digest: sha256Hex(jre17Bytes), verifiedAt: "2026-10-07" },
     licence: "GPL-2.0-only WITH Classpath-exception-2.0",
+    licenceSource: "test fixture: no real artefact behind it",
     platform: { os: "linux", arch: "x64" },
     entry: { template: "{home}/bin/java", home: "jdk-17.0.12+7-jre" },
     runtimes: [],
@@ -72,6 +73,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/jre-21.tar.gz" },
     digest: { algorithm: "sha256", digest: sha256Hex(jre21Bytes), verifiedAt: "2026-10-07" },
     licence: "GPL-2.0-only WITH Classpath-exception-2.0",
+    licenceSource: "test fixture: no real artefact behind it",
     platform: { os: "linux", arch: "x64" },
     entry: { template: "{home}/bin/java", home: "jdk-21.0.4+7-jre" },
     runtimes: [],
@@ -86,6 +88,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/node-22.tar.xz" },
     digest: { algorithm: "sha256", digest: sha256Hex(nodeBytes), verifiedAt: "2026-10-07" },
     licence: "MIT",
+    licenceSource: "test fixture: no real artefact behind it",
     platform: { os: "linux", arch: "x64" },
     entry: { template: "{home}/bin/node", home: "node-v22.11.0-linux-x64" },
     runtimes: [],
@@ -100,6 +103,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/plantuml-1.2024.7.jar" },
     digest: { algorithm: "sha256", digest: sha256Hex(plantumlBytes), verifiedAt: "2026-10-07" },
     licence: "GPL-3.0-or-later",
+    licenceSource: "test fixture: no real artefact behind it",
     entry: { template: "java -jar {path}" },
     runtimes: [{ release: "temurin-jre@21.0.4+7", inject: "JAVA_HOME" }],
   };
@@ -113,6 +117,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/publisher-1.6.20.jar" },
     digest: { algorithm: "sha256", digest: sha256Hex(igPubBytes), verifiedAt: "2026-10-07" },
     licence: "Apache-2.0",
+    licenceSource: "test fixture: no real artefact behind it",
     entry: { template: "java -jar {path}" },
     runtimes: [
       { release: "temurin-jre@17.0.12+7", inject: "JAVA_HOME" },
@@ -129,6 +134,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/fsh-sushi-3.13.0.tgz" },
     digest: { algorithm: "sha256", digest: sha256Hex(sushiBytes), verifiedAt: "2026-10-07" },
     licence: "MIT",
+    licenceSource: "test fixture: no real artefact behind it",
     entry: { template: "node {home}/dist/app.js", home: "package" },
     runtimes: [{ release: "node@22.11.0", inject: "PATH" }],
   };
@@ -142,6 +148,7 @@ function makeSyntheticCatalog(): {
     source: { type: "url", url: "https://example.invalid/lean-4.12.0" },
     digest: { algorithm: "sha256", digest: sha256Hex(leanBytes), verifiedAt: "2026-10-07" },
     licence: "Apache-2.0",
+    licenceSource: "test fixture: no real artefact behind it",
     entry: { template: "elan toolchain install --file {path}" },
     runtimes: [],
   };
@@ -310,8 +317,8 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
     }
   });
 
-  test("plantuml-render resolves PlantUML's release from tool-releases/", () => {
-    const resolved = resolvePlantumlRelease(HARNESS_ROOT);
+  test("plantuml-render resolves PlantUML's release from the declared tool-release directory", async () => {
+    const resolved = await resolvePlantumlRelease(HARNESS_ROOT);
     expect(resolved.version).toBe(PLANTUML.version);
     expect(resolved.sha256).toBe(PLANTUML.sha256);
     expect(resolved.url).toBe(PLANTUML.url);
@@ -494,15 +501,12 @@ describe("Step 4 — `tools:sbom` SPDX 3.0.1 JSON-LD export", () => {
 
 describe("Step 6 — `upstream-pins` assessment for tool-release pins", () => {
   test("assesses tool-release pins in upstream-pins.json with three-state semantics", () => {
-    const pinDef: PinDef = {
-      id: "plantuml",
-      title: "PlantUML — diagram renderer (`tool-releases/plantuml-1.2024.7.json`)",
-      repo: "https://github.com/plantuml/plantuml.git",
-      pinnedIn: "tool-releases/plantuml-1.2024.7.json",
-      pattern: "^\\s*\"version\":\\s*\"([0-9]+\\.[0-9]+\\.[0-9]+)\"",
-      tagPattern: "^v\\d+\\.\\d+\\.\\d+$",
-      tagPrefix: "v",
-    };
+    // The pin as cat-harness's registry declares it, not a hand-written copy:
+    // the registry is what `check:upstream-pins` reads, so this asserts the
+    // real entry's `pinnedIn` and patterns against the real release file.
+    const registry = JSON.parse(readFileSync(join(HARNESS_ROOT, "upstream", "upstream-pins.json"), "utf8")) as { pins: PinDef[] };
+    const pinDef = registry.pins.find((p) => p.id === "plantuml");
+    if (!pinDef) throw new Error("cat-harness upstream-pins.json declares no `plantuml` pin");
     const fileText = readFileSync(join(HARNESS_ROOT, pinDef.pinnedIn), "utf8");
     const pinned = readPin(fileText, pinDef.pattern);
     expect(pinned).toBe("1.2024.7");
