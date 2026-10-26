@@ -1592,6 +1592,21 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
   if (want !== have) {
     return { state: "missing", reason: "the lock was written for different pins than the declaration names — run `bun run cat mount:remote`", outcomes: [] };
   }
+  // A pin's own instances were mounted from that pin (folio-assistant#2682):
+  // `mount:remote --seed` in a checkout whose mounts had drifted rewrote the
+  // top-level `ref` and left the instance entries at the old commit, and CI,
+  // which mounts from the entries, kept testing the old layer.
+  const stale = r.lock.instances.flatMap((inst) => {
+    const m = r.lock.mounts.find((x) => x.harness === inst.via && x.repository === inst.repository);
+    return m && inst.sha !== m.ref ? [`${inst.instance} at ${inst.sha.slice(0, 12)}, pinned at ${m.ref.slice(0, 12)}`] : [];
+  });
+  if (stale.length) {
+    return {
+      state: "missing",
+      reason: `the lock's instance entries are not the pinned commits (${stale.join("; ")}) — re-pin from a checkout mounted from the lock: \`bun run cat mount:remote --seed …\` then \`bun run cat mount:remote\``,
+      outcomes: [],
+    };
+  }
   // What the mount reached and did not lay down is carried in the lock, so
   // "the lock lists nothing wrong" is never mistaken for "nothing was wrong".
   const outcomes: InstanceOutcome[] = r.lock.unmounted.map(
