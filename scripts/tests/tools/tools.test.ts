@@ -304,6 +304,7 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
       // same things, and each carries a `selection` naming the forge.
       "github-branches ~ gitlab-branches",
       "github-pr-comment ~ gitlab-mr-comment",
+      "github-pr-files ~ gitlab-mr-files",
       "github-pr-list ~ gitlab-mr-list",
       "github-pr-view ~ gitlab-mr-view",
       "ingest-extended ~ ingest-stdlib",

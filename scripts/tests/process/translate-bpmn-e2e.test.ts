@@ -9,16 +9,20 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { extractBpmn, injectBpmn } from "../../../pipeline/bpmn-translate.ts";
 import { parsePo } from "../../../pipeline/po-inject.ts";
 import { loadProcessModel, isActivity } from "../../../src/workflow/process-model.ts";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { workflowFile } from "../../known-skills.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SRC = join(ROOT, "processes/sdlc/bean-lifecycle.bpmn");
+// bean-open.bpmn, not bean-lifecycle.bpmn: since the lifecycle was split
+// (bean m8gz), its gateways, its labels and its one bean op live in the open
+// half. Found by NAME through the declared `processes` graphs.
+const SRC = workflowFile(ROOT, "bean-open.bpmn");
 
 /** A PO translating a handful of the diagram's msgids. */
 function poFor(pairs: [string, string][]): string {
@@ -32,13 +36,13 @@ describe("bpmn translation end to end", () => {
     const before = await loadProcessModel(SRC);
 
     // Translate every label the extractor offers, so nothing is left to luck.
-    const entries = extractBpmn(xml, "processes/sdlc/bean-lifecycle.bpmn");
+    const entries = extractBpmn(xml, relative(ROOT, SRC));
     expect(entries.length).toBeGreaterThan(5);
     const po = poFor(entries.map((e) => [e.msgid, `[fr] ${e.msgid}`] as [string, string]));
 
     const out = injectBpmn(xml, parsePo(po));
     const dir = mkdtempSync(join(tmpdir(), "bpmn-fr-"));
-    const path = join(dir, "bean-lifecycle.bpmn");
+    const path = join(dir, "bean-open.bpmn");
     writeFileSync(path, out);
     try {
       const after = await loadProcessModel(path);

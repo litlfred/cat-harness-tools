@@ -403,6 +403,17 @@ export const RULES: Rule[] = [
       "schemas/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
       "schemas/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
       "schemas/built-at-publish.ts",         // what an instance serves and never commits — read by the declaration schema itself (B1)
+      // What one run ran on (bean `3sbm`), cited by digest from the harness's
+      // own run records — tool-run, test-report, health-report and kg-qa — so
+      // harness, with the release shapes it states its releases in. Left to
+      // the `schemas/` prefix rule they were core, and each citation was a
+      // wrong-direction edge.
+      "schemas/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
+      "schemas/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
+      "schemas/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
+      "schemas/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
+      "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
+      "schemas/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
 
       "schemas/property-skills.ts",          // declaration key → its edit skills (issue #1146)
       "schemas/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)

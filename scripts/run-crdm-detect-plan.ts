@@ -14,6 +14,7 @@
  *
  * | step | here |
  * |---|---|
+ * | `Call_BeanOpen`, `GW_BeanYours` | {@link openTrackedBean}: claim bean `ff09`, which already exists |
  * | `A_Request` … `A_BindData` | load and parse the plan; bind the fixed corpus |
  * | `A_Execute` | run `detect` on every issue; a verdict per case |
  * | `A_WriteRun` | `folio-test-run/v1` (data and process hashed apart) + `test-report/v1` |
@@ -48,7 +49,7 @@ import { detect, type Verdict } from "../src/crdm/detect-signals.ts";
 import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { complete, enabled, startInstance, type InstanceState } from "../src/workflow/instance.ts";
 import { saveInstance } from "../src/workflow/store.ts";
-import { completeExitCriteriaGateway } from "./test-plan-execution.ts";
+import { completeExitCriteriaGateway, openTrackedBean } from "./test-plan-execution.ts";
 import { renderTestReport, testReportBadge } from "./render-test-report.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
@@ -212,6 +213,8 @@ if (import.meta.main) {
   const sdlc = join(processes, "sdlc");
   const model = await loadProcessModel(join(sdlc, "test-plan-execution.bpmn"));
   let state: InstanceState = startInstance(model, { id: `${plan.id}-${runId}`, subject: `${plan.id}@${plan.version} vs ${SUT.actor}`, bean: "folio-assistant-ff09" });
+  // The bean is opened first, in bean-open.bpmn (bean `m8gz`); `ff09` exists and is this runner's.
+  state = openTrackedBean(model, state, { exists: true, actor: TESTER.actor });
   const notes: Record<string, string> = {
     A_Request: `certify ${SUT.actor} against ${plan.id} v${plan.version}`,
     A_ResolvePlan: `cat-harness/test/plans/crdm-detect-evaluation.test-plan.json parses; ${plan.testCases.length} cases`,
