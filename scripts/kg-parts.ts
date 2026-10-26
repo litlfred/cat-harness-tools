@@ -38,9 +38,20 @@ import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/substrate-s
  * <snapshot dir>/<subscription>/subgraphs/<subgraph id>/tree/…      the upstream directory's contents
  * <snapshot dir>/<subscription>/assets/<upstream path>/materialization.json
  * <snapshot dir>/<subscription>/assets/<upstream path>/tree/<file>
+ * <snapshot dir>/<subscription>/nested/<subgraph path>/materialization.json
+ * <snapshot dir>/<subscription>/nested/<subgraph path>/tree/…   a NESTED subgraph's contents
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/nodes.json
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/index.hydrated.jsonld
  * ```
+ *
+ * `nested/` is the byte copy of a subgraph declared FROM WITHIN another
+ * (`skills/voices`, declared in `skills/skills.json`). Owner, 2026-10-24
+ * (cat-harness-tools#744, ruling 4): it is CHOSEN by its parent's id — the
+ * snapshot holds the root declaration only, so a nested id cannot be checked
+ * offline — and materialised by its PATH. Its record says so (`nested: true`,
+ * the parent's `id`, its own `path`), and it sits apart from the parent's
+ * part, keyed by path like an asset, because re-materialising the parent
+ * replaces the parent's directory whole and must never take a child with it.
  *
  * `nodes/` is the METADATA mode (`kg:materialize --nodes`, bean `c1m4`): the
  * subgraph's published `index.hydrated.jsonld` and a `nodes.json` record with
@@ -58,7 +69,11 @@ import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/substrate-s
 export const PART_RECORD_FILE = "materialization.json";
 export const PART_TREE = "tree";
 
-export type KgPart = { kind: "subgraph"; id: string; path: string } | { kind: "asset"; path: string };
+/** `nested: true`: a subgraph declared within its parent `id`, held by `path` under {@link NESTED_DIR}. */
+export type KgPart = { kind: "subgraph"; id: string; path: string; nested?: true } | { kind: "asset"; path: string };
+
+/** Where nested subgraphs' byte copies live, keyed by path (module note). */
+export const NESTED_DIR = "nested";
 
 /** The metadata-mode record beside a fetched `index.hydrated.jsonld`. */
 export const NODES_RECORD_FILE = "nodes.json";
@@ -73,8 +88,9 @@ export function nodesDirOf(snapshotDir: string, subscription: string, subgraphPa
 export function partDirOf(
   snapshotDir: string,
   subscription: string,
-  part: { kind: "subgraph"; id: string } | { kind: "asset"; path: string },
+  part: { kind: "subgraph"; id: string; path?: string; nested?: true } | { kind: "asset"; path: string },
 ): string {
+  if (part.kind === "subgraph" && part.nested) return join(snapshotDir, subscription, NESTED_DIR, ...(part.path ?? part.id).split("/"));
   return part.kind === "subgraph"
     ? join(snapshotDir, subscription, "subgraphs", part.id)
     : join(snapshotDir, subscription, "assets", ...part.path.split("/"));
@@ -143,7 +159,7 @@ export interface PartView {
    * record is unreadable, so a broken record is drawn on its part's row
    * instead of falling off the page.
    */
-  slot: { kind: "subgraph"; id: string } | { kind: "asset"; path: string };
+  slot: { kind: "subgraph"; id: string } | { kind: "nested"; path: string } | { kind: "asset"; path: string };
   /** Which part the RECORD says it is; the writer's `--check` holds the two equal. */
   part?: KgPart;
   ref?: string;

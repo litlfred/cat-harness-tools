@@ -15,7 +15,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -27,6 +27,8 @@ import { AGENT_SURFACE_GENERATORS, checkRemote, exitCode, mountRemote, planRemot
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { packSubgraphIndex } from "../subgraph-index-package.ts";
 
 function git(cwd: string, ...args: string[]): string {
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
@@ -837,5 +839,399 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
       if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
       else process.env.CAT_MOUNT_URL_PREFIX = prev;
     }
+  });
+  // ── G2b: the index files come from the pin's subgraph index PACKAGE ──────
+
+  /** Publish `harness`'s package for `repo@sha`, holding `files` under docs/subgraph/<harness>/. */
+  function publish(harness: string, repository: string, sha: string, files: Record<string, object>): string {
+    const root = join(base, `pkg-src-${++n}`);
+    write(root, { [`${harness}.json`]: decl(harness, { directories: dirs.slice(0, 3) }) });
+    for (const [rel, body] of Object.entries(files)) write(root, { [`docs/subgraph/${harness}/${rel}`]: body });
+    const out = join(base, `pkg-out-${n}`);
+    packSubgraphIndex({ root, repository, ref: sha, outDir: out });
+    return out;
+  }
+  const serveFrom = (dir: string) => (url: string) => `file://${join(dir, url.split("/").pop()!)}`;
+
+  test("H7. a pin whose tree holds no index file (builtAtPublish) mounts it from the pin's package, and the lock says so", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools"), "tools/index.jsonld": { "@id": `${BASE}/subgraph/np/tools/` } });
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const r = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(out) });
+    const o = r.plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("mounted");
+    expect(o.detail).toContain("1 from the pin's subgraph index package");
+    expect(o.detail).toMatch(/not published at the pin, so not mounted: (skills, docs|docs, skills)/);
+    expect(JSON.parse(readFileSync(join(root, "np/tools/index.hydrated.jsonld"), "utf-8"))["@id"]).toBe(`${BASE}/subgraph/np/tools/`);
+    expect(existsSync(join(root, "np/tools/index.jsonld"))).toBe(false);
+    expect(existsSync(join(root, "np/np.json"))).toBe(false);
+
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    const dir = readLock(root).instances.find((i) => i.instance === "np")!.directories[0]!;
+    // the CANONICAL url, never the fixture's — so a replay anywhere fetches the same asset
+    expect(dir).toMatchObject({ id: "tools", path: "np/tools", upstreamPath: "docs/subgraph/np/tools", files: 1, package: { url: pkg.tarballUrl, member: "docs/subgraph/np/tools/index.hydrated.jsonld" } });
+    expect(dir.package!.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
+  test("H8. a package file declaring another subgraph's IRI is refused like a tree file; no package at all keeps G2's answer, naming where it looked", () => {
+    const bad = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools", "elsewhere") });
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(bad) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("it was fetched for");
+    expect(existsSync(join(root, "np/tools"))).toBe(false);
+
+    const none = hdown("np", np, "o/np", { hydrated: true });
+    const p = mountRemote({ instanceRoot: none, urlFor: hUrl, packageUrlFor: serveFrom(join(base, "no-such-release")) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(p.state).toBe("missing");
+    expect(p.detail).toContain("builtAtPublish");
+    expect(p.detail).toContain("subgraph index package: absent");
+  });
+
+  test("H9. a package that fails its checks is never an empty layer", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    writeFileSync(join(out, pkg.tarball), "not the published bytes");
+    const root = hdown("np", np, "o/np", { hydrated: true });
+    const o = mountRemote({ instanceRoot: root, urlFor: hUrl, packageUrlFor: serveFrom(out) }).plan.outcomes.find((x) => x.instance === "np")!;
+    expect(o.state).toBe("missing");
+    expect(o.detail).toContain("subgraph index package: refused");
+    expect(existsSync(join(root, "np"))).toBe(false);
+  });
+
+  test("H10. the lock replays a package-sourced directory on a fresh clone: same bytes, refused if they change", () => {
+    const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
+    const src = hdown("np", np, "o/np", { hydrated: true });
+    mountRemote({ instanceRoot: src, urlFor: hUrl, packageUrlFor: serveFrom(out) });
+    const fresh = join(base, `hfresh-${++n}`);
+    mkdirSync(fresh, { recursive: true });
+    git(fresh, "init", "-q", "-b", "main");
+    writeFileSync(join(fresh, "index.lock.json"), readFileSync(join(src, "index.lock.json")));
+    writeFileSync(join(fresh, "down.json"), readFileSync(join(src, "down.json")));
+    // CAT_MOUNT_URL_PREFIX serves the repository AND its release assets, as github.com does.
+    const srv = join(base, `hsrv-${n}`);
+    mkdirSync(join(srv, "o"), { recursive: true });
+    spawnSync("ln", ["-s", np.bare, join(srv, "o", "np")]);
+    const pkg = subgraphIndexPackage("o/np", np.sha, "np");
+    const rel = join(srv, "o", "np", "releases", "download", pkg.tag);
+    mkdirSync(rel, { recursive: true });
+    writeFileSync(join(rel, pkg.tarball), readFileSync(join(out, pkg.tarball)));
+    const prev = process.env.CAT_MOUNT_URL_PREFIX;
+    process.env.CAT_MOUNT_URL_PREFIX = `file://${srv}`;
+    try {
+      expect(replayLocks(fresh, false).outcomes.map((o) => [o.instance, o.state])).toEqual([["np", "mounted"]]);
+      expect(readFileSync(join(fresh, "np/tools/index.hydrated.jsonld"))).toEqual(readFileSync(join(src, "np/tools/index.hydrated.jsonld")));
+      expect(existsSync(join(fresh, "np/np.json"))).toBe(false);
+      expect(replayLocks(fresh, true).outcomes.every((o) => o.state === "current")).toBe(true);
+      // re-published bytes under the same name are not the lock's
+      rmSync(join(fresh, "np"), { recursive: true, force: true });
+      writeFileSync(join(rel, pkg.tarball), "other bytes");
+      const again = replayLocks(fresh, false).outcomes.find((o) => o.instance === "np")!;
+      expect(again.state).toBe("could-not-determine");
+      expect(again.detail).toContain("refused");
+      expect(existsSync(join(fresh, "np/tools/index.hydrated.jsonld"))).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
+      else process.env.CAT_MOUNT_URL_PREFIX = prev;
+    }
+  });
+});
+
+describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {
+  // o/nest: `nn` declares `skills/` at the top level, and `skills/skills.json`
+  // declares `voices/` from within it (beans `cmsl`, `1g4s`) — the shape of
+  // cat-harness's own `voices`. Before G3 both planners built their id map
+  // from `<name>.json` alone and refused `voices` as "not declared".
+  const BASE = "https://example.org";
+  let nest: { bare: string; sha: string };
+  let nUrl: (r: string) => string;
+
+  beforeAll(() => {
+    nest = bareRepo(base, "nest", {
+      "nn/nn.json": decl("nn", {
+        livesAt: { repository: "o/nest", path: "nn" },
+        directories: [
+          { id: "tools", path: "tools/", graphTypologies: ["tools"] },
+          { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+          { id: "docs", path: "docs/", graphTypologies: ["docs"] },
+        ],
+      }),
+      "nn/skills/skills.json": { directories: [{ id: "voices", path: "voices", subgraph: true, graphTypologies: ["skills"] }] },
+      "nn/skills/s/s.md": "# s\n",
+      "nn/skills/voices/v.md": "# v\n",
+      "nn/tools/a/a.ts": "export const a = 1;\n",
+      "nn/docs/readme.md": "# nn\n",
+      // `mm`: the harness's OWN default names a nested id
+      "mm/mm.json": decl("mm", {
+        livesAt: { repository: "o/nest", path: "mm" },
+        mountDefaults: { directories: ["voices"] },
+        directories: [{ id: "skills", path: "skills/", graphTypologies: ["skills"] }],
+      }),
+      "mm/skills/skills.json": { directories: [{ id: "voices", path: "voices", subgraph: true, graphTypologies: ["skills"] }] },
+      "mm/skills/s/s.md": "# s\n",
+      "mm/skills/voices/v.md": "# v\n",
+      "nn/docs/subgraph/nn/skills/voices/index.hydrated.jsonld": {
+        "@context": `${BASE}/ns/subgraph/v1.jsonld`,
+        "@id": `${BASE}/subgraph/nn/skills/voices/`,
+        "@type": "Subgraph",
+        name: "skills/voices",
+        path: "skills/voices/",
+      },
+    });
+    nUrl = (r) => {
+      if (r !== "o/nest") throw new Error(`no fixture for ${r}`);
+      return `file://${nest.bare}`;
+    };
+  });
+
+  function ndown(mount: object, harness = "nn"): string {
+    const root = join(base, `ndown-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness, repository: "o/nest", ref: nest.sha, ...consentFor(nest.sha), ...mount }] }) });
+    return root;
+  }
+
+  test("N1. files: a nested id mounts its own path alone, and the lock and check agree", () => {
+    const root = ndown({ overrides: { nn: { directories: ["voices"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(r.plan.outcomes.find((x) => x.instance === "nn")!.state).toBe("mounted");
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/s"))).toBe(false);
+    expect(existsSync(join(root, "nn/tools"))).toBe(false);
+    expect(readLock(root).instances.find((i) => i.instance === "nn")!.directories).toEqual([
+      expect.objectContaining({ id: "voices", path: "nn/skills/voices", upstreamPath: "nn/skills/voices" }),
+    ]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
+  test("N2. files: a nested id beside a top-level one, through the harness's own `mountDefaults` too", () => {
+    const root = ndown({ overrides: { nn: { directories: ["tools", "voices"] } } });
+    mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(existsSync(join(root, "nn/tools/a/a.ts"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(root, "nn/skills/s"))).toBe(false);
+    const own = ndown({}, "mm");
+    mountRemote({ instanceRoot: own, urlFor: nUrl });
+    expect(existsSync(join(own, "mm/skills/voices/v.md"))).toBe(true);
+    expect(existsSync(join(own, "mm/skills/s"))).toBe(false);
+  });
+
+  test("N3. hydrated: a nested id lays down its own published file, as a `hydrated` source for its nested path", () => {
+    const root = ndown({ overrides: { nn: { hydrated: true, directories: ["voices"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: nUrl });
+    expect(r.plan.outcomes.find((x) => x.instance === "nn")!.state).toBe("mounted");
+    expect(JSON.parse(readFileSync(join(root, "nn/skills/voices/index.hydrated.jsonld"), "utf-8"))["@id"]).toBe(`${BASE}/subgraph/nn/skills/voices/`);
+    expect(existsSync(join(root, "nn/skills/voices/v.md"))).toBe(false);
+    const planned = r.plan.instances.find((i) => i.instance === "nn")!.directories[0]!;
+    expect(planned).toMatchObject({ id: "voices", path: "nn/skills/voices", upstreamPath: "nn/docs/subgraph/nn/skills/voices" });
+    expect(planned.hydrated).toMatchObject({ kind: "hydrated", harness: "nn", subgraph: "skills/voices" });
+  });
+
+  test("N4. an id declared nowhere — not in `<name>.json`, not from within — is refused at plan time and says where it looked", () => {
+    for (const hydrated of [false, true]) {
+      const root = ndown({ overrides: { nn: { hydrated, directories: ["voices", "choir"] } } });
+      const o = planRemote({ instanceRoot: root, urlFor: nUrl }).outcomes.find((x) => x.instance === "nn")!;
+      expect(o.state).toBe("could-not-determine");
+      expect(o.detail).toContain("`choir` named for mounting but not declared");
+      expect(o.detail).toContain("neither in its declaration nor from within");
+    }
+  });
+});
+
+describe("Tools chosen by id, mounted runnable (bean `mo75` G3; owner, 2026-10-24)", () => {
+  // o/tl is the layer stack, shrunk: `kit` (bootstrap-tools: mounted whole),
+  // `def` (cat-harness: the Tool DEFINITIONS, `tools/<id>/<id>.ts`, plus
+  // their published Tools metadata) and `impl` (cat-harness-tools: the code
+  // the definitions invoke). Each implementation reaches the layers below it
+  // the way the real one does: a relative import inside its own layer, and a
+  // PACKAGE import (`@o/def/…`, `@o/kit/…`) across layers.
+  const BASE = "https://example.org";
+  const tool = (id: string, invoke: object) => ({
+    "@id": `${BASE}/subgraph/def/tools/${id}/`,
+    "@type": "Subgraph",
+    name: `tools/${id}`,
+    path: `tools/${id}/`,
+    hasMember: [{ "@id": `${BASE}/def/tools/${id}.jsonld`, "@type": "Tool", name: id, description: `Tool ${id}`, invoke }],
+  });
+  const INVOKE: Record<string, object> = {
+    alpha: { inProcess: { module: "src/alpha.ts" }, mcp: { tool: "alpha" } },
+    beta: { shell: "bun run cat beta:run" },
+    gamma: { inProcess: { module: "src/gamma.ts" } },
+    delta: { shell: "gh pr list" },
+    broken: { inProcess: { module: "src/broken.ts" } },
+    stray: { inProcess: { module: "src/stray.ts" } },
+  };
+  const metadata = (ids: string[]) => ({
+    "@context": `${BASE}/ns/subgraph/v1.jsonld`,
+    "@id": `${BASE}/subgraph/def/tools/`,
+    "@type": "Subgraph",
+    name: "tools",
+    path: "tools/",
+    hasSubgraph: ids.map((id) => tool(id, INVOKE[id] ?? { manual: true })),
+  });
+  /** A Tool definition the way cat-harness writes one: a factory, through the folder's shared helper. */
+  const definition = (id: string) =>
+    `import { defineTool } from "../../schemas/tool.ts";\nimport { described } from "../lib.ts";\nexport default () => defineTool({ id: "${id}", description: described("${id}") });\n`;
+  let tl: { bare: string; sha: string };
+  let bad: { bare: string; sha: string };
+  let tUrl: (r: string) => string;
+
+  const layers = (extra: Record<string, string | object> = {}, tools = ["alpha", "beta", "gamma", "delta"]): Record<string, string | object> => ({
+    "kit/kit.json": decl("kit", { livesAt: { repository: "o/tl", path: "kit" }, mountDefaults: { whole: true }, directories: [{ id: "kit-schemas", path: "schemas/", graphTypologies: ["code"] }] }),
+    "kit/package.json": { name: "@o/kit", private: true },
+    "kit/schemas/graph.ts": "export const edge = (a: string, b: string): string => `${a}->${b}`;\n",
+    "def/def.json": decl("def", {
+      needs: ["kit"],
+      livesAt: { repository: "o/tl", path: "def" },
+      directories: [
+        { id: "tools", path: "tools/", graphTypologies: ["tools"] },
+        { id: "schemas", path: "schemas/", graphTypologies: ["code"] },
+        { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+        { id: "docs", path: "docs/", graphTypologies: ["docs"] },
+      ],
+    }),
+    "def/package.json": { name: "@o/def", private: true, exports: { "./*.js": "./*.ts", "./*": "./*" } },
+    "def/schemas/tool.ts": 'import { stamp } from "./util.ts";\nexport const defineTool = <T extends { id: string }>(t: T): T & { stamped: string } => ({ ...t, stamped: stamp(t.id) });\n',
+    "def/schemas/util.ts": "export const stamp = (s: string): string => `def:${s}`;\n",
+    "def/tools/lib.ts": "export const described = (id: string): string => `the ${id} Tool`;\n",
+    ...Object.fromEntries(tools.map((id) => [`def/tools/${id}/${id}.ts`, definition(id)])),
+    "def/skills/s/s.md": "# s\n",
+    "def/docs/readme.md": "# def\n",
+    "def/docs/subgraph/def/tools/index.hydrated.jsonld": metadata(tools),
+    "impl/impl.json": decl("impl", {
+      needs: ["def", "kit"],
+      livesAt: { repository: "o/tl", path: "impl" },
+      directories: [
+        { id: "impl-src", path: "src/", graphTypologies: ["code"] },
+        { id: "impl-scripts", path: "scripts/", graphTypologies: ["code"] },
+        { id: "impl-ui", path: "ui/", graphTypologies: ["code"] },
+        { id: "impl-tools", path: "tools/", graphTypologies: ["tools"] },
+      ],
+    }),
+    "impl/package.json": { name: "@o/impl", private: true, checkoutScripts: { "beta:run": "bun run impl/scripts/beta.ts" } },
+    "impl/src/alpha.ts": 'import { stamp } from "@o/def/schemas/util.js";\nimport { shared } from "../scripts/shared.ts";\nexport const alpha = (): string => stamp(shared("alpha"));\n',
+    "impl/src/gamma.ts": 'import { edge } from "@o/kit/schemas/graph.js";\nexport const gamma = (): string => edge("gamma", "kit");\n',
+    "impl/scripts/beta.ts": 'import { shared } from "./shared.ts";\nexport const beta = (): string => shared("beta");\n',
+    "impl/scripts/shared.ts": "export const shared = (s: string): string => `shared:${s}`;\n",
+    "impl/ui/page.ts": "export const page = 1;\n",
+    "impl/tools/own/own.ts": "export default () => ({ id: \"own\" });\n",
+    ...extra,
+  });
+
+  beforeAll(() => {
+    tl = bareRepo(base, "tl", layers());
+    // Two Tools whose code cannot arrive whole: `broken` imports a file the pin
+    // does not hold, `stray` a file outside every declared directory.
+    bad = bareRepo(
+      base,
+      "tlbad",
+      layers(
+        {
+          "impl/src/broken.ts": 'import { gone } from "../scripts/gone.ts";\nexport const broken = gone;\n',
+          "impl/src/stray.ts": 'import { loose } from "../loose.ts";\nexport const stray = loose;\n',
+          "impl/loose.ts": "export const loose = 1;\n",
+        },
+        ["alpha", "broken", "stray"],
+      ),
+    );
+    const map: Record<string, string> = { "o/tl": `file://${tl.bare}`, "o/tlbad": `file://${bad.bare}` };
+    tUrl = (r) => {
+      const u = map[r];
+      if (!u) throw new Error(`no fixture for ${r}`);
+      return u;
+    };
+  });
+
+  function tdown(harness: string, repo: { sha: string }, repository: string, mount: object): string {
+    const root = join(base, `tdown-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness, repository, ref: repo.sha, ...consentFor(repo.sha), ...mount }] }) });
+    return root;
+  }
+
+  test("T1. load the Tools metadata (hydrated), choose three Tools by id, materialise them: each arrives with definition, implementation and closure, and loads", async () => {
+    // 1. Load the metadata: no code arrives.
+    const meta = tdown("def", tl, "o/tl", { hydrated: true, overrides: { def: { directories: ["tools"] } } });
+    const read = mountRemote({ instanceRoot: meta, urlFor: tUrl, install: false });
+    expect(read.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("mounted");
+    expect(existsSync(join(meta, "def/tools/alpha"))).toBe(false);
+    const hydrated = JSON.parse(readFileSync(join(meta, "def/tools/index.hydrated.jsonld"), "utf-8")) as {
+      hasSubgraph: Array<{ hasMember: Array<{ name: string; invoke: Record<string, unknown> }> }>;
+    };
+
+    // 2. Review and choose: the three whose metadata says they run code of a layer.
+    const chosen = hydrated.hasSubgraph
+      .flatMap((s) => s.hasMember)
+      .filter((t) => t.invoke.inProcess !== undefined || String(t.invoke.shell ?? "").startsWith("bun run cat "))
+      .map((t) => t.name);
+    expect(chosen).toEqual(["alpha", "beta", "gamma"]);
+
+    // 3. Materialise exactly those, runnable.
+    const root = tdown("impl", tl, "o/tl", { overrides: { def: { tools: chosen } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+    const state = Object.fromEntries(r.plan.outcomes.map((o) => [o.instance, o.state]));
+    expect(state).toEqual({ impl: "mounted", def: "mounted", kit: "mounted" });
+    expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("Tools `alpha` (def/tools/alpha/alpha.ts + impl/src/alpha.ts)");
+
+    // The directories the closure touches, whole — and nothing else.
+    const dirs = (i: string) => readLock(root).instances.find((x) => x.instance === i)!.directories.map((d) => d.id).sort();
+    expect(dirs("def")).toEqual(["schemas", "tools"]);
+    expect(dirs("impl")).toEqual(["impl-scripts", "impl-src"]);
+    expect(dirs("kit")).toEqual(["*"]);
+    for (const absent of ["def/skills", "def/docs", "impl/ui", "impl/tools"]) expect(existsSync(join(root, absent))).toBe(false);
+    // Directory granularity: a Tool folder is not a declared directory, so an
+    // unchosen Tool's folder comes with `tools/` (owner's ruling 3).
+    expect(existsSync(join(root, "def/tools/delta/delta.ts"))).toBe(true);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    // It loads: the workspace links a root install would make, then each
+    // definition and each implementation, imported from the mounted bytes.
+    mkdirSync(join(root, "node_modules/@o"), { recursive: true });
+    for (const p of ["kit", "def", "impl"]) symlinkSync(join(root, p), join(root, "node_modules/@o", p));
+    for (const id of chosen) {
+      const def = (await import(join(root, `def/tools/${id}/${id}.ts`))) as { default: () => { id: string; stamped: string; description: string } };
+      expect(def.default()).toEqual({ id, description: `the ${id} Tool`, stamped: `def:${id}` });
+    }
+    expect(((await import(join(root, "impl/src/alpha.ts"))) as { alpha: () => string }).alpha()).toBe("def:shared:alpha");
+    expect(((await import(join(root, "impl/scripts/beta.ts"))) as { beta: () => string }).beta()).toBe("shared:beta");
+    expect(((await import(join(root, "impl/src/gamma.ts"))) as { gamma: () => string }).gamma()).toBe("gamma->kit");
+  });
+
+  test("T2. a Tool with no implementation layer brings its definition only, and names what it runs", () => {
+    const root = tdown("impl", tl, "o/tl", { overrides: { def: { tools: ["delta"] } } });
+    const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("runs `gh pr list`");
+    expect(readLock(root).instances.find((x) => x.instance === "impl")!.directories).toEqual([]);
+    expect(existsSync(join(root, "impl/src"))).toBe(false);
+  });
+
+  test("T3. an id the metadata does not hold, an import that names nothing and a file in no declared directory are refused — and nothing of the entry is mounted", () => {
+    const unknown = tdown("impl", tl, "o/tl", { overrides: { def: { tools: ["alpha", "omega"] } } });
+    const u = mountRemote({ instanceRoot: unknown, urlFor: tUrl, install: false });
+    expect(u.plan.outcomes.find((o) => o.instance === "def")).toMatchObject({ state: "missing" });
+    expect(u.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("`omega` named for mounting but in none of `def`'s published Tools metadata");
+    expect(existsSync(join(unknown, "def"))).toBe(false);
+    expect(existsSync(join(unknown, "impl"))).toBe(false);
+
+    for (const [id, says] of [
+      ["broken", "impl/src/broken.ts imports `../scripts/gone.ts`, which names no file at the pin"],
+      ["stray", "impl/loose.ts is in no directory `impl` declares"],
+    ] as const) {
+      const root = tdown("impl", bad, "o/tlbad", { overrides: { def: { tools: [id] } } });
+      const r = mountRemote({ instanceRoot: root, urlFor: tUrl, install: false });
+      expect(r.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("missing");
+      expect(r.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain(says);
+      expect(r.plan.outcomes.find((o) => o.instance === "impl")!.state).toBe("missing");
+      expect(existsSync(join(root, "impl/src"))).toBe(false);
+    }
+  });
+
+  test("T4. `tools` with `hydrated` is refused at plan time: metadata brings no code", () => {
+    const root = tdown("def", tl, "o/tl", { overrides: { def: { hydrated: true, tools: ["alpha"] } } });
+    const p = planRemote({ instanceRoot: root, urlFor: tUrl });
+    expect(p.outcomes.find((o) => o.instance === "def")).toMatchObject({ state: "could-not-determine" });
+    expect(p.outcomes.find((o) => o.instance === "def")!.detail).toContain("`tools` and `hydrated` both asked for");
   });
 });

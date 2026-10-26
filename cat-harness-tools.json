@@ -33,7 +33,7 @@
     {
       "id": "cat-harness-tools-viewer",
       "path": "viewer/",
-      "description": "The content viewer the MCP server serves at `/viewer/` (`adapters/mcp-server/server.ts`, `VIEWER_DIR`): one HTML page carrying the whole single-page app, which reads `/api/folio` and opens the first paper the folio lists. A platform viewer, not folio content: it names no folio, and `test/test-server.e2e.ts` and `scripts/tests/viewer-script.test.ts` assert it. Declared 2026-10-24 under bean `0uu2` (owner, card \"A. Declare and keep\"), when its last hardcoded folio name (`quantum-observable-universe`, the `qou-viewer` package name, now `folio-content-viewer`, because `folio-viewer` is already the folio graph's registered viewer Tool) was removed.",
+      "description": "The content viewer the MCP server serves at `/viewer/` (`adapters/mcp-server/server.ts`, `VIEWER_DIR`): one HTML page carrying the whole single-page app, which reads `/api/folio` and opens the first paper the folio lists. A platform viewer, not folio content: it names no folio, and `test/test-server.e2e.ts` and `scripts/tests/ui/viewer-script.test.ts` assert it. Declared 2026-10-24 under bean `0uu2` (owner, card \"A. Declare and keep\"), when its last hardcoded folio name (`quantum-observable-universe`, the `qou-viewer` package name, now `folio-content-viewer`, because `folio-viewer` is already the folio graph's registered viewer Tool) was removed.",
       "graphTypologies": [
         "code"
       ]
@@ -107,6 +107,15 @@
       "description": "The Python toolchain's dependency manifests: `requirements.txt` (the LEAN set CI installs, `pip install -r cat-harness-tools/python/requirements.txt` from the checkout root) and `requirements-extended.txt` (declared, deliberately not installed in CI — its cost is stated per entry). GENERATED, never hand-edited: the source is `cat-harness/schemas/python-deps.ts`, whose `requirementsPath` is the one place this location is written, and `bun run cat deps:python` writes both (`deps:python:check` fails when either is stale). Moved here from the repository root on 2026-10-06 (bean `ar1s`, phase 3: tooling leaves the root before the repo split); dependabot's pip `directory:` names this directory. `code`: a dependency manifest is the toolchain's, the same class as a `package.json`.",
       "graphTypologies": [
         "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-libraries",
+      "path": "libraries/",
+      "title": "Software libraries",
+      "description": "The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions.",
+      "graphTypologies": [
+        "software-library"
       ]
     },
     {

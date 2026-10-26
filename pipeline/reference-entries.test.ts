@@ -8,8 +8,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { authorNames, entryUrl, issuedYear, referenceDirs, referenceEntries, stringField } from "./reference-entries.ts";
+import { authorNames, entryUrl, issuedYear, referenceDirs, referenceEntries, referenceEntryIds, stringField } from "./reference-entries.ts";
 import { readReferences } from "./source-ledger-index.ts";
+import { resolveAllReferenceIds } from "./validate.ts";
+import { allConstraintRules } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
 
 const made: string[] = [];
 afterAll(() => made.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -114,5 +116,37 @@ describe("source-ledger-index reads split references", () => {
     expect([...r.ids].sort()).toEqual(["garoufalidis2004", "leitner2026", "who2014"]);
     expect(r.byArxiv.get("2601.00001")).toBe("leitner2026");
     expect(r.urls.get("garoufalidis2004")).toBe("https://doi.org/10.2140/gtm.2004.7.291");
+  });
+
+  test("reads .jsonld Reference nodes and resolves cites-resolve against them alongside the registry", () => {
+    const root = folio({
+      files: {
+        "garoufalidis2004.json": garoufalidis,
+        "knuth1984.jsonld": {
+          "@id": "references/knuth1984",
+          "@type": ["fabio:Work", "bibo:AcademicArticle"],
+          "dcterms:title": "Literate Programming",
+          "dcterms:creator": ["Knuth, Donald E."],
+          "dcterms:issued": "1984",
+          "bibo:doi": "10.1093/comjnl/27.2.97",
+        },
+      },
+    });
+    expect([...referenceEntryIds(root)].sort()).toEqual(["garoufalidis2004", "knuth1984"]);
+    const allIds = resolveAllReferenceIds(root)!;
+    expect(allIds.has("knuth1984")).toBe(true);
+    expect(allIds.has("garoufalidis2004")).toBe(true);
+
+    const citesRule = allConstraintRules().find((r) => r.id === "cites-resolve")!;
+    const ctx = {
+      rootName: "b",
+      dir: root,
+      allLabels: new Set<string>(),
+      allRefIds: allIds,
+      fileExists: () => true,
+      lakeTreeContainsBasename: () => false,
+    } as unknown as Parameters<typeof citesRule.check>[1];
+    expect(citesRule.check({ kind: "theorem", label: "thm:x", cites: ["knuth1984", "garoufalidis2004"] } as never, ctx)).toBeNull();
+    expect(citesRule.check({ kind: "theorem", label: "thm:x", cites: ["missing2099"] } as never, ctx)).toContain("missing2099");
   });
 });
