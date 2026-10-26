@@ -184,6 +184,20 @@ describe("mount:remote over fixture repositories", () => {
     expect(exitCode(c.state)).toBe(0);
   });
 
+  test("1b. an instance entry left at an older commit than its pin is missing, not mounted (folio-assistant#2682)", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    const file = join(root, "index.lock.json");
+    const lock = JSON.parse(readFileSync(file, "utf-8")) as { mounts: Array<{ harness: string; repository: string }>; instances: Array<{ instance: string; via: string; repository: string; sha: string }> };
+    // What `--seed` left behind: the pin moved, its own instance entry did not.
+    const own = lock.instances.find((i) => lock.mounts.some((m) => m.harness === i.via && m.repository === i.repository))!;
+    own.sha = "f".repeat(40);
+    writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
+    const c = checkRemote({ instanceRoot: root });
+    expect(c.state).toBe("missing");
+    expect(c.reason).toContain(`${own.instance} at ffffffffffff`);
+  });
+
   test("2. code arrives through mounted paths: a cross-instance relative import resolves", async () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
