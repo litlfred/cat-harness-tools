@@ -302,9 +302,12 @@ function publishedByParent(g: string, registry: GraphTypologyRegistry): boolean 
  * `siteResolved`; judging them from the page that shows them is the kind
  * owner's gate (fhir-harness's `check:ig-annex-links`), since only it knows
  * which page that is.
+ *
+ * Read through a cast so this compiles against a cat-harness pinned before
+ * cat-harness#618 added the field; an older registry simply never sets it.
  */
 export function addressesPublishedTree(kinds: readonly string[], registry: GraphTypologyRegistry = defaultGraphTypologies): boolean {
-  return kinds.some((g) => isRenderable(g, registry) || publishedByParent(g, registry) || registry.get(g)?.shownOnPublishedPages === true);
+  return kinds.some((g) => isRenderable(g, registry) || publishedByParent(g, registry) || (registry.get(g) as { shownOnPublishedPages?: boolean } | undefined)?.shownOnPublishedPages === true);
 }
 
 export function decodeLinkTarget(target: string): string {

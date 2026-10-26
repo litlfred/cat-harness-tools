@@ -31,7 +31,7 @@ import {
   subgraphTree,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
-import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -254,7 +254,8 @@ describe("a kind whose markdown a published page SHOWS addresses the published t
   const reg = new GraphTypologyRegistry({
     site: { renderable: true, holds: "content", summary: "a site" },
     group: { renderable: false, within: "site", holds: "content", summary: "a group of the site's pages" },
-    annex: { renderable: false, shownOnPublishedPages: true, holds: "content", summary: "markdown appended to a page" },
+    // Cast: the field is cat-harness#618's, absent from an older pinned GraphTypologyDef.
+    annex: { renderable: false, shownOnPublishedPages: true, holds: "content", summary: "markdown appended to a page" } as GraphTypologyDef,
     data: { renderable: false, holds: "content", summary: "nothing shows it" },
   });
 
