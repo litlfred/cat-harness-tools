@@ -298,7 +298,7 @@ function publishedByParent(g: string, registry: GraphTypologyRegistry): boolean 
  * rather than this one? A renderable kind's do; so do a kind `within` a
  * renderable one ({@link publishedByParent}) and a kind whose markdown is
  * shown on a published page (`shownOnPublishedPages`: an IG annex appended
- * to its host page, smart-immunizations#81). Those links go to
+ * to its host page). Those links go to
  * `siteResolved`; judging them from the page that shows them is the kind
  * owner's gate (fhir-harness's `check:ig-annex-links`), since only it knows
  * which page that is.
