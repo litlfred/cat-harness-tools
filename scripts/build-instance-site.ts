@@ -815,7 +815,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // The forwarding pages at the old addresses (folio-assistant#2527). The
     // chrome step composes with `--shell`, which writes none, so a visualiser
     // that moved under its locale lost its old address on every instance site
-    // and the parity guard refused the publish (smart-base, 2026-10-16: the
+    // and the parity guard refused the publish (an IG's site, 2026-10-16: the
     // glossary under `en/`). Written last, on the built site, so they forward
     // to the pages as published and never replace one.
     const fwd = writeForwardingPages(site, root);
