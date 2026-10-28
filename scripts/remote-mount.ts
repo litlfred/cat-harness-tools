@@ -457,7 +457,14 @@ function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: s
   // `index.config.json` when the checkout has one, else the declaration's
   // `remoteMounts` — and BOTH is an error, never a pick (schemas/index-config.ts).
   const name = decl?.name ?? (idx.state === "ok" ? idx.config.site?.landing ?? "coordinator" : "downstream");
-  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: decl?.mountApprovers };
+  // Who may consent: the index's list, or the declaration's — never both
+  // (folio-assistant#2389: a checkout whose index lists the mounts may
+  // declare no instance of its own).
+  // Read structurally: the field is new in cat-harness#625, and a pinned
+  // cat-harness without it rejects an index that carries it anyway.
+  const fromIndex = idx.state === "ok" ? (idx.config as { mountApprovers?: string[] }).mountApprovers : undefined;
+  if (fromIndex && decl?.mountApprovers) throw new Error(`${instanceRoot} declares mountApprovers in both index.config.json and its instance declaration — keep one`);
+  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: fromIndex ?? decl?.mountApprovers };
 }
 
 /**
