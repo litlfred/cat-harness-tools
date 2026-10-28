@@ -11,8 +11,8 @@
  * capabilities were read from the platform's `scenarios/capabilities/` alone in
  * every case. So an actor a higher instance declares, claiming a capability
  * that same instance declares beside it, was judged against a registry that
- * could not hold the capability: `folio-assistant-sci`'s `lean-mcp` claims
- * `lean-toolchain`, which `folio-assistant-sci/scenarios/capabilities/`
+ * could not hold the capability: the science layer's `lean-mcp` claims
+ * `lean-toolchain`, which that layer's own `scenarios/capabilities/`
  * declares, and the platform's run reported it CRITICAL. The rule is the one
  * the actors already follow: resolution reads the layers the subject came from.
  */
