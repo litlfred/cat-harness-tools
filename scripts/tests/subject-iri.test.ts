@@ -205,4 +205,28 @@ describe("every subject loads: its own .jsonld and page", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  test("served somewhere its IRI does not name: a copy here, sameAs the canonical subject document (#638 option B)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subject-copy-"));
+    try {
+      const served = "https://mirror.test/folio/folio-assistant-core/folio-assistant-core.jsonld";
+      writeSubjectDocuments(published, join(dir, "folio-assistant-core.jsonld"), served);
+      const step = JSON.parse(readFileSync(join(dir, "process/P/node/T.jsonld"), "utf-8"));
+      // The copy is named by where it is served, and its context loads from there.
+      expect(step["@id"]).toBe("https://mirror.test/folio/folio-assistant-core/process/P/node/T.jsonld");
+      expect(step["@context"]).toBe("https://mirror.test/folio/folio-assistant-core/folio-assistant-core.context.jsonld");
+      expect(step.partOf).toBe(served);
+      expect(step.sameAs).toBe("https://x.test/site/folio-assistant-core/process/P/node/T.jsonld");
+      // The node keeps its canonical identity.
+      expect(step["@graph"][0]["@id"]).toBe("https://x.test/site/folio-assistant-core/process/P/node/T");
+      expect(readFileSync(join(dir, "process/P/node/T.html"), "utf-8")).toContain("owl:sameAs");
+
+      // Served where its IRI says: no copy, no sameAs.
+      writeSubjectDocuments(published, join(dir, "folio-assistant-core.jsonld"), DOC);
+      const same = JSON.parse(readFileSync(join(dir, "process/P/node/T.jsonld"), "utf-8"));
+      expect(same["@id"]).toBe("https://x.test/site/folio-assistant-core/process/P/node/T.jsonld");
+      expect(same.sameAs).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
