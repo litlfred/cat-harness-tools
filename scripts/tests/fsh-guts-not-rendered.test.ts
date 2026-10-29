@@ -34,7 +34,7 @@ import {
   frozenSubtreeNote,
   fshGutsDirectory,
   isFrozenSubtree,
-} from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+} from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

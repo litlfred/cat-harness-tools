@@ -18,7 +18,7 @@ import { join, resolve, sep } from "node:path";
 
 import { LOG_DIR } from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.js";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

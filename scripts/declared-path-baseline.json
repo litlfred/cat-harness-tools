@@ -41,7 +41,7 @@
     "scripts/partition/instance-rules.ts::schemas/content/document-kind.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/folio-graph-typology.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/front-matter.ts",
-    "scripts/partition/instance-rules.ts::schemas/fsh-guts.ts",
+    "scripts/partition/instance-rules.ts::schemas/kg/fsh-guts.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/git-corpus.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/graph-typology-registry.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/harness-config.ts",

@@ -1076,9 +1076,10 @@ export const RULES: Rule[] = [
       // falsifier the contribution design was measured against, and this is
       // where it is answered rather than absorbed.
       "schemas/content/sticky-contribution.ts",
-      "schemas/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
+      "schemas/kg/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/sdlc/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
+      "schemas/fsh-guts.ts",           // the trashcan's one-release re-export at the old path, still not FHIR
       "schemas/ui/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
