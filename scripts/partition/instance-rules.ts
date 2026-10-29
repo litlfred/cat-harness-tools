@@ -411,8 +411,8 @@ export const RULES: Rule[] = [
       "schemas/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
       "schemas/tools/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
       "schemas/sdlc/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
-      "schemas/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
-      "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
+      "schemas/library/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
+      "schemas/library/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
       "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
 
       "schemas/kg/property-skills.ts",          // declaration key → its edit skills (issue #1146)
@@ -1082,7 +1082,7 @@ export const RULES: Rule[] = [
       "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
-      "schemas/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
+      "schemas/library/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
       "schemas/actor-reach.ts",     // which actors a declaration can reach
       // WHAT A REPOSITORY IS — the markers it carries. The word "content" in
       // the filename is what sends it to core by keyword, and it is a false

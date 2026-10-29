@@ -75,7 +75,7 @@ import {
   SOURCE_DESCRIPTOR_SCHEMA_TAG,
   SourceDescriptorSchema,
   enumerationCost,
-} from "@litlfred/cat-harness/schemas/source-descriptor.ts";
+} from "@litlfred/cat-harness/schemas/library/source-descriptor.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);

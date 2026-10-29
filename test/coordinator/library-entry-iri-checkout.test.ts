@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 import { entryView, instanceRootRoutes } from "../../scripts/gen-library-viz.ts";
 import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { libraryAssetIri, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { libraryAssetIri, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

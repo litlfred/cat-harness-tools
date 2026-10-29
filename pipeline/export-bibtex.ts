@@ -18,7 +18,7 @@ import type { Data as CSLData } from "csl-json";
 import { cslToBibtex } from "./bibtex-format";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
-import { readSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { readSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 // Content repo root (was import-relative, which pointed at

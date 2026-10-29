@@ -5,7 +5,7 @@
  * its source**. This script computes each entry's `entryHash` (staleness gate),
  * reads each reference's human review — the attestation store's `bib-human-review`
  * family, or the legacy `<folio>/schema/references.review.json` before migration
- * (`schemas/bib-attestations.ts`) — and flags
+ * (`schemas/library/bib-attestations.ts`) — and flags
  * every reference whose *effective* status is not `validated` (absent ⇒
  * `unreviewed` by default; a `validated` entry whose `entryHash` has drifted is
  * stale ⇒ treated as `unreviewed`).
@@ -29,7 +29,7 @@ import { createHash } from "crypto";
 import { references } from "./references-registry-di";
 import type { Data as CSLData } from "csl-json";
 import { findContentRepoRoot } from "./repo-root";
-import { BIB_REVIEW_STATUSES, readHumanReviews } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { BIB_REVIEW_STATUSES, readHumanReviews } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 
 /** The status vocabulary — the schema's (`BIB_REVIEW_STATUSES`), not a second copy. */
 const STATUS_ENUM = BIB_REVIEW_STATUSES;

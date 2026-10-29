@@ -24,7 +24,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync } from "fs";
 import { resolve, join, extname, relative } from "path";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
-import { readSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { readSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import type { Data as CSLData, Person as CSLPerson } from "csl-json";
 
 // Content repo root (was import-relative, which pointed at

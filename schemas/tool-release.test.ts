@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,
   ToolReleaseRefSchema,
