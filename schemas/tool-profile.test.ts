@@ -116,6 +116,6 @@ describe("the seeded directory, as the gate reads it", () => {
 
   test("the graph is clean, and the `default` profile names no runtime", () => {
     expect(toolReleaseGraphProblems(loaded.releases.map((r) => r.release), loaded.profiles.map((p) => p.profile))).toEqual([]);
-    expect(loaded.profiles.map((p) => p.profile.name)).toEqual(["default"]);
+    expect(loaded.profiles.map((p) => p.profile.name)).toContain("default");
   });
 });

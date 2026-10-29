@@ -68,7 +68,8 @@ describe("injectBpmn", () => {
     expect(out).toContain("<bpmn:flowNodeRef>BA_Submit</bpmn:flowNodeRef>");
     expect(out).toContain('<bootstrap.processes:skill ref="crdm-detect"/>');
 
-    // A bean operation is structure too, and this diagram's are in its phases (a note since bean m8gz moved the claim into Process_BeanOpen).
+    // A bean operation is structure too, and this diagram's are in its phases.
+    // The phase's own op is a `note`: its claim is bean-open.bpmn's (bean m8gz).
     const phase = injectBpmn(PHASE_XML, new Map([["Agent", "Agent (fr)"]]));
     expect(phase).toContain('<cat-harness.processes:bean op="note"/>');
   });

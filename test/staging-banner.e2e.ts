@@ -89,6 +89,16 @@ test("the banner fills in from staging.json", async ({ page }) => {
   await expect(banner.getByText("build log")).toBeVisible();
 });
 
+test("with no open PR it says so in words, never \"PR #n/a\" — bean `zvl0`", async ({ page }) => {
+  // A preview built by hand (`workflow_dispatch`) on a branch with no open PR
+  // records `"pr": "n/a"`. The link still searches the branch's PRs.
+  const search = "https://github.com/litlfred/folio-assistant/pulls?q=head%3Aclaude%2Fexample";
+  await serve(page, `${ROOT}index.html`, { ...FACTS, pr: "n/a", prUrl: search });
+  const banner = page.locator("[data-fa-staging-banner]");
+  await expect(banner.getByText("no open PR found")).toHaveAttribute("href", search);
+  await expect(banner).not.toContainText("PR #");
+});
+
 test("on an Arabic page it reads left to right, as the English it is — bean `giiw`", async ({ page }) => {
   // The banner is one English sentence on every locale. Measured with it
   // inheriting `dir="rtl"` (bean `giiw`): the links kept their order and each

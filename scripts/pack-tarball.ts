@@ -63,6 +63,11 @@ export interface PackTarballOptions {
   /** Public release URL or base URL for fetchedFrom. */
   releaseUrl?: string;
   /**
+   * The release's git tag. Default `v<version>`; a per-pin package
+   * (`subgraph-index-package`, bean `mo75` G2b) is released under its own.
+   */
+  tag?: string;
+  /**
    * Whether to build the hydrated package (including binary media assets).
    * When false (default), binary assets in library/ and uploads/ are excluded
    * to produce a lean unhydrated source Knowledge Graph package.
@@ -224,16 +229,16 @@ export function packTarball(opts: PackTarballOptions = {}): PackResult {
   }
 
   // Determine fetchedFrom URL
+  const tag = opts.tag ?? `v${version}`;
   const fetchedFrom = opts.releaseUrl
     ? (opts.releaseUrl.endsWith(".tgz") ? opts.releaseUrl : `${opts.releaseUrl.replace(/\/+$/, "")}/${tarballName}`)
     : repository.includes("/")
-    ? `https://github.com/${repository}/releases/download/v${version}/${tarballName}`
+    ? `https://github.com/${repository}/releases/download/${tag}/${tarballName}`
     : `https://registry.npmjs.org/${name}/-/${tarballName}`;
 
   const releaseId = opts.hydrated
     ? `${name.replace(/^@/, "").replace("/", "-")}-v${version}-hydrated`
     : `${name.replace(/^@/, "").replace("/", "-")}-v${version}`;
-  const tag = `v${version}`;
   const now = new Date().toISOString();
 
   const releaseRecord: BinaryRelease = {
@@ -243,7 +248,7 @@ export function packTarball(opts: PackTarballOptions = {}): PackResult {
       version,
       tag,
       publishedAt: now,
-      url: repository.includes("/") ? `https://github.com/${repository}/releases/tag/v${version}` : undefined,
+      url: repository.includes("/") ? `https://github.com/${repository}/releases/tag/${tag}` : undefined,
     },
     origin: {
       kind: "github-release",

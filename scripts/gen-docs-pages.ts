@@ -66,6 +66,8 @@ import { isTodoPage, todoPageHtml } from "./todo-page.ts";
 import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, readBeans } from "./beans.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.js";
 import { milestoneRollup } from "./milestone-rollup.js";
+import { BURNDOWN_SCHEMA, DEFAULT_BURNDOWN_DAYS, buildBurndownFeed, burndownTargets, fetchBeanHistory, type BurndownFeed } from "./bean-burndown-feed.ts";
+import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
@@ -255,6 +257,13 @@ export function readQaSummary(blockDir: string, block: string): QaSummary | unde
 }
 
 const check = process.argv.includes("--check");
+/**
+ * Publish only (owner, 2026-10-24, bean `tk99` option C): fetch the bean
+ * store's history and write `assets/beans/burndown.json`. Off by default, so a
+ * local run or a `--check` never touches the network and never writes a file
+ * that would be stale on the next bean edit. See `bean-burndown-feed.ts`.
+ */
+const burndownHistory = process.argv.includes("--burndown-history") && !check;
 let stale = 0;
 let written = 0;
 let qaWritten = 0;
@@ -514,6 +523,8 @@ const BEANS_ASSET = join(OUT_DIR, "assets", "beans", "index.json");
  */
 const TODO_COUNT_ASSET = join(OUT_DIR, "assets", "todos", "count.json");
 const BEANS_COUNT_ASSET = join(OUT_DIR, "assets", "beans", "count.json");
+/** The board's burn-down feed, written by a publish build only (`--burndown-history`). */
+const BEANS_BURNDOWN_ASSET = join(OUT_DIR, "assets", "beans", "burndown.json");
 
 /**
  * How much of a bean's body the projection carries.
@@ -1994,6 +2005,17 @@ function processHierarchy(): Record<string, string[]> {
       // publishing so what a reader fetches is current regardless.
       "verdict",
     );
+    if (burndownHistory) {
+      // Written directly, not through `emit`: it is never committed, so there
+      // is nothing for `--check` to compare it with.
+      const feed = burndownFeedFor(beans);
+      writeFileSync(BEANS_BURNDOWN_ASSET, JSON.stringify(feed) + "\n");
+      console.log(
+        feed.available
+          ? `  ✓ assets/beans/burndown.json (${feed.series.length} series over ${feed.days.length} day(s) of ${feed.branch})`
+          : `  · assets/beans/burndown.json — no history: ${feed.reason}`,
+      );
+    }
     // Existence-gated for the same reason as the index: every session moves it.
     emit(BEANS_COUNT_ASSET, JSON.stringify(tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }), null, 2) + "\n", "verdict");
     const both = edges.filter((e) => e.declaredOn.length > 1).length;
@@ -2243,4 +2265,27 @@ console.log(
     ? "\ngenerated pages are up to date"
     : `\nWrote ${written} page(s) to ${OUT_DIR} and ${qaWritten} QA witness file(s) to ${QA_ASSET_DIR}`,
 );
+}
+
+/**
+ * The burn-down feed for the store `beans` came from: fetch its branch's
+ * history, read one snapshot per day, one series per open milestone and epic.
+ * A failure anywhere is `available: false` with the reason, never an empty feed.
+ */
+function burndownFeedFor(beans: ReadonlyArray<{ id: string; title: string; type: string; status: string }>): BurndownFeed {
+  const root = repoRootFor(INSTANCE_ROOT);
+  try {
+    const dir = beanDefsDir(root);
+    if (dir === null) return { $schema: BURNDOWN_SCHEMA, available: false, reason: "no bean store is declared" };
+    const loc = branchKeptLocation(root, relative(root, dir).split(sep).join("/"), REPO_WEB);
+    const got = fetchBeanHistory(root, { branch: loc.ref, web: loc.web, repoWeb: REPO_WEB, days: DEFAULT_BURNDOWN_DAYS });
+    if ("reason" in got) return { $schema: BURNDOWN_SCHEMA, available: false, reason: got.reason };
+    const snapshots = snapshotsFromGit(root, got.ref, loc.path, DEFAULT_BURNDOWN_DAYS);
+    if (snapshots.length === 0) {
+      return { $schema: BURNDOWN_SCHEMA, available: false, reason: `no commit to ${loc.path} on ${loc.ref} in the last ${DEFAULT_BURNDOWN_DAYS} days` };
+    }
+    return buildBurndownFeed(snapshots, burndownTargets(beans), { web: loc.web, branch: loc.ref, path: loc.path });
+  } catch (e) {
+    return { $schema: BURNDOWN_SCHEMA, available: false, reason: (e as Error).message };
+  }
 }

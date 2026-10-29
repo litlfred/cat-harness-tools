@@ -25,9 +25,9 @@ import {
   resolvePlanExitCriteriaDmn,
   evaluatePlanExitCriteria,
   completeExitCriteriaGateway,
+  openTrackedBean,
 } from "../../test-plan-execution.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
-import { openNewBean } from "../../lib/bean-open-close-walk.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const WF = join(ROOT, "processes", "sdlc");
@@ -176,8 +176,8 @@ describe("per-plan exitCriteria DMN resolution and execution (folio-assistant-4i
       subject: `${planUnderTest.id}@${planUnderTest.version}`,
       bean: "folio-assistant-4iey",
     });
-    // Bean m8gz: the process opens its bean first, through Process_BeanOpen.
-    openNewBean(model, s, { actor: "tester" });
+    // The bean is opened first, in bean-open.bpmn (bean `m8gz`).
+    openTrackedBean(model, s, { exists: true, actor: "tester" });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       expect(at(s)).toEqual([step]);
       complete(model, s, step, { actor: "tester" });

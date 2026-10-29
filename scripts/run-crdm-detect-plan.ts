@@ -14,6 +14,7 @@
  *
  * | step | here |
  * |---|---|
+ * | `Call_BeanOpen`, `GW_BeanYours` | {@link openTrackedBean}: claim bean `ff09`, which already exists |
  * | `A_Request` … `A_BindData` | load and parse the plan; bind the fixed corpus |
  * | `A_Execute` | run `detect` on every issue; a verdict per case |
  * | `A_WriteRun` | `folio-test-run/v1` (data and process hashed apart) + `test-report/v1` |
@@ -47,9 +48,8 @@ import {
 import { detect, type Verdict } from "../src/crdm/detect-signals.ts";
 import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { complete, enabled, startInstance, type InstanceState } from "../src/workflow/instance.ts";
-import { openNewBean } from "./lib/bean-open-close-walk.ts";
 import { saveInstance } from "../src/workflow/store.ts";
-import { completeExitCriteriaGateway } from "./test-plan-execution.ts";
+import { completeExitCriteriaGateway, openTrackedBean } from "./test-plan-execution.ts";
 import { renderTestReport, testReportBadge } from "./render-test-report.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
@@ -213,6 +213,8 @@ if (import.meta.main) {
   const sdlc = join(processes, "sdlc");
   const model = await loadProcessModel(join(sdlc, "test-plan-execution.bpmn"));
   let state: InstanceState = startInstance(model, { id: `${plan.id}-${runId}`, subject: `${plan.id}@${plan.version} vs ${SUT.actor}`, bean: "folio-assistant-ff09" });
+  // The bean is opened first, in bean-open.bpmn (bean `m8gz`); `ff09` exists and is this runner's.
+  state = openTrackedBean(model, state, { exists: true, actor: TESTER.actor });
   const notes: Record<string, string> = {
     A_Request: `certify ${SUT.actor} against ${plan.id} v${plan.version}`,
     A_ResolvePlan: `cat-harness/test/plans/crdm-detect-evaluation.test-plan.json parses; ${plan.testCases.length} cases`,
@@ -221,9 +223,6 @@ if (import.meta.main) {
     A_WriteRun: `run ${runId} → ${join("test/results", dirname(testReportPath(report)))}`,
     A_ReExecuteSample: `checker ${sample.checker} on ${sample.sampled.length} sampled case(s)${sample.disagreements.length ? `; disagrees on ${sample.disagreements.join(", ")}` : ""}`,
   };
-  // Bean m8gz: the process opens its bean first (Process_BeanOpen), so the
-  // walk takes OPEN's common path before the steps this driver annotates.
-  state = openNewBean(model, state, { actor: TESTER.actor });
   for (const step of Object.keys(notes)) {
     const at = enabled(model, state).map((e) => e.node);
     if (!at.includes(step)) throw new Error(`expected ${step} to be enabled, found ${at.join(", ") || "nothing"}`);
