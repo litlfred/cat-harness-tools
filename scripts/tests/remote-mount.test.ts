@@ -198,6 +198,46 @@ describe("mount:remote over fixture repositories", () => {
     expect(c.reason).toContain(`${own.instance} at ffffffffffff`);
   });
 
+  test("1c. a concern name expands to the members its kinds declare: processes/sdlc/ and skills/sdlc/ (bean mo75)", () => {
+    const cg = bareRepo(base, "cg", {
+      "cg.json": decl("cg", {
+        directories: [
+          { id: "processes", path: "processes/", graphTypologies: ["processes"] },
+          { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+          { id: "notes", path: "notes/", graphTypologies: ["code"] },
+        ],
+      }),
+      "processes/processes.json": { $schema: "concern-groups/v1", groups: ["sdlc", "kg"] },
+      "processes/sdlc/a.bpmn": "<definitions/>\n",
+      "processes/kg/b.bpmn": "<definitions/>\n",
+      "skills/skills.json": { $schema: "skill-topics/v1", topics: [{ id: "sdlc", path: "sdlc", title: "SDLC", description: "Delivery." }] },
+      "skills/sdlc/s.md": "# s\n",
+      "notes/n.md": "# n\n",
+    });
+    const map: Record<string, string> = { "o/cg": `file://${cg.bare}` };
+    const cgUrl = (r: string) => map[r] ?? urlFor(r);
+    const root = join(base, `down-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, {
+      "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness: "cg", repository: "o/cg", ref: cg.sha, ...consentFor(cg.sha), overrides: { cg: { directories: ["sdlc"] } } }] }),
+    });
+    const r = mountRemote({ instanceRoot: root, urlFor: cgUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "cg")!.state).toBe("mounted");
+    expect(existsSync(join(root, "cg/processes/sdlc/a.bpmn"))).toBe(true);
+    expect(existsSync(join(root, "cg/skills/sdlc/s.md"))).toBe(true);
+    expect(existsSync(join(root, "cg/processes/kg"))).toBe(false);
+    expect(existsSync(join(root, "cg/notes"))).toBe(false);
+    expect(readLock(root).instances.find((i) => i.instance === "cg")!.directories.map((d) => d.id).sort()).toEqual(["processes/sdlc", "skills/sdlc"]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    // A code no kind declares is refused like any unknown id.
+    editDecl(root, (d) => {
+      (d.remoteMounts[0]!.overrides as Record<string, { directories: string[] }>).cg = { directories: ["conduct"] };
+    });
+    const bad = planRemote({ instanceRoot: root, urlFor: cgUrl });
+    expect(bad.outcomes.find((o) => o.instance === "cg")!.state).toBe("could-not-determine");
+  });
+
   test("2. code arrives through mounted paths: a cross-instance relative import resolves", async () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });

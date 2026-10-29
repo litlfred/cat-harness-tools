@@ -121,6 +121,17 @@
  * holds what is declared within it — its files, or, hydrated, its nested
  * subgraphs inline (`hasSubgraph`).
  *
+ * ## Concern names (bean `mo75`)
+ *
+ * An id that is neither, but is a concern group's code (`sdlc`, `kg`, `ui`
+ * …, from `code-lists/concern-group.json`), names that concern across kinds:
+ * it expands to every kind-first member the instance declares —
+ * `processes/sdlc/`, `skills/sdlc/`, `schemas/sdlc/` — read from each
+ * grouping kind's own declaration file at the pin (`processes.json`
+ * `groups`, `skills.json` `topics`; the walk `concern-groups.ts` owns). Each
+ * member is locked under the id `<directory id>/<code>`. A code no kind of
+ * the instance declares is refused like any other unknown id.
+ *
  * ## Tools: chosen by id, mounted runnable (bean `mo75` G3)
  *
  * `overrides.<instance>.tools` names Tools that instance declares. Each is
@@ -183,7 +194,8 @@ import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedD
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
-import { upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { ConcernGroupCodeSchema } from "@litlfred/cat-harness/schemas/concern-groups.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -509,14 +521,31 @@ function directoriesById(
   tree: RemoteTree,
   found: { root: string; file: string; decl: UpstreamDeclaration },
   named: readonly string[],
-): { byId: Map<string, UpstreamDirectory> } | { unknown: string[]; why: string } {
+): { byId: Map<string, UpstreamDirectory>; ids: string[] } | { unknown: string[]; why: string } {
   const byId = new Map<string, UpstreamDirectory>(found.decl.directories.map((d) => [d.id, d]));
-  if (named.every((id) => byId.has(id))) return { byId };
+  if (named.every((id) => byId.has(id))) return { byId, ids: [...named] };
   const nested = upstreamDirectories(tree, found.root, found.file);
   if (nested.ok) for (const d of nested.directories) if (!byId.has(d.id)) byId.set(d.id, d);
-  const unknown = named.filter((id) => !byId.has(id));
-  if (unknown.length === 0) return { byId };
-  return { unknown, why: nested.ok ? "neither in its declaration nor from within a directory it declares" : `not in its declaration, and what it declares from within was not read: ${nested.detail}` };
+  // A CONCERN NAME (bean `mo75`): an id that is no directory but a concern
+  // group's code expands to its kind-first members, `processes/sdlc/`,
+  // `skills/sdlc/` …, read from each kind's own declaration file at the pin.
+  const expanded = new Map<string, string[]>();
+  let concernWhy: string | undefined;
+  for (const id of named) {
+    if (byId.has(id) || !ConcernGroupCodeSchema.safeParse(id).success) continue;
+    const members = upstreamConcernMembers(tree, found.root, found.file, found.decl.directories, id);
+    if (!members.ok) {
+      concernWhy = members.detail;
+      continue;
+    }
+    if (members.directories.length === 0) continue;
+    for (const m of members.directories) if (!byId.has(m.id)) byId.set(m.id, m);
+    expanded.set(id, members.directories.map((m) => m.id));
+  }
+  const unknown = named.filter((id) => !byId.has(id) && !expanded.has(id));
+  if (unknown.length === 0) return { byId, ids: [...new Set(named.flatMap((id) => expanded.get(id) ?? [id]))] };
+  const why = nested.ok ? "neither in its declaration nor from within a directory it declares, and no concern group of its kinds" : `not in its declaration, and what it declares from within was not read: ${nested.detail}`;
+  return { unknown, why: concernWhy ? `${why}; a concern group's declaration was not read: ${concernWhy}` : why };
 }
 
 /**
@@ -561,7 +590,7 @@ function planHydrated(a: {
   const notPublished: string[] = [];
   /** The pin's package, once a directory's file was not in the tree (G2b). */
   let looked: SubgraphIndexFetch | undefined;
-  for (const id of ids) {
+  for (const id of lookup.ids) {
     const d = byId.get(id)!;
     let pub: string;
     try {
@@ -812,7 +841,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       }
       const { byId } = lookup;
       const directories: PlannedDirectory[] = [];
-      if (!whole) for (const id of ids) {
+      if (!whole) for (const id of lookup.ids) {
         const d = byId.get(id)!;
         if (strip(d.path).split("/").includes("..")) continue; // a path that climbs out is not this instance's to give
         directories.push({ id, path: joinRel(path, d.path), upstreamPath: joinRel(found.root, d.path) });
