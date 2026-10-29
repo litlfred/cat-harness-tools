@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 
 import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
 import { MountLockSchema } from "@litlfred/cat-harness/schemas/remote-mount.ts";
-import { checkRemote, mountRemote, parseSeed, seedRemote } from "../remote-mount.ts";
+import { checkRemote, chooseRemote, mountRemote, parseChoose, parseSeed, seedRemote } from "../remote-mount.ts";
 import { enclosingWorkspaceRoot, installDependencies, isInstallArtefact, run as replayLocks } from "../mount-from-lock.ts";
 
 function git(cwd: string, ...args: string[]): string {
@@ -266,6 +266,21 @@ describe("(c) seeding a remote instance writes its consent", () => {
     expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
     seedRemote(root, [moved], grant, { discardEdits: true });
     expect(readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!.ref).toBe("c".repeat(40));
+  });
+
+  test("a review's choice is written back to the mount entry, keeping the pin and consent (bean mo75)", () => {
+    const root = indexed([]);
+    seedRemote(root, [parseSeed(`lib=o/lib@${lib.sha}`)], grant);
+    const before = readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!;
+    chooseRemote(root, { ...parseChoose("lib"), directories: ["lib-schemas", "lib-schemas"] });
+    const m = readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!;
+    expect(m.overrides?.lib).toEqual({ directories: ["lib-schemas"] });
+    expect(m.ref).toBe(before.ref);
+    expect(m.trust).toEqual(before.trust);
+    expect(states(mountRemote({ instanceRoot: root, urlFor, install: false }).plan.outcomes)).toEqual({ lib: "mounted" });
+    expect(parseChoose("a:b")).toEqual({ harness: "a", instance: "b" });
+    expect(() => chooseRemote(root, { harness: "lib" })).toThrow(/a choice of nothing/);
+    expect(() => chooseRemote(root, { harness: "nope", directories: ["x"] })).toThrow(/no mount entry/);
   });
 
   test("a seed spec must be <name>=<owner/repo>@<40-char sha>, and an empty grant writes nothing", () => {
