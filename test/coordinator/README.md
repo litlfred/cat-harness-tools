@@ -56,7 +56,6 @@ Part of [Folio Assistant](../README.md) 0.1.0, declared as `folio-assistant-test
 | [`health-probes-repo-root.test.ts`](health-probes-repo-root.test.ts) | a file |  |
 | [`image-placements-checkout.test.ts`](image-placements-checkout.test.ts) | a file |  |
 | [`infrastructure-repo-root.test.ts`](infrastructure-repo-root.test.ts) | a file |  |
-| [`ingest-ig-invocation-checkout.test.ts`](ingest-ig-invocation-checkout.test.ts) | a file |  |
 | [`init-folio-checkout.test.ts`](init-folio-checkout.test.ts) | a file |  |
 | [`instance-repositories-checkout.test.ts`](instance-repositories-checkout.test.ts) | a file |  |
 | [`jsonld-label-resolution-checkout.test.ts`](jsonld-label-resolution-checkout.test.ts) | a file |  |
