@@ -832,8 +832,8 @@ export const RULES: Rule[] = [
       // The adapter for an instance that holds no content (bean `zmdo`): the
       // server's fallback when no content adapter is installed above the
       // harness. Harness by definition — it exists for the harness alone.
-      "schemas/assistant-package.ts",
-      "schemas/assistant-types.ts",
+      "schemas/conduct/assistant-package.ts",
+      "schemas/conduct/assistant-types.ts",
       "schemas/process/assistant-workflow.ts",
       // The CatHarness root declaration is harness-layer by concept even
       // though it sits in schemas/. It declares its own HARNESS_NS rather than
@@ -1493,7 +1493,7 @@ const PERMITTED_EDGES: readonly PermittedEdge[] = [
   // belong is the placement audit's question (bean `lthi`), not this one's.
   {
     from: "schemas/process/role-graph.ts",
-    to: "schemas/model-capabilities.ts", // declared-path-literal: an import-direction exception names its endpoints by path
+    to: "schemas/conduct/model-capabilities.ts", // declared-path-literal: an import-direction exception names its endpoints by path
     reason:
       "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
       "role-graph.ts reads the model-capability schema; whether that schema is the harness's or core's is undecided.",

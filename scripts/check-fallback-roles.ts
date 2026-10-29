@@ -160,7 +160,7 @@ function readCapabilityDir(dir: string, out: Map<string, CapabilityFacts>): void
  *
  * Not cosmetic. This file's own header discusses `degradation: "fallback"`
  * in prose, and the first run of the rewritten check reported
- * `schemas/assistant-types.ts` as a skill with an unresolvable fallback —
+ * `schemas/conduct/assistant-types.ts` as a skill with an unresolvable fallback —
  * it had matched a JSDoc table. A scanner that reads its own documentation
  * as corpus is the "measured the wrong thing" failure in miniature.
  *
