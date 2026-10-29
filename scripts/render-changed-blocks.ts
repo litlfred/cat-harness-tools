@@ -31,12 +31,12 @@
  * @module scripts/render-changed-blocks
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve, relative, basename } from "path";
 import { spawnSync } from "child_process";
 import type { Paper } from "@litlfred/cat-harness/schemas/types.ts";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 // ── Repo layout ──────────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@
  * @module folio-assistant/src/tools/folio-init
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { z } from "zod";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,7 +30,7 @@ import {
   slugify,
   type InitFolioOptions,
 } from "../../scripts/init-folio.js";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 /**
  * Is this directory already a folio?

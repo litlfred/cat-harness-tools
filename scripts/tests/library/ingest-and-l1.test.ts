@@ -45,11 +45,11 @@ import {
   withDerivedArms,
   withKnownTitle,
 } from "../../ingest-document.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
-import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 
 const made: string[] = [];
 afterEach(() => {

@@ -47,7 +47,7 @@ import {
   type MergeReview,
   type ReviewGateEvaluation,
 } from "@litlfred/cat-harness/schemas/red-flag.ts";
-import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { attestationsHomeFor } from "@litlfred/cat-harness/schemas/qa-attestations.js";
 
 /** The declared state graph that holds one `merge-review/v1` verdict per PR head. */

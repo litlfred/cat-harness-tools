@@ -77,7 +77,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { fshGutsDirectories } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
 import { exitUnlessMounted } from "./branch-store.ts";
 

@@ -18,7 +18,7 @@
  * link it had — never a slash path nothing serves.
  */
 import { resolve } from "node:path";
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { makeIri, publishedIdentity } from "../kg-export.js";
 import { declaresOwnCanonical, publishesInstanceSchema } from "../instance-exports.js";
 import { HARNESS_ROOT } from "./roots.ts";

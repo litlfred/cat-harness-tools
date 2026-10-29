@@ -36,7 +36,7 @@ import {
   installsBrowser,
 } from "../../scripts/gates.ts";
 import { parse } from "yaml";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

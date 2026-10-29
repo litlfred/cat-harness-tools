@@ -32,9 +32,9 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, relative, resolve } from "node:path";
 
 import { detectRepoUrl } from "../pipeline/readme-toc.js";
-import { instanceDeclarationFilename, instanceRootsIn, readDeclaration, resolveInherited, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDeclarationFilename, instanceRootsIn, readDeclaration, resolveInherited, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
-import { imageForRole, imagesForRole } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { imageForRole, imagesForRole } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import { graphTiles, resolveGlassStrip, withTileCounts } from "./graph-tiles.js";
 import { readTileCounts, type TileCount } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/git-corpus.ts";
@@ -43,7 +43,7 @@ import { harnessPanel, skillPageIn } from "./harness-panel.js";
 import { siteLinks } from "./site-links.js";
 import { siteDirectories, withViewers } from "./viewer-declarations.js";
 import { harnessTitle } from "./lib/nav-label.js";
-import { checkoutDirectories, resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { checkoutDirectories, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 

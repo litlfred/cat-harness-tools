@@ -72,7 +72,7 @@ import {
   directoriesForGraph,
   instanceRootsIn,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const ROOT = HARNESS_ROOT;
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { injectRail, railModel } from "../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, navbarRegionsHtml } from "../lib/navbar.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

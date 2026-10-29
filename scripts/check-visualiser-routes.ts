@@ -56,7 +56,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { declarationPathIn, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
 import { aliasRoute, routeCollisions, routeOf, visualiserRoute, type RouteClaim } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { discoverTools } from "../tools/discover.js";

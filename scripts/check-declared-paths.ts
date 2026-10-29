@@ -160,7 +160,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
@@ -275,7 +275,7 @@ export function underBuiltAtPublish(root: string, literal: string): boolean {
  */
 const HELPERS: Record<string, string> = {
   skills: "skillMdDirs() / workflowDirs() / workflowFiles() in scripts/known-skills.ts",
-  schemas: "resolveDirectories() in schemas/cat-harness.ts",
+  schemas: "resolveDirectories() in schemas/kg/cat-harness.ts",
 };
 
 /** Source trees this instance authors. Generated output is not code. */

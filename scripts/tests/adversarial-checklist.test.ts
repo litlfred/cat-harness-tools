@@ -30,7 +30,7 @@ import {
 } from "../audit-coverage.ts";
 import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

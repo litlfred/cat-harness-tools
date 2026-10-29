@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Emit the published JSON-LD `@context` from `schemas/jsonld.ts`.
+ * Emit the published JSON-LD `@context` from `schemas/kg/jsonld.ts`.
  *
  * The context is the one artefact both populations share — authored block
  * siblings and ingested `library/**` nodes both reference it by URL — so it
@@ -19,7 +19,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
-import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // NOT a folio root: `content` here names the content VOCABULARY, and this

@@ -49,7 +49,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 
 /** `"src/"` for `"src"`, `"./src/"` and `"src/"` alike. */

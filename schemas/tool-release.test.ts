@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,

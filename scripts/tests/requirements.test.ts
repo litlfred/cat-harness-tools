@@ -13,7 +13,7 @@ import {
   RequirementSchema,
   requirementRef,
 } from "@litlfred/bootstrap-tools/schemas/requirement.ts";
-import { RequirementSchema as HarnessRequirementSchema } from "@litlfred/cat-harness/schemas/skill-package.ts";
+import { RequirementSchema as HarnessRequirementSchema } from "@litlfred/cat-harness/schemas/kg/skill-package.ts";
 import { TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.ts";
 import { checkRequirementPage, collisions, declaredDirFor, statementsWithoutCriteria } from "../check-requirements.ts";
 import { bootstrapSchemaDirs, bootstrapSchemaSources, scan } from "@litlfred/bootstrap-tools/scripts/check-bootstrap-concepts.ts";

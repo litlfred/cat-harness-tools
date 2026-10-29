@@ -43,9 +43,9 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import {
   artefactStub,
   readDeclaration,
-  repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+  repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.js";
 import { exitUnlessMounted } from "./branch-store.js";

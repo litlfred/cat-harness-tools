@@ -56,7 +56,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 
 import { initSteps, offlineProbe, type InitStep, type StepState } from "@litlfred/bootstrap-tools/scripts/init.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { healthReportPath, parseHealthReport } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { z } from "zod";

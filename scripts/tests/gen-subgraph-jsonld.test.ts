@@ -24,7 +24,7 @@ import {
   type SubgraphPlan,
 } from "../gen-subgraph-jsonld.js";
 import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import jsonld from "jsonld";
 import { exportIdentity } from "../kg-export.js";
 import { expandFindings, type localLoader } from "../publish-verify.js";

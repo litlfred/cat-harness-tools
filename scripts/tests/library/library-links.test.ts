@@ -11,7 +11,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../lib/library-links.ts";
 import { itemFacts } from "../../library-readmes.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";

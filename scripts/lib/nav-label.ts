@@ -42,7 +42,7 @@
  * generated surface it can read statically and fails when one destination
  * carries two base labels.
  */
-import { kindTitle } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { kindTitle } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 
 export { kindTitle };
 

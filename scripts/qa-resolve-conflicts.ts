@@ -91,7 +91,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { attestationKeyForDerived, attestationPath, entryIdentity, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

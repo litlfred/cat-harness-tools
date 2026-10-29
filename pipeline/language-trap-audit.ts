@@ -68,7 +68,7 @@
  *
  * @module pipeline/language-trap-audit
  */
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { createHash } from "node:crypto";
 import {
   existsSync,

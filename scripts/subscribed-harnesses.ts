@@ -26,9 +26,9 @@ import { join, resolve } from "node:path";
 
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
-import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,

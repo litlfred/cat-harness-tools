@@ -94,12 +94,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 
@@ -248,7 +248,7 @@ export function platformContexts(repoRoot: string): {
 } {
   const aliases = new Map<string, Record<string, unknown>>([[CONTENT_CONTEXT_URL, CONTENT_CONTEXT as Record<string, unknown>]]);
   const bindings = new Map<string, Record<string, unknown>>();
-  // Both live in cat-harness (`schemas/jsonld.ts`, `ns/subgraph/v1.jsonld`):
+  // Both live in cat-harness (`schemas/kg/jsonld.ts`, `ns/subgraph/v1.jsonld`):
   // the owner is a fact about where they are published, so it is named here
   // once rather than inferred from a path.
   const terms = new Map<string, TermSource>([[CONTENT_CONTEXT_URL, { instance: "cat-harness", context: CONTENT_CONTEXT as Record<string, unknown> }]]);

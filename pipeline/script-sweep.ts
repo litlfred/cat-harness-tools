@@ -64,7 +64,7 @@ import {
   SCRIPT_ROOTS,
   type ScriptTarget,
 } from "./script-walker";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { findContentRepoRoot } from "./repo-root";
 import {
   checkDoesNotDefaultToFloat,

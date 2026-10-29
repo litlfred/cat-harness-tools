@@ -67,8 +67,8 @@ export const SPDX_3_0_1_CONTEXT_URL = "https://spdx.org/rdf/3.0.1/spdx-context.j
  * `codeListDirs` does. T1: every layer inherits cat-harness's.
  */
 export async function toolReleaseDirs(instanceRoot: string): Promise<string[]> {
-  const { orderedDependencies } = await import("@litlfred/cat-harness/schemas/harness-config.js");
-  const { ownDirectories } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+  const { orderedDependencies } = await import("@litlfred/cat-harness/schemas/kg/harness-config.js");
+  const { ownDirectories } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
   const dirs: string[] = [];
   const add = (name: string, root: string, own: boolean) => {
     for (const d of ownDirectories({ name, root, own })) {

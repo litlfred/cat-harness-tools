@@ -19,7 +19,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { ArchimateConfigSchema, readArchimate, type ArchimateConfig } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
 

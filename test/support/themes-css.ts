@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The generator, in this layer — `TOOLS_ROOT`, since Playwright loads specs under Node, where `import.meta.dir` is undefined. */

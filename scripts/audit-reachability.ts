@@ -161,7 +161,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, normalize, relative } from "node:path";
 
-import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { corpusScopeFor, workflowFiles } from "./known-skills.js";
 import { processFiles } from "../src/workflow/process-files.js";

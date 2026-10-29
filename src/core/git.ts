@@ -8,7 +8,7 @@
  * @module folio-assistant/core/git
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync, symlinkSync, readdirSync } from "fs";
 import { join, resolve } from "path";
 import { spawnSync } from "child_process";

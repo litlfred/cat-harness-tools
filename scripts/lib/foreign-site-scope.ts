@@ -72,8 +72,8 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-tiles.ts";
 

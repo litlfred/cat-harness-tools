@@ -33,7 +33,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync,
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { judgeThemeKinds, type ThemeWiring } from "../../check-navbar-consistency.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..", "..");

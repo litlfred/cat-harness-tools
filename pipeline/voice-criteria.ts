@@ -43,7 +43,7 @@
  */
 
 import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/voices.ts";
-import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 /**

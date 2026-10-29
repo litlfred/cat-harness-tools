@@ -52,7 +52,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
 import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";

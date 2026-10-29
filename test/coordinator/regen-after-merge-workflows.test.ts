@@ -25,7 +25,7 @@ import {
   writerFor,
 } from "../../scripts/regen-after-merge.ts";
 import { loadGates } from "../../scripts/gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /**

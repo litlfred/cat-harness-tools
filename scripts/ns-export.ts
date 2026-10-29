@@ -55,8 +55,8 @@ import {
   isPublishedGraphTypology,
   ownPrefixTable,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import {
   LEGACY_FOLIO_NS,
   namespaceForLayer,
@@ -64,9 +64,9 @@ import {
   replacementIri,
   termIri,
 } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/block-kinds.js";
 import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content-context.js";
@@ -93,7 +93,7 @@ const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const OWL = "http://www.w3.org/2002/07/owl#";
 // DECLARED HERE RATHER THAN IMPORTED, and the duplicate is CHECKED.
 //
-// `schemas/jsonld.ts` also declares these two, but it is `folio-assist-core`
+// `schemas/kg/jsonld.ts` also declares these two, but it is `folio-assist-core`
 // and this module is `agentic-harness` — core depends on the harness, so the
 // import would be a wrong-direction edge and `check:partition` refuses it.
 // That is the rule working: the constant a harness module needs must not be
@@ -118,7 +118,7 @@ const DCTERMS = "http://purl.org/dc/terms/";
 export function vocabularyIri(): string {
   // `<base>/ns/vocabulary.jsonld`, NOT `<base>/ns`.
   //
-  // `schemas/jsonld.ts` publishes the content `@context` at
+  // `schemas/kg/jsonld.ts` publishes the content `@context` at
   // `<base>/ns/content/v1.jsonld`, so `<base>/ns` has to be a DIRECTORY. A
   // static host cannot serve a file and a directory at one path, and the
   // first version of this exporter wrote the union document straight to

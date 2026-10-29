@@ -26,7 +26,7 @@ import {
   isPublishedDirectory,
   isPublishedGraphTypology,
   isPublishedSkill,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { buildExport } from "../kg-export.js";
 import { unpublishedSkills } from "../known-skills.js";
 

@@ -31,7 +31,7 @@
  * avatar. etc)"*.
  */
 import { BLANK_AVATAR, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The first clause of a kind's registered summary — up to the first dash,

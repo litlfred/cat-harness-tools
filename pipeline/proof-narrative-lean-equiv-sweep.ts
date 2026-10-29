@@ -12,7 +12,7 @@
  *   bun run cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts <chapter-dir> --json
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, basename, dirname, relative as pathRelative, join } from "path";
 import { findContentRepoRoot } from "./repo-root";

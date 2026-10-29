@@ -21,7 +21,7 @@ import { checkTools, danglingStorageTools, knownSkills, contractRequires } from 
 import { knownSkills as canonicalKnownSkills } from "../../known-skills.js";
 import { buildExport } from "../../kg-export.js";
 import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../../harness-schema-export.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { hostSchemaBase } from "../../lib/host-schema.ts";

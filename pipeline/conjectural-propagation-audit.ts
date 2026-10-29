@@ -19,7 +19,7 @@
  * Definitions are exempt — they name constructions, not logical
  * claims.
  */
-import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { leanPackageByName } from "@litlfred/cat-harness/schemas/lean-packages.ts";
@@ -28,7 +28,7 @@ import { requirePaper } from "./repo-root";
 import { loadBlocksUnder, reportLoadFailures } from "./block-module";
 import type { BlockLoadFailure } from "./block-module";
 import { paperArg } from "./cli-args";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 /** Blocks that would not import. Surfaced, never silently dropped. */
 const LOAD_FAILURES: BlockLoadFailure[] = [];

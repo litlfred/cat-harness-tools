@@ -10,7 +10,7 @@
  */
 import { describe, test, expect } from "bun:test";
 import { resolve, join } from "path";
-import { parseReference } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { parseReference } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import type { FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -19,7 +19,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 describe("contributed label prefixes", () => {
 
   test("the real registry supplies them", async () => {
-    const { loadContributions } = await import("@litlfred/cat-harness/schemas/harness-config.ts");
+    const { loadContributions } = await import("@litlfred/cat-harness/schemas/kg/harness-config.ts");
     const { ContributionRegistry } = await import("@litlfred/cat-harness/schemas/contributions.ts");
     const registry = await loadContributions<FolioContribution, InstanceType<typeof ContributionRegistry>>(
       resolve(ORIGIN_DIR, "../../.."),

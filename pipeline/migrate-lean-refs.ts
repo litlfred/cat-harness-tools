@@ -20,7 +20,7 @@
  * @module pipeline/migrate-lean-refs
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
 import { LEAN_PACKAGES } from "@litlfred/cat-harness/schemas/lean-packages.ts";

@@ -32,7 +32,7 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkoutRootFor, directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { actionGraph, readPolicies, type ActionGraph, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
 import { actorsDir, readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { checkoutActors, overlayPolicies, policyLayersAbove } from "@litlfred/cat-harness/schemas/scenario-overlay.js";

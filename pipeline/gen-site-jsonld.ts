@@ -50,10 +50,10 @@ import {
   SITE_PAGE_TYPES,
   SITE_NARRATIVE_TYPES,
   SITE_ASSET_TYPES,
-} from "@litlfred/cat-harness/schemas/jsonld.ts";
+} from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
 import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
-import { docsSourceDirFor, repoRootFor, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { docsSourceDirFor, repoRootFor, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";

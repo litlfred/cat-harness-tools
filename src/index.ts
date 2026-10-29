@@ -14,7 +14,7 @@ import { resolve } from "path";
 import { FolioServer } from "./server.js";
 import { createContentAdapter, readFolioContentConfig } from "./content-adapter.js";
 import { GitHelper } from "./core/git.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // ── Parse CLI args ───────────────────────────────────────────────
 

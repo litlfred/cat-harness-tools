@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 

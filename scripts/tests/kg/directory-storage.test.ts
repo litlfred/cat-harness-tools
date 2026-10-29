@@ -47,7 +47,7 @@ import { join } from "node:path";
 
 import { MOUNT_MARKER_SCHEMA, markerPath } from "../../branch-store.ts";
 
-import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { censusDirectories } from "../../audit-coverage.js";
 import { auditInstance } from "../../check-declared-dirs.ts";
 import { graphReadPath } from "../../graph-read.js";

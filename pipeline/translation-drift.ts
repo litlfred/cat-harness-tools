@@ -40,7 +40,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { directoryForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { buildTranslationIndex, siteRoot } from "./translation-index.ts";
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { pathToFileURL } from "node:url";

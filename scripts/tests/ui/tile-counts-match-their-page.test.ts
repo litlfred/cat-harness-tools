@@ -34,8 +34,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { readTileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 /**

@@ -31,7 +31,7 @@ import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "pat
 import { isSkillMd, kgDirectories, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { processRows, type ProcessRow } from "./gen-processes-viz.js";
-import { readDeclaration, siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { stripInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";

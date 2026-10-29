@@ -48,8 +48,8 @@ import { join, resolve } from "node:path";
 
 import { unresolvedPaths } from "../../scripts/check-tools.ts";
 import { tools, toolsOf } from "../../tools/discover.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { resolveScriptCommand } from "../../scripts/lib/script-command.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */

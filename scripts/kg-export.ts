@@ -82,14 +82,14 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
-import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
 import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import {
   artefactStub,
   defaultGraphTypologies,
@@ -105,7 +105,7 @@ import {
   renderingPath,
   siteDirFor,
   UNPUBLISHED_GRAPH_TYPOLOGIES,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { firstHeading, frontMatter } from "./front-matter.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
@@ -123,7 +123,7 @@ import {
 } from "./known-skills.js";
 import { auditSchemaNodes } from "./schema-nodes.js";
 import { loadSpecs } from "./external-schemas.js";
-import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
+import { declaredNamespaces } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
 import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
@@ -159,7 +159,7 @@ import {
   declaredSubgraph,
   subgraphSourceOverrides,
   type DeclaredSubgraph,
-} from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";

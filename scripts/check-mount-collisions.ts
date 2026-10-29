@@ -25,7 +25,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readDeclaredMounts, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import {
   RESERVED_ROOT_AND_ROUTE_NAMES,

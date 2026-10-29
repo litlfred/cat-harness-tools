@@ -93,7 +93,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 
-import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import {
   LIBRARY_FILE_SUFFIX,

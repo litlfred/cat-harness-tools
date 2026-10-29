@@ -17,7 +17,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { RENDERING_MEDIA_TYPES, renderingMediaType } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { RENDERING_MEDIA_TYPES, renderingMediaType } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { resolveFile, resolveWithin, serveRendering } from "../../serve-rendering.js";
 
 let root: string;

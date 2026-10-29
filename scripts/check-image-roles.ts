@@ -67,7 +67,7 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 /* NO `folio-graph-typology` IMPORT IS NEEDED HERE, and that is recent: until #840
    `readDeclaration` THREW on this repository's own declaration unless the
@@ -178,7 +178,7 @@ export function code(src: string): string {
  * turned the one live orphan (`landing-architecture`) into a `declined` and
  * hid the exact defect this gate was built to find.
  */
-const DEFINES_LOOKUPS = "schemas/kg-node.ts";
+const DEFINES_LOOKUPS = "schemas/kg/kg-node.ts";
 
 /** A role named through a variable — this tool cannot say which role it is. */
 export function hasDynamicLookup(rel: string, src: string): boolean {

@@ -38,11 +38,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/skill-topics.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/kg/skill-topics.ts";
 
 /** The code list every group id is drawn from, by its `id`. */
 export const CONCERN_GROUP_LIST = "concern-group";

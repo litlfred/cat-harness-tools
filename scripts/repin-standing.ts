@@ -255,7 +255,7 @@ if (import.meta.main) {
   };
   const dryRun = argv.includes("--dry-run");
   try {
-    const { checkoutRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+    const { checkoutRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
     const { readDeclaredMounts } = await import("@litlfred/cat-harness/schemas/index-config.js");
     const root = valueOf("--instance") ? resolve(valueOf("--instance")!) : checkoutRootFor(process.cwd());
     const depth = Number(valueOf("--depth") ?? 30);

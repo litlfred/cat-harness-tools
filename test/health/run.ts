@@ -51,7 +51,7 @@ import {
 } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { HEALTH_CHECKS, formatBytes, runHealthChecks, type HealthContext } from "./checks.ts";
 import { gatherContext } from "./probes.ts";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { graphReadPath } from "../../scripts/graph-read.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 

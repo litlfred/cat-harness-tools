@@ -65,7 +65,7 @@ function translationsRoot(repoRoot: string): string {
   return directoryForGraph(repoRoot, "translation-sources") ?? join(repoRoot, "translations");
 }
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** This file's own path, for the POT's `#:` source references. */
 export const STRINGS_SOURCE = "scripts/kg-viewer-strings.ts";

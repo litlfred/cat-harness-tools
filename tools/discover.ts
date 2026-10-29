@@ -43,7 +43,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { hostSchemaBase } from "../scripts/lib/host-schema.ts";

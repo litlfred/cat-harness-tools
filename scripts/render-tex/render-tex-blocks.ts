@@ -18,7 +18,7 @@
  * @module scripts/render-tex/render-tex-blocks
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   readFileSync,
   writeFileSync,

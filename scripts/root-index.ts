@@ -44,7 +44,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { exportIdentity } from "./kg-export.js";
 import { instanceDocPath } from "./instance-exports.js";
 import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";

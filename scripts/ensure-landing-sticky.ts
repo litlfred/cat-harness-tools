@@ -72,7 +72,7 @@ import {
   readDeclaration,
   rootForScope,
   declarationPathIn,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import {
   LandingStickySchema,

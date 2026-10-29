@@ -17,7 +17,7 @@ import {
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {
   ContributionRegistry,
   type FolioContribution,

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { MARKER } from "../scripts/folio-mount.ts";
 import { TRANSLATION_META_ID } from "../scripts/lib/translation-meta.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

@@ -74,10 +74,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { checkQaDirs } from "../pipeline/qa-graph-integrity.ts";
-import { directoriesForGraph, instanceRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 // `directoriesForGraph` reads declarations, which throw on the `folio` kind
 // unless core has registered it — the same side-effect import qa-store carries.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import {
   criteriaFor,
   KG_CRITERIA_BY_ID,

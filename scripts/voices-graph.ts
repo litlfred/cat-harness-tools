@@ -46,7 +46,7 @@ import {
   readDeclaration,
   repoRootFor,
   siblingScopeFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   loadVoices,
   voiceProvenanceFlags,

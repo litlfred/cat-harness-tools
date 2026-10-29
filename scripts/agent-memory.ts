@@ -67,7 +67,7 @@ import {
   type MemoryLabel,
   type MemoryNode,
 } from "@litlfred/cat-harness/schemas/memory.js";
-import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { declaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

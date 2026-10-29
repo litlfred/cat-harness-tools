@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { OPEN_BEANS_UNIT, OPEN_STATUSES, openBeanCount } from "../bean-store-read.ts";
 import { readTileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);

@@ -43,7 +43,7 @@ import { join, resolve } from "node:path";
 import { isSkillMd, knownSkills, skillMdDirs } from "../known-skills.js";
 import { packageDirsIn } from "../skill-topics.js";
 import { buildExport } from "../kg-export.js";
-import { isPublishedSkill, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { isPublishedSkill, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

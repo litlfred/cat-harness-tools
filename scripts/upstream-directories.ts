@@ -31,7 +31,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import type { RemoteTree } from "./remote-tree.ts";
 import { groupsOfDeclaration } from "./concern-groups.ts";
 

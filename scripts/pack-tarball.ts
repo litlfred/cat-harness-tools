@@ -31,7 +31,7 @@ import {
   BinaryReleaseSchema,
   type BinaryRelease,
 } from "@litlfred/cat-harness/schemas/binary-release.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // declared-path-literal: the pack-time exclusions for the binary assets a
 // PACKAGED instance may hold, written into that package's ignore list. They

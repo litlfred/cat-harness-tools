@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
 import { scanTriggers } from "../../src/core/workflow-events.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

@@ -42,7 +42,7 @@
  *   - publish.yml (per-build coverage badge)
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { stripLeanComments } from "../pipeline/lean-lexer.js";
 import { refToDecl } from "../pipeline/content-graph.js";
 import { readdirSync, readFileSync, existsSync, writeFileSync } from "fs";

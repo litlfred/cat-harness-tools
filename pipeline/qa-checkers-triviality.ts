@@ -76,7 +76,7 @@ import { join, resolve, extname, sep } from "path";
 import { parseLeanRef, refToDecl } from "./content-graph";
 import { hashFile } from "./qa-utils";
 import { findContentRepoRoot } from "./repo-root";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 /**
  * Relative to the instance root, and composed rather than written out: the

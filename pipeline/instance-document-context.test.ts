@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { CONTENT_CONTEXT_URL, FOLIO_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL, FOLIO_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 
 import { atInstanceContext, INSTANCE_CONTEXT_PATH, instanceContextUrl, serialisedAtInstanceContext } from "./instance-document-context.ts";
 

@@ -20,7 +20,7 @@ import { auditNested, tipPresence } from "../../check-declared-dirs.ts";
 import { graphReadPath } from "../../graph-read.ts";
 import { entryFileName, readQueueEntries, readQueueStore, recordDecision } from "../../merge-queue-store.ts";
 import { MERGE_QUEUE_ENTRY_TAG } from "@litlfred/cat-harness/schemas/merge-queue.ts";
-import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const made: string[] = [];
 afterAll(() => {

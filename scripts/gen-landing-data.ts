@@ -36,7 +36,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { instanceRootNamed } from "@litlfred/cat-harness/schemas/instance-roots.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import {
@@ -45,7 +45,7 @@ import {
   readDeclaration,
   siteDirFor,
   sourceLinks,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
@@ -140,7 +140,7 @@ const decl = readDeclaration(ROOT);
  * `docs/assets/x.png` → `/assets/x.png`; anything else is passed through.
  *
  * A one-line wrapper, kept so the call sites below read as they did. The
- * IMPLEMENTATION moved to `publishedAssetPath` in `schemas/cat-harness.ts`
+ * IMPLEMENTATION moved to `publishedAssetPath` in `schemas/kg/cat-harness.ts`
  * when the todo board needed the same transform (bean `5y4b`): this copy
  * hardcoded `docs/` where the site directory has a single answer already, and
  * a second hardcoded copy is how an instance that moves its site directory

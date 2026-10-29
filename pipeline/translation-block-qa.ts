@@ -87,7 +87,7 @@ import type {
   UntaintedDispatch,
 } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { parsePo, parsePoEntries } from "./po-inject.ts";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";
 import { extractMarkdown } from "./pot-extract.ts";
 import { gitFileCommitSha, gitHeadSha, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
@@ -104,7 +104,7 @@ import {
 import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
-import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/

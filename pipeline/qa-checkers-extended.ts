@@ -22,7 +22,7 @@
  * @module pipeline/qa-checkers-extended
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { stripLeanComments } from "./pipeline-plugins.js"; // science-layer slot (bean squu)
 import { existsSync, readFileSync, readdirSync } from "fs";
 import type { CheckerPaths, CheckerHit, CheckerResult } from "@litlfred/cat-harness/schemas/block-qa.ts";

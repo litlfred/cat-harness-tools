@@ -73,7 +73,7 @@ import { basename, join, relative, resolve } from "node:path";
 
 import * as gitCorpusModule from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 

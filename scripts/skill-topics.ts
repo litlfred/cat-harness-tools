@@ -35,8 +35,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { SkillTopicsSchema, type SkillTopic } from "@litlfred/cat-harness/schemas/skill-topics.ts";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { SkillTopicsSchema, type SkillTopic } from "@litlfred/cat-harness/schemas/kg/skill-topics.ts";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { groupedChildrenIn } from "./concern-groups.ts";
 
 /**

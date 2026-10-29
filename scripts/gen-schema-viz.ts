@@ -64,13 +64,13 @@ import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { readSchemaGraph, schemaRoots, type SchemaGraph } from "./schema-graph.ts";
-import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { nodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kind-validator.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import {
   SOURCE_DESCRIPTOR_SCHEMA_TAG,
   SourceDescriptorSchema,

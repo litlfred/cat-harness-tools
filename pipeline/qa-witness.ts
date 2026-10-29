@@ -60,8 +60,8 @@ import { basename, dirname, join, relative } from "node:path";
 
 import type { BlockQaReport, QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { KG_QA_MANIFEST_PATH, KG_QA_RESULTS_DIR, kgQaSidecarPath, owningInstanceOf, subjectEscapes } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import type { KgQaManifest, KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import type { ScriptQaReport } from "@litlfred/cat-harness/schemas/script-qa.ts";
 import {

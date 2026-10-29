@@ -26,7 +26,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { isWithheld, withheldFromCanonical } from "../compose-docs.ts";
 import { pageRelPath } from "../gen-fsh-guts-viz.ts";
 import {
@@ -35,7 +35,7 @@ import {
   fshGutsDirectory,
   isFrozenSubtree,
 } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

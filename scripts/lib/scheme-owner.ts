@@ -17,7 +17,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 /** An instance's root and its declared name. */

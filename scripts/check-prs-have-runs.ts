@@ -67,7 +67,7 @@ import { resolve } from "node:path";
 import { executed, runsForHead } from "./check-head-has-run.js";
 import { classifyResponse, withBackoff } from "../src/core/retry.js";
 import { detectRepoUrl, ownerRepo } from "../src/core/git-refs.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 const REPO = repoRootFor(resolve(import.meta.dir, ".."));
 

@@ -45,7 +45,7 @@ import {
 import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

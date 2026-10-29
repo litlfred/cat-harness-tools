@@ -7,8 +7,8 @@ import {
   resetTrivialityCache,
   TRIVIAL_STEP_THRESHOLD,
 } from "../../pipeline/qa-checkers-triviality";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 // The checker resolves the content repo from process.cwd(), so each test

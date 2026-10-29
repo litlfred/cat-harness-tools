@@ -67,9 +67,9 @@
 
 import { relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 /**
  * Keys whose value records where THIS artefact came from.

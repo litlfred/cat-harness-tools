@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { allAvatars, GENERIC, avatarFor, avatarKinds, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.ts";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { avatarsCssPath, renderAvatarsCss } from "../gen-avatars-css.ts";
 import { coverage, requiredKinds, trashDerivationPresent } from "../check-avatar-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

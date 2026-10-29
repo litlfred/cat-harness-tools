@@ -24,12 +24,12 @@
  * @module pipeline/lean-compile-audit
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from "fs";
 import { resolve, dirname, join, relative, extname, sep } from "path";
 import { fileURLToPath } from "url";
 import { hashFile } from "./qa-utils";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const INSTANCE_ROOT = resolve(dirname(__filename), "..");

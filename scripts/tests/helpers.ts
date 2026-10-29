@@ -10,7 +10,7 @@ import { join, relative, resolve } from "path";
 import { execSync } from "child_process";
 import { findContentRepoRoot, findPapers } from "../../pipeline/repo-root";
 import { LEAN_PACKAGES } from "@litlfred/cat-harness/schemas/lean-packages.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { complete, enabled, type InstanceState } from "../../src/workflow/instance";
 import type { ProcessModel } from "../../src/workflow/process-model";
 import { HARNESS_ROOT } from "../lib/roots.ts";

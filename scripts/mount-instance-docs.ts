@@ -106,7 +106,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
-import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
 import { injectRailOnce } from "./lib/rail-once.js";
 import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
@@ -125,7 +125,7 @@ import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar }
 import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
 

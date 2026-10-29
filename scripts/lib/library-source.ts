@@ -29,7 +29,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { forgeLocation } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { forgeLocation } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { repoOf } from "../../src/core/edit-links.ts";
 

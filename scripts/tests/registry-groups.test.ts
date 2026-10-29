@@ -21,7 +21,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.ts";
+import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { CLASS_GLOSSES } from "@litlfred/cat-harness/schemas/vocabulary.ts";
 import { mintedTermsFromSource } from "../ns-export.ts";
 

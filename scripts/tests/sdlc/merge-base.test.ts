@@ -17,7 +17,7 @@ import { pathClass } from "../../merge-pipeline-paths.ts";
 import { parseLog } from "../../merge-main-comment.js";
 import { plan as qaPlan } from "../../qa-resolve-conflicts.ts";
 import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, PATTERNS, resolveGeneratedRegions } from "../../merge-conflict-patterns.js";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

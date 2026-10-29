@@ -17,7 +17,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { localeDirIn, translationsHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { localeDirIn, translationsHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { undeclaredRootTerms } from "../../kg-export.ts";
 import {
   buildLocaleExports,

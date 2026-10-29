@@ -23,7 +23,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   checkoutDependentsOf,
   checkoutDirectories,
@@ -31,7 +31,7 @@ import {
   corpusDirectoriesForGraph,
   declarationChain,
   repositoryMirrors,
-} from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   checkoutActors,

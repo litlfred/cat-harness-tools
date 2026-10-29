@@ -11,7 +11,7 @@
  * `docs/_includes/head_custom.html` wrote the knowledge-graph tile's target as
  * `{{ '/kg/' | relative_url }}`, which on this site resolves to
  * `/folio-assistant/kg/`. **Nothing has ever been published there.**
- * `renderingPath` in `schemas/cat-harness.ts` says where an instance's
+ * `renderingPath` in `schemas/kg/cat-harness.ts` says where an instance's
  * renderings actually land, and has said so since the layout moved off `kg/`:
  *
  * ```
@@ -59,8 +59,8 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { artefactStub, readDeclaration, renderingPath } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import type { CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStub, readDeclaration, renderingPath } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instanceDocPath } from "./instance-exports.js";
 
 /**

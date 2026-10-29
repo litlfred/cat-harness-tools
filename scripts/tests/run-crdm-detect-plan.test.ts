@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { TestPlanSchema } from "@litlfred/cat-harness/schemas/test-plan.ts";
 import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup } from "@litlfred/cat-harness/schemas/test-report.ts";
 import { detect } from "../../src/crdm/detect-signals.ts";

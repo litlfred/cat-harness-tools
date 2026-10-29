@@ -50,7 +50,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";

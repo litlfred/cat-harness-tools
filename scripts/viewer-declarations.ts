@@ -64,8 +64,8 @@ import {
   type HarnessVisualiser,
   type Tile,
   type Visualisation,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
 import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
@@ -342,7 +342,7 @@ export function visualiserFor(harnessRoot: string, tool: string, repoRoot: strin
     if (d?.name !== undefined && own.length === 1) return { ...own[0]!, harness: d.name, harnessRoot: resolve(harnessRoot) };
     throw new Error(
       `${harnessRoot}: declares ${own.length === 0 ? "no" : own.length} visualiser(s) rendered by \`${tool}\` — ` +
-        "declare exactly one in its `visualisers` (cat-harness/schemas/cat-harness.ts, HarnessVisualiserSchema)",
+        "declare exactly one in its `visualisers` (cat-harness/schemas/kg/cat-harness.ts, HarnessVisualiserSchema)",
     );
   }
   if (mine.length > 1) {

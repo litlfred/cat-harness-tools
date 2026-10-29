@@ -55,7 +55,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";

@@ -27,7 +27,7 @@ import { todoGraphDocument } from "../../todo-graph.ts";
 import { buildGlossary } from "../../glossary-export.ts";
 import { buildDocumentNodes, librarySubgraphStart } from "../../../pipeline/gen-library-jsonld.ts";
 import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { directoryForGraph, docsSourceDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph, docsSourceDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

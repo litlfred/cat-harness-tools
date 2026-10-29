@@ -15,7 +15,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { defaultGraphTypologies, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ignoreLineFor } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { NodeKindIndexFileKind, nodeKindIndex, ratchet, typologyOwner, unkindedKey, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import { INDEX_PATH, readBaselines, render, tableBuiltAtPublish } from "../check-node-kinds.ts";

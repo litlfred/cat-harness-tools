@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { foldable, settleCovered } from "../pair-cover.ts";
 import { regenPass, type Pair, type Runner } from "../regen-after-merge.ts";
 import { CHECKS } from "../skill-register.ts";
-import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 

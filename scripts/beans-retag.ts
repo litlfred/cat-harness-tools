@@ -50,8 +50,8 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { BEAN_SCHEMA_TAG, BeanKind } from "@litlfred/cat-harness/schemas/bean-graph.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 
 import { NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

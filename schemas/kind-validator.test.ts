@@ -18,7 +18,7 @@ import {
   parseValidatorRef,
   resolveKindValidator,
 } from "@litlfred/cat-harness/schemas/kind-validator.ts";
-import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const INSTANCE = HARNESS_ROOT;
 

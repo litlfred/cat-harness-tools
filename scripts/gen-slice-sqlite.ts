@@ -138,14 +138,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSy
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
 import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { nodeKind } from "@litlfred/cat-harness/schemas/node-kind.ts";
+import { nodeKind } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 import { z } from "zod";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);

@@ -40,7 +40,7 @@
  * @covers docs
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { spawnSync } from "child_process";
@@ -69,8 +69,8 @@ export function isForeignRoot(dir: string): boolean {
 import { discoverPapers, injectSection, loadReadmeConfig, renderToc, type ReadmeTocConfig } from "./readme-toc";
 import { findContentRepoRoot } from "./repo-root";
 import { optionalPipelinePlugin } from "./pipeline-plugins";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { filesSection, processesSection, rolesSection } from "@litlfred/bootstrap-tools/scripts/readme-graph-sections.ts";
 

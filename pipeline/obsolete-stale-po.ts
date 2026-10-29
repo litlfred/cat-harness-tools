@@ -37,7 +37,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "
 import { join, relative } from "node:path";
 
 import { extractMarkdown } from "./pot-extract.ts";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { siteRoot } from "./translation-index.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

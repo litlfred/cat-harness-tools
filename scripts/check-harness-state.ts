@@ -56,7 +56,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
 import { checkerHash } from "../test/health/run.js";
 import {
@@ -72,7 +72,7 @@ import {
   type QaResult,
 } from "./qa-results.js";
 import { readQaTree } from "./qa-store.js";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { parse as parseYaml } from "yaml";
 import { BOARD_POSITIONS_SCHEMA_TAG, BoardPositionsSchema, renderPositions } from "@litlfred/cat-harness/schemas/board-positions.ts";

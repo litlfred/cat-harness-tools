@@ -45,7 +45,7 @@ import { join, relative, resolve } from "node:path";
 
 import { auditMarkdownFile } from "../src/core/markdown-links.js";
 import { publishTargets } from "../src/core/git-refs.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**

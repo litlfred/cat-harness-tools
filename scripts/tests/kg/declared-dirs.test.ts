@@ -34,7 +34,7 @@ import { join, resolve } from "node:path";
 
 import { auditInstance, auditNested, auditUndeclaredState, conventionalStateDirectories, resolveDeclaredPath } from "../../check-declared-dirs.ts";
 import { mayLeaveMain } from "../../qa-results.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { notApplicableAlone } from "../../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
@@ -260,8 +260,8 @@ const CHECKOUT_LEVEL_ABSENT = notApplicableAlone(
 
 describe("the real corpus", () => {
   test("every declared directory in this repository resolves", async () => {
-    const { instanceRootsIn } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
-    await import("@litlfred/cat-harness/schemas/folio-graph-typology.ts");
+    const { instanceRootsIn } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.ts");
+    await import("@litlfred/cat-harness/schemas/kg/folio-graph-typology.ts");
     const roots = instanceRootsIn(REPO);
     // Vacuity guard: an empty discovery would make the assertion below pass
     // over nothing, which is the shape this whole check exists to catch.

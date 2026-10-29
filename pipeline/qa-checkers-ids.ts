@@ -38,7 +38,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import type { CheckerHit, CheckerPaths, CheckerResult } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
 import { parseManifestStringArray } from "./qa-checkers-extended";
