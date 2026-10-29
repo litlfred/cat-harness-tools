@@ -19,9 +19,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { readFshGutsNode } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { buildFshGutsExport, fshGutsDirs } from "../fsh-guts-export.ts";
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { buildExport } from "../kg-export.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";

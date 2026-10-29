@@ -29,7 +29,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { codeWithoutComments } from "../repo-files.js";
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.js";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

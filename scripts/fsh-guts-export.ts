@@ -47,7 +47,7 @@ import {
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { contentSourceContext } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
-import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.js";
+import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
 import { exitUnlessMounted } from "./branch-store.js";
 import { contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";

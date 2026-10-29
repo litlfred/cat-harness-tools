@@ -24,7 +24,7 @@ import { join } from "node:path";
 
 import { BranchStore, MANIFEST_SCHEMA } from "../branch-store.ts";
 import { archiveIds, archiveTreeId, cutoverMain, exitCode, refreshSeed, retireInstance, rowFor } from "../state-seed.ts";
-import { FROZEN_SUBTREE_FIELDS, FROZEN_SUBTREE_KIND, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { FROZEN_SUBTREE_FIELDS, FROZEN_SUBTREE_KIND, readFshGutsNode } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { defaultRepoRoot, driftOf, observedRows } from "../state-drift.ts";
 
 const made: string[] = [];
