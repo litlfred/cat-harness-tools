@@ -6,7 +6,7 @@
  *
  * `getCriterionSourceFile()` resolves the path that `script_hash` is computed
  * over. That hash is the ONLY thing that makes a cached sidecar verdict go
- * stale when checker logic changes (`schemas/block-qa.ts` →
+ * stale when checker logic changes (`schemas/sdlc/block-qa.ts` →
  * `QaReviewer.script_hash`).
  *
  * So a criterion pointed at a file that does not contain its checker never

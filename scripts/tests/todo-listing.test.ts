@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } from "../todo-listing.js";
-import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js";
+import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
 import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
@@ -105,7 +105,7 @@ describe("the listing", () => {
   test("the attachment is rendered from `target`'s PARTS, never from the label", () => {
     // `sec:<page>-<node>` is ambiguous to split — node ids contain `-` — which
     // is exactly why `target` exists. A renderer that parsed the composite
-    // would reintroduce the burden `schemas/todo-index.ts` removed.
+    // would reintroduce the burden `schemas/sdlc/todo-index.ts` removed.
     const html = renderTodoListing([
       item({
         id: "x",

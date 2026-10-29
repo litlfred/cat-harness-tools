@@ -52,7 +52,7 @@ import type {
   BlockQaReport,
   QaCriterionEntry,
   QaReviewer,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 interface FindingInput {
   block_md?: string;

@@ -24,7 +24,7 @@
  * | human actor | `todos/` | *— nothing —* |
  * | agent actor | `memory/` | **beans** (here) |
  *
- * `scripts/todos.ts` validates each node against `schemas/todo.ts` and
+ * `scripts/todos.ts` validates each node against `schemas/sdlc/todo.ts` and
  * **throws** on a file that declares itself a todo and fails to parse. This
  * reader deliberately does not, and the asymmetry is not laziness:
  *
@@ -64,7 +64,7 @@ import {
   nodeOfKind,
   type BeanNodeKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/bean-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 // Bean `9ofm` row D. No cycle: `graph-read` reads the declaration, git and the
 // mount marker, and knows nothing about beans.
 import { graphReadPath } from "./graph-read.ts";

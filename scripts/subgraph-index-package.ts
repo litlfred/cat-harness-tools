@@ -49,7 +49,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { BinaryReleaseSchema } from "@litlfred/cat-harness/schemas/binary-release.js";
+import { BinaryReleaseSchema } from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   SUBGRAPH_HYDRATED_FILE,

@@ -159,7 +159,7 @@ import {
   repoRootFor,
   resolveDirectories,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 // The same single reader `check:declared-dirs` uses, so the two gates cannot

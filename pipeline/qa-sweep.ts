@@ -89,13 +89,13 @@ import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, re
 import { contributionsRoot } from "./repo-root";
 
 
-import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import {
   criterionAdapters,
   criterionProfiles,
   profileExcludesCriterion,
   voiceExcludesCriterion,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import { readDeclaredFolioProfile } from "./profile-check";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";

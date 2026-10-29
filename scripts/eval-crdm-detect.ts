@@ -44,7 +44,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { detect, parseSkillExclusions } from "../src/crdm/detect-signals.ts";
-import { buildTestRun, hashesReproduce, TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.ts";
+import { buildTestRun, hashesReproduce, TestRunSchema } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);

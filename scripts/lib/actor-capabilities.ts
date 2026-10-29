@@ -24,7 +24,7 @@ import {
   overlayCapabilities,
   scenarioLayersBelow,
 } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 /** Which layers the actors were read over, as `kg-audit` chose for them. */
 export type ActorScope = "checkout" | "needed" | "own";

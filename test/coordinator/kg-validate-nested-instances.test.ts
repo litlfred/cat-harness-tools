@@ -14,7 +14,7 @@
  * ```
  *
  * Fixing the owner exposed the second half: the `qa` kind's validator refs
- * (`schemas/kg-qa.ts#…`) are relative to the instance whose registry DEFINES
+ * (`schemas/sdlc/kg-qa.ts#…`) are relative to the instance whose registry DEFINES
  * the kind, and resolving them against `smart-dak/` reported "does not exist".
  * Both halves are asserted here, over the REAL corpus, because the question is
  * whether the committed sidecars a reader picks up parse — not whether a

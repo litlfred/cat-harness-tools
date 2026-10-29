@@ -37,7 +37,7 @@ import {
   CONTENT_ADAPTERS,
   adapterForKind,
 } from "@litlfred/cat-harness/schemas/block-kinds.ts";
-import { criterionAdapters, incompatibleCompanions } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { criterionAdapters, incompatibleCompanions } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
 import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {

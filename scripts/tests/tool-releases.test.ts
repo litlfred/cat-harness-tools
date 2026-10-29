@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { RunContextRefSchema, RunContextSchema, unprovisioned } from "@litlfred/cat-harness/schemas/run-context.ts";
 import { TOOL_RELEASE_SCHEMA_TAG, type ToolRelease } from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { TOOL_PROFILE_SCHEMA_TAG, type ToolProfile } from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
-import { TEST_RUN_SCHEMA_ID, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";
+import { TEST_RUN_SCHEMA_ID, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import { TEST_REPORT_SCHEMA_ID, type TestReport } from "@litlfred/cat-harness/schemas/test-report.ts";
 import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

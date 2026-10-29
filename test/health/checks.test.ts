@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
-import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 import type { QaTreeRead } from "../../scripts/qa-store.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import {

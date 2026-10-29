@@ -63,7 +63,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   kgAttestationFor,
   priorKgJudgements,

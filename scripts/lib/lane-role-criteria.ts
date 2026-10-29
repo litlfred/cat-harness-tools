@@ -5,7 +5,7 @@
  *
  * Owner, 2026-10-16 (thread "BPMN lane, role and skill modelling"; the
  * implementation spec's §5): *"These are report entries, not gates."* The
- * criteria are DECLARED in cat-harness `schemas/kg-qa.ts` — ids, applies-to,
+ * criteria are DECLARED in cat-harness `schemas/sdlc/kg-qa.ts` — ids, applies-to,
  * severity `minor`, which is below what `--check` and `--strict` fail on — and
  * computed here, beside the other criteria `kg-audit.ts` computes, as pure
  * functions so each case is testable without a checkout. The model they look
@@ -30,7 +30,7 @@
  *   nothing tests is a promise nobody checks.
  */
 import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import type { LaneDef, ProcessNode } from "../../src/workflow/process-model.ts";
 import type { SkillEdges } from "./skill-edges.ts";
 

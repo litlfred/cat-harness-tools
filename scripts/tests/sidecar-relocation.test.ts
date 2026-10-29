@@ -31,7 +31,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { sweepOrphans } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { sweepOrphans } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 
 const RESULTS = "test/results/kg-qa";
 

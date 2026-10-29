@@ -25,7 +25,7 @@ import { readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { walkBlocks } from "../pipeline/qa-utils.ts";
 import { KNOWN_LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 
 /**
  * A target reference from a bean (explicit or inferred).

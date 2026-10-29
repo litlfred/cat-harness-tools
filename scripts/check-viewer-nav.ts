@@ -77,7 +77,7 @@ import {
   type ViewerNavFlag,
   type ViewerNavPage,
   type ViewerNavQa,
-} from "@litlfred/cat-harness/schemas/viewer-nav-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/viewer-nav-qa.ts";
 import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
 import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "./lib/navbar.ts";

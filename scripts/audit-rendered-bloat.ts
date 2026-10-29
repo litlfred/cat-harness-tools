@@ -36,7 +36,7 @@ import {
   tally,
   type KgFinding,
   type KgQaReport,
-} from "@litlfred/cat-harness/schemas/kg-qa.js";
+} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 export const CRITERION_ID = "redundant-rendered-content-audit";
 export const DEFAULT_THRESHOLD_BYTES = 500;

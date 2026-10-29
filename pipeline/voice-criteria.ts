@@ -44,7 +44,7 @@
 
 import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 /**
  * A voice, plus the instance that ships it.

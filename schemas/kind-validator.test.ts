@@ -42,7 +42,7 @@ describe("parseValidatorRef", () => {
   });
 
   test("a bare module is REFUSED — the export is not optional", () => {
-    // `schemas/health-report.ts` exports five schemas. A default would pick
+    // `schemas/sdlc/health-report.ts` exports five schemas. A default would pick
     // one silently, which is how a validator checks the wrong shape and passes.
     expect(() => parseValidatorRef("schemas/x.ts")).toThrow(ValidatorRefError);
     expect(() => parseValidatorRef("schemas/x.ts")).toThrow(/#Export/);
@@ -81,7 +81,7 @@ describe("resolveKindValidator — three states", () => {
     const r = await resolveKindValidator(
       "test-kind",
       INSTANCE,
-      registryWith({ validator: "schemas/health-report.ts#HealthReportSchema" }),
+      registryWith({ validator: "schemas/sdlc/health-report.ts#HealthReportSchema" }),
     );
     expect(r.state).toBe("resolved");
     if (r.state === "resolved") expect(typeof r.schema.safeParse).toBe("function");
@@ -101,7 +101,7 @@ describe("resolveKindValidator — three states", () => {
     const r = await resolveKindValidator(
       "test-kind",
       INSTANCE,
-      registryWith({ validator: "schemas/health-report.ts#NotAThing" }),
+      registryWith({ validator: "schemas/sdlc/health-report.ts#NotAThing" }),
     );
     expect(r.state).toBe("unresolvable");
     if (r.state === "unresolvable") expect(r.reason).toMatch(/exports no NotAThing/);
@@ -113,7 +113,7 @@ describe("resolveKindValidator — three states", () => {
     const r = await resolveKindValidator(
       "test-kind",
       INSTANCE,
-      registryWith({ validator: "schemas/health-report.ts#HEALTH_CHECKS" }),
+      registryWith({ validator: "schemas/sdlc/health-report.ts#HEALTH_CHECKS" }),
     );
     expect(r.state).toBe("unresolvable");
     if (r.state === "unresolvable") expect(r.reason).toMatch(/not a Zod schema|exports no/);
@@ -233,7 +233,7 @@ describe("per-family node schemas (bean rdkm)", () => {
     // `main`), so it is created for the fixture and removed after if so.
     const { validatePath } = await import("../scripts/kg-validate.ts");
     const { existsSync } = await import("node:fs");
-    const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/kg-qa.ts");
+    const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/sdlc/kg-qa.ts");
     const results = join(HARNESS, "test", "results");
     const hadResults = existsSync(results);
     const dir = join(results, `.kind-validator-fixture-${process.pid}`);

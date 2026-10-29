@@ -18,8 +18,8 @@
  *
  * ## Directories are resolved from the declarations, never hardcoded
  *
- * `beans/defs/` and `todos/items/` are read through `schemas/bean-graph.ts`
- * and `schemas/todo-graph.ts`, so relocating either store moves this sweep
+ * `beans/defs/` and `todos/items/` are read through `schemas/sdlc/bean-graph.ts`
+ * and `schemas/sdlc/todo-graph.ts`, so relocating either store moves this sweep
  * with it. A literal path here would be a second spelling of one fact and
  * would go wrong on the day the store moves — which is the day somebody most
  * needs the sweep to still work.
@@ -37,18 +37,18 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind as beanNodeOfKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/bean-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 import {
   DEFAULT_TODO_GRAPH,
   DEFAULT_TODO_GRAPH_ROOT,
   TODO_GRAPH_FILE,
   nodeOfKind as todoNodeOfKind,
   parseTodoGraph,
-} from "@litlfred/cat-harness/schemas/todo-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/todo-graph.ts";
 import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
-} from "@litlfred/cat-harness/schemas/health-report.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { scriptSidecarPath } from "../pipeline/qa-utils.ts";
 import { detailFileName, detailRelPath } from "../scripts/agent-memory.ts";
 import { stickyFile } from "../scripts/ensure-landing-sticky.ts";
-import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { ForeignSubjectError, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import { portableSegment, unportablePath, unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 
 describe("unportableSegment", () => {

@@ -934,7 +934,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "writes the preview's `staging-preview` record into the built `_site` at deploy time (bean `6pfo`); " +
       "the PR, issue and the already-published record it updates exist only in CI and on `gh-pages`. " +
       "Its rules — builtAt kept, a retired record refused as live, a corrupt one refused — are in " +
-      "`schemas/staging-preview.ts` and covered by `staging-record.test.ts` in `bun test`",
+      "`schemas/sdlc/staging-preview.ts` and covered by `staging-record.test.ts` in `bun test`",
   },
   {
     match: "staging-rotate.ts",

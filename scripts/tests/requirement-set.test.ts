@@ -11,7 +11,7 @@ import { join } from "node:path";
 import Ajv from "ajv";
 
 import { RequirementSetSchema, SignerKindSchema, type SignOff } from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
-import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import {
   QaAttestationsSchema,
   requirementSignoffPath,

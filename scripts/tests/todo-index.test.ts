@@ -20,7 +20,7 @@ import {
   TodoIndexSchema,
   resolveTarget,
   type TodoIndex,
-} from "@litlfred/cat-harness/schemas/todo-index.js";
+} from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

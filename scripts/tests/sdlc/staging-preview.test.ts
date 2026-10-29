@@ -23,7 +23,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingDeployFacts,
-} from "@litlfred/cat-harness/schemas/staging-preview.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
 
 const DEPLOY: StagingDeployFacts = {
   slug: "claude-sleepy-babbage-ls90iz",

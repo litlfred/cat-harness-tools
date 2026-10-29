@@ -85,7 +85,7 @@ import type {
   QaCriterionEntry,
   QaReviewer,
   UntaintedDispatch,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { parsePo, parsePoEntries } from "./po-inject.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";

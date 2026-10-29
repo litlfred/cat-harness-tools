@@ -51,9 +51,9 @@ import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/pro
 import { UserStorySchema } from "@litlfred/cat-harness/schemas/user-story.js";
 import { SkillDefinitionSchema } from "@litlfred/cat-harness/schemas/kg/skill-package.js";
 import { TaskRefSchema } from "@litlfred/cat-harness/schemas/carried-note.js";
-import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/todo.js";
-import { TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.js";
-import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
+import { TestRunSchema } from "@litlfred/cat-harness/schemas/sdlc/test-run.js";
+import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { ExternalSchemaSchema } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
 import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/content/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";

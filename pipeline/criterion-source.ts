@@ -37,7 +37,7 @@
  */
 
 import type { ContributedChecker, ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import type { CheckerPaths, CheckerResult, QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { CheckerPaths, CheckerResult, QaCriterionDefinition } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "./qa-criteria-registry";
 

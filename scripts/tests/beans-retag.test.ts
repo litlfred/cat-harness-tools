@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { BEAN_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/bean-graph.ts";
+import { BEAN_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { RETAG_COMMAND, retagBeanText, retagDir } from "../beans-retag.ts";

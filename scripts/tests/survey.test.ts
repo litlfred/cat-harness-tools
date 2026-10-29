@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "bun:test";
 
-import { SESSION_SURVEY_TAG, SessionSurveySchema } from "@litlfred/cat-harness/schemas/session-survey.ts";
+import { SESSION_SURVEY_TAG, SessionSurveySchema } from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
 import { owed, readSurveys } from "../survey.js";
 
 const scratches: string[] = [];

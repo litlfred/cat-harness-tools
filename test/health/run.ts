@@ -23,7 +23,7 @@
  * `gh-pages` has not established that the previews are under 100 MB, and the
  * workflow that consumes this leaves its tracking issue untouched and fails
  * the job on a 2 — because a watchdog going blind must not read as good news.
- * `healthVerdict` in `schemas/health-report.ts` is the one place that
+ * `healthVerdict` in `schemas/sdlc/health-report.ts` is the one place that
  * precedence lives.
  *
  * ## `--markdown` always exits 0, deliberately
@@ -48,7 +48,7 @@ import {
   HEALTH_REPORT_FILENAME,
   healthVerdict,
   parseHealthReport,
-} from "@litlfred/cat-harness/schemas/health-report.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 import { HEALTH_CHECKS, formatBytes, runHealthChecks, type HealthContext } from "./checks.ts";
 import { gatherContext } from "./probes.ts";
 import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";

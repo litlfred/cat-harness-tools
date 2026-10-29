@@ -44,7 +44,7 @@ import {
 import { blockQaPath } from "./qa-paths";
 import { blockAttestationKey, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 import { findContentRepoRoot } from "./repo-root";
-import type { BlockQaReport } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { BlockQaReport } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 interface Args {

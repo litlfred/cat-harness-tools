@@ -6,7 +6,7 @@
  *
  * Owner, 2026-10-14: *"In addition to staging links in the output contracts,
  * we should also have a list of changed assets in the staging knowledge
- * graph."* The staging links (cat-harness `schemas/staging.ts`,
+ * graph."* The staging links (cat-harness `schemas/sdlc/staging.ts`,
  * `StagingComparison`) say which PAGES changed; this says which GRAPH NODES
  * did, inside the graph a reviewer is inspecting.
  *
@@ -70,7 +70,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { reviewList, type RenderedImpact } from "@litlfred/cat-harness/schemas/rendered-impact.ts";
-import { StagingPageComparisonSchema, type StagingPageComparison } from "@litlfred/cat-harness/schemas/staging.ts";
+import { StagingPageComparisonSchema, type StagingPageComparison } from "@litlfred/cat-harness/schemas/sdlc/staging.ts";
 import { coneByFile, docsMounts, docsRenderedImpact, indexSite } from "./docs-rendered-impact.ts";
 import type { ConeDecision } from "./staging-cone.ts";
 
