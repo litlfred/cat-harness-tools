@@ -10,7 +10,7 @@
  *
  * `auto:docs:check` and its siblings compared a generator's output with the
  * bytes the instance had COMMITTED. For an artefact an instance declares in
- * `builtAtPublish` (`@litlfred/cat-harness/schemas/built-at-publish.ts`) there
+ * `builtAtPublish` (`@litlfred/cat-harness/schemas/kg/built-at-publish.ts`) there
  * are no committed bytes: it is computed over the checkout's other instances,
  * or from a branch-kept graph, so no commit could hold it current, and every
  * re-pin of the index turned the comparison red. Removing the comparison

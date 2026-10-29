@@ -28,7 +28,7 @@ import {
   partitionBySubjectOwner,
   subjectEscapes,
 } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.js";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.js";
 import { toolsOf } from "../../../tools/discover.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

@@ -6,7 +6,7 @@
  *
  * Bean `folio-assistant-63q4`, owner 2026-10-14: no "forward-declared"
  * prefix anywhere. An instance declares the external namespaces it speaks
- * (`jsonldPrefixes`, cat-harness `schemas/jsonld-prefixes.ts`); its published
+ * (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`); its published
  * context binds exactly the prefixes its `.jsonld` documents use, resolved
  * through its own table flattened with those of every instance it `needs`
  * (dependency order, `@protected`). A node then references ONE context URL
@@ -95,13 +95,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/kg/jsonld-prefixes.js";
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
-import { ownNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownNamespace } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
-import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
+import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 
 import {
   buildInstanceContext,

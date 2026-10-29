@@ -16,7 +16,7 @@
  *   centralize?"*, and this reads the declarations where they are, never a
  *   table of branches;
  * - the branch's own root **`manifest.json`** (`state-manifest/v1`, schema in
- *   `@litlfred/cat-harness/schemas/state-manifest.ts`) — status, the seed
+ *   `@litlfred/cat-harness/schemas/kg/state-manifest.ts`) — status, the seed
  *   commit, when, the writer and gate of a rendered branch.
  *
  * The facts a reader cannot recover from the files — status, provenance and
@@ -47,8 +47,8 @@
 import { readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { StateManifestSchema, type StateManifest } from "@litlfred/cat-harness/schemas/state-manifest.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { StateManifestSchema, type StateManifest } from "@litlfred/cat-harness/schemas/kg/state-manifest.ts";
 
 import { BranchStore, storeOptionsFor, tipLocations, type BranchKeying, type FileRead } from "./branch-store.ts";
 import { REPO_ROOT } from "./lib/roots.ts";

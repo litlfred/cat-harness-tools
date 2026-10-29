@@ -46,7 +46,7 @@ import {
   renderingPath,
   repoRootFor,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { isZodSchema } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { tools } from "../tools/discover.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tools/tool-types.js";

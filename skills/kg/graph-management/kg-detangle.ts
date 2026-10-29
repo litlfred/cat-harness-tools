@@ -49,9 +49,9 @@ import {
   type DetangleNode,
   type EdgeAuthority,
 } from "@litlfred/cat-harness/schemas/kg/detangle.js";
-import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";

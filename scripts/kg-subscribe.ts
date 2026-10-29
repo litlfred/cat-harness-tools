@@ -158,7 +158,7 @@ import {
   siblingScopeFor,
   rootForScope,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/repo-full-name.js";
+import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/kg/repo-full-name.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
@@ -167,7 +167,7 @@ import {
   type SubscriptionKind,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/substrate-snapshot.js";
+} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
 import { NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
 import { git, pinnedRef, shallowFetch } from "./sync-remote-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

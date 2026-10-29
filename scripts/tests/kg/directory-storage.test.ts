@@ -51,7 +51,7 @@ import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories,
 import { censusDirectories } from "../../audit-coverage.js";
 import { auditInstance } from "../../check-declared-dirs.ts";
 import { graphReadPath } from "../../graph-read.js";
-import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { QaUsageError, resolveQaLocation } from "../../qa-store.js";
 
 const made: string[] = [];

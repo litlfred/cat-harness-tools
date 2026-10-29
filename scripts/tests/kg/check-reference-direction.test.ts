@@ -8,7 +8,7 @@
  * and thrown away — so a failure names a rule rather than a file somebody
  * edited, and the suite costs milliseconds.
  *
- * The pure half (`schemas/reference-direction.ts`) needs no tree at all,
+ * The pure half (`schemas/kg/reference-direction.ts`) needs no tree at all,
  * which is why it is a separate module.
  */
 import { afterEach, describe, expect, test } from "bun:test";
@@ -16,15 +16,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.ts";
-import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.ts";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.ts";
+import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.ts";
 import {
   classifyReference,
   occurrencesOf,
   type NameCollision,
   type Occurrence,
   type ReferenceExemption,
-} from "@litlfred/cat-harness/schemas/reference-direction.ts";
+} from "@litlfred/cat-harness/schemas/kg/reference-direction.ts";
 import {
   analyse,
   buildDirectionResult,
@@ -932,7 +932,7 @@ describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (ow
 
   test("FAILS for code and configuration in cat-harness naming the same script", () => {
     const line = "bun run cat-harness-tools/scripts/qa-refresh.ts --check";
-    expect(verdict("cat-harness/schemas/qa-record-shapes.ts", line)).toBe("wrong-direction");
+    expect(verdict("cat-harness/schemas/kg/qa-record-shapes.ts", line)).toBe("wrong-direction");
     expect(verdict("cat-harness/.github/workflows/post-merge-regen.yml", line)).toBe("wrong-direction");
     expect(verdict("cat-harness/openapi/typologies/openapi.json", line)).toBe("wrong-direction");
   });

@@ -43,7 +43,7 @@ import {
   type IndexConfig,
   type IndexInstance,
   type RemoteSource,
-} from "@litlfred/cat-harness/schemas/index-config.ts";
+} from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
@@ -53,7 +53,7 @@ import {
   type ResolvedSubgraphSource,
   type SubgraphSource,
   type SubgraphSourceOverrides,
-} from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";

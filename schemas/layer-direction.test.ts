@@ -6,8 +6,8 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.ts";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.ts";
+import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.ts";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.ts";
 import { ALLOWED } from "../scripts/partition/instance-rules.ts";
 import { classifyByDirection } from "@litlfred/cat-harness/schemas/kg/detangle.ts";
 

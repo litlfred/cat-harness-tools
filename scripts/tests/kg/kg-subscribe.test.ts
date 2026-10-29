@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 
 import { BOOTSTRAP_GRAPH_TYPOLOGIES } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { SubstrateSnapshotSchema } from "@litlfred/cat-harness/schemas/substrate-snapshot.ts";
+import { SubstrateSnapshotSchema } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.ts";
 import {
   HARNESS_GRAPH_TYPOLOGIES,
   type RootFetcher,

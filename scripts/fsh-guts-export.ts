@@ -44,9 +44,9 @@ import {
   artefactStub,
   readDeclaration,
   repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { contentSourceContext } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.js";
 import { exitUnlessMounted } from "./branch-store.js";
 import { contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";

@@ -52,7 +52,7 @@ import {
   SITE_ASSET_TYPES,
 } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 import { docsSourceDirFor, repoRootFor, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";

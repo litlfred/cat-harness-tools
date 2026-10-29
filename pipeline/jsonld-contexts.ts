@@ -3,7 +3,7 @@
  *
  * Bean `folio-assistant-63q4`, owner 2026-10-14: no "forward-declared" prefix
  * anywhere. Each instance declares the external namespaces it speaks
- * (`jsonldPrefixes`, cat-harness `schemas/jsonld-prefixes.ts`), and its
+ * (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`), and its
  * published context binds ONLY the prefixes its documents actually use,
  * resolved through its table flattened with the tables of the instances it
  * `needs`. A bound-but-unused prefix cannot exist, so nothing needs excusing.
@@ -46,7 +46,7 @@
  * @module pipeline/jsonld-contexts
  * @covers schemas
  */
-import { mergePrefixTables, type DeclaredPrefixes, type PrefixConflict } from "@litlfred/cat-harness/schemas/jsonld-prefixes.js";
+import { mergePrefixTables, type DeclaredPrefixes, type PrefixConflict } from "@litlfred/cat-harness/schemas/kg/jsonld-prefixes.js";
 
 /** Where a prefix was met. See the module note. */
 export type PrefixPosition = "iri" | "literal";

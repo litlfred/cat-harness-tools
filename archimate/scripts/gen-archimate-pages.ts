@@ -69,7 +69,7 @@ import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archi
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "archimate-page";

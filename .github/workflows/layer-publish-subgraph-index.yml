@@ -32,7 +32,7 @@
 #   4. Create the prerelease `subgraph-index-<sha>` at the pushed commit with
 #      the tarball and its `folio-binary-release/v1` record as assets. Every
 #      name is `subgraphIndexPackage` in cat-harness's
-#      `schemas/subgraph-manifest.ts`; nothing here spells one.
+#      `schemas/kg/subgraph-manifest.ts`; nothing here spells one.
 
 name: Layer publish subgraph index
 
@@ -140,7 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(bun -e '
-            import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+            import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
             const [repo, sha, inst] = process.argv.slice(1);
             console.log(subgraphIndexPackage(repo, sha, inst).tag);
           ' "$REPO" "$SHA" "$INSTANCE")"

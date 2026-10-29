@@ -58,7 +58,7 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import { initSteps, offlineProbe, type InitStep, type StepState } from "@litlfred/bootstrap-tools/scripts/init.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { healthReportPath, parseHealthReport } from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { z } from "zod";
 
 import { HARNESS_ROOT } from "./lib/roots.ts";

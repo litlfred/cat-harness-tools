@@ -32,7 +32,7 @@ import { join, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 
 import { readRawConfigFile } from "./instance-config.ts";
 

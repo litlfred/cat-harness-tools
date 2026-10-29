@@ -38,7 +38,7 @@ import { resolve, relative, join } from "node:path";
 
 import { Glob } from "bun";
 
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
 import { checkoutRootFor, repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { exitUnlessMounted } from "./branch-store.ts";
 import { kgRoots } from "./known-skills.ts";

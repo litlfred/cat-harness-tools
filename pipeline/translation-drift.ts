@@ -46,7 +46,7 @@ import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { PAGE_LOCALE, routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
 
 /** One heading, reduced to what can be compared ACROSS a translation. */
 export interface Heading {

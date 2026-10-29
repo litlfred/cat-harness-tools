@@ -46,7 +46,7 @@ import {
   CatHarnessDeclarationKind,
   repoRootFor,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 
 import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";

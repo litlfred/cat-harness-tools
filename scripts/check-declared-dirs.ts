@@ -127,7 +127,7 @@ import {
   resolveSubgraphSource,
   type ResolvedSubgraphSource,
   type SubgraphSource,
-} from "@litlfred/cat-harness/schemas/subgraph-source.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 // The marker format has ONE reader, in `branch-store.ts`. This gate asking
 // `existsSync` on a path it spelled itself would be a second, and the two
 // would drift the first time the marker moved — which it already did once,
@@ -333,7 +333,7 @@ export function routePresence(
 
 /**
  * The directories this instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
- * `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
+ * `schemas/kg/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
  * ending in the separator. A declared directory among them is never on disk in
  * a checkout that has not run `derive:publish`, and that is its correct state,
  * not an `absent` one: whether the publish step built it is

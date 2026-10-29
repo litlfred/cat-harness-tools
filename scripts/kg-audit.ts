@@ -2680,7 +2680,7 @@ const resolvableSkills: Set<string> = (() => {
  * `needs` is OPTIONAL with a documented THIRD STATE: an absent value is
  * UNDETERMINED, never `[]` — `[]` is an assertion that this instance is the
  * floor, absent is nobody having said (`schemas/kg/cat-harness.ts`, `needs`;
- * `schemas/layer-direction.ts` refuses the same collapse for edges).
+ * `schemas/kg/layer-direction.ts` refuses the same collapse for edges).
  *
  * Read straight from the declaration rather than inferred from
  * {@link resolvableSkills} being no wider than {@link skills}, because

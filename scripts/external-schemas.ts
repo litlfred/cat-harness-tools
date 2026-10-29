@@ -31,11 +31,11 @@ import {
   type ExternalSchema,
 } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
 
-import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 import { directoriesForGraph, instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -485,7 +485,7 @@ function run(argv: string[]): number {
 
   if (drifted.length > 0) {
     console.error(`\n✗ a diagram binds ${drifted.length} of our namespace(s) that is not active:`);
-    for (const ns of OWN_BPMN_EXTENSION_NAMESPACES) console.error(`    ${ns}   (active — schemas/namespaces.ts)`);
+    for (const ns of OWN_BPMN_EXTENSION_NAMESPACES) console.error(`    ${ns}   (active — schemas/kg/namespaces.ts)`);
     for (const ns of drifted) console.error(`    ${ns}   ✗ retired`);
     console.error("  Bind bootstrap.processes: for skill, role and precondition, and");
     console.error("  cat-harness.processes: for every other element (bean 12s9). This is not cosmetic:");
@@ -496,7 +496,7 @@ function run(argv: string[]): number {
   if (offTarget.length > 0) {
     const n = offTarget.reduce((a, [, fs]) => a + fs.length, 0);
     console.error(`\n✗ ${n} diagram(s) declare a targetNamespace other than the one every diagram shares:`);
-    console.error(`    ${WORKFLOWS_NS}   (canonical — schemas/namespaces.ts, bean rtrg)`);
+    console.error(`    ${WORKFLOWS_NS}   (canonical — schemas/kg/namespaces.ts, bean rtrg)`);
     for (const [ns, fs] of offTarget) {
       console.error(`    ${ns || "(none declared)"}   ✗ ${fs.length}: ${fs.slice(0, 4).join(", ")}${fs.length > 4 ? ", …" : ""}`);
     }

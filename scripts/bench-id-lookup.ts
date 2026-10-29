@@ -44,7 +44,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
-import { buildIdLookup, type IdEntry } from "@litlfred/cat-harness/schemas/id-lookup.js";
+import { buildIdLookup, type IdEntry } from "@litlfred/cat-harness/schemas/kg/id-lookup.js";
 import { catalogueNodesDir, defaultSource, libraryDirOfSource, referencedEntries } from "./gen-id-lookup.js";
 
 const INSTANCE = resolve(import.meta.dir, "..");

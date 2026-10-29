@@ -16,7 +16,7 @@
  * mount reading the git tree at a pin (G2) always found nothing. Committing
  * them (B) and generating them at mount time (C) were rejected; the contract,
  * every name included, is `subgraphIndexPackage` in
- * `@litlfred/cat-harness/schemas/subgraph-manifest.ts`.
+ * `@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts`.
  *
  * ## Reuse
  *
@@ -61,7 +61,7 @@ import {
   type SubgraphIndexFile,
   type SubgraphIndexManifest,
   type SubgraphIndexPackageRef,
-} from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { retrieveNpmKg } from "./kg-retrieve-npm.ts";
 import { download, packageFetchUrl } from "./mount-from-lock.ts";
 import { packTarball } from "./pack-tarball.ts";

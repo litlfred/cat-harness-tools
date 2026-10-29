@@ -39,7 +39,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.ts";
+import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/kg/skill-topics.ts";

@@ -8,7 +8,7 @@
  * (option 1), *"and make pattern for declared repo branches (and declared dir
  * subgraphs)"* — and, later the same day, that a directory subgraph and a
  * branch subgraph are one pattern with two content sources
- * (`schemas/subgraph-source.ts`). Bean `l4ay`.
+ * (`schemas/kg/subgraph-source.ts`). Bean `l4ay`.
  *
  * ## The defect it removes
  *

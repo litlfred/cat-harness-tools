@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 
 import { sitePathOf } from "../print-published-path.ts";
 

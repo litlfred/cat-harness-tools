@@ -23,7 +23,7 @@ import {
   type PayloadPlan,
   type SubgraphPlan,
 } from "../gen-subgraph-jsonld.js";
-import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import jsonld from "jsonld";
 import { exportIdentity } from "../kg-export.js";
@@ -40,7 +40,7 @@ import {
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
   type PayloadLink,
-} from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
 import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";

@@ -65,8 +65,8 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { readSchemaGraph, schemaRoots, type SchemaGraph } from "./schema-graph.ts";
 import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { nodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
-import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kind-validator.ts";
+import { nodeKindIndex } from "@litlfred/cat-harness/schemas/kg/node-kind-index.ts";
+import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kg/kind-validator.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -511,7 +511,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";

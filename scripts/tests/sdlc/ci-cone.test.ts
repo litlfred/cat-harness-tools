@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
-import { NOT_INSTANCE_DIRS } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { NOT_INSTANCE_DIRS } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
 
 const ROOT = "/work/repo";

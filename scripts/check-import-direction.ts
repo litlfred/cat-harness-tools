@@ -77,8 +77,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { specifiersOf, stripComments } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));

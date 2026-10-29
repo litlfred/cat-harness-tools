@@ -55,7 +55,7 @@ import { basename, relative, resolve } from "node:path";
 import { readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { resolveInstanceGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
 import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 
 import { auditInstance as auditDirs } from "./check-declared-dirs.ts";

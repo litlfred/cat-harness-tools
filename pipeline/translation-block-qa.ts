@@ -106,7 +106,7 @@ import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
 import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
-import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
+import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
 

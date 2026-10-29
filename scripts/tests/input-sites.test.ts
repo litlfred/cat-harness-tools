@@ -15,9 +15,9 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { declaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.ts";
+import { declaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.ts";
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";

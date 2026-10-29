@@ -393,16 +393,16 @@ export const RULES: Rule[] = [
       "schemas/content/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
-      "schemas/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
+      "schemas/kg/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
       "schemas/kg/skill-definitions-dir.ts",    // where the JSON skill definitions and conventions live (bean `rqao`)
       "schemas/kg/kg-node.ts",                  // the labels every KG node carries
       "schemas/kg/harness-config.ts",           // cross-instance dependency resolution
-      "schemas/subgraph-source.ts",          // where a declared subgraph gets its content (bean `l4ay`) — read by the declaration schema itself
-      "schemas/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
-      "schemas/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
-      "schemas/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
-      "schemas/built-at-publish.ts",         // what an instance serves and never commits — read by the declaration schema itself (B1)
+      "schemas/kg/subgraph-source.ts",          // where a declared subgraph gets its content (bean `l4ay`) — read by the declaration schema itself
+      "schemas/kg/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
+      "schemas/kg/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
+      "schemas/kg/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
+      "schemas/kg/built-at-publish.ts",         // what an instance serves and never commits — read by the declaration schema itself (B1)
       // What one run ran on (bean `3sbm`), cited by digest from the harness's
       // own run records — tool-run, test-report, health-report and kg-qa — so
       // harness, with the release shapes it states its releases in. Left to
@@ -415,9 +415,9 @@ export const RULES: Rule[] = [
       "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
       "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
 
-      "schemas/property-skills.ts",          // declaration key → its edit skills (issue #1146)
-      "schemas/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)
-      "schemas/layer-direction.ts",          // the ONE wrong-direction verdict, shared with kg-detangle (bean `j79e`)
+      "schemas/kg/property-skills.ts",          // declaration key → its edit skills (issue #1146)
+      "schemas/kg/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)
+      "schemas/kg/layer-direction.ts",          // the ONE wrong-direction verdict, shared with kg-detangle (bean `j79e`)
       // "what files does this REPOSITORY contain", asked of git rather than of
       // the disk (beans `rsi6`, `xd1g`). Harness by its subject: the corpus it
       // reports is a checkout's, and its whole point is that a folio's material
@@ -453,7 +453,7 @@ export const RULES: Rule[] = [
       // The other grouping kinds' from-within group declaration (placement
       // PR0c, bean `ejye`); imports only zod. Concern groups are how the
       // harness's own subgraphs are laid out, not content.
-      "schemas/concern-groups.ts",
+      "schemas/kg/concern-groups.ts",
       // Roles, actors and capabilities extended by id from a dependent's
       // `scenarios/` (placement PR0b). The role model is harness vocabulary
       // (`role-graph.ts` below), and this reads it and `harness-config.ts`.
@@ -854,15 +854,15 @@ export const RULES: Rule[] = [
       // (moved verbatim out of cat-harness.ts), the graph-typology, validator,
       // block-kind and contribution node schemas, and the declared-node scan.
       // Harness for the same reason as their importers.
-      "schemas/instance-roots.ts",
-      "schemas/visualiser-route.ts",        // the ONE route every declared visualiser is published at (owner, 2026-10-09): imported by the declaration reader and the tiles
+      "schemas/kg/instance-roots.ts",
+      "schemas/kg/visualiser-route.ts",        // the ONE route every declared visualiser is published at (owner, 2026-10-09): imported by the declaration reader and the tiles
       "schemas/script-table.ts",            // the checkout's script table, by layer (bean `ar1s` P4): read from the declared instances, as instance-roots finds them
-      "schemas/graph-typology-node.ts",
-      "schemas/declared-nodes.ts",
-      "schemas/validator-node.ts",
-      "schemas/block-kind-node.ts",
-      "schemas/content-adapter-node.ts",
-      "schemas/contribution-nodes.ts",
+      "schemas/kg/graph-typology-node.ts",
+      "schemas/kg/declared-nodes.ts",
+      "schemas/kg/validator-node.ts",
+      "schemas/kg/block-kind-node.ts",
+      "schemas/kg/content-adapter-node.ts",
+      "schemas/kg/contribution-nodes.ts",
 
       // Roles, actors and the KG audit sidecar are harness-layer for the same
       // reason and on the same terms: `role-graph.ts` imports only
@@ -881,7 +881,7 @@ export const RULES: Rule[] = [
       // in core is what the keyword pass guessed, and that read as
       // `schemas/sdlc/kg-qa.ts [harness] -> [core]`, a wrong-direction edge for a
       // leaf with no dependencies of its own.
-      "schemas/portable-path.ts",
+      "schemas/kg/portable-path.ts",
       // The bean graph declares the harness's own work-plan store and imports
       // only zod. It was already harness-layer by concept; classifying the
       // scripts below is what made the edge to it visible, and the edge was
@@ -943,7 +943,7 @@ export const RULES: Rule[] = [
       // core may import the harness, the harness may not import core, so a
       // constant BOTH need cannot live in core without reintroducing the edge
       // it was extracted to remove.
-      "schemas/namespaces.ts",
+      "schemas/kg/namespaces.ts",
       // What the terms in that namespace MEAN, and therefore the same
       // argument one step along: a core placement made `ns-export.ts` — which
       // is harness — import its definitions from core, the wrong-direction
@@ -956,7 +956,7 @@ export const RULES: Rule[] = [
       // declaration's `jsonldPrefixes` field through its schema, so a core
       // placement — which the `schemas/` prefix rule gave it — was a
       // wrong-direction edge the moment the module landed.
-      "schemas/jsonld-prefixes.ts", // declared-path-literal: a partition plan names modules by path.
+      "schemas/kg/jsonld-prefixes.ts", // declared-path-literal: a partition plan names modules by path.
 
       // bootstrap's own Zod (graph, discussion, requirement, and since
       // 2026-09-30 the graph document's) lives in `bootstrap-tools/` (bean
@@ -998,7 +998,7 @@ export const RULES: Rule[] = [
       //    is what an ACTOR carries across knowledge-graph nodes. Neither
       //    survives the "describes a process" test.
       "schemas/conduct/memory.ts",
-      "schemas/carried-note.ts",
+      "schemas/kg/carried-note.ts",
       // The BPMN process element id (#1168 B8): a leaf `carried-note`'s
       // TaskRef and the log / invocation records all reference.
       "schemas/process/process-element-id.ts",
@@ -1048,7 +1048,7 @@ export const RULES: Rule[] = [
       // rule cannot tell a homograph from a hit, which is why every keyword
       // assignment in this file is provisional against a read of the module.
       // It was the single `folio-assist-core -> smart-base` edge.
-      "schemas/front-matter.ts",    // "this repository's self-declaring files"
+      "schemas/kg/front-matter.ts",    // "this repository's self-declaring files"
       "schemas/sdlc/test-run.ts",        // what was measured, with what; only eval-crdm-detect reads it
       "schemas/input-trace.ts",     // ...and the traced input sites a run reached, which test-run records (moved from scripts/ in 70lx)
       // The TEST PROCESS's other two schemas (beans `ygzh`, `3o5b`), by the
@@ -1080,8 +1080,8 @@ export const RULES: Rule[] = [
       "schemas/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
       "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
-      "schemas/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
-      "schemas/kind-validator.ts",  // a graph typology's validator
+      "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
+      "schemas/kg/kind-validator.ts",  // a graph typology's validator
       "schemas/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
       "schemas/actor-reach.ts",     // which actors a declaration can reach
       // WHAT A REPOSITORY IS — the markers it carries. The word "content" in

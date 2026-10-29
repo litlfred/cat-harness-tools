@@ -249,7 +249,7 @@ describe("skill refs resolve across the `needs` chain", () => {
    *
    * `needs` is OPTIONAL in the schema and an absent value is UNDETERMINED —
    * `[]` asserts this instance is the floor, absent is nobody having said
-   * (`schemas/kg/cat-harness.ts`; `schemas/layer-direction.ts` refuses the same
+   * (`schemas/kg/cat-harness.ts`; `schemas/kg/layer-direction.ts` refuses the same
    * collapse for edges). Such an instance cannot have a ref judged dangling:
    * what it reaches was never declared, so the honest answer is `unknown`.
    * The constructed test below proves that mechanism on an instance it builds.

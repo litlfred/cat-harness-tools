@@ -58,8 +58,8 @@
  */
 import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { DOCS_SITE_BASE, siteNodeIri } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
-import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
+import { contentSourceContext } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 import { memberOf, subgraphContainer } from "./subgraph-node.ts";
 
 /**

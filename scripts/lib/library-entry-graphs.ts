@@ -39,7 +39,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 
 /** One file of a sub-graph declared inside a library entry. */

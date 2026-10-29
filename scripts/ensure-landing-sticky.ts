@@ -73,13 +73,13 @@ import {
   rootForScope,
   declarationPathIn,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import {
   LandingStickySchema,
   stickyFromContribution,
   type LandingSticky,
 } from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 import {
   StickyContributionSchema,
   composeContributions,

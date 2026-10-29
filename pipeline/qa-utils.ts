@@ -15,7 +15,7 @@ import {
 import { join, resolve } from "path";
 import { execFileSync } from "child_process";
 import { findDeclarationFile, graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 import { criterionSourceHash } from "./qa-criterion-hash";
 import { maskStringsAndComments, parseStringField } from "./uses-field";
 import {
