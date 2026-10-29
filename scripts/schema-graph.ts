@@ -70,12 +70,13 @@
  * pattern in `cat-harness.ts` are the real cases, so this is not hypothetical.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { basename, join, posix, relative } from "node:path";
 
 import ts from "typescript";
 
 import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -609,17 +610,68 @@ function typeMembers(members: ts.NodeArray<ts.TypeElement>, text: string): Schem
   return out;
 }
 
-/** `./foo.js`, `./foo.ts`, `../schemas/foo` → `foo`; anything else → `null`. */
-function moduleStemOf(specifier: string): string | null {
+/**
+ * `./foo.js`, `../kg/foo.ts` → `./foo`, `../kg/foo`: a relative specifier as
+ * a PATH, extension dropped; anything else → `null`.
+ *
+ * A path and not a bare stem since the concern-group regroup (bean `f8wp`):
+ * `schemas/<group>/` put modules one directory down, so `./foo` and
+ * `../kg/foo` name different files, and a stem keyed to the importer's own
+ * directory resolved every cross-group import to nothing.
+ */
+function moduleSpecifierPathOf(specifier: string): string | null {
   if (!specifier.startsWith(".")) return null;
-  return basename(specifier).replace(/\.(ts|js|mts|mjs)$/, "");
+  return specifier.replace(/\.(ts|js|mts|mjs)$/, "");
+}
+
+/** A module's path with `.ts` dropped: the key an import specifier resolves to. */
+function moduleKeyOf(moduleRel: string): string {
+  return moduleRel.replace(/\.ts$/, "");
+}
+
+/** The module key `specifier` names, read from inside `fromModule`. */
+function resolveSpecifier(fromModule: string, specifier: string): string {
+  return posix.normalize(posix.join(posix.dirname(fromModule), specifier));
+}
+
+/**
+ * What a module RE-EXPORTS: `export * from "./x.js"` (`names` null) and
+ * `export { A, B as C } from "./x.js"` (`names` maps exported → original).
+ *
+ * The regroup's one-release shims at the old paths are exactly this shape,
+ * and a module still importing through one must reach the declaration it
+ * forwards to rather than be reported as naming nothing.
+ */
+interface ReExport {
+  specifier: string;
+  names: Map<string, string> | null;
+}
+
+function reExportsOf(src: ts.SourceFile): ReExport[] {
+  const out: ReExport[] = [];
+  for (const st of src.statements) {
+    if (!ts.isExportDeclaration(st) || !st.moduleSpecifier || !ts.isStringLiteral(st.moduleSpecifier)) continue;
+    const specifier = moduleSpecifierPathOf(st.moduleSpecifier.text);
+    if (specifier === null) continue;
+    const clause = st.exportClause;
+    if (clause === undefined) {
+      out.push({ specifier, names: null });
+      continue;
+    }
+    if (!ts.isNamedExports(clause)) continue;
+    const names = new Map<string, string>();
+    for (const el of clause.elements) names.set(el.name.text, (el.propertyName ?? el.name).text);
+    out.push({ specifier, names });
+  }
+  return out;
 }
 
 /**
  * Every name BOUND in a module, and where it came from.
  *
- * The value is the exporting module's stem for a relative import, and `null`
- * for a non-relative one (`z` from `zod`) or for a name declared here.
+ * The value is the exporting module's specifier path for a relative import
+ * (see {@link moduleSpecifierPathOf}), `""` for a non-relative one (`z` from
+ * `zod`), and `null` for a name declared here.
  *
  * ## Why this replaced a plain import map, and why it is not a deny-list
  *
@@ -646,7 +698,7 @@ function bindingsOf(src: ts.SourceFile): Map<string, string | null> {
       // graph. `null` marks a name declared in this module. Keeping them apart
       // is what lets `z` (bound to `zod`) be reported as external rather than
       // as the graph's most-referenced missing declaration.
-      const stem = moduleStemOf(st.moduleSpecifier.text) ?? "";
+      const stem = moduleSpecifierPathOf(st.moduleSpecifier.text) ?? "";
       const named = st.importClause.namedBindings;
       if (named && ts.isNamedImports(named)) {
         for (const el of named.elements) out.set(el.name.text, stem);
@@ -682,7 +734,7 @@ function readModule(
   file: string,
   moduleRel: string,
   text: string,
-): { decls: SchemaDecl[]; bindings: Map<string, string | null> } {
+): { decls: SchemaDecl[]; bindings: Map<string, string | null>; reExports: ReExport[] } {
   const src = ts.createSourceFile(file, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
   const stem = basename(moduleRel).replace(/\.ts$/, "");
   const decls: SchemaDecl[] = [];
@@ -779,7 +831,7 @@ function readModule(
       });
     }
   }
-  return { decls, bindings: bindingsOf(src) };
+  return { decls, bindings: bindingsOf(src), reExports: reExportsOf(src) };
 }
 
 // ── JSON Schema files (issue #2278) ─────────────────────────────────────
@@ -995,88 +1047,114 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   const modules: SchemaGraphModule[] = [];
   const decls: SchemaDecl[] = [];
   /**
-   * Module stem → its exports, for cross-module resolution.
+   * Module key (its repo-relative path, `.ts` dropped) → its exports, for
+   * cross-module resolution.
    *
-   * Keyed by stem because a relative import names a FILE, not an instance —
+   * Keyed by PATH because a relative import names a FILE, not an instance —
    * `import { X } from "./foo.js"` inside `detangle/schemas/` means
    * `detangle/schemas/foo.ts`, and two instances may both have a `foo.ts`.
-   * So the key is scoped per directory, not global: a shared stem across
-   * instances would otherwise resolve one instance's import to another's
-   * export, which is the `wggr` failure in miniature.
+   * A global stem would resolve one instance's import to another's export,
+   * which is the `wggr` failure in miniature. It was keyed by directory and
+   * stem until the concern-group regroup (bean `f8wp`) put modules in
+   * `schemas/<group>/`, where `../kg/foo.js` names a file in ANOTHER
+   * directory; resolving the specifier as a path is what reaches it.
    */
-  const exportsByDirStem = new Map<string, Map<string, string>>();
+  const exportsByModule = new Map<string, Map<string, string>>();
+  /** Module key → what it re-exports, for the regroup's old-path shims. */
+  const reExportsByModule = new Map<string, ReExport[]>();
   /** `$ref`s read from JSON Schema files, resolved after every file is read. */
   const jsonRefs: JsonSchemaRef[] = [];
   const bindingsByModule = new Map<string, Map<string, string | null>>();
-  /** Module path → the directory it was read from, for scoped resolution. */
+  /**
+   * Module path → the declared schema directory it was read from, for `@ref`'s
+   * same-directory tier. The DECLARED directory, not a concern group under
+   * it: the groups split one directory's corpus by concern, and an `@ref` that
+   * resolved within that corpus before the split must resolve the same after.
+   */
   const dirOfModule = new Map<string, string>();
 
   // The root's DECLARED name, else the single landing harness (issue #1904),
   // never the clone's folder name. Undefined only matters if a module sits at
   // the root, and then it is a finding rather than a guess.
   const rootName = rootInstanceName(repoRoot);
-  for (const dir of dirs) {
-    const dirRel = rel(dir);
+  for (const declaredDir of dirs) {
+    const declaredRel = rel(declaredDir);
     // The root's DECLARED name, not the clone's folder name (bean `t5dm`,
     // the sibling of `library-graph`'s `instanceOf`).
-    const instance = dirRel.includes("/") ? dirRel.split("/")[0]! : rootName;
+    const instance = declaredRel.includes("/") ? declaredRel.split("/")[0]! : rootName;
     if (instance === undefined) {
-      throw new Error(`${dirRel} sits at the root of ${repoRoot}, which declares no instance and has no single landing harness (issue #1904)`);
+      throw new Error(`${declaredRel} sits at the root of ${repoRoot}, which declares no instance and has no single landing harness (issue #1904)`);
     }
-    for (const f of readdirSync(dir).sort()) {
-      if (f.endsWith(JSON_SCHEMA_SUFFIX)) {
+    // The directory AND its declared concern groups (`schemas/<group>/`,
+    // named from within by `schemas/schemas.json`; bean `f8wp`), one level
+    // deep — the walk `schemaModules` makes, through the same helper so the
+    // two readers cannot disagree about which directories are the graph.
+    // Reading the declared directory alone saw only the old-path re-export
+    // shims once a group moved, and the schemas page lost every declaration
+    // the regroup had moved.
+    for (const dir of withConcernGroupDirs([declaredDir], "schemas")) {
+      const dirRel = rel(dir);
+      for (const f of readdirSync(dir).sort()) {
+        if (f.endsWith(JSON_SCHEMA_SUFFIX)) {
+          const moduleRel = `${dirRel}/${f}`;
+          const read = readJsonSchemaModule(readFileSync(join(dir, f), "utf-8"), moduleRel);
+          dirOfModule.set(moduleRel, declaredRel);
+          modules.push({
+            module: moduleRel,
+            instance,
+            name: basename(f, JSON_SCHEMA_SUFFIX),
+            // A JSON Schema file IS a schema node: it carries `$id`, and the
+            // `@graphNode` tag is a TypeScript docblock convention it cannot hold.
+            graphNode: "schema",
+            ...(read.summary ? { summary: read.summary } : {}),
+            isTest: false,
+            decls: read.decls.map((d) => d.id),
+          });
+          decls.push(...read.decls);
+          jsonRefs.push(...read.refs);
+          continue;
+        }
+        if (!f.endsWith(".ts")) continue;
         const moduleRel = `${dirRel}/${f}`;
-        const read = readJsonSchemaModule(readFileSync(join(dir, f), "utf-8"), moduleRel);
-        dirOfModule.set(moduleRel, dirRel);
+        const text = readFileSync(join(dir, f), "utf-8");
+        const block = /^\/\*\*[\s\S]*?^ \*\//m.exec(text)?.[0] ?? "";
+        const tag = TAG.exec(block);
+        const graphNode =
+          tag === null
+            ? "undeclared"
+            : tag[1] === "none"
+              ? "none"
+              : tag[1] === "schema"
+                ? "schema"
+                : "undeclared";
+
+        const { decls: got, bindings, reExports } = readModule(join(dir, f), moduleRel, text);
+        const stem = basename(f, ".ts");
+        bindingsByModule.set(moduleRel, bindings);
+        dirOfModule.set(moduleRel, declaredRel);
+        const key = moduleKeyOf(moduleRel);
+        const exported = exportsByModule.get(key) ?? new Map<string, string>();
+        for (const d of got) exported.set(d.name, d.id);
+        exportsByModule.set(key, exported);
+        if (reExports.length > 0) {
+          reExportsByModule.set(
+            key,
+            reExports.map((r) => ({ specifier: resolveSpecifier(moduleRel, r.specifier), names: r.names })),
+          );
+        }
+
         modules.push({
           module: moduleRel,
           instance,
-          name: basename(f, JSON_SCHEMA_SUFFIX),
-          // A JSON Schema file IS a schema node: it carries `$id`, and the
-          // `@graphNode` tag is a TypeScript docblock convention it cannot hold.
-          graphNode: "schema",
-          ...(read.summary ? { summary: read.summary } : {}),
-          isTest: false,
-          decls: read.decls.map((d) => d.id),
+          name: stem,
+          graphNode,
+          reason: tag?.[2]?.trim() || undefined,
+          summary: firstProse(block),
+          isTest: f.endsWith(".test.ts"),
+          decls: got.map((d) => d.id),
         });
-        decls.push(...read.decls);
-        jsonRefs.push(...read.refs);
-        continue;
+        decls.push(...got);
       }
-      if (!f.endsWith(".ts")) continue;
-      const moduleRel = `${dirRel}/${f}`;
-      const text = readFileSync(join(dir, f), "utf-8");
-      const block = /^\/\*\*[\s\S]*?^ \*\//m.exec(text)?.[0] ?? "";
-      const tag = TAG.exec(block);
-      const graphNode =
-        tag === null
-          ? "undeclared"
-          : tag[1] === "none"
-            ? "none"
-            : tag[1] === "schema"
-              ? "schema"
-              : "undeclared";
-
-      const { decls: got, bindings } = readModule(join(dir, f), moduleRel, text);
-      const stem = basename(f, ".ts");
-      bindingsByModule.set(moduleRel, bindings);
-      dirOfModule.set(moduleRel, dirRel);
-      const key = `${dirRel}\u0000${stem}`;
-      const exported = exportsByDirStem.get(key) ?? new Map<string, string>();
-      for (const d of got) exported.set(d.name, d.id);
-      exportsByDirStem.set(key, exported);
-
-      modules.push({
-        module: moduleRel,
-        instance,
-        name: stem,
-        graphNode,
-        reason: tag?.[2]?.trim() || undefined,
-        summary: firstProse(block),
-        isTest: f.endsWith(".test.ts"),
-        decls: got.map((d) => d.id),
-      });
-      decls.push(...got);
     }
   }
 
@@ -1094,24 +1172,41 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
    * a non-relative import resolved correctly, to somewhere outside this graph.
    * Reporting it as a miss would bury the real misses under `z`.
    */
+  /**
+   * The declaration module `key` exports as `name`, following its re-exports
+   * — so an import through an old-path shim reaches the module it forwards
+   * to. `seen` stops a re-export cycle rather than recursing forever.
+   */
+  const exportedBy = (key: string, name: string, seen: Set<string> = new Set()): string | undefined => {
+    if (seen.has(key)) return undefined;
+    seen.add(key);
+    const hit = exportsByModule.get(key)?.get(name);
+    if (hit) return hit;
+    for (const r of reExportsByModule.get(key) ?? []) {
+      const original = r.names === null ? name : r.names.get(name);
+      if (original === undefined) continue;
+      const found = exportedBy(r.specifier, original, seen);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
   const resolve = (moduleRel: string, name: string): string | "external" | null => {
     const bindings = bindingsByModule.get(moduleRel);
     if (!bindings || !bindings.has(name)) return null; // not bound here: not a reference
-    const dirRel = dirOfModule.get(moduleRel) ?? "";
-    const own = exportsByDirStem.get(`${dirRel}\u0000${basename(moduleRel, ".ts")}`);
-    const here = own?.get(name);
+    const here = exportsByModule.get(moduleKeyOf(moduleRel))?.get(name);
     if (here) return here;
-    const stem = bindings.get(name);
+    const specifier = bindings.get(name);
     // Bound to a non-relative import, or to something in this module that is
     // not a declaration of the graph (a helper function, a const array of
     // literals). Both resolved; neither is a node.
-    if (stem === "" || stem === null || stem === undefined) return "external";
-    const target = exportsByDirStem.get(`${dirRel}\u0000${stem}`);
+    if (specifier === "" || specifier === null || specifier === undefined) return "external";
+    const target = resolveSpecifier(moduleRel, specifier);
     // A relative import pointing OUT of `schemas/` is external too. Only a
     // module that is part of this graph and does not export the name is a
     // genuine miss — which is the narrow case worth reporting.
-    if (target === undefined) return "external";
-    return target.get(name) ?? null;
+    if (!exportsByModule.has(target)) return "external";
+    return exportedBy(target, name) ?? null;
   };
 
   /**
