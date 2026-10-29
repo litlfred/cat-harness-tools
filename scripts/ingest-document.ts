@@ -68,13 +68,13 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ARCHIVE_MIMETYPES } from "@litlfred/cat-harness/schemas/archive-contents.ts";
+import { ARCHIVE_MIMETYPES } from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
 import { checkEntry, type Requirement } from "./check-l1-complete.ts";
 import { catalogueRecordFor, dcValue } from "../pipeline/library-title.ts";
-import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
 import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 import { refreshLibraryIndex } from "./lsi.ts";
-import { IntakeSchema } from "@litlfred/cat-harness/schemas/intake.ts";
+import { IntakeSchema } from "@litlfred/cat-harness/schemas/library/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
@@ -276,7 +276,7 @@ export interface Plan {
  * unasked.
  *
  * It sees only the upload itself, as the ruling requires: the `licence`
- * record in the `intake.json` beside it (`schemas/source-licence.ts`, the same
+ * record in the `intake.json` beside it (`schemas/library/source-licence.ts`, the same
  * record a library manifest carries) and whether a LICENSE file sits beside
  * it. It never reads a licence out of extracted text — that is a later check's
  * to find — so with nothing recorded the verdict is `undetermined`, and

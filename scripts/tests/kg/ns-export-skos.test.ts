@@ -6,7 +6,7 @@
  *
  * `skos:` has been bound in the published `@context` since it was written
  * (`schemas/jsonld.ts:551`, and the shipped `ns/content/v1.jsonld`), and
- * `schemas/tabular-csvw.ts` states in prose that this graph "already speaks
+ * `schemas/library/tabular-csvw.ts` states in prose that this graph "already speaks
  * eight published vocabularies — doco, deo, cito, oa, prov, **skos**, dcterms,
  * fhir". Measured while holding the `lqo9` roast, `skos:` was emitted by
  * **zero** nodes. The claim was false, and nothing broke, which is exactly why

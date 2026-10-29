@@ -763,7 +763,7 @@ function compareWithStored(ref: string): { from: string; moved: { path: string; 
  * `check:partition` resolves its ROOT to `<checkout>/cat-harness`, so the
  * wrong-direction count it prints is scoped to ONE instance and is silent
  * about edges between already-extracted siblings. `bf5l` measured the
- * discriminator: with `cat-harness/schemas/intake.ts` importing
+ * discriminator: with `cat-harness/schemas/library/intake.ts` importing
  * `folio-assistant-core` in place, `check:instance-graph` and
  * `check:partition` were both green and this script reported 1. A node's
  * layer HERE is the instance it lives in, which is why it can see the axis at

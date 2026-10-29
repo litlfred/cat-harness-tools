@@ -16,7 +16,7 @@ import { CAT_HARNESS_NS } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { buildFshGutsExport } from "../../fsh-guts-export";
 import { buildGlossary } from "../../glossary-export";
 import { buildVocabulary } from "../../ns-export";
-import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/code-list.ts";
+import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/library/code-list.ts";
 import { buildCodeListsDoc } from "../../code-lists";
 import { PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
 import { SCOPES_DIR, render } from "../../search-split.ts";

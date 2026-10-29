@@ -13,7 +13,7 @@
  *
  * **A sheet node appears iff the SOURCE has sheets.** Not iff there are two or
  * more: a one-sheet workbook still has a sheet, and a CSV has none however
- * many rows it holds. `schemas/tabular-csvw.ts` already decided this one level
+ * many rows it holds. `schemas/library/tabular-csvw.ts` already decided this one level
  * down, setting `fac:anchor.sheet` to `null` for a CSV because *"a CSV
  * genuinely has no sheet, and writing `Sheet1` would invent one"*.
  *

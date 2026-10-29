@@ -31,7 +31,7 @@
  *
  * This script writes judgements and joins only.  It never copies a title,
  * author, year, or DOI out of `references.ts` — see the schema header in
- * `schemas/bib-verification.ts`.
+ * `schemas/library/bib-verification.ts`.
  *
  * ## Usage
  *
@@ -44,7 +44,7 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import type { LedgerEntry, SourceLedger, SourceRef } from "@litlfred/cat-harness/schemas/bib-verification.ts";
+import type { LedgerEntry, SourceLedger, SourceRef } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 import {
   readSourceLedger,
   SOURCE_LEDGER_AUTHORITATIVE_FOR,

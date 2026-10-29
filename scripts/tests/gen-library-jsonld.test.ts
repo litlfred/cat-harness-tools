@@ -36,7 +36,7 @@ import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 import { contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
-import { manifestLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
+import { manifestLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

@@ -241,7 +241,7 @@ function main(): void {
   // list is empty or every survivor has a written reason". It does not,
   // because `ROOT` is this instance and the scan never leaves it. `bf5l`
   // measured the gap rather than arguing it: with a real wrong-direction
-  // import in place (`cat-harness/schemas/intake.ts` importing
+  // import in place (`cat-harness/schemas/library/intake.ts` importing
   // `folio-assistant-core`), `check:instance-graph` said no cycle, THIS TOOL
   // said 0, and `kg:detangle` said 1. Three green checks did not mean the
   // layering held.

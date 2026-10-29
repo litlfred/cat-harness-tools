@@ -68,7 +68,7 @@ import {
   type BibFamily,
   type BibReview,
 } from "@litlfred/cat-harness/schemas/bib-attestations.js";
-import type { SourceLedger } from "@litlfred/cat-harness/schemas/bib-verification.js";
+import type { SourceLedger } from "@litlfred/cat-harness/schemas/library/bib-verification.js";
 
 export interface FamilyReport {
   family: BibFamily;

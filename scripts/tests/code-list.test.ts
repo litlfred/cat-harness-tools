@@ -22,7 +22,7 @@ import {
   codeListToSkos,
   loadCodeLists,
   type CodeList,
-} from "@litlfred/cat-harness/schemas/code-list.ts";
+} from "@litlfred/cat-harness/schemas/library/code-list.ts";
 import * as ns from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { buildCodeListsDoc, unlistedAdjudications } from "../code-lists";

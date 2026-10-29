@@ -19,7 +19,7 @@ import {
   TABULAR_CSVW_SCHEMA_ID,
   toCsvw,
   stubsIn,
-} from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+} from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
 import { stubFindings, stubbedTools } from "../check-tabular-stubs.ts";
 import { tools } from "@litlfred/cat-harness/tools/index.ts";

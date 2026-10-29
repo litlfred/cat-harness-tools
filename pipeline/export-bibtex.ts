@@ -61,8 +61,8 @@ export function folioBibtexTitle(repoRoot: string = REPO_ROOT): string {
 // `annotation = {...}` field that LaTeX / biblatex / pandoc can
 // display in the rendered bibliography.
 
-import type { Verifier } from "@litlfred/cat-harness/schemas/bib-verification.ts";
-import { verifierLabel } from "@litlfred/cat-harness/schemas/bib-verification.ts";
+import type { Verifier } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 
 interface VerifEntry {
   id: string;

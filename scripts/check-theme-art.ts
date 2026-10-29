@@ -14,7 +14,7 @@
  * meeting certain formatting constraints), return sucches or explnation of
  * falire"*, scoped by *"make as part of docuemtn ingestion skill...."*
  *
- * `schemas/theme-art-intake.ts` is the check itself and is pure. This is its CLI
+ * `schemas/library/theme-art-intake.ts` is the check itself and is pure. This is its CLI
  * face: it reads the instance's declaration, groups the declared images by role,
  * and runs intake over each group.
  *
@@ -61,7 +61,7 @@ import {
   ingestThemeArt,
   type ArtCandidate,
   type ThemeArtIntakeResult,
-} from "@litlfred/cat-harness/schemas/theme-art-intake.js";
+} from "@litlfred/cat-harness/schemas/library/theme-art-intake.js";
 
 /** Roles whose images are theme backdrops, as opposed to icons or marks. */
 export function backdropRoles(

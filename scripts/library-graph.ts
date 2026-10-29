@@ -97,7 +97,7 @@ import { entryItems, type SummaryTally } from "./summaries.ts";
 import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
+import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { displayNarrative } from "./lib/narrative-display.ts";
@@ -243,7 +243,7 @@ export interface LibraryEntry {
   viewable?: "pdf" | "image";
   /**
    * Where else a reader can go for this entry — read from a `referenced`
-   * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
+   * entry's own `links` (`schemas/library/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
    * so the row has nothing of its own to open and must say where the thing is.
    *

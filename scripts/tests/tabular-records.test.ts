@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
 import { checkAll, checkEntry } from "../check-l1-complete.ts";
 import { planFor, sniffMimetype, tabularDelimiter } from "../ingest-document.ts";
 
