@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { judge, markerOf, writersNamed } from "../check-generated-writers.ts";
+import { judge, markerOf, unmarkedWrites, writersNamed } from "../check-generated-writers.ts";
 
 const REG = new Set(["folio-library-index/v1"]);
 
@@ -54,5 +54,25 @@ describe("judge: a writer is real when the checkout can find it", () => {
   });
   test("a marker naming no writer is a warning", () => {
     expect(judge(file, { kind: "_generated", text: "do not hand-edit" }, o)).toMatch(/names no writer/);
+  });
+});
+
+describe("unmarkedWrites: a writer's declared files must carry a marker (cat-harness#693)", () => {
+  const root = mkdtempSync(join(tmpdir(), "gen-writes-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const content = join(root, "content");
+  mkdirSync(join(content, "docs"), { recursive: true });
+  writeFileSync(join(content, "docs", "marked.md"), "---\ngenerated: scripts/gen.ts\n---\n");
+  writeFileSync(join(content, "docs", "bare.md"), "# no marker\n");
+  const o = { repo: root, byName: new Map([["content", content]]), registry: REG };
+
+  test("an unmarked file a glob matches is a warning; a marked one is not", () => {
+    const f = unmarkedWrites([{ task: "docs:gen", instance: join(root, "tools"), globs: ["content:docs/*.md"] }], o);
+    expect(f.map((x) => x.file)).toEqual(["content/docs/bare.md"]);
+    expect(f[0]!.problem).toMatch(/written by `docs:gen`.*no generated marker/);
+  });
+  test("a glob matching nothing, or naming an absent instance, is reported", () => {
+    expect(unmarkedWrites([{ task: "t", instance: content, globs: ["gone/*.md"] }], o)[0]!.problem).toMatch(/match no file/);
+    expect(unmarkedWrites([{ task: "t", instance: content, globs: ["elsewhere:x.md"] }], o)[0]!.problem).toMatch(/not in this checkout/);
   });
 });

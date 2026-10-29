@@ -249,7 +249,7 @@ export function render(model: ProcessModel, step: ProcessNode, matched: ToolDefi
   const L: string[] = [];
   L.push("---");
   L.push("layout: default");
-  L.push("generated: cat-harness/scripts/gen-upload-step-docs.ts — do not hand-edit; edit the Tool nodes");
+  L.push("generated: cat-harness-tools/scripts/gen-upload-step-docs.ts — do not hand-edit; edit the Tool nodes");
   L.push("title: The upload step");
   L.push("nav_order: 44");
   L.push("---");
