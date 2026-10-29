@@ -141,7 +141,11 @@
  * closure — as the declared directories that closure touches, and with
  * `tools` named anywhere in an entry, that entry's instances mount those
  * directories (plus any their override names) instead of their default list.
- * A `whole` instance stays whole. The owner's rulings and why each is so are
+ * A `whole` instance stays whole. An instance of ANOTHER entry the closure
+ * reaches shrinks too, to the directories the closures need from it (owner,
+ * 2026-10-29, option B: "every touched entry"), unless its own entry mounts
+ * it whole or names its `directories`: then that list stands, and must
+ * already bring what the closure needs. The owner's rulings and why each is so are
  * in `tool-closure.ts`, which computes it; this file only plans with it:
  *
  * - each chosen Tool's `invoke` is read from the declaring instance's
@@ -1004,8 +1008,10 @@ function applyToolChoices(
   local: Map<string, string>,
   pkgAt: (repository: string, sha: string) => (harness: string) => SubgraphIndexFetch,
 ): void {
-  const choosing = plan.mounts.filter((m) => Object.values(m.overrides ?? {}).some((o) => o.tools?.length));
+  const choosing = plan.mounts.filter(entryChoosesTools);
   if (choosing.length === 0) return;
+  /** Instances of other entries that shrink to Tool closures, and the directory ids those closures need. */
+  const shrunk = new Map<string, Set<string>>();
 
   // Every instance the closure may reach: those laid down as files, and the ones this checkout holds.
   const instances: ClosureInstance[] = [];
@@ -1093,11 +1099,21 @@ function applyToolChoices(
     }
 
     const result = failures.length ? undefined : toolClosure(instances, choices);
+    /** What this entry's closure asks of instances of OTHER entries that shrink to it (owner, 2026-10-29, option B). */
+    const asks = new Map<string, string[]>();
     if (result) {
-      // An instance of ANOTHER entry the closure needs a directory of must already bring it.
+      // An instance of ANOTHER entry the closure touches shrinks to what the
+      // closure needs from it, unless its own entry says otherwise: an
+      // explicit `directories` list or `whole` wins, and then it must already
+      // bring what the closure needs.
       for (const [name, ids] of result.directories) {
-        const p = plan.instances.find((i) => i.instance === name)!;
-        if (reached.get(name)?.via === m) continue;
+        const p = plan.instances.find((i) => i.instance === name);
+        const r = reached.get(name);
+        if (!p || !r || r.via === m) continue;
+        if (shrinksToClosure(p, r)) {
+          asks.set(name, ids);
+          continue;
+        }
         const have = p.directories.map((d) => d.path);
         const inst = instances.find((i) => i.instance === name)!;
         for (const id of ids) {
@@ -1139,7 +1155,47 @@ function applyToolChoices(
       const p = plan.instances.find((i) => i.instance === c.instance);
       if (p) p.tools = result!.tools.filter((t) => t.instance === c.instance);
     }
+    for (const [name, ids] of asks) {
+      const prev = shrunk.get(name) ?? new Set<string>();
+      for (const id of ids) prev.add(id);
+      shrunk.set(name, prev);
+    }
   }
+
+  // Each shrinking instance mounts the union of what every closure asked of it.
+  // An entry that chooses Tools itself already started from its own closure, so
+  // what others ask is added to it; any other entry's default list is replaced.
+  for (const [name, ids] of shrunk) {
+    const p = plan.instances.find((i) => i.instance === name);
+    const r = reached.get(name);
+    if (!p || !r) continue;
+    const inst = instances.find((i) => i.instance === name)!;
+    const own = entryChoosesTools(r.via);
+    const keep = own ? p.directories : [];
+    const have = new Set(keep.map((d) => d.id));
+    for (const id of [...ids].sort()) {
+      if (have.has(id)) continue;
+      const d = inst.directories.find((x) => x.id === id)!;
+      keep.push({ id, path: joinRel(p.path, d.path), upstreamPath: joinRel(r.found.root, d.path) });
+      have.add(id);
+    }
+    p.directories = keep;
+  }
+}
+
+/** Whether a mount entry names `tools` for any of its instances. */
+function entryChoosesTools(m: RemoteMount): boolean {
+  return Object.values(m.overrides ?? {}).some((o) => o.tools?.length);
+}
+
+/**
+ * Whether an instance reached through another entry shrinks to a Tool
+ * closure's needs (owner, 2026-10-29, option B): yes, unless its entry mounts
+ * it whole or as metadata, or names its directories explicitly.
+ */
+function shrinksToClosure(p: PlannedInstance, r: { whole: boolean; via: RemoteMount }): boolean {
+  if (r.whole || p.hydrated) return false;
+  return !r.via.overrides?.[p.instance]?.directories?.length;
 }
 
 /** Resolve the closure and close every fetched tree. Writes nothing. */
