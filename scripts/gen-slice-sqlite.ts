@@ -165,9 +165,10 @@ export const PAGE_SIZE = 4096;
  * change nobody made. The measurement in the manifest is what a person reads.
  * Raised from 5 MB to 10 MB by the owner on 2026-10-24 ("Raise to 10 MB"),
  * when the whole-repo KG slice reached 8.3 MB (issue #733). Shrinking that
- * slice is bean `0exf`.
+ * slice is bean `0exf`, and once 0exf shrank it the owner set 6 MB on
+ * 2026-10-29 (card option "B. 6 MB").
  */
-export const SIZE_BUDGET_BYTES = 10 * 1024 * 1024;
+export const SIZE_BUDGET_BYTES = 6 * 1024 * 1024;
 
 /** The repository root a source `file` is relative to. */
 export const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
