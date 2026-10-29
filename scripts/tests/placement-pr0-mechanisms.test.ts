@@ -32,7 +32,7 @@ import {
   declarationChain,
   repositoryMirrors,
 } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   checkoutActors,
   checkoutCapabilities,

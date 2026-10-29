@@ -86,7 +86,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { classify } from "./check-docs-populated.ts";
 import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "./known-skills.ts";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import {
   findDeclarationFile,
   instanceRootsIn,

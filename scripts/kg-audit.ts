@@ -127,7 +127,7 @@ import {
   fulfilmentKindsForBpmnType,
   type RoleGraph,
   type LoadedActor,
-} from "@litlfred/cat-harness/schemas/role-graph.js";
+} from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
@@ -151,7 +151,7 @@ import { VERIFIERS } from "./publish-verify.ts";
 import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
 import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
 import {
   checkoutActors,

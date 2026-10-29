@@ -88,7 +88,7 @@ import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-f
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
-import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
 import {
   artefactStub,
@@ -392,7 +392,7 @@ export function buildContext(): Record<string, unknown> {
     // role is the general node and must not name its lanes (data-modelling
     // step 8).
     //
-    // REUSED, not coined. `schemas/role-graph.ts`'s own JSON-LD projection
+    // REUSED, not coined. `schemas/process/role-graph.ts`'s own JSON-LD projection
     // already publishes exactly these two relations under these two IRIs, so
     // a second spelling here would put one concept in the vocabulary twice --
     // the drift this repo keeps paying for. `ns:check` is what caught it, by
@@ -3214,7 +3214,7 @@ export async function scannedInstanceSchemas(instanceRoot: string, baseUrl?: str
 // would fetch the document and find nothing at the fragment, with nothing to
 // say where it went. The precedent is the vocabulary's own retired terms
 // (`schemas/vocabulary.ts` `replacedBy`) and a role's former names
-// (`schemas/role-graph.ts` `formerNames`).
+// (`schemas/process/role-graph.ts` `formerNames`).
 //
 // Removal: delete `tombstonesFor`, its call in `buildExport`, and the two
 // context terms. `kg-export.test.ts` holds every tombstone to a replacement

@@ -18,7 +18,7 @@
  */
 import { join, relative, resolve } from "node:path";
 
-import { CAPABILITIES_DIRNAME } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { CAPABILITIES_DIRNAME } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   checkoutCapabilities,
   overlayCapabilities,

@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 import { loadProcessModel, type ProcessModel } from "../../src/workflow/process-model";
 import { complete, enabled, startInstance, type InstanceState } from "../../src/workflow/instance";
 import { evaluate, loadDecisionTable } from "../../src/workflow/decision-table";
-import { readRoleGraph, readActors } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { readRoleGraph, readActors } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { ActorDefinitionSchema, sutRefFor } from "@litlfred/cat-harness/schemas/skill-package.ts";
 import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.ts";
 import { buildTestRun, UNKNOWN_HASH, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";

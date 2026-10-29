@@ -374,7 +374,7 @@ export interface AppliedBy {
 
 /**
  * Which skills apply each methodology, by name: every skill in the checkout's
- * instances that declares `uses-methodology` (cat-harness `schemas/methodology.ts`).
+ * instances that declares `uses-methodology` (cat-harness `schemas/process/methodology.ts`).
  * The edge is the skill's; the methodology's page reads it back.
  */
 export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
@@ -568,7 +568,7 @@ export function page(
       "## Nodes that do not validate",
       "",
       `**${report.invalid.length}.** Tagged \`folio-methodology/v1\` and refused by`,
-      "`schemas/methodology.ts`. The schema is `strict()`, so a misspelled key is a",
+      "`schemas/process/methodology.ts`. The schema is `strict()`, so a misspelled key is a",
       "finding rather than a silent omission.",
       "",
       ...report.invalid.map((f) => `- \`${cell(f.node)}\` — ${cell(f.detail)}`),

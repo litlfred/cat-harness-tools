@@ -656,7 +656,7 @@ const OPTION_ENUMERATED = /^\*\*[A-Z][.)]\s/;
  */
 
 /**
- * The five row labels `renderDecision` emits, in `schemas/decision-request.ts`.
+ * The five row labels `renderDecision` emits, in `schemas/process/decision-request.ts`.
  *
  * A decision put through the schema leaves this table behind; a hand-written
  * `## Options` section does not. The distinction is load-bearing and was

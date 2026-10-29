@@ -64,7 +64,7 @@ import {
   MethodologyFrontMatterSchema,
   METHODOLOGY_SCHEMA_TAG,
   type MethodologyFrontMatter,
-} from "@litlfred/cat-harness/schemas/methodology.ts";
+} from "@litlfred/cat-harness/schemas/process/methodology.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -111,7 +111,7 @@ export interface EvidenceReport {
 
 /**
  * The skill → methodology edge's key (owner, 2026-10-16: *"uses-methodology in
- * Skill"*). Defined, with its shape, in cat-harness `schemas/methodology.ts`
+ * Skill"*). Defined, with its shape, in cat-harness `schemas/process/methodology.ts`
  * (`USES_METHODOLOGY_FIELD`, litlfred/cat-harness#325); spelled here as well
  * until this layer's pin of cat-harness carries that export.
  */
@@ -439,7 +439,7 @@ export function methodologyEvidenceDocument(r: EvidenceReport): QaResult {
       "invalid-front-matter": {
         summary:
           "A node tagged `folio-methodology/v1` whose front matter does not validate against " +
-          "`schemas/methodology.ts`. The schema is `strict()`, so a misspelled key is a finding rather than " +
+          "`schemas/process/methodology.ts`. The schema is `strict()`, so a misspelled key is a finding rather than " +
           "a silent omission — `applies_when` beside a correct `applies-when` would otherwise validate while " +
           "the selection question never reached the node. Fails by default.",
         entries: r.invalid,
@@ -467,7 +467,7 @@ export function methodologyEvidenceDocument(r: EvidenceReport): QaResult {
             "uses-methodology-unresolved": {
               summary:
                 "A skill's `uses-methodology` naming a methodology no declared directory holds: the typed " +
-                "skill → methodology edge (cat-harness `schemas/methodology.ts`) pointing at nothing. Fails by " +
+                "skill → methodology edge (cat-harness `schemas/process/methodology.ts`) pointing at nothing. Fails by " +
                 "default, like an unresolved `evidence` reference, because a broken edge reads as an applied method.",
               entries: r.badUses!,
             },

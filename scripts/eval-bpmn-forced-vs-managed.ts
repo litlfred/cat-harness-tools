@@ -40,7 +40,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   buildTestRun,
   hashesReproduce,

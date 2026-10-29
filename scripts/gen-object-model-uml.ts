@@ -47,7 +47,7 @@ import type { z } from "zod";
 
 import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
 
-import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { UserStorySchema } from "@litlfred/cat-harness/schemas/user-story.js";
 import { SkillDefinitionSchema } from "@litlfred/cat-harness/schemas/skill-package.js";
 import { TaskRefSchema } from "@litlfred/cat-harness/schemas/carried-note.js";

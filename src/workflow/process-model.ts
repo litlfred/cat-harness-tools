@@ -35,7 +35,7 @@ import { BpmnModdle } from "bpmn-moddle";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
-import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
 import { WORK_PLAN_OPS, type WorkPlanOp } from "./bean-link.js";
 import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/code-list.js";
@@ -172,7 +172,7 @@ export interface ProcessNode {
    * ({@link LaneDef.roleRef}).
    *
    * A lane NAME is free text and sixty of them spell two dozen positions
-   * (`schemas/role-graph.ts`); an explicit ref is the join that does not
+   * (`schemas/process/role-graph.ts`); an explicit ref is the join that does not
    * depend on spelling, and it wins over name matching when present.
    */
   roleRef?: string;
@@ -292,7 +292,7 @@ export interface ProcessNode {
    *
    * Almost no activity needs one. The BPMN type already answers the question
    * for a `userTask` and a `serviceTask`, and `fulfilmentKindsForBpmnType` in
-   * `schemas/role-graph.ts` reads that answer, so this exists for the step
+   * `schemas/process/role-graph.ts` reads that answer, so this exists for the step
    * where the derived answer is wrong — an abstract `bpmn:Task` that genuinely
    * admits only one kind, or a `serviceTask` a person really does drive.
    *
@@ -505,7 +505,7 @@ export interface LaneDef {
    * the workflow engine) are right before and after the diagrams migrate.
    *
    * The precedence is not decided here: it is cat-harness's `laneRoleRef`
-   * (`schemas/role-graph.ts`), the one reader every layer asks.
+   * (`schemas/process/role-graph.ts`), the one reader every layer asks.
    */
   roleRef?: string;
   /**

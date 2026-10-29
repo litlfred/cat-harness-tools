@@ -26,7 +26,7 @@
  * has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { EXTERNAL_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/external-schema.ts";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { workflowFiles } from "../known-skills.ts";

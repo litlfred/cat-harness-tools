@@ -31,7 +31,7 @@
 
 import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
-import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
