@@ -68,7 +68,7 @@ export function corpusScopeFor(root: string): CorpusScope {
 import { readRoleGraph, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 import { parseFrontMatter, scalar, type FrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every

@@ -38,7 +38,7 @@ import {
   checkoutCapabilities,
   checkoutRoleGraph,
   overlayRoleGraphs,
-} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.js";
 import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "../concern-groups.js";

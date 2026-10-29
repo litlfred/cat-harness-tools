@@ -149,8 +149,8 @@ import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, re
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
 import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
-import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
+import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/process/convention.js";
+import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/process/user-story.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
 import {
@@ -159,7 +159,7 @@ import {
   checkoutRoleGraph,
   neededActors,
   neededPolicies,
-} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
