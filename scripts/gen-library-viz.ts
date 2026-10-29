@@ -72,7 +72,7 @@ import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
 import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
@@ -107,7 +107,7 @@ export function projection(
 ): unknown {
   return {
     $schema: "folio-library-index/v1",
-    // TWO tiles, ONE dataset — the case `schemas/tile-count.ts` is keyed by
+    // TWO tiles, ONE dataset — the case `schemas/ui/tile-count.ts` is keyed by
     // directory for. `flh4` put the queue block here rather than under a
     // second projection, "since two projections over it would be two answers
     // to how many are queued", and `gen-uploads-viz.ts` publishes a viewer

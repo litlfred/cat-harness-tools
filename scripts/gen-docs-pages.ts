@@ -38,7 +38,7 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
 import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
-import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
+import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
 import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
 import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/semantic-zoom.js";
@@ -71,8 +71,8 @@ import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
-import { THEMES, themeById } from "@litlfred/cat-harness/schemas/themes.js";
+import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { THEMES, themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import {
   directoryForGraph,
   publishedAssetPath,
@@ -83,7 +83,7 @@ import {
   repoRootFor,
 } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
@@ -1677,7 +1677,7 @@ function processHierarchy(): Record<string, string[]> {
       // card: the author asked for something and got nothing, and the failure
       // is invisible on the page.
       throw new Error(
-        `a todo declares theme "${id}", which no theme in schemas/themes.ts defines. ` +
+        `a todo declares theme "${id}", which no theme in schemas/ui/themes.ts defines. ` +
           `Declared themes: ${THEMES.map((t) => t.id).join(", ")}`,
       );
     }
@@ -1698,7 +1698,7 @@ function processHierarchy(): Record<string, string[]> {
         $schema: "folio-todo-index/v1",
         // The tile's headline number, declared here because only this
         // generator knows WHICH of the projection's arrays is the one — see
-        // `schemas/tile-count.ts`. `items`, not `processes`: a process is a
+        // `schemas/ui/tile-count.ts`. `items`, not `processes`: a process is a
         // lane the board draws, not a todo somebody owes.
         ...tileCounts({ todos: [items.length, "todos"] }),
         repoWeb: REPO_WEB,
@@ -1948,7 +1948,7 @@ function processHierarchy(): Record<string, string[]> {
         // board's "open" (bean `v215`): it was `items.length`, every bean
         // ever filed, so the tile read 943 beside the icon row's 541. Not
         // `findings` either: a finding is a defect ABOUT the work plan, not
-        // an item on it. See `schemas/tile-count.ts` for why the number is
+        // an item on it. See `schemas/ui/tile-count.ts` for why the number is
         // declared here rather than inferred by the reader.
         ...tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }),
         // The forge, so `work-plan.js` composes its links from DATA rather

@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { RunContextSchema, runContextRef } from "@litlfred/cat-harness/schemas/run-context.ts";
-import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
+import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 
 import { knownTitle, withKnownTitle, type Plan } from "../../ingest-document.ts";
 

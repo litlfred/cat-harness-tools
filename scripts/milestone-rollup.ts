@@ -86,7 +86,7 @@ export const MILESTONE_TYPE = "milestone";
 /**
  * One milestone and the state of everything beneath it.
  *
- * INFERRED from the Zod schema in `schemas/site-indexes.ts`, which is where the
+ * INFERRED from the Zod schema in `schemas/ui/site-indexes.ts`, which is where the
  * projection declares it. Writing the fields twice — once as an interface here
  * and once as a schema there — is two declarations of one shape, and the
  * `.strict()` object only refuses the extra key in one direction.

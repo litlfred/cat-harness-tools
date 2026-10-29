@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.js";
-import { defaultRendererFor, DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/diff-renderers.js";
+import { defaultRendererFor, DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
 import { wordDiff } from "../word-diff.js";
 
 const side = (ops: NonNullable<ReturnType<typeof wordDiff>>, keep: "ins" | "del") =>

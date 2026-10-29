@@ -181,7 +181,7 @@ export interface GraphTile {
    * The projection's DECLARED headline number, and what it counts.
    *
    * Both present or both absent — a count with no unit is the ambiguity
-   * `schemas/tile-count.ts` exists to remove, and {@link withTileCounts} is
+   * `schemas/ui/tile-count.ts` exists to remove, and {@link withTileCounts} is
    * the only writer, so the pair cannot come apart.
    *
    * ABSENT is a third state and must not be rendered as `0`. A tile whose

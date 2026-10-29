@@ -52,7 +52,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";

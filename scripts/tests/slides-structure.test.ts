@@ -16,8 +16,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
-import { type SlidesAccessibility, SlidesAccessibilitySchema } from "@litlfred/cat-harness/schemas/slides-accessibility.ts";
+import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
+import { type SlidesAccessibility, SlidesAccessibilitySchema } from "@litlfred/cat-harness/schemas/ui/slides-accessibility.ts";
 import { ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { attributionFor } from "../apply-image-verdicts.ts";
 import { planFor } from "../ingest-document.ts";

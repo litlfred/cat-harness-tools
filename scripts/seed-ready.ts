@@ -96,7 +96,7 @@ import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-har
 import { clearCheckoutCache, resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { toolsOf } from "../tools/discover.js";
 import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "../pipeline/qa-criteria-registry.js";
-import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.js";
+import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.js";
 import { evaluate, loadDecisionTable, type DecisionTable } from "../src/workflow/decision-table.js";
 import { workflowFile } from "./known-skills.js";
 import { classify as classifyConflict } from "./merge-conflict-patterns.js";

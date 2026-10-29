@@ -18,7 +18,7 @@ import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-h
 import { declaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.ts";
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/theme-by-ref.ts";
+import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
@@ -392,7 +392,7 @@ describe("annotations hold to the data that chooses their targets", () => {
         if (existsSync(f)) expect(globMatch("*/themes/themes.ts", relTo(f)), `${relTo(f)} is outside the glob`).toBe(true);
       }
     }
-    expect(annotated("cat-harness/schemas/theme-by-ref.ts", "*/themes/themes.ts")).toBe(true);
+    expect(annotated("cat-harness/schemas/ui/theme-by-ref.ts", "*/themes/themes.ts")).toBe(true);
   });
 
   test("skill-register's `scripts` annotation names exactly the verify half of its STEPS", async () => {

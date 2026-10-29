@@ -31,7 +31,7 @@ import { baseDocsSource, declaredDocsSources, docsSources, type DocsSource } fro
 
 /**
  * The part of a `WebPage` manifest this reads, declared here rather than
- * imported: `schemas/webpage.ts` is a core module and this one is harness,
+ * imported: `schemas/ui/webpage.ts` is a core module and this one is harness,
  * which may not depend on core. A real manifest satisfies it structurally.
  */
 interface PageManifest {

@@ -68,7 +68,7 @@ import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from
 import { nodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
 import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kind-validator.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
 import {

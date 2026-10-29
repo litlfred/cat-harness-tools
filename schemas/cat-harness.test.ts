@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
 import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/folio-graph-typology.ts";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes.ts";
+import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.ts";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/todo-graph.ts";
 import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.ts";

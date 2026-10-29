@@ -72,7 +72,7 @@ import { ARCHIVE_MIMETYPES } from "@litlfred/cat-harness/schemas/archive-content
 import { checkEntry, type Requirement } from "./check-l1-complete.ts";
 import { catalogueRecordFor, dcValue } from "../pipeline/library-title.ts";
 import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/tabular-records.ts";
-import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
+import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 import { refreshLibraryIndex } from "./lsi.ts";
 import { IntakeSchema } from "@litlfred/cat-harness/schemas/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";

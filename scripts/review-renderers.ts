@@ -1,7 +1,7 @@
 /**
  * The diff renderers the review page runs in the reviewer's browser. Bean
  * `d903`. Their registry, what each needs and which block kinds each is the
- * default for, is `schemas/diff-renderers.ts`.
+ * default for, is `schemas/ui/diff-renderers.ts`.
  *
  * Every function here is SELF-CONTAINED: it closes over nothing in this
  * module and gets what it needs as arguments. `gen-review-page` embeds each

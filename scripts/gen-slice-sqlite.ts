@@ -139,7 +139,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
 import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
 import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";

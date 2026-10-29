@@ -24,7 +24,7 @@ import { join, resolve } from "node:path";
 
 import type { ContentProfile } from "@litlfred/cat-harness/schemas/block-kinds.ts";
 import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
-import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.ts";
+import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

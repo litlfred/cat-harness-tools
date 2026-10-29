@@ -935,7 +935,7 @@ export async function validateObjects(
   // file. It used to render every block to LaTeX unconditionally, which on a
   // document folio raises `LaTeX AST:` errors against output that folio never
   // produces — its render path goes through pandoc and deliberately never
-  // falls back to `latexmk`. See `schemas/render-targets.ts`.
+  // falls back to `latexmk`. See `schemas/ui/render-targets.ts`.
   const declaredProfile = readDeclaredFolioProfile(REPO_ROOT);
   const lookup = await resolveRenderTarget(declaredProfile.profile);
   if (lookup.miss) {
