@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { TABULAR_CSVW_FILENAME, type TabularCsvwTables } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { UnregisteredPipelinePluginError, usePipelinePluginRegistry } from "../../pipeline/pipeline-plugins.ts";
 import { checkEntry, entryKind } from "../check-l1-complete.ts";

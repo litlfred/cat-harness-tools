@@ -28,7 +28,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { NOT_AUTHORED } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { NOT_AUTHORED } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 import { TABULAR_CSVW_FILENAME, TabularCsvwSchema, type TabularCsvw } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { extractTabularCsvw } from "../pipeline/pipeline-plugins.ts";
 

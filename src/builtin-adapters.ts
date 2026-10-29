@@ -88,7 +88,7 @@ export interface BuiltinAdapterDeclaration {
   extends?: string;
 }
 
-/** Two instances declaring one `contentType`. Not resolved by order — see `schemas/contributions.ts`. */
+/** Two instances declaring one `contentType`. Not resolved by order — see `schemas/content/contributions.ts`. */
 export class AdapterDeclarationCollisionError extends Error {}
 
 /** How many `extends` hops lie beneath this entry — deeper sorts first. */

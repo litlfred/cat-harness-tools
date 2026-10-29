@@ -19,7 +19,7 @@
  */
 
 import { basename } from "node:path";
-import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
+import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { TaskAuthVerdict } from "./authorize.js";
 
 /** `code-change-review.bpmn` → `code-change-review`: the `hadPlan` prefix, as the after-check writes it. */

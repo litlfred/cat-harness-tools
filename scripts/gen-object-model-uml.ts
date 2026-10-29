@@ -55,7 +55,7 @@ import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/todo.js";
 import { TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.js";
 import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { ExternalSchemaSchema } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
-import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
+import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/content/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

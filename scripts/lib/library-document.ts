@@ -42,7 +42,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { readStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import { displayNarrative } from "./narrative-display.ts";
 
 /** How much of a section's text an extract carries. */

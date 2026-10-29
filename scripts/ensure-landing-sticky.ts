@@ -78,14 +78,14 @@ import {
   LandingStickySchema,
   stickyFromContribution,
   type LandingSticky,
-} from "@litlfred/cat-harness/schemas/landing-sticky.js";
+} from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
 import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import {
   StickyContributionSchema,
   composeContributions,
   readerText,
   type DeclaredContribution,
-} from "@litlfred/cat-harness/schemas/sticky-contribution.js";
+} from "@litlfred/cat-harness/schemas/content/sticky-contribution.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The graph typology, and the conventional directory an instance keeps it in. */

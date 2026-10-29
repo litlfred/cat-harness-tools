@@ -744,7 +744,7 @@ function esc(s) {
 }
 /* A field's doc is prose that names things in markdown inline code; escaped
    verbatim, "bean \x60abc\x60" showed its backticks. Escape first, then turn each
-   PAIRED span into <code>, the rule schemas/inline-code.ts applies server-side.
+   PAIRED span into <code>, the rule schemas/content/inline-code.ts applies server-side.
    An unpaired backtick stays as written. \x60 is the backtick: the character
    itself would end the template literal that carries this script. */
 function withCode(s) {

@@ -14,7 +14,7 @@
  *
  * Into each PREVIEW document under `--site`, where the deploy writes it (one with a `canonicalDocument`
  * that is not its own `@id`), three root fields declared in `kg-export.ts`
- * `buildContext` and glossed in cat-harness `schemas/vocabulary.ts`:
+ * `buildContext` and glossed in cat-harness `schemas/content/vocabulary.ts`:
  *
  * - `changedAssetsComparedWith`: main's document it was compared with;
  * - `changedAssets`: one record per node that differs, in `@id` order —

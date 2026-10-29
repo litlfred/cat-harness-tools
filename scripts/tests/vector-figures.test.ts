@@ -31,7 +31,7 @@ import {
 } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const AGENT = { kind: "agent", id: "claude", model: "not-disclosed", session: "https://claude.ai/code/session_test" };
@@ -122,7 +122,7 @@ describe("a role arrives by inspection, through apply-image-verdicts", () => {
     expect(f.role).toBe("figure");
     expect(f.basis).toMatchObject({ method: "inspection", by: AGENT, saw: "an architecture diagram", page: 34 });
     expect(f.shows).toEqual(["3"]);
-    // A draft, never confirmed — only a human confirms (schemas/narrative.ts).
+    // A draft, never confirmed — only a human confirms (schemas/content/narrative.ts).
     expect(f.narrative && narrativeFor(f.narrative).state).toBe("draft");
   });
 

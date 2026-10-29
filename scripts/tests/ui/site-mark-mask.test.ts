@@ -15,7 +15,7 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { avatarFor } from "@litlfred/cat-harness/schemas/avatars.js";
+import { avatarFor } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

@@ -15,7 +15,7 @@
  *
  * A slot is a {@link PipelinePluginContribution} on {@link ContributionRegistry},
  * loaded by the same dependency walk as content adapters, QA checkers, render
- * targets and MCP tools (`schemas/contributions.ts`). A kind claimed by two
+ * targets and MCP tools (`schemas/content/contributions.ts`). A kind claimed by two
  * contributors THROWS — the `contributions.ts` rule, kept for the reason it was
  * made: which Lean lexer runs must not depend on the order dependencies are
  * listed in.
@@ -50,7 +50,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import type { TabularCsvwTables } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";

@@ -68,7 +68,7 @@
  * @covers policies, scenarios
  */
 
-import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
+import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 

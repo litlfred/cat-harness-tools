@@ -55,7 +55,7 @@
  */
 import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
-import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.js";
+import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.js";
 
 /** How the caller turns a note's attachment into an href it can serve. */
 export interface TodoListingOptions {

@@ -20,7 +20,7 @@
  * way left: the owner looked at the site and said *"folio assistant icon is
  * messed up still."*
  *
- * `schemas/avatars.ts` names the gap too — *"`harness-tiles` calls
+ * `schemas/content/avatars.ts` names the gap too — *"`harness-tiles` calls
  * `avatarFor(decl.name)` — an INSTANCE's declared name … nothing currently
  * checks"* — and points at bean `4kj4` for it. `4kj4` turned out to be about
  * the per-KIND fan, so that pointer was stale as well; this is the check both
@@ -53,7 +53,7 @@
  * exemption is stale.
  */
 
-import { hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.

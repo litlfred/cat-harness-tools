@@ -798,7 +798,7 @@ function renderBlocks(id, data, err, entry){
    as text rather than colour alone, and none is styled as an error: "not yet
    summarised" is the drain's backlog, which is expected and slow on purpose.
    A draft names its MODEL, because "a model wrote this" without which one is
-   the provenance gap schemas/attribution.ts closes. */
+   the provenance gap schemas/content/attribution.ts closes. */
 function summaryLabel(s){
   var d = s.draftedBy;
   switch (s.status) {

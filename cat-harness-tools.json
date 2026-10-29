@@ -12,7 +12,7 @@
     "tone": 268,
     "reads": "a wrench, in cat-harness's colour — the code that implements its tools"
   },
-  "_avatar_comment": "A wrench — what implements the harness's tool definitions. Moved here from cat-harness/schemas/avatars.ts, 2026-10-05 (bean sod4 #4): an instance declares its own mark.",
+  "_avatar_comment": "A wrench — what implements the harness's tool definitions. Moved here from cat-harness/schemas/content/avatars.ts, 2026-10-05 (bean sod4 #4): an instance declares its own mark.",
   "directories": [
     {
       "id": "cat-harness-tools-adapters",

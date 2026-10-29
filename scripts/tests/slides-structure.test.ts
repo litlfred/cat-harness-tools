@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 
 import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 import { type SlidesAccessibility, SlidesAccessibilitySchema } from "@litlfred/cat-harness/schemas/ui/slides-accessibility.ts";
-import { ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
+import { ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
 import { attributionFor } from "../apply-image-verdicts.ts";
 import { planFor } from "../ingest-document.ts";
 

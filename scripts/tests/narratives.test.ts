@@ -34,7 +34,7 @@ import {
   STATES_WITH_TEXT,
   awaitsConfirmation,
   isConfirmed,
-} from "@litlfred/cat-harness/schemas/narrative.ts";
+} from "@litlfred/cat-harness/schemas/content/narrative.ts";
 import {
   NARRATIVE_BEARING,
   atATerminal,

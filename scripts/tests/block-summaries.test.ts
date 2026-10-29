@@ -29,8 +29,8 @@ import {
   sourceHash,
   summaryStatus,
   type BlockSummary,
-} from "@litlfred/cat-harness/schemas/block-summary.ts";
-import { NarrativeSchema } from "@litlfred/cat-harness/schemas/narrative.ts";
+} from "@litlfred/cat-harness/schemas/content/block-summary.ts";
+import { NarrativeSchema } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 import { backlog, entryDirs, entryItems, next, record, sidecarDefects, tally } from "../summaries.ts";
 import { decide, queue } from "../narratives.ts";
 import { checkEntry } from "../check-l1-complete.ts";

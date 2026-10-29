@@ -35,7 +35,7 @@
  *
  * ## `ContributionRegistry` is not the mechanism here
  *
- * It looks like it should be, and it is not: `schemas/contributions.ts` is
+ * It looks like it should be, and it is not: `schemas/content/contributions.ts` is
  * read **only for dependencies** — "a root folio's own `contributes` is
  * ignored, because the root already is everything it would contribute". The
  * root's own checkers go through `qa-checker-discovery` and its own renderers
@@ -58,7 +58,7 @@
  * layer that OWNS a type is the right place to name it — and typing them here
  * would put `ContentAdapter` and `FeedbackStore` back into the harness, which
  * is the import this module exists to remove. Same rule as
- * `schemas/contributions.ts` carrying MCP registrars as
+ * `schemas/content/contributions.ts` carrying MCP registrars as
  * `(server: unknown) => void`.
  *
  * ## Three outcomes, never two

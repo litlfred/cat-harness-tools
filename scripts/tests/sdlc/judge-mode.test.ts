@@ -494,7 +494,7 @@ describe("check:avatar-coverage", () => {
     const corrupted = {
       ...c,
       required: [...c.required, "zzz-kind-with-no-art"],
-      missing: [...c.missing, { kind: "zzz-kind-with-no-art", where: "schemas/avatars.ts", note: "planted" }],
+      missing: [...c.missing, { kind: "zzz-kind-with-no-art", where: "schemas/content/avatars.ts", note: "planted" }],
     };
     expect(exitOf(judgeAvatarCoverage(corrupted, true))).toBe(1);
     expect(exitOf(judgeAvatarCoverage(c, trashDerivationPresent()))).toBe(0);

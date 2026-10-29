@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 
 import { buildEntry, formatOf, frontMatterTitle, headingsOf, linesOf } from "../text-structure.ts";
-import { TextStructureSchema, pagesOf, structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { TextStructureSchema, pagesOf, structureOf } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 
 const f = (path: string, text: string) => ({ path, bytes: Buffer.from(text, "utf-8") });
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");

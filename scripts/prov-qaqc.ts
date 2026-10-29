@@ -54,7 +54,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
-import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
+import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";

@@ -21,7 +21,7 @@ import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-conf
 import {
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

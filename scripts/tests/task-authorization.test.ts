@@ -17,7 +17,7 @@ import { authorizeTask } from "../../src/workflow/authorize.js";
 import { loadAccessContext, principalFromEnv, type AccessContext } from "../../src/core/access.js";
 import { allows, principalOf } from "../../src/core/rbac.js";
 import { workflowFile } from "../known-skills.js";
-import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
+import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

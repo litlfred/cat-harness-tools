@@ -12,7 +12,7 @@
 import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
 
-import { readActiveVoices } from "@litlfred/cat-harness/schemas/voices.ts";
+import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import { qaCriteriaByIdFor } from "../../pipeline/qa-criteria-registry.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 

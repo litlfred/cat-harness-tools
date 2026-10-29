@@ -53,7 +53,7 @@ import {
 import { loadBlocksUnder, reportLoadFailures, type LoadedBlock } from "./block-module";
 import { contributionsRoot, findContentRepoRoot, findPapers } from "./repo-root";
 import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { paperArg } from "./cli-args";
 
 /** A reference that could not be resolved to an IRI, with where it came from. */

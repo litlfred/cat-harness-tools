@@ -67,7 +67,7 @@
 import { spawnSync } from "node:child_process";
 
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { allAvatars, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { allAvatars, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { documentedKinds, KIND_TABLE_DOC } from "./kind-table.ts";
 // `folio` is registered by CORE as a load-time side effect, so the harness alone
 // does not know it exists. Same import, same reason, as `check-declared-dirs`.
@@ -151,7 +151,7 @@ export function authoredGaps(root?: string): AuthoredGap[] {
         kind,
         owes: "avatar",
         detail:
-          `no avatar: an \`avatar\` on its \`typologies/\` node for a declared kind, else an entry in \`schemas/avatars.ts\`. It needs a glyph (24x24 path data), a \`tone\` ` +
+          `no avatar: an \`avatar\` on its \`typologies/\` node for a declared kind, else an entry in \`schemas/content/avatars.ts\`. It needs a glyph (24x24 path data), a \`tone\` ` +
           `(hue, 0-359) and a \`reads\` sentence saying why that mark. Check the clearance report ` +
           `below before choosing the tone.`,
       });

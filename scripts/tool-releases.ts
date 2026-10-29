@@ -24,7 +24,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { basename, delimiter, join, relative, resolve } from "node:path";
 
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.ts";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 import {
   RUN_CONTEXT_SCHEMA_TAG,
   RunContextSchema,
