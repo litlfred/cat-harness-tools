@@ -102,7 +102,8 @@ import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, tileCountsForPages, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
@@ -1432,6 +1433,21 @@ function emit(path: string, content: string): void {
   emitRaw(path, content);
 }
 
+/**
+ * What a type's tile badge counts, singular and plural. Named per type
+ * because only the type knows its noun; an unnamed one says `items`.
+ */
+function unitOf(type: AutoDocType): readonly [string, string] {
+  const named: Record<string, readonly [string, string]> = {
+    "index/skills": ["skill", "skills"],
+    "index/docs": ["page", "pages"],
+    "index/schemas": ["schema", "schemas"],
+    "index/tools": ["tool", "tools"],
+    "index/processes": ["diagram", "diagrams"],
+  };
+  return named[type.id] ?? ["item", "items"];
+}
+
 if (import.meta.main) {
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
@@ -1457,6 +1473,8 @@ if (import.meta.main) {
 
   /** Items indexed per BUILT type — what the level pages below count. */
   const built = new Map<string, number>();
+  /** Each sub-graph page and its own item count, for the tile counts below. */
+  const counted: Array<{ page: string; count: number; unit: readonly [string, string] }> = [];
 
   for (const type of TYPES) {
     const dirs = (type.directories ?? (() => declaredDirectories(type.graph)))();
@@ -1484,6 +1502,7 @@ if (import.meta.main) {
     );
     for (const id of populated) {
       const sub = viewerPlacement(site, `${route}/${type.id}/${id}`, "auto-docs");
+      counted.push({ page: relative(REPO_ROOT, join(sub.pageDir, "index.html")), count: byDir.get(id)!.length, unit: unitOf(type) });
       emit(
         join(sub.pageDir, "index.html"),
         withRenderedByFrontMatter(
@@ -1618,6 +1637,18 @@ if (import.meta.main) {
     const at = viewerPlacement(site, route, "auto-docs");
     emitRaw(join(at.pageDir, "auto-docs.json"), autoDocsManifest());
     if (!check) console.log(`  ✓ auto-docs.json: ${TYPES.length} sub-sub-graph(s)`);
+  }
+
+  // THE TILE COUNTS (folio-assistant#931, owner's ruling 2026-10-29): a
+  // directory's tile opens its sub-graph page here, so its badge is that
+  // page's own item count. Build-time data like every projection
+  // `scanTileCounts` reads, so `--check` does not compare it.
+  if (!check) {
+    const tiles = tileCountsForPages(counted, REPO_ROOT, ROOT);
+    const countFile = join(site, "assets", "auto-docs", "index.json");
+    mkdirSync(dirname(countFile), { recursive: true });
+    writeFileSync(countFile, JSON.stringify(tileCounts(tiles), null, 2) + "\n");
+    console.log(`  ✓ tile counts: ${Object.keys(tiles).length} tile(s) → assets/auto-docs/index.json`);
   }
 
   if (stale > 0) {

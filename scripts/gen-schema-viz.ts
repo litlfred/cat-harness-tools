@@ -508,7 +508,7 @@ export function viewerPlacement(
  * to ask an ownership question. */
 import { orphanSubjectPages } from "./orphan-pages.ts";
 import { makeEmit } from "./viewer-page.ts";
-import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
+import { declaredPageRoute, declaredRoute, withRenderedBy, tileDirectories } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
@@ -1679,9 +1679,10 @@ if (import.meta.main) {
    * a zero: it is a page with no tile, so there is nothing to badge, and an
    * invented entry would be a count for a directory nobody declared.
    */
-  // THIS INSTANCE'S declaration only, because that is the one that produces
-  // tiles: `sync-docs-harness.ts` calls `graphTiles(readDeclaration(ROOT)
-  // .directories)`. Scanning every instance was the first draft and it was
+  // THE LANDING HARNESS'S directories only, because those are the ones that
+  // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
+  // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
+  // a cat-harness id once the landing moved to folio-assistant-core). Scanning every instance was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
@@ -1693,7 +1694,7 @@ if (import.meta.main) {
   //
   // The rule that falls out: look the ref up in the SAME list the tiles came
   // from, or the ids do not correspond to tiles at all.
-  const byRef = directoryByVisualisationRef(withViewers(readDeclaration(ROOT)?.directories ?? [], ROOT));
+  const byRef = directoryByVisualisationRef(tileDirectories(REPO_ROOT, ROOT));
   const scoped: Record<string, readonly [number, string]> = {};
   /** The repo-relative ref of a page this run emits, as a declaration spells it. */
   const refOf = (dirPath: string): string =>

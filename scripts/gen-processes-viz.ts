@@ -89,7 +89,8 @@ import {
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
-import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { pageParts, tileCountsForPages, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { workflowInstanceLinks } from "./state-visualizer.ts";
 import { instancesByProcess, type InstanceLink } from "./workflow-view.ts";
@@ -1170,6 +1171,18 @@ if (import.meta.main) {
   } else {
     mkdirSync(dirname(out), { recursive: true });
     for (const [f, body] of pages) writeFileSync(f, body);
+    // THE TILE COUNT (folio-assistant#931, owner's ruling 2026-10-29): the
+    // index's own diagram count, keyed by the tile that opens the index.
+    // Build-time data like every projection `scanTileCounts` reads, so
+    // `--check` does not compare it.
+    const counted = tileCountsForPages(
+      [{ page: relative(REPO, out), count: rows.length, unit: ["diagram", "diagrams"] }],
+      REPO,
+      resolve(HARNESS_ROOT),
+    );
+    const countFile = join(into ?? baseDocsDir(REPO), "assets", "processes", "index.json");
+    mkdirSync(dirname(countFile), { recursive: true });
+    writeFileSync(countFile, JSON.stringify(tileCounts(counted), null, 2) + "\n");
     console.log(`Wrote ${rel} + ${pages.size - 1} process page(s) — ${skillToProcesses(rows).size} skill(s) joined`);
   }
 }

@@ -65,7 +65,7 @@ import {
   type Tile,
   type Visualisation,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/content/translation.js";
 import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
@@ -808,6 +808,77 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
   const decl = q === undefined ? undefined : read(q);
   if (ownerRoot === undefined || decl === undefined) return undefined;
   return { root: resolve(ownerRoot), directories: (decl.directories ?? []).filter((d) => d.scope === "repository") };
+}
+
+/**
+ * The landing harness's own directory: where the declaration whose
+ * directories become the site's tiles lives (issue #1904).
+ *
+ * `instance` is that harness's root. A hub, or a checkout where nothing can
+ * be decided, falls back to the checkout root when it declares an instance,
+ * else to `fallback`. `sync-docs-harness.ts` refuses an ambiguous or invalid
+ * landing before it gets here; a generator only needs the same answer when
+ * there is one.
+ */
+export function landingRoot(repoRoot: string, fallback: string): string {
+  const choice = resolveLandingInstance(repoRoot);
+  if (choice.kind === "instance") {
+    const r = instanceRootsIn(repoRoot).find((x) => readDeclaration(x)?.name === choice.name);
+    if (r !== undefined) return r;
+  }
+  return readDeclaration(repoRoot) !== undefined ? repoRoot : fallback;
+}
+
+/**
+ * THE DIRECTORIES THE SITE'S TILES ARE MADE FROM, with their viewers
+ * resolved: the landing harness's declaration plus the checkout's shared
+ * directories, exactly what `sync-docs-harness.ts` hands `graphTiles`.
+ *
+ * A generator that declares a tile count must key it by an id from THIS
+ * list, or the count names a directory that is not a tile and the badge is
+ * silently absent (litlfred/folio-assistant#931). Reading `ROOT`'s own
+ * declaration was right while `ROOT` was the landing harness; since the
+ * landing moved to folio-assistant-core it keyed every scoped count by a
+ * cat-harness id, and the core tiles over the same pages drew no badge.
+ */
+export function tileDirectories<T extends ViewedDirectory>(repoRoot: string, fallback: string): T[] {
+  const root = landingRoot(repoRoot, fallback);
+  const own = (readDeclaration(root)?.directories ?? []) as unknown as T[];
+  return withViewers(siteDirectories(own, root, repoRoot), root, repoRoot);
+}
+
+/**
+ * A tile count for each page a generator wrote that is a TILE's page, keyed
+ * by that tile's directory id, in the shape `tileCounts` takes.
+ *
+ * `pages` holds each page's repository-relative path and its own count:
+ * the number computed FOR that page, the rule #889 set. A page no tile
+ * opens contributes nothing, so there is no badge rather than a wrong one.
+ *
+ * Pages are matched by their DIRECTORY, not their file name: a declaration
+ * spells a tile's page `…/index.html` while a Jekyll source is
+ * `…/index.md`, and both are the one page at that directory. A ref declared
+ * by two tiles keeps the first, as `directoryByVisualisationRef` does.
+ */
+export function tileCountsForPages(
+  pages: Readonly<Array<{ page: string; count: number; unit: readonly [string, string] }>>,
+  repoRoot: string,
+  fallback: string,
+): Record<string, readonly [number, string]> {
+  const dirOf = (ref: string): string => ref.split("/").slice(0, -1).join("/");
+  const byDir = new Map<string, string>();
+  for (const d of tileDirectories(repoRoot, fallback)) {
+    for (const v of visualisationsOf(d.coverage, d.id)) {
+      const k = dirOf(v.ref);
+      if (!byDir.has(k)) byDir.set(k, d.id);
+    }
+  }
+  const out: Record<string, readonly [number, string]> = {};
+  for (const p of pages) {
+    const id = byDir.get(dirOf(p.page.split(sep).join("/")));
+    if (id !== undefined && !(id in out)) out[id] = [p.count, p.count === 1 ? p.unit[0] : p.unit[1]];
+  }
+  return out;
 }
 
 export function withViewers<T extends ViewedDirectory>(

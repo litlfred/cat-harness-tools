@@ -54,7 +54,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
-import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { pageParts, tileDirectories, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
@@ -696,13 +696,22 @@ function main(): void {
     // `untranslated` is reported per row, and a tile carrying it would answer
     // a question the page answers five times over.
     //
-    // The key is `translation-sources` — the id of the DIRECTORY the tile was
-    // declared for (`translations/`) — and not this projection's own segment.
-    // `scanTileCounts` reads whatever a projection names, so what it names has
-    // to be the directory, which is the half a reader gets wrong first.
-    ...tileCounts({
-      "translation-sources": [locales.length, locales.length === 1 ? "locale" : "locales"],
-    }),
+    // The key is the id of the DIRECTORY the tile was declared for
+    // (`translations/`), not this projection's own segment: `scanTileCounts`
+    // reads whatever a projection names, so what it names has to be the
+    // directory, which is the half a reader gets wrong first. And it is the
+    // id in the TILES' list (`tileDirectories`), not this instance's: since
+    // the landing moved to folio-assistant-core the tile is
+    // `folio-assistant-core-translations`, and the literal
+    // `translation-sources` badged nothing (#931). The page is unscoped, so
+    // every tile of the kind opens it and every one gets this count.
+    ...tileCounts(
+      Object.fromEntries(
+        tileDirectories(REPO_ROOT, ROOT)
+          .filter((d) => (d.graphTypologies ?? []).includes("translation-sources"))
+          .map((d) => [d.id, [locales.length, locales.length === 1 ? "locale" : "locales"] as const]),
+      ),
+    ),
     // WHERE THE PAGE IS, so the translation drawer on any page can link to it
     // without composing a route (bean `cat-tools-bbnd`).
     page: sitePath.rel,

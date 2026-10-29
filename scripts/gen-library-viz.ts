@@ -77,7 +77,7 @@ import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
-import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, withViewers } from "./viewer-declarations.js";
+import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
@@ -1649,9 +1649,10 @@ if (import.meta.main) {
    * cat-harness's entries — zero — and not the eight entries the graph holds
    * across every instance.
    */
-  // THIS INSTANCE'S declaration only, because that is the one that produces
-  // tiles: `sync-docs-harness.ts` calls `graphTiles(readDeclaration(ROOT)
-  // .directories)`. Scanning every instance was the first draft and it was
+  // THE LANDING HARNESS'S directories only, because those are the ones that
+  // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
+  // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
+  // a cat-harness id once the landing moved to folio-assistant-core). Scanning every instance was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
@@ -1663,7 +1664,7 @@ if (import.meta.main) {
   //
   // The rule that falls out: look the ref up in the SAME list the tiles came
   // from, or the ids do not correspond to tiles at all.
-  const byRef = directoryByVisualisationRef(withViewers(readDeclaration(ROOT)?.directories ?? [], ROOT));
+  const byRef = directoryByVisualisationRef(tileDirectories(REPO_ROOT, ROOT));
   const refOf = (dirPath: string): string =>
     relative(REPO_ROOT, join(viewerPlacement(site, dirPath, seg).pageDir, "index.html"))
       .split(sep)
