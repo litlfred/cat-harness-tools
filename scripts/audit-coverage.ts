@@ -165,7 +165,7 @@ import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
-import { loadGatesCiRuns, SCRIPT_EXEMPTIONS } from "./gates.js";
+import { loadGatesCiRuns } from "./gates.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -581,18 +581,7 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   // kind regardless of this tool's ability to invoke it. Using the runner's
   // list here made the census 209 and the "all N have declared" verdict narrower
   // than reality.
-  const gates = [
-    ...loadGatesCiRuns(repo, { all: true }),
-    ...(rootProfile(repo) === "content"
-      ? []
-      : // A `covered-by` script exemption whose reason is that layer CI
-        // (`layer-pr-checks.yml`'s `run-gates.py`) runs it on every layer PR
-        // (`libraries:check`, bean `jbvi`) is run by CI even before the index's
-        // `code-quality-gates.yml` names it directly.
-        SCRIPT_EXEMPTIONS.filter((e) => e.kind === "covered-by" && e.reason.startsWith("RUN BY THE LAYER CHECKS:")).map(
-          (e) => ({ job: "layer-pr-checks.yml", step: e.script, command: `bun run cat ${e.script}` }),
-        )),
-  ];
+  const gates = loadGatesCiRuns(repo, { all: true });
   const out: GateCoverage[] = [];
   const byCommand = new Map<string, GateCoverage>();
   for (const g of gates) {
