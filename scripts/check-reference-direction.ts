@@ -558,8 +558,14 @@ export const WORKFLOW_USES_ADDRESS: ReferenceExemption = {
 const TOOLS_NAME = "cat-harness-tools";
 const NAME_BOUND = `(?<![A-Za-z0-9_-])${escapeRe(TOOLS_NAME)}(?![A-Za-z0-9_-])`;
 const PATH_CHARS = "[A-Za-z0-9_.-]";
+/**
+ * A path separator: `/`, or `\` in the Windows form a cmd.exe or PowerShell
+ * line needs (`.\cat-harness-tools\scripts\bootstrap.ps1`;
+ * folio-assistant#2681).
+ */
+const SEP = "[/\\\\]";
 /** A path inside a `scripts/` directory of the tools layer, at any depth. */
-const TOOLS_SCRIPT_PATH = `(?<![A-Za-z0-9_-])${escapeRe(TOOLS_NAME)}/(?:${PATH_CHARS}+/)*?scripts/(?:${PATH_CHARS}+(?:/${PATH_CHARS}+)*)?`;
+const TOOLS_SCRIPT_PATH = `(?<![A-Za-z0-9_-])${escapeRe(TOOLS_NAME)}${SEP}(?:${PATH_CHARS}+${SEP})*?scripts${SEP}(?:${PATH_CHARS}+(?:${SEP}${PATH_CHARS}+)*)?`;
 /** The file a `bun run` command executes, optionally behind a `<platform>/` or `./` prefix. */
 const TOOLS_COMMAND_PATH = `(?<=\\bbun run (?:<[a-z-]+>/|\\./)?)${escapeRe(TOOLS_NAME)}/(?:${PATH_CHARS}+/)*${PATH_CHARS}+\\.(?:ts|js|mjs|sh|py)(?![A-Za-z0-9_])`;
 export const DEFINITION_NAMES_IMPLEMENTATION: ReferenceExemption = {
