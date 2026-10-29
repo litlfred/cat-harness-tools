@@ -52,6 +52,7 @@ import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
 import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { withConcernGroupDirs } from "./concern-groups.ts";
 import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
 /**
@@ -645,7 +646,22 @@ export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
 export function instanceZodSchemaDirs(root: string): string[] {
   const declared = instanceDirectoriesForGraph(root, "schemas");
   // declared-path-literal: the convention fallback for an instance that declares no `schemas` graph, the same fallback `schemasRoot` uses for the host.
-  return declared.length > 0 ? declared : [join(root, "schemas")];
+  // With each one's concern groups (`schemas/<group>/`, bean `f8wp`).
+  return withConcernGroupDirs(declared.length > 0 ? declared : [join(root, "schemas")], "schemas");
+}
+
+/**
+ * A module that only re-exports a module moved into a concern group — the
+ * one-release shim a regroup leaves at the old path (bean `f8wp`). Its exports
+ * are the moved module's own objects, so scanning it would publish each
+ * schema twice under one basename.
+ */
+export function isReexportShim(text: string): boolean {
+  const body = text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .trim();
+  return body.length > 0 && body.split(/;\s*/).filter((s) => s.trim() !== "").every((s) => /^export\s+(\*|\{\s*default\s*\})\s+from\s+["'][^"']+["']$/.test(s.trim()));
 }
 
 /**
@@ -705,7 +721,8 @@ export interface ZodSchemaScan {
  * static import edge, so `check:import-direction` does not see it, and it
  * should not — this module does not depend on what it renders.
  *
- * Top-level `.ts` only, matching `schemaModules` in `schema-nodes.ts`, which is
+ * Top-level `.ts` of each directory and of its declared concern groups,
+ * matching `schemaModules` in `schema-nodes.ts`, which is
  * this graph's other reader. A module that fails to import is a PROBLEM, never
  * a skip: a silently missing module is "there are none" said falsely.
  */
@@ -730,6 +747,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).sort()) {
       if (!f.endsWith(".ts") || f.endsWith(".test.ts") || f.endsWith(".d.ts")) continue;
+      if (isReexportShim(readFileSync(join(dir, f), "utf-8"))) continue;
       const module = rel(join(dir, f));
       let mod: Record<string, unknown>;
       try {

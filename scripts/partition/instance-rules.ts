@@ -997,7 +997,7 @@ export const RULES: Rule[] = [
       //    agent's memory has nothing to do with a folio, and `carried-note`
       //    is what an ACTOR carries across knowledge-graph nodes. Neither
       //    survives the "describes a process" test.
-      "schemas/memory.ts",
+      "schemas/conduct/memory.ts",
       "schemas/carried-note.ts",
       // The BPMN process element id (#1168 B8): a leaf `carried-note`'s
       // TaskRef and the log / invocation records all reference.
@@ -1009,7 +1009,7 @@ export const RULES: Rule[] = [
       // put it in core on the word "confirmation"; the import direction is
       // what settles it — `scripts/check-waivers.ts` is harness and may not
       // reach into core.
-      "schemas/waiver.ts",
+      "schemas/conduct/waiver.ts",
       // How a DECISION is handed to a person. Harness by the same test again:
       // it is about the agent-human interaction this platform defines, and a
       // folio authors no decision requests.
