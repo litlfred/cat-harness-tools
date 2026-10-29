@@ -65,7 +65,7 @@ import {
   type Tile,
   type Visualisation,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
 import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
 import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
@@ -808,6 +808,43 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
   const decl = q === undefined ? undefined : read(q);
   if (ownerRoot === undefined || decl === undefined) return undefined;
   return { root: resolve(ownerRoot), directories: (decl.directories ?? []).filter((d) => d.scope === "repository") };
+}
+
+/**
+ * The landing harness's own directory: where the declaration whose
+ * directories become the site's tiles lives (issue #1904).
+ *
+ * `instance` is that harness's root. A hub, or a checkout where nothing can
+ * be decided, falls back to the checkout root when it declares an instance,
+ * else to `fallback`. `sync-docs-harness.ts` refuses an ambiguous or invalid
+ * landing before it gets here; a generator only needs the same answer when
+ * there is one.
+ */
+export function landingRoot(repoRoot: string, fallback: string): string {
+  const choice = resolveLandingInstance(repoRoot);
+  if (choice.kind === "instance") {
+    const r = instanceRootsIn(repoRoot).find((x) => readDeclaration(x)?.name === choice.name);
+    if (r !== undefined) return r;
+  }
+  return readDeclaration(repoRoot) !== undefined ? repoRoot : fallback;
+}
+
+/**
+ * THE DIRECTORIES THE SITE'S TILES ARE MADE FROM, with their viewers
+ * resolved: the landing harness's declaration plus the checkout's shared
+ * directories, exactly what `sync-docs-harness.ts` hands `graphTiles`.
+ *
+ * A generator that declares a tile count must key it by an id from THIS
+ * list, or the count names a directory that is not a tile and the badge is
+ * silently absent (litlfred/folio-assistant#931). Reading `ROOT`'s own
+ * declaration was right while `ROOT` was the landing harness; since the
+ * landing moved to folio-assistant-core it keyed every scoped count by a
+ * cat-harness id, and the core tiles over the same pages drew no badge.
+ */
+export function tileDirectories<T extends ViewedDirectory>(repoRoot: string, fallback: string): T[] {
+  const root = landingRoot(repoRoot, fallback);
+  const own = (readDeclaration(root)?.directories ?? []) as unknown as T[];
+  return withViewers(siteDirectories(own, root, repoRoot), root, repoRoot);
 }
 
 export function withViewers<T extends ViewedDirectory>(
