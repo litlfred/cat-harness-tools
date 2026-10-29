@@ -24,7 +24,7 @@ import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { checkoutCapabilities } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { checkoutCapabilities } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 
 export interface CapabilityDetection {
   method: "command" | "env-var" | "file-exists" | "mcp-probe" | "always";

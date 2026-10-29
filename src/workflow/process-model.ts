@@ -36,7 +36,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
 import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
+import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
 import { WORK_PLAN_OPS, type WorkPlanOp } from "./bean-link.js";
 import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/library/code-list.js";
 import { directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";

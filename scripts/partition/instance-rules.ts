@@ -457,7 +457,7 @@ export const RULES: Rule[] = [
       // Roles, actors and capabilities extended by id from a dependent's
       // `scenarios/` (placement PR0b). The role model is harness vocabulary
       // (`role-graph.ts` below), and this reads it and `harness-config.ts`.
-      "schemas/scenario-overlay.ts",
+      "schemas/process/scenario-overlay.ts",
       // What happened when a Tool ran, and under whose authority. Tools are
       // the HARNESS's vocabulary — the `tools` graph is declared by
       // `agentic-harness`, not by any folio — and this file imports only
@@ -471,7 +471,7 @@ export const RULES: Rule[] = [
       // them. Omitting it cost 3 wrong-direction edges out of the harness the
       // day `folio-assistant#468` merged, and the gate did not catch it
       // because `check:partition` reports without `--strict` and exits 0.
-      "schemas/convention.ts",
+      "schemas/process/convention.ts",
       // The composition root's own inventory of which content adapters this
       // instance ships. `src/` is claimed by subdirectory, so a new file at
       // its top level falls through — reported `unassigned`, which is the
@@ -1083,7 +1083,7 @@ export const RULES: Rule[] = [
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
       "schemas/library/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
-      "schemas/actor-reach.ts",     // which actors a declaration can reach
+      "schemas/process/actor-reach.ts",     // which actors a declaration can reach
       // WHAT A REPOSITORY IS — the markers it carries. The word "content" in
       // the filename is what sends it to core by keyword, and it is a false
       // signal: this is not a content MODEL, it is machinery for recognising
