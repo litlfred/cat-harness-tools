@@ -8,7 +8,12 @@ when head has a gate base did not run and it fails. A gate red on both is
 listed, not counted: it is main's to fix, and failing every PR on it would
 teach `|| true`. Exit 2 from a gate is "could not determine" in this
 harness's convention; it is reported, and it counts as a failure only when
-base determined (0 or 1) and head did not. A gate run-gates.py skipped
+base determined (0 or 1) and head did not. Exit 78 is "not applicable in
+this root" (`scripts/lib/not-applicable.ts`). Either one, on a gate base did
+not run at all, is listed and never counted: there is no base answer for head
+to have lost (smart-immunizations-uganda#15, where `check:unlinked-beans`
+exited 78 and `folio:shim:check` 2 on gates main had not yet run, and both
+read as NEW FAILURE). A gate run-gates.py skipped
 (a `skipped` reason, no `exit`) is listed as skipped and never counted; on
 base it reads as not run. Writes a Markdown summary to
 $GITHUB_STEP_SUMMARY when set.
@@ -29,6 +34,9 @@ sides, red on both stays "failing on main too".
 """
 import json
 import os
+
+# Exit 2: the gate could not determine. Exit 78: it does not apply in this root.
+UNDETERMINED = {2: "could not determine", 78: "not applicable here"}
 import sys
 from collections import Counter
 
@@ -77,6 +85,8 @@ def main():
         b = base_exit(base.get(name))
         if h == 0:
             verdict = "pass"
+        elif b is None and h in UNDETERMINED:
+            verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
         elif b == 0 or b is None:
             verdict = "NEW FAILURE"
             new.append(name)

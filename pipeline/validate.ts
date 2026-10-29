@@ -36,6 +36,22 @@ import { validateSimulatorAssets } from "./validate-simulator";
 import { findContentRepoRoot, findPapers } from "./repo-root";
 import { blockQaPath, blockOfQaPath, BLOCK_QA_SUFFIX } from "./qa-paths";
 import { referenceRegistryConfigured, getReferenceRegistry } from "./references-registry-di";
+import { referenceEntryIds } from "./reference-entries";
+
+/**
+ * Union of reference IDs from the configured DI registry and on-disk Reference
+ * nodes (`references/<key>.json` / `.jsonld` / `schema/references.ts`), or
+ * `undefined` when neither is present.
+ */
+export function resolveAllReferenceIds(repoRoot: string = findContentRepoRoot()): Set<string> | undefined {
+  const refsConfigured = referenceRegistryConfigured();
+  const nodeIds = referenceEntryIds(repoRoot);
+  if (!refsConfigured && nodeIds.size === 0) return undefined;
+  return new Set([
+    ...(refsConfigured ? getReferenceRegistry().referenceMap.keys() : []),
+    ...nodeIds,
+  ]);
+}
 
 // ── File discovery ───────────────────────────────────────────────
 
@@ -875,16 +891,13 @@ export async function validateObjects(
   //
   // A folio with no bibliography is legitimate, so an absent registry is
   // not an error — but it must not read as "citations checked" either.
-  const refsConfigured = referenceRegistryConfigured();
-  const allRefIds = refsConfigured
-    ? new Set(getReferenceRegistry().referenceMap.keys())
-    : undefined;
-  if (!refsConfigured) {
+  const allRefIds = resolveAllReferenceIds(REPO_ROOT);
+  if (!allRefIds) {
     issues.push({
       level: "info",
       block: "(bibliography)",
       message:
-        "no reference registry configured — cites-resolve did not run, so " +
+        "no reference registry configured and no reference nodes found — cites-resolve did not run, so " +
         "cites[] entries were NOT validated against references",
     });
   }

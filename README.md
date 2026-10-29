@@ -49,7 +49,7 @@ git clone https://github.com/litlfred/bootstrap-tools
 git clone https://github.com/litlfred/cat-harness-tools
 cd cat-harness-tools
 bun install
-bun test scripts/tests/stage-local-publisher.test.ts
+bun test scripts/tests/sdlc/stage-local-publisher.test.ts
 ```
 
 `main` of `cat-harness` is the right sibling, since this repository's `main`

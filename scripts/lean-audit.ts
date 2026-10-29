@@ -644,4 +644,4 @@ if (import.meta.main) {
   }
 }
 
-export { runAudit, type AuditReport, type ChapterAudit, type LeanFileStatus };
+export { runAudit, extractSorries, extractAxioms, type AuditReport, type ChapterAudit, type LeanFileStatus };

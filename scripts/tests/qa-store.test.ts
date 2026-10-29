@@ -447,9 +447,9 @@ describe("every branch name (bean zlq9; renames 32f6, tlk2)", () => {
   const heads = (f: Fixture) =>
     git(f.bare, "for-each-ref", "--format=%(refname:short)", "refs/heads/").trim().split("\n").filter(Boolean).sort();
 
-  test("candidates: any spelling of the QA branch yields all three, newest first; any other name stands alone", () => {
+  test("candidates: any spelling of the QA branch yields the current name only (oycs); any other name stands alone", () => {
     const ALL = ["cat/cat-harness/qa-reports", "cat-qa-reports", "qa-reports"];
-    for (const n of ALL) expect(qaBranchCandidates(n)).toEqual(ALL);
+    for (const n of ALL) expect(qaBranchCandidates(n)).toEqual(["cat/cat-harness/qa-reports"]);
     expect(qaBranchCandidates("my-qa")).toEqual(["my-qa"]);
     expect(pickQaBranch(ALL, new Set())).toBe("cat/cat-harness/qa-reports");
     expect(pickQaBranch(ALL, new Set(["qa-reports"]))).toBe("qa-reports");
@@ -463,19 +463,21 @@ describe("every branch name (bean zlq9; renames 32f6, tlk2)", () => {
     expect(heads(f)).toEqual(["cat/cat-harness/qa-reports"]);
   }, T);
 
-  test("ONLY the legacy name: a reader finds it and a writer extends it, never creating cat/cat-harness/qa-reports beside it", () => {
+  test("ONLY a retired name: it is not read, and a writer creates cat/cat-harness/qa-reports (oycs)", () => {
     const f = fixture();
     publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("old", { branch: "my-legacy-only" }));
     git(f.bare, "branch", "-m", "my-legacy-only", "qa-reports");
     clearQaCache();
-    // A declaration naming the OLD spelling and one naming the new both find it.
+    const legacyTip = git(f.bare, "rev-parse", "refs/heads/qa-reports").trim();
+    // A declaration naming the OLD spelling and one naming the new both look at the new name only.
     for (const branch of ["qa-reports", "cat/cat-harness/qa-reports"]) {
       const r = readQa(`main/${SHA_A}`, `${RESULTS}/kg-qa/skills/a.kg-qa.json`, f.container(`r-${branch}`, { branch }));
-      expect(r.state).toBe("hit");
+      expect(r.state).toBe("miss");
     }
     expect(publishQa({ ref: `main/${SHA_B}`, roots: [RESULTS], force: true }, f.container("ci")).state).toBe("published");
-    expect(heads(f)).toEqual(["qa-reports"]);
-    expect(git(f.bare, "ls-tree", "--name-only", "qa-reports:main").trim().split("\n").sort()).toEqual([SHA_A, SHA_B]);
+    expect(heads(f)).toEqual(["cat/cat-harness/qa-reports", "qa-reports"]);
+    expect(git(f.bare, "rev-parse", "refs/heads/qa-reports").trim()).toBe(legacyTip);
+    expect(git(f.bare, "ls-tree", "--name-only", "cat/cat-harness/qa-reports:main").trim().split("\n").sort()).toEqual([SHA_B]);
   }, T);
 
   test("BOTH exist: the new name wins for readers and writers; the legacy branch is left as it was", () => {

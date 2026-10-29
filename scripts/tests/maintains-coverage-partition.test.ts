@@ -111,6 +111,7 @@ describe("the artefacts that caused the narrowing are the ones to name", () => {
     // regression here is the exact state bean `6f1x` was opened to close.
     const { site, driftJudges } = scopes();
     // `cat-harness/ns.jsonld` since the all-layers union was retired (2026-09-30).
+    // declared-path-literal: the test's subject is this published context path itself, written as consumers see it.
     for (const a of ["cat-harness/ns.jsonld", "ns/content/v1.jsonld"]) {
       expect(site.has(a), `${a} is not a subject of the site check`).toBe(true);
       // And still correctly declined by the drift check — the other suite asserts

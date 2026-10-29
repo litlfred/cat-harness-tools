@@ -445,7 +445,7 @@ export const LITERAL = /(["'`])((?:[^\\\n]|\\.)*?)\1/g;
 /**
  * Every declared-path literal in the instance's own source, classified.
  *
- * Exported so `scripts/tests/declared-paths.test.ts` asserts the property
+ * Exported so `scripts/tests/kg/declared-paths.test.ts` asserts the property
  * rather than shelling out to the CLI and reading its exit code — the pattern
  * `activity-skill-coverage.test.ts` set, and for its reason: a test that
  * parses console output breaks on a wording change and proves nothing about

@@ -1,7 +1,7 @@
 /**
  * `tool-coverage-uncovered-by-design` tests about the WHOLE CHECKOUT, moved
  * here from
- * `cat-harness/scripts/tests/tool-coverage-uncovered-by-design.test.ts` (bean
+ * `cat-harness-tools/scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts` (bean
  * `7zz1`, owner ruling 2026-10-06 "Top-level instance"): each triages the
  * skills of every instance in the checkout, which only the checkout holds.
  * Standing alone, cat-harness has none of it, and

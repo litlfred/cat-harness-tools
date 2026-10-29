@@ -37,12 +37,12 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
 
     const car = ingestion!.criteria["call-activity-resolves"];
     expect(car.result).toBe("pass");
-    // Bean m8gz: it also calls the harness's OPEN and CLOSE, as every process
-    // that works a bean does.
+    // Four: its two ingestion phases, and the bean's open and close (bean m8gz).
     expect(car.findings.length).toBe(4);
-    for (const called of ["Process_Ingestion", "Process_IngestTheme", "Process_BeanOpen", "Process_BeanClose"]) {
-      expect(car.findings.some((f) => f.detail === `calls "${called}", hosted by instance "cat-harness".`)).toBe(true);
-    }
+    expect(car.findings.some((f) => f.detail === 'calls "Process_Ingestion", hosted by instance "cat-harness".')).toBe(true);
+    expect(car.findings.some((f) => f.detail === 'calls "Process_IngestTheme", hosted by instance "cat-harness".')).toBe(true);
+    expect(car.findings.some((f) => f.detail === 'calls "Process_BeanOpen", hosted by instance "cat-harness".')).toBe(true);
+    expect(car.findings.some((f) => f.detail === 'calls "Process_BeanClose", hosted by instance "cat-harness".')).toBe(true);
   }, 30_000);
 
   test("a call activity whose targets are all local resolves as a PASS with empty findings", async () => {
@@ -55,12 +55,13 @@ describe("kg-audit: call-activity-resolves across repository instances (bean `t5
 
     const data = JSON.parse(out);
     const reports = data.reports as { subject: { id: string }; criteria: Record<string, { result: string; findings: unknown[] }> }[];
-    // Process_Lifecycle was the example until bean m8gz gave it OPEN and CLOSE
-    // calls, which the harness hosts; public-comment calls only its own layer.
-    const local = reports.find((r) => r.subject.id === "Process_PublicComment");
-    expect(local).toBeDefined();
+    // Process_PublicComment calls only Process_ContentChangeReview, which
+    // folio-assistant-core hosts itself. (Process_Lifecycle was the subject until
+    // it began calling cat-harness's bean-open and bean-close, bean m8gz.)
+    const publicComment = reports.find((r) => r.subject.id === "Process_PublicComment");
+    expect(publicComment).toBeDefined();
 
-    const car = local!.criteria["call-activity-resolves"];
+    const car = publicComment!.criteria["call-activity-resolves"];
     expect(car.result).toBe("pass");
     expect(car.findings).toEqual([]);
   }, 30_000);
