@@ -19,6 +19,8 @@
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
+ *   bun run cat mount:remote --choose <harness>[:<instance>] [--directories a,b] [--tools x,y]
+ *                                          # write a review's choice into overrides.<instance>, so a fresh clone replays it (bean mo75)
  *   bun run cat mount:repin:standing [--dry-run]
  *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts, #401)
  *
@@ -1614,6 +1616,57 @@ export function editedMounts(instanceRoot: string, harnesses: readonly string[])
     });
 }
 
+// ── Writing back a review's choice (bean `mo75`) ──────────────────────────
+
+/** One `--choose <harness>[:<instance>]` with what was chosen. */
+export interface ChoiceSpec {
+  /** The mount entry, by its harness name. */
+  harness: string;
+  /** The instance of that entry's closure the choice is for; the harness itself when omitted. */
+  instance?: string;
+  directories?: string[];
+  tools?: string[];
+}
+
+/** Parse `<harness>` or `<harness>:<instance>`; throws with the expected shape. */
+export function parseChoose(arg: string): { harness: string; instance?: string } {
+  const m = /^([^:\s]+)(?::([^:\s]+))?$/.exec(arg);
+  if (!m) throw new Error(`--choose \`${arg}\`: expected <harness> or <harness>:<instance>`);
+  return { harness: m[1]!, ...(m[2] ? { instance: m[2] } : {}) };
+}
+
+/**
+ * Write the CHOICE a review made — which directories (nested ids and concern
+ * names included) and which Tools — into the mount entry's
+ * `overrides.<instance>`, so a fresh clone replays it (bean `mo75`; the
+ * proposal's "the choice, never the state"). The pin and its consent are not
+ * touched: a choice moves no commit. The choice replaces the override's
+ * `whole` and `skip`, and ends the review: the chosen set is mounted as files,
+ * so a `hydrated` the instance had is dropped (set `false` where the entry
+ * itself is hydrated). Nothing is fetched or checked here; the next
+ * `mount:remote` resolves the choice at the pin, refuses an id the pin does
+ * not declare, and records what it resolved to in `index.lock.json`.
+ */
+export function chooseRemote(instanceRoot: string, spec: ChoiceSpec): { file: string; mount: RemoteMount } {
+  if (!spec.directories?.length && !spec.tools?.length) throw new Error("--choose needs --directories and/or --tools: a choice of nothing is not one");
+  const current = readDeclaredMounts(instanceRoot).mounts;
+  const at = current.findIndex((m) => m.harness === spec.harness);
+  if (at < 0) throw new Error(`no mount entry \`${spec.harness}\` — seed it first (\`mount:remote --seed\`)`);
+  const instance = spec.instance ?? spec.harness;
+  const m = current[at]!;
+  const { whole: _w, skip: _s, hydrated: _h, directories: _d, tools: _t, ...kept } = m.overrides?.[instance] ?? {};
+  const override = {
+    ...kept,
+    ...(spec.directories?.length ? { directories: [...new Set(spec.directories)] } : {}),
+    ...(spec.tools?.length ? { tools: [...new Set(spec.tools)] } : {}),
+    ...(m.hydrated ? { hydrated: false } : {}),
+  };
+  const next = [...current];
+  next[at] = { ...m, overrides: { ...m.overrides, [instance]: override } } as RemoteMount;
+  const { file } = writeDeclaredMounts(instanceRoot, next);
+  return { file, mount: next[at]! };
+}
+
 // ── Checking (no network) ────────────────────────────────────────────────────
 
 export interface CheckResult {
@@ -1905,6 +1958,9 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--consent-by", "value"],
   ["--consent-on", "value"],
   ["--evidence", "value"],
+  ["--choose", "value"],
+  ["--directories", "value"],
+  ["--tools", "value"],
 ]);
 
 /** What is wrong with `argv`, one line each; empty when every argument is a known flag or a known flag's value. */
@@ -1945,6 +2001,24 @@ if (import.meta.main) {
     process.exit(2);
   }
   const at = argv.indexOf("--instance");
+  if (argv.includes("--choose")) {
+    const list = (flag: string): string[] | undefined => {
+      const i = argv.indexOf(flag);
+      return i >= 0 ? argv[i + 1]!.split(",").map((x) => x.trim()).filter(Boolean) : undefined;
+    };
+    try {
+      const root = at === -1 ? checkoutRootFor(process.cwd()) : resolve(argv[at + 1]!);
+      const target = parseChoose(argv[argv.indexOf("--choose") + 1]!);
+      const r = chooseRemote(root, { ...target, directories: list("--directories"), tools: list("--tools") });
+      const o = r.mount.overrides?.[target.instance ?? target.harness];
+      console.log(`✓ ${target.harness}${target.instance ? `:${target.instance}` : ""}: ${JSON.stringify(o)}`);
+      console.log(`wrote ${r.file} — run \`bun run cat mount:remote\` to mount the choice; the lock records what it resolves to`);
+      process.exit(0);
+    } catch (e) {
+      console.error(`✗ ${(e as Error).message}`);
+      process.exit(2);
+    }
+  }
   if (argv.includes("--seed")) {
     const valueOf = (flag: string): string | undefined => {
       const i = argv.indexOf(flag);
