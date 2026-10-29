@@ -22,9 +22,9 @@ import {
   type ModelCapabilities,
   type ModelCapabilityViolation,
   type ModelConfig,
-} from "@litlfred/cat-harness/schemas/model-capabilities.js";
+} from "@litlfred/cat-harness/schemas/conduct/model-capabilities.js";
 
-export * from "@litlfred/cat-harness/schemas/model-capabilities.js";
+export * from "@litlfred/cat-harness/schemas/conduct/model-capabilities.js";
 
 /**
  * Structured refusal error thrown when a workflow or lane demands capabilities

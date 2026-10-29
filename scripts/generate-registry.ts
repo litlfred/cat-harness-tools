@@ -15,7 +15,7 @@ import { fileURLToPath } from "url";
 import type {
   ActorDefinition, CapabilityDefinition, HookCommand, Requirement, RoleAssignment,
   SessionHook, SkillDefinition, SkillRegistry,
-} from "@litlfred/cat-harness/schemas/assistant-types.ts";
+} from "@litlfred/cat-harness/schemas/conduct/assistant-types.ts";
 import type { SkillPackageManifest } from "@litlfred/cat-harness/schemas/kg/skill-package.ts";
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
