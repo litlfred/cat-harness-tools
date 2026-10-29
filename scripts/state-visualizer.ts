@@ -173,6 +173,7 @@ import {
   STUCK_AFTER_DAYS,
   stuckStatesOf,
   todosNamedBy,
+  workingContextOf,
   processIdsOf,
   type BeanPosition,
   type InstanceLink,
@@ -182,7 +183,10 @@ import {
 } from "./workflow-view.ts";
 import { positionOf, type InstanceState } from "../src/workflow/instance.js";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
-import { workflowFiles } from "./known-skills.js";
+import { roleGraphFor, workflowFiles } from "./known-skills.js";
+import { readMemoryNodes } from "./agent-memory.ts";
+import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
 import type { z } from "zod";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
@@ -1477,7 +1481,7 @@ function workflowViewLead(view: WorkflowViewContext): string {
     `<p class="sv-sub">Each instance opens its own view: the diagram with the token highlighted, the history, and ` +
     `the beans and todos its steps name. <strong>stuck</strong> lists the states read from committed data, ages ` +
     `measured at ${esc(view.now.toISOString())} (when this page was built) against a ${STUCK_AFTER_DAYS}-day ` +
-    `threshold. Refused gates: <strong>${GATE_REFUSALS.state}</strong> — ${esc(GATE_REFUSALS.why)}</p>`
+    `threshold. A gate the engine refused since the instance last moved is <code>refused-gate</code>; ${esc(GATE_REFUSALS.why)}</p>`
   );
 }
 
@@ -1546,6 +1550,10 @@ export interface WorkflowInstanceView {
   drawingFor: (bpmn: string) => string | undefined;
   /** The processes viewer's page for a `.bpmn` path, page-relative, or undefined when none is declared. */
   processPageFor?: (bpmn: string) => string | undefined;
+  /** The role graph lanes bind, when one was found: the working context's roles and skills. */
+  roles?: RoleGraph;
+  /** Every instance's memory nodes, when read: joined to each step by role. */
+  memory?: readonly MemoryNode[];
 }
 
 /** The workflow pages' own styles: the token and the steps done, over the published drawing. */
@@ -1689,7 +1697,55 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
       ? `<p class="sv-sub">None found in committed data${s.status === "completed" ? " — the instance is completed" : ""}.</p>`
       : `<ul>${states.map((x) => `<li><span class="sv-tag is-stuck">${esc(x.kind)}</span> ${describe(x.detail)}</li>`).join("")}</ul>`) +
     `<p class="sv-sub">Measured at ${esc(v.now.toISOString())}, when this page was built; a token unmoved for more than ` +
-    `${STUCK_AFTER_DAYS} days is <code>enabled-not-taken</code>. Refused gates: <strong>${GATE_REFUSALS.state}</strong> — ${esc(GATE_REFUSALS.why)}</p>`;
+    `${STUCK_AFTER_DAYS} days is <code>enabled-not-taken</code>, and a step the engine refused since the instance last moved is <code>refused-gate</code>.</p>`;
+
+  const refusals = s.refusals;
+  const refusalPart =
+    `<h2 class="sv-h2" id="refusals">Refused steps — ${refusals === undefined ? "not recorded" : refusals.length}</h2>` +
+    (refusals === undefined
+      ? `<p class="sv-sub">${esc(GATE_REFUSALS.why)}</p>`
+      : refusals.length === 0
+        ? `<p class="sv-sub">None recorded.</p>`
+        : `<table><thead><tr><th>at</th><th>step asked for</th><th>actor</th><th>the engine's reason</th></tr></thead><tbody>${refusals
+            .map((r) => `<tr><td>${esc(r.at)}</td><td><code>${esc(r.node)}</code></td><td>${esc(r.actor ?? "")}</td><td>${esc(r.reason)}</td></tr>`)
+            .join("")}</tbody></table>`);
+
+  const contexts = model ? workingContextOf(model, s, v.roles, v.memory ?? []) : [];
+  const list = (xs: readonly string[], none: string): string =>
+    xs.length === 0 ? none : xs.map((x) => `<code>${esc(x)}</code>`).join(", ");
+  const contextPart =
+    `<h2 class="sv-h2" id="context">Working context at the token</h2>` +
+    (s.status === "completed"
+      ? `<p class="sv-sub">The instance is completed, so no step holds a token.</p>`
+      : model === undefined
+        ? `<p class="sv-sub">Not computed: the diagram was not found.</p>`
+        : contexts.length === 0
+          ? `<p class="sv-sub">No step is enabled, so there is no working context to show.</p>`
+          : contexts
+              .map(
+                (c) =>
+                  `<h3><code>${esc([...c.phase, c.node].join(" ▸ "))}</code> ${esc(c.name)}</h3><ul>` +
+                  `<li><strong>Role:</strong> ${c.role ? `<code>${esc(c.role)}</code>` : v.roles ? "the lane binds none" : "unknown: no role graph was found"}` +
+                  (c.roleStack.length > 1 ? `; call path ${list(c.roleStack, "")}` : "") +
+                  `</li><li><strong>Skills</strong> (the role's, closed over <code>inherits</code>, and the step's own): ${list(c.skills, "none")}</li>` +
+                  `<li><strong>Conventions in force:</strong> ${list(c.conventions, "none")}</li>` +
+                  `<li><strong>Beans the token carries:</strong> ${list(c.carriedBeans, "none")}</li>` +
+                  `<li><strong>Memory for ${c.memoryRoles.length > 0 ? list(c.memoryRoles, "") : "no role"}:</strong> ` +
+                  (v.memory === undefined
+                    ? "not read"
+                    : c.roleMemory.length === 0
+                      ? "no entry is tagged with these roles"
+                      : c.roleMemory.map((m) => `<code>${esc(m.id)}</code> (${esc(m.label)}) ${esc(m.summary)}`).join("; ")) +
+                  (v.memory === undefined ? "" : `. Plus ${c.everyoneMemory} untagged entr${c.everyoneMemory === 1 ? "y" : "ies"} that reach every step.`) +
+                  `</li></ul>`,
+              )
+              .join("")) +
+    `<p class="sv-sub">Read from the engine's own task context. Memory is joined on the step's role and the roles it inherits; ` +
+    `the call path's outer roles are not overlaid, which the memory schema leaves open on purpose. Archived entries reach nobody.</p>`;
+
+  const logPart =
+    `<p class="sv-sub">The history below is this instance's committed log. The activity log (<code>fsh-guts/logs/</code>) is ` +
+    `git-ignored on the machine that ran each step, so it is not committed state and is not read here.</p>`;
 
   const byId = new Map((v.beans ?? []).map((b) => [b.id, b]));
   const steps = model ? beanStepsOf(model) : [];
@@ -1747,11 +1803,14 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
       ` · <a href="../../">${esc(v.store)}'s work plan</a> · <a href="../">every instance in it</a></p>` +
       `<p><strong>Where it is:</strong> ${position.length > 0 ? position.map((p) => `<code>${esc(p)}</code>`).join(", ") : "no step holds a token"}</p>` +
       stuck +
+      refusalPart +
       `<h2 class="sv-h2" id="diagram">Diagram</h2>` +
       source +
       diagrams +
+      contextPart +
       beans +
       todoPart +
+      logPart +
       history +
       WV_SCRIPT,
   });
@@ -2718,6 +2777,23 @@ const hubs: string[] = [];
 // so every page of one run measures against the same instant and says which.
 const NOW = new Date();
 const todosForView = readViewTodos();
+// Bean `v49e`, item 3: the working context of each step holding a token. Read
+// once; a graph or memory store that cannot be read leaves that part unshown
+// and the page says so, never an empty answer passed off as a measured one.
+const rolesForView: RoleGraph | undefined = (() => {
+  try {
+    return roleGraphFor(ROOT);
+  } catch {
+    return undefined;
+  }
+})();
+const memoryForView: MemoryNode[] | undefined = (() => {
+  try {
+    return readMemoryNodes();
+  } catch {
+    return undefined;
+  }
+})();
 // Bean `folio-assistant-w2hn`: the diagrams' ids and every store's instances,
 // read once; each store page then classifies and groups its own beans.
 const unlinkedInputs = mine.some((x) => x.subgraphs === "instance")
@@ -2766,6 +2842,8 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
       beans: read.beans,
       todos: todosForView,
       now: NOW,
+      ...(rolesForView ? { roles: rolesForView } : {}),
+      ...(memoryForView ? { memory: memoryForView } : {}),
       drawingFor: (bpmn) => {
         const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
         return existsSync(svg) ? relative(pageDir, svg).split(sep).join("/") : undefined;
