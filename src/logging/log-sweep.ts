@@ -38,7 +38,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { LOG_ENTRY_SCHEMA_ID, LogEntrySchema, logDirs } from "@litlfred/cat-harness/schemas/log-entry.ts";
+import { LOG_ENTRY_SCHEMA_ID, LogEntrySchema, logDirs } from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
 
 /**
  * Which entries to remove.

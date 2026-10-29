@@ -37,7 +37,7 @@ import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authoriz
 import { provActivityFor } from "./prov-record.js";
 import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import {
   validateWorkflowModel,
   validateLaneModelCapabilities,

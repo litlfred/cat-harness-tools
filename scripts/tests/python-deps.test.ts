@@ -18,7 +18,7 @@ import {
   depsForTier,
   importNameOf,
   requirementsPath,
-} from "@litlfred/cat-harness/schemas/python-deps.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/python-deps.ts";
 import { checkPythonDeps, scanImports } from "../check-python-deps.ts";
 import { dockerfileFindings, dockerfileOf, generatedPaths, imageFindings, requirementsBody, staleTiers } from "../gen-python-deps.ts";
 import { tools } from "../../tools/discover.ts";
@@ -130,7 +130,7 @@ describe("the generated files cannot drift from the declaration", () => {
     for (const tier of DEP_TIERS) {
       const body = readFileSync(join(TOOLS_ROOT, requirementsPath(tier)), "utf-8");
       expect(body).toContain("GENERATED");
-      expect(body).toContain("schemas/python-deps.ts");
+      expect(body).toContain("schemas/sdlc/python-deps.ts");
     }
   });
 

@@ -162,7 +162,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, normalize, relative } from "node:path";
 
 import { instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { corpusScopeFor, workflowFiles } from "./known-skills.js";
 import { processFiles } from "../src/workflow/process-files.js";
 import { isGlobalTasksFile, loadGlobalTasks, loadProcessModel } from "../src/workflow/process-model.js";
@@ -180,7 +180,7 @@ import {
   qaResultPath,
   writeQaResult,
 } from "./qa-results.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */

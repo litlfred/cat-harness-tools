@@ -1,7 +1,7 @@
 /**
  * `merge-priority.dmn` against the vocabulary it answers in.
  *
- * `schemas/merge-queue.ts` has said since it was written that "a test asserts
+ * `schemas/sdlc/merge-queue.ts` has said since it was written that "a test asserts
  * the two agree". No such test existed. Measured 2026-10-04: `PRIORITY_CLASSES`
  * was referenced from nowhere but its own file, and the diagram's rule 3
  * returned a class — `ci-not-green` — that the enum did not contain, so the
@@ -15,7 +15,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { PRIORITY_CLASSES } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { PRIORITY_CLASSES } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import { loadPriorityTable, PRIORITY_DMN } from "../../merge-queue.ts";
 import { unaryTest } from "../../../src/workflow/decision-table.ts";
 

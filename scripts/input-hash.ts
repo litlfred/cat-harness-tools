@@ -94,7 +94,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { dirname, join, relative, resolve } from "node:path";
 import { readQaManifest, type QaStoreOptions } from "./qa-store.ts";
 import { auditClosure, SiteMemo } from "./input-sites.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 /** Where the cache lives, relative to the repository root. `build/` is git-ignored. */
 // input-site: inert #9a24257c — names a build-output directory only to leave it out of a walk

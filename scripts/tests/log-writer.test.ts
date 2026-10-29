@@ -22,7 +22,7 @@ import {
   LogExecutionSchema,
   LogReferenceSchema,
   logDirs,
-} from "@litlfred/cat-harness/schemas/log-entry.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
 import { describeCapture, writeLogEntry } from "../../src/logging/log-writer.ts";
 import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";

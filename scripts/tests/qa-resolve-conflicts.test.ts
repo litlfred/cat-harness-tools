@@ -27,8 +27,8 @@ import {
   unmergedStages,
   type SideScan,
 } from "../qa-resolve-conflicts.ts";
-import { attestationKeyForDerived, attestationPath, writeCriteriaAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { attestationKeyForDerived, attestationPath, writeCriteriaAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

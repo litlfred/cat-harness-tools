@@ -83,7 +83,7 @@ import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
-import { inputSiteReached, qaRefLine, quietly } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached, qaRefLine, quietly } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 

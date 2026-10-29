@@ -36,12 +36,12 @@ import { dirname, join, relative, resolve } from "node:path";
 import {
   getChecklistForKind,
   type AdversarialContentKind,
-} from "@litlfred/cat-harness/schemas/adversarial-checklist.js";
+} from "@litlfred/cat-harness/schemas/sdlc/adversarial-checklist.js";
 import {
   AdversarialFindingSchema,
   type AdversarialFinding,
   type AdversarialReview,
-} from "@litlfred/cat-harness/schemas/red-flag.js";
+} from "@litlfred/cat-harness/schemas/sdlc/red-flag.js";
 import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

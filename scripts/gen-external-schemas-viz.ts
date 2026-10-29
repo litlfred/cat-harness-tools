@@ -51,7 +51,7 @@ import {
 } from "./external-schemas.js";
 import { OWN_XML_NAMESPACES } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { specUsers, type SpecUse, type SpecUseForm, type SpecUsers } from "./spec-users.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   undeclaredNamespaces,

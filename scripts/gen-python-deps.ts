@@ -2,14 +2,14 @@
 /**
  * Write `requirements.txt` and `requirements-extended.txt` from the declaration,
  * into this layer's declared `python/` directory — the location
- * `requirementsPath` in `cat-harness/schemas/python-deps.ts` names, and nowhere
+ * `requirementsPath` in `cat-harness/schemas/sdlc/python-deps.ts` names, and nowhere
  * else (bean `ar1s`, phase 3).
  *
  * It moved here from `cat-harness/scripts/` with the files it writes: a
  * generator in the harness writing into the tool layer above it would be a
  * wrong-direction reference by construction, whatever it was spelled as.
  *
- * Bean `68dt`. `schemas/python-deps.ts` is definitional; these are downstream,
+ * Bean `68dt`. `schemas/sdlc/python-deps.ts` is definitional; these are downstream,
  * the same carrier split the schema modules use (`harness-schema-export.ts`
  * does it for JSON Schema). pip cannot read TypeScript, and the declaration
  * carries two things a flat list cannot — the import name a distribution
@@ -34,7 +34,7 @@ import {
   importNameOf,
   requirementsPath,
   type DepTier,
-} from "@litlfred/cat-harness/schemas/python-deps.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/python-deps.ts";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { resolveScriptCommand } from "./lib/script-command.ts";
 import { tools } from "../tools/discover.ts";
@@ -55,12 +55,12 @@ export function requirementsBody(tier: DepTier): string {
   const deps = [...depsForTier(tier)].sort((a, b) => a.distribution.localeCompare(b.distribution));
   const head = [
     "# GENERATED — do not edit.",
-    "# Source: schemas/python-deps.ts (bean 68dt). Regenerate: bun run cat deps:python",
+    "# Source: schemas/sdlc/python-deps.ts (bean 68dt). Regenerate: bun run cat deps:python",
     "#",
     tier === "lean"
       ? "# The set CI installs. Everything a gate can exercise."
       : "# NOT installed in CI. Declared so the cost is visible rather than implied;",
-    tier === "lean" ? "#" : "# see each entry's reason in schemas/python-deps.ts.",
+    tier === "lean" ? "#" : "# see each entry's reason in schemas/sdlc/python-deps.ts.",
     "",
   ];
   const body = deps.flatMap((d) => {
@@ -240,7 +240,7 @@ if (import.meta.main) {
       console.error("  importing cryptography panics and every PDF backend fails at import.");
       process.exit(1);
     }
-    console.log(`✓ ${DEP_TIERS.length} requirements file(s) current with schemas/python-deps.ts`);
+    console.log(`✓ ${DEP_TIERS.length} requirements file(s) current with schemas/sdlc/python-deps.ts`);
     console.log(`✓ ${images.length} declared image(s) install the declared set rather than retyping it: ${images.map((t) => t.id).join(", ") || "none"}`);
     process.exit(0);
   }

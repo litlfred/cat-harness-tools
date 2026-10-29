@@ -37,7 +37,7 @@ import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { imageForRole, imagesForRole } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import { graphTiles, resolveGlassStrip, withTileCounts } from "./graph-tiles.js";
 import { readTileCounts, type TileCount } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
-import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { harnessTiles, instanceDirs } from "./harness-tiles.js";
 import { harnessPanel, skillPageIn } from "./harness-panel.js";
 import { siteLinks } from "./site-links.js";

@@ -34,7 +34,7 @@ import type {
 // anchors everything else to); `existingBlockQaPath` for reading (results
 // tree first, legacy `<block>.qa.json` sibling as fallback).
 import { blockQaPath } from "./qa-paths";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 /**
  * Root of the CONTENT repo being swept.

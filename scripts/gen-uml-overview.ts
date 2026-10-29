@@ -63,7 +63,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 

@@ -73,7 +73,7 @@ import { tools } from "../tools/discover.js";
 import { isGlobalTasksFile, loadProcessModel } from "../src/workflow/process-model.js";
 import { isSkillMd, kgRoots, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

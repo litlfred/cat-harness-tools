@@ -68,7 +68,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 import {
   defaultGraphTypologies,

@@ -35,7 +35,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve, dirname } from "path";
 import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "@litlfred/cat-harness/schemas/kg/detangle-sidecar.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { groupDepthFor } from "./group-depth.ts";
 import { TOPICS_FILE, topicsOf } from "../../../scripts/skill-topics.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";

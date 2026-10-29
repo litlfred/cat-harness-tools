@@ -68,7 +68,7 @@ import { join, relative } from "node:path";
 
 import { directoryEntriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
-import { MergeQueueEntrySchema, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { MergeQueueEntrySchema, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import { RESERVED, pushMount, readMarker, type BranchStoreOptions, type PushResult } from "./branch-store.ts";
 import { graphReadPath } from "./graph-read.ts";
 

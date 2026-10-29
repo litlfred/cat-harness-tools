@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 import { TASK_IO } from "../../scripts/task-io.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

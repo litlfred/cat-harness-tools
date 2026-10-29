@@ -44,7 +44,7 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 function gitList(root: string, args: string[]): string[] {
   const proc = Bun.spawnSync(["git", ...args], { cwd: root });

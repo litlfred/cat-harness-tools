@@ -63,7 +63,7 @@ import {
   stripComments,
 } from "./check-declared-paths.js";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");
 

@@ -69,7 +69,7 @@ import {
   attestationsHomeFor,
   requirementSignoffPath,
   RequirementSignoffAttestationsSchema,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { kgRoots } from "./known-skills.ts";
 

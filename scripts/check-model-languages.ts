@@ -46,7 +46,7 @@ import {
   type ModelEntry,
 } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = HARNESS_ROOT;

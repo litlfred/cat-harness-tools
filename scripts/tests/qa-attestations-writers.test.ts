@@ -6,7 +6,7 @@
  * the prior report and carrying them forward, so a run with no prior — which
  * moving `test/results/` to the `qa-reports` branch makes ordinary — wrote a
  * report without them and said nothing. Every writer now reads them from the
- * attestation store (`schemas/qa-attestations.ts`), and refuses with
+ * attestation store (`schemas/sdlc/qa-attestations.ts`), and refuses with
  * exit 4 when the store cannot be read.
  *
  * The writers are CLIs with top-level state, so each is SPAWNED against a
@@ -40,7 +40,7 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations as writeAttestations,
   type CriteriaMap,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { mergeWithAttestations } from "../../pipeline/translation-block-qa";
 import { writeDeclaration } from "../../test/support/instance-fixture";
 

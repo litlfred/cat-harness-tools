@@ -160,7 +160,7 @@ import {
   resolveDirectories,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
@@ -174,7 +174,7 @@ import {
   qaResultPath,
   writeQaResult,
 } from "./qa-results.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";

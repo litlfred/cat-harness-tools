@@ -55,7 +55,7 @@ import {
   withoutKey,
 } from "../skill-register.js";
 import { BUILDING_ENV } from "../qa-working-copy.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const scripts = (): Record<string, string> => scriptsOf(ROOT);

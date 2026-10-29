@@ -45,7 +45,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname, extname, resolve, sep } from "path";
 import { hashFile } from "./qa-utils";
 import { findContentRepoRoot } from "./repo-root";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 const OUTPUT_REL = "docs/audits/lean-profile.json";
 

@@ -23,12 +23,12 @@ import { resolve } from "node:path";
 import { loadDecisionTable, evaluate, type DecisionTable } from "../src/workflow/decision-table.js";
 import { complete, type InstanceState, type AuthzOptions } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
-import type { TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
+import type { TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.js";
 import {
   fileCertification,
   readCertificationAttestations,
   type CertificationEntry,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 
 export interface ResolvedPlanDmn {
   ok: true;

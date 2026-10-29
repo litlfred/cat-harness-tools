@@ -22,7 +22,7 @@ import { describe, expect, it } from "bun:test";
 import { buildReport, gates, render } from "./run.ts";
 import { runHealthChecks, type HealthContext } from "./checks.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

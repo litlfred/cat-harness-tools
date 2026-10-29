@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { attest, discoverPairs, evaluatePairs, evaluatePairsFrom, readAttestations } from "../prose-code-pairs";
-import { QA_ATTESTATIONS_SCHEMA, serialiseAttestations, type KgAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { QA_ATTESTATIONS_SCHEMA, serialiseAttestations, type KgAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 const SUBJECT = { kind: "skill", id: "s", path: "skills/pkg/s.md" };
 

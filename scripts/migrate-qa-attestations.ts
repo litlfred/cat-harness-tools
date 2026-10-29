@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * IDEMPOTENT: move every QA judgement still inside a derived file into the
- * attestation store (`schemas/qa-attestations.ts`) — the ONE migration path
+ * attestation store (`schemas/sdlc/qa-attestations.ts`) — the ONE migration path
  * for all three families.
  *
  * Beans `2gst` (kg-qa) and `8wj1` (block-qa, translation-qa), arc `3fva`.
@@ -32,7 +32,7 @@
  * `script` is added to the subject's store file, verbatim, unless the store
  * already holds it (same serialisation). The derived report keeps its copy:
  * it is the PROJECTION readers still take `criteria[id][0]` from (see the
- * module comment of `schemas/qa-attestations.ts`). The store file keeps the
+ * module comment of `schemas/sdlc/qa-attestations.ts`). The store file keeps the
  * escaping of the report its entries came from, so their bytes survive.
  *
  * Nothing is deleted, in either family. `--dry-run` reports the plan and
@@ -75,7 +75,7 @@ import {
   type CriteriaMap,
   type KgAttestations,
   type KgAttestationTree as TreePair,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The kg-qa arrays that are judgements, in the order the sidecar carried them. */
