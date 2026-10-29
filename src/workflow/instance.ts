@@ -35,7 +35,7 @@ import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from
 import type { ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import {

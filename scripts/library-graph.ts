@@ -91,17 +91,17 @@ const REPO_URL = (root: string): string | undefined => {
   if (!repoUrls.has(root)) repoUrls.set(root, detectRepoUrl(root));
   return repoUrls.get(root);
 };
-import { proseBody, type SummaryStatus } from "@litlfred/cat-harness/schemas/block-summary.ts";
+import { proseBody, type SummaryStatus } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
 import { withheldEntryFor } from "./lib/withheld.ts";
 import { entryItems, type SummaryTally } from "./summaries.ts";
 import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
-import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { displayNarrative } from "./lib/narrative-display.ts";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is

@@ -25,7 +25,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
-import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";

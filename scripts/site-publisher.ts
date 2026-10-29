@@ -35,7 +35,7 @@ import { join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 /** The reusable workflow a folio calls. */

@@ -27,14 +27,14 @@ import {
   stickyFile,
   toAsciiJson,
 } from "../ensure-landing-sticky.js";
-import { LandingStickySchema } from "@litlfred/cat-harness/schemas/landing-sticky.js";
+import { LandingStickySchema } from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
 import {
   contributingRoots,
   declaredContributions,
   initiationFromArgv,
   readerTextProblems,
 } from "../ensure-landing-sticky.js";
-import { InitiationSchema } from "@litlfred/cat-harness/schemas/sticky-contribution.js";
+import { InitiationSchema } from "@litlfred/cat-harness/schemas/content/sticky-contribution.js";
 import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 

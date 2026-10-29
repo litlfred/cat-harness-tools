@@ -42,7 +42,7 @@
  * @module pipeline/voice-criteria
  */
 
-import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/voices.ts";
+import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
 
@@ -98,7 +98,7 @@ export function overlayCriterionId(voiceId: string): string {
  * `who-publication-design` carries `critical` rules and is registered `major`;
  * `milnor`'s worst rule is `major` and it is registered `minor`. Deriving it
  * would have silently re-graded half the corpus, which is why
- * `overlaySeverity` is a declared field. See `schemas/voices.ts`.
+ * `overlaySeverity` is a declared field. See `schemas/content/voices.ts`.
  */
 export function overlaySeverityOf(v: VoiceProfile): "critical" | "major" | "minor" {
   const declared = (v as { overlaySeverity?: unknown }).overlaySeverity;

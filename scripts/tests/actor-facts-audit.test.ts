@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import { evaluateActorFactConsumers, matchesToken } from "../actor-facts.js";
 import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import { readActors, actorsDir, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { readPolicyGrants, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
+import { readPolicyGrants, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { workflowFiles, corpusScopeFor } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

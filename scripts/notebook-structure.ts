@@ -6,7 +6,7 @@
  * @covers none — a WRITER an ingest step calls, not an audit.
  *
  * Bean `rkqp`, owner 2026-09-30: notebook ingestion is "A+B", a variant of the
- * shared document-structure base (`schemas/document-structure.ts`) rather than
+ * shared document-structure base (`schemas/content/document-structure.ts`) rather than
  * a notebook rendered to PDF. What this rung decides, and why:
  *
  * - **A section is a heading and the cells under it**, up to the next cell
@@ -28,7 +28,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { NOTEBOOK_STRUCTURE_SCHEMA_ID, NotebookStructureSchema, STRUCTURE_FILENAME, type NotebookStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { NOTEBOOK_STRUCTURE_SCHEMA_ID, NotebookStructureSchema, STRUCTURE_FILENAME, type NotebookStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 
 interface Cell {
   cell_type: "markdown" | "code" | "raw" | string;

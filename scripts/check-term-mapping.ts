@@ -5,7 +5,7 @@
  * Bean `7wou`, under `5yhm`. The check the owner asked for on 2026-09-29:
  * *"extracting exsiting glossary needs compaision to existing
  * termonology/coding."* The contract, the three states and why `exact` and
- * `concept` are a pair are in `schemas/term-mapping.ts` and are not restated
+ * `concept` are a pair are in `schemas/content/term-mapping.ts` and are not restated
  * here. Three things decide what the code below does:
  *
  *   * TWO TARGETS, NEVER MERGED. `skos` is authoritative for meaning, `fhir`
@@ -48,8 +48,8 @@ import {
   type TermMapping,
   TermMappingsFileSchema,
   normaliseLabel,
-} from "@litlfred/cat-harness/schemas/term-mapping.ts";
-import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/pinned-terminology.ts";
+} from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
+import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/content/pinned-terminology.ts";
 import {
   TERM_ADJUDICATIONS_SUFFIX,
   TermAdjudicationsFileSchema,

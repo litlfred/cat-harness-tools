@@ -24,7 +24,7 @@ import {
   ContributionCollisionError,
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {

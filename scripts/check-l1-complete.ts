@@ -55,17 +55,17 @@ import {
   ArchiveContentsSchema,
   isArchiveMimetype,
 } from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
-import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/attribution.ts";
-import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/narrative.ts";
-import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/content/attribution.ts";
+import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import {
   TABULAR_RECORDS_SCHEMA_ID,
   TabularRecordsSchema,
   isTabularMimetype,
 } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
 import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
-import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
-import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/vector-labels.ts";
+import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
+import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/content/vector-labels.ts";
 import {
   VECTOR_FIGURES_DIR,
   VECTOR_FIGURES_FILE,
@@ -85,7 +85,7 @@ function slotStates(slot: NarrativeSlot): string {
     .map((n) => (n.lang ? `${n.lang}:${n.state}` : n.state))
     .join(", ");
 }
-import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/block-summary.ts";
+import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
 import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
@@ -230,7 +230,7 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // A JSON-LD context the SOURCE ITSELF publishes among its files, held so a
   // documentLoader can serve it offline instead of fetching it (bean `9y9j`,
   // the linked-data voice's `ld-no-context-fetched-at-run-time`; first case:
-  // PROV-JSONLD's, pinned by sha256 in schemas/prov.ts).
+  // PROV-JSONLD's, pinned by sha256 in schemas/content/prov.ts).
   "context.jsonld",
   // A smart-kg L1 graph document (publication → section → recommendation)
   // DERIVED from this entry by a DAK base layer's scripts/extract-smart-kg-l1.ts and
@@ -728,7 +728,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     if (s) {
       const secs = Array.isArray(s.sections) ? s.sections.length : 0;
       // Conformance to ONE of the declared variants (issue #1112; bean rkqp
-      // made it a base with variants, `schemas/document-structure.ts`). A file
+      // made it a base with variants, `schemas/content/document-structure.ts`). A file
       // that parses but conforms to none is not "met": a second spelling of a
       // field is how gen-library-jsonld crashed on `section_id`. Read through
       // `structureOf`, the accessor every reader shares, so this gate cannot

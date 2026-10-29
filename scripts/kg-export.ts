@@ -85,7 +85,7 @@ import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.j
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
-import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
+import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
 import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
@@ -3213,7 +3213,7 @@ export async function scannedInstanceSchemas(instanceRoot: string, baseUrl?: str
 // FRAGMENT, so without this a consumer holding `cat-harness.jsonld#skill/x`
 // would fetch the document and find nothing at the fragment, with nothing to
 // say where it went. The precedent is the vocabulary's own retired terms
-// (`schemas/vocabulary.ts` `replacedBy`) and a role's former names
+// (`schemas/content/vocabulary.ts` `replacedBy`) and a role's former names
 // (`schemas/process/role-graph.ts` `formerNames`).
 //
 // Removal: delete `tombstonesFor`, its call in `buildExport`, and the two

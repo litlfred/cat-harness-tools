@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { TermMappingsFileSchema } from "@litlfred/cat-harness/schemas/term-mapping.ts";
+import { TermMappingsFileSchema } from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

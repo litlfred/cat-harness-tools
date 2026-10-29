@@ -9,7 +9,7 @@ import { TOOL_RELEASE_SCHEMA_TAG, type ToolRelease } from "@litlfred/cat-harness
 import { TOOL_PROFILE_SCHEMA_TAG, type ToolProfile } from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
 import { TEST_RUN_SCHEMA_ID, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";
 import { TEST_REPORT_SCHEMA_ID, type TestReport } from "@litlfred/cat-harness/schemas/test-report.ts";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.ts";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { assessPin, readPin, type PinDef } from "../../src/upstream/pins.ts";
 import { resolvePlantumlRelease, PLANTUML } from "../plantuml-render.ts";

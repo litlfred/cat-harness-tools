@@ -128,7 +128,7 @@ import {
   type RoleGraph,
   type LoadedActor,
 } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/odrl.js";
+import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";

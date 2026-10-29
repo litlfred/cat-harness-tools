@@ -28,7 +28,7 @@ import {
   VECTOR_LABELS_FILE,
   VECTOR_LABELS_SCHEMA_ID,
   VectorLabelsSidecarSchema,
-} from "@litlfred/cat-harness/schemas/vector-labels.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-labels.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

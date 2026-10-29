@@ -390,7 +390,7 @@ export const RULES: Rule[] = [
       // path instead of in this list.
       "schemas/tools/tool.ts",                     // what a Tool IS — `tools` is a harness graph typology
       "schemas/tools/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
-      "schemas/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
+      "schemas/content/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
@@ -413,7 +413,7 @@ export const RULES: Rule[] = [
       "schemas/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
       "schemas/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
       "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
-      "schemas/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
+      "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
 
       "schemas/property-skills.ts",          // declaration key → its edit skills (issue #1146)
       "schemas/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)
@@ -582,7 +582,7 @@ export const RULES: Rule[] = [
       // does it need a folio to have anything to do? This one CREATES the
       // folio graph and writes content nodes into it — the landing stickies —
       // so it does not merely need a folio, it is where one comes from. It also
-      // imports `schemas/landing-sticky.ts` (a content node) and
+      // imports `schemas/content/landing-sticky.ts` (a content node) and
       // `schemas/kg/folio-graph-typology.ts`, which is core's by the argument written
       // on that module: a layer that cannot render must not own the renderable
       // kind. Classifying it harness would put core's own kind registration
@@ -681,7 +681,7 @@ export const RULES: Rule[] = [
       // on that, so the vocabulary both sides use stays here.
       // HARNESS, both re-triaged 2026-09-19 while draining the last edges.
       //
-      // `schemas/contributions.ts` is what a DEPENDENCY may add to the root
+      // `schemas/content/contributions.ts` is what a DEPENDENCY may add to the root
       // instance — its own header calls it Phase 0.1 of the separation. It is
       // the composition mechanism of the harness, not a thing a folio
       // contains, so `harness-config.ts` importing it was never the wrong
@@ -871,8 +871,8 @@ export const RULES: Rule[] = [
       // no wrong-direction edge — and leaving them unclassified would have made
       // `src/workflow/` and `src/tools/workflow.ts` read as harness → core.
       "schemas/process/role-graph.ts",
-      "schemas/odrl.ts",                     // W3C ODRL 2.2 policies: what an Actor may do (issue #1180)
-      "schemas/prov.ts",                     // W3C PROV-O task-run record (issue #1180)
+      "schemas/content/odrl.ts",                     // W3C ODRL 2.2 policies: what an Actor may do (issue #1180)
+      "schemas/content/prov.ts",                     // W3C PROV-O task-run record (issue #1180)
       "schemas/kg-qa.ts",
       // Whether a path can be CHECKED OUT. It imports nothing at all, so it
       // sits at or below every consumer by construction — but it is harness by
@@ -949,7 +949,7 @@ export const RULES: Rule[] = [
       // is harness — import its definitions from core, the wrong-direction
       // edge `namespaces.ts` was extracted to remove. Measured on first run:
       // the prefix rule claimed it for core and the edge appeared immediately.
-      "schemas/vocabulary.ts",
+      "schemas/content/vocabulary.ts",
       // The external vocabularies an instance's JSON-LD speaks, as DECLARED
       // data (bean folio-assistant-63q4, owner 2026-10-14). Harness by the
       // same argument as `namespaces.ts`: `cat-harness.ts` reads the
@@ -1066,7 +1066,7 @@ export const RULES: Rule[] = [
       // (harness) and bootstrap's model registry, and its core consumers
       // (`apply-image-verdicts.ts`, the narrative and image schemas) may import
       // the harness — so the move adds no wrong-direction edge. Bean `3o5b`.
-      "schemas/attribution.ts",
+      "schemas/content/attribution.ts",
       "schemas/note-anchor.ts",     // read only by `carried-note.ts`, already harness
       // Declaration vocabulary, by the same test as the four above: it imports
       // only zod, and it carries no part of the content model. The direction is
@@ -1075,10 +1075,10 @@ export const RULES: Rule[] = [
       // would make the harness import core. That wrong-direction edge was the
       // falsifier the contribution design was measured against, and this is
       // where it is answered rather than absorbed.
-      "schemas/sticky-contribution.ts",
+      "schemas/content/sticky-contribution.ts",
       "schemas/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/python-deps.ts",     // the repository's own Python toolchain
-      "schemas/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
+      "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
       "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kind-validator.ts",  // a graph typology's validator
@@ -1090,13 +1090,13 @@ export const RULES: Rule[] = [
       // marker files, and `harness-config.ts` composes it into
       // `describeRepositoryClosure`. The harness importing core was the edge
       // this gate caught the moment closure was wired.
-      "schemas/content-type.ts",
+      "schemas/content/content-type.ts",
       // The two markers the harness itself owns: `harness.json` says "an
       // instance", `harness.config.json` says "authors folio content". Both
       // are harness files even though one of them is what makes something a
       // FOLIO — a folio is recognised BY the harness, which is why
       // `cat-harness/` carries the first and not the second.
-      "schemas/content-types-base.ts",
+      "schemas/content/content-types-base.ts",
 
       // ── The 19 modules still reported `unassigned` on 2026-09-20, at
       //    `5b8277ea9b`. `scripts/` is in no prefix rule, so a top-level
@@ -1109,7 +1109,7 @@ export const RULES: Rule[] = [
       //    folio's content model.
       // HARNESS, although what it reads is core's glossary — the test is the
       // module's imports, not the data's home. It reaches only
-      // `schemas/term-mapping.ts` and `scripts/qa-results.ts`, both harness,
+      // `schemas/content/term-mapping.ts` and `scripts/qa-results.ts`, both harness,
       // so classifying it core would buy two wrong-direction edges for the
       // tidiness of filing it beside the glossary it inspects. Same reasoning
       // the content-side block below states in the other direction.
@@ -1121,7 +1121,7 @@ export const RULES: Rule[] = [
       // `schemas/kg/cat-harness.ts` and nothing else. The declaration resolver
       // is harness, so filing this core would buy a wrong-direction edge for
       // the tidiness of sitting beside the pipeline it audits. The three
-      // below are core because THEY reach `schemas/narrative.ts` and its
+      // below are core because THEY reach `schemas/content/narrative.ts` and its
       // siblings; this one reaches no core schema at all, which is what
       // makes it a different answer rather than an inconsistent one.
       // `scripts/gen-python-deps.ts` STOOD HERE and moved to
@@ -1403,8 +1403,8 @@ export const RULES: Rule[] = [
       // Three of the 19 unassigned that are CONTENT-side, by the same test
       // read the other way: each operates on a folio's own material, not on
       // the machinery that runs a process. Classifying them harness alongside
-      // their sixteen siblings would have reached into `schemas/narrative.ts`,
-      // `schemas/attribution.ts`, `schemas/library/archive-contents.ts` and
+      // their sixteen siblings would have reached into `schemas/content/narrative.ts`,
+      // `schemas/content/attribution.ts`, `schemas/library/archive-contents.ts` and
       // `schemas/library/tabular-records.ts` — all core — and bought four
       // wrong-direction edges for the tidiness of one homogeneous list.
       // `scripts/extract-assets.ts` STOOD HERE and is GONE as of bean `yj6r`,
@@ -1426,10 +1426,10 @@ export const RULES: Rule[] = [
       // can no longer see fires on nothing while reading as an adjudication.
       // Same test, same answer: it reads `library/<bib-slug>/blocks/` and
       // writes `summaries.json` beside them, a folio's own material, through
-      // `schemas/block-summary.ts` and `schemas/narrative.ts` — both core.
+      // `schemas/content/block-summary.ts` and `schemas/content/narrative.ts` — both core.
       // Same test, same answer: it reads `library/<bib-slug>/images.json`,
-      // which is a folio's own material, and imports `schemas/attribution.ts`
-      // and `schemas/document-image.ts` — the latter reaching `narrative.ts`
+      // which is a folio's own material, and imports `schemas/content/attribution.ts`
+      // and `schemas/content/document-image.ts` — the latter reaching `narrative.ts`
       // in turn. Every one of those is core, so classifying it harness would
       // buy three wrong-direction edges for the tidiness of one list.
     ],

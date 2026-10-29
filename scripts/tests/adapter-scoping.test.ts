@@ -44,7 +44,7 @@ import {
   ContributionRegistry,
   composedKindOwner,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

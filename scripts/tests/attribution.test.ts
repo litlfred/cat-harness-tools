@@ -25,7 +25,7 @@ import {
   attributionOf,
   isIngested,
   isNarrativeKind,
-} from "@litlfred/cat-harness/schemas/attribution.ts";
+} from "@litlfred/cat-harness/schemas/content/attribution.ts";
 import { checkAll, checkEntry } from "../check-l1-complete.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -259,14 +259,14 @@ describe("the real corpus", () => {
 
 describe("MODEL_NOT_DISCLOSED — the declared non-identifier (owner, 2026-09-30)", () => {
   test("an agent that may not name its model says so, and must give its session", async () => {
-    const { AttributionSchema, MODEL_NOT_DISCLOSED, modelDisclosed } = await import("@litlfred/cat-harness/schemas/attribution.ts");
+    const { AttributionSchema, MODEL_NOT_DISCLOSED, modelDisclosed } = await import("@litlfred/cat-harness/schemas/content/attribution.ts");
     const withSession = { kind: "agent", id: "claude-code", model: MODEL_NOT_DISCLOSED, session: "https://claude.ai/code/session_x" };
     expect(AttributionSchema.safeParse(withSession).success).toBe(true);
     expect(AttributionSchema.safeParse({ ...withSession, session: undefined }).success).toBe(false);
     expect(modelDisclosed(withSession)).toBe(false);
   });
   test("model stays REQUIRED for an agent: not-disclosed is an answer, silence is not", async () => {
-    const { AttributionSchema } = await import("@litlfred/cat-harness/schemas/attribution.ts");
+    const { AttributionSchema } = await import("@litlfred/cat-harness/schemas/content/attribution.ts");
     expect(AttributionSchema.safeParse({ kind: "agent", id: "a", session: "s" }).success).toBe(false);
   });
 });

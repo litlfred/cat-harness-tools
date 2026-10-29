@@ -51,7 +51,7 @@
  *
  * Otherwise the avatar's tone, as before: inventing a palette per instance
  * would put a second colour vocabulary beside `schemas/ui/theme.ts`, and
- * `schemas/avatars.ts` already gives every kind a **hue angle**. An instance
+ * `schemas/content/avatars.ts` already gives every kind a **hue angle**. An instance
  * with no avatar of its own takes `GENERIC`, which is reported as a finding
  * rather than rendered as a blank.
  *
@@ -62,7 +62,7 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";

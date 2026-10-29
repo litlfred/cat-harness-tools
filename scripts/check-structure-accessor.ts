@@ -9,7 +9,7 @@
  *
  * `structure.json` has two variants since A+B: `pdf-structure/v1` and
  * `notebook-structure/v1`, read through one accessor
- * (`schemas/document-structure.ts`: `readStructure`, `structureOf`). A reader
+ * (`schemas/content/document-structure.ts`: `readStructure`, `structureOf`). A reader
  * that builds the path itself and parses the file learns ONE variant and
  * misreads the next — a notebook's cell range taken for pages, or an
  * undeclared variant half-rendered. So the quoted token `"structure.json"` on
@@ -56,7 +56,7 @@ export const GATE = "check:structure-accessor";
 // this gate exempts, compared against git's corpus listing, not directories
 // any declaration resolves.
 export const ALLOWED: Readonly<Record<string, string>> = {
-  "cat-harness/schemas/document-structure.ts": "the accessor itself: it defines STRUCTURE_FILENAME",
+  "cat-harness/schemas/content/document-structure.ts": "the accessor itself: it defines STRUCTURE_FILENAME",
 };
 
 /**
@@ -116,7 +116,7 @@ if (import.meta.main) {
   for (const f of stale) console.error(`✗ stale allowlist entry: ${f} no longer names structure.json — remove it`);
   if (unlisted.length || stale.length) {
     console.error(
-      "\nRead a library entry's structure through schemas/document-structure.ts (readStructure / structureOf) " +
+      "\nRead a library entry's structure through schemas/content/document-structure.ts (readStructure / structureOf) " +
         "and name the file as STRUCTURE_FILENAME. A reader that builds the path and parses it itself learns one " +
         "variant and misreads the next (bean rkqp).",
     );

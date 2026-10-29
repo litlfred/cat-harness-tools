@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { PROPERTY_GLOSSES } from "@litlfred/cat-harness/schemas/vocabulary.js";
+import { PROPERTY_GLOSSES } from "@litlfred/cat-harness/schemas/content/vocabulary.js";
 import type { RenderedImpact } from "@litlfred/cat-harness/schemas/rendered-impact.ts";
 import { buildContext } from "../../kg-export.ts";
 import {

@@ -73,7 +73,7 @@ import { hashBlockFiles, loadQaReport, summariseFreshness, walkBlocks } from "..
 import { usesGraphHash } from "../pipeline/uses-graph-hash.js";
 import { qaCriteriaByIdFor, qaCriteriaFor } from "../pipeline/qa-criteria-registry.js";
 import { voiceExcludesCriterion, type QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.js";
-import { readActiveVoices } from "@litlfred/cat-harness/schemas/voices.js";
+import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.js";
 
 export const BLOCK_QA_SUMMARY_SCHEMA = "folio-block-qa-summary/v1" as const;
 

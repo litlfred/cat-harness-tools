@@ -47,7 +47,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
-import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.js";
+import { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.js";
 import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { graphReadPath } from "./graph-read.ts";

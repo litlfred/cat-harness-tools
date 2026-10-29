@@ -19,7 +19,7 @@ import {
   PROV_JSONLD_CONTEXT_URL,
   type AddressBook,
 } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.ts";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

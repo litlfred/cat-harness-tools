@@ -3,7 +3,7 @@
  * in the exporter, in the published vocabulary, and in bootstrap's own graph.
  *
  * Owner, 2026-09-30 (bean `xsqm`): "emphasize preexisting standards … now
- * align". The mechanism is one field, `replacedBy` in `schemas/vocabulary.ts`;
+ * align". The mechanism is one field, `replacedBy` in `schemas/content/vocabulary.ts`;
  * these tests are what make it one source rather than three copies.
  */
 import { describe, expect, test } from "bun:test";
@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { exportGraph } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
 import { propertyIri, replacementIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
-import { PROPERTY_GLOSSES } from "@litlfred/cat-harness/schemas/vocabulary.ts";
+import { PROPERTY_GLOSSES } from "@litlfred/cat-harness/schemas/content/vocabulary.ts";
 import { buildContext } from "../kg-export.ts";
 import { buildVocabulary } from "../ns-export.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

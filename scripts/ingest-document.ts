@@ -76,7 +76,7 @@ import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/ui/pdf-structure.
 import { refreshLibraryIndex } from "./lsi.ts";
 import { IntakeSchema } from "@litlfred/cat-harness/schemas/library/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
-import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
@@ -822,7 +822,7 @@ export function planFor(
   // notebook when it parses as JSON with a numeric `nbformat` and a `cells`
   // array. Checked BEFORE the delimited-text test, which a notebook's lines
   // could satisfy by accident. Bean `rkqp`: the notebook variant of the shared
-  // document-structure base (`schemas/document-structure.ts`).
+  // document-structure base (`schemas/content/document-structure.ts`).
   if (mime === null && isNotebook(pdf)) {
     return {
       rung: "notebook",

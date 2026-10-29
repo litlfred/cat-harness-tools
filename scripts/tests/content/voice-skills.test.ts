@@ -1,5 +1,5 @@
 /**
- * `check:voice-skills` — the gate `schemas/voice-skill.ts` promised.
+ * `check:voice-skills` — the gate `schemas/content/voice-skill.ts` promised.
  *
  * Bean `n8br`. The doc comment said "`check:voice-skills` enforces it" from the
  * day it was written, and four `SKILL.md` files repeat the claim in their own

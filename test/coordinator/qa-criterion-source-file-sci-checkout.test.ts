@@ -28,7 +28,7 @@ import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-conf
 import {
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

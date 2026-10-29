@@ -25,7 +25,7 @@
  * ## Where each definition comes from, and why not from here
  *
  * Graph typologies are read from `BASE_GRAPH_TYPOLOGIES`, which already carries a
- * `summary` for each. Restating them in `schemas/vocabulary.ts` would be a
+ * `summary` for each. Restating them in `schemas/content/vocabulary.ts` would be a
  * second answer to one question, free to disagree — the drift this repository
  * keeps paying for. Everything else is glossed in `vocabulary.ts`. A term
  * defined in both is an error, not a preference.
@@ -78,7 +78,7 @@ import {
   TERM_LAYERS,
   type TermGloss,
   type TermLayer,
-} from "@litlfred/cat-harness/schemas/vocabulary.js";
+} from "@litlfred/cat-harness/schemas/content/vocabulary.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

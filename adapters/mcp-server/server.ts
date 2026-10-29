@@ -74,7 +74,7 @@ import { declarationLine, leanSourceUrl } from "../../src/core/lean-source-link.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
 import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { contributionsRoot } from "../../pipeline/repo-root.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "../../src/core/handover-screen.js";

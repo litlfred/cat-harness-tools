@@ -10,7 +10,7 @@
  * It was part of it, and that was a **layering violation I introduced**.
  * `repo-partition --edges` reported two wrong-direction edges out of
  * `sync-docs-harness.ts` (agentic-harness) into `ensure-landing-sticky.ts` and
- * `schemas/landing-sticky.ts` (folio-assist-core): the harness reaching up into
+ * `schemas/content/landing-sticky.ts` (folio-assist-core): the harness reaching up into
  * core's content nodes.
  *
  * The fix is not an exemption, it is the right owner. **Core owns the folio
@@ -50,7 +50,7 @@ import { detectRepoUrl } from "../src/core/git-refs.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
 import { readLandingStickies } from "./ensure-landing-sticky.js";
-import { isExternalLink } from "@litlfred/cat-harness/schemas/landing-sticky.js";
+import { isExternalLink } from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

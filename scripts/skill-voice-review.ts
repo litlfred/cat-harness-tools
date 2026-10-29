@@ -46,7 +46,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "@litlfred/cat-harness/schemas/voices.ts";
+import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import type { KgCriterionEntry, KgFinding, KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import {

@@ -83,10 +83,10 @@ import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
+import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/content/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
-import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
+import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
@@ -412,7 +412,7 @@ export function buildDocumentNodes(
 
   // Figures, by the page they sit on. Only FIGURES: of 164 placed images in
   // this corpus 140 are page scans, and a scan is the page itself rather than
-  // something on it — `schemas/document-image.ts` carries the measurement.
+  // something on it — `schemas/content/document-image.ts` carries the measurement.
   // `images: null` means the extractor could not look, which is not the same
   // as "no figures" and must not become an empty map silently; it does become
   // one here, but the sidecar keeps the reason and `pdf-images.py` exits 2.
