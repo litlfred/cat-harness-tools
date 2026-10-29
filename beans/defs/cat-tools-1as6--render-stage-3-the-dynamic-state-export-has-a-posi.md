@@ -2,12 +2,12 @@
 # cat-tools-1as6
 $schema: bean/1.0.0
 title: 'RENDER STAGE 3: the dynamic-state export has a position but no filename — the owner left it open on purpose'
-status: todo
+status: in-progress
 type: task
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-20T15:15:39Z
+updated_at: 2026-10-29T12:40:00Z
 parent: folio-assistant-yj32
 ---
 
@@ -35,9 +35,9 @@ chose, and a consumer fetching it would be relying on a guess.
 
 ## Done when
 
-[ ] A dynamic-state visualiser names the document it reads
-[ ] `kg-dynamic` writes that, at the path that visualiser resolves
-[ ] It is distinguishable from the stage-1 current-state export — two
+[x] A dynamic-state visualiser names the document it reads
+[x] `kg-dynamic` writes that, at the path that visualiser resolves
+[x] It is distinguishable from the stage-1 current-state export — two
     documents, two names, and a reader can tell which is which
 
 Related: `render-order` skill §"What stage 3 writes is not settled", issue
@@ -82,3 +82,7 @@ re-measure when a dynamic-state visualiser opens a PR.
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
 
 *2026-10-24T14:25:00Z* — Re-measured at cat-harness-tools `46c1625` (session https://claude.ai/code/session_01RzLVMhhApyXYiw4bb9RwG8). `state.jsonld` and `kg-dynamic` still occur only in `scripts/render-pipeline.ts`. No open PR adds a dynamic-state visualiser. Still blocked on box 1, so it is left `todo`.
+
+## Owner decision, 2026-10-29: settled
+
+Lane B cards Q1 (10:19Z–11:34Z): **"A. Publish `<harness>/state.jsonld`"** and **"A. Publish state.jsonld, pages read it"**. The workflow instance pages (bean `v49e`) are the dynamic-state visualiser, and they name `<site>/<harness>/state.jsonld` as their input. `kg-dynamic` runs `scripts/dynamic-state-export.ts`, which writes that document typed `cat-harness:DynamicState` (`$schema: cat-harness-dynamic-state/v1`), separate from the stage-1 export. A store that could not be read is named in `unreadStores`. All three boxes are ticked by litlfred/cat-harness-tools#838's PR. The bean closes when it merges. Session https://claude.ai/code/session_01Qmmkt7rXCDPexdBbNqeJqU

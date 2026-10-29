@@ -1502,6 +1502,26 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
     }
   });
 
+  test("an instance page reads the dynamic-state document when given one (bean 6h47), and says what it was built with", () => {
+    const base = {
+      instance: stale as never,
+      store: "cat-harness",
+      model: { missing: "not loaded", recorded: "" },
+      beans: [bean("x-ab12")] as never,
+      todos: [],
+      now: NOW,
+      drawingFor: () => undefined,
+    };
+    const html = workflowInstancePage({ ...base, stateDocument: "../../../../../state.jsonld" });
+    expect(html).toContain('data-wv-state="../../../../../state.jsonld"');
+    expect(html).toContain(`data-wv-instance="#workflow/cat-harness/${(stale as { id: string }).id}"`);
+    expect(html).toContain("Latest exported state");
+    expect(html).toContain("enabled-not-taken"); // the build-time stuck kinds ride along in data-wv-built
+    expect(html).toContain("[data-wv-state]");
+    // Without one, no section: a page never links a document nobody published.
+    expect(workflowInstancePage(base)).not.toContain("data-wv-state=");
+  });
+
   test("an instance page states position, stuck states, the not-recorded gate and a missing diagram in words", () => {
     const html = workflowInstancePage({
       instance: stale as never,

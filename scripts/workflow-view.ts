@@ -498,3 +498,129 @@ export function workingContextOf(
     };
   });
 }
+
+// ── The dynamic-state document (bean 6h47 / cat-tools-1as6) ─────────────────
+//
+// Owner, 2026-10-29 (Lane B card Q1, "A. Publish <harness>/state.jsonld" and
+// "A. Publish state.jsonld, pages read it"): render stage 3 (`kg-dynamic`)
+// publishes the running workflows' state as JSON-LD at
+// `<site>/<harness>/state.jsonld`, and the workflow pages read it. It is NOT
+// the stage-1 graph export: that is `../<stub>.jsonld`, typed as the graph;
+// this is typed `cat-harness:DynamicState` and carries only instances,
+// positions and stuck states.
+
+/** The file the workflow pages read, under `<site>/<harness>/`. */
+export const DYNAMIC_STATE_FILE = "state.jsonld";
+
+/** The schema tag, so a reader can tell the two documents apart without the path. */
+export const DYNAMIC_STATE_SCHEMA = "cat-harness-dynamic-state/v1";
+
+const CAT_NS = "https://litlfred.github.io/cat-harness/v0/ns#";
+const PROV_NS = "http://www.w3.org/ns/prov#";
+const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
+
+/**
+ * Every term declared with its full IRI and no `@vocab`, as `kg-export.ts`
+ * does, so an undeclared key stays undeclared rather than minting an IRI.
+ */
+export function dynamicStateContext(): Record<string, unknown> {
+  const link = { "@type": "@id" } as const;
+  return {
+    "@version": 1.1,
+    "cat-harness": CAT_NS,
+    prov: PROV_NS,
+    xsd: XSD_NS,
+    id: "@id",
+    type: "@type",
+    graph: "@graph",
+    generatedAt: { "@id": `${PROV_NS}generatedAtTime`, "@type": `${XSD_NS}dateTime` },
+    harness: { "@id": `${CAT_NS}harness` },
+    store: { "@id": `${CAT_NS}beanStore` },
+    process: { "@id": `${CAT_NS}process` },
+    status: { "@id": `${CAT_NS}instanceStatus` },
+    tokens: { "@id": `${CAT_NS}token`, "@container": "@set" },
+    lastMoved: { "@id": `${CAT_NS}lastMoved`, "@type": `${XSD_NS}dateTime` },
+    beans: { "@id": `${CAT_NS}namesBean`, "@container": "@set" },
+    children: { "@id": `${CAT_NS}runningChild`, "@container": "@set" },
+    stuck: { "@id": `${CAT_NS}stuckState`, "@container": "@set" },
+    kind: { "@id": `${CAT_NS}stuckKind` },
+    detail: { "@id": `${CAT_NS}stuckDetail` },
+    page: { "@id": `${CAT_NS}instancePage`, ...link },
+    unreadStores: { "@id": `${CAT_NS}unreadBeanStore`, "@container": "@set" },
+  };
+}
+
+export interface DynamicStateInput {
+  store: string;
+  state: InstanceState;
+  beans: readonly BeanNode[];
+  /** The diagram's end events, when it was found. */
+  ends?: ReadonlySet<string>;
+  /** The instance's page, site-relative, when one is drawn. */
+  page?: string;
+}
+
+export interface DynamicStateInstance {
+  id: string;
+  type: "cat-harness:WorkflowInstance";
+  store: string;
+  process: string;
+  status: string;
+  tokens: string[];
+  lastMoved?: string;
+  beans: string[];
+  children: Array<{ process: string; status: string; tokens: string[] }>;
+  stuck: Array<{ kind: StuckKind; detail: string }>;
+  page?: string;
+}
+
+export interface DynamicStateDocument {
+  "@context": Record<string, unknown>;
+  $schema: typeof DYNAMIC_STATE_SCHEMA;
+  id: string;
+  type: "cat-harness:DynamicState";
+  harness: string;
+  generatedAt: string;
+  /** Stores that could not be read: their instances are unknown, not none. */
+  unreadStores: string[];
+  graph: DynamicStateInstance[];
+}
+
+/** The published document: one node per instance, sorted by store then id. */
+export function dynamicStateDocument(
+  harness: string,
+  inputs: readonly DynamicStateInput[],
+  now: Date,
+  unreadStores: readonly string[] = [],
+): DynamicStateDocument {
+  const graph = inputs
+    .map((i): DynamicStateInstance => {
+      const s = i.state;
+      const moved = lastMoved(s);
+      return {
+        // Relative: it resolves against wherever the document is published.
+        id: `#workflow/${i.store}/${s.id}`,
+        type: "cat-harness:WorkflowInstance",
+        store: i.store,
+        process: s.processId,
+        status: s.status ?? "unknown",
+        tokens: [...s.tokens],
+        ...(moved ? { lastMoved: moved } : {}),
+        beans: beansNamedBy(s),
+        children: Object.values(s.children ?? {}).map((c) => ({ process: c.processId, status: c.status ?? "unknown", tokens: [...c.tokens] })),
+        stuck: stuckStatesOf(s, i.beans, now, i.ends ?? new Set()).map((x) => ({ kind: x.kind, detail: x.detail })),
+        ...(i.page ? { page: i.page } : {}),
+      };
+    })
+    .sort((a, b) => a.store.localeCompare(b.store) || a.id.localeCompare(b.id));
+  return {
+    "@context": dynamicStateContext(),
+    $schema: DYNAMIC_STATE_SCHEMA,
+    id: "",
+    type: "cat-harness:DynamicState",
+    harness,
+    generatedAt: now.toISOString(),
+    unreadStores: [...unreadStores].sort(),
+    graph,
+  };
+}

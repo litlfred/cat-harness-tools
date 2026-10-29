@@ -26,6 +26,9 @@ import {
   todosNamedBy,
   inheritsClosure,
   workingContextOf,
+  dynamicStateDocument,
+  DYNAMIC_STATE_FILE,
+  DYNAMIC_STATE_SCHEMA,
 } from "../workflow-view.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
@@ -327,5 +330,58 @@ describe("the working context at the token (item 3)", () => {
     expect(c!.role).toBeUndefined();
     expect(c!.roleMemory).toEqual([]);
     expect(workingContextOf(m, inst({ status: "completed" }), roles, memory)).toEqual([]);
+  });
+});
+
+describe("the dynamic-state document (bean 6h47)", () => {
+  const doc = () =>
+    dynamicStateDocument(
+      "h",
+      [
+        { store: "s", state: inst({ id: "b", updatedAt: daysBefore(10) }), beans: [bean()], page: "en/h/beans/s/workflows/b/" },
+        { store: "s", state: inst({ id: "a" }), beans: [bean()] },
+      ],
+      NOW,
+      ["other"],
+    );
+
+  test("it is told apart from the stage-1 graph export by type and schema, not only by path", () => {
+    const d = doc();
+    expect(DYNAMIC_STATE_FILE).toBe("state.jsonld");
+    expect(d.type).toBe("cat-harness:DynamicState");
+    expect(d.$schema).toBe(DYNAMIC_STATE_SCHEMA);
+    expect(d.generatedAt).toBe(NOW.toISOString());
+  });
+
+  test("one node per instance, sorted, with the stuck states its page shows", () => {
+    const d = doc();
+    expect(d.graph.map((n) => n.id)).toEqual(["#workflow/s/a", "#workflow/s/b"]);
+    const b = d.graph[1]!;
+    expect(b.tokens).toEqual(["Task_A"]);
+    expect(b.beans).toEqual(["x-1"]);
+    expect(b.page).toBe("en/h/beans/s/workflows/b/");
+    expect(b.stuck.map((x) => x.kind)).toEqual(stuckStatesOf(inst({ id: "b", updatedAt: daysBefore(10) }), [bean()], NOW).map((x) => x.kind));
+    expect(b.stuck.map((x) => x.kind)).toContain("enabled-not-taken");
+  });
+
+  test("an unread store is named, so its instances read as unknown, not none", () => {
+    expect(doc().unreadStores).toEqual(["other"]);
+  });
+
+  test("every key it uses is declared in its context: no undeclared term, no @vocab", async () => {
+    const d = doc() as unknown as Record<string, unknown>;
+    const ctx = d["@context"] as Record<string, unknown>;
+    expect(ctx["@vocab"]).toBeUndefined();
+    const keys = new Set<string>();
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) { if (k !== "@context") { keys.add(k); walk(x); } }
+    };
+    walk(d);
+    keys.delete("$schema");
+    for (const k of keys) expect(k in ctx || k.startsWith("@")).toBe(true);
+    const jsonld = (await import("jsonld")).default;
+    const expanded = await jsonld.expand(JSON.parse(JSON.stringify(d)), { base: "https://example.org/h/state.jsonld" });
+    expect(JSON.stringify(expanded)).toContain("https://example.org/h/state.jsonld#workflow/s/a");
   });
 });
