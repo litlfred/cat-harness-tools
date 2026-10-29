@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { BoardSchema } from "@litlfred/cat-harness/schemas/board.js";
+import { BoardSchema } from "@litlfred/cat-harness/schemas/ui/board.js";
 import { DECLARATION_SUFFIX } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
