@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { createStagingPreview, readStagingPreview, serializeStagingPreview } from "@litlfred/cat-harness/schemas/staging-preview.ts";
+import { createStagingPreview, readStagingPreview, serializeStagingPreview } from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
 import {
   MAX_PREVIEW_BYTES,
   STAGED_AT_FILE,

@@ -9,7 +9,7 @@
  * Packaging & binary release tooling for the Knowledge Graph:
  * - Builds the npm .tgz tarball via `bun pm pack`.
  * - Records size in bytes and sha256 digest into a `folio-binary-release/v1` state document.
- * - Conforms to `schemas/binary-release.ts` (BinaryReleaseSchema).
+ * - Conforms to `schemas/sdlc/binary-release.ts` (BinaryReleaseSchema).
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -30,7 +30,7 @@ import {
   BINARY_RELEASE_SCHEMA_TAG,
   BinaryReleaseSchema,
   type BinaryRelease,
-} from "@litlfred/cat-harness/schemas/binary-release.js";
+} from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // declared-path-literal: the pack-time exclusions for the binary assets a

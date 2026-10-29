@@ -7,7 +7,7 @@
  * that 2 or more processes reuse."* The owner's rulings of 2026-10-20 ("a1 b1
  * c1") put a layer's global tasks in one shared `.bpmn` that holds no process,
  * called by bare id from the layer's own processes. The criterion is DECLARED
- * in cat-harness `schemas/kg-qa.ts` (`global-task-shared`, applies to the
+ * in cat-harness `schemas/sdlc/kg-qa.ts` (`global-task-shared`, applies to the
  * graph, severity `minor`: a report entry, not a gate) and computed here as a
  * pure function, beside `lane-role-criteria.ts`.
  *
@@ -16,7 +16,7 @@
  *   process again, and one that nothing calls is dead.
  */
 import { relative } from "node:path";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import type { GlobalTaskDef, ProcessModel } from "../../src/workflow/process-model.ts";
 
 /** `global-task-shared`: each global task in `defs` that fewer than two of `processes` call. */

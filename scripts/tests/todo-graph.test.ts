@@ -19,7 +19,7 @@ import jsonld from "jsonld";
 
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { TodoIndexSchema, type TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.ts";
+import { TodoIndexSchema, type TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.ts";
 import { thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { subgraphPublicationFindings } from "../subgraph-node.ts";

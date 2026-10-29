@@ -27,7 +27,7 @@ import {
 } from "./qa-utils";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 import type {
-  QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
+  QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 // The one contract for where a block's verdict lives — see
 // pipeline/qa-paths.ts. `blockQaPath` for writing (results tree
 // only, mirroring REPO_ROOT — the content repo root the module comment above

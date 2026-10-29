@@ -21,7 +21,7 @@ import {
   danglingTags,
   TODO_SCHEMA_TAG,
   type KgIndex,
-} from "@litlfred/cat-harness/schemas/todo.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/todo.ts";
 import { readTodoFiles, todoDefaultTheme } from "../scripts/todos.js";
 import { buildKgIndex } from "../src/core/feedback.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";

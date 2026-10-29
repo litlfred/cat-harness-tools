@@ -82,11 +82,11 @@ import type { CheckerResult } from "./qa-checkers-voice";
 import type {
   ScriptQaReport,
   ScriptLanguage,
-} from "@litlfred/cat-harness/schemas/script-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/script-qa.ts";
 import type {
   QaCriterionEntry,
   QaScriptSidecar,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 // ─── Dispatch ──────────────────────────────────────────────────
 

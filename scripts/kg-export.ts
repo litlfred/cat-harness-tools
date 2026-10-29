@@ -708,7 +708,7 @@ export function buildContext(): Record<string, unknown> {
     // Scoped, for `staging`'s reason: `change`, `kind`, `before`, `after`,
     // `source` and `pages` are words a node could use for something else.
     // `before` / `after` / `title` are `StagingPageComparison`'s field names
-    // (cat-harness `schemas/staging.ts`), so a page row reads as one.
+    // (cat-harness `schemas/sdlc/staging.ts`), so a page row reads as one.
     changedAssets: {
       "@id": termIri("changedAssets"),
       "@container": "@list",

@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import {
   criterionVoices,
   voiceExcludesCriterion,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import { criterionDefHash } from "../../../pipeline/qa-utils";
 import { writeInstanceConfig } from "../../../test/support/instance-fixture.js";

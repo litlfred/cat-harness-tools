@@ -22,7 +22,7 @@ import {
   buildTestRun,
   hashBasis,
   hashesReproduce,
-} from "@litlfred/cat-harness/schemas/test-run.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

@@ -410,7 +410,7 @@ export const RULES: Rule[] = [
       // wrong-direction edge.
       "schemas/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
       "schemas/tools/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
-      "schemas/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
+      "schemas/sdlc/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
       "schemas/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
       "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
       "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
@@ -732,8 +732,8 @@ export const RULES: Rule[] = [
       // and the todo graph is the human half of the work plan, a sibling of
       // `beans/`, which is harness-level workflow rather than anything a
       // folio contains.
-      "schemas/health-report.ts",
-      "schemas/todo-graph.ts",
+      "schemas/sdlc/health-report.ts",
+      "schemas/sdlc/todo-graph.ts",
       // Imports `schemas/kg/cat-harness.js` and nothing else, so unlike its
       // neighbour `check-agent-entry-links.ts` it inherits no wrong-direction
       // edge from the generic link auditor (bean `cp3l`). Harness by subject
@@ -808,7 +808,7 @@ export const RULES: Rule[] = [
       // the four shared targets above did, or classifying the script alone
       // mints the edge it was meant to retire. `staging-preview.ts` imports
       // only zod and `fsh-guts.ts` (harness), so it carries no content model.
-      "schemas/staging-preview.ts",
+      "schemas/sdlc/staging-preview.ts",
       // The render log — same family, same argument, and the schema moves WITH
       // the script for the reason stated just above. It describes what is on
       // the PUBLISH BRANCH, which is a property of the repository rather than
@@ -873,20 +873,20 @@ export const RULES: Rule[] = [
       "schemas/process/role-graph.ts",
       "schemas/content/odrl.ts",                     // W3C ODRL 2.2 policies: what an Actor may do (issue #1180)
       "schemas/content/prov.ts",                     // W3C PROV-O task-run record (issue #1180)
-      "schemas/kg-qa.ts",
+      "schemas/sdlc/kg-qa.ts",
       // Whether a path can be CHECKED OUT. It imports nothing at all, so it
       // sits at or below every consumer by construction — but it is harness by
       // subject too: its subject is this repository's own tree, and a folio has
       // no stake in whether a sidecar filename is legal on NTFS. Classifying it
       // in core is what the keyword pass guessed, and that read as
-      // `schemas/kg-qa.ts [harness] -> [core]`, a wrong-direction edge for a
+      // `schemas/sdlc/kg-qa.ts [harness] -> [core]`, a wrong-direction edge for a
       // leaf with no dependencies of its own.
       "schemas/portable-path.ts",
       // The bean graph declares the harness's own work-plan store and imports
       // only zod. It was already harness-layer by concept; classifying the
       // scripts below is what made the edge to it visible, and the edge was
       // never core's to own.
-      "schemas/bean-graph.ts",
+      "schemas/sdlc/bean-graph.ts",
       // The scripts that read those graphs. All four were `unassigned`, which
       // the tool's own report says not to read as clean: they are the work
       // plan's fallback writer, the `.beans.yml` cross-check, the KG audit and
@@ -1049,7 +1049,7 @@ export const RULES: Rule[] = [
       // assignment in this file is provisional against a read of the module.
       // It was the single `folio-assist-core -> smart-base` edge.
       "schemas/front-matter.ts",    // "this repository's self-declaring files"
-      "schemas/test-run.ts",        // what was measured, with what; only eval-crdm-detect reads it
+      "schemas/sdlc/test-run.ts",        // what was measured, with what; only eval-crdm-detect reads it
       "schemas/input-trace.ts",     // ...and the traced input sites a run reached, which test-run records (moved from scripts/ in 70lx)
       // The TEST PROCESS's other two schemas (beans `ygzh`, `3o5b`), by the
       // same test as `test-run.ts` beside them: a plan and a report describe
@@ -1346,7 +1346,7 @@ export const RULES: Rule[] = [
       // The reasoning is kept here rather than only in the commit because the next
       // reader of this rule set will ask why an IG tool is not adjudicated, and
       // "it is, by where it sits" is the answer.
-      // Reads `schemas/todo.ts` and `schemas/todo-graph.ts` and nothing else.
+      // Reads `schemas/sdlc/todo.ts` and `schemas/sdlc/todo-graph.ts` and nothing else.
       // A script is not automatically tooling-side: this one operates
       // exclusively on core data, and calling it harness bought two
       // wrong-direction edges for nothing.
@@ -1368,7 +1368,7 @@ export const RULES: Rule[] = [
       // instance questions are how it decides WHICH folios, not what it makes.
       // The linear floor's renderer, and CORE for the reason
       // `state-visualizer.ts` records two entries down: it is a RENDERER, and
-      // rendering is core's. Its only import is `schemas/todo-index.ts`, its
+      // rendering is core's. Its only import is `schemas/sdlc/todo-index.ts`, its
       // subject is a folio's own notes, and what it produces is the artefact a
       // reader gets when JavaScript never runs. `gen-docs-pages.ts` calling it
       // is core calling core; nothing about it is instance machinery.
@@ -1377,7 +1377,7 @@ export const RULES: Rule[] = [
       // generic thin-page shell they render with. CORE for the reason
       // `todo-listing.ts` gives: renderers of a folio's own notes, called by
       // `gen-docs-pages.ts` (core). They import `schemas/kg/jsonld.ts`,
-      // `schemas/todo-index.ts`, `scripts/todos.ts` and `viewer-page.ts`, all
+      // `schemas/sdlc/todo-index.ts`, `scripts/todos.ts` and `viewer-page.ts`, all
       // core, so harness here would be four wrong-direction edges.
       // The state visualiser, and it is core for the reason `gen-landing-data.ts`
       // records about itself: it is a RENDERER, and rendering is core's.
@@ -1499,8 +1499,8 @@ const PERMITTED_EDGES: readonly PermittedEdge[] = [
       "role-graph.ts reads the model-capability schema; whether that schema is the harness's or core's is undecided.",
   },
   {
-    from: "schemas/kg-qa.ts",
-    to: "schemas/qa-review.ts", // declared-path-literal: an import-direction exception names its endpoints by path
+    from: "schemas/sdlc/kg-qa.ts",
+    to: "schemas/sdlc/qa-review.ts", // declared-path-literal: an import-direction exception names its endpoints by path
     reason:
       "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +
       "kg-qa.ts reads the review-verdict shape; whether qa-review.ts is the harness's or core's is undecided.",

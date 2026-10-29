@@ -34,9 +34,9 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { TestPlanSchema, TEST_PLAN_SCHEMA_ID, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
-import { TestRunSchema, UNKNOWN_HASH, type SutRef } from "@litlfred/cat-harness/schemas/test-run.js";
+import { TestRunSchema, UNKNOWN_HASH, type SutRef } from "@litlfred/cat-harness/schemas/sdlc/test-run.js";
 import { TestReportSchema, TEST_REPORT_SCHEMA_ID, checkAgainstPlan } from "@litlfred/cat-harness/schemas/test-report.js";
 import { CertificationAttestationsSchema } from "@litlfred/cat-harness/schemas/qa-attestations.js";
 import type { SutKind } from "@litlfred/cat-harness/schemas/test-plan.js";

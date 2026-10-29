@@ -48,7 +48,7 @@ import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, re
 import type {
   BlockQaReport,
   QaCriterionEntry,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

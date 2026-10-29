@@ -9,7 +9,7 @@ import {
   TEST_RUN_SCHEMA_ID,
   TestRunSchema,
   UNKNOWN_HASH,
-} from "@litlfred/cat-harness/schemas/test-run.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import {
   evaluateForcedVsManaged,
   HARNESS_ROOT,

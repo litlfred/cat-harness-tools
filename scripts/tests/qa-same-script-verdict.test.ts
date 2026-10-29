@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { sameScriptVerdict } from "../../pipeline/qa-utils";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 function entry(over: Partial<QaCriterionEntry> = {}): QaCriterionEntry {
   return {

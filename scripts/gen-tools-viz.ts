@@ -78,7 +78,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { discoverTools, toolsOf } from "../tools/discover.ts";

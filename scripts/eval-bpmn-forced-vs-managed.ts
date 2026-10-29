@@ -6,7 +6,7 @@
  * Runs both arms on the same BPMN diagram (`test-plan-execution.bpmn` and its
  * called subprocess `qa-report-signing.bpmn`) over the same independent task bank
  * (`scripts/eval/bpmn-forced-vs-managed-bank.json`), and records each arm as a
- * `folio-test-run/v1` record (`schemas/test-run.ts`):
+ * `folio-test-run/v1` record (`schemas/sdlc/test-run.ts`):
  *
  * - **Identical `data` hash across arms**: `dataInputs` is the diagram, its
  *   called subprocess diagram, both DMN decision tables, `roles.json`, and the
@@ -46,7 +46,7 @@ import {
   hashesReproduce,
   type TestCase,
   type TestRun,
-} from "@litlfred/cat-harness/schemas/test-run.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import { loadProcessModel } from "../src/workflow/process-model.js";
 import {
   runForcedCase,

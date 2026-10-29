@@ -70,7 +70,7 @@
  */
 
 import { existsSync, readFileSync } from "fs";
-import type { CheckerResult } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { join, resolve, extname, sep } from "path";
 
 import { parseLeanRef, refToDecl } from "./content-graph";

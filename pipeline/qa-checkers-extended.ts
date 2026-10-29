@@ -25,7 +25,7 @@
 import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { stripLeanComments } from "./pipeline-plugins.js"; // science-layer slot (bean squu)
 import { existsSync, readFileSync, readdirSync } from "fs";
-import type { CheckerPaths, CheckerHit, CheckerResult } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { CheckerPaths, CheckerHit, CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { resolve, dirname, join, relative } from "path";
 // The conformance check itself, plus its result type. Imported here rather than
 // given its own module because a checker belongs in the registry's file, and the

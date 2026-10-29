@@ -25,7 +25,7 @@ import {
   type KgFinding,
   type KgQaReport,
   type KgResult,
-} from "@litlfred/cat-harness/schemas/kg-qa.js";
+} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 export const BLOCK_REFERENCE_RESOLVES_CRITERION = "block-reference-resolves";
 

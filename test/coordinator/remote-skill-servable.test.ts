@@ -22,7 +22,7 @@
  * became invisible *because* it was constant. Making this criterion `critical`
  * would block the whole repository on one known, sized, non-urgent
  * overstatement. The owner can ask for that escalation in one line — change the
- * severity in `schemas/kg-qa.ts` — and this comment is the argument they would
+ * severity in `schemas/sdlc/kg-qa.ts` — and this comment is the argument they would
  * be overriding, recorded so the decision is not re-derived.
  *
  * ## So what does this test do

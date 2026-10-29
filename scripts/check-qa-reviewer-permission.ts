@@ -72,7 +72,7 @@ import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js"
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import type { QaCriterionEntry, QaReviewer } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionEntry, QaReviewer } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { isCheckerWitness, isCouldNotDispatch } from "../pipeline/untainted-verification.ts";
 import { actorsDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";

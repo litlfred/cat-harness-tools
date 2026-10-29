@@ -671,7 +671,7 @@ export interface ProcessModel {
    * `<bpmn:documentation>` on the process element itself — what the diagram
    * is FOR. The node-level `documentation` says what one step does; this is
    * the paragraph a reader meets before any step, and `process-documented`
-   * in `schemas/kg-qa.ts` is what notices when it is missing.
+   * in `schemas/sdlc/kg-qa.ts` is what notices when it is missing.
    */
   documentation?: string;
   /**

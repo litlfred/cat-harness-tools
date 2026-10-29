@@ -53,7 +53,7 @@
  * such affordance, so {@link escapeHtml} is applied to every interpolated
  * value without exception, including ones that "cannot" contain markup.
  */
-import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.js";
+import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.js";
 
@@ -170,7 +170,7 @@ function renderItem(item: TodoIndexItem, opts: TodoListingOptions): string {
   if (item.target !== undefined) {
     // The parts, never the composite: `target` exists precisely so a consumer
     // — this one included — never splits `sec:<page>-<node>` to find out which
-    // page a note is on. See `schemas/todo-index.ts`.
+    // page a note is on. See `schemas/sdlc/todo-index.ts`.
     const { page, node } = item.target;
     // The caller's own composition, still checked: `gen-docs-pages.ts` passes a
     // Liquid `relative_url` call, which `safeHref` reads as a relative

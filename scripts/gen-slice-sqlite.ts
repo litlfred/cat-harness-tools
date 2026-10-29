@@ -141,7 +141,7 @@ import { join, relative, resolve } from "node:path";
 import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
-import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
+import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/sdlc/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

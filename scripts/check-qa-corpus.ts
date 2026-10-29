@@ -84,7 +84,7 @@ import {
   KgQaManifestSchema,
   KgQaReportSchema,
   type KgQaReport,
-} from "@litlfred/cat-harness/schemas/kg-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { githubPublishDecision, QaUsageError, readQaTree } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

@@ -55,7 +55,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import type { QaCriterionEntry, QaFieldHash } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionEntry, QaFieldHash } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import {
   attestationKeyForDerived,
   composeCriteria,

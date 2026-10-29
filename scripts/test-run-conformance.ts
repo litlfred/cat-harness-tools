@@ -25,7 +25,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fromJSONSchema, type ZodType } from "zod";
-import { TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.js";
+import { TestRunSchema } from "@litlfred/cat-harness/schemas/sdlc/test-run.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
 
 export interface RunFinding {

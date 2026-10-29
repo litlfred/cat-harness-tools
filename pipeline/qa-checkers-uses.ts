@@ -19,7 +19,7 @@
 
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync } from "fs";
-import type { CheckerResult } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 
 import {

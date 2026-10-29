@@ -39,7 +39,7 @@ import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
 import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
-import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
+import { resolveTarget } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
 import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/kg/semantic-zoom.js";
 import {

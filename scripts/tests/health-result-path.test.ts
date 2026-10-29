@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { MOUNT_MARKER_SCHEMA, markerPath } from "../branch-store.ts";
-import { HEALTH_REPORT_FILENAME } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { HEALTH_REPORT_FILENAME } from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 import { healthResultPath } from "../../test/health/run.ts";
 
 const made: string[] = [];

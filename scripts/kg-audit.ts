@@ -25,7 +25,7 @@
  * cannot separate a new defect from inherited debt. The sidecars are committed,
  * so the diff says exactly which findings a change introduced. Same argument,
  * and same file shape, as the block sweep's `*.qa.json` and the script sweep's
- * `*.script-qa.json`; schema in `schemas/kg-qa.ts`.
+ * `*.script-qa.json`; schema in `schemas/sdlc/kg-qa.ts`.
  *
  * ## Gate
  *
@@ -115,7 +115,7 @@ import {
   type KgResult,
   type KgSeverity,
   type KgSubjectKind,
-} from "@litlfred/cat-harness/schemas/kg-qa.js";
+} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -715,7 +715,7 @@ async function auditProcess(
 
   // A skill that owns a same-named process, named by exactly ONE plain step
   // here. Several steps naming it are using its know-how, not calling it —
-  // see the criterion's note in `schemas/kg-qa.ts`.
+  // see the criterion's note in `schemas/sdlc/kg-qa.ts`.
   const stem = basename(p.file, ".bpmn");
   const namers = new Map<string, typeof activities>();
   for (const n of activities) {
@@ -899,7 +899,7 @@ async function auditProcess(
 
   // DECISIONS — diverging exclusive gateways. Merges, forks and joins decide
   // nothing, so `isDecision` leaves them out; see the criteria's notes in
-  // `schemas/kg-qa.ts` for the measurement behind both.
+  // `schemas/sdlc/kg-qa.ts` for the measurement behind both.
   const decisions = [...m.nodes.values()].filter(isDecision);
   const undocumentedDecision: KgFinding[] = decisions
     .filter((n) => !n.documentation)
@@ -3323,7 +3323,7 @@ if (asJson) {
       `  instance run: ${relative(repoRootFor(AUDITOR_ROOT), root) || "."} — ` +
         `${scopeSuppressed} \`repo\`-scoped criterion result(s) recorded n/a, each with its basis ` +
         `in the sidecar. ${KG_CRITERIA.filter((c) => c.scope === "repo").length} of ${KG_CRITERIA.length} ` +
-        `criteria are \`repo\`-scoped; see \`scopeBasis\` in schemas/kg-qa.ts.\n`,
+        `criteria are \`repo\`-scoped; see \`scopeBasis\` in schemas/sdlc/kg-qa.ts.\n`,
     );
   }
 

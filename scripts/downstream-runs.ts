@@ -31,7 +31,7 @@
  */
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
 import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "@litlfred/cat-harness/schemas/tools/tool-run.ts";
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import { graphVerdict, LSI_TOOL_ID, proseGraphs, targetOf } from "./lsi.ts";
 
 /** One target of a downstream tool, as its member reads it. */

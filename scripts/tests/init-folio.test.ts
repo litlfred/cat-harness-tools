@@ -44,7 +44,7 @@ import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schem
 import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
+import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

@@ -27,7 +27,7 @@ import {
   type MergeReview,
   type RedFlagOverride,
 } from "@litlfred/cat-harness/schemas/red-flag.ts";
-import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 
 const NOW = "2026-10-09T12:00:00Z";
 const HEAD_SHA = "a1b2c3d4e5f6789012345678901234567890abcd";

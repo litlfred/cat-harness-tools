@@ -20,9 +20,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { BEAN_GRAPH_FILE, parseBeanGraph } from "@litlfred/cat-harness/schemas/bean-graph.js";
+import { BEAN_GRAPH_FILE, parseBeanGraph } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.js";
 import { contentIsOffCheckout, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
-import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
+import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../scripts/todos.js";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { workflowFiles } from "../../scripts/known-skills.js";

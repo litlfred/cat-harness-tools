@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { libraryEntries } from "./library-dirs.ts";
 
-import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import {
   ATTRIBUTION_KINDS,
   AttributionSchema,

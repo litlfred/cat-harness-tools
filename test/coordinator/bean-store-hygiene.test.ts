@@ -32,7 +32,7 @@ import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
-// The `bean-defs` node of the bean graph (schemas/bean-graph.ts), not the
+// The `bean-defs` node of the bean graph (schemas/sdlc/bean-graph.ts), not the
 // graph root — `beans/` itself holds only `beans.json`.
 //
 // The REPOSITORY's, reached from this instance. `beans/` is declared

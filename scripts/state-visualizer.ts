@@ -155,7 +155,7 @@ import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedRepor
 import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
 import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
 import { graphReadPath } from "./graph-read.ts";
-import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/session-survey.ts";
+import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
 import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
 import { BoardSchema } from "@litlfred/cat-harness/schemas/board.ts";
 import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/board-positions.ts";

@@ -63,7 +63,7 @@ import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typ
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
-import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "@litlfred/cat-harness/schemas/todo-graph.js";
+import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
 /** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
@@ -1282,7 +1282,7 @@ function todosGraph(slug: string): string {
   ) + "\n";
 }
 
-/** The bean graph's declaration, `beans/beans.json` — the shape `schemas/bean-graph.ts` reads. */
+/** The bean graph's declaration, `beans/beans.json` — the shape `schemas/sdlc/bean-graph.ts` reads. */
 function beansGraph(slug: string): string {
   return JSON.stringify(
     {

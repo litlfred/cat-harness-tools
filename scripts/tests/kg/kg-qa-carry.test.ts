@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { withPriorAdversarialReviews } from "../../lib/kg-qa-carry.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "kg-qa-carry-"));

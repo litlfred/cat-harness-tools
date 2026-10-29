@@ -41,7 +41,7 @@ import { join, resolve } from "node:path";
 import { buildLsi, centroid, cosineVectors, foldIn, unitVector, type LsiIndex } from "../pipeline/lsi";
 import { declaredGraphs } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { buildCa } from "../pipeline/ca";
-import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
+import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { formatNearAcross, nearAcross, parseNearAcrossArgs } from "../pipeline/lsi-near-across";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
