@@ -34,7 +34,7 @@ import {
   entryIsFresh,
 } from "../../pipeline/qa-utils";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
-import { CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { criterionAdapters } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 

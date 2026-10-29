@@ -41,7 +41,7 @@
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
-import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
 import { atInstanceContext } from "./instance-document-context.ts";
 import {
   resolveLabel,

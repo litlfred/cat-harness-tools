@@ -28,7 +28,7 @@ import {
   VECTOR_FIGURES_FILE,
   VectorFigureSchema,
   VectorFiguresSidecarSchema,
-} from "@litlfred/cat-harness/schemas/vector-figure.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";

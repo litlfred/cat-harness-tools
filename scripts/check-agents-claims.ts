@@ -114,7 +114,7 @@ export function normalise(md: string): string {
  * Coordination is accepted only WITHOUT a comma. `` `A` and `B` in `M` `` is
  * one claim about two symbols; `` …`A`, and `B` in `M` `` is a clause
  * boundary, and treating it as a list produced a real false positive —
- * `DocumentContentAdapter` attributed to `schemas/block-kinds.ts`, which it
+ * `DocumentContentAdapter` attributed to `schemas/content/block-kinds.ts`, which it
  * has nothing to do with. A checker that cries wolf is one somebody switches
  * off, so the comma is respected.
  */

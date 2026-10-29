@@ -36,9 +36,9 @@
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
 import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
-import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
+import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
 import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
-import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.js";
+import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";

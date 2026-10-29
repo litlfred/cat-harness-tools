@@ -6,7 +6,7 @@
  *
  * ## Why this is here and not only in cat-harness
  *
- * cat-harness#257 adds the same rule to `schemas/content-context.ts`
+ * cat-harness#257 adds the same rule to `schemas/content/content-context.ts`
  * (`instanceContext`, `instanceDocumentContext`, `atInstanceContext`). This
  * layer's checks run against cat-harness `main`, which does not have it yet,
  * so the emitters importing it could not typecheck until that merged. The

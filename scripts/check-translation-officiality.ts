@@ -7,7 +7,7 @@
  * That is written per catalogue, as the PO header `X-Folio-Official: yes`
  * (read by `kg-viewer-strings.ts`), and per locale, as `official: true` with
  * `signedOffBy`/`signedOffAt` in `translations/<locale>/status.json`
- * (`schemas/translation.ts`). The translation drawer shows officiality from
+ * (`schemas/content/translation.ts`). The translation drawer shows officiality from
  * both, so a disagreement would show a reader two answers to one question.
  *
  * ## What disagrees

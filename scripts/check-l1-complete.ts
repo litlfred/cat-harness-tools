@@ -81,7 +81,7 @@ import {
   VECTOR_FIGURES_DIR,
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
-} from "@litlfred/cat-harness/schemas/vector-figure.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { COVER_FILENAME } from "./library-graph.ts";

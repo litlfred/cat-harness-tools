@@ -49,7 +49,7 @@ import { basename, join, resolve } from "node:path";
 import { blockId, libraryInstanceOf, licenceProperties, sectionKey } from "../pipeline/gen-library-jsonld.ts";
 import { manifestLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
 import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
+import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
 import { serialisedAtInstanceContext } from "../pipeline/instance-document-context.ts";
 import { typesForKind } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";

@@ -1,7 +1,7 @@
 /** The word diff the review page runs (bean d903). */
 import { describe, expect, test } from "bun:test";
 
-import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.js";
+import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
 import { defaultRendererFor, DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
 import { wordDiff } from "../word-diff.js";
 

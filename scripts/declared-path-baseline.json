@@ -38,7 +38,7 @@
     "scripts/partition/instance-rules.ts::schemas/kg/detangle-sidecar.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/detangle.ts",
     "scripts/partition/instance-rules.ts::schemas/ui/diff-renderers.ts",
-    "scripts/partition/instance-rules.ts::schemas/document-kind.ts",
+    "scripts/partition/instance-rules.ts::schemas/content/document-kind.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/folio-graph-typology.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/front-matter.ts",
     "scripts/partition/instance-rules.ts::schemas/fsh-guts.ts",
@@ -133,6 +133,6 @@
     "tools/themes-css/themes-css.ts::schemas/ui/themes.ts",
     "tools/tool-schema/tool-schema.ts::schemas/tools/tool.ts",
     "tools/tool-types-schema/tool-types-schema.ts::schemas/tools/tool-types.ts",
-    "tools/vocab-map/vocab-map.ts::schemas/vocab-mapping.ts"
+    "tools/vocab-map/vocab-map.ts::schemas/content/vocab-mapping.ts"
   ]
 }

@@ -52,7 +52,7 @@ import { readdir } from "node:fs/promises";
 import { writeFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, dirname, basename } from "node:path";
-import { ALL_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { ALL_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 
 /** A block as the pipeline sees it, plus where it came from. */

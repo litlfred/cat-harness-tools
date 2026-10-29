@@ -19,12 +19,14 @@
     "schemas/prov-jsonld.test.ts",
     "scripts/content-compile-gates.ts",
     "scripts/gen-subgraph-jsonld.ts",
+    "scripts/lib/library-subgraph-nodes.ts",
     "scripts/publish-verify.ts",
     "scripts/tests/gen-subgraph-jsonld.test.ts",
     "scripts/tests/kg-export.test.ts",
     "scripts/tests/kg/vocab-mapping-apply.test.ts",
     "scripts/tests/sdlc/publish-verify.test.ts",
     "scripts/tests/todo-graph.test.ts",
+    "scripts/tests/workflow-view.test.ts",
     "test/coordinator/prov-jsonld-checkout.test.ts"
   ]
 }

@@ -31,7 +31,7 @@ import {
   VocabMappingSchema,
   applyVocabMapping,
   type VocabMapping,
-} from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
+} from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
 import { detectRelease, fromConceptMap, toConceptMap, type FhirRelease } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 
 const FIX = resolve(import.meta.dir, "fixtures", "conceptmap");
