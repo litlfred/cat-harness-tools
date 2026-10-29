@@ -122,8 +122,8 @@ import {
   SITE_PUBLISHER_SLOT_PREFIX,
 } from "./site-publisher.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */

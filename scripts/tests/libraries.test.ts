@@ -11,8 +11,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
-import { SoftwareLibrarySchema } from "@litlfred/cat-harness/schemas/software-library.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
+import { SoftwareLibrarySchema } from "@litlfred/cat-harness/schemas/library/software-library.ts";
 import {
   codeFiles,
   deriveLayer,

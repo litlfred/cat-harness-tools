@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
+import { mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
 import { MEMORY_DIRS } from "../../scripts/agent-memory.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */

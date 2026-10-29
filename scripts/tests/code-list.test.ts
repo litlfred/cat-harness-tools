@@ -23,7 +23,7 @@ import {
   loadCodeLists,
   type CodeList,
 } from "@litlfred/cat-harness/schemas/library/code-list.ts";
-import * as ns from "@litlfred/cat-harness/schemas/namespaces.ts";
+import * as ns from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { buildCodeListsDoc, unlistedAdjudications } from "../code-lists";
 import { jsonLdNamespacesInUse } from "../external-schemas";

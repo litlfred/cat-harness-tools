@@ -56,8 +56,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { EMPTY_NOTE_TAGS, KgRefSchema, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/carried-note.js";
-import { mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
+import { EMPTY_NOTE_TAGS, KgRefSchema, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
+import { mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
 import {
   AGENT_REF_KIND,
   MEMORY_LABELS,
@@ -68,8 +68,8 @@ import {
   type MemoryNode,
 } from "@litlfred/cat-harness/schemas/memory.js";
 import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
-import { declaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.js";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { declaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export const ROOT = resolve(HARNESS_ROOT);

@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { BinaryReleaseSchema } from "@litlfred/cat-harness/schemas/sdlc/binary-release.ts";
-import { SubgraphIndexManifestSchema, subgraphIndexPackage } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { SubgraphIndexManifestSchema, subgraphIndexPackage } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
 import { fetchPackage } from "../mount-from-lock.ts";
 import { fetchSubgraphIndex, packSubgraphIndex, type PackageUrlFor } from "../subgraph-index-package.ts";
 

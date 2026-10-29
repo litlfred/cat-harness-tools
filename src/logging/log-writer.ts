@@ -1,7 +1,7 @@
 /**
  * The activity-log producer — the thing that actually writes an entry.
  *
- * `schemas/log-entry.ts` says what an entry IS and where logs live;
+ * `schemas/sdlc/log-entry.ts` says what an entry IS and where logs live;
  * this says how one gets written. They are separate because the schema is a
  * contract a folio's own tooling may read, and the writer is platform
  * machinery with a filesystem in it.
@@ -50,7 +50,7 @@ import {
   logDirs,
   resolveCapture,
   shouldPersist,
-} from "@litlfred/cat-harness/schemas/log-entry.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
 
 /** What the caller supplies. The writer fills in `$schema`, `id` and `at`. */
 export interface LogDraft {

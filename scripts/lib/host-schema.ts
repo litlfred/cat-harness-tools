@@ -28,7 +28,7 @@
  * rewritten contracts can be re-pinned in either order. Both go together.
  */
 import { readDeclaration, renderingPath } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 
 import { HARNESS_NAME, HARNESS_ROOT } from "./roots.ts";
 

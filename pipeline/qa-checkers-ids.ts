@@ -45,7 +45,7 @@ import { parseManifestStringArray } from "./qa-checkers-extended";
 import { readBlockManifest, walkBlocks } from "./qa-utils";
 import { findContentRepoRoot } from "./repo-root";
 import { parseStringField } from "./uses-field";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 // ── Corpus label index (built once per process) ─────────────────
 

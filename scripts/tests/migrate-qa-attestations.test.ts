@@ -12,7 +12,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { composeAttestations, entryFingerprints, migrateTree } from "../migrate-qa-attestations";
 import { readAttestations } from "../prose-code-pairs.ts";
 import { readVoiceReviews } from "../skill-voice-review.ts";
-import { ATTESTATIONS_SUFFIX, KG_QA_SIDECAR_SUFFIX, kgAttestationTrees } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { ATTESTATIONS_SUFFIX, KG_QA_SIDECAR_SUFFIX, kgAttestationTrees } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 const HOST = resolve(import.meta.dir, "..", "..");
 const REPO = resolve(HOST, "..");

@@ -81,7 +81,7 @@ import {
   VECTOR_FIGURES_DIR,
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
-} from "@litlfred/cat-harness/schemas/vector-figure.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
@@ -97,7 +97,7 @@ function slotStates(slot: NarrativeSlot): string {
     .join(", ");
 }
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
-import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
+import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
@@ -1485,7 +1485,7 @@ export function audioTranscripts(dir: string): Requirement[] {
     let r: ReturnType<typeof TranscriptSchema.safeParse>;
     try {
       r = TranscriptSchema.safeParse(JSON.parse(readFileSync(join(tdir, f), "utf-8")));
-    } catch (e) {
+    } catch {
       problems.push(`${TRANSCRIPT_DIR}/${f}: unparseable`);
       continue;
     }

@@ -19,7 +19,7 @@ import { MOUNT_MARKER_SCHEMA, markerPath } from "../../branch-store.ts";
 import { auditNested, tipPresence } from "../../check-declared-dirs.ts";
 import { graphReadPath } from "../../graph-read.ts";
 import { entryFileName, readQueueEntries, readQueueStore, recordDecision } from "../../merge-queue-store.ts";
-import { MERGE_QUEUE_ENTRY_TAG } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { MERGE_QUEUE_ENTRY_TAG } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const made: string[] = [];

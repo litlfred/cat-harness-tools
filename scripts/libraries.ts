@@ -7,7 +7,7 @@
  * @covers software-library — it derives every node of each declared `libraries/` directory, vendored bundles included, and fails on a stale node, an import no node names, a shim no node names, and a vendored bundle whose bytes or manifest it cannot vouch for
  *
  * Option D of bean `jbvi` (owner, 2026-10-24 08:25Z, "D. Shared core"). The
- * kind is cat-harness's (`schemas/software-library.ts`, a node kind on the
+ * kind is cat-harness's (`schemas/library/software-library.ts`, a node kind on the
  * `outside-software` core it shares with `tool-release`); this is its writer
  * and its gate.
  *
@@ -94,7 +94,7 @@ import ts from "typescript";
 import { z } from "zod";
 
 import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import {
   LIBRARY_FILE_SUFFIX,
   SoftwareLibrarySchema,
@@ -103,9 +103,9 @@ import {
   librarySchemaTag,
   vendoredLibraryFileName,
   type SoftwareLibrary,
-} from "@litlfred/cat-harness/schemas/software-library.ts";
-import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/outside-software.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+} from "@litlfred/cat-harness/schemas/library/software-library.ts";
+import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/library/outside-software.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 
 /** The graph typology a `libraries/` directory is declared with. */
 export const LIBRARY_KIND = "software-library";

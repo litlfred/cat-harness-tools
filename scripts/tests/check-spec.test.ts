@@ -6,7 +6,7 @@ import {
   isStatusAdjudicated,
   loadDeclaredSpecTemplate,
   validateSpec,
-} from "@litlfred/cat-harness/schemas/spec-template.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/spec-template.ts";
 import {
   DEFAULT_TEMPLATE_PATH,
   checkSpecBeforeCode,

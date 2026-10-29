@@ -5,7 +5,7 @@
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Named subgraphs — one
  * IRI, two files, framed from one graph" (bean `c1m4`), and the schema both
- * files validate against is `schemas/subgraph-manifest.ts`.
+ * files validate against is `schemas/kg/subgraph-manifest.ts`.
  *
  * ## What is a subgraph here
  *
@@ -88,7 +88,7 @@
  * literal over {@link HEAVY_LITERAL_BYTES} rather than trimming it, because a
  * body that has crept into the graph is a kg-export defect to fix there.
  *
- * For the fields `HEAVY_POINTERS` names (`schemas/subgraph-manifest.ts`), the
+ * For the fields `HEAVY_POINTERS` names (`schemas/kg/subgraph-manifest.ts`), the
  * TARGET is published as a PAYLOAD: one immutable file per distinct body at
  * `docs/payload/sha256/<hex>`, served at `<BASE_URL>/payload/sha256/<hex>`,
  * with its media type in `<hex>.json` beside it. The node carries a `payload`
@@ -132,8 +132,8 @@ import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js"
 import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   HEAVY_POINTERS,
@@ -149,7 +149,7 @@ import {
   SUBGRAPH_INDEX_FILE,
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
-} from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
@@ -561,7 +561,7 @@ function pathOf(n: Node): string | undefined {
  * a tracked or unignored file, and each of its ancestors — as `rel`-prefixed,
  * `/`-terminated paths in sorted order (parents before children).
  *
- * Asked of git, never of the disk (`schemas/git-corpus.ts`): a walk would mint
+ * Asked of git, never of the disk (`schemas/sdlc/git-corpus.ts`): a walk would mint
  * a subgraph for one machine's ignored residue, and the committed output would
  * then differ by checkout. `undefined` when git cannot answer.
  */

@@ -37,8 +37,8 @@ import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

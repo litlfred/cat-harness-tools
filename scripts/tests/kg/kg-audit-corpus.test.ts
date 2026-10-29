@@ -20,7 +20,7 @@ import { spawnSync } from "node:child_process";
 
 import { describe, expect, test } from "bun:test";
 
-import { corpusPredicate } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { corpusPredicate } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 /** A git work tree with one tracked page and one gitignored page. */
 function fixture(): string {

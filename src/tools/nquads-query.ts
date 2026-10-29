@@ -2,7 +2,7 @@
  * `nquads_query` — Universal W3C N-Quads and named SPARQL query engine.
  *
  * Implements the `named-query-execution` skill and conforms to
- * `schemas/nquads-distribution.ts`:
+ * `schemas/kg/nquads-distribution.ts`:
  * - Executes pre-compiled, audited named SPARQL queries over partitioned N-Quads distributions.
  * - Enforces Graph Availability Guard to prevent silent partial query results.
  * - Safely binds parameters without SPARQL injection risk.

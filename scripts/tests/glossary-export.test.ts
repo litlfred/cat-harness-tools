@@ -427,7 +427,7 @@ describe("ledger keys and renames", () => {
 // kg-export and fsh-guts-export).
 describe("the vocabulary-mapping tables agree with the document's @context", () => {
   test("every key a table writes expands, in the context, to the table's target + code", async () => {
-    const { vocabMapping } = await import("@litlfred/cat-harness/schemas/vocab-mapping.ts");
+    const { vocabMapping } = await import("@litlfred/cat-harness/schemas/content/vocab-mapping.ts");
     const { expandCurie, STANDARD_PREFIXES } = await import("@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts");
     const { ownPrefixTable } = await import("@litlfred/cat-harness/schemas/kg/graph-typology-registry.js");
     const prefixes = { ...STANDARD_PREFIXES, ...ownPrefixTable() };

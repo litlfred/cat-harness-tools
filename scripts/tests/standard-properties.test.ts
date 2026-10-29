@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 import { exportGraph } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
-import { propertyIri, replacementIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { propertyIri, replacementIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { PROPERTY_GLOSSES } from "@litlfred/cat-harness/schemas/content/vocabulary.ts";
 import { buildContext } from "../kg-export.ts";
 import { buildVocabulary } from "../ns-export.ts";

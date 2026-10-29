@@ -117,7 +117,7 @@ import { withSavedScheme } from "./lib/scheme-css.js";
 import { heldVisualiserPaths, viewersOf } from "./viewer-declarations.js";
 import { translationMetaBlock, withTranslationMeta } from "./lib/translation-meta.ts";
 import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.ts";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
@@ -126,7 +126,7 @@ import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
-import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
 
 /**

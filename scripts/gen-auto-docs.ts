@@ -98,10 +98,10 @@ import {
   forgeLocation,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, tileCountsForPages, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { publishPlan } from "./derive-at-publish.ts";

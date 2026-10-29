@@ -128,7 +128,7 @@ import { tagCompatible } from "@litlfred/bootstrap-tools/schemas/release-iri.ts"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
@@ -137,9 +137,9 @@ import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";
 import { movedDocument, placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/library/code-list.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
-import { applyVocabMapping, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
+import { applyVocabMapping, vocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

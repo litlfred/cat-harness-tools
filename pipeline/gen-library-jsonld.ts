@@ -76,8 +76,8 @@ import {
   defaultInstancePrefixes,
   documentContext,
   instancePrefixes,
-} from "@litlfred/cat-harness/schemas/content-context.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
+} from "@litlfred/cat-harness/schemas/content/content-context.ts";
+import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
@@ -96,9 +96,9 @@ import {
 import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
+import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
 import type { SourceLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
-import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   readTitleCandidates,
@@ -341,7 +341,7 @@ function docIri(docId: string, rest: string): string {
  * The entry's node IRIs. Every node keeps its relative `library/<id>/…` id
  * EXCEPT the manifest — the asset itself — which is named by the address its
  * JSON-LD is published at when the entry's instance is known (#1881,
- * `schemas/library-iri.ts`). A staged entry, outside any library, has no
+ * `schemas/library/library-iri.ts`). A staged entry, outside any library, has no
  * instance yet and keeps the relative form until it is promoted and
  * regenerated; `--check` then reports it stale, so it cannot linger.
  */

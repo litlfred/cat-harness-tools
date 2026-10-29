@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * The DOCS SITE's answer to the rendered-impact contract
- * (`cat-harness/schemas/rendered-impact.ts`, bean `bnjs`, issue #971): from
+ * (`cat-harness/schemas/ui/rendered-impact.ts`, bean `bnjs`, issue #971): from
  * the files a change touched, the pages of the just-the-docs site it alters.
  *
  * ## How the site is made, and so how a file reaches a page
@@ -59,7 +59,7 @@ import {
   RenderedImpactSchema,
   type RenderedFile,
   type RenderedImpact,
-} from "@litlfred/cat-harness/schemas/rendered-impact.ts";
+} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
 import { judge, readTree, renderingOrder } from "./check-derived-from.ts";
 import { composedInstances, docsLayers } from "./compose-docs.ts";
 import { gitBlobs } from "./git-blobs.ts";

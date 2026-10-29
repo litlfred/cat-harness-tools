@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { authorNames, entryUrl, issuedYear, referenceDirs, referenceEntries, referenceEntryIds, stringField } from "./reference-entries.ts";
 import { readReferences } from "./source-ledger-index.ts";
 import { resolveAllReferenceIds } from "./validate.ts";
-import { allConstraintRules } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
+import { allConstraintRules } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
 
 const made: string[] = [];
 afterAll(() => made.forEach((d) => rmSync(d, { recursive: true, force: true })));

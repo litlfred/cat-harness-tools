@@ -35,7 +35,7 @@
  * `docPath` `exportIdentity` gives a foreign instance (bean `dyd3`), with the
  * `.json` alias beside it because Pages serves `.jsonld` as octet-stream. The
  * `<name>/` segment is cat-harness's one URL-space resolver
- * (`schemas/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
+ * (`schemas/kg/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
  * segment is the instance's NAME, never its stub (owner, 2026-09-20, recorded
  * on bean `cat-tools-sthf`). An instance declaring `"enabled": false` is not
  * planned, so it is not published.
@@ -57,7 +57,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";

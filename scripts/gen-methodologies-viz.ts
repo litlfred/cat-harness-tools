@@ -70,10 +70,10 @@ import {
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { blobUrl, forgeAt } from "./lib/library-source.ts";
 import { repoOf } from "../src/core/edit-links.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
 import { visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";

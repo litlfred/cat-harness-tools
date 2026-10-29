@@ -32,7 +32,7 @@ import { instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred
 import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import type { z } from "zod";
 
-import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

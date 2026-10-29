@@ -63,15 +63,15 @@ import {
   prefixForLayer,
   replacementIri,
   termIri,
-} from "@litlfred/cat-harness/schemas/namespaces.js";
+} from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/block-kinds.js";
-import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content-context.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.js";
+import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
+import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content/content-context.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
 import {
   CLASS_GLOSSES,
   PROPERTY_GLOSSES,

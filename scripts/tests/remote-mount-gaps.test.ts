@@ -15,8 +15,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { MountLockSchema } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { MountLockSchema } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { checkRemote, chooseRemote, mountRemote, parseChoose, parseSeed, seedRemote } from "../remote-mount.ts";
 import { enclosingWorkspaceRoot, installDependencies, isInstallArtefact, run as replayLocks } from "../mount-from-lock.ts";
 

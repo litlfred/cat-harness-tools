@@ -89,7 +89,7 @@ import { join, relative, resolve } from "node:path";
 
 import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 // The registration side-effect import, same reason `check:declared-dirs` has
 // it: without it a reader's acceptance of this repository's own declaration is
 // an import-order property of the process rather than of the declaration.

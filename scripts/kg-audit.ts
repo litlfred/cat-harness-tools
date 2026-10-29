@@ -82,7 +82,7 @@ import {
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
@@ -91,7 +91,7 @@ import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { corpusPredicate } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { corpusPredicate } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 import {
   KG_QA_SCHEMA,
@@ -378,7 +378,7 @@ const KG_QA_TREE = join(QA_HOME.root, "kg-qa");
  * apart from the derived sidecars above (bean `2gst`, owner ruling D2 (a)).
  * The same own / hosted / convention answer as `QA_HOME`, from the
  * `attestations` directory; the tree under it mirrors `KG_QA_TREE` exactly.
- * See `schemas/qa-attestations.ts`.
+ * See `schemas/sdlc/qa-attestations.ts`.
  */
 const ATT_HOME = attestationsHomeFor(root, INSTANCE_RUN ? AUDITOR_ROOT : undefined);
 const KG_ATT_TREE = join(ATT_HOME.root, "kg-qa");
@@ -2680,7 +2680,7 @@ const resolvableSkills: Set<string> = (() => {
  * `needs` is OPTIONAL with a documented THIRD STATE: an absent value is
  * UNDETERMINED, never `[]` — `[]` is an assertion that this instance is the
  * floor, absent is nobody having said (`schemas/kg/cat-harness.ts`, `needs`;
- * `schemas/layer-direction.ts` refuses the same collapse for edges).
+ * `schemas/kg/layer-direction.ts` refuses the same collapse for edges).
  *
  * Read straight from the declaration rather than inferred from
  * {@link resolvableSkills} being no wider than {@link skills}, because

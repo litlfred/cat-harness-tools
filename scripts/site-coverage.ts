@@ -39,7 +39,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { toolSubjects } from "./gen-tools-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 

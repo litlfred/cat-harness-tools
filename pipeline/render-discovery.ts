@@ -22,7 +22,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import type { ContentProfile } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import type { ContentProfile } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";

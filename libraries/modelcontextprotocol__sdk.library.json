@@ -33,6 +33,7 @@
     "src/tools/skill-fetch.ts",
     "src/tools/skill-prompts.test.ts",
     "src/tools/skill-prompts.ts",
+    "src/tools/skill-update.ts",
     "src/tools/stakeholder-map.ts",
     "src/tools/translation.ts",
     "src/tools/workflow.ts",

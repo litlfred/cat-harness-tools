@@ -58,7 +58,7 @@ import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 // so a downstream folio that has not moved its own sidecars yet is not read
 // as having none).
 import { blockQaPath, existingBlockQaPath } from "./qa-paths.ts";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { loadPriorBlockReport, priorRefusalLine } from "./qa-utils.ts";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";

@@ -16,7 +16,7 @@
  *
  * ## "Filled with all contents" is the ABSENT filter, and that is a convergence
  *
- * `schemas/board.ts` already decided this, from a different question: a board
+ * `schemas/ui/board.ts` already decided this, from a different question: a board
  * with no `filter` shows the whole folio, chosen because a stored selection
  * needs a staleness check and a query has nothing to fall behind. So the
  * default board is the MINIMAL one — id, title, nothing else — and "filled
@@ -48,11 +48,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { BOARD_SCHEMA_TAG, wholeFolioBoard } from "@litlfred/cat-harness/schemas/board.js";
+import { BOARD_SCHEMA_TAG, wholeFolioBoard } from "@litlfred/cat-harness/schemas/ui/board.js";
 import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
-import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { TODO_ROOT } from "./todos.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

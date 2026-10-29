@@ -75,9 +75,9 @@ import {
   zodSchemaPath,
   type InstanceSchemaExport,
 } from "./harness-schema-export.js";
-import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { isZodSchema } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
-import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const WORKFLOW_DIR = join(REPO_ROOT, ".github", "workflows");

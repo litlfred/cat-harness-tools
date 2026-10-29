@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { badgeAt, notesAt } from "@litlfred/cat-harness/schemas/note-anchor.ts";
+import { badgeAt, notesAt } from "@litlfred/cat-harness/schemas/ui/note-anchor.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

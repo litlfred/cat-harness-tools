@@ -71,8 +71,8 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
 import { checkoutRootFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 import { parse } from "yaml";
 
 import { distortions } from "./check-environment.ts";
@@ -106,9 +106,9 @@ import {
   type PairIO,
   type SkipDecision,
 } from "./input-hash.ts";
-import { openTrace } from "@litlfred/cat-harness/schemas/input-trace.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
-import { scriptNameOf, scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { openTrace } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { scriptNameOf, scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import {
   CONTENT_COMPILE_GATES,
   compileGatesForPaths,

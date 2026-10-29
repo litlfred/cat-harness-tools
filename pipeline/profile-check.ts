@@ -14,7 +14,7 @@
  * needs a `.lean` file and a TeX installation the folio was set up without.
  * This is the check that turns that into an error at authoring time.
  *
- * Two rules, both from `schemas/block-kinds.ts`:
+ * Two rules, both from `schemas/content/block-kinds.ts`:
  *
  * 1. every block's kind is in the declared profile
  *    ({@link kindsOutsideProfile}); and
@@ -35,7 +35,7 @@ import {
   profileAcceptsKind,
   profileForContentType,
   type ContentProfile,
-} from "@litlfred/cat-harness/schemas/block-kinds.ts";
+} from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { walkBlocks } from "./qa-utils";
 import { expectedInstanceConfigPath, readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 

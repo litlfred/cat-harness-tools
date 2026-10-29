@@ -5,7 +5,7 @@
  * which `init-folio` writes as a re-export of cat-harness's
  * `schemas/builders`. Since the owner's ruling of 2026-10-22 a layer above
  * cat-harness types its own kinds in a vocabulary module
- * (`@litlfred/cat-harness/schemas/vocabulary-modules.ts`), and its builders
+ * (`@litlfred/cat-harness/schemas/content/vocabulary-modules.ts`), and its builders
  * (`theorem`, `definition`, …) are that module's, not cat-harness's. So the shim
  * also re-exports each vocabulary module whose kinds the folio's profile
  * admits: a paper folio the science layer's `mathpaper`, a document folio
@@ -18,8 +18,8 @@
  */
 import { dirname, relative } from "node:path";
 
-import { CONTENT_PROFILES, type ContentProfile, PROFILE_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
-import { vocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
+import { CONTENT_PROFILES, type ContentProfile, PROFILE_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
 
 import { HARNESS_ROOT } from "./roots.ts";
 

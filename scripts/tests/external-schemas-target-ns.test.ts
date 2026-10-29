@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { targetNamespacesInUse } from "../external-schemas";
 
 /** Writes the diagrams and returns [the file list, the base they are relative to]. */

@@ -62,14 +62,14 @@ import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
-import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
@@ -1865,7 +1865,7 @@ if (import.meta.main) {
       const src = join(repoRoot, e.dir, "manifest.jsonld");
       let jsonld: string | undefined;
       if (existsSync(src)) {
-        // At the path its IRI names (`schemas/library-iri.ts`), so the entry's
+        // At the path its IRI names (`schemas/library/library-iri.ts`), so the entry's
         // `@id` dereferences to exactly this file — one function decides both.
         const dest = join(site, libraryAssetSitePath(subject, e.id));
         wantedJsonld.add(dest);

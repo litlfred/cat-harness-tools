@@ -191,12 +191,12 @@ import {
   type Affected,
 } from "./changed-paths.ts";
 import { ReadWriteGate, jobsFromArgv, orderedEmitter, runCaptured, runPool } from "./task-pool.ts";
-import { openTrace } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { openTrace } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { TASK_IO, pairIO } from "./task-io.ts";
 import { foldable, settleCovered } from "./pair-cover.ts";
 import { WorkingCopyFailed, ensureWorkingCopy, workingCopyState } from "./qa-working-copy.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

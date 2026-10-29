@@ -22,7 +22,7 @@
  * @module scripts/render-test-report
  */
 import type { TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
-import { currentVerdicts, testReportVerdict, type TestReport } from "@litlfred/cat-harness/schemas/test-report.ts";
+import { currentVerdicts, testReportVerdict, type TestReport } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
 
 const COLOUR: Record<ReturnType<typeof testReportVerdict>, string> = { ok: "#2e7d32", finding: "#c62828", unknown: "#6d6d6d" };
 const WORD: Record<ReturnType<typeof testReportVerdict>, string> = { ok: "passed", finding: "findings", unknown: "could not determine" };

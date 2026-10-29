@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 
 import { loadProcessModel, type ProcessModel } from "../../../src/workflow/process-model.js";
 import { complete, enabled, startInstance, type InstanceState } from "../../../src/workflow/instance.js";
-import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
+import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.js";
 import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   auditTestPlanExitCriteria,

@@ -49,7 +49,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { resolveBeanDefs } from "../../scripts/beans.ts";
 import type { InstanceState } from "./instance.js";
 import type { ProcessModel } from "./process-model.js";

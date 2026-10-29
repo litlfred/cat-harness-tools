@@ -63,7 +63,7 @@ import {
   isAsciiEscaped,
   refusalLine,
   resolvePrior,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 /** Who ran, and under what. `model` is meaningless without `model_source`. */
 export interface UntaintedParty {

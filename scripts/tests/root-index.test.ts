@@ -18,7 +18,7 @@ import { exportIdentity } from "../kg-export.ts";
 import { instanceDocPath } from "../instance-exports.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

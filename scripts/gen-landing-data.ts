@@ -37,8 +37,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { instanceRootNamed } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { instanceRootNamed } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import {
   checkoutRootFor,
   publishedAssetPath,

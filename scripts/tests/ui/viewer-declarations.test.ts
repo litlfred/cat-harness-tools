@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { DEFAULT_LOCALE, PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
+import { DEFAULT_LOCALE, PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.js";
 import {
   builtAtPublishWriter,
   carriesRenders,

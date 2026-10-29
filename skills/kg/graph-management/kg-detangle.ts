@@ -35,7 +35,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve, dirname } from "path";
 import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "@litlfred/cat-harness/schemas/kg/detangle-sidecar.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { groupDepthFor } from "./group-depth.ts";
 import { TOPICS_FILE, topicsOf } from "../../../scripts/skill-topics.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
@@ -49,9 +49,9 @@ import {
   type DetangleNode,
   type EdgeAuthority,
 } from "@litlfred/cat-harness/schemas/kg/detangle.js";
-import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";

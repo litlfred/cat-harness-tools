@@ -31,7 +31,7 @@ import {
   type FactContext,
   type LivePr,
 } from "../../merge-queue.js";
-import { PRIORITY_CLASSES } from "@litlfred/cat-harness/schemas/merge-queue.js";
+import { PRIORITY_CLASSES } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.js";
 
 /** A PR with just enough shape to derive facts from. */
 const pr = (n: number, files: string[]): LivePr => ({

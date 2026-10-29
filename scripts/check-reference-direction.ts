@@ -10,8 +10,8 @@
  * through the direction computation `check:partition` already uses, so the
  * import axis and the prose axis cannot give two answers (bean `zhg2`).
  *
- * The rule itself is `schemas/reference-direction.ts`; the direction is
- * `schemas/layer-direction.ts`. What is here is discovery, this instance's
+ * The rule itself is `schemas/kg/reference-direction.ts`; the direction is
+ * `schemas/kg/layer-direction.ts`. What is here is discovery, this instance's
  * exemptions, and the report — the parts that are genuinely about running the
  * tool over a checkout, split the way `repo-partition.ts` splits from
  * `partition/engine.ts`.
@@ -155,8 +155,8 @@ import {
   isStateGraph,
   rootForScope,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
 import {
   classifyReference,
   occurrencesOf,
@@ -164,9 +164,9 @@ import {
   type Occurrence,
   type ReferenceExemption,
   type ReferenceVerdict,
-} from "@litlfred/cat-harness/schemas/reference-direction.js";
+} from "@litlfred/cat-harness/schemas/kg/reference-direction.js";
 import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
   againstOrUsage,
@@ -1349,7 +1349,7 @@ export function directionSidecarState(
  *     exists under exactly one other instance root.
  *  2. **A visualiser page** — the page's address is DECLARED
  *     (`visualisers` in the harness's `<instance>.json`, route by
- *     `schemas/visualiser-route.ts`): a page now at its localised route was,
+ *     `schemas/kg/visualiser-route.ts`): a page now at its localised route was,
  *     before bean `t4xb`, at its forwarding address `<harness>/<visualiser>/`
  *     or its alias `<alias>/`, the two addresses `compose-docs.ts` still
  *     forwards. The baseline's file at one of those is gone and the same page

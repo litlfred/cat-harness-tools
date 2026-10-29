@@ -19,7 +19,7 @@
  * re-read with every `renders` entry prefixed by the mount path to be found at
  * all. None of that survives. A visualiser is declared in `<instance>.json`
  * (`visualisers`, `HarnessVisualiserSchema`), its URL is
- * `visualiserRoute({ harness, visualiser })` (`schemas/visualiser-route.ts`),
+ * `visualiserRoute({ harness, visualiser })` (`schemas/kg/visualiser-route.ts`),
  * and a page is found because the declaration says where it is.
  *
  * ## What a page still carries
@@ -66,10 +66,10 @@ import {
   type Visualisation,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/content/translation.js";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 

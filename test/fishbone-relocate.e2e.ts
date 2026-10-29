@@ -29,7 +29,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { PANEL_CONTROLS, controlsFor } from "@litlfred/cat-harness/schemas/panel-chrome.ts";
+import { PANEL_CONTROLS, controlsFor } from "@litlfred/cat-harness/schemas/ui/panel-chrome.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

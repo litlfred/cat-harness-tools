@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { FshGutsNodeSchema, readFshGutsNode, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
 import {
   STAGING_PREVIEW_KIND,
   createStagingPreview,

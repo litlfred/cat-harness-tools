@@ -66,7 +66,7 @@ import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harne
 import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
 import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
 import {
   type CatHarnessDeclaration,
   type NavbarIcon,
@@ -83,7 +83,7 @@ import {
   nestedDirectories,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";

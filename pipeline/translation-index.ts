@@ -78,7 +78,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 /** Re-exported so a caller that already reads pages through this module needs no second import. */
 export { permalinkDefaultsIn };
 
-import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
+import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
 import { isTranslatable } from "@litlfred/cat-harness/schemas/library/translation-tools.ts";
 import { ownDirectoryById, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 

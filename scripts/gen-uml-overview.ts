@@ -63,7 +63,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 
@@ -81,7 +81,7 @@ import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { spawnSync } from "node:child_process";
 import { glossaryLinksMd, schemasViewPuml } from "./gen-object-model-uml.js";
-import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

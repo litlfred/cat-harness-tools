@@ -36,7 +36,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
 
@@ -55,9 +55,9 @@ import {
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type AdjudicationStatus,
-} from "@litlfred/cat-harness/schemas/term-adjudication.ts";
+} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { dirname } from "node:path";

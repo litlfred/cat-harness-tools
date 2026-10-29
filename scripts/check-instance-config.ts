@@ -40,7 +40,7 @@ import { join, resolve } from "node:path";
 
 import { findDeclarationFile, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instanceConfigFilename, LEGACY_HARNESS_CONFIG } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { rootConfigStems } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { rootConfigStems } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
 
 const CHECKOUT = resolve(import.meta.dir, "..", "..");
 

@@ -47,11 +47,11 @@ import { join, resolve } from "node:path";
 import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { exportIdentity } from "./kg-export.js";
 import { instanceDocPath } from "./instance-exports.js";
-import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

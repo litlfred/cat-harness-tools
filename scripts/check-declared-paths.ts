@@ -161,7 +161,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { join, relative, resolve } from "node:path";
 
 import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -257,7 +257,7 @@ export function underAbsentResults(root: string, literal: string, absent: readon
 
 /**
  * Is `literal` (relative to `root`) an artefact `root` declares it BUILDS AT
- * PUBLISH (`builtAtPublish`, `schemas/built-at-publish.ts`; owner,
+ * PUBLISH (`builtAtPublish`, `schemas/kg/built-at-publish.ts`; owner,
  * 2026-10-14, "B1")? Such a file is never committed and is on disk only after
  * `derive:publish`, so a recorded witness naming it is held by the
  * declaration when this checkout has not built it: absent is its correct

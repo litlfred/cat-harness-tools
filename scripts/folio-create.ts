@@ -42,7 +42,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import type { DocumentKind } from "@litlfred/cat-harness/schemas/document-kind.ts";
+import type { DocumentKind } from "@litlfred/cat-harness/schemas/content/document-kind.ts";
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { readDocumentKinds, type KindEntry } from "./gen-document-kinds-viz.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";

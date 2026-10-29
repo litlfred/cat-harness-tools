@@ -22,7 +22,7 @@ import { knownSkills as canonicalKnownSkills } from "../../known-skills.js";
 import { buildExport } from "../../kg-export.js";
 import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../../harness-schema-export.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { hostSchemaBase } from "../../lib/host-schema.ts";
 

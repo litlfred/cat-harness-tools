@@ -21,7 +21,7 @@ import {
   NoteAnchorSchema,
   notesAt,
   type Related,
-} from "@litlfred/cat-harness/schemas/note-anchor.js";
+} from "@litlfred/cat-harness/schemas/ui/note-anchor.js";
 
 const NOTE = { id: "t1", summary: "s" };
 

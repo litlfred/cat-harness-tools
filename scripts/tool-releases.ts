@@ -34,9 +34,9 @@ import {
   type RunContext,
   type RunContextRef,
   type RunRelease,
-} from "@litlfred/cat-harness/schemas/run-context.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
-import type { TestReport } from "@litlfred/cat-harness/schemas/test-report.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/run-context.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
+import type { TestReport } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
 import { TestRunSchema, UNKNOWN_HASH, type HashBasis, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import {
   TOOL_PROFILE_SCHEMA_TAG,

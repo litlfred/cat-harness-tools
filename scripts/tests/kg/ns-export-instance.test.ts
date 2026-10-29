@@ -186,7 +186,7 @@ describe("ns:check fails on a folioType whose owner does not publish an ns defin
     // The kinds are passed in rather than mocked: `mock.module` on block-kinds.js
     // is never undone by bun, and it leaked `weird` into every later test file
     // that discovers block kinds (block-kind-nodes.test.ts among them).
-    const { discoverBlockKinds } = await import("@litlfred/cat-harness/schemas/block-kinds.js");
+    const { discoverBlockKinds } = await import("@litlfred/cat-harness/schemas/content/block-kinds.js");
     const kinds = [
       ...discoverBlockKinds(findPlatformRoot()),
       { kind: "weird", folioType: "unpublishing-owner:WeirdKind", adapter: "paper", labelPrefix: "wrd" },

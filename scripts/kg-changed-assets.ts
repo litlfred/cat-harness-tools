@@ -69,7 +69,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { reviewList, type RenderedImpact } from "@litlfred/cat-harness/schemas/rendered-impact.ts";
+import { reviewList, type RenderedImpact } from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
 import { StagingPageComparisonSchema, type StagingPageComparison } from "@litlfred/cat-harness/schemas/sdlc/staging.ts";
 import { coneByFile, docsMounts, docsRenderedImpact, indexSite } from "./docs-rendered-impact.ts";
 import type { ConeDecision } from "./staging-cone.ts";

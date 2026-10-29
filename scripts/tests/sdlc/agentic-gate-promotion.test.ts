@@ -25,12 +25,12 @@ import {
   WOULD_HAVE_BLOCKED_TAG,
   type WouldHaveBlockedRecord,
   type WouldHaveBlockedFinding,
-} from "@litlfred/cat-harness/schemas/merge-queue.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 
 import {
   WouldHaveBlockedRecordSchema as ReexportedRecordSchema,
   evaluateAgenticPromotion as reexportedEvaluate,
-} from "@litlfred/cat-harness/schemas/merge-review.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/merge-review.ts";
 
 const VALID_HEAD_SHA = "0123456789abcdef0123456789abcdef01234567";
 
@@ -83,7 +83,7 @@ describe("WouldHaveBlockedRecordSchema validation", () => {
     expect(parsed.metrics.empiricalFpr).toBeCloseTo(0.5, 4);
   });
 
-  test("schemas/merge-review.ts re-exports the identical schema", () => {
+  test("schemas/sdlc/merge-review.ts re-exports the identical schema", () => {
     expect(ReexportedRecordSchema).toBe(WouldHaveBlockedRecordSchema);
     expect(reexportedEvaluate).toBe(evaluateAgenticPromotion);
   });

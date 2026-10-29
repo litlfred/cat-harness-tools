@@ -10,7 +10,7 @@
  * mount that claimed their coverage would let them be removed unnoticed (the
  * reasoning `state-mount.ts` records for the branch mounts).
  *
- * Bean `0mpw`. Schema and the owner's rulings: `schemas/remote-mount.ts`.
+ * Bean `0mpw`. Schema and the owner's rulings: `schemas/kg/remote-mount.ts`.
  *
  *   bun run cat mount:remote              # plan, fetch, mount, write the lock, re-render the agent surface if it changed
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
@@ -97,7 +97,7 @@
  * declared in-checkout directory whose hydrated file the pin HOLDS — the
  * others are named in the detail, and a pin that holds none is `missing`,
  * never an empty "mounted". No `<name>.json` is laid down and the lock marks
- * the instance `hydrated` (`schemas/remote-mount.ts` says why).
+ * the instance `hydrated` (`schemas/kg/remote-mount.ts` says why).
  *
  * Absent, it is NOT `mountDefaults.directories`, on purpose. That list is the
  * harness's answer to "which FILES does a downstream want unless it says
@@ -177,9 +177,9 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
+import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/kg/mount-trust.js";
 import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
   MountDefaultsSchema,
@@ -192,16 +192,16 @@ import {
   type RemoteMount,
   WHOLE_INSTANCE_ID,
   checkMountPathCollisions,
-} from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
-import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
-import { ConcernGroupCodeSchema } from "@litlfred/cat-harness/schemas/concern-groups.ts";
+import { ConcernGroupCodeSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -473,7 +473,7 @@ function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: s
   const idx = readIndexConfig(instanceRoot);
   if (!decl && idx.state !== "ok") throw new Error(`${instanceRoot} holds no instance declaration or index.config.json`);
   // `index.config.json` when the checkout has one, else the declaration's
-  // `remoteMounts` — and BOTH is an error, never a pick (schemas/index-config.ts).
+  // `remoteMounts` — and BOTH is an error, never a pick (schemas/kg/index-config.ts).
   const name = decl?.name ?? (idx.state === "ok" ? idx.config.site?.landing ?? "coordinator" : "downstream");
   // Who may consent: the index's list, or the declaration's — never both
   // (folio-assistant#2389: a checkout whose index lists the mounts may

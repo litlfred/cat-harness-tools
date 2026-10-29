@@ -25,7 +25,7 @@
  * ## And the artefacts an instance DECLARES it builds at publish (B1)
  *
  * Owner, 2026-10-14 ("B1"; widened to state: "fix all, in proper way"). An
- * instance's `builtAtPublish` (`schemas/built-at-publish.ts`) lists artefacts
+ * instance's `builtAtPublish` (`schemas/kg/built-at-publish.ts`) lists artefacts
  * no commit of it can hold current — computed over the checkout's other
  * instances (`checkout`), or from a branch-kept graph (`state`) — and names
  * each one's writer as a package script. After the branch-derived artefacts
@@ -70,7 +70,7 @@
  * - an instance's own declared order: each of its writers runs after the one
  *   it lists before it (`processes:viz` after `render:bpmn`, `navbar:include`
  *   after the `docs:harness` whose `harness.json` it renders);
- * - a READ EDGE (`reads` on an entry, `schemas/built-at-publish.ts` in
+ * - a READ EDGE (`reads` on an entry, `schemas/kg/built-at-publish.ts` in
  *   cat-harness): the entry's writers run after the writers of every OTHER
  *   instance's entry that fills (`directory`) a directory of one of those
  *   kinds.
@@ -121,11 +121,11 @@ import { join, resolve } from "node:path";
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { dirname } from "node:path";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { FileDigests, TRACKED, fingerprint, trackedTreeDigest, type Fingerprint } from "./input-hash.ts";
 import { TASK_IO } from "./task-io.ts";
 import {

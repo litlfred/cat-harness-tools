@@ -46,7 +46,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { TRACKED, entryFiles, expandGlobs, sourceClosure, type PairIO } from "./input-hash.ts";
-import { CHECKOUT_SCRIPTS_KEY, scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { CHECKOUT_SCRIPTS_KEY, scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 
 /** What a pair can read, or why that cannot be said. */
 export type Footprint =

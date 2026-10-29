@@ -146,19 +146,19 @@ import {
   visualisationsOf,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
-import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
-import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
-import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
 import { graphReadPath } from "./graph-read.ts";
 import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
-import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
-import { BoardSchema } from "@litlfred/cat-harness/schemas/board.ts";
-import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/board-positions.ts";
+import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts";
+import { BoardSchema } from "@litlfred/cat-harness/schemas/ui/board.ts";
+import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/ui/board-positions.ts";
 import { parseTodoFile, readTodos, TODO_ROOT } from "./todos.ts";
 import {
   beanPositions,
@@ -190,8 +190,8 @@ import { readMemoryNodes } from "./agent-memory.ts";
 import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
 import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { z } from "zod";
-import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
+import { unportableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";
 import {
