@@ -523,10 +523,24 @@ export type TermStateAnswer =
 
 export function termState(
   states: readonly SchemeState[],
-  key: { instance: string; scheme: string },
+  key: { instance: string; scheme: string } | string,
   target: string,
   term: string,
 ): TermStateAnswer {
+  if (typeof key === "string") {
+    const scheme = key;
+    const rows = states.filter((s) => s.scheme === scheme && s.target === target);
+    const which = `scheme \`${scheme}\``;
+    if (rows.length === 0) return { state: "unknown", why: `no row for ${which} on \`${target}\`` };
+    const hits = rows.flatMap((r) => r.mappedTerms.filter((m) => m.term === term));
+    if (hits.length > 1) return { state: "unknown", why: `${hits.length} rows match \`${term}\` in ${which} on \`${target}\`` };
+    if (hits.length === 1) return { state: "mapped", exact: hits[0]!.exact, concepts: hits[0]!.concepts };
+    const reason = rows.find((r) => r.reason)?.reason;
+    const undetermined = (): TermStateAnswer => ({ state: "undetermined", ...(reason ? { reason } : {}) });
+    if (rows.every((r) => r.undetermined === 0)) return { state: "unmapped" };
+    if (rows.every((r) => r.unmapped === 0)) return undetermined();
+    return { state: "unknown", why: `${which} on \`${target}\` mixes unmapped and undetermined terms` };
+  }
   const { instance, scheme } = key;
   const rows = states.filter((s) => s.instance === instance && s.scheme === scheme && s.target === target);
   const which = `scheme \`${scheme}\` of \`${instance}\``;
