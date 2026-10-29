@@ -1485,7 +1485,7 @@ export function audioTranscripts(dir: string): Requirement[] {
     let r: ReturnType<typeof TranscriptSchema.safeParse>;
     try {
       r = TranscriptSchema.safeParse(JSON.parse(readFileSync(join(tdir, f), "utf-8")));
-    } catch (e) {
+    } catch {
       problems.push(`${TRANSCRIPT_DIR}/${f}: unparseable`);
       continue;
     }
