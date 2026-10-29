@@ -86,6 +86,13 @@ import { memberOf } from "../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/content/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import {
+  RECORDING_FILENAME,
+  RecordingSchema,
+  TRANSCRIPT_DIR,
+  TranscriptSchema,
+  type Transcript,
+} from "@litlfred/cat-harness/schemas/library/recording.ts";
 import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
@@ -656,6 +663,10 @@ export const RUNG_INPUT: ReadonlyArray<readonly [IngestRung, readonly string[]]>
   // A source RECORDED and not held (bean `scfh`): `referenced-source.py`
   // writes the record, and this writes the manifest, as for every other rung.
   ["referenced", ["referenced.json"]],
+  // A recorded meeting or talk (bean `1r0p`): `recording-transcript.py`
+  // writes the record and the transcripts, and this writes the manifest and
+  // one `transcript` block per language.
+  ["recording", [RECORDING_FILENAME]],
 ];
 
 /**
@@ -965,6 +976,70 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       rung,
       files: [{ path: "manifest.jsonld", content: JSON.stringify(manifest, null, 2) + "\n" }],
     };
+  }
+
+  if (rung === "recording") {
+    const parsed = RecordingSchema.safeParse(readJson<unknown>(join(dir, RECORDING_FILENAME)));
+    if (!parsed.success) return { state: "unreadable", rung };
+    const record = parsed.data;
+    const titled = entryTitle(dir, docId, { sourceFiles: [record.source.file] }, locatedAt);
+    if (!titled) return { state: "unreadable", rung };
+    // The source-language transcript first, then each translation by tag.
+    const tdir = join(dir, TRANSCRIPT_DIR);
+    const transcripts: Transcript[] = [];
+    if (existsSync(tdir)) {
+      for (const f of readdirSync(tdir).filter((x) => x.endsWith(".json")).sort()) {
+        const t = TranscriptSchema.safeParse(readJson<unknown>(join(tdir, f)));
+        // check:l1-complete names a transcript that will not parse; the
+        // manifest lists only what is there to read.
+        if (t.success && f === `${t.data.lang}.json`) transcripts.push(t.data);
+      }
+    }
+    const spoken = record.identity.language;
+    transcripts.sort((a, b) => (a.lang === spoken ? -1 : b.lang === spoken ? 1 : a.lang.localeCompare(b.lang)));
+    const files: Array<{ path: string; content: string }> = [];
+    const contains: string[] = [];
+    for (const t of transcripts) {
+      const bId = `transcript-${t.lang}`;
+      const bIri = iri(`blocks/${bId}`);
+      contains.push(bIri);
+      files.push({
+        path: `blocks/${bId}.jsonld`,
+        content: node({
+          "@id": bIri,
+          "@type": [termCurie("Block")],
+          kind: "transcript",
+          lang: t.lang,
+          label: t.translated_from ? `Transcript (${t.lang}, translated from ${t.translated_from.lang})` : `Transcript (${t.lang})`,
+          // The text, its segments and its review state are in the file.
+          file: `../${TRANSCRIPT_DIR}/${t.lang}.json`,
+          state: t.state,
+          derivedFrom: iri("manifest"),
+          sourceDocument: iri("manifest"),
+          // Authored (LIBRARY_BLOCK_ORIGIN.transcript): who drafted it.
+          provenance: t.drafted_by,
+        }),
+      });
+    }
+    const manifest = {
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@id": iri("manifest"),
+      "@type": [termCurie("SourceDocument")],
+      title: titled.title,
+      contains,
+      provenance: "ingested",
+      ...(librarySubgraph ? memberOf(librarySubgraph.iri) : {}),
+      ...licenceProperties(readLicence(dir)),
+      meta: {
+        doc_id: docId,
+        ...titleMeta(titled),
+        source_file: record.source.file,
+        source_sha256: record.source.sha256,
+        disposition: "recorded speech — the recording's transcripts, one per language",
+      },
+    };
+    files.unshift({ path: "manifest.jsonld", content: JSON.stringify(manifest, null, 2) + "\n" });
+    return { state: "built", rung, files };
   }
 
   // Not a parse failure to hide: an entry with no ingest input simply has not

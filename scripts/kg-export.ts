@@ -3973,10 +3973,24 @@ export function writeToolDocuments(published: Record<string, unknown>, out: stri
  *
  * Build output, like the Tool documents: never committed.
  *
+ * ## A COPY, when the document is served somewhere its IRI does not name
+ *
+ * An instance with its own `canonicalUrl` (smart-base:
+ * `http://smart.who.int/base`) mints its subjects there, and that site serves
+ * none of them. Owner, 2026-10-29 (litlfred/cat-harness-tools#638, option B):
+ * publish a copy on THIS site and link it to the canonical IRI with
+ * `owl:sameAs`. So when `servedDocIri` (where `--out` is served) sits in
+ * another directory than the document's `@id`, each subject document is
+ * named by where it is served, is `partOf` the served document, and is
+ * `sameAs` its canonical subject document. Its `@context` is the copy beside
+ * it, which loads. The nodes inside keep their canonical `@id`s: the
+ * canonical address stays the identity.
+ *
  * @returns the paths written
  */
-export function writeSubjectDocuments(published: Record<string, unknown>, out: string): string[] {
+export function writeSubjectDocuments(published: Record<string, unknown>, out: string, servedDocIri?: string): string[] {
   const docIri = String(published["@id"]);
+  const copyBase = servedDocIri !== undefined && subjectBase(servedDocIri) !== subjectBase(docIri) ? subjectBase(servedDocIri) : undefined;
   const graph = (published["@graph"] ?? []) as Node[];
   const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
   // A flow's `<process>#flow/F` belongs on its process's page.
@@ -4016,25 +4030,30 @@ export function writeSubjectDocuments(published: Record<string, unknown>, out: s
     const name = stem.split("/").pop()!;
     const doc = {
       // Absolute where the document is; relative to the subject's file otherwise.
-      "@context": /^https?:\/\//.test(docIri)
-        ? `${subjectBase(docIri)}${contextName}`
-        : `${"../".repeat(stem.split("/").length - 1)}${contextName}`,
-      "@id": `${id}.jsonld`,
-      partOf: docIri,
+      "@context":
+        copyBase !== undefined
+          ? `${copyBase}${contextName}`
+          : /^https?:\/\//.test(docIri)
+            ? `${subjectBase(docIri)}${contextName}`
+            : `${"../".repeat(stem.split("/").length - 1)}${contextName}`,
+      ...(copyBase !== undefined
+        ? { "@id": `${copyBase}${stem}.jsonld`, partOf: servedDocIri, sameAs: `${id}.jsonld` }
+        : { "@id": `${id}.jsonld`, partOf: docIri }),
       ...stamp,
       "@graph": [node, ...(fragmentsOf.get(id) ?? [])],
     };
+    const pageDoc = copyBase !== undefined ? servedDocIri! : docIri;
     const file = join(dir, `${stem}.jsonld`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
     written.push(file);
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, docIri));
+    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, docIri));
+      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc));
       written.push(index);
     }
   }
@@ -4153,6 +4172,22 @@ function valueHtml(v: unknown): string {
 }
 
 /**
+ * A subject page is excluded from the site search ON PURPOSE (fa#2683).
+ *
+ * There is one per graph node (about 3,000 on the folio-assistant site), and
+ * each repeats data a human page already carries: the skill, process or
+ * schema page that Jekyll indexes. They are written after Jekyll, so the
+ * theme's index never held them. But `rail-standalone-pages` gives them the
+ * theme's search box, and `publish-verify`'s `search-index` check counted
+ * them as pages the index failed to cover. That dropped coverage below its
+ * floor and refused every publish. The marker is the one `head_custom.html`
+ * writes for `search_exclude: true` (`SEARCH_EXCLUDE_MARKER` in
+ * `publish-verify.ts`), so the check counts these pages as excluded, and
+ * says how many, rather than as missing.
+ */
+const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
+
+/**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
@@ -4180,6 +4215,7 @@ function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readon
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${SUBJECT_SEARCH_EXCLUDE}
 <title>${escHtml(title)} · ${escHtml(type)}</title>
 <link rel="alternate" type="application/ld+json" href="${escHtml(jsonldHref)}">
 <script type="application/ld+json">
@@ -4201,7 +4237,9 @@ a { color: inherit; }
 <p class="muted">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
 <p class="iri">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>
+<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>${
+    typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
+  }
 <table>
 ${rows(node)}
 </table>
@@ -4295,7 +4333,11 @@ if (import.meta.main) {
   const published = { ...publishedDocument(data), ...stagingFields() };
   writeFileSync(out, JSON.stringify(published, null, 2) + "\n");
   const toolDocs = writeToolDocuments(published, out);
-  const subjectDocs = writeSubjectDocuments(published, out);
+  // `--served-at <url>`: where `--out` is served, when that is not its `@id`
+  // (an own-canonical instance published on this site, #638). Its subject
+  // documents are then copies named by where they are served.
+  const servedAt = arg("--served-at");
+  const subjectDocs = writeSubjectDocuments(published, out, servedAt);
   const legacyDocs = writeLegacyDocuments(published, out, docPath, legacyDocPath);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);

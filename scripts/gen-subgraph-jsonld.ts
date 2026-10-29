@@ -151,6 +151,7 @@ import {
   SubgraphIndexSchema,
 } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -512,6 +513,12 @@ export function framedInstances(root: string = ROOT): string[] {
 
 /** The graph typology whose directories hold Tool nodes (`schemas/tools/tool-folders.ts`). */
 const TOOLS_GRAPH = "tools";
+/**
+ * The graph typology whose directories hold library entries (cat-harness#180;
+ * owner, 2026-10-11 and 2026-10-29: each `library/<doc>/` is a subgraph, nested
+ * under its instance's `library` subgraph by the containment rule).
+ */
+const LIBRARY_GRAPH = "library";
 
 /**
  * Every directory this build heads a subgraph tree at: the knowledge-graph
@@ -529,7 +536,7 @@ export function subgraphDirectories(root: string = ROOT): Array<{ id: string; pa
   const out = kgDirectories(root, corpusScopeFor(root)).map((d) => ({ id: d.id, path: d.path, absPath: d.absPath }));
   for (const inst of framedInstances(root)) {
     const ids = new Map(instanceDirectories(inst).map((d) => [resolve(inst, d.path), d.id]));
-    for (const abs of instanceDirectoriesForGraph(inst, TOOLS_GRAPH)) {
+    for (const abs of [...instanceDirectoriesForGraph(inst, TOOLS_GRAPH), ...instanceDirectoriesForGraph(inst, LIBRARY_GRAPH)]) {
       if (!existsSync(abs)) continue;
       const id = ids.get(resolve(abs));
       if (id === undefined) continue; // declared FROM WITHIN another entry: its parent's tree already walks it
@@ -976,6 +983,8 @@ export async function generateSubgraphs(
   payloadPlan: PayloadPlan;
   payloadFiles: Map<string, Buffer | string>;
   payloadDir: string;
+  /** Library entry files left out of the tree, and why — printed, never fatal. */
+  warnings: string[];
 }> {
   const root = opts.root ?? ROOT;
   const decl = readDeclaration(root);
@@ -994,6 +1003,11 @@ export async function generateSubgraphs(
   const rootOf = new Map<string, string>();
   const payloadPlans: PayloadPlan[] = [];
   const exportProblems: string[] = [];
+  // Library entry files that cannot be read as nodes are WARNINGS, not
+  // problems: they are the entry's own defect (its writer's to fix), and a
+  // publish must not stop over committed data this generator only points at.
+  const warnings: string[] = [];
+  const libraryLoader = libraryContextLoader(checkoutRootFor(root));
   for (const inst of framedInstances(root)) {
     const data = await buildExport({ instanceRoot: inst, scope: "instance" });
     const name = readDeclaration(inst)?.name ?? basename(inst);
@@ -1001,6 +1015,15 @@ export async function generateSubgraphs(
     const own = (data["@graph"] as Node[]).filter((n) => n.deprecated !== true && !rootOf.has(String(n["@id"])));
     for (const n of own) rootOf.set(String(n["@id"]), inst);
     exported.push(...own);
+    // Library entries, which kg-export does not read (cat-harness#180): one
+    // pointer per entry file, placed by its path under the `library` subgraph.
+    const lib = await libraryEntryNodes(inst, libraryLoader);
+    for (const p of lib.problems) warnings.push(`library (${name}): ${p}`);
+    for (const n of lib.nodes as Node[]) {
+      if (rootOf.has(String(n["@id"]))) continue;
+      rootOf.set(String(n["@id"]), inst);
+      exported.push(n);
+    }
     // Payloads first, so every node carries its link into both frames — each
     // against the instance its paths are relative to.
     payloadPlans.push(planPayloads(own, { root: inst, baseUrl }));
@@ -1023,7 +1046,7 @@ export async function generateSubgraphs(
   const files = await renderSubgraphFiles(plan, decl.name, outDir);
   const payloadDir = payloadOutDir(root);
   const payloadFiles = renderPayloadFiles(payloadPlan, payloadDir);
-  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir };
+  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir, warnings };
 }
 
 function listFiles(abs: string): string[] {
@@ -1039,7 +1062,8 @@ function listFiles(abs: string): string[] {
 
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
-  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir } = await generateSubgraphs();
+  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir, warnings } = await generateSubgraphs();
+  for (const w of warnings) console.error(`  ⚠ ${w}`);
 
   if (plan.problems.length > 0) {
     console.error(`gen-subgraph-jsonld: ${plan.problems.length} problem(s) — nothing written:`);

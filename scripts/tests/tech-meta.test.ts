@@ -62,6 +62,19 @@ describe("the mimetype is sniffed, never claimed", () => {
     expect(m.mimetype_sniffed).toBe("text/html");
   });
 
+  test("recordings are sniffed by their container (bean 1r0p)", () => {
+    const iso = (brand: string) => new Uint8Array([0, 0, 0, 0x18, ...new TextEncoder().encode(`ftyp${brand}`), ...new Uint8Array(16)]);
+    expect(techMeta(fileWith("a.bin", iso("isom"))).mimetype_sniffed).toBe("video/mp4");
+    expect(techMeta(fileWith("a.bin", iso("M4A "))).mimetype_sniffed).toBe("audio/mp4");
+    expect(techMeta(fileWith("a.bin", iso("qt  "))).mimetype_sniffed).toBe("video/quicktime");
+    expect(techMeta(fileWith("a.bin", "RIFF\0\0\0\0WAVEfmt ")).mimetype_sniffed).toBe("audio/wav");
+    expect(techMeta(fileWith("a.bin", "ID3\x04rest")).mimetype_sniffed).toBe("audio/mpeg");
+    expect(techMeta(fileWith("a.bin", "OggS\0rest")).mimetype_sniffed).toBe("audio/ogg");
+    expect(techMeta(fileWith("a.bin", "fLaC\0rest")).mimetype_sniffed).toBe("audio/flac");
+    // A RIFF that is not WAVE (an AVI) is not called audio.
+    expect(techMeta(fileWith("a.bin", "RIFF\0\0\0\0AVI LIST")).mimetype_sniffed).toBeNull();
+  });
+
   test("unrecognised bytes are NULL, never guessed from the extension", () => {
     const m = techMeta(fileWith("thing.pdf", "just some words, no signature"));
     // Falling back to the extension would make a real sniff and a guess

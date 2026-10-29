@@ -165,6 +165,7 @@ import {
   beansNamedBy,
   beanStepsOf,
   diagramLevels,
+  DYNAMIC_STATE_FILE,
   endNodesOf,
   GATE_REFUSALS,
   lastMoved,
@@ -178,6 +179,7 @@ import {
   type BeanPosition,
   type InstanceLink,
   type DiagramLevel,
+  type DynamicStateInput,
   type StuckState,
   type TodoLike,
 } from "./workflow-view.ts";
@@ -1554,6 +1556,8 @@ export interface WorkflowInstanceView {
   roles?: RoleGraph;
   /** Every instance's memory nodes, when read: joined to each step by role. */
   memory?: readonly MemoryNode[];
+  /** The dynamic-state document (`<site>/<harness>/state.jsonld`), relative to this page; the page reads it when it loads. */
+  stateDocument?: string;
 }
 
 /** The workflow pages' own styles: the token and the steps done, over the published drawing. */
@@ -1592,6 +1596,38 @@ const WV_SCRIPT = `<script>
       mark("data-wv-tokens", "wv-token");
       f.replaceChildren(document.importNode(svg, true));
     }).catch(function () {});
+  });
+  // The dynamic-state document (bean 6h47): the instance as the latest render
+  // exported it. Shown beside what this page was built with, and any
+  // difference is named, so a page older than the export says so.
+  document.querySelectorAll("[data-wv-state]").forEach(function (sec) {
+    var out = sec.querySelector(".wv-live");
+    var url = new URL(sec.getAttribute("data-wv-state"), document.baseURI);
+    var want = sec.getAttribute("data-wv-instance");
+    var built = JSON.parse(sec.getAttribute("data-wv-built") || "{}");
+    var text = function (t) { var p = document.createElement("p"); p.className = "sv-sub"; p.textContent = t; return p; };
+    fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); }).then(function (doc) {
+      var node = (doc.graph || []).filter(function (n) { return n.id === want; })[0];
+      if (!node) {
+        var store = want.split("/")[1];
+        out.replaceChildren(text((doc.unreadStores || []).indexOf(store) >= 0
+          ? "The state document (generated " + doc.generatedAt + ") could not read this instance's store, so its exported state is unknown."
+          : "The state document (generated " + doc.generatedAt + ") does not list this instance."));
+        return;
+      }
+      var kinds = (node.stuck || []).map(function (x) { return x.kind; }).sort();
+      var parts = [
+        text("From state.jsonld, generated " + doc.generatedAt + ": status " + node.status + ", token at " +
+          ((node.tokens || []).join(", ") || "no step") + ", stuck states: " + (kinds.join(", ") || "none") + "."),
+      ];
+      var same = JSON.stringify(kinds) === JSON.stringify((built.stuck || []).slice().sort()) &&
+        JSON.stringify(node.tokens || []) === JSON.stringify(built.tokens || []) && node.status === built.status;
+      parts.push(text(same ? "This matches what the page was built with." :
+        "This differs from what the page was built with (" + (built.at || "unknown") + "): the page is older than the state export."));
+      out.replaceChildren.apply(out, parts);
+    }).catch(function (e) {
+      out.replaceChildren(text("The state document could not be read (" + e + "), so only the build-time state above is known."));
+    });
   });
 })();
 </script>`;
@@ -1648,6 +1684,61 @@ export function workflowInstanceLinks(root: string = ROOT): { links: InstanceLin
     }
   }
   return { links: out, unread };
+}
+
+/**
+ * What the dynamic-state document is built from (bean 6h47): every workflow
+ * instance `workflowInstanceLinks` names, with its store's beans and its
+ * diagram's end events, so its stuck states are the ones its page shows.
+ * Read from the same resolved checkout, so the document and the pages never
+ * disagree about which instances exist.
+ */
+export async function dynamicStateInputs(root: string = ROOT): Promise<{ harness: string; inputs: DynamicStateInput[]; unread: string[] }> {
+  const decl = readDeclaration(root);
+  const harness = decl?.name ?? basename(root);
+  if (!decl) return { harness, inputs: [], unread: [] };
+  const inputs: DynamicStateInput[] = [];
+  const unread: string[] = [];
+  const seen = new Set<string>();
+  const viewers = (decl.visualisers ?? []).filter(
+    (v) => v.renderedBy === VIEWER_TOOL && v.subgraphs === "instance" && (v.coversKinds ?? []).includes("workflow-state"),
+  );
+  for (const v of viewers) {
+    const { beans, subjects } = perInstanceSubjects(v, root, harness);
+    if (!beans) continue;
+    for (const s of subjects) {
+      const read = readSubjectBeans(s.instanceRoot);
+      if (!("beans" in read) || read.beans === null) {
+        if ("unreachable" in read) unread.push(s.name);
+        continue;
+      }
+      const ends = endsOf(await workflowModelsOf(s));
+      for (const r of readInstances(filesIn(storePartDirs(s.absPath, "workflow-state"), ".json"))) {
+        if (!("state" in r) || !ROUTE_SEGMENT.test(r.state.id)) continue;
+        const key = `${s.name}/${r.state.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        inputs.push({
+          store: s.name,
+          state: r.state,
+          beans: read.beans,
+          ends: ends.get(r.state.id),
+          page: visualiserRoute(pageParts({ harness, visualiser: v.id, subgraph: workflowSubgraph(s.name, r.state.id) })),
+        });
+      }
+    }
+  }
+  return { harness, inputs, unread };
+}
+
+/** Where THIS run publishes it: the same site and harness the workflow pages are drawn for, so their relative link holds. */
+export function dynamicStateTarget(): string {
+  return dynamicStatePath(SITE, harnessOf());
+}
+
+/** Where the dynamic-state document is published on `site`: `<site>/<harness>/state.jsonld`. */
+export function dynamicStatePath(site: string, harness: string): string {
+  return join(site, harness, DYNAMIC_STATE_FILE);
 }
 
 /** One diagram level: the drawing, or why there is none, and the position as words either way. */
@@ -1791,6 +1882,16 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
           })
           .join("")}</tbody></table>`);
 
+  // The page reads the dynamic-state document when it loads (bean 6h47).
+  const livePart =
+    v.stateDocument === undefined
+      ? ""
+      : `<section id="live" data-wv-state="${esc(v.stateDocument)}" data-wv-instance="${esc(`#workflow/${v.store}/${s.id}`)}" ` +
+        `data-wv-built="${esc(JSON.stringify({ at: v.now.toISOString(), status: s.status ?? "unknown", tokens: s.tokens, stuck: states.map((x) => x.kind) }))}">` +
+        `<h2 class="sv-h2">Latest exported state</h2>` +
+        `<div class="wv-live"><p class="sv-sub">Read from <a href="${esc(v.stateDocument)}"><code>${DYNAMIC_STATE_FILE}</code></a> when the page loads; it needs JavaScript. ` +
+        `The stuck states above are the ones measured when this page was built.</p></div></section>`;
+
   const position = positionOf(s);
   return page({
     title: `${s.id} — workflow`,
@@ -1803,6 +1904,7 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
       ` · <a href="../../">${esc(v.store)}'s work plan</a> · <a href="../">every instance in it</a></p>` +
       `<p><strong>Where it is:</strong> ${position.length > 0 ? position.map((p) => `<code>${esc(p)}</code>`).join(", ") : "no step holds a token"}</p>` +
       stuck +
+      livePart +
       refusalPart +
       `<h2 class="sv-h2" id="diagram">Diagram</h2>` +
       source +
@@ -2844,6 +2946,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
       now: NOW,
       ...(rolesForView ? { roles: rolesForView } : {}),
       ...(memoryForView ? { memory: memoryForView } : {}),
+      stateDocument: relative(pageDir, dynamicStatePath(SITE, harnessOf())).split(sep).join("/"),
       drawingFor: (bpmn) => {
         const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
         return existsSync(svg) ? relative(pageDir, svg).split(sep).join("/") : undefined;

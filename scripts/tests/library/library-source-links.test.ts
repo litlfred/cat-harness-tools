@@ -64,6 +64,13 @@ describe("an entry page's sources are the files the writer publishes", () => {
     expect([...avatarCopies(g, SITE, "/repo").keys()]).toEqual([at("e1.png")]);
   });
 
+  test("the entry's own subgraph index is linked when published (cat-harness#180)", () => {
+    const sg = join(SITE, "subgraph", "inst", "library", "e1", "index.jsonld");
+    const withSg = entrySources({ site: SITE, dataDir: DATA, shellDir: SHELL, instance: "inst", entry: { id: "e1" }, manifest: false, files: [], subgraph: sg });
+    const link = withSg.find((l) => l.what === "the entry's subgraph (JSON-LD)");
+    expect(link && resolve(SHELL, link.href)).toBe(sg);
+  });
+
   test("a file that is not published is not linked", () => {
     const bare = entrySources({ site: SITE, dataDir: DATA, shellDir: SHELL, instance: "inst", entry: { id: "e1" }, manifest: false, files: [] });
     expect(bare.map((l) => l.label)).toEqual(["e1.doc.json", "e1.json"]);
