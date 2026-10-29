@@ -194,6 +194,7 @@
     "check:soft-hyphens": "bun run cat-harness-tools/scripts/check-soft-hyphens.ts",
     "check:structure-accessor": "bun run cat-harness-tools/scripts/check-structure-accessor.ts",
     "check:reference-direction": "bun run cat-harness-tools/scripts/check-reference-direction.ts",
+    "check:generated-writers": "bun run cat-harness-tools/scripts/check-generated-writers.ts",
     "check:process-bindings": "bun run cat-harness-tools/scripts/check-process-bindings.ts",
     "check:document-kind-sources": "bun run cat-harness-tools/scripts/check-document-kind-sources.ts",
     "check:reference-direction:strict": "bun run cat-harness-tools/scripts/check-reference-direction.ts --strict",
