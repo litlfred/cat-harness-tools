@@ -87,7 +87,7 @@ import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
 import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
-import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import type { SourceLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";

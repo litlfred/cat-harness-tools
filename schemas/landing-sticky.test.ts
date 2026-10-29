@@ -33,8 +33,8 @@ import {
   type DeclaredContribution,
 } from "@litlfred/cat-harness/schemas/sticky-contribution.js";
 import { CatHarnessDeclarationSchema, siteDirFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
+import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
+import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { inAggregate } from "../test/support/checkout.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredDocsSources } from "../scripts/lib/docs-sources.ts";

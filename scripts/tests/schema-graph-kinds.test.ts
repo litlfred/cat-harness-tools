@@ -3,7 +3,7 @@
  * emits.
  *
  * `schema-graph.ts` types a declaration's kind as `DeclKind`;
- * `schemas/site-indexes.ts` validates the projection against `DECL_KINDS`.
+ * `schemas/ui/site-indexes.ts` validates the projection against `DECL_KINDS`.
  * They are two lists of one fact, and they drifted: `json-schema` (bootstrap's
  * `.schema.json` declarations) was emitted 28 times and accepted by nothing,
  * so `check:kind-validators` failed the committed `docs/assets/schemas/index.json`
@@ -13,7 +13,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { DECL_KINDS } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import { DECL_KINDS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import type { DeclKind } from "../schema-graph.ts";
 
 /** Exhaustive over `DeclKind`: adding a kind there and not here fails `tsc`. */

@@ -10,7 +10,7 @@ import { basename, join } from "node:path";
 
 import { folioSubjects, readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
 import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
-import { FolioGraphProjectionSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import { FolioGraphProjectionSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";

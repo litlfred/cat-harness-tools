@@ -434,14 +434,14 @@ export const RULES: Rule[] = [
       "schemas/detangle.ts",                 // the detangle criterion — folded in from its own instance (bean `byql`)
       "schemas/detangle-sidecar.ts",         // what a detangle measurement pins (bean `byql`)
       "schemas/node-kind.ts",                // node kinds declare their parents; composed by that walk (bean `a1lq`)
-      "schemas/diff-renderers.ts",           // the review page's diff renderers, declared as data (bean `d903`)
+      "schemas/ui/diff-renderers.ts",           // the review page's diff renderers, declared as data (bean `d903`)
       // What a graph TILE shows. Same argument as `scripts/graph-tiles.ts`
       // twenty lines up, and it arrived the same way: classified core first
       // because a badge is something a reader sees, and `check:partition`
       // answered with a wrong-direction edge from `sync-docs-harness.ts`,
       // which is harness and reads it. A tile is harness machinery whatever
       // it looks like on the page.
-      "schemas/tile-count.ts",               // a projection's declared headline number
+      "schemas/ui/tile-count.ts",               // a projection's declared headline number
       // The skill-framework vocabulary — actors, capabilities, skills,
       // requirements, the package registry. It was the top 240 lines of
       // `constraints.ts` and 32 aliases in `types.ts`, which put it under the
@@ -706,7 +706,7 @@ export const RULES: Rule[] = [
       // normal way this list goes stale rather than a lapse.
       // HARNESS, exposed once the ten above stopped hiding their edges.
       //
-      // `schemas/theme.ts` / `themes.ts` are the STICKY-NOTE themes — colour
+      // `schemas/ui/theme.ts` / `themes.ts` are the STICKY-NOTE themes — colour
       // roles and layouts for the docs site, generated into CSS by
       // `gen-themes-css.ts`. Site presentation belongs to the platform that
       // publishes the site, not to a folio's content model, and their own
@@ -718,13 +718,13 @@ export const RULES: Rule[] = [
       // module under `test/` that production code imports is shared tooling
       // that happens to live there; the blanket `test/` rule is right for
       // everything else in that tree and wrong for these two.
-      "schemas/theme.ts",
+      "schemas/ui/theme.ts",
       "schemas/document-kind.ts",            // the document-kind graph typology's schema, beside theme.ts (stage D5, #1767)
-      "schemas/themes.ts",
+      "schemas/ui/themes.ts",
       // Resolves a ThemeRef against its owner's declared themes (bean `v8n5`):
       // the same sticky-note theme layer as the two above, reached through a
       // declaration rather than an import, so it holds no folio's values.
-      "schemas/theme-by-ref.ts",
+      "schemas/ui/theme-by-ref.ts",
       // Exposed by moving `test/health/` here — the same reveal-on-move
       // pattern, third time in this pass. Both are harness by their own
       // headers: "Repository health reports — what the daily sweep under
@@ -821,7 +821,7 @@ export const RULES: Rule[] = [
       // `scripts/restore-staging.ts` both reaching into `folio-assist-core`,
       // taking the wrong-direction count from 1 to 3. With the schema here it
       // is back to 1, the `src/types.ts` residue this file already analyses.
-      "schemas/render-log.ts",
+      "schemas/ui/render-log.ts",
       // The preview cap (issue #1868) — same family as its imports above
       // (`restore-staging`, `render-log`, `staging-record`,
       // `staging-cleanup-preflight`, `staging-preview`), all harness.

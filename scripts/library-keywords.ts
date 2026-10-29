@@ -37,7 +37,7 @@ import { readStructure } from "@litlfred/cat-harness/schemas/document-structure.
 import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "@litlfred/cat-harness/schemas/library-keywords.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 export { KEYWORDS_FILE };
-import type { PdfStructure } from "@litlfred/cat-harness/schemas/pdf-structure.ts";
+import type { PdfStructure } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 import { readLibraryGraph } from "./library-graph.ts";
 import { unitsOf } from "./lsi.ts";
 

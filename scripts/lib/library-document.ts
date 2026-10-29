@@ -8,7 +8,7 @@
  * link to sections, and extracted summaries of each section" — and not for one
  * instance: "it is being ingested into a certain schema, no? that schema needs
  * a visualizer." So this reads the SCHEMA, `pdf-structure/v1`
- * (`schemas/pdf-structure.ts`), and every `library/<slug>/` of every instance
+ * (`schemas/ui/pdf-structure.ts`), and every `library/<slug>/` of every instance
  * that carries a `structure.json` gets the same view.
  *
  * ## What it reads, and only that
@@ -139,7 +139,7 @@ export interface DocumentView {
   links?: { repo: string; branch: string; dir: string };
 }
 
-/** The raw `structure.json` fields this view reads (schemas/pdf-structure.ts). */
+/** The raw `structure.json` fields this view reads (schemas/ui/pdf-structure.ts). */
 interface RawToc { level?: number; title: string; number?: string | null; page?: number | null; page_label?: string | null; confidence?: number | null; evidence?: string[] | null; source?: string }
 interface RawSection { id: string; number?: string | null; title: string; level?: number; page_start?: number | null; page_end?: number | null; label_start?: string | null; label_end?: string | null; n_words?: number }
 interface RawPage { physical: number; label?: string | null; source?: string | null; confidence?: number }

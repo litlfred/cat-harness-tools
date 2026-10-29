@@ -61,9 +61,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "@litlfred/cat-harness/schemas/theme.js";
-import { instanceThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
+import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { instanceThemes } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import type { ImageRegion, KgImage } from "@litlfred/cat-harness/schemas/kg-node.js";
 import { avatarClip, dataUri } from "./render-avatar-crops.js";
 import { declaredContributions } from "./ensure-landing-sticky.js";

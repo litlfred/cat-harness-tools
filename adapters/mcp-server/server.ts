@@ -35,7 +35,7 @@ import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../..
 // The LaTeX renderer itself is no longer imported: this is a GENERIC server
 // and the TeX renderer belongs to the science layer, so it is resolved from
 // the folio's declared profile through `resolveRenderTarget`. See
-// `schemas/render-targets.ts`.
+// `schemas/ui/render-targets.ts`.
 import { resolveRenderTarget } from "../../pipeline/render-discovery.js";
 import { readDeclaredFolioProfile } from "../../pipeline/profile-check.js";
 import { registerServedToolGroups } from "../../src/tool-groups.js";
