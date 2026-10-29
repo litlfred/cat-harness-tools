@@ -41,6 +41,8 @@ export type Loader = (url: string) => Promise<{ contextUrl: null; documentUrl: s
  * goes to `publish-verify`'s local loader.
  */
 export function libraryContextLoader(repoRoot: string): Loader {
+  // declared-path-literal: the built site tree publish-verify's loader maps
+  // URLs onto — only reached for a URL the in-memory contexts did not answer.
   const fallback = localLoader(join(repoRoot, "docs"));
   let byUrl: Map<string, unknown> | undefined;
   return async (url: string) => {
