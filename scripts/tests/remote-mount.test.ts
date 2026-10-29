@@ -207,6 +207,8 @@ describe("mount:remote over fixture repositories", () => {
           { id: "notes", path: "notes/", graphTypologies: ["code"] },
         ],
       }),
+      // declared-path-literal: fixture keys of the bare repository this test builds under its temp base; they
+      // name files inside that fixture tree, never this checkout's `processes/` or `skills/`.
       "processes/processes.json": { $schema: "concern-groups/v1", groups: ["sdlc", "kg"] },
       "processes/sdlc/a.bpmn": "<definitions/>\n",
       "processes/kg/b.bpmn": "<definitions/>\n",
