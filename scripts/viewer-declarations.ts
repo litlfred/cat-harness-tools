@@ -847,6 +847,40 @@ export function tileDirectories<T extends ViewedDirectory>(repoRoot: string, fal
   return withViewers(siteDirectories(own, root, repoRoot), root, repoRoot);
 }
 
+/**
+ * A tile count for each page a generator wrote that is a TILE's page, keyed
+ * by that tile's directory id, in the shape `tileCounts` takes.
+ *
+ * `pages` holds each page's repository-relative path and its own count:
+ * the number computed FOR that page, the rule #889 set. A page no tile
+ * opens contributes nothing, so there is no badge rather than a wrong one.
+ *
+ * Pages are matched by their DIRECTORY, not their file name: a declaration
+ * spells a tile's page `…/index.html` while a Jekyll source is
+ * `…/index.md`, and both are the one page at that directory. A ref declared
+ * by two tiles keeps the first, as `directoryByVisualisationRef` does.
+ */
+export function tileCountsForPages(
+  pages: Readonly<Array<{ page: string; count: number; unit: readonly [string, string] }>>,
+  repoRoot: string,
+  fallback: string,
+): Record<string, readonly [number, string]> {
+  const dirOf = (ref: string): string => ref.split("/").slice(0, -1).join("/");
+  const byDir = new Map<string, string>();
+  for (const d of tileDirectories(repoRoot, fallback)) {
+    for (const v of visualisationsOf(d.coverage, d.id)) {
+      const k = dirOf(v.ref);
+      if (!byDir.has(k)) byDir.set(k, d.id);
+    }
+  }
+  const out: Record<string, readonly [number, string]> = {};
+  for (const p of pages) {
+    const id = byDir.get(dirOf(p.page.split(sep).join("/")));
+    if (id !== undefined && !(id in out)) out[id] = [p.count, p.count === 1 ? p.unit[0] : p.unit[1]];
+  }
+  return out;
+}
+
 export function withViewers<T extends ViewedDirectory>(
   dirs: readonly T[],
   instanceRoot: string,
