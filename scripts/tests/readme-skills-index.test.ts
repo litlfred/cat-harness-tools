@@ -1,5 +1,5 @@
 /**
- * The per-repository skill index (bean `e0uk`): the `cat-harness:skills`
+ * The per-repository skill index (bean `e0uk`): the `skills:index`
  * region of an instance's AGENTS.md lists the skills that instance publishes.
  *
  * What is worth gating: a summary that tells an agent nothing (a heading that

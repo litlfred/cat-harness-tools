@@ -938,7 +938,7 @@ const readmeTocSection: ReadmeSection = {
 // ── Skills this instance publishes ──────────────────────────────────────────
 
 /** The marker for the per-repository skill index (bean `e0uk`). */
-export const SKILLS_INDEX_MARKER = "cat-harness:skills";
+export const SKILLS_INDEX_MARKER = "skills:index";
 
 /** One line of a skill's summary: its first sentence, capped at a word, never empty-as-said. */
 export function skillSummaryLine(text: string | undefined, cap = 200): string | undefined {
