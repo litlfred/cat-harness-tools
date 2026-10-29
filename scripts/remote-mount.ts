@@ -685,7 +685,14 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
     prior.ok ? [...prior.lock.instances.map((i) => i.instance), ...prior.lock.unmounted.flatMap((u) => (u.leftOnDisk ? [u.instance] : []))] : [],
   );
   const local = new Map<string, string>();
+  // An instance directory in a git checkout with NO tracked file is not the
+  // checkout's own: it is what something else left behind (a removed
+  // submodule, a lock deleted by hand). It is a mount target, adopted only if
+  // it is exactly the pinned bytes (folio-assistant#2467, decision 2).
+  const inCheckout = gitIn(ds.instanceRoot, ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
   for (const root of instanceRootsIn(ds.instanceRoot)) {
+    const rel = relative(ds.instanceRoot, root);
+    if (inCheckout && rel !== "" && !tracked(ds.instanceRoot, rel)) continue;
     try {
       const n = readDeclaration(root)?.name;
       if (n && !previouslyMounted.has(n)) local.set(n, root);
@@ -1167,6 +1174,53 @@ function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: stri
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
 
+/**
+ * Whether the bytes already at a planned instance's target ARE the pinned
+ * bytes (folio-assistant#2467, decision 2, "adopt if identical"): every
+ * declared directory holds exactly the pinned files (none absent, none
+ * extra, none different, install artefacts and state mounts aside), the
+ * declaration file matches, and every declared asset's sha256 matches.
+ * Reads only; never writes or deletes.
+ */
+export function identicalToPin(
+  base: string,
+  work: string,
+  p: Pick<PlannedInstance, "path" | "instance" | "declarationFile" | "directories" | "assets" | "upstreamRoot" | "hydrated">,
+): { same: true } | { same: false; differ: string[]; extra: string[]; absent: string[] } {
+  const differ: string[] = [];
+  const extra: string[] = [];
+  const absent: string[] = [];
+  const skip = stateMountedDirs(base);
+  for (const d of p.directories) {
+    if (d.package) continue;
+    const src = join(work, d.upstreamPath);
+    const dst = join(base, d.path);
+    const pinned = existsSync(src)
+      ? withoutInstallArtefacts(treeEntries(src).files.filter((f) => !(d.upstreamPath === "." && (f === ".git" || f.startsWith(".git/")))))
+      : [];
+    const onDisk = existsSync(dst) ? withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst)) : [];
+    const have = new Set(onDisk);
+    const want = new Set(pinned);
+    for (const f of pinned) {
+      if (!have.has(f)) absent.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+      else if (sha256Text(readFileSync(join(src, f))) !== sha256Text(readFileSync(join(dst, f)))) differ.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+    }
+    for (const f of onDisk) if (!want.has(f)) extra.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+  }
+  const decl = join(base, p.path, `${p.instance}.json`);
+  if (!existsSync(decl)) absent.push(`${p.path}/${p.instance}.json`);
+  else if (sha256Text(readFileSync(decl)) !== sha256Text(readFileSync(join(work, p.declarationFile)))) differ.push(`${p.path}/${p.instance}.json`);
+  for (const a of p.assets ?? []) {
+    const src = join(work, p.upstreamRoot, a);
+    const dst = join(base, p.path, a);
+    if (!existsSync(src)) continue;
+    if (!existsSync(dst)) absent.push(`${p.path}/${a}`);
+    else if (sha256Text(readFileSync(src)) !== sha256Text(readFileSync(dst))) differ.push(`${p.path}/${a}`);
+  }
+  const uniq = (xs: string[]) => [...new Set(xs)].sort();
+  return differ.length || extra.length || absent.length ? { same: false, differ: uniq(differ), extra: uniq(extra), absent: uniq(absent) } : { same: true };
+}
+
 function gitIn(cwd: string, args: string[]): { status: number; stdout: string } {
   const r = spawnSync("git", args, { cwd, encoding: "utf-8" });
   return { status: r.status ?? 128, stdout: r.stdout ?? "" };
@@ -1307,6 +1361,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         plan.outcomes.push({ instance: p.instance, state: trust.state, path: p.path, detail });
         continue;
       }
+      let adopting = false;
       try {
         if (before) {
           const changed = modifiedSince(plan.instanceRoot, before);
@@ -1327,8 +1382,13 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
             continue;
           }
         } else if (existsSync(target)) {
-          plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` already exists and no lock says this mount put it there — refused` });
-          continue;
+          // folio-assistant#2467, decision 2: adopt it if it IS the pinned
+          // bytes (checked once the pin is checked out, below); else refuse.
+          if (p.hydrated) {
+            plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` already exists and no lock says this mount put it there — refused` });
+            continue;
+          }
+          adopting = true;
         }
         if (tracked(plan.instanceRoot, p.path)) {
           plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` holds tracked files — a mount never lands on tracked bytes` });
@@ -1355,6 +1415,54 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
             state: "could-not-determine",
             path: p.path,
             detail: `\`${pinsArtefacts.upstreamPath}\` at ${p.sha.slice(0, 12)} tracks files under node_modules/, which the mount digest excludes as install artefacts — refused rather than locked with bytes no check would see`,
+          });
+          continue;
+        }
+
+        if (adopting) {
+          const same = identicalToPin(plan.instanceRoot, work, p);
+          if (!same.same) {
+            const list = (label: string, xs: string[]) => (xs.length ? `${label} ${xs.slice(0, 5).map((x) => `\`${x}\``).join(", ")}${xs.length > 5 ? ` and ${xs.length - 5} more` : ""}` : "");
+            plan.outcomes.push({
+              instance: p.instance,
+              state: "missing",
+              path: p.path,
+              detail:
+                `\`${p.path}/\` already exists, no lock says this mount put it there, and it is not the pinned bytes (${[list("differ:", same.differ), list("extra:", same.extra), list("absent:", same.absent)].filter(Boolean).join("; ")}) — refused, nothing changed. ` +
+                "Move the edits upstream to the fork, or delete or rename the directory, then re-mount",
+            });
+            continue;
+          }
+          const declText = readFileSync(join(work, p.declarationFile));
+          const dirs: LockedInstance["directories"] = p.directories
+            .filter((d) => existsSync(join(plan.instanceRoot, d.path)))
+            .map((d) => ({
+              id: d.id,
+              path: d.path,
+              upstreamPath: d.upstreamPath,
+              ...digestOf(join(plan.instanceRoot, d.path), stateMountedDirs(plan.instanceRoot)),
+              ...(d.package ? { package: { url: d.package.url, sha256: d.package.sha256, member: d.package.member } } : {}),
+            }));
+          const assets = (p.assets ?? []).filter((a) => existsSync(join(target, a))).map((a) => ({ src: a, sha256: sha256Text(readFileSync(join(target, a))) }));
+          ensureIgnored(plan.instanceRoot, p.path, true);
+          locked.push({
+            instance: p.instance,
+            repository: p.repository,
+            sha: p.sha,
+            upstreamRoot: p.upstreamRoot,
+            path: p.path,
+            via: p.via,
+            pinnedBy: p.pinnedBy,
+            declaration: { file: `${p.instance}.json`, sha256: sha256Text(declText) },
+            directories: dirs,
+            ...(assets.length ? { assets } : {}),
+            trust: trust.record,
+          });
+          plan.outcomes.push({
+            instance: p.instance,
+            state: mountedState(trust),
+            path: p.path,
+            detail: `adopted: \`${p.path}/\` was already the pinned bytes of ${p.repository}@${p.sha.slice(0, 12)} (${dirs.length} director${dirs.length === 1 ? "y" : "ies"} compared file by file), so it was locked, not re-laid; basis: ${trust.detail}`,
           });
           continue;
         }

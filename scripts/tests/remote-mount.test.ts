@@ -320,6 +320,26 @@ describe("mount:remote over fixture repositories", () => {
     expect(checkRemote({ instanceRoot: root }).state).toBe("missing");
   });
 
+  test("9b. a target that IS the pinned bytes, with no lock, is adopted; one that differs is refused and named (folio-assistant#2467)", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    rmSync(join(root, "index.lock.json"));
+    const again = mountRemote({ instanceRoot: root, urlFor });
+    const base = again.plan.outcomes.find((o) => o.instance === "base")!;
+    expect(base.state).toBe("mounted");
+    expect(base.detail).toContain("adopted");
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    rmSync(join(root, "index.lock.json"));
+    writeFileSync(join(root, "base/schemas/util.ts"), "export const answer = 41;\n");
+    writeFileSync(join(root, "base/schemas/extra.ts"), "export {};\n");
+    const refused = mountRemote({ instanceRoot: root, urlFor }).plan.outcomes.find((o) => o.instance === "base")!;
+    expect(refused.state).toBe("missing");
+    expect(refused.detail).toContain("differ: `base/schemas/util.ts`");
+    expect(refused.detail).toContain("extra: `base/schemas/extra.ts`");
+    expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).toContain("41");
+  });
+
   test("10. a lock for other pins reads stale; an unreadable lock reads could-not-determine", () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
