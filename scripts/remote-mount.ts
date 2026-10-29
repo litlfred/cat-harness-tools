@@ -1282,11 +1282,14 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           if (changed.length && opts.discardEdits) {
             console.error(`fresh: replacing ${p.path}/ (${changed.length} path(s) no longer hashed to the lock)`);
           } else if (changed.length) {
+            // folio-assistant#2682: when the pin moved, say so. The lock keeps
+            // this entry at its old commit, so the layer was NOT re-pinned.
+            const moved = before.sha !== p.sha ? `; the pin moved to ${p.sha.slice(0, 12)} but this instance stays at ${before.sha.slice(0, 12)}, so it is NOT re-pinned (\`--fresh\` replaces it)` : "";
             plan.outcomes.push({
               instance: p.instance,
               state: "missing",
               path: p.path,
-              detail: `left untouched: ${changed.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount`,
+              detail: `left untouched: ${changed.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount${moved}`,
             });
             locked.push(before);
             untouched.add(p.instance);
@@ -1539,8 +1542,17 @@ export function parseSeed(arg: string): SeedSpec {
  * the committed `.gitignore` block moves with it. Nothing is fetched: run
  * `mount:remote` afterwards.
  */
-export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant): { file: string; mounts: RemoteMount[] } {
+export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant, opts: { discardEdits?: boolean } = {}): { file: string; mounts: RemoteMount[] } {
   if (specs.length === 0) throw new Error("nothing to seed");
+  // folio-assistant#2682: re-pinning over edited mounts moved the pin while
+  // the next mount left the edited instances at their old commit. Refuse up
+  // front, unless the caller will replace them (`--fresh`).
+  const edited = opts.discardEdits ? [] : editedMounts(instanceRoot, specs.map((s) => s.harness));
+  if (edited.length) {
+    throw new Error(
+      `the mounts this re-pin moves have edits the lock does not hold (${edited.join("; ")}), so the next mount would leave them at the old commit — move the edits upstream, or re-pin from a checkout mounted from the lock (\`.github/mount-from-lock.sh\`), or pass \`--fresh\` to discard them`,
+    );
+  }
   const current = readDeclaredMounts(instanceRoot).mounts;
   const next: RemoteMount[] = [...current];
   for (const spec of specs) {
@@ -1553,6 +1565,24 @@ export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], gra
   }
   const { file } = writeDeclaredMounts(instanceRoot, next);
   return { file, mounts: next.filter((m) => specs.some((s) => s.harness === m.harness)) };
+}
+
+/** Locked instances reached through `harnesses` whose bytes on disk no longer hash to the lock, as `<instance>: <paths>`. */
+export function editedMounts(instanceRoot: string, harnesses: readonly string[]): string[] {
+  let lockFile: string;
+  try {
+    lockFile = mountLockPathFor(instanceRoot, downstreamOf({ instanceRoot }).name);
+  } catch {
+    return [];
+  }
+  const r = readMountLock(lockFile);
+  if (!r.ok) return [];
+  return r.lock.instances
+    .filter((i) => harnesses.includes(i.via))
+    .flatMap((i) => {
+      const changed = modifiedSince(instanceRoot, i);
+      return changed.length ? [`${i.instance}: ${changed.join(", ")}`] : [];
+    });
 }
 
 // ── Checking (no network) ────────────────────────────────────────────────────
@@ -1904,7 +1934,7 @@ if (import.meta.main) {
     try {
       const specs = argv.flatMap((a, i) => (a === "--seed" ? [parseSeed(argv[i + 1] ?? "")] : [])).map((s) => ({ ...s, whole: argv.includes("--whole") }));
       const root = at === -1 ? checkoutRootFor(process.cwd()) : resolve(argv[at + 1]!);
-      const r = seedRemote(root, specs, { by, evidence, on: valueOf("--consent-on") });
+      const r = seedRemote(root, specs, { by, evidence, on: valueOf("--consent-on") }, { discardEdits: argv.includes("--fresh") });
       for (const m of r.mounts) console.log(`✓ ${m.harness} = ${m.repository}@${m.ref.slice(0, 12)}; consent by ${m.trust?.consent?.by} on ${m.trust?.consent?.on}`);
       console.log(`wrote ${r.file} — run \`bun run cat mount:remote\` to lay the bytes down`);
       process.exit(0);
