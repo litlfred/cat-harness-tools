@@ -117,7 +117,7 @@ describe("MCP tool groups", () => {
     // Different states because the remedies are opposite: fix the module vs
     // install the layer. Collapsing them sends the operator the wrong way.
     const broken: ToolGroupDeclaration[] = [
-      { id: "wrong-export", module: "src/tools/preview.ts", registrar: "registerNoSuchThing", layer: "sci" },
+      { id: "wrong-export", module: "src/tools/readme-audit.ts", registrar: "registerNoSuchThing", layer: "sci" },
     ];
     const [o] = await registerDeclaredToolGroups({}, broken, MCP_ROOT);
     expect(o.state).toBe("failed");
@@ -127,8 +127,8 @@ describe("MCP tool groups", () => {
   test("a registrar that throws is `failed`, and does not abort the rest", async () => {
     const calls: string[] = [];
     const groups: ToolGroupDeclaration[] = [
-      { id: "wrong-export", module: "src/tools/preview.ts", registrar: "registerNoSuchThing", layer: "sci" },
-      { id: "preferences", module: "src/tools/preferences.ts", registrar: "registerPreferenceTools", layer: "cat-harness" },
+      { id: "wrong-export", module: "src/tools/readme-audit.ts", registrar: "registerNoSuchThing", layer: "sci" },
+      { id: "readme-audit", module: "src/tools/readme-audit.ts", registrar: "registerReadmeAuditTools", layer: "cat-harness" },
     ];
     const fake = { tool: (n: string) => calls.push(n), registerTool: (n: string) => calls.push(n) };
     const out = await registerDeclaredToolGroups(fake, groups, MCP_ROOT);

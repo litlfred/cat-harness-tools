@@ -60,7 +60,9 @@ describe("MCP-vs-CLI tool parity measurer", () => {
     expect(mcpOnlyToolIds).toContain("workflow-start");
     expect(mcpOnlyToolIds).toContain("workflow-complete");
     expect(mcpOnlyToolIds).toContain("skill-fetch");
-    expect(mcpOnlyToolIds).toContain("paper-preferences");
+    // paper-preferences was here until bean `bbza` moved it to folio-assistant-sci;
+    // this measurer reads the harness's own Tool list.
+    expect(mcpOnlyToolIds).toContain("translation-status");
 
     expect(report.skills.mcpOnly).toContain("process-state");
     expect(report.skills.mcpOnly).toContain("skills-and-tools");

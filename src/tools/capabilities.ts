@@ -4,8 +4,10 @@
  * `.claude/skills/capabilities/*.json` has always described how to detect each
  * external tool — a command, an env var, a file — and `requires` edges between
  * them. Nothing executed them: `--check-deps` carried its own hardcoded list,
- * and so did `src/tools/check-deps.ts`. So the probes were documentation, and
- * a skill declaring `requiredCapabilities` had nothing to check against.
+ * and so did the `check_dependencies` MCP tool (`src/tools/check-deps.ts`,
+ * now `folio-assistant-sci/adapters/paper/tools/check-deps.ts`). So the probes
+ * were documentation, and a skill declaring `requiredCapabilities` had
+ * nothing to check against.
  *
  * That matters beyond tidiness. The integration contract in
  * `docs/proposals/rag-document-ingestion.md` §5 rests on **absent tool ⇒
