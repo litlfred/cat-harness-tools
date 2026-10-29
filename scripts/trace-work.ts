@@ -22,7 +22,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { walkBlocks } from "../pipeline/qa-utils.ts";
 import { KNOWN_LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";

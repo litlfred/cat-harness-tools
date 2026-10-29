@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   basisOverlap,
   hashesReproduce,

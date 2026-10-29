@@ -47,7 +47,7 @@ import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import type { Subscription } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { Subscription } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { PART_RECORD_FILE, PART_TREE, partDirOf, viewOf } from "./kg-parts.js";
 import { readSnapshot, snapshotDirFor } from "./subscribed-harnesses.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";

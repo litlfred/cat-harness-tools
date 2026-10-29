@@ -56,7 +56,7 @@ import { voiceCriteriaFor } from "./voice-criteria.ts";
  */
 
 import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 // ── Domain: voice ───────────────────────────────────────────────
 

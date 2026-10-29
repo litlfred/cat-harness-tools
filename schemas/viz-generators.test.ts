@@ -27,7 +27,7 @@ import { unscopedSelectors } from "../scripts/lib/themed-page.ts";
 import { viewerHtml as libraryShell, VIEWER_CSS, VIEWER_JS } from "../scripts/gen-library-viz.ts";
 import { readSchemaGraph } from "../scripts/schema-graph.ts";
 import { readLibraryGraph } from "../scripts/library-graph.ts";
-import { directoriesForGraph, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoriesForGraph, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const ROOT = HARNESS_ROOT;
 

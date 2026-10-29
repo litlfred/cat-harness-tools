@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { CatHarnessDeclarationSchema, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CatHarnessDeclarationSchema, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { harnessPanel, summarise } from "../harness-panel.ts";
 import { instanceDirs } from "../harness-tiles.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

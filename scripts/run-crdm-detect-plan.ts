@@ -33,7 +33,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.ts";
 import { buildTestRun, UNKNOWN_HASH, type SutRef, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";
 import {

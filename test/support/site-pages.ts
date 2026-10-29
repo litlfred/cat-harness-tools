@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import type { VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
 import {
   declaredVisualisers,

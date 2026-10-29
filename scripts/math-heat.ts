@@ -372,7 +372,7 @@ if (import.meta.main) {
     process.exit(0);
   }
   const { requirePaper } = await import("../pipeline/repo-root");
-  const { folioDir } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+  const { folioDir } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
   const paper = requirePaper(flag(args, "--paper"));
   const contentRoot = resolve(flag(args, "--content-root") ?? folioDir(process.cwd()));
   const { input, sources } = await gatherMathHeat({

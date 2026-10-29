@@ -64,7 +64,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
 import {
   type Bump,

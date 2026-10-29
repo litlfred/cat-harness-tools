@@ -70,7 +70,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   VIEWER_NAV_QA_SCHEMA,
   ViewerNavQaSchema,

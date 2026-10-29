@@ -37,8 +37,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 

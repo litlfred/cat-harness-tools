@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { declarationChain } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { declarationChain } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";

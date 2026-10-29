@@ -57,7 +57,7 @@
  * disagree with the index the board reads.
  */
 import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.js";
-import { DOCS_SITE_BASE, siteNodeIri } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE, siteNodeIri } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.ts";
 import { contentSourceContext } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { memberOf, subgraphContainer } from "./subgraph-node.ts";

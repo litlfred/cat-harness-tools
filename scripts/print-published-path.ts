@@ -21,7 +21,7 @@
  * Exit 0 printed; 1 no declaration; 3 the instance declares `"enabled": false`
  * and is not published, which a workflow reads as "skip", never as an error.
  */
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
 
 /** The exit status that means "declared not published". */

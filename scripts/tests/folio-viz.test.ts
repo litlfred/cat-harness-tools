@@ -13,7 +13,7 @@ import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import { FolioGraphProjectionSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { MARKER } from "../folio-mount.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
 

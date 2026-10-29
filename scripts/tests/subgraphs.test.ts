@@ -29,10 +29,10 @@ import {
   resolveDirectories,
   siteDirFor,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
-import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -120,7 +120,7 @@ describe("the entanglement report", () => {
     // every one asking somebody to edit a transcription of a document this
     // project did not write.
     //
-    // `schemas/cat-harness.ts` already said so of the `derived` layer — *"a QA
+    // `schemas/kg/cat-harness.ts` already said so of the `derived` layer — *"a QA
     // finding against a derived section is a finding against its GENERATOR,
     // not against the corpus, and it sends a reviewer to fix the wrong file"*
     // — and this check simply was not applying it.

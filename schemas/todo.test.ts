@@ -24,7 +24,7 @@ import {
 } from "@litlfred/cat-harness/schemas/todo.ts";
 import { readTodoFiles, todoDefaultTheme } from "../scripts/todos.js";
 import { buildKgIndex } from "../src/core/feedback.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
 

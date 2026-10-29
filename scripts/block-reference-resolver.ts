@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { folioDir as folioDirOf, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir as folioDirOf, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   KG_QA_SCHEMA,
   tally,

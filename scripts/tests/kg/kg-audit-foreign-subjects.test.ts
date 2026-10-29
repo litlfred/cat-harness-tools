@@ -20,7 +20,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   ForeignSubjectError,
   kgQaSidecarPath,

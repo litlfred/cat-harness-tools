@@ -21,7 +21,7 @@
  *
  * ## What is allowed, and why
  *
- * - `schemas/cat-harness.ts` — `folioDir` itself. It IS the base case: the
+ * - `schemas/kg/cat-harness.ts` — `folioDir` itself. It IS the base case: the
  *   convention has to be written down once, and resolving it through a
  *   declaration would be circular.
  * - `*.test.ts` — fixtures BUILD trees rather than resolving them. A test that
@@ -35,7 +35,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
@@ -45,7 +45,7 @@ const ROOT = repoRootFor(INSTANCE);
 const LITERAL = /(?<![.\w])(?:join|resolve)\s*\([^,()]*(?:\([^()]*\))?[^,()]*,\s*"folio"\s*[,)]/;
 
 /** The one module that may spell it, because it is where the answer lives. */
-const BASE_CASE = "cat-harness/schemas/cat-harness.ts";
+const BASE_CASE = "cat-harness/schemas/kg/cat-harness.ts";
 
 /**
  * The harness and the layer that implements its tools. The MCP server moved to

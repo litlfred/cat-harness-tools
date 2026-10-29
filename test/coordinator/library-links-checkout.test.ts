@@ -12,7 +12,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { forgeLocation, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { forgeLocation, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../scripts/lib/library-links.ts";
 import { pageParts } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";

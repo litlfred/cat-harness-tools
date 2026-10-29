@@ -8,7 +8,7 @@
  * `remote-mount.ts` (bean `0mpw`) PLANS a mount: it reads the harness's
  * declaration at the pin, follows `needs` across the closure, checks trust and
  * writes the lock. To do that it reads declarations through
- * `schemas/cat-harness.ts`, whose import closure reaches six modules under
+ * `schemas/kg/cat-harness.ts`, whose import closure reaches six modules under
  * `bootstrap-tools/schemas/` (measured 2026-10-07: `declared-order`, `graph`,
  * `requirement`, `model-registry`, `release-iri`, `declaration`). That is fine
  * while `bootstrap-tools` arrives as a git submodule. It is a bootstrapping

@@ -144,8 +144,8 @@ import {
   siteDirFor,
   type CatHarnessDeclaration,
   visualisationsOf,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";

@@ -27,7 +27,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { siteOwnerDir } from "./viewer-declarations.ts";
 
 import {

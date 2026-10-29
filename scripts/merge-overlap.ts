@@ -38,7 +38,7 @@
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { git } from "./merge-pipeline-git.ts";
 import { differsOnlyInRegions, pathClass, sharedDeclarationsOf } from "./merge-pipeline-paths.ts";
 

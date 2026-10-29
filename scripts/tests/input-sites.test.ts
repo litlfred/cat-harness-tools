@@ -14,9 +14,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { declaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.ts";
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.ts";
 
@@ -381,7 +381,7 @@ describe("annotations hold to the data that chooses their targets", () => {
         }
       }
     }
-    for (const g of globs) expect(annotated("cat-harness/schemas/harness-config.ts", g), g).toBe(true);
+    for (const g of globs) expect(annotated("cat-harness/schemas/kg/harness-config.ts", g), g).toBe(true);
   });
 
 

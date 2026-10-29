@@ -15,7 +15,7 @@
  * > harnesses, todos,"
  *
  * This is that gate. The resolution is `resolveLandingInstance` in
- * `schemas/harness-config.ts`, the only reader of the flag; this script
+ * `schemas/kg/harness-config.ts`, the only reader of the flag; this script
  * reports its answer and fails on `ambiguous`. `none` passes: a checkout with
  * nothing instantiated has no site landing to decide, and failing there
  * would make every bare fixture red.
@@ -30,8 +30,8 @@
  */
 import { join, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { indexAgreement, resolveLandingInstance, type IndexAgreement, type LandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 
 import { readRawConfigFile } from "./instance-config.ts";

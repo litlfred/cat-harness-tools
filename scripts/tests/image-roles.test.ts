@@ -120,7 +120,7 @@ describe("what counts as a mention", () => {
 
   test("the module that DEFINES the lookups is never a consumer of them", () => {
     const src = "const byLayout = imagesForRole(images, role);";
-    expect(hasDynamicLookup("cat-harness/schemas/kg-node.ts", src)).toBe(false);
+    expect(hasDynamicLookup("cat-harness/schemas/kg/kg-node.ts", src)).toBe(false);
     expect(hasDynamicLookup("cat-harness/scripts/other.ts", src)).toBe(true);
   });
 });

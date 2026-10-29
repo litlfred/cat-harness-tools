@@ -37,7 +37,7 @@ import {
   findInstanceRoot,
   instanceRootsIn,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { workflowFiles } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT, isGlobalTasksFile } from "../src/workflow/process-model.js";
 

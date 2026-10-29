@@ -53,7 +53,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { BranchStore, MANIFEST_FILE, MANIFEST_SCHEMA } from "./branch-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

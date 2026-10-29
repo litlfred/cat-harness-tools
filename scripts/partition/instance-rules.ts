@@ -252,7 +252,7 @@ export const RULES: Rule[] = [
       // instance decide what every other mounted page declares.
       // The migration a renamed or major-bumped NODE KIND ships with (issue
       // #2195): rewrites `$schema` values only. HARNESS, beside the node-kind
-      // machinery in `schemas/node-kind.ts` it serves.
+      // machinery in `schemas/kg/node-kind.ts` it serves.
       // The generic node-kind pages (issue #2195): one per kind, harness and
       // node. HARNESS for the reason the viewer pages are: it is the
       // platform's view of any harness's nodes, and its reader beside it.
@@ -370,7 +370,7 @@ export const RULES: Rule[] = [
       // records: what settles it is what a module is ABOUT. That one produces
       // folio content (a board); this one reads instance DECLARATIONS and
       // answers a question about the machinery — which directories an instance
-      // says it renders. Its only import is `schemas/cat-harness.ts`, which is
+      // says it renders. Its only import is `schemas/kg/cat-harness.ts`, which is
       // harness, so the direction is flat rather than upward.
       //
       // Classified core first, on the reasoning that a tile is something a
@@ -394,10 +394,10 @@ export const RULES: Rule[] = [
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
-      "schemas/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
-      "schemas/skill-definitions-dir.ts",    // where the JSON skill definitions and conventions live (bean `rqao`)
-      "schemas/kg-node.ts",                  // the labels every KG node carries
-      "schemas/harness-config.ts",           // cross-instance dependency resolution
+      "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
+      "schemas/kg/skill-definitions-dir.ts",    // where the JSON skill definitions and conventions live (bean `rqao`)
+      "schemas/kg/kg-node.ts",                  // the labels every KG node carries
+      "schemas/kg/harness-config.ts",           // cross-instance dependency resolution
       "schemas/subgraph-source.ts",          // where a declared subgraph gets its content (bean `l4ay`) — read by the declaration schema itself
       "schemas/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
       "schemas/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
@@ -431,9 +431,9 @@ export const RULES: Rule[] = [
       // such edges). Its neighbour above is the precedent rather than an
       // analogy -- the same shape, shared by the same two callers.
       "schemas/git-corpus.ts",
-      "schemas/detangle.ts",                 // the detangle criterion — folded in from its own instance (bean `byql`)
-      "schemas/detangle-sidecar.ts",         // what a detangle measurement pins (bean `byql`)
-      "schemas/node-kind.ts",                // node kinds declare their parents; composed by that walk (bean `a1lq`)
+      "schemas/kg/detangle.ts",                 // the detangle criterion — folded in from its own instance (bean `byql`)
+      "schemas/kg/detangle-sidecar.ts",         // what a detangle measurement pins (bean `byql`)
+      "schemas/kg/node-kind.ts",                // node kinds declare their parents; composed by that walk (bean `a1lq`)
       "schemas/ui/diff-renderers.ts",           // the review page's diff renderers, declared as data (bean `d903`)
       // What a graph TILE shows. Same argument as `scripts/graph-tiles.ts`
       // twenty lines up, and it arrived the same way: classified core first
@@ -447,9 +447,9 @@ export const RULES: Rule[] = [
       // `constraints.ts` and 32 aliases in `types.ts`, which put it under the
       // core `schemas/` prefix and made four harness modules read as depending
       // on the content layer. None of it describes a folio's content.
-      "schemas/skill-package.ts",
+      "schemas/kg/skill-package.ts",
       // `skills.json`'s shape (bean `9umr`); read by `scripts/skill-topics.ts`.
-      "schemas/skill-topics.ts",
+      "schemas/kg/skill-topics.ts",
       // The other grouping kinds' from-within group declaration (placement
       // PR0c, bean `ejye`); imports only zod. Concern groups are how the
       // harness's own subgraphs are laid out, not content.
@@ -583,7 +583,7 @@ export const RULES: Rule[] = [
       // folio graph and writes content nodes into it — the landing stickies —
       // so it does not merely need a folio, it is where one comes from. It also
       // imports `schemas/landing-sticky.ts` (a content node) and
-      // `schemas/folio-graph-typology.ts`, which is core's by the argument written
+      // `schemas/kg/folio-graph-typology.ts`, which is core's by the argument written
       // on that module: a layer that cannot render must not own the renderable
       // kind. Classifying it harness would put core's own kind registration
       // behind a harness module.
@@ -613,7 +613,7 @@ export const RULES: Rule[] = [
       //
       // CORE rather than harness for the reason every entry above shares: each
       // reads THIS INSTANCE'S declaration, and this instance declares a `folio`
-      // graph, so each must import `schemas/folio-graph-typology.ts` for the kind
+      // graph, so each must import `schemas/kg/folio-graph-typology.ts` for the kind
       // to be registered — and that module is core's by the argument written on
       // it ("a layer that cannot render must not own the renderable kind").
       //
@@ -734,13 +734,13 @@ export const RULES: Rule[] = [
       // folio contains.
       "schemas/health-report.ts",
       "schemas/todo-graph.ts",
-      // Imports `schemas/cat-harness.js` and nothing else, so unlike its
+      // Imports `schemas/kg/cat-harness.js` and nothing else, so unlike its
       // neighbour `check-agent-entry-links.ts` it inherits no wrong-direction
       // edge from the generic link auditor (bean `cp3l`). Harness by subject
       // as well as by dependency: it reads THIS repository's `AGENTS.md`
       // against THIS repository's source, and a folio has neither as content.
       // Reads GitHub's view of THIS repository's commits, and imports only
-      // `src/core/git-refs.ts` and `schemas/cat-harness.ts` — both harness.
+      // `src/core/git-refs.ts` and `schemas/kg/cat-harness.ts` — both harness.
       // Harness by subject too: whether a commit got a CI run is a fact about
       // the forge and the pipeline, and a folio has neither as content.
       // Bean `6ptx`. Harness by subject: a survey is of THIS repository's own
@@ -838,8 +838,8 @@ export const RULES: Rule[] = [
       // The CatHarness root declaration is harness-layer by concept even
       // though it sits in schemas/. It declares its own HARNESS_NS rather than
       // importing the content vocabulary, so classifying it here adds no
-      // wrong-direction edge — see schemas/cat-harness.ts.
-      "schemas/cat-harness.ts",
+      // wrong-direction edge — see schemas/kg/cat-harness.ts.
+      "schemas/kg/cat-harness.ts",
       // The graph-typology registry, split out of the line above so core could
       // import it without a cycle (bean `q2wn`). HARNESS on the same terms:
       // it holds `BASE_GRAPH_TYPOLOGIES` — the harness's OWN three kinds — plus
@@ -847,7 +847,7 @@ export const RULES: Rule[] = [
       // not own it; core CONTRIBUTES `folio` to it, which is the whole
       // distinction `folio-graph-typology.ts` argues. Left to triage it landed
       // in core on a keyword, which had the ownership exactly backwards.
-      "schemas/graph-typology-registry.ts",
+      "schemas/kg/graph-typology-registry.ts",
       // declared-path-literal: a partition plan names modules by path, the
       // same base case as the TARGET layouts above. dmx1's and riit's leaves,
       // imported by the registry and the declaration schema: instance discovery
@@ -1118,7 +1118,7 @@ export const RULES: Rule[] = [
       // `library/`, a folio's own material, and its three nearest
       // neighbours by SUBJECT — `check-l1-complete`, `ingest-document`,
       // `l1-blocks` — are all in the content-side block below. It imports
-      // `schemas/cat-harness.ts` and nothing else. The declaration resolver
+      // `schemas/kg/cat-harness.ts` and nothing else. The declaration resolver
       // is harness, so filing this core would buy a wrong-direction edge for
       // the tidiness of sitting beside the pipeline it audits. The three
       // below are core because THEY reach `schemas/narrative.ts` and its
@@ -1129,7 +1129,7 @@ export const RULES: Rule[] = [
       // it writes (bean `ar1s`, phase 3), so it is classified by location now.
       // The activity log's vocabulary: "what an agent did, when, and in which
       // process". Its only consumers are the two modules above and
-      // `schemas/cat-harness.ts`, which is already harness. Left to the
+      // `schemas/kg/cat-harness.ts`, which is already harness. Left to the
       // `schemas/` prefix it lands in core, and classifying the pair above
       // would then MINT two wrong-direction edges rather than retire two —
       // which is why it moves in the same change and not after.
@@ -1376,7 +1376,7 @@ export const RULES: Rule[] = [
       // ONE seam that says where published todos are read from, and the
       // generic thin-page shell they render with. CORE for the reason
       // `todo-listing.ts` gives: renderers of a folio's own notes, called by
-      // `gen-docs-pages.ts` (core). They import `schemas/jsonld.ts`,
+      // `gen-docs-pages.ts` (core). They import `schemas/kg/jsonld.ts`,
       // `schemas/todo-index.ts`, `scripts/todos.ts` and `viewer-page.ts`, all
       // core, so harness here would be four wrong-direction edges.
       // The state visualiser, and it is core for the reason `gen-landing-data.ts`
@@ -1463,7 +1463,7 @@ export const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "bean
  * `cat-harness.ts` imports core's `folio-graph-typology.ts` for its side effect,
  * which is what makes the `folio` registration automatic instead of something
  * 110 commands had to remember. Bean `q2wn`, and the header of
- * `schemas/graph-typology-registry.ts` for why the alternatives were worse.
+ * `schemas/kg/graph-typology-registry.ts` for why the alternatives were worse.
  *
  * ONE entry, naming BOTH endpoints. That is the difference between this and
  * the blanket rule first tried here — "a bare side-effect import is exempt"
@@ -1477,8 +1477,8 @@ export const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "bean
  */
 const PERMITTED_EDGES: readonly PermittedEdge[] = [
   {
-    from: "schemas/cat-harness.ts",
-    to: "schemas/folio-graph-typology.ts",
+    from: "schemas/kg/cat-harness.ts",
+    to: "schemas/kg/folio-graph-typology.ts",
     reason:
       "The registration trigger. Core owns `folio`; this import is what makes it registered " +
       "by the time any reader can be called, because a reader lives in `cat-harness.ts` and " +

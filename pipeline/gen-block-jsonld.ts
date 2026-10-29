@@ -38,7 +38,7 @@
  * @covers folio
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
@@ -49,10 +49,10 @@ import {
   resolveReferenceKey,
   typesForKind,
   parseReference,
-} from "@litlfred/cat-harness/schemas/jsonld.ts";
+} from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { loadBlocksUnder, reportLoadFailures, type LoadedBlock } from "./block-module";
 import { contributionsRoot, findContentRepoRoot, findPapers } from "./repo-root";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { paperArg } from "./cli-args";
 

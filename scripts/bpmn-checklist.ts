@@ -60,7 +60,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { loadProcessModel, processDiagrams, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
 import { belowOf } from "./declarations-retag.ts";
 import { workflowFiles } from "./known-skills.js";

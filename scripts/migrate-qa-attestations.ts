@@ -52,8 +52,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   ATTESTATIONS_SUFFIX,
   attestationKeyForDerived,

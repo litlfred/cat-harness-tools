@@ -23,7 +23,7 @@ import { readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
 import { buildFshGutsExport, fshGutsDirs } from "../fsh-guts-export.ts";
 import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
 import { buildExport } from "../kg-export.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

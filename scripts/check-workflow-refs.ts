@@ -37,7 +37,7 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { beanCallFindings, noteTakers, type DiagramFacts } from "./check-bean-lifecycle-calls.ts";
 
 interface Dangling { file: string; node: string; ref: string }

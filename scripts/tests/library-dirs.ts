@@ -20,7 +20,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 // The CORPUS (placement PR0, bean `ejye`): the libraries the platform once
 // mirrored are asked of the checkout now.
-import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** The instance root these helpers resolve against: `cat-harness`. */

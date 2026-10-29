@@ -22,7 +22,7 @@ import { resolve } from "path";
 import { evaluate, loadDecisionTable, possibleOutcomes } from "../../src/workflow/decision-table";
 import { loadProcessModel } from "../../src/workflow/process-model";
 import { REACH_UNKNOWN, effectiveReach } from "@litlfred/cat-harness/schemas/actor-reach.ts";
-import { NETWORK_REACHES } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { NETWORK_REACHES } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { fulfilmentKindsForBpmnType } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { workflowFile } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

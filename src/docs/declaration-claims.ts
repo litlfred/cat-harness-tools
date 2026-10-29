@@ -45,7 +45,7 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findDeclarationFile, instanceRootsIn, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** Where a graph id is declared: the ids, each with its declaring file(s). */
 export type GraphSources = Map<string, Set<string>>;

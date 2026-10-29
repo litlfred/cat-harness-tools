@@ -101,7 +101,7 @@ import {
   requiresInspection,
   type ImageRole,
 } from "@litlfred/cat-harness/schemas/document-image.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import {
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,

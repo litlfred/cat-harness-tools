@@ -54,8 +54,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 import { findEntryFiles } from "./check-agent-entry-links.ts";
 import { isSyncedSkillDir } from "./sync-remote-skills.js";

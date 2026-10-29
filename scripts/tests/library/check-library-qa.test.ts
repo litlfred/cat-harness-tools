@@ -22,7 +22,7 @@ import {
   yearOf,
 } from "../../check-library-qa.ts";
 import { readLibraryGraph, type LibraryEntry } from "../../library-graph.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", "..", ".."));

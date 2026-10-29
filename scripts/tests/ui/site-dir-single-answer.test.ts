@@ -22,7 +22,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDir, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDir, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { repoFilesWithExt } from "../../repo-files.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 

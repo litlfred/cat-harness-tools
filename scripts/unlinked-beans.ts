@@ -52,7 +52,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { buildLsi, buildTermMatrix, keywordsOf, type LsiIndex, type TermMatrix } from "../pipeline/lsi.ts";
-import { instanceRootsIn, declaredGraphs } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, declaredGraphs } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import type { QaResult } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
 import { beanDefsDir, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";

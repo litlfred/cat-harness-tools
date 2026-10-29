@@ -23,7 +23,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 const REGISTRY = resolve(import.meta.dir, "../../pipeline/qa-criteria-registry.ts");

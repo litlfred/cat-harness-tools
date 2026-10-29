@@ -24,7 +24,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ActorDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { ownKgRoots, workflowFile } from "../../scripts/known-skills.ts";
 

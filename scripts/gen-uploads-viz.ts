@@ -94,7 +94,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";

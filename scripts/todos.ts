@@ -44,8 +44,8 @@ import { basename, join, relative, resolve } from "node:path";
 import { EMPTY_NOTE_TAGS, KgRefSchema, type ArtefactRef, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/carried-note.js";
 import { TODO_SCHEMA_TAG, TodoNodeSchema, type TodoNode } from "@litlfred/cat-harness/schemas/todo.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { graphReadPath } from "./graph-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

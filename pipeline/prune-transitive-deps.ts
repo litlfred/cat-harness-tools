@@ -34,7 +34,7 @@
  * @module pipeline/prune-transitive-deps
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { Paper, Chapter, Section, Block } from "@litlfred/cat-harness/schemas/types.ts";

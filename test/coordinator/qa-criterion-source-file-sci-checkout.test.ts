@@ -23,8 +23,8 @@ import {
   isCriterionSourceMiss,
   resolveCriterionSource,
 } from "../../pipeline/criterion-source.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {
   ContributionRegistry,
   type FolioContribution,

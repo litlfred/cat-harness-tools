@@ -74,8 +74,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 export type Probe = "ok" | "not-found" | "error" | "unchecked";
 export type PagesOutcome = "live" | "not-yet" | "unknown" | "unprovisioned";

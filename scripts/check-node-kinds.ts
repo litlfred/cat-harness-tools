@@ -45,7 +45,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { defaultGraphTypologies, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
 import {

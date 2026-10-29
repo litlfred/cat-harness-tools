@@ -92,7 +92,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   siteFileFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { THEME_KINDS, type ThemeKind } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { instanceThemes } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
 import { instanceThemesDataPath } from "./gen-themes-css.js";
@@ -429,7 +429,7 @@ function main(): number {
   //
   // A first draft had one: an `icon` naming no entry in `images`. It was dead
   // code. `readDeclaration` ALREADY throws on exactly that
-  // (`schemas/cat-harness.ts`, the `ids.includes(parsed.data.icon)` guard), and
+  // (`schemas/kg/cat-harness.ts`, the `ids.includes(parsed.data.icon)` guard), and
   // its message lists every declared id, which this one did not. So the family
   // could never fire, and had the schema ever stopped checking it, the version
   // here would have been the weaker of two answers to one question — free to

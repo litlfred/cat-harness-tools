@@ -23,7 +23,7 @@
  * @module pipeline/q-usage-audit
  */
 
-import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve, relative } from "node:path";
@@ -50,7 +50,7 @@ import {
 // from this file's own location lands inside the platform tree instead.
 import { findContentRepoRoot, findPapers } from "./repo-root.ts";
 import { paperArg } from "./cli-args";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 // The one contract for where a block's verdict lives (test/results/block-qa/,
 // mirroring the block's own directory) — see pipeline/qa-paths.ts.
 // `blockQaPath` for writing (results tree only); `existingBlockQaPath` for

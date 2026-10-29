@@ -32,8 +32,8 @@ import {
   libraryInstanceOf,
   unknownArgument,
 } from "../../pipeline/gen-library-jsonld";
-import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 import { contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import { manifestLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";

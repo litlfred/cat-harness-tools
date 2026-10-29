@@ -85,8 +85,8 @@ import {
   instanceRootsIn,
   readDeclaration,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
 import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

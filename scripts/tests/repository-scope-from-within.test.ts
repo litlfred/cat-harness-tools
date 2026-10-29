@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DECLARATION_SUFFIX, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { DECLARATION_SUFFIX, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const made: string[] = [];
 afterEach(() => {

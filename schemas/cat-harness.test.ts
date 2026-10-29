@@ -11,13 +11,13 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
-import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/folio-graph-typology.ts";
+import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/kg/folio-graph-typology.ts";
 import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.ts";
 import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/bean-graph.ts";
 import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/todo-graph.ts";
-import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { writeDeclaration } from "../test/support/instance-fixture.js";
-import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 const TMP = join(import.meta.dir, "__test_agent_harness__");
 const INSTANCE_ROOT = HARNESS_ROOT;
@@ -195,16 +195,16 @@ describe("inheritance — the Phase 0.3 gate", () => {
 describe("layering", () => {
   it("does not import the content vocabulary", () => {
     // The property, pinned structurally rather than by a drift guard: this is
-    // a HARNESS-layer module, and `schemas/jsonld.ts` is folio-assist-core's
+    // a HARNESS-layer module, and `schemas/kg/jsonld.ts` is folio-assist-core's
     // content vocabulary (block kinds, DoCO types, SPAR citation terms).
     // Importing it would make agentic-harness depend on the content model for
     // its own type IRIs — a harness -> core edge, already the largest
     // wrong-direction group, and the coupling the split exists to undo.
-    // The namespace comes from the leaf `./namespaces` instead.
-    const src = readFileSync(join(HARNESS_ROOT, "schemas", "cat-harness.ts"), "utf-8");
+    // The namespace comes from the leaf `../namespaces` instead.
+    const src = readFileSync(join(HARNESS_ROOT, "schemas", "kg", "cat-harness.ts"), "utf-8");
     expect(src).not.toMatch(/from "\.\/jsonld"/);
-    expect(src).not.toMatch(/from "\.\/block-kinds"/);
-    expect(src).toMatch(/from "\.\/namespaces"/);
+    expect(src).not.toMatch(/from "\.\.?\/block-kinds"/);
+    expect(src).toMatch(/from "\.\.\/namespaces"/);
   });
 });
 

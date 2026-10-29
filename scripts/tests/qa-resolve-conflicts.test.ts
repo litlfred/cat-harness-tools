@@ -303,8 +303,8 @@ describe("the qa directory is resolved, not assembled", () => {
     // It FAILED OPEN, which is the shape the command exists to prevent, in the
     // command itself. It was found on its first real conflict rather than by a
     // test, so the shape of the return value is asserted here directly.
-    const { directoryForGraph, repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
-    await import("@litlfred/cat-harness/schemas/folio-graph-typology.js");
+    const { directoryForGraph, repoRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.ts");
+    await import("@litlfred/cat-harness/schemas/kg/folio-graph-typology.js");
     const instance = join(HARNESS_ROOT);
     const qa = directoryForGraph(instance, "qa");
     expect(qa).toBeDefined();

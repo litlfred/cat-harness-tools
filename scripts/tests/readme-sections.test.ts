@@ -30,9 +30,9 @@ import {
   type SectionContext,
 } from "../../pipeline/readme-sections";
 import { loadReadmeConfig } from "../../pipeline/readme-toc";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { FIXTURE_CONFIG, FIXTURE_INSTANCE, declareInstance , writeFixtureFile} from "../../test/support/instance-fixture.js";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

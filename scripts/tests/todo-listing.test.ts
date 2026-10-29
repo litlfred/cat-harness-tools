@@ -17,7 +17,7 @@ import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } f
 import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** The minimum a note needs to be a valid `TodoIndexItem`. */
 function item(over: Record<string, unknown> = {}) {

@@ -48,7 +48,7 @@ import { relative } from "node:path";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { corpusScopeFor, workflowFiles } from "./known-skills.js";
 import { isActivity, loadProcessModel, processDiagrams, type ProcessModel } from "../src/workflow/process-model.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** The reusable OPEN: check exists, create, whose bean, claim or leave alone. */
 export const BEAN_OPEN = "Process_BeanOpen";

@@ -103,14 +103,14 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { lockFilesIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
 import { mountScopeFor, readMountLock } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";

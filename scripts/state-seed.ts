@@ -124,7 +124,7 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
 import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.ts";

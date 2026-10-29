@@ -21,7 +21,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { COVER_FILENAME, readLibraryGraph } from "./library-graph.ts";
 import { sourceFileOf } from "./lib/library-source.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

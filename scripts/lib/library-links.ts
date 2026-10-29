@@ -27,12 +27,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 
-import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { detectRepoUrl } from "../../src/core/git-refs.js";
 import { baseDocsDir } from "../compose-docs.js";
 import { itemFacts } from "../library-readmes.ts";
 import { existingPageDir } from "../viewer-declarations.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 /** The links a library reference resolves to; each absent where it does not. */
 export interface LibraryLinks {

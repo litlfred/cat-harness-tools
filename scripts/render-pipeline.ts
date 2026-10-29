@@ -60,7 +60,7 @@ import { dirname, join } from "node:path";
 
 import { flattenDependencies, runInOrder, type OrderedStep } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { buildManifest, readManifest, selectSteps } from "./render-selection.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** A step, plus the command that performs it. */
@@ -160,7 +160,7 @@ export function pipeline(scratch: string): RenderStep[] {
       fatal: false,
       inputGraphs: ["beans", "todos"],
       // declared-path-literal: the `folio` graph typology is CORE's — registered
-      // by `schemas/folio-graph-typology.ts`, which this layer may not import
+      // by `schemas/kg/folio-graph-typology.ts`, which this layer may not import
       // ("a layer that cannot render must not own the renderable kind"). So
       // asking the resolver for it throws, and the authored pages would
       // otherwise go undeclared — which under-declares, the direction bean

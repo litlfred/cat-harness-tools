@@ -34,11 +34,11 @@
  */
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve, dirname } from "path";
-import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "@litlfred/cat-harness/schemas/detangle-sidecar.ts";
+import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "@litlfred/cat-harness/schemas/kg/detangle-sidecar.ts";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { groupDepthFor } from "./group-depth.ts";
 import { TOPICS_FILE, topicsOf } from "../../../scripts/skill-topics.ts";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import {
   DEFAULT_THRESHOLDS,
   measure,
@@ -48,13 +48,13 @@ import {
   type DetangleEdge,
   type DetangleNode,
   type EdgeAuthority,
-} from "@litlfred/cat-harness/schemas/detangle.js";
+} from "@litlfred/cat-harness/schemas/kg/detangle.js";
 import { allowedFromNeeds, directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
-import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
+import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 import { againstOrUsage, qaStorageOf } from "../../../scripts/qa-results.ts";
 import { readQaTree } from "../../../scripts/qa-store.ts";
@@ -846,7 +846,7 @@ if (gatingDirection) {
   }
   console.log(
     `\n  Nothing here decides anything. A failing clause is a reason to LOOK.\n` +
-      `  The carve is an adjudication — see cat-harness/schemas/detangle.ts, "taste is a declared step".\n`,
+      `  The carve is an adjudication — see cat-harness/schemas/kg/detangle.ts, "taste is a declared step".\n`,
   );
 }
 

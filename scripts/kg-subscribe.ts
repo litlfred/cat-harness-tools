@@ -157,7 +157,7 @@ import {
   repoRootFor,
   siblingScopeFor,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/repo-full-name.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,

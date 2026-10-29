@@ -16,7 +16,7 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { INSTANCE_ROOT, REPO_ROOT } from "../../scripts/tests/helpers.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { folioTemplates } from "../../scripts/init-folio.ts";
 
 /**

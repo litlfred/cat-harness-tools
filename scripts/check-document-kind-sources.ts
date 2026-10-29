@@ -25,7 +25,7 @@
  */
 import { resolve } from "node:path";
 
-import { resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import { readInstances } from "./check-import-direction.ts";

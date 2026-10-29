@@ -21,8 +21,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {
   BlockSummariesSidecarSchema,
   SUMMARIES_FILE,

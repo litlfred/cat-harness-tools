@@ -37,11 +37,11 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
-import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
+import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
 import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
-import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/semantic-zoom.js";
+import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
   localesReadableFor,
@@ -81,14 +81,14 @@ import {
   siteDirFor,
   sourceLinks,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
 import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);

@@ -13,8 +13,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isKgOnlyDirectory, ownDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { isKgOnlyDirectory, ownDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
 import { writeDeclaration } from "../test/support/instance-fixture.js";
 

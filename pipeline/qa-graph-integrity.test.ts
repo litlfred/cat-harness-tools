@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { CONFLICT_MARKER, checkQaDirs, checkQaFile, declaredQaDirs } from "./qa-graph-integrity";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

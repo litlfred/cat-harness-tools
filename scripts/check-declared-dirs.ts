@@ -119,9 +119,9 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { DEFAULT_DIRECTORIES, instanceRootsIn, nestedDirectories, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg-node.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { DEFAULT_DIRECTORIES, instanceRootsIn, nestedDirectories, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   contentIsOffCheckout,
   resolveSubgraphSource,
@@ -137,7 +137,7 @@ import { markerAtPath, readMarker } from "./branch-store.ts";
 // the harness alone does not know it exists and `readDeclaration` throws on a
 // perfectly valid declaration that uses it. Same import, same reason, as
 // `check-declared-assets.ts` and `kg-export.ts` carry.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 
 export interface DirFinding {
   instance: string;

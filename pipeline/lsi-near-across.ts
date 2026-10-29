@@ -45,7 +45,7 @@ import {
   instanceRootsIn,
   LsiUnitProviderDeclarationSchema,
   type LsiUnitProviderDeclaration,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { buildLsi, foldIn, rank, tokenize, type LsiOptions, type LsiUnit } from "./lsi";
 
 /** What a provider is called with. */

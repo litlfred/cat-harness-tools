@@ -49,9 +49,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import type { TabularCsvwTables } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";

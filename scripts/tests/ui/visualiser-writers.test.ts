@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { RUN_SCRIPT, writerCommand } from "../../lib/script-command.ts";

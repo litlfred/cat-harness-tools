@@ -24,7 +24,7 @@
  * @module pipeline/validate-references-human-review
  */
 
-import { deferResolution } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { deferResolution } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { createHash } from "crypto";
 import { references } from "./references-registry-di";
 import type { Data as CSLData } from "csl-json";

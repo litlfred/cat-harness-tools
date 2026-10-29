@@ -47,7 +47,7 @@ import {
   defaultGraphTypologies,
   isPublishedGraphTypology,
   readDeclaration,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { renderAvatarsCss } from "./gen-avatars-css.js";
 import {
   buildQaResult,

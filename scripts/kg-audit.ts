@@ -52,7 +52,7 @@
 
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
@@ -145,14 +145,14 @@ import {
   remotePackageSkills,
 } from "./known-skills.js";
 import { LOCAL_PACKAGES } from "./skill-packages.js";
-import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
-import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
 import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
+import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
 import {
   checkoutActors,
   checkoutPolicies,
@@ -281,7 +281,7 @@ const root = resolve(instanceArg(process.argv.slice(2)) ?? AUDITOR_ROOT);
  * longer exists is worse than none, which is the only reason this is five
  * lines instead of one.
  */
-// `ownDirectoryById` moved to `schemas/cat-harness.ts` (2026-09-30) when
+// `ownDirectoryById` moved to `schemas/kg/cat-harness.ts` (2026-09-30) when
 // `pipeline/translation-index.ts` became its second caller. The
 // reasoning for the BY-ID lookup travelled with it.
 
@@ -2423,7 +2423,7 @@ function auditGraph(
       // value, `src/tools/skill-fetch.ts` and `scripts/generate-registry.ts`
       // contain no mention of `remote-packages/` at all, and the single consumer —
       // `scripts/generate-docs.ts` — reads those files solely for Docker
-      // requirements, which is what `schemas/skill-package.ts` documents them as.
+      // requirements, which is what `schemas/kg/skill-package.ts` documents them as.
       // (That consumer was retired to `fsh-guts/scripts/` on 2026-09-20,
       // having never been invoked in any commit since the root commit — bean
       // `folio-assistant-3w0i`. The reading below only gets stronger.)
@@ -2679,7 +2679,7 @@ const resolvableSkills: Set<string> = (() => {
  *
  * `needs` is OPTIONAL with a documented THIRD STATE: an absent value is
  * UNDETERMINED, never `[]` — `[]` is an assertion that this instance is the
- * floor, absent is nobody having said (`schemas/cat-harness.ts`, `needs`;
+ * floor, absent is nobody having said (`schemas/kg/cat-harness.ts`, `needs`;
  * `schemas/layer-direction.ts` refuses the same collapse for edges).
  *
  * Read straight from the declaration rather than inferred from

@@ -64,7 +64,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 // here" from the FILENAME convention and parses nothing, so this gate needs
 // no graph-typology registered to ask. `readDeclaration` would, and a gate that
 // throws on an unregistered kind reports a break it did not find.
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
 import { readQaTree } from "./qa-store.js";
 import { PUBLISHED_ELSEWHERE, declaredInstanceStubs, instanceExportPlan, type PlannedExport } from "./instance-exports.js";

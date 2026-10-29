@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { dirname, join, resolve } from "node:path";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { instanceHarnesses } from "../mount-instance-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

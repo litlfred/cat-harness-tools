@@ -195,7 +195,7 @@ import { openTrace } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { TASK_IO, pairIO } from "./task-io.ts";
 import { foldable, settleCovered } from "./pair-cover.ts";
 import { WorkingCopyFailed, ensureWorkingCopy, workingCopyState } from "./qa-working-copy.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

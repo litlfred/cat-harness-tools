@@ -42,7 +42,7 @@ import { join } from "node:path";
 
 import { tools } from "@litlfred/cat-harness/tools/index.ts";
 import { TABULAR_CSVW_FILENAME, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 const ROOT = HARNESS_ROOT;
 

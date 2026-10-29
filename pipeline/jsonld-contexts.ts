@@ -34,7 +34,7 @@
  *   (bean `zaqn`). An unresolved prefix in this position is a finding.
  * - **literal** — any other string value. `leanRef: "qou:QOU.Torsion.x"` and
  *   `label: "def:foo"` are authored strings that merely LOOK like CURIEs
- *   (the hazard `schemas/jsonld.ts` opens with). A processor never expands
+ *   (the hazard `schemas/kg/jsonld.ts` opens with). A processor never expands
  *   them, so an unresolved prefix here is reported, never failed on: failing
  *   would condemn every Lean reference in the corpus, and a gate that cries
  *   wolf is switched off.

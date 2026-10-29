@@ -37,7 +37,7 @@ import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tab
 import { VECTOR_FIGURES_FILE } from "@litlfred/cat-harness/schemas/vector-figure.ts";
 import { FIGURE_DESCRIPTIONS_FILE } from "@litlfred/cat-harness/schemas/figure-description.ts";
 import { entryItems } from "./summaries.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

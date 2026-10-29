@@ -75,7 +75,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
 import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.js";

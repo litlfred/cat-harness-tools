@@ -77,8 +77,8 @@ import { refreshLibraryIndex } from "./lsi.ts";
 import { IntakeSchema } from "@litlfred/cat-harness/schemas/library/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
 import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 

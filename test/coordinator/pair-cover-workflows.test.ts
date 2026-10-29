@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { COVERED } from "../../scripts/pair-cover.ts";
 import { repairableGates } from "../../scripts/regen-after-merge.ts";
 import { loadGates } from "../../scripts/gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
 
 /** The directory this test was written in (`cat-harness-tools/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */

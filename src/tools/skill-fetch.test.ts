@@ -10,7 +10,7 @@ import { join, resolve } from "node:path";
 
 import { LOCAL_PACKAGES, REFERENCE_PACKAGES, discoverLocalPackages, locateLocalSkill } from "./skill-fetch.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const ROOT = resolve(import.meta.dir, "../..");

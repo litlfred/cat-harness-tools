@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 
 import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } from "../gen-auto-docs.ts";
 import { knownSkills } from "../known-skills.ts";
-import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).

@@ -90,7 +90,7 @@ import {
   type LocaleCatalogue,
   type PlannedLocale,
 } from "./kg-viewer-strings.js";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { pageParts } from "./viewer-declarations.ts";

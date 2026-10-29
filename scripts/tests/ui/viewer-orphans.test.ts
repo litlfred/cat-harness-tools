@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 
 import { isSubjectShell } from "../../gen-library-viz.ts";
 import { orphanSubjectPages, viewerHtml } from "../../gen-schema-viz.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
 

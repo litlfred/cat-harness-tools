@@ -35,7 +35,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 
 import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
@@ -59,7 +59,7 @@ import {
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));

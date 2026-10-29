@@ -22,7 +22,7 @@ import {
   instantiatedHarnessNames,
   readHarnessConfig,
   resolveLandingInstance,
-} from "@litlfred/cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {
   IGNORE_BLOCK_BEGIN,
   IGNORE_BLOCK_END,
@@ -38,7 +38,7 @@ import {
   writeDeclaredMounts,
   type IndexConfig,
 } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { findDeclarationFile, instanceRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { mountLockPathFor, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { applyMigration, planMigration } from "../index-config-migrate.ts";

@@ -96,8 +96,8 @@ import {
   resolveDirectories,
   siteDirFor,
   forgeLocation,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";

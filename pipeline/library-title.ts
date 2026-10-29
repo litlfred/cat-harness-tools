@@ -63,7 +63,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** Where a manifest's title came from. Recorded as `meta.title_source`. */
 export const LIBRARY_TITLE_SOURCES = [

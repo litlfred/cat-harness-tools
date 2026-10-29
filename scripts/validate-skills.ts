@@ -36,10 +36,10 @@ import {
   CapabilityDefinitionSchema,
   RequirementSchema,
   SkillDefinitionSchema,
-} from "@litlfred/cat-harness/schemas/skill-package.js";
+} from "@litlfred/cat-harness/schemas/kg/skill-package.js";
 import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(HARNESS_ROOT);

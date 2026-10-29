@@ -46,7 +46,7 @@
 
 import { resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { CLOSED_STATUSES, readBeanFiles } from "./bean-store-read.ts";
 

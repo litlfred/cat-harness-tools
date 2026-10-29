@@ -129,9 +129,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
 import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";

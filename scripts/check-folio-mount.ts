@@ -98,8 +98,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { hasMount } from "./folio-mount.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 /**
  * Resolved from this file rather than from `process.cwd()`.

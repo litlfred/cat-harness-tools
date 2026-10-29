@@ -154,7 +154,7 @@ export const UNCOVERED_BY_DESIGN: UncoveredByDesign[] = [
     state: "folio-mechanism",
     reason:
       "bean `w5h0`. Its group is 14 files: 13 are LIBRARIES (`block-module` alone " +
-      "is imported by `schemas/jsonld.ts`, `gen-block-jsonld`, `qa-utils`, " +
+      "is imported by `schemas/kg/jsonld.ts`, `gen-block-jsonld`, `qa-utils`, " +
       "`graph-index`, `verify-block-walk` and two audits) and the 14th, " +
       "`check-voices.ts`, was a categoriser bug since re-filed. A Tool node needs " +
       "an `invoke`, and the command that authors a block is in a folio's " +

@@ -50,7 +50,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import {
   BIB_HUMAN_REVIEW_FAMILY,
   BIB_REVIEW_STATUSES,

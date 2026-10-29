@@ -59,7 +59,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 
-import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";

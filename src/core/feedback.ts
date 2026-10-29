@@ -28,7 +28,7 @@ import {
   nodeOfKind,
   parseTodoGraph,
 } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { directoriesForGraph, directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   ACTORS_DIRNAME,
   ROLE_GRAPH_DIR,

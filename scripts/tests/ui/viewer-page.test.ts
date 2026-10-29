@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { audit, regressions } from "../../check-viewer-nav.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   NAVBAR_OPT_OUT,
   declinesNavbar,

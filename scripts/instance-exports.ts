@@ -56,7 +56,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
 import { stagingFields } from "./staging-stamp.js";

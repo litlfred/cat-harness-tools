@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import jsonld from "jsonld";
 
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 import { applyVocabMapping, contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
 import { buildFshGutsExport } from "../../fsh-guts-export.ts";

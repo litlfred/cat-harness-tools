@@ -120,7 +120,7 @@ import { join, resolve } from "node:path";
 
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";

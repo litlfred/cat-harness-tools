@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

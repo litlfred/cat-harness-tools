@@ -25,7 +25,7 @@ import {
   ContributionRegistry,
   type FolioContribution,
 } from "@litlfred/cat-harness/schemas/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {
   UnregisteredPipelinePluginError,

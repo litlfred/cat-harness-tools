@@ -59,10 +59,10 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
 import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts/lib/navbar.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
@@ -135,7 +135,7 @@ export function declaredPageRoot(decl: Declaration, directory: string): string {
       `${decl.name}: declares ${mine.length === 0 ? "no" : mine.length} visualiser(s) rendered by \`${TOOL_ID}\`` +
         `${mine.length > 1 ? `, and none covers "${directory}"` : ""} — declare one in its \`visualisers\`, ` +
         `e.g. { "id": "archimate", "renderedBy": "${TOOL_ID}", "covers": ["${directory}"] } ` +
-        "(cat-harness/schemas/cat-harness.ts, HarnessVisualiserSchema); the pages are written at its route",
+        "(cat-harness/schemas/kg/cat-harness.ts, HarnessVisualiserSchema); the pages are written at its route",
     );
   }
   return visualiserRoute(pageParts({ harness: decl.name, visualiser: chosen.id })).replace(/\/$/, "");

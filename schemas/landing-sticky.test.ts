@@ -32,7 +32,7 @@ import {
   readerText,
   type DeclaredContribution,
 } from "@litlfred/cat-harness/schemas/sticky-contribution.js";
-import { CatHarnessDeclarationSchema, siteDirFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { CatHarnessDeclarationSchema, siteDirFor, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import { inAggregate } from "../test/support/checkout.js";

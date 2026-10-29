@@ -365,7 +365,7 @@ async function checkUrl(
 
 import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
-import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 interface VerificationEntry {
   id: string;

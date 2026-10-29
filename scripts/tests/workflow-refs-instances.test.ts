@@ -34,7 +34,7 @@ import { basename, join } from "node:path";
 
 import { workflowFiles } from "../known-skills.js";
 import { processDiagrams } from "../../src/workflow/process-model.js";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(INSTANCE_ROOT);

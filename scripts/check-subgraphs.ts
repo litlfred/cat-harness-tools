@@ -19,7 +19,7 @@
  *   an edgeless set of nodes is a perfectly good one.
  * - A **directory** is a CONVENIENCE: where a subgraph somebody chose to name
  *   gets written down so tooling can find it. Bookkeeping, not the object.
- *   `subgraphTree` and `owningDirectory` in `schemas/cat-harness.ts` are pure
+ *   `subgraphTree` and `owningDirectory` in `schemas/kg/cat-harness.ts` are pure
  *   path containment for exactly this reason.
  *
  * The inversion is not pedantry, because it is what makes the property this
@@ -39,7 +39,7 @@
  * something false. It did — *"every declared directory is a disconnected
  * component"* — and that is corrected below too.
  *
- * The declaration half lives in `schemas/cat-harness.ts` — `subgraphTree` and
+ * The declaration half lives in `schemas/kg/cat-harness.ts` — `subgraphTree` and
  * `owningDirectory`, both DERIVED from the paths already declared rather than
  * restated, with the reasoning on those functions. This is the other half:
  * measuring how far the corpus is from the intent.
@@ -78,9 +78,9 @@ import {
   owningDirectory,
   resolveDirectories,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
-import type { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import type { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -180,7 +180,7 @@ export interface SubgraphReport {
    * edges in this graph, and there is nothing to repoint.
    *
    * **The rule already existed one layer down, and this check was simply not
-   * applying it.** `schemas/cat-harness.ts` says of the `derived` layer that
+   * applying it.** `schemas/kg/cat-harness.ts` says of the `derived` layer that
    * *"a QA finding against a derived section is a finding against its
    * GENERATOR, not against the corpus, and it sends a reviewer to fix the
    * wrong file"*. That is exactly what happened on 2026-09-23: five ingested

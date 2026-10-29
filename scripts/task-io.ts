@@ -71,7 +71,7 @@
  * produce a false red, not a false green.
  */
 import { dirname } from "node:path";
-import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { TRACKED, type PairIO } from "./input-hash.ts";

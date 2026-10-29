@@ -47,7 +47,7 @@ import {
   repoRootFor,
   rootForScope,
   type ContentDirectory,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../pipeline/readme-toc.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

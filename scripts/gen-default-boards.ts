@@ -49,8 +49,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join, relative, resolve } from "node:path";
 
 import { BOARD_SCHEMA_TAG, wholeFolioBoard } from "@litlfred/cat-harness/schemas/board.js";
-import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
 import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { TODO_ROOT } from "./todos.js";

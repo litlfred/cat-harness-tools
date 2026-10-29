@@ -52,7 +52,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   LITERAL,
   firstLiteralIn,

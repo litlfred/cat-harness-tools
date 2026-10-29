@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { declaredEditLocation } from "../../gen-docs-pages.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";

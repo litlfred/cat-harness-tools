@@ -76,10 +76,10 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `check-declared-dirs.ts` carries, same reason.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
@@ -251,7 +251,7 @@ export interface QaDirectory {
   path: string;
   absPath: string;
   present: boolean;
-  storage?: import("@litlfred/cat-harness/schemas/cat-harness.js").DirectoryStorage;
+  storage?: import("@litlfred/cat-harness/schemas/kg/cat-harness.js").DirectoryStorage;
 }
 
 export interface QaLocation {

@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { contributingRoots, ensureLandingSticky } from "../ensure-landing-sticky.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const SCRIPT = join(import.meta.dir, "..", "gen-landing-data.ts");
 

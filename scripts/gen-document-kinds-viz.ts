@@ -39,7 +39,7 @@ import {
   type DocumentKind,
   type DocumentKindCoverage,
 } from "@litlfred/cat-harness/schemas/document-kind.ts";
-import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";

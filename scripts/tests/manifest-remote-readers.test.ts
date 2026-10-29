@@ -15,7 +15,7 @@
  *  - `src/tools/skill-fetch.ts` and `scripts/generate-registry.ts` contain no
  *    mention of `remote-packages/` at all.
  *  - the one consumer, `scripts/generate-docs.ts`, reads those files solely for
- *    Docker requirements — which is what `schemas/skill-package.ts` documents
+ *    Docker requirements — which is what `schemas/kg/skill-package.ts` documents
  *    them as providing.
  *
  * So an entry resolvable only that way publishes a registry name `skill_fetch`
@@ -137,7 +137,7 @@ describe("the reason the allowance was closed is still true", () => {
     // each has a role that is not serving:
     //
     //   generate-docs.ts    documents the Docker requirements — what
-    //                       schemas/skill-package.ts says the wrappers are for
+    //                       schemas/kg/skill-package.ts says the wrappers are for
     //   gen-skill-docs.ts   EXCLUDES it, as a group holding non-skills
     //   known-skills.ts     remotePackageSkills(), the wider question
     //   kg-audit.ts         classifies the finding (which remedy), never excuses it

@@ -54,7 +54,7 @@ import { join } from "node:path";
 import {
   readDeclaration,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { THEME_LAYOUTS, type ThemeLayout } from "@litlfred/cat-harness/schemas/ui/theme.js";
 import {
   formatIntakeReport,

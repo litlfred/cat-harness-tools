@@ -14,7 +14,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { contributionsRoot } from "../../pipeline/repo-root.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 const COST_CRITERIA = ["proof-compile-cost", "proof-no-cost-regression"];
 

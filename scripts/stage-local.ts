@@ -104,7 +104,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";

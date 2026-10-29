@@ -51,7 +51,7 @@ import {
   SOURCE_LEDGER_SCHEMA,
   writeSourceLedger,
 } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
-import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { entryUrl, referenceEntries } from "./reference-entries.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();

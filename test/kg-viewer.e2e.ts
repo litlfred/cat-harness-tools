@@ -17,7 +17,7 @@ import { test, expect } from "@playwright/test";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { artefactStubFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStubFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**

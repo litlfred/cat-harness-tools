@@ -28,7 +28,7 @@ import {
   MODEL_PROVENANCES,
   PUBLICATION_HOSTS,
   topologyConflicts,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   reasoningTierGte,
   checkModelCapabilities,

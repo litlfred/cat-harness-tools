@@ -39,13 +39,13 @@ import {
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
-import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

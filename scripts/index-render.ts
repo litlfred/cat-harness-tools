@@ -65,7 +65,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 
-import { AGENT_INSTRUCTIONS_ROLE, INSTANCE_README_ROLE, declaredAssets, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { AGENT_INSTRUCTIONS_ROLE, INSTANCE_README_ROLE, declaredAssets, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_FILENAME, readIndexConfig, remoteMountPathOf, type IndexConfig, type IndexInstance } from "@litlfred/cat-harness/schemas/index-config.js";
 import { README_TOC_MARKER, syncSections } from "../pipeline/readme-sections.js";
 import { loadReadmeConfig } from "../pipeline/readme-toc.js";

@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, basename, sep } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { workflowFiles } from "../known-skills.js";
 import { processDiagrams } from "../../src/workflow/process-model.js";
 import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";

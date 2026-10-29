@@ -154,7 +154,7 @@ import {
   isDerivedGraph,
   isStateGraph,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
 import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/layer-direction.js";
 import {

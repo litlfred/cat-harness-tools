@@ -70,7 +70,7 @@ import {
   requirementSignoffPath,
   RequirementSignoffAttestationsSchema,
 } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { kgRoots } from "./known-skills.ts";
 
 const REPO = join(import.meta.dir, "..", "..");

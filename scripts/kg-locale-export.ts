@@ -108,8 +108,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { basename, join, relative, resolve } from "node:path";
 
 import { parsePo } from "../pipeline/po-inject.js";
-import { readHarnessConfig } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { localeDirIn, repoRootFor, translationsHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readHarnessConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { localeDirIn, repoRootFor, translationsHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { buildExport, exportIdentity, publishedDocument, undeclaredRootTerms } from "./kg-export.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

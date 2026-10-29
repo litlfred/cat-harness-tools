@@ -31,7 +31,7 @@ import {
   declarationPathIn,
   readDeclaration,
   artefactStub,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

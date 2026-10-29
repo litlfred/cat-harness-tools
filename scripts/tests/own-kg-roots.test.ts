@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { DECLARATION_SUFFIX } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { DECLARATION_SUFFIX } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 import { ownKgRoots } from "../known-skills.ts";
 

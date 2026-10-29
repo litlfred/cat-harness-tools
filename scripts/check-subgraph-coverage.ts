@@ -57,7 +57,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { docsPages, documentingPages } from "./docs-declarations.js";
 import { governingSkills, skillGovernance } from "./skill-governance.js";
 import { processIndex, resolveProcess, type ProcessIndex } from "./governing-process.js";
@@ -79,7 +79,7 @@ import {
   type CatHarnessDeclaration,
   visualisationsOf,
   visualisationResolves,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { withViewers } from "./viewer-declarations.js";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 

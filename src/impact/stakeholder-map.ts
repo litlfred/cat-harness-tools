@@ -6,7 +6,7 @@
  * `harness.config.json` and CODEOWNERS".
  *
  * NEITHER SOURCE EXISTS. This repository has no CODEOWNERS file, and
- * `schemas/harness-config.ts` declares no role, owner, maintainer or contact
+ * `schemas/kg/harness-config.ts` declares no role, owner, maintainer or contact
  * field. A tool built on those two would have reported "no stakeholders" for
  * every change, forever, and looked like it worked.
  *

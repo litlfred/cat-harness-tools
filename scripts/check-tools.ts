@@ -35,12 +35,12 @@ import { join, relative, resolve } from "node:path";
 import { tools, toolsOf } from "../tools/discover.js";
 import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "@litlfred/cat-harness/schemas/tools/tool.js";
-import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
+import { toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
 import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
-import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { inlineToolDeclarations } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
-import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { resolveScriptCommand } from "./lib/script-command.ts";
@@ -122,7 +122,7 @@ const REPO = join(ROOT, "..");
  * stay in the harness and the code moves to the layer above, so a module path
  * stays as written (`src/tools/x.ts`) and is found in the instance whose own
  * `needs` names the declarer — `resolveImplementingPath` in
- * `schemas/harness-config.ts`. Writing the implementer's name into the path
+ * `schemas/kg/harness-config.ts`. Writing the implementer's name into the path
  * instead would be the harness naming a layer above it. Two implementers
  * holding the same path is reported, never resolved by order.
  *

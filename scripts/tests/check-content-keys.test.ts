@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { checkDeclaredKeys, checkPathsAreNotLinks, looksLikePath, namesContentTerms } from "../check-content-keys.ts";
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 
 /** A tree of `.jsonld` documents, and nothing else. */
 function corpus(docs: Record<string, unknown>): string {

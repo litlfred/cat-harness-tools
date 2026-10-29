@@ -22,10 +22,10 @@ import {
   implementingInstancesOf,
   implementingRootFor,
   resolveImplementingPath,
-} from "@litlfred/cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { unresolvedPaths } from "../../check-tools.ts";
 import { toolsOf } from "../../../tools/discover.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const made: string[] = [];

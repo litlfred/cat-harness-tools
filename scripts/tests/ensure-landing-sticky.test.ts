@@ -11,7 +11,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import type { ContentDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { ContentDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +35,7 @@ import {
   readerTextProblems,
 } from "../ensure-landing-sticky.js";
 import { InitiationSchema } from "@litlfred/cat-harness/schemas/sticky-contribution.js";
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /**

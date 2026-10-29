@@ -3,7 +3,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { resolveChromium } from "../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { ensureThemesCss } from "./support/themes-css.ts";

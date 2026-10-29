@@ -42,7 +42,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { namespaceForLayer } from "@litlfred/cat-harness/schemas/namespaces.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

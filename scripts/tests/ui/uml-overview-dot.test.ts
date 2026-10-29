@@ -15,7 +15,7 @@ import { join, relative, resolve } from "node:path";
 
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
 
-import { instanceDirectoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceDirectoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { dot, type Section } from "../../gen-uml-overview.ts";
 import { readUmlPalette } from "../../uml-palette.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";

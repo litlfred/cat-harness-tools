@@ -12,7 +12,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";

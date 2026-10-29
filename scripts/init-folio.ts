@@ -44,9 +44,9 @@ import {
   type IndexInstance,
   type RemoteSource,
 } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import {
   instanceStateBranch,
   resolveSubgraphSource,
@@ -59,7 +59,7 @@ import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";

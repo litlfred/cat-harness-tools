@@ -31,7 +31,7 @@
  */
 import { relative, resolve } from "node:path";
 
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, expandCurie, toConceptMap } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
 import { loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

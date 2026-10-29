@@ -77,7 +77,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { readEntryBlocks, readLibraryGraph, type LibraryEntry } from "./library-graph.ts";

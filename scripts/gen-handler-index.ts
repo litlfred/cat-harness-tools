@@ -54,7 +54,7 @@ import { dirname, join, relative } from "node:path";
 
 import { harnessTiles, type HarnessTile } from "./harness-tiles.ts";
 import { graphTiles, type GraphTile } from "./graph-tiles.ts";
-import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

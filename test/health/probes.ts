@@ -49,7 +49,7 @@ import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
 } from "@litlfred/cat-harness/schemas/health-report.ts";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
 import {

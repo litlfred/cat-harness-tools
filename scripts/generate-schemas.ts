@@ -9,7 +9,7 @@
  * Usage: npx ts-node cat-harness/scripts/generate-schemas.ts
  */
 
-import { namedJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.ts";
+import { namedJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.ts";
 import { writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";

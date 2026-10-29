@@ -30,7 +30,7 @@ import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER
 import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { checkEntry } from "../../check-l1-complete.ts";
-import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";

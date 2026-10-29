@@ -36,7 +36,7 @@
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { basename, dirname, join, posix, relative } from "node:path";
 import type { z } from "zod";
-import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.ts";
+import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.ts";
 
 import {
   CatHarnessDeclarationSchema,
@@ -45,7 +45,7 @@ import {
   readDeclaration,
   renderingPath,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { tools } from "../tools/discover.js";
 import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
@@ -120,7 +120,7 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
     description:
       "The root declaration every instance carries as `<name>.json`: what it is called, " +
       "where it publishes, and which directories it scans for which kind of graph. " +
-      "Generated from `CatHarnessDeclarationSchema` in schemas/cat-harness.ts, which is authoritative.",
+      "Generated from `CatHarnessDeclarationSchema` in schemas/kg/cat-harness.ts, which is authoritative.",
     // Under the instance's own directory, the host's included, since #603
     // decision 1b (owner, 2026-10-23) — `kg-export`'s `exportIdentity`.
     ...(base ? { $comment: `Instance graph: ${renderingPath(base, decl?.name ?? stub, `${stub}.jsonld`)}` } : {}),

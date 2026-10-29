@@ -10,7 +10,7 @@
  *  3. the constants code reads are the list's values, so the two cannot drift.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

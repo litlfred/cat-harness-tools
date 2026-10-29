@@ -80,7 +80,7 @@ import {
 } from "./qa-criteria-registry";
 import { discoverBlockCheckers } from "./qa-checker-discovery";
 import { isCriterionSourceMiss, resolveCriterionSource } from "./criterion-source";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { ContributionRegistry, composedKindOwner, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
 import { usesGraphHash } from "./uses-graph-hash";
 import { blockQaPath, findContentRepoRoot } from "./qa-paths";
