@@ -109,6 +109,16 @@ describe("scriptsFor — a gate command to the files it runs", () => {
     ]);
   });
 
+  test("through run-script.ts to the layer script it runs (run-gates.py)", () => {
+    const routed = {
+      "libraries:check": "bun run cat-harness-tools/scripts/libraries.ts --check",
+    };
+    expect(scriptsFor("bun cat-harness-tools/scripts/run-script.ts libraries:check", routed)).toEqual([
+      "cat-harness-tools/scripts/run-script.ts",
+      "cat-harness-tools/scripts/libraries.ts",
+    ]);
+  });
+
   test("a command with no script resolves to nothing, rather than guessing", () => {
     expect(scriptsFor("bun run cat lint", scripts)).toEqual([]);
     expect(scriptsFor("bunx tsc --noEmit -p tsconfig.json", scripts)).toEqual([]);

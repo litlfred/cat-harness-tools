@@ -76,7 +76,6 @@ import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
 import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
 import { forDirectory, processIndex, resolveProcess, type ProcessIndex } from "./governing-process.ts";
-import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, mayLeaveMain, writeQaResult } from "./qa-results.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -324,8 +323,9 @@ if (import.meta.main) {
   if (other !== undefined) process.exit(await runForRepo(other, check));
   const { against, exit: badRef } = againstOrUsage(GATE, argv);
   if (badRef !== undefined) process.exit(badRef);
-  // Bean `7how`: a `qa` directory's README is drawn from the copy on disk.
-  requireCurrentWorkingCopy(REPO, GATE);
+  // Stored (`qa`, `beans`, `todos`) and off-checkout directories are filtered
+  // out by `harnessInstances` (`!isStored(d) && !contentIsOffCheckout(d)`, bean
+  // `f3bh`), so neither `--check` nor the writer reads `test/results/`.
   const p = await harnessPlan(REPO);
   const { stale: staleFiles, wrote } = apply(p, check, REPO);
   for (const f of staleFiles) console.error(`  ✗ ${f} is stale`);
