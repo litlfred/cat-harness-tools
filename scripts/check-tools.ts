@@ -33,15 +33,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
-import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
-import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "@litlfred/cat-harness/schemas/tool.js";
+import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
 import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
 import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { inlineToolDeclarations } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { inlineToolDeclarations } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { resolveScriptCommand } from "./lib/script-command.ts";
 
@@ -450,7 +450,7 @@ export function declaredToolsDirs(repoRoot: string = REPO): Array<{ instance: st
  * `claude/tool-folders-tdir` are; an instance outside that set may not be),
  * at which point the CLI's section below sets `bad`.
  *
- * `inlineToolDeclarations` (`schemas/tool-folders.ts`) is the one test of
+ * `inlineToolDeclarations` (`schemas/tools/tool-folders.ts`) is the one test of
  * "inline"; this only asks it of every declared directory.
  */
 export function inlineToolFindings(

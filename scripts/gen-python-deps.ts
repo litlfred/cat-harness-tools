@@ -38,7 +38,7 @@ import {
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { resolveScriptCommand } from "./lib/script-command.ts";
 import { tools } from "../tools/discover.ts";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
 
 // THIS LAYER's root, because `requirementsPath` is relative to it. The pair
 // sat beside `package.json` until 2026-10-06 and moved into the declared

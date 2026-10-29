@@ -91,7 +91,7 @@ function schemasRoots(root: string, scope: CorpusScope = "checkout"): string[] {
 export type SchemaNodeKind = "schema" | "none" | "undeclared";
 
 export interface SchemaModule {
-  /** Repo-relative path, e.g. `schemas/tool.ts`. */
+  /** Repo-relative path, e.g. `schemas/tools/tool.ts`. */
   module: string;
   /** Bare stem, the identifier a node IRI is minted from. */
   name: string;

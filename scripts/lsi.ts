@@ -59,7 +59,7 @@ import { declaredGraphs, instanceRootsIn } from "@litlfred/cat-harness/schemas/c
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
-import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "@litlfred/cat-harness/schemas/tool-run.ts";
+import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "@litlfred/cat-harness/schemas/tools/tool-run.ts";
 import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
 import {
   buildLsi,

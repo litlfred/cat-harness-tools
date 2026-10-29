@@ -80,11 +80,11 @@
     "scripts/partition/instance-rules.ts::schemas/themes.ts",
     "scripts/partition/instance-rules.ts::schemas/tile-count.ts",
     "scripts/partition/instance-rules.ts::schemas/todo-graph.ts",
-    "scripts/partition/instance-rules.ts::schemas/tool-id.ts",
-    "scripts/partition/instance-rules.ts::schemas/tool-invocation.ts",
-    "scripts/partition/instance-rules.ts::schemas/tool-run.ts",
-    "scripts/partition/instance-rules.ts::schemas/tool-types.ts",
-    "scripts/partition/instance-rules.ts::schemas/tool.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/tool-id.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/tool-invocation.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/tool-run.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/tool-types.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/tool.ts",
     "scripts/partition/instance-rules.ts::schemas/translation-tools.ts",
     "scripts/partition/instance-rules.ts::schemas/vocabulary.ts",
     "scripts/partition/instance-rules.ts::schemas/conduct/waiver.ts",
@@ -131,8 +131,8 @@
     "tools/content-context/content-context.ts::schemas/jsonld.ts",
     "tools/ns-vocabulary/ns-vocabulary.ts::schemas/vocabulary.ts",
     "tools/themes-css/themes-css.ts::schemas/themes.ts",
-    "tools/tool-schema/tool-schema.ts::schemas/tool.ts",
-    "tools/tool-types-schema/tool-types-schema.ts::schemas/tool-types.ts",
+    "tools/tool-schema/tool-schema.ts::schemas/tools/tool.ts",
+    "tools/tool-types-schema/tool-types-schema.ts::schemas/tools/tool-types.ts",
     "tools/vocab-map/vocab-map.ts::schemas/vocab-mapping.ts"
   ]
 }

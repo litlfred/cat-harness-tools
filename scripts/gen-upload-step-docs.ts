@@ -57,7 +57,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { loadProcessModel, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { tools } from "@litlfred/cat-harness/tools/index.ts";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

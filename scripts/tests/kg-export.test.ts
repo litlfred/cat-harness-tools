@@ -47,8 +47,8 @@ import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-reg
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
-import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
-import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
+import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { dirname } from "node:path";
 
 /**
@@ -659,7 +659,7 @@ describe("every self-URL the export publishes resolves to something published", 
    *
    * Moving the renderings from `<base>/kg/` to `<base>/` touched six places.
    * Five were found by searching the two exporters; the sixth was
-   * `toolTypeIri` in `schemas/tool-types.ts`, which computed its FRAGMENT with
+   * `toolTypeIri` in `schemas/tools/tool-types.ts`, which computed its FRAGMENT with
    * a function and wrote `kg/tool-types.schema.json` as a literal. Every `@id`
    * in the document moved correctly and **95 `schema` refs still pointed at a
    * URL that 404s** — the document they named sat one directory away, and

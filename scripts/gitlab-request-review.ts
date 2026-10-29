@@ -16,7 +16,7 @@
  * @module scripts/gitlab-request-review
  */
 import { spawnSync } from "node:child_process";
-import { GitLabUsernameSchema } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { GitLabUsernameSchema } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 
 /** The `glab` argument array. Throws when no username is given or one does not parse. */
 export function requestReviewArgv(args: readonly string[]): string[] {

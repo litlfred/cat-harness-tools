@@ -18,7 +18,7 @@
  * @module scripts/github-resolve-thread
  */
 import { spawnSync } from "node:child_process";
-import { ReviewThreadIdSchema } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { ReviewThreadIdSchema } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 
 export const RESOLVE_MUTATION = "mutation($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { id isResolved } } }";
 

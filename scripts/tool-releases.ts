@@ -43,7 +43,7 @@ import {
   ToolProfileSchema,
   toolReleaseGraphProblems,
   type ToolProfile,
-} from "@litlfred/cat-harness/schemas/tool-profile.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,
   ToolReleaseSchema,
@@ -53,7 +53,7 @@ import {
   type ToolPlatform,
   type ToolRelease,
   type ToolReleaseRef,
-} from "@litlfred/cat-harness/schemas/tool-release.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

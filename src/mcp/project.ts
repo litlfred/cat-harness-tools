@@ -24,16 +24,16 @@
  * **Arguments reach the process as argv, never spliced into a shell string.**
  * That is the second line of defence and it is unconditional. The first line is
  * that the values cannot be payloads: every input references a type from
- * `schemas/tool-types.ts` that refuses shell metacharacters, and a Tool whose
+ * `schemas/tools/tool-types.ts` that refuses shell metacharacters, and a Tool whose
  * input references an unconstrained type is rejected before it is ever run.
  *
  * @module src/mcp/project
  */
 import { z } from "zod";
 
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
-import type { InvocationAuthority, InvocationContext, ToolInvocation } from "@litlfred/cat-harness/schemas/tool-invocation.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf, type ToolTypeName } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import type { InvocationAuthority, InvocationContext, ToolInvocation } from "@litlfred/cat-harness/schemas/tools/tool-invocation.js";
 
 /** An MCP tool declaration, as `tools/list` returns it. */
 export interface McpToolDeclaration {

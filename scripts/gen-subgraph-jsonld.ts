@@ -36,7 +36,7 @@
  *   over its declared directories (bean `ax6r`) — a path outside them falls
  *   to that instance's root.
  * - A Tool node has no source path: it is placed by the folder convention
- *   (`schemas/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
+ *   (`schemas/tools/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
  *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
  *   else the `tools/` directory itself.
  * - Everything else — schemas, roles, graph typologies — is a direct member
@@ -510,7 +510,7 @@ export function framedInstances(root: string = ROOT): string[] {
   return [own, ...[...out].sort()];
 }
 
-/** The graph typology whose directories hold Tool nodes (`schemas/tool-folders.ts`). */
+/** The graph typology whose directories hold Tool nodes (`schemas/tools/tool-folders.ts`). */
 const TOOLS_GRAPH = "tools";
 
 /**

@@ -65,7 +65,7 @@ import { auditLakeTargetLeanResolution } from "./check-lake-targets.js";
 import { classifyName, diagramProse, generalDeclarationProse, namedFiles } from "./prose-names.js";
 import { readSchemaGraph } from "./schema-graph.js";
 import { checkTools, unresolvedPaths } from "./check-tools.js";
-import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
+import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { tools, toolsOf } from "../tools/discover.js";
 import { kgDirectories, kgRoots, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { baseDocsDir, docsLayers } from "./compose-docs.js";

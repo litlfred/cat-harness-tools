@@ -22,7 +22,7 @@
  * ```
  *
  * The status vocabulary belongs to the third-party CLI, and `BeanStatusSchema`
- * in `schemas/tool-types.ts` is defined as *"exactly what `beans update
+ * in `schemas/tools/tool-types.ts` is defined as *"exactly what `beans update
  * --status` accepts"*. A sixth value here would desync the schema from the
  * tool it documents on the next `beans` release.
  *

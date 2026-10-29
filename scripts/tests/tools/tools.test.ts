@@ -15,8 +15,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { tools } from "../../../tools/discover.js";
-import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../../check-tools.js";
 import { knownSkills as canonicalKnownSkills } from "../../known-skills.js";
 import { buildExport } from "../../kg-export.js";

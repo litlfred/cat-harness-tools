@@ -35,7 +35,7 @@ describe("path classes come from the merge-conflict declaration", () => {
     expect(sharedDeclarationsOf("cat-harness/scenarios/roles.json")).toEqual(["roles"]);
     expect(sharedDeclarationsOf("package.json")).toEqual(["package-json"]);
     expect(sharedDeclarationsOf("bun.lock")).toEqual(["lockfile"]);
-    expect(sharedDeclarationsOf("cat-harness/schemas/tool.ts")).toEqual(["schemas"]);
+    expect(sharedDeclarationsOf("cat-harness/schemas/tools/tool.ts")).toEqual(["schemas"]);
     expect(sharedDeclarationsOf("cat-harness/processes/sdlc/merge-base.bpmn")).toEqual(["processes"]);
     expect(sharedDeclarationsOf("cat-harness-tools/scripts/merge-train.ts")).toEqual([]);
   });
