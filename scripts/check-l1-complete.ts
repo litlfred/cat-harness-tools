@@ -248,6 +248,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // Authored, not produced by an arm: an editor's title, read by
   // gen-library-jsonld over the extracted one (bean `v8wg`).
   TITLE_CORRECTION_FILE,
+  // A volume scan's proposed article boundaries, written by
+  // `volume-separation.py propose` (cat-harness-tools#132). Proposed, never
+  // applied: a person confirms a span before it becomes an entry.
+  "separation-proposal.json",
   // The two review-anchor arms of the document adapter (`docx-structure.py`,
   // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
   // written beside `structure.json` so a public comment citing "page 12, line
