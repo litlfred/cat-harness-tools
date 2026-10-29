@@ -15,7 +15,6 @@
   "licence": "MIT",
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
-    "adapters/mcp-server/server.ts",
     "src/server.ts",
     "src/tools/auth.ts",
     "src/tools/bean-query.test.ts",

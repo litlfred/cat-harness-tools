@@ -20,6 +20,7 @@
     "scripts/gen-slice-sqlite.ts",
     "scripts/gen-uml-overview.ts",
     "scripts/harness-schema-export.ts",
+    "scripts/harness-state.ts",
     "scripts/kg-validate.ts",
     "scripts/libraries.ts",
     "scripts/milestone-rollup.ts",

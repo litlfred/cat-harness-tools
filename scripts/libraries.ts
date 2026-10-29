@@ -277,6 +277,9 @@ export function installedManifest(from: string, name: string): { path: string; m
 }
 
 /** Every directory under `root` the import walk enters, layer-relative and POSIX (`""` for the root). */
+/** The lockfiles that make a directory with a package.json its own package. */
+const NESTED_LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
+
 function walkDirs(root: string, visit: (rel: string, abs: string) => boolean | void): void {
   const walk = (dir: string): void => {
     if (visit(relative(root, dir).split(sep).join("/"), dir) === false) return;
@@ -285,6 +288,10 @@ function walkDirs(root: string, visit: (rel: string, abs: string) => boolean | v
       const p = join(dir, e.name);
       // Another instance nested inside this one is its own layer.
       if (existsSync(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
+      // So is a nested package with its own lockfile (cat-harness's
+      // `schemas/block-qa-schema`): it pins its own dependencies, and its
+      // imports are judged against its own package.json, not the layer's.
+      if (existsSync(join(p, "package.json")) && NESTED_LOCKFILES.some((f) => existsSync(join(p, f)))) continue;
       walk(p);
     }
   };

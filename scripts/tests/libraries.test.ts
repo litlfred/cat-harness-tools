@@ -207,6 +207,20 @@ describe("--check", () => {
     rmSync(join(root, "src/c.ts"));
   });
 
+  test("a nested package with its own lockfile is its own package: its imports are not the layer's", () => {
+    put("pkgs/inner/package.json", JSON.stringify({ name: "@x/inner", devDependencies: { vitest: "^4" } }));
+    put("pkgs/inner/bun.lock", "{}\n");
+    put("pkgs/inner/tests/t.test.ts", 'import { test } from "vitest";\n');
+    try {
+      expect(codeFiles(root).some((f) => f.startsWith("pkgs/inner/"))).toBe(false);
+      expect(deriveLayer(root).unknownImports.has("vitest")).toBe(false);
+      rmSync(join(root, "pkgs/inner/bun.lock"));
+      expect(deriveLayer(root).unknownImports.has("vitest")).toBe(true);
+    } finally {
+      rmSync(join(root, "pkgs"), { recursive: true, force: true });
+    }
+  });
+
   test("a shim that names no node is a finding", () => {
     put("types/ghost.d.ts", `declare module "ghost-pkg" {}\n`);
     const f = layerFindings(layer, deriveLayer(root), SPDX);
