@@ -12,7 +12,7 @@
 import { readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 /** The checkout this layer sits in: `scripts/lib/` → `scripts/` → the layer → the checkout. */
 const REPO = resolve(import.meta.dir, "..", "..", "..");

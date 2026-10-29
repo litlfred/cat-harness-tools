@@ -152,11 +152,11 @@ import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProject
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
-import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/merge-queue.ts";
-import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
 import { graphReadPath } from "./graph-read.ts";
 import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
-import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
+import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts";
 import { BoardSchema } from "@litlfred/cat-harness/schemas/ui/board.ts";
 import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/ui/board-positions.ts";
 import { parseTodoFile, readTodos, TODO_ROOT } from "./todos.ts";

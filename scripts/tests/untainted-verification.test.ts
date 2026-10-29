@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { attestationPath, blockAttestationKey, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { attestationPath, blockAttestationKey, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 import { COMPANION_ROLES, untaintedPartitionDefects } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { ROUNDTRIP_DISPATCH, TRANSLATION_ARTEFACTS } from "../../pipeline/translation-block-qa.ts";

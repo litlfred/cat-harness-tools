@@ -15,7 +15,7 @@ import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/sdlc/block-qa.t
 import {
   QaAttestationsSchema,
   requirementSignoffPath,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
 import { checkRequirementSet, signoffFacts, storedSignOffs, unionSignOffs } from "../check-requirements.ts";
 

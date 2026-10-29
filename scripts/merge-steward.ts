@@ -36,7 +36,7 @@ import { readBeanStore } from "./bean-store-read.ts";
 import { classify } from "./merge-conflict-patterns.ts";
 import { readyMarkers, type GhComment } from "./merge-guard.ts";
 import { holdInForce, readQueueEntries } from "./merge-queue-store.ts";
-import { releaseCovers, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { releaseCovers, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import {
   deriveFacts,
   loadPriorityTable,

@@ -408,7 +408,7 @@ export const RULES: Rule[] = [
       // harness, with the release shapes it states its releases in. Left to
       // the `schemas/` prefix rule they were core, and each citation was a
       // wrong-direction edge.
-      "schemas/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
+      "schemas/sdlc/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
       "schemas/tools/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
       "schemas/sdlc/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
       "schemas/library/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
@@ -430,7 +430,7 @@ export const RULES: Rule[] = [
       // first `skills/` -> `scripts/` edge in the repository (measured: zero
       // such edges). Its neighbour above is the precedent rather than an
       // analogy -- the same shape, shared by the same two callers.
-      "schemas/git-corpus.ts",
+      "schemas/sdlc/git-corpus.ts",
       "schemas/kg/detangle.ts",                 // the detangle criterion — folded in from its own instance (bean `byql`)
       "schemas/kg/detangle-sidecar.ts",         // what a detangle measurement pins (bean `byql`)
       "schemas/kg/node-kind.ts",                // node kinds declare their parents; composed by that walk (bean `a1lq`)
@@ -813,7 +813,7 @@ export const RULES: Rule[] = [
       // the script for the reason stated just above. It describes what is on
       // the PUBLISH BRANCH, which is a property of the repository rather than
       // of any folio's content, and its only imports are zod and
-      // `schemas/log-entry.ts` (harness). Caught by the unassigned gate added
+      // `schemas/sdlc/log-entry.ts` (harness). Caught by the unassigned gate added
       // in #469 on its first encounter, which is the gate working.
       //
       // Classifying the script alone minted exactly the two edges that comment
@@ -856,7 +856,7 @@ export const RULES: Rule[] = [
       // Harness for the same reason as their importers.
       "schemas/kg/instance-roots.ts",
       "schemas/kg/visualiser-route.ts",        // the ONE route every declared visualiser is published at (owner, 2026-10-09): imported by the declaration reader and the tiles
-      "schemas/script-table.ts",            // the checkout's script table, by layer (bean `ar1s` P4): read from the declared instances, as instance-roots finds them
+      "schemas/sdlc/script-table.ts",            // the checkout's script table, by layer (bean `ar1s` P4): read from the declared instances, as instance-roots finds them
       "schemas/kg/graph-typology-node.ts",
       "schemas/kg/declared-nodes.ts",
       "schemas/kg/validator-node.ts",
@@ -1050,7 +1050,7 @@ export const RULES: Rule[] = [
       // It was the single `folio-assist-core -> smart-base` edge.
       "schemas/kg/front-matter.ts",    // "this repository's self-declaring files"
       "schemas/sdlc/test-run.ts",        // what was measured, with what; only eval-crdm-detect reads it
-      "schemas/input-trace.ts",     // ...and the traced input sites a run reached, which test-run records (moved from scripts/ in 70lx)
+      "schemas/sdlc/input-trace.ts",     // ...and the traced input sites a run reached, which test-run records (moved from scripts/ in 70lx)
       // The TEST PROCESS's other two schemas (beans `ygzh`, `3o5b`), by the
       // same test as `test-run.ts` beside them: a plan and a report describe
       // how a SYSTEM UNDER TEST is judged, not a folio's content, and their
@@ -1058,8 +1058,8 @@ export const RULES: Rule[] = [
       // Left `core` by the `schemas/` rule they made `kg-audit` import core,
       // and the system-under-test facet on `skill-package.ts` (harness) import
       // `test-plan.ts` for `SUT_KINDS` — two wrong-direction edges.
-      "schemas/test-plan.ts",
-      "schemas/test-report.ts",
+      "schemas/sdlc/test-plan.ts",
+      "schemas/sdlc/test-report.ts",
       // ...which forces `attribution.ts` too: both import `ATTRIBUTION_KINDS`
       // from it. It is the reviewer-identity vocabulary of every QA verdict
       // (`script` / `agent` / `human`), it imports only `tool-types.ts`
@@ -1077,7 +1077,7 @@ export const RULES: Rule[] = [
       // where it is answered rather than absorbed.
       "schemas/content/sticky-contribution.ts",
       "schemas/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
-      "schemas/python-deps.ts",     // the repository's own Python toolchain
+      "schemas/sdlc/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
       "schemas/ui/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
@@ -1133,7 +1133,7 @@ export const RULES: Rule[] = [
       // `schemas/` prefix it lands in core, and classifying the pair above
       // would then MINT two wrong-direction edges rather than retire two —
       // which is why it moves in the same change and not after.
-      "schemas/log-entry.ts",
+      "schemas/sdlc/log-entry.ts",
     ],
     // declared-path-literal: the TARGET layout of the five-repo split, which no
     // declaration in THIS repo describes — that is the whole point of the plan.

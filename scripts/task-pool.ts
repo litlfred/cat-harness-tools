@@ -40,7 +40,7 @@
  * same tree print the same lines in the same order.
  */
 import { availableParallelism, cpus } from "node:os";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 /** The default pool size: one core left for the person (and the other sessions) on the box. */
 export function defaultJobs(): number {

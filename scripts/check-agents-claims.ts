@@ -54,7 +54,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, declaredAssetPath, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const HERE = resolve(HARNESS_ROOT);

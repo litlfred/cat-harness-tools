@@ -132,7 +132,7 @@ import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js"
 import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
@@ -561,7 +561,7 @@ function pathOf(n: Node): string | undefined {
  * a tracked or unignored file, and each of its ancestors — as `rel`-prefixed,
  * `/`-terminated paths in sorted order (parents before children).
  *
- * Asked of git, never of the disk (`schemas/git-corpus.ts`): a walk would mint
+ * Asked of git, never of the disk (`schemas/sdlc/git-corpus.ts`): a walk would mint
  * a subgraph for one machine's ignored residue, and the committed output would
  * then differ by checkout. `undefined` when git cannot answer.
  */

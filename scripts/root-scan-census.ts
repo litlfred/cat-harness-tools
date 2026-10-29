@@ -71,8 +71,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import * as gitCorpusModule from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import * as gitCorpusModule from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -106,7 +106,7 @@ const ROOT_BOUND = /\b(?:REPO_ROOT|INSTANCE_ROOT|ROOT)\s*[:=]/;
  */
 function gitCorpusExports(): string[] {
   // THE MODULE'S OWN EXPORTS, not its source text. The first version read
-  // `schemas/git-corpus.ts` and matched `^export function` — which worked, and
+  // `schemas/sdlc/git-corpus.ts` and matched `^export function` — which worked, and
   // was a composed path literal that `check:declared-paths` flagged the moment
   // it landed. It was right to: a scanner that reads a file by a path it
   // built is one more thing to keep in step by hand, which is the exact class
@@ -123,7 +123,7 @@ function gitCorpusExports(): string[] {
   // happen — the `dh4f` shape, in the file whose subject is exactly that.
   if (names.length === 0) {
     throw new Error(
-      "schemas/git-corpus.ts exports no function — the census cannot tell git-aware from not " +
+      "schemas/sdlc/git-corpus.ts exports no function — the census cannot tell git-aware from not " +
         "without them, and an empty answer here reads as a repository-wide regression",
     );
   }

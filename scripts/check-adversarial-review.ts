@@ -14,7 +14,7 @@
  *    changed files report 'unknown' (never silent pass, never truncated pass).
  * 4. Reviewer Independence: Reviewer must not match author session (`reviewer.session !== author.session`),
  *    and reviewer session and model must be recorded.
- * 5. Findings: Evaluated using RED FLAG taxonomy (`schemas/red-flag.ts`).
+ * 5. Findings: Evaluated using RED FLAG taxonomy (`schemas/sdlc/red-flag.ts`).
  *
  * ## Warn-only ruling (2026-10-03 owner ruling)
  *
@@ -46,9 +46,9 @@ import {
   type EnforcementMode,
   type MergeReview,
   type ReviewGateEvaluation,
-} from "@litlfred/cat-harness/schemas/red-flag.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
 import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { attestationsHomeFor } from "@litlfred/cat-harness/schemas/qa-attestations.js";
+import { attestationsHomeFor } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 
 /** The declared state graph that holds one `merge-review/v1` verdict per PR head. */
 export const MERGE_REVIEWS_GRAPH = "merge-reviews";

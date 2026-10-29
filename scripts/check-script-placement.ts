@@ -3,7 +3,7 @@
  * Does every script live in the manifest of the layer it runs?
  *
  * Bean `ar1s` phase 4 split the root `package.json`'s 509 scripts by layer
- * (`cat-harness/schemas/script-table.ts`). A script whose command names one
+ * (`cat-harness/schemas/sdlc/script-table.ts`). A script whose command names one
  * layer's paths belongs to that layer; one naming several belongs to the one
  * that needs all the others (its declared `needs`, transitively); one naming
  * none, or naming layers no single one needs, belongs to the root, the
@@ -22,7 +22,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");

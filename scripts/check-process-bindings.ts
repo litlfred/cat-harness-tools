@@ -73,7 +73,7 @@ import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/
 import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
 import { BASELINE, type BindingBaselineEntry } from "./process-bindings.baseline.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

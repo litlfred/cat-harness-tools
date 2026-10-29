@@ -113,7 +113,7 @@ import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph
 import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 

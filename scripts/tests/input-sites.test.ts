@@ -22,7 +22,7 @@ import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-har
 
 import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
-import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -282,7 +282,7 @@ describe("the runtime trace", () => {
 
   const inChild = (env: Record<string, string | undefined>, code: string) => {
     const file = join(root, "child.ts");
-    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(HARNESS_ROOT, "schemas", "input-trace.ts"))};\n${code}\n`);
+    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(HARNESS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
     const r = Bun.spawnSync(["bun", file], { env, stdout: "pipe", stderr: "pipe" });
     expect(r.exitCode).toBe(0);
   };

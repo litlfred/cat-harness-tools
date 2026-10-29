@@ -68,7 +68,7 @@ import {
 import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/content/translation.js";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────

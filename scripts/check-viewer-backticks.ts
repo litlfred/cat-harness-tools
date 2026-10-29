@@ -50,7 +50,7 @@ import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 /** The line that opens a page template, and the only thing that selects a file. */
 export const PAGE_TEMPLATE_OPENER = /return\s+`<!doctype html>/i;

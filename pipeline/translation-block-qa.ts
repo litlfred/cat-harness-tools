@@ -100,7 +100,7 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations,
   type PriorOk,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";

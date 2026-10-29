@@ -33,7 +33,7 @@ import {
   loadDeclaredSpecTemplate,
   validateSpec,
   type SpecValidationResult,
-} from "@litlfred/cat-harness/schemas/spec-template.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/spec-template.ts";
 
 /** Default path to the declared spec template relative to repo root. */
 // declared-path-literal: the spec template is one fixed FILE inside cat-harness's own spec-kit skill, not a directory any instance declares; the two spellings are the composed and standalone layouts.

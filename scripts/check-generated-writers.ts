@@ -35,7 +35,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 
 const REPO = resolve(import.meta.dir, "../..");
 

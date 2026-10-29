@@ -81,7 +81,7 @@ import {
   visualisationResolves,
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { withViewers } from "./viewer-declarations.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 /** The three obligations, in the order the owner named them. */
 export const CRITERIA = ["visualiser", "docs", "skill", "serialisations"] as const;

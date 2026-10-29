@@ -85,7 +85,7 @@ import { ContributionRegistry, composedKindOwner, type FolioContribution } from 
 import { usesGraphHash } from "./uses-graph-hash";
 import { blockQaPath, findContentRepoRoot } from "./qa-paths";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { contributionsRoot } from "./repo-root";
 
 

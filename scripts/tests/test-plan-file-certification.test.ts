@@ -3,7 +3,7 @@
  * `folio-assistant-zaui`, done-when #1).
  *
  * The family, its schema and the store functions live in cat-harness
- * (`schemas/qa-attestations.ts`). These tests drive the STEP: the
+ * (`schemas/sdlc/qa-attestations.ts`). These tests drive the STEP: the
  * `fileSignedCertification` that `test-plan-execution.bpmn`'s filing activity
  * names, against a real directory, in each state the store can be in.
  *
@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readCertificationAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { readCertificationAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { fileSignedCertification, type FileCertificationInput } from "../test-plan-execution.ts";
 
 const dirs: string[] = [];

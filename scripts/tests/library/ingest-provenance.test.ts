@@ -6,7 +6,7 @@
  *    rungs through `bun run cat ingest`, instead of a hand rebuild with
  *    `pdf-pages.py --from-ocr --title …`;
  * 2. the OCR engine and version are recorded at ingest time, as the existing
- *    `folio-run-context/v1` (cat-harness `schemas/run-context.ts`) beside
+ *    `folio-run-context/v1` (cat-harness `schemas/sdlc/run-context.ts`) beside
  *    `ocr/`, and cited from `structure.json` `source.runContext` by digest.
  *
  * The run-context checks hold the Python writer to the TypeScript schema and
@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { RunContextSchema, runContextRef } from "@litlfred/cat-harness/schemas/run-context.ts";
+import { RunContextSchema, runContextRef } from "@litlfred/cat-harness/schemas/sdlc/run-context.ts";
 import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
 
 import { knownTitle, withKnownTitle, type Plan } from "../../ingest-document.ts";

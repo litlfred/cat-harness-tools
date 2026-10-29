@@ -106,9 +106,9 @@ import {
   type PairIO,
   type SkipDecision,
 } from "./input-hash.ts";
-import { openTrace } from "@litlfred/cat-harness/schemas/input-trace.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
-import { scriptNameOf, scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { openTrace } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { scriptNameOf, scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import {
   CONTENT_COMPILE_GATES,
   compileGatesForPaths,

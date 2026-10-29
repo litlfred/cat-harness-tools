@@ -65,7 +65,7 @@ import {
   termIri,
 } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/content/block-kinds.js";

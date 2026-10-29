@@ -99,7 +99,7 @@ import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportCompl
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";

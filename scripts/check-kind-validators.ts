@@ -41,7 +41,7 @@ import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/kg/declared-nod
 import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";

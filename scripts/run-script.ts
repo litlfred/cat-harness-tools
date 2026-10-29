@@ -3,7 +3,7 @@
  * `bun run cat <name> [args…]` — run a checkout script wherever it is declared.
  *
  * The scripts left the root `package.json` for the layer each one runs (bean
- * `ar1s` phase 4, `schemas/script-table.ts`). `bun run` reads only the
+ * `ar1s` phase 4, `schemas/sdlc/script-table.ts`). `bun run` reads only the
  * manifest in the directory it starts in, so the root keeps this one entry,
  * `cat`, and this finds the script by asking the declared instances.
  *
@@ -20,7 +20,7 @@
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 

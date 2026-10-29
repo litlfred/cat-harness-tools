@@ -15,7 +15,7 @@ import {
   SKILL_ADVERSARIAL_CHECKLIST,
   TOOL_ADVERSARIAL_CHECKLIST,
   type AdversarialContentKind,
-} from "@litlfred/cat-harness/schemas/adversarial-checklist.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/adversarial-checklist.ts";
 import {
   executeBackfillBatch,
   GATE_PATH_NODES,
@@ -28,7 +28,7 @@ import {
   asRecord,
   coverage,
 } from "../audit-coverage.ts";
-import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/red-flag.ts";
+import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -36,7 +36,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
-describe("Adversarial Checklist Definitions (schemas/adversarial-checklist.ts)", () => {
+describe("Adversarial Checklist Definitions (schemas/sdlc/adversarial-checklist.ts)", () => {
   it("defines checklists for all four content kinds", () => {
     expect(ADVERSARIAL_CONTENT_KINDS).toEqual(["tool", "schema", "skill", "process"]);
     for (const kind of ADVERSARIAL_CONTENT_KINDS) {

@@ -137,7 +137,7 @@ import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";
 import { movedDocument, placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/library/code-list.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
 import { applyVocabMapping, vocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

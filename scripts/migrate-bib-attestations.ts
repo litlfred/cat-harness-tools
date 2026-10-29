@@ -8,7 +8,7 @@
  * | `bib-qa-verifications.json` | `bib-verification`, one file per reference (orphan sources by file) |
  * | `schema/references.review.json` | `bib-human-review`, one file per reference |
  *
- * Shapes: `schemas/qa-attestations.ts`. Reading and writing:
+ * Shapes: `schemas/sdlc/qa-attestations.ts`. Reading and writing:
  * `schemas/library/bib-attestations.ts`, which falls back to the legacy file while a
  * family is absent from the store — so a folio keeps working before and after.
  *
