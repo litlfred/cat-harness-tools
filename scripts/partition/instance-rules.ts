@@ -590,7 +590,7 @@ export const RULES: Rule[] = [
       // CORE, and my first classification of it was WRONG. I filed it with
       // the harness because it reads the TOOL declarations, and `--edges`
       // immediately reported the consequence: a harness module importing
-      // `schemas/tabular-csvw.ts`, which is core's. The table's own test
+      // `schemas/library/tabular-csvw.ts`, which is core's. The table's own test
       // settles it — does it need a folio to have anything to do? It scans
       // `library/` for tabular records, so yes. Reading the tool graph is
       // core importing harness, which is the allowed direction.
@@ -965,7 +965,7 @@ export const RULES: Rule[] = [
       // adjudication's codes against, and the loader `namespaces.ts` sits
       // beside. Needed to RUN a process, so harness — the same test as the
       // tooling below; a core placement made `process-model.ts` import down.
-      "schemas/code-list.ts",
+      "schemas/library/code-list.ts",
       // Tool releases (issue #2481, bean `3sbm`): the gate over the
       // `tool-release` graph that T1 puts in cat-harness for every layer to
       // inherit. Harness, beside `code-lists.ts`, for the same reason: the
@@ -1019,7 +1019,7 @@ export const RULES: Rule[] = [
       // cat-harness/". These three are the gettext machinery and the registry
       // that binds a content type to its extractors — the tools that DO the
       // translating, not the translated content.
-      "schemas/translation-tools.ts",
+      "schemas/library/translation-tools.ts",
       // A README generator, not a README. It was the shared target of two
       // wrong-direction edges — `sync-docs-harness` and `site-links` both
       // reach it — so one re-bucket cleared both.
@@ -1404,8 +1404,8 @@ export const RULES: Rule[] = [
       // read the other way: each operates on a folio's own material, not on
       // the machinery that runs a process. Classifying them harness alongside
       // their sixteen siblings would have reached into `schemas/narrative.ts`,
-      // `schemas/attribution.ts`, `schemas/archive-contents.ts` and
-      // `schemas/tabular-records.ts` — all core — and bought four
+      // `schemas/attribution.ts`, `schemas/library/archive-contents.ts` and
+      // `schemas/library/tabular-records.ts` — all core — and bought four
       // wrong-direction edges for the tidiness of one homogeneous list.
       // `scripts/extract-assets.ts` STOOD HERE and is GONE as of bean `yj6r`,
       // 2026-09-30, for the reason the materialisation trio above gives: it

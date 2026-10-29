@@ -12,12 +12,12 @@ import { describe, expect, test } from "bun:test";
 
 describe("declared diagram paths resolve", () => {
   test("every bpmnDiagrams entry names a file that exists", async () => {
-    // Same failure one layer over. `schemas/translation-tools.ts` listed
+    // Same failure one layer over. `schemas/library/translation-tools.ts` listed
     // `processes/publication-workflow.bpmn`, which has never existed —
     // `docs/process/publication-workflow.md` is a PAGE embedding three diagrams. The
     // re-render skipped it silently, and a skipped diagram is
     // indistinguishable from one that needed no work.
-    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/translation-tools.ts");
+    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/library/translation-tools.ts");
     const missing: string[] = [];
     for (const ct of CONTENT_TYPE_TRANSLATIONS) {
       for (const rel of ct.bpmnDiagrams ?? []) {

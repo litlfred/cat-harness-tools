@@ -1,7 +1,7 @@
 /**
  * Extract and inject the translatable text of a BPMN diagram.
  *
- * `schemas/translation-tools.ts` has declared a `bpmn` format for the DAK
+ * `schemas/library/translation-tools.ts` has declared a `bpmn` format for the DAK
  * content type since the translation work landed — "BPMN label translation.
  * Diagram is re-rendered after text injection to handle text overflow in
  * translated labels" — with **no `extractModule` and no `injectModule`**, and

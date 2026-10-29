@@ -54,7 +54,7 @@ import {
   ARCHIVE_CONTENTS_SCHEMA_ID,
   ArchiveContentsSchema,
   isArchiveMimetype,
-} from "@litlfred/cat-harness/schemas/archive-contents.ts";
+} from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
 import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/attribution.ts";
 import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/narrative.ts";
 import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/document-structure.ts";
@@ -62,8 +62,8 @@ import {
   TABULAR_RECORDS_SCHEMA_ID,
   TabularRecordsSchema,
   isTabularMimetype,
-} from "@litlfred/cat-harness/schemas/tabular-records.ts";
-import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+} from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/vector-labels.ts";
 import {
@@ -90,7 +90,7 @@ import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
-import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
+import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";

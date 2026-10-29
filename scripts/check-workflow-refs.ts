@@ -285,14 +285,14 @@ if (adjTotal > 0) {
 }
 
 /*
- * The same failure, one layer over: `schemas/translation-tools.ts` lists
+ * The same failure, one layer over: `schemas/library/translation-tools.ts` lists
  * `bpmnDiagrams` per content type — the diagrams whose labels need
  * re-rendering after translation. One entry named
  * `processes/publication-workflow.bpmn`, which has never existed, so the
  * re-render skipped it silently and a skipped diagram is indistinguishable
  * from a diagram that needed no work.
  */
-const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/translation-tools.js");
+const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/library/translation-tools.js");
 const missingDeclared: string[] = [];
 for (const ct of CONTENT_TYPE_TRANSLATIONS) {
   for (const rel of ct.bpmnDiagrams ?? []) {

@@ -1,7 +1,7 @@
 /**
  * BPMN label extraction and injection.
  *
- * The `bpmn` format was declared in schemas/translation-tools.ts with no
+ * The `bpmn` format was declared in schemas/library/translation-tools.ts with no
  * extractModule, no injectModule and no code — so these tests pin the
  * behaviour the declaration implied, and in particular the things a
  * translation pass must NOT touch. Translating an id disconnects the graph;

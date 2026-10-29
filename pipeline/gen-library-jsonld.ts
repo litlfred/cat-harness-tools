@@ -85,12 +85,12 @@ import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
-import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
+import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
 import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
 import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
-import type { SourceLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
+import type { SourceLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
 import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import {
@@ -917,7 +917,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       identity?: { title?: string };
       source?: { file?: string; sha256?: string; kind?: string; url?: string; canonical?: string; version?: string };
     }>(join(dir, "referenced.json"));
-    // Two shapes of source (`schemas/referenced-source.ts`): one FILE, whose
+    // Two shapes of source (`schemas/library/referenced-source.ts`): one FILE, whose
     // bytes were hashed, or a PUBLICATION — a FHIR IG — identified by its
     // canonical and version, with nothing to hash. A record that is neither
     // is unreadable, and is reported so rather than guessed at.

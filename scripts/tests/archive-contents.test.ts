@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/archive-contents.ts";
+import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
 import { checkAll, checkEntry } from "../check-l1-complete.ts";
 import { planFor, sniffMimetype } from "../ingest-document.ts";
 

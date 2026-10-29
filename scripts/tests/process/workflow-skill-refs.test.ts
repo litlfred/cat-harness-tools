@@ -58,7 +58,7 @@ describe("declared diagram paths resolve", () => {
   test("every declared extractModule / injectModule exists", async () => {
     // `bpmn` declared NEITHER while its note described a working re-render,
     // so the capability read as built and was not.
-    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/translation-tools.ts");
+    const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/library/translation-tools.ts");
     const missing: string[] = [];
     for (const ct of CONTENT_TYPE_TRANSLATIONS) {
       for (const f of ct.formats) {

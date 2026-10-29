@@ -39,7 +39,7 @@ import {
   readLanes,
   type Ledger,
 } from "../glossary-export.ts";
-import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/glossary-ledger.ts";
+import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/library/glossary-ledger.ts";
 import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

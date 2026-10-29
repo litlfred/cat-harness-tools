@@ -50,7 +50,7 @@ import type {
   RelevanceAssessment,
   SourceLedger,
   Verifier,
-} from "@litlfred/cat-harness/schemas/bib-verification.ts";
+} from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();
 

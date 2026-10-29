@@ -358,13 +358,13 @@ async function checkUrl(
 
 // ── Verification status (added 2026-05-19; Verifier union 2026-05-31) ───
 //
-// The canonical schema lives in schemas/bib-verification.ts.
+// The canonical schema lives in schemas/library/bib-verification.ts.
 // We re-declare the consumer-side shape here to avoid a pipeline →
 // folio-assistant import edge (the content pipeline must stay in the
 // content/ tree).  The shapes must stay in sync.
 
-import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/bib-verification.ts";
-import { verifierLabel } from "@litlfred/cat-harness/schemas/bib-verification.ts";
+import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
 
 interface VerificationEntry {
