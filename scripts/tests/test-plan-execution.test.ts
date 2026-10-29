@@ -3,11 +3,13 @@
  *
  * Four things are held here:
  *
- * 1. `test-plan-execution.bpmn` RUNS: a tiny fixture plan is executed against
+ * 1. `test-plan-execution.bpmn` RUNS: the bean is opened through
+ *    `bean-open.bpmn`, a tiny fixture plan is executed against
  *    a fixture system under test, its run and report are built with the real
  *    schemas, the certification gateway is fed facts READ OFF those records,
  *    the call into `qa-report-signing.bpmn` is driven through its own DMN
- *    gateway, and the instance completes — with the role each step reports
+ *    gateway, the bean is closed through `bean-close.bpmn`, and the instance
+ *    completes — with the role each step reports
  *    being the lane's declared role. The same calls the `workflow_start` /
  *    `workflow_next` / `workflow_complete` MCP tools make, minus the GitHub
  *    authentication that wraps them.
@@ -37,8 +39,10 @@ import {
   type TestReport,
 } from "@litlfred/cat-harness/schemas/test-report.ts";
 import { auditTestPlans, dmnRefResolves, type SutActor } from "../test-plan-audit";
+import { openTrackedBean } from "../test-plan-execution";
 import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { drainSubprocess } from "./helpers.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const WF = join(ROOT, "processes", "sdlc");
@@ -127,6 +131,9 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
   /** workflow_start → workflow_next/complete up to the certification gateway. */
   function toGateway(id: string): InstanceState {
     const s = startInstance(model, { id, subject: `${plan.id}@${plan.version}`, bean: "folio-assistant-3o5b" });
+    // The bean is opened first, in bean-open.bpmn: the claim is drawn there and nowhere else (bean `m8gz`).
+    expect(at(s)).toEqual(["Open_CheckExists"]);
+    openTrackedBean(model, s, { exists: true, actor: "fixture" });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       expect(at(s)).toEqual([step]);
       complete(model, s, step, { actor: "fixture" });
@@ -138,6 +145,7 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
   test("every lane binds its declared role, and each step reports it (workflow_next)", () => {
     const roles = readRoleGraph(join(ROOT, "scenarios"))!;
     const s = startInstance(model, { id: "roles", subject: "fixture" });
+    openTrackedBean(model, s, { exists: false });
     const seen: Record<string, string | undefined> = {};
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       const e = enabled(model, s, roles)[0]!;
@@ -156,10 +164,21 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
   });
 
   test("every activity names a skill and a bean op; the gateway is computed", () => {
+    const beanCalls = ["Process_BeanOpen", "Process_BeanClose"];
     for (const n of model.nodes.values()) {
       if (n.kind !== "activity") continue;
       expect(n.skills.length).toBeGreaterThan(0);
+      // The bean's claim, resolve and archive are drawn once, inside
+      // bean-open.bpmn and bean-close.bpmn (bean `m8gz`); a call into either
+      // IS that op and carries none of its own.
+      if (beanCalls.includes(n.calledElement ?? "")) continue;
       expect(n.workPlanOp).toBeDefined();
+    }
+    // Opened first, and closed straight before each end the claim reaches.
+    expect(model.nodes.get("Call_BeanOpen")?.calledElement).toBe("Process_BeanOpen");
+    for (const end of ["End_Certified", "End_Refused", "End_Undetermined"]) {
+      const from = model.nodes.get(end)!.incoming.map((f) => model.flows.get(f)!.from);
+      expect(from.map((id) => [end, model.nodes.get(id)?.calledElement])).toEqual([[end, "Process_BeanClose"]]);
     }
     expect(model.decisions.get("GW_ExitCriteria")?.id).toBe("Decision_TestCertification");
     expect(model.nodes.get("Call_Sign")?.calledElement).toBe("Process_QaReportSigning");
@@ -188,6 +207,9 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
 
     expect(at(s)).toEqual(["A_FileCertification"]);
     complete(model, s, "A_FileCertification");
+    // bean-close.bpmn: an end named for success closes the bean as `done`.
+    expect(at(s)).toEqual(["Close_Outcome"]);
+    drainSubprocess(model, s, "Call_BeanClose", { Close_Outcome: "done" });
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).toContain("End_Certified");
   });
@@ -198,6 +220,8 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     complete(model, s, "GW_ExitCriteria", { facts: factsFrom(run, report, "agree") });
     expect(at(s)).toEqual(["A_RecordRefusal"]);
     complete(model, s, "A_RecordRefusal");
+    // bean-close.bpmn: an end named for a refusal closes the bean as `not wanted`.
+    drainSubprocess(model, s, "Call_BeanClose_2", { Close_Outcome: "not wanted" });
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).not.toContain("Call_Sign");
   });
@@ -208,12 +232,26 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     complete(model, s, "GW_ExitCriteria", { facts: factsFrom(run, report, "disagree") });
     expect(at(s)).toEqual(["A_RecordUndetermined"]);
     complete(model, s, "A_RecordUndetermined");
+    // bean-close.bpmn: an undetermined end hands the bean back as `blocked`.
+    drainSubprocess(model, s, "Call_BeanClose_3", { Close_Outcome: "blocked" });
     expect(s.status).toBe("completed");
+    expect(s.children?.Call_BeanClose_3?.history.map((h) => h.node)).toContain("Close_RecordBlocker");
   });
 
   test("the gateway is computed: asserting the branch is refused", () => {
     const s = toGateway("asserted");
     expect(() => complete(model, s, "GW_ExitCriteria", { outcome: "certified" })).toThrow();
+  });
+
+  test("a bean someone else holds stops the run before the request (bean-open.bpmn)", () => {
+    const s = startInstance(model, { id: "not-yours", subject: "fixture" });
+    drainSubprocess(model, s, "Call_BeanOpen", { Open_Exists: "yes", Open_Owner: "someone else's" });
+    complete(model, s, "GW_BeanYours", { outcome: "not yours" });
+    expect(s.status).toBe("completed");
+    const opened = s.children?.Call_BeanOpen?.history.map((h) => h.node);
+    expect(opened).toContain("Open_LeaveAlone");
+    expect(opened).not.toContain("Open_Claim");
+    expect(s.history.map((h) => h.node)).toEqual(["Start_Request", "Call_BeanOpen", "GW_BeanYours", "End_BeanNotYours"]);
   });
 
   test("a step out of order is refused (what workflow_complete enforces)", () => {

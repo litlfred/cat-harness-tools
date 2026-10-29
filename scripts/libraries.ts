@@ -4,7 +4,7 @@
  * check that it is current.
  *
  * @module scripts/libraries
- * @covers software-library — it derives every node of each declared `libraries/` directory and fails on a stale node, an import no node names, and a shim no node names
+ * @covers software-library — it derives every node of each declared `libraries/` directory, vendored bundles included, and fails on a stale node, an import no node names, a shim no node names, and a vendored bundle whose bytes or manifest it cannot vouch for
  *
  * Option D of bean `jbvi` (owner, 2026-10-24 08:25Z, "D. Shared core"). The
  * kind is cat-harness's (`schemas/software-library.ts`, a node kind on the
@@ -48,6 +48,34 @@
  *    the lockfile does not resolve from a registry, a package that is not
  *    installed, or one that states no licence. Each is a finding, never a
  *    quietly skipped node.
+ * 6. A vendored bundle with no manifest, a manifest that does not parse or
+ *    disagrees with its directory, a kept file whose bytes are not the ones
+ *    its manifest records, or no licence to read (§"A vendored bundle").
+ *
+ * ## A vendored bundle is a node too, and its bytes are not read for imports
+ *
+ * Owner, 2026-10-26 (bean `jbvi`, Q3 "A. Record as vendored"). A layer may
+ * keep a library's prebuilt bytes rather than install them: one directory per
+ * bundle, `vendor/<name>/<version>/`, anywhere in the layer, holding the
+ * bytes, the package's own licence file and a `vendored.json` manifest
+ * ({@link VendoredManifestSchema}: the npm `package`, `version`, `tarball`,
+ * `integrity`, and a sha256 per kept file). Each bundle gets ONE node,
+ * `software-library/1.1.0` with `vendored: { path }` and no `range` or `dev`:
+ *
+ * | field | from |
+ * |---|---|
+ * | `name`, `version` | the manifest's `package` and `version` (the directory's `<version>` must agree) |
+ * | `digest`, `source` | the manifest's `integrity` (re-spelled in hex) and `tarball` |
+ * | `licence`, `licenceSource` | the bundle's own `package.json` when it kept one; else its licence file — a text recognised as a listed licence ({@link recogniseLicenceText}) is that id, and any other is `LicenseRef-<name>`, SPDX's own name for a licence the list does not carry, whose text is that file |
+ *
+ * The imports INSIDE a bundle are not this layer's imports — they are what
+ * the bundle was built from — so its files are not read for imports, and a
+ * polyfill a bundle names is not a finding against the layer's `package.json`.
+ * What `--check` refuses instead: a bundle with no manifest, a manifest that
+ * does not parse or disagrees with its directory, and a kept file whose bytes
+ * are not the sha256 its manifest records (the node's digest vouches for the
+ * tarball, so the bytes must be the tarball's). `usedBy` is empty: what loads
+ * a bundle is a page or a path string, never an import.
  *
  * ## The licence is read from what is installed
  *
@@ -58,19 +86,22 @@
  * between versions, and refusing would make the gate depend on which
  * checkout ran it.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
+import { z } from "zod";
 
 import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
 import {
   LIBRARY_FILE_SUFFIX,
-  SOFTWARE_LIBRARY_SCHEMA_TAG,
   SoftwareLibrarySchema,
   libraryFileName,
   libraryLicenceProblem,
+  librarySchemaTag,
+  vendoredLibraryFileName,
   type SoftwareLibrary,
 } from "@litlfred/cat-harness/schemas/software-library.ts";
 import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/outside-software.ts";
@@ -95,6 +126,71 @@ const SKIP_DIRS = new Set(["node_modules", "dist", "build", "_site", "_kg"]);
 const PACKAGE_SPECIFIER = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(\/.*)?$/i;
 
 const BUILTINS = new Set(builtinModules);
+
+/** The directory a layer keeps vendored bundles under, one per `<name>/<version>/`. */
+export const VENDOR_DIR = "vendor";
+
+/** The manifest every vendored bundle carries beside its bytes. */
+export const VENDORED_MANIFEST = "vendored.json";
+
+/**
+ * What `libraries:derive` reads from a bundle's {@link VENDORED_MANIFEST}. Only
+ * these keys; a manifest may carry more (a `_comment`, a `from`, a free-text
+ * `licence`), which are its author's and not read.
+ */
+export const VendoredManifestSchema = z
+  .object({
+    /** The npm package the bytes were taken from. */
+    package: z.string().min(1),
+    version: z.string().min(1),
+    /** The registry tarball they were taken from. */
+    tarball: z.string().min(1),
+    /** That tarball's `sha512-<base64>` integrity, as the registry gives it. */
+    integrity: z.string().min(1),
+    /** Each kept file, bundle-relative, with the sha256 of its bytes. */
+    files: z.array(z.object({ path: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).passthrough()).optional(),
+  })
+  .passthrough();
+
+/** A bundle's licence file: `LICENSE`, `LICENCE.md`, `COPYING.txt`, … */
+const LICENCE_FILE = /^(?:licen[cs]e|copying)(?:\.[a-z]+)?$/i;
+
+/**
+ * Licence texts recognised by their words, each with its SPDX id. Matched
+ * WHOLE after {@link normaliseLicenceText} drops copyright lines, a title and
+ * whitespace — a text with one more term is not this licence, and becomes a
+ * `LicenseRef-`.
+ */
+const KNOWN_LICENCE_TEXTS: readonly { id: string; text: string }[] = [
+  {
+    id: "MIT",
+    text: `Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`,
+  },
+];
+
+/** A licence text with its copyright lines and title dropped, lowercased, whitespace collapsed. */
+export function normaliseLicenceText(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*(?:copyright\b|\(c\)|©|(?:the\s+)?mit\s+licen[cs]e\s*$)/i.test(l))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** The SPDX id of a licence text recognised whole, or `undefined`. */
+export function recogniseLicenceText(text: string): string | undefined {
+  const t = normaliseLicenceText(text);
+  return KNOWN_LICENCE_TEXTS.find((k) => normaliseLicenceText(k.text) === t)?.id;
+}
+
+/** `LicenseRef-<name>`: the package name in SPDX idstring characters (`@lhncbc/ucum-lhc` → `LicenseRef-lhncbc-ucum-lhc`). */
+export function licenseRefFor(name: string): string {
+  return `LicenseRef-${name.replace(/^@/, "").replace(/[^A-Za-z0-9.-]+/g, "-")}`;
+}
 
 /** One layer the check judges: its root and the `libraries/` directory it declares. */
 export interface LibraryLayer {
@@ -180,22 +276,124 @@ export function installedManifest(from: string, name: string): { path: string; m
   }
 }
 
-/** Every code file under `root`, layer-relative and POSIX, sorted. */
-export function codeFiles(root: string): string[] {
-  const out: string[] = [];
+/** Every directory under `root` the import walk enters, layer-relative and POSIX (`""` for the root). */
+function walkDirs(root: string, visit: (rel: string, abs: string) => boolean | void): void {
   const walk = (dir: string): void => {
+    if (visit(relative(root, dir).split(sep).join("/"), dir) === false) return;
     for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
+      if (!e.isDirectory() || e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
       const p = join(dir, e.name);
-      if (e.isDirectory()) {
-        // Another instance nested inside this one is its own layer.
-        if (existsSync(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
-        walk(p);
-      } else if (e.isFile() && CODE_FILE.test(e.name)) out.push(relative(root, p).split(sep).join("/"));
+      // Another instance nested inside this one is its own layer.
+      if (existsSync(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
+      walk(p);
     }
   };
   walk(root);
+}
+
+/**
+ * Every vendored bundle under `root`: each `<name>/<version>/` directory of a
+ * directory named {@link VENDOR_DIR}, layer-relative and POSIX, sorted.
+ */
+export function vendoredBundles(root: string): string[] {
+  const out: string[] = [];
+  walkDirs(root, (rel, abs) => {
+    if (basename(abs) !== VENDOR_DIR || rel === "") return;
+    for (const n of readdirSync(abs, { withFileTypes: true })) {
+      if (!n.isDirectory() || n.name.startsWith(".")) continue;
+      for (const v of readdirSync(join(abs, n.name), { withFileTypes: true })) {
+        if (v.isDirectory() && !v.name.startsWith(".")) out.push(`${rel}/${n.name}/${v.name}`);
+      }
+    }
+  });
   return out.sort();
+}
+
+/** Every code file under `root`, layer-relative and POSIX, sorted — never one inside a directory of `skip` (a vendored bundle). */
+export function codeFiles(root: string, skip: ReadonlySet<string> = new Set()): string[] {
+  const out: string[] = [];
+  walkDirs(root, (rel, abs) => {
+    if (skip.has(rel)) return false;
+    for (const e of readdirSync(abs, { withFileTypes: true })) {
+      if (e.isFile() && CODE_FILE.test(e.name)) out.push(relative(root, join(abs, e.name)).split(sep).join("/"));
+    }
+  });
+  return out.sort();
+}
+
+/** The sha256 of a file's bytes, as 64 lowercase hex characters. */
+function sha256Of(path: string): string {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+/**
+ * One vendored bundle's node, from its manifest and its own licence file, or
+ * the problems that kept it from being written. Never throws for a problem in
+ * the inputs.
+ */
+export function deriveVendored(root: string, bundle: string): { node?: SoftwareLibrary; problems: string[] } {
+  const dir = join(root, bundle);
+  const manifestPath = join(dir, VENDORED_MANIFEST);
+  if (!existsSync(manifestPath)) {
+    return { problems: [`${bundle}: a vendored bundle with no ${VENDORED_MANIFEST} — could not determine where its bytes came from`] };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  } catch (e) {
+    return { problems: [`${bundle}/${VENDORED_MANIFEST}: not JSON — ${(e as Error).message}`] };
+  }
+  const parsed = VendoredManifestSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { problems: [`${bundle}/${VENDORED_MANIFEST}: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`] };
+  }
+  const m = parsed.data;
+  const problems: string[] = [];
+  if (basename(bundle) !== m.version) problems.push(`${bundle}: the directory says version ${basename(bundle)}, its ${VENDORED_MANIFEST} says ${m.version}`);
+  const digest = sha512Hex(m.integrity);
+  if (!digest) problems.push(`${bundle}/${VENDORED_MANIFEST}: \`integrity\` is not a sha512 integrity`);
+  for (const f of m.files ?? []) {
+    const p = join(dir, f.path);
+    if (!existsSync(p) || !statSync(p).isFile()) problems.push(`${bundle}/${f.path}: named by ${VENDORED_MANIFEST}, and not there`);
+    else if (sha256Of(p) !== f.sha256) problems.push(`${bundle}/${f.path}: its bytes are not the sha256 ${VENDORED_MANIFEST} records — a vendored file is kept unmodified`);
+  }
+  // The licence: the bundle's own package.json, else its own licence file.
+  let licence: string | undefined;
+  let licenceSource: string | undefined;
+  const ownPkg = join(dir, "package.json");
+  if (existsSync(ownPkg)) {
+    try {
+      licence = licenceOf(JSON.parse(readFileSync(ownPkg, "utf-8")) as Record<string, unknown>);
+      if (licence) licenceSource = `${bundle}/package.json`;
+    } catch {
+      // not JSON: fall through to the licence file
+    }
+  }
+  if (!licence) {
+    const file = readdirSync(dir).filter((f) => LICENCE_FILE.test(f)).sort()[0];
+    if (file) {
+      licence = recogniseLicenceText(readFileSync(join(dir, file), "utf-8")) ?? licenseRefFor(m.package);
+      licenceSource = `${bundle}/${file}`;
+    }
+  }
+  if (!licence || !licenceSource) problems.push(`${bundle}: no package.json licence and no licence file — could not determine its licence`);
+  if (problems.length > 0 || !digest || !licence || !licenceSource) return { problems };
+  const node = {
+    $schema: librarySchemaTag({ vendored: true }),
+    name: m.package,
+    version: m.version,
+    digest: { algorithm: "sha512", digest },
+    source: { type: "url", url: m.tarball },
+    licence,
+    licenceSource,
+    vendored: { path: bundle },
+    usedBy: [],
+  } as SoftwareLibrary;
+  const check = SoftwareLibrarySchema.safeParse(node);
+  if (!check.success) {
+    return { problems: [`${bundle}: ${check.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`] };
+  }
+  return { node, problems: [] };
 }
 
 /** The module specifiers a file imports, and the modules it declares ambiently. */
@@ -280,7 +478,8 @@ export function deriveLayer(root: string): DerivedLayer {
     const t = typesPackageFor(p);
     return deps.has(t) ? t : undefined;
   };
-  for (const file of codeFiles(root)) {
+  const bundles = vendoredBundles(root);
+  for (const file of codeFiles(root, new Set(bundles))) {
     const refs = readModuleRefs(file, readFileSync(join(root, file), "utf-8"));
     const isShim = /^types\/[^/]+\.d\.ts$/.test(file);
     for (const m of refs.ambient) {
@@ -341,7 +540,7 @@ export function deriveLayer(root: string): DerivedLayer {
     fileOf.set(file, name);
     const shim = shims.get(name);
     out.nodes.set(file, {
-      $schema: SOFTWARE_LIBRARY_SCHEMA_TAG,
+      $schema: librarySchemaTag({}),
       name,
       version: resolved.version,
       range,
@@ -353,6 +552,21 @@ export function deriveLayer(root: string): DerivedLayer {
       ...(shim ? { shim } : {}),
       usedBy: [...(usedBy.get(name) ?? [])].sort(),
     } as SoftwareLibrary);
+  }
+
+  // The vendored bundles: one node each, from the bundle's own manifest.
+  for (const bundle of bundles) {
+    const v = deriveVendored(root, bundle);
+    out.problems.push(...v.problems);
+    if (!v.node) continue;
+    const file = vendoredLibraryFileName(v.node.name, v.node.version);
+    const clash = fileOf.get(file);
+    if (clash) {
+      out.problems.push(`${bundle}: its file \`${file}\` is already ${clash}'s`);
+      continue;
+    }
+    fileOf.set(file, bundle);
+    out.nodes.set(file, v.node);
   }
   return out;
 }

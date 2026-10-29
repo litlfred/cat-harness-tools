@@ -163,6 +163,7 @@ import {
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
+import { type ActorScope, declaredCapabilityIds, unresolvedActorCapabilities } from "./lib/actor-capabilities.ts";
 
 const ENGINE_VERSION = "1";
 
@@ -2346,21 +2347,10 @@ function auditGraph(
       })),
   );
 
-  const capabilities = new Set<string>();
-  if (existsSync(CAPABILITY_DIR)) {
-    for (const f of readdirSync(CAPABILITY_DIR)) if (f.endsWith(".json")) capabilities.add(f.slice(0, -5));
-  }
-  const badCaps: KgFinding[] = [];
-  for (const a of actors) {
-    for (const c of a.capabilities ?? []) {
-      if (!capabilities.has(c)) {
-        badCaps.push({
-          where: a.id,
-          detail: `${relative(root, a.path)} claims capability "${c}", which the registry does not declare.`,
-        });
-      }
-    }
-  }
+  // Over the SAME layers the actors were read from (see `actors` below): an
+  // actor a higher instance declares may claim a capability declared beside it.
+  const capabilities = declaredCapabilityIds(root, CAPABILITY_DIR, ACTOR_SCOPE);
+  const badCaps = unresolvedActorCapabilities(root, actors, capabilities);
 
   // The folio ODRL profile is declared once, by the platform: an instance that
   // declares none of its own (one whose actors' grants live in its own
@@ -2739,10 +2729,12 @@ const refUnjudgeable = (ref: string): boolean =>
 const PLATFORM_ROOT = ACTOR_DIR ? findInstanceRoot(ACTOR_DIR) : undefined;
 // declared-path-literal: the convention fallback, at the call site, as POLICY_DIR.
 const PLATFORM_POLICY_DIR = PLATFORM_ROOT ? ownDirectoryById(PLATFORM_ROOT, "policies", "policies") : POLICY_DIR;
+/** Which layers the actors are read over; their capabilities are read over the same. */
+const ACTOR_SCOPE: ActorScope = corpusScopeFor(root) === "checkout" ? "checkout" : INSTANCE_RUN ? "needed" : "own";
 const actors =
-  corpusScopeFor(root) === "checkout"
+  ACTOR_SCOPE === "checkout"
     ? checkoutActors(root, ACTOR_DIR, policyGrants(checkoutPolicies(root, POLICY_DIR)))
-    : INSTANCE_RUN
+    : ACTOR_SCOPE === "needed"
       ? neededActors(root, ACTOR_DIR, policyGrants(neededPolicies(root, PLATFORM_POLICY_DIR)))
       : readActors(ACTOR_DIR, policyGrants(readPolicies(POLICY_DIR)));
 

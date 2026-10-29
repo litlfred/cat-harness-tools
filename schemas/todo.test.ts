@@ -23,6 +23,7 @@ import {
   type KgIndex,
 } from "@litlfred/cat-harness/schemas/todo.ts";
 import { readTodoFiles, todoDefaultTheme } from "../scripts/todos.js";
+import { buildKgIndex } from "../src/core/feedback.js";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
 import { themeById } from "@litlfred/cat-harness/schemas/themes.js";
@@ -188,6 +189,29 @@ describe("not-checked is a third state and never collapses", () => {
       KG,
     );
     expect(r[0]).toEqual({ axis: "actor", ref: "no-such-actor", state: "dangling" });
+  });
+
+  test("buildKgIndex reads the live harness roles, processes, tasks and actors, and returns undefined for absent directories (bean c4rz)", () => {
+    const live = buildKgIndex(HARNESS_ROOT);
+    expect(live.roles).toBeDefined();
+    expect((live.roles?.size ?? 0) > 0).toBe(true);
+    expect(live.processes).toBeDefined();
+    expect((live.processes?.size ?? 0) > 0).toBe(true);
+    expect(live.tasks).toBeDefined();
+    expect((live.tasks?.size ?? 0) > 0).toBe(true);
+    expect(live.actors).toBeDefined();
+    expect((live.actors?.size ?? 0) > 0).toBe(true);
+
+    const missing = buildKgIndex("/nonexistent-c4rz-checkout-dir");
+    expect(missing.roles).toBeUndefined();
+    expect(missing.processes).toBeUndefined();
+    expect(missing.tasks).toBeUndefined();
+    expect(missing.actors).toBeUndefined();
+    const unchecked = resolveTodoTags(
+      tags({ roles: ["editor"], processes: ["Process_CRDM"], tasks: [{ process: "Process_CRDM", task: "A_Implement" }] }),
+      missing,
+    );
+    expect(unchecked.every((x) => x.state === "not-checked")).toBe(true);
   });
 });
 

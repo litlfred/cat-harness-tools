@@ -290,7 +290,12 @@ interface Stats {
   };
 }
 
-function computeStats(paperDir: string, contentRoot: string): Stats {
+/**
+ * Every content block of one paper, with its resolved Lean file and that
+ * file's sorry/class status. The walk {@link computeStats} counts, exported so
+ * `math-heat` (bean `cat-tools-tk99`) can split the same blocks by chapter.
+ */
+function collectCoverageBlocks(paperDir: string, contentRoot: string): Block[] {
   const repoRoot = resolve(contentRoot, "..");
   const root = join(contentRoot, paperDir);
   const leanRoot = join(root, "lean");
@@ -323,7 +328,11 @@ function computeStats(paperDir: string, contentRoot: string): Stats {
     }
     blocks.push(block);
   }
+  return blocks;
+}
 
+function computeStats(paperDir: string, contentRoot: string): Stats {
+  const blocks = collectCoverageBlocks(paperDir, contentRoot);
   const byKind: Record<string, number> = {};
   for (const b of blocks) byKind[b.kind] = (byKind[b.kind] ?? 0) + 1;
 
@@ -450,5 +459,5 @@ if (import.meta.main) {
   }
 }
 
-export { computeStats, resolveLeanFile, inspectLean, leanFileStatus };
-export type { Stats };
+export { computeStats, collectCoverageBlocks, resolveLeanFile, inspectLean, leanFileStatus, PROVABLE };
+export type { Stats, Block as CoverageBlock };

@@ -6,6 +6,7 @@
  * @module scripts/tests/libraries.test
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,10 +14,14 @@ import { dirname, join, resolve } from "node:path";
 import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
 import { SoftwareLibrarySchema } from "@litlfred/cat-harness/schemas/software-library.ts";
 import {
+  codeFiles,
   deriveLayer,
   layerFindings,
   libraryLayers,
   licenceOf,
+  licenseRefFor,
+  recogniseLicenceText,
+  vendoredBundles,
   packageOf,
   parseBunLock,
   readModuleRefs,
@@ -234,6 +239,123 @@ describe("--check", () => {
     writeFileSync(join(bare, "package.json"), "{}");
     expect(deriveLayer(bare).problems.some((p) => p.includes("bun.lock"))).toBe(true);
     rmSync(bare, { recursive: true, force: true });
+  });
+});
+
+describe("a vendored bundle (owner, 2026-10-26: record as vendored)", () => {
+  const MIT = `Copyright Somebody and other contributors
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+`;
+  const sha256 = (t: string) => createHash("sha256").update(t).digest("hex");
+  const BUNDLE_JS = `import "promise-polyfill";\nexport const lib = 1;\n`;
+  const OWN_TERMS = "Our own terms, which no SPDX id names.\n";
+
+  function vendor(name: string, dir: string, version: string, licenceFile: [string, string], extra: Record<string, unknown> = {}): void {
+    const at = `scripts/assets/vendor/${dir}/${version}`;
+    put(`${at}/${licenceFile[0]}`, licenceFile[1]);
+    put(`${at}/lib.js`, BUNDLE_JS);
+    put(
+      `${at}/vendored.json`,
+      JSON.stringify({
+        _comment: "fixture",
+        package: name,
+        version,
+        tarball: `https://registry.npmjs.org/${name}/-/${name.split("/").pop()}-${version}.tgz`,
+        integrity: INTEGRITY,
+        files: [
+          { path: licenceFile[0], sha256: sha256(licenceFile[1]) },
+          { path: "lib.js", sha256: sha256(BUNDLE_JS) },
+        ],
+        ...extra,
+      }),
+    );
+  }
+
+  beforeAll(() => {
+    vendor("libmit", "libmit", "3.6.0", ["LICENSE.txt", MIT]);
+    vendor("@own/terms", "own-terms", "8.0.0", ["LICENSE.md", OWN_TERMS]);
+  });
+  afterAll(() => {
+    rmSync(join(root, "scripts"), { recursive: true, force: true });
+    writeLayer(layer, deriveLayer(root));
+  });
+
+  test("each `vendor/<name>/<version>/` is a bundle, and its files are not read for imports", () => {
+    expect(vendoredBundles(root)).toEqual(["scripts/assets/vendor/libmit/3.6.0", "scripts/assets/vendor/own-terms/8.0.0"]);
+    expect(codeFiles(root, new Set(vendoredBundles(root))).some((f) => f.includes("/vendor/"))).toBe(false);
+    const d = deriveLayer(root);
+    expect(d.unknownImports.has("promise-polyfill")).toBe(false);
+  });
+
+  test("one 1.1.0 node per bundle, marked vendored, with no range or dev; the other nodes stay 1.0.0", () => {
+    const d = deriveLayer(root);
+    expect(d.problems).toEqual([]);
+    const v = d.nodes.get("libmit-3.6.0.vendored.library.json")!;
+    expect(SoftwareLibrarySchema.safeParse(v).success).toBe(true);
+    expect(v.$schema).toBe("software-library/1.1.0");
+    expect(v.vendored).toEqual({ path: "scripts/assets/vendor/libmit/3.6.0" });
+    expect(v.range).toBeUndefined();
+    expect(v.dev).toBeUndefined();
+    expect(v.version).toBe("3.6.0");
+    expect(v.digest).toEqual({ algorithm: "sha512", digest: HEX });
+    expect(v.source).toEqual({ type: "url", url: "https://registry.npmjs.org/libmit/-/libmit-3.6.0.tgz" });
+    expect(v.usedBy).toEqual([]);
+    expect(d.nodes.get("pkg-a.library.json")!.$schema).toBe("software-library/1.0.0");
+  });
+
+  test("the licence is read from the bundle's own files: a recognised text is its id, any other a LicenseRef", () => {
+    const d = deriveLayer(root);
+    const mit = d.nodes.get("libmit-3.6.0.vendored.library.json")!;
+    expect(mit.licence).toBe("MIT");
+    expect(mit.licenceSource).toBe("scripts/assets/vendor/libmit/3.6.0/LICENSE.txt");
+    const own = d.nodes.get("own__terms-8.0.0.vendored.library.json")!;
+    expect(own.licence).toBe("LicenseRef-own-terms");
+    expect(own.licenceSource).toBe("scripts/assets/vendor/own-terms/8.0.0/LICENSE.md");
+    expect(recogniseLicenceText(`${MIT}\nAnd one more term.`)).toBeUndefined();
+    expect(licenseRefFor("@lhncbc/ucum-lhc")).toBe("LicenseRef-lhncbc-ucum-lhc");
+  });
+
+  test("a written layer with bundles is clean, and its licences parse on the pinned list", () => {
+    const d = deriveLayer(root);
+    writeLayer(layer, d);
+    expect(layerFindings(layer, d, SPDX)).toEqual([]);
+  });
+
+  test("a kept file whose bytes changed is a finding, and the bundle gets no node", () => {
+    const p = join(root, "scripts/assets/vendor/libmit/3.6.0/lib.js");
+    writeFileSync(p, `${BUNDLE_JS}// patched\n`);
+    const d = deriveLayer(root);
+    expect(d.nodes.has("libmit-3.6.0.vendored.library.json")).toBe(false);
+    expect(d.problems.some((x) => x.includes("lib.js") && x.includes("sha256"))).toBe(true);
+    writeFileSync(p, BUNDLE_JS);
+  });
+
+  test("a bundle with no manifest, or one that disagrees with its directory, could not be determined", () => {
+    put("scripts/assets/vendor/bare/1.0.0/x.js", "export {};\n");
+    vendor("libmit", "skewed", "2.0.0", ["LICENSE", MIT], { version: "2.0.1" });
+    const p = deriveLayer(root).problems;
+    expect(p.some((x) => x.includes("vendor/bare/1.0.0") && x.includes("vendored.json"))).toBe(true);
+    expect(p.some((x) => x.includes("vendor/skewed/2.0.0") && x.includes("2.0.1"))).toBe(true);
+    rmSync(join(root, "scripts/assets/vendor/bare"), { recursive: true });
+    rmSync(join(root, "scripts/assets/vendor/skewed"), { recursive: true });
   });
 });
 

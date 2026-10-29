@@ -22,7 +22,7 @@
  *
  * @covers none — a build step that installs third-party bytes, not an audit of a declared graph
  */
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -57,8 +57,9 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
     const katex = katexDir();
     const jsEntry = join(work, "entry.ts");
     writeFileSync(jsEntry, `export * from ${JSON.stringify(join(ENTRY, "entry.ts"))};\nexport { default } from ${JSON.stringify(Bun.resolveSync("katex", katex))};\n`);
-    const js = await Bun.build({ entrypoints: [jsEntry], target: "browser", format: "esm", minify: true });
-    if (!js.success || js.outputs.length !== 1) throw new Error(`the editor did not bundle: ${js.logs.map(String).join("; ")}`);
+    const jsOut = join(work, "js");
+    const js = await Bun.build({ entrypoints: [jsEntry], outdir: jsOut, target: "browser", format: "esm", minify: true, splitting: true, naming: { entry: "crepe.js", chunk: "chunks/[name]-[hash].js" } });
+    if (!js.success) throw new Error(`the editor did not bundle: ${js.logs.map(String).join("; ")}`);
     // The stylesheet entry names each package's CSS by the path module
     // resolution finds, not by a relative node_modules path: standing alone, a
     // layer's own node_modules is not there and the root's is (seed-ready.ts).
@@ -66,15 +67,26 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
     writeFileSync(cssEntry, [
       `${packageDir("@milkdown/crepe")}/lib/theme/common/style.css`,
       `${packageDir("@milkdown/crepe")}/lib/theme/frame/style.css`,
-      `${katexDir()}/dist/katex.min.css`,
     ].map((f) => `@import ${JSON.stringify(f)};`).join("\n") + "\n");
     const out = join(work, "out");
-    const css = await Bun.build({ entrypoints: [cssEntry], outdir: out, minify: true, naming: { entry: "crepe.css", asset: "fonts/[name]-[hash].[ext]" } });
+    const css = await Bun.build({ entrypoints: [cssEntry], outdir: out, minify: true, naming: { entry: "crepe.css" } });
     if (!css.success) throw new Error(`the editor's stylesheet did not bundle: ${css.logs.map(String).join("; ")}`);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "crepe.js"), await js.outputs[0]!.text());
+    cpSync(jsOut, dir, { recursive: true });
     cpSync(out, dir, { recursive: true });
+    // KaTeX's fonts as files beside the stylesheet, not inlined: Bun's CSS
+    // bundler writes all sixty into crepe.css as base64, about a megabyte
+    // compressed that every reader downloaded before the editor opened
+    // (smart-ra, 2026-10-26). KaTeX's own @font-face rules name them by
+    // relative url(fonts/…), and a browser fetches a font only when a formula
+    // uses it.
+    const FONT_FACE = /@font-face\s*\{[^}]*\}/g;
+    const bundled = readFileSync(join(dir, "crepe.css"), "utf-8").replace(FONT_FACE, (r) => (r.includes("url(data:") ? "" : r));
+    const katexFaces = readFileSync(join(katexDir(), "dist", "katex.min.css"), "utf-8").match(FONT_FACE) ?? [];
+    if (!katexFaces.length) throw new Error("KaTeX's stylesheet declares no fonts");
+    writeFileSync(join(dir, "crepe.css"), bundled + "\n" + katexFaces.join("") + "\n");
+    cpSync(join(katexDir(), "dist", "fonts"), join(dir, "fonts"), { recursive: true });
     if (!existsSync(join(dir, "crepe.css"))) throw new Error("the editor's stylesheet was not written");
     const files = readdirSync(dir, { recursive: true }).map(String).sort();
     return { dir, files };

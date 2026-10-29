@@ -10,7 +10,7 @@
  *
  * It lives here, below both of its readers, so there is one implementation:
  * `check-term-mapping.ts` (this layer) keys the term-mapping record by it, and
- * `folio-assistant-core/scripts/glossary-page.ts` (a layer above) mints IRIs
+ * the content core's `scripts/glossary-page.ts` (a layer above) mints IRIs
  * and places terms by it. The page used to hold the only copy, which the
  * record could not import without reading upward.
  */

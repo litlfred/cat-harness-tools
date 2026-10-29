@@ -21,6 +21,7 @@
     "scripts/gen-uml-overview.ts",
     "scripts/harness-schema-export.ts",
     "scripts/kg-validate.ts",
+    "scripts/libraries.ts",
     "scripts/milestone-rollup.ts",
     "scripts/remote-mount.ts",
     "scripts/state-visualizer.ts",

@@ -184,6 +184,20 @@ describe("mount:remote over fixture repositories", () => {
     expect(exitCode(c.state)).toBe(0);
   });
 
+  test("1b. an instance entry left at an older commit than its pin is missing, not mounted (folio-assistant#2682)", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    const file = join(root, "index.lock.json");
+    const lock = JSON.parse(readFileSync(file, "utf-8")) as { mounts: Array<{ harness: string; repository: string }>; instances: Array<{ instance: string; via: string; repository: string; sha: string }> };
+    // What `--seed` left behind: the pin moved, its own instance entry did not.
+    const own = lock.instances.find((i) => lock.mounts.some((m) => m.harness === i.via && m.repository === i.repository))!;
+    own.sha = "f".repeat(40);
+    writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
+    const c = checkRemote({ instanceRoot: root });
+    expect(c.state).toBe("missing");
+    expect(c.reason).toContain(`${own.instance} at ffffffffffff`);
+  });
+
   test("2. code arrives through mounted paths: a cross-instance relative import resolves", async () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
@@ -654,6 +668,29 @@ describe("index.config.json as the mount declaration (owner, 2026-10-07)", () =>
     expect(c.reason).toContain("index.config.json");
     expect(c.reason).toContain("down.json");
     expect(() => mountRemote({ instanceRoot: root, urlFor })).toThrow(/BOTH/);
+  });
+
+  test("29b. approvers in the index count when the declaration has none; on both, the mount throws (folio-assistant#2389)", () => {
+    const withIndexApprovers = (who: string[]): string => {
+      const root = indexed();
+      write(root, { "down.json": decl("down", { mountApprovers: undefined }) });
+      const cfg = JSON.parse(readFileSync(join(root, "index.config.json"), "utf-8"));
+      cfg.mountApprovers = who;
+      writeFileSync(join(root, "index.config.json"), JSON.stringify(cfg, null, 2));
+      return root;
+    };
+    const ok = withIndexApprovers(["test"]);
+    const r = mountRemote({ instanceRoot: ok, urlFor });
+    expect(r.plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "mounted" });
+    expect(readLock(ok).instances.find((i) => i.instance === "core")!.trust).toMatchObject({ approver: "declared" });
+    expect(checkRemote({ instanceRoot: ok }).state).toBe("mounted");
+
+    const other = withIndexApprovers(["someone-else"]);
+    expect(mountRemote({ instanceRoot: other, urlFor }).plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "refused" });
+
+    const both = withIndexApprovers(["test"]);
+    write(both, { "down.json": decl("down", { mountApprovers: ["test"] }) });
+    expect(() => mountRemote({ instanceRoot: both, urlFor })).toThrow(/mountApprovers in both/);
   });
 
   test("30. a legacy lock is RENAMED onto index.lock.json when the mount rewrites it, never left beside it", () => {

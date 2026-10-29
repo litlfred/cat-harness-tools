@@ -457,7 +457,14 @@ function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: s
   // `index.config.json` when the checkout has one, else the declaration's
   // `remoteMounts` — and BOTH is an error, never a pick (schemas/index-config.ts).
   const name = decl?.name ?? (idx.state === "ok" ? idx.config.site?.landing ?? "coordinator" : "downstream");
-  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: decl?.mountApprovers };
+  // Who may consent: the index's list, or the declaration's — never both
+  // (folio-assistant#2389: a checkout whose index lists the mounts may
+  // declare no instance of its own).
+  // Read structurally: the field is new in cat-harness#625, and a pinned
+  // cat-harness without it rejects an index that carries it anyway.
+  const fromIndex = idx.state === "ok" ? (idx.config as { mountApprovers?: string[] }).mountApprovers : undefined;
+  if (fromIndex && decl?.mountApprovers) throw new Error(`${instanceRoot} declares mountApprovers in both index.config.json and its instance declaration — keep one`);
+  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: fromIndex ?? decl?.mountApprovers };
 }
 
 /**
@@ -1591,6 +1598,21 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
   const have = JSON.stringify(r.lock.mounts.map((m) => [m.harness, m.repository, m.ref]).sort());
   if (want !== have) {
     return { state: "missing", reason: "the lock was written for different pins than the declaration names — run `bun run cat mount:remote`", outcomes: [] };
+  }
+  // A pin's own instances were mounted from that pin (folio-assistant#2682):
+  // `mount:remote --seed` in a checkout whose mounts had drifted rewrote the
+  // top-level `ref` and left the instance entries at the old commit, and CI,
+  // which mounts from the entries, kept testing the old layer.
+  const stale = r.lock.instances.flatMap((inst) => {
+    const m = r.lock.mounts.find((x) => x.harness === inst.via && x.repository === inst.repository);
+    return m && inst.sha !== m.ref ? [`${inst.instance} at ${inst.sha.slice(0, 12)}, pinned at ${m.ref.slice(0, 12)}`] : [];
+  });
+  if (stale.length) {
+    return {
+      state: "missing",
+      reason: `the lock's instance entries are not the pinned commits (${stale.join("; ")}) — re-pin from a checkout mounted from the lock: \`bun run cat mount:remote --seed …\` then \`bun run cat mount:remote\``,
+      outcomes: [],
+    };
   }
   // What the mount reached and did not lay down is carried in the lock, so
   // "the lock lists nothing wrong" is never mistaken for "nothing was wrong".
