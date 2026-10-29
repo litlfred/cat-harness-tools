@@ -7,7 +7,7 @@
  * @module scripts/tests/formula-benchmark
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -108,5 +108,89 @@ describe("formula-benchmark", () => {
     const { code, err } = bench(f, "--json", "library/formula.json");
     expect(code).not.toBe(0);
     expect(err).toContain("declared graph directory");
+  });
+});
+
+describe("formula-benchmark stage 3 — judge verdicts read as data (#130)", () => {
+  const agent = { kind: "agent", id: "claude-code", model: "test-model" };
+  // `\\frac{a}{b}` printed as a/b: the string stages miss it, a judge would not.
+  const TEXT = "the ratio a/b and the sum x+y";
+  const TEX = "the ratio $\\frac{a}{b}$ and the sum $x+y$";
+
+  function queue(f: Fixture): { entry: string; section: string; formula: string; text_sha256: string }[] {
+    const q = join(f.root, "build", "q.json");
+    expect(bench(f, "--judge-queue", q).code).toBe(0);
+    const doc = JSON.parse(readFileSync(q, "utf8"));
+    expect(doc.$schema).toBe("formula-judge-queue/v1");
+    return doc.pairs;
+  }
+
+  function verdicts(f: Fixture, rows: object[]): string {
+    const p = join(f.root, "library", "formula-verdicts.json");
+    writeFileSync(p, JSON.stringify({ $schema: "formula-verdicts/v1", verdicts: rows }));
+    return p;
+  }
+
+  test("the queue holds only the pairs the string stages did not find", () => {
+    const f = fixture({ [INTRO]: TEXT }, { [INTRO]: TEX });
+    const pairs = queue(f);
+    expect(pairs.map((p) => p.formula)).toEqual(["\\frac{a}{b}"]);
+    expect(pairs[0]!.text_sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test("a current verdict is reported beside the string recall, uncalibrated by default", () => {
+    const f = fixture({ [INTRO]: TEXT }, { [INTRO]: TEX });
+    const [p] = queue(f);
+    verdicts(f, [{ ...p, verdict: "equivalent", judged_by: agent }]);
+    const { code, out, err } = bench(f);
+    expect(code).toBe(0);
+    expect(out.recall).toBeCloseTo(0.5, 2);
+    expect(out.judge.judged).toBe(1);
+    expect(out.judge.recall_judged).toBe(1);
+    expect(out.judge.recall_combined).toBe(1);
+    expect(out.judge.calibrated).toBe(false);
+    expect(err).toContain("UNCALIBRATED");
+    expect(queue(f)).toEqual([]);
+  });
+
+  test("a verdict on text that has since changed is stale and never used", () => {
+    const f = fixture({ [INTRO]: TEXT }, { [INTRO]: TEX });
+    const [p] = queue(f);
+    verdicts(f, [{ ...p, text_sha256: "0".repeat(64), verdict: "equivalent", judged_by: agent }]);
+    const { out } = bench(f);
+    expect(out.judge.stale).toBe(1);
+    expect(out.judge.judged).toBe(0);
+    expect(out.judge.recall_combined).toBeCloseTo(0.5, 2);
+  });
+
+  test("a verdict must name its model", () => {
+    const f = fixture({ [INTRO]: TEXT }, { [INTRO]: TEX });
+    const [p] = queue(f);
+    verdicts(f, [{ ...p, verdict: "equivalent", judged_by: { kind: "agent", id: "x" } }]);
+    const { code, err } = bench(f);
+    expect(code).not.toBe(0);
+    expect(err).toContain("must name the model");
+  });
+
+  test("a held set scores the judge against ground truth", () => {
+    const f = fixture({ [INTRO]: TEXT }, { [INTRO]: TEX });
+    const held = join(f.root, "held.json");
+    writeFileSync(
+      held,
+      JSON.stringify({
+        $schema: "formula-judge-held-set/v1",
+        pairs: [
+          { formula: "\\frac{a}{b}", text: "a/b", truth: true, verdict: "equivalent", judged_by: agent },
+          { formula: "x_i", text: "x i", truth: true, verdict: "not-equivalent", judged_by: agent },
+          { formula: "a+b", text: "a-b", truth: false, verdict: "not-equivalent", judged_by: agent },
+          { formula: "a+b", text: "b+c", truth: false, verdict: "equivalent", judged_by: agent },
+        ],
+      }),
+    );
+    const { out } = bench(f, "--held-set", held);
+    expect(out.judge.calibrated).toBe(true);
+    expect(out.judge.calibration.agreement).toBe(0.5);
+    expect(out.judge.calibration.precision).toBe(0.5);
+    expect(out.judge.calibration.recall).toBe(0.5);
   });
 });
