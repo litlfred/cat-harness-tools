@@ -63,6 +63,7 @@ import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typolo
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
+import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "@litlfred/cat-harness/schemas/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
 /** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
@@ -531,7 +532,7 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
         adapterModule: adapterModulePath(assistant, o.contentType),
       }),
       dependencies: { folioAssistant: [standsOn(assistant, o.contentType)] },
-      feedbackDir: ".folio-feedback",
+      feedbackDir: `${DEFAULT_TODO_GRAPH_ROOT}/${nodeOfKind(DEFAULT_TODO_GRAPH, "todo-feedback")!.path}`,
       skills: ".claude/skills/local",
       viewer: { dir: `${toolsDir(assistant)}/viewer`, port: 8080 },
       // `blob` rather than `pages`: it is the only link style that resolves
