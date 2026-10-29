@@ -922,6 +922,14 @@ describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (ow
     expect(verdict("cat-harness/AGENTS.md", "bun run cat-harness-tools/scripts/mount-from-lock.ts")).toBe("exempt");
   });
 
+  test("a Windows command line naming a tools script with backslashes is exempt", () => {
+    // cmd.exe needs `\`, so the guide's Windows lines name the same script path.
+    expect(verdict("cat-harness/docs/start/installation.md", ".\\cat-harness-tools\\scripts\\bootstrap.ps1")).toBe("exempt");
+    expect(verdict("cat-harness/docs/start/installation.md", "powershell -File .\\cat-harness-tools\\scripts\\win\\setup.ps1 -Force")).toBe("exempt");
+    // The separator widens; nothing else does — a backslashed source path still fails.
+    expect(verdict(SKILL, "see `cat-harness-tools\\src\\core\\handover-screen.ts`")).toBe("wrong-direction");
+  });
+
   test("FAILS for code and configuration in cat-harness naming the same script", () => {
     const line = "bun run cat-harness-tools/scripts/qa-refresh.ts --check";
     expect(verdict("cat-harness/schemas/qa-record-shapes.ts", line)).toBe("wrong-direction");
