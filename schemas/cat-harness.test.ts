@@ -200,11 +200,14 @@ describe("layering", () => {
     // Importing it would make agentic-harness depend on the content model for
     // its own type IRIs — a harness -> core edge, already the largest
     // wrong-direction group, and the coupling the split exists to undo.
-    // The namespace comes from the leaf `../namespaces` instead.
+    // The namespace comes from the leaf `./namespaces` instead — it sits beside
+    // this module since bean `f8wp` (placement PR8) moved it into `schemas/kg/`;
+    // `schemas/namespaces.ts` is now only a one-release re-export of it.
     const src = readFileSync(join(HARNESS_ROOT, "schemas", "kg", "cat-harness.ts"), "utf-8");
     expect(src).not.toMatch(/from "\.\/jsonld"/);
     expect(src).not.toMatch(/from "\.\.?\/block-kinds"/);
-    expect(src).toMatch(/from "\.\.\/namespaces"/);
+    expect(src).toMatch(/from "\.\/namespaces(\.js)?"/);
+    expect(existsSync(join(HARNESS_ROOT, "schemas", "kg", "namespaces.ts"))).toBe(true);
   });
 });
 
