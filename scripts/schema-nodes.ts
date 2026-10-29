@@ -44,6 +44,7 @@ import { basename, join, relative, sep } from "node:path";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import type { CorpusScope } from "./known-skills.js";
+import { withConcernGroupDirs } from "./concern-groups.ts";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The
@@ -81,7 +82,9 @@ import type { CorpusScope } from "./known-skills.js";
  */
 function schemasRoots(root: string, scope: CorpusScope = "checkout"): string[] {
   const declared = scope === "instance" ? directoriesForGraph(root, "schemas") : corpusDirectoriesForGraph(root, "schemas");
-  return declared.length > 0 ? declared : [join(root, "schemas")];
+  // Each directory's concern groups too (`schemas/<group>/`, declared from
+  // within by `schemas.json`; bean `f8wp`), one level deep like the rest.
+  return withConcernGroupDirs(declared.length > 0 ? declared : [join(root, "schemas")], "schemas");
 }
 
 /** What a `schemas/*.ts` module declares itself to be. */

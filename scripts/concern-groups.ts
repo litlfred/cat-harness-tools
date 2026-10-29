@@ -90,6 +90,30 @@ export function declaredGroupsIn(dir: string, kind: string, registry: GraphTypol
 }
 
 /**
+ * `dirs` followed by each one's declared concern-group directories for `kind`
+ * — the directories a reader of a grouped graph walks when it reads one level
+ * deep, as the schema readers do (bean `f8wp`, placement PR8). A directory
+ * that declares no groups contributes only itself, so an ungrouped graph reads
+ * exactly as before.
+ */
+export function withConcernGroupDirs(
+  dirs: readonly string[],
+  kind: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const dir of dirs) {
+    for (const d of [dir, ...declaredGroupsIn(dir, kind, registry).map((g) => join(dir, g.path))]) {
+      if (seen.has(d)) continue;
+      seen.add(d);
+      out.push(d);
+    }
+  }
+  return out;
+}
+
+/**
  * The groups one parsed declaration file names for `kind`, WITHOUT checking
  * that their directories exist — for a reader holding only the declaration
  * files at a pin (`upstream-directories.ts`, bean `mo75` concern names).
