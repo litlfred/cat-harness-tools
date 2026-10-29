@@ -4,8 +4,9 @@
  * `.claude/skills/capabilities/*.json` has always described how to detect each
  * external tool — a command, an env var, a file — and `requires` edges between
  * them. Nothing executed them: `--check-deps` carried its own hardcoded list,
- * and so did the `check_dependencies` MCP tool (`src/tools/check-deps.ts`,
- * now `folio-assistant-sci/adapters/paper/tools/check-deps.ts`). So the probes
+ * and so did the `check_dependencies` MCP tool (once `src/tools/check-deps.ts`
+ * here; bean `bbza` moved it up to the content layer that owns the paper
+ * adapter, and this layer does not name it). So the probes
  * were documentation, and a skill declaring `requiredCapabilities` had
  * nothing to check against.
  *
