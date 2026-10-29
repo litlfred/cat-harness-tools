@@ -989,6 +989,21 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
 }
 
 /**
+ * One entry's own subgraph JSON-LD (cat-harness#180): since library entries
+ * are framed, `library/<doc>/` is a subgraph of its instance's tree, at the
+ * entry's path relative to its instance. `undefined` when it is not on disk
+ * (subgraphs are built before this writer, and not on every run).
+ */
+export function entrySubgraphFile(harnessRoot: string, site: string, instance: string, entryAbs: string): string | undefined {
+  const inst = findInstanceRoot(entryAbs);
+  if (inst === undefined) return undefined;
+  const base = instanceSubgraphFile(harnessRoot, site, instance);
+  if (base === undefined) return undefined;
+  const abs = join(dirname(base), relative(inst, entryAbs), SUBGRAPH_INDEX_FILE);
+  return existsSync(abs) ? abs : undefined;
+}
+
+/**
  * The instance roots a site COMPOSES — owner, 2026-10-15: *"a harness should
  * combine it libray/ (or whatever) sites of it and all its depndencies"*.
  * When the checkout's root declares an instance (a per-repository site such
@@ -1033,6 +1048,8 @@ export function entrySources(
     files: readonly EntryGraphFile[];
     /** The source file and the KG files in the repository that holds the entry (`entryRepoLinks`). */
     repo?: readonly RepoLink[];
+    /** The entry's own subgraph index ({@link entrySubgraphFile}), when published. */
+    subgraph?: string;
   },
 ): SourceLink[] {
   const { site, shellDir, instance, entry: e } = o;
@@ -1040,6 +1057,7 @@ export function entrySources(
   const data = entryDataFiles(o.dataDir, e.id);
   return [
     ...(o.manifest ? [{ label: "manifest.jsonld", href: at(libraryAssetSitePath(instance, e.id)), what: "the entry's JSON-LD" }] : []),
+    ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(shellDir, o.subgraph), what: "the entry's subgraph (JSON-LD)" }] : []),
     ...o.files.map((f) => ({
       label: f.rel,
       href: at(entryGraphSitePath(instance, e.id, f.rel)),
@@ -1892,6 +1910,7 @@ if (import.meta.main) {
           })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
+            subgraph: entrySubgraphFile(ROOT, site, subject, join(repoRoot, e.dir)),
             repo: entryRepoLinks({
               repoRoot,
               dir: e.dir,
