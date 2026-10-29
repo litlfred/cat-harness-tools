@@ -244,6 +244,18 @@ export interface HealthContext {
    * `qa-reports` (bean `1dre`), read offline through the qa-store.
    */
   pagesServing: Probe<PagesServingEvidence>;
+  /**
+   * `mount:remote:check` over the declared remote mounts, read with no
+   * network (folio-assistant#2467, decision 3). Optional: a context built
+   * before this probe existed reads as `absent`.
+   */
+  remoteMounts?: StoreProbe<RemoteMountEvidence>;
+}
+
+/** One declared remote instance as the mount check left it. */
+export interface RemoteMountEvidence {
+  outcomes: { instance: string; state: string; detail?: string }[];
+  command: string;
 }
 
 /** The observation, and the qa-store entry it was read from. */
@@ -1929,6 +1941,54 @@ export function pagesPublishHealthCheck(ctx: HealthContext): HealthCheckResult {
   return settle(id, summary, PAGES_PUBLISH_THRESHOLDS, measurements, findings);
 }
 
+export const REMOTE_MOUNT_THRESHOLDS: HealthThreshold[] = [
+  {
+    metric: "remote-mounts-not-mounted",
+    value: 0,
+    unit: "count",
+    severity: "major",
+    basis:
+      "a declared remote instance that is not its pinned bytes on disk is a layer the checkout's tools " +
+      "and CI do not run as pinned (folio-assistant#2682 kept testing an old layer this way). `major`: " +
+      "nothing is lost, and every remedy is a person's (owner, 2026-10-07, folio-assistant#2467 decision 3: " +
+      "the check reports and never acts).",
+  },
+];
+
+/** What a person does about one remote mount that is not mounted, by what the check said. */
+export function remoteMountAction(detail: string): string {
+  if (/modified|not the pinned bytes|left untouched|differ:|extra:/.test(detail)) {
+    return "Move the edits upstream to the fork, or delete or rename the directory, then `bun run cat mount:remote` (`--fresh` discards them).";
+  }
+  if (/consent|approver|basis|trust/i.test(detail)) {
+    return "Record a person's consent for this pin (`mount:remote --seed … --consent-by`), or drop the mount entry.";
+  }
+  if (/tracked/.test(detail)) return "The target holds tracked files: move the mount with `path`, or untrack them, then re-mount.";
+  return "Run `bun run cat mount:remote` and read the instance's outcome; re-pin from a checkout mounted from the lock if the lock is behind.";
+}
+
+export function remoteMountHealthCheck(ctx: HealthContext): HealthCheckResult {
+  const id = "remote-mounts";
+  const summary = "Each declared remote mount: its pinned bytes on disk, or why not (no network; `mount:remote:check`).";
+  const probe = ctx.remoteMounts ?? { state: "absent" as const, reason: "no remote-mount probe ran" };
+  if (probe.state === "absent") return absentResult(id, summary, REMOTE_MOUNT_THRESHOLDS, probe.reason);
+  if (probe.state === "unknown") return unknownResult(id, summary, REMOTE_MOUNT_THRESHOLDS, probe.reason);
+  const { outcomes, command } = probe.value;
+  const fine = new Set(["mounted", "unverified-approver", "local", "skipped"]);
+  const bad = outcomes.filter((o) => !fine.has(o.state));
+  const measurements: HealthMeasurement[] = [
+    { metric: "remote-mounts-declared", value: outcomes.length, unit: "count", command },
+    { metric: "remote-mounts-not-mounted", value: bad.length, unit: "count", command },
+  ];
+  const findings: HealthFinding[] = bad.map((o) => ({
+    metric: "remote-mounts-not-mounted",
+    severity: "major",
+    summary: `${o.instance}: ${o.state}${o.detail ? ` — ${o.detail}` : ""}`,
+    action: remoteMountAction(o.detail ?? ""),
+  }));
+  return settle(id, summary, REMOTE_MOUNT_THRESHOLDS, measurements, findings);
+}
+
 export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
   const id = "todo-store";
   const summary = "The human todo store: how many items are open, and whether any have gone stale.";
@@ -2079,6 +2139,13 @@ export const HEALTH_CHECKS: readonly {
       "What the published site served, read offline from the CI pages-serving observation on " +
       "`qa-reports` (bean `1dre`). Missing or older than a week is `unknown`, with its date.",
     run: pagesPublishHealthCheck,
+  },
+  {
+    id: "remote-mounts",
+    summary:
+      "Each declared remote mount: its pinned bytes on disk, or why not, with what a person does " +
+      "(folio-assistant#2467). Reads the lock and the disk; fetches nothing, changes nothing.",
+    run: remoteMountHealthCheck,
   },
   {
     id: "staging-preview-orphans",

@@ -51,6 +51,7 @@ import {
 } from "@litlfred/cat-harness/schemas/health-report.ts";
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
+import { checkRemote } from "../../scripts/remote-mount.ts";
 import {
   stagingSlug,
   type BranchEvidence,
@@ -58,6 +59,7 @@ import {
 } from "./checks.ts";
 import type {
   PagesServingEvidence,
+  RemoteMountEvidence,
   BeanEvidence,
   DoneWhenState,
   HealthContext,
@@ -1151,5 +1153,21 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
       rows: readSpecialBranches(o.specialBranchesPath ?? SPECIAL_BRANCHES_JSON, o.repoRoot),
     }),
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
+    remoteMounts: probeRemoteMounts(o.repoRoot),
   };
+}
+
+/** `mount:remote:check` at `repoRoot`, as evidence: absent when nothing is declared. No network. */
+export function probeRemoteMounts(repoRoot: string): StoreProbe<RemoteMountEvidence> {
+  try {
+    const r = checkRemote({ instanceRoot: repoRoot });
+    if (r.state === "not-enabled") return { state: "absent", reason: r.reason };
+    if (r.outcomes.length === 0) return { state: "unknown", reason: r.reason };
+    return {
+      state: "ok",
+      value: { outcomes: r.outcomes.map((o) => ({ instance: o.instance, state: o.state, ...(o.detail ? { detail: o.detail } : {}) })), command: "bun run cat mount:remote:check" },
+    };
+  } catch (e) {
+    return { state: "unknown", reason: `mount:remote:check threw: ${(e as Error).message}` };
+  }
 }
