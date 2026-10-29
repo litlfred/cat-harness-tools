@@ -555,7 +555,7 @@ export const RULES: Rule[] = [
     triaged: true,
     exact: [
       // `schemas/dak-blocks.ts` was listed here as CORE until bean `1335`,
-      // because core's `schemas/block-kinds.ts` then declared
+      // because core's `schemas/content/block-kinds.ts` then declared
       // `CONTENT_ADAPTERS = ["paper", "dak"]` and `DAK_BLOCK_KINDS`, and the
       // module defining their schemas could not sit in a different repository
       // from the union naming them. That premise was removed rather than the
@@ -719,7 +719,7 @@ export const RULES: Rule[] = [
       // that happens to live there; the blanket `test/` rule is right for
       // everything else in that tree and wrong for these two.
       "schemas/ui/theme.ts",
-      "schemas/document-kind.ts",            // the document-kind graph typology's schema, beside theme.ts (stage D5, #1767)
+      "schemas/content/document-kind.ts",            // the document-kind graph typology's schema, beside theme.ts (stage D5, #1767)
       "schemas/ui/themes.ts",
       // Resolves a ThemeRef against its owner's declared themes (bean `v8n5`):
       // the same sticky-note theme layer as the two above, reached through a
@@ -1410,11 +1410,11 @@ export const RULES: Rule[] = [
       // `scripts/extract-assets.ts` STOOD HERE and is GONE as of bean `yj6r`,
       // 2026-09-30, for the reason the materialisation trio above gives: it
       // moved to `folio-assistant-core/scripts/` beside the
-      // `schemas/extraction.ts` it reads, so the classification was carried by
+      // `schemas/content/extraction.ts` it reads, so the classification was carried by
       // location. SUPERSEDED 2026-10-02 by owner ruling 2 of the placement
       // proposal (bean `tlat`, PR5): the pair is the tool behind the harness's
       // own `asset-extraction` skill, so the schema moved DOWN to
-      // `cat-harness/schemas/extraction.ts` and the script to
+      // `cat-harness/schemas/content/extraction.ts` and the script to
       // `cat-harness-tools/scripts/extract-assets.ts`. Neither is in this
       // core list again; the reasoning below is kept as the record of why it
       // was ever classified core. Its reasoning is kept rather than deleted with the entry,

@@ -55,7 +55,7 @@ import {
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type AdjudicationStatus,
-} from "@litlfred/cat-harness/schemas/term-adjudication.ts";
+} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { vocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
+import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
 import { folioShim } from "../folio-shim.ts";
 import { missingReexports, reexportLine, shimAssistant, vocabularyModulesFor } from "../lib/folio-shim.ts";
 

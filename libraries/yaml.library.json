@@ -42,6 +42,7 @@
     "scripts/tests/requirements-standards-assessment.test.ts",
     "scripts/tests/sdlc/red-gate-is-last.test.ts",
     "src/core/workflow-events.ts",
+    "src/tools/skill-update.ts",
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts"

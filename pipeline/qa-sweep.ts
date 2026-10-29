@@ -96,7 +96,7 @@ import {
   profileExcludesCriterion,
   voiceExcludesCriterion,
 } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { adapterForKind } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { readDeclaredFolioProfile } from "./profile-check";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
 

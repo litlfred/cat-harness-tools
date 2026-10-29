@@ -26,7 +26,7 @@ import {
 } from "@litlfred/cat-harness/schemas/constraints.ts";
 // A block is parsed by the schema its kind is typed by: a vocabulary module's
 // (a layer above cat-harness typing its own kinds), else BlockSchema.
-import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
+import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
 import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "@litlfred/cat-harness/schemas/types.ts";
 import { resolveRenderTarget } from "./render-discovery";
 import { readDeclaredFolioProfile } from "./profile-check";

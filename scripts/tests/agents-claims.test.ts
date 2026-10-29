@@ -59,9 +59,9 @@ describe("parsing — a claim must carry a backticked symbol and a shape", () =>
 
   test("a COMMA before `and` is a clause boundary, not a list", () => {
     // A real false positive: `DocumentContentAdapter` was swallowed across
-    // ", and" and attributed to `schemas/block-kinds.ts`, which it has
+    // ", and" and attributed to `schemas/content/block-kinds.ts`, which it has
     // nothing to do with. A checker that cries wolf gets switched off.
-    const c = locationClaims(normalise("`DocumentContentAdapter` extends it, and `X` in `schemas/block-kinds.ts`"));
+    const c = locationClaims(normalise("`DocumentContentAdapter` extends it, and `X` in `schemas/content/block-kinds.ts`"));
     expect(c.map((x) => x.symbol)).toEqual(["X"]);
   });
 

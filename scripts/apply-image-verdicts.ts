@@ -106,7 +106,7 @@ import {
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
   isVectorFigureId,
-} from "@litlfred/cat-harness/schemas/vector-figure.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 

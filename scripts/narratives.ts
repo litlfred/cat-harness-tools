@@ -34,7 +34,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
 import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
-import { VECTOR_FIGURES_FILE } from "@litlfred/cat-harness/schemas/vector-figure.ts";
+import { VECTOR_FIGURES_FILE } from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { FIGURE_DESCRIPTIONS_FILE } from "@litlfred/cat-harness/schemas/content/figure-description.ts";
 import { entryItems } from "./summaries.ts";
 import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";

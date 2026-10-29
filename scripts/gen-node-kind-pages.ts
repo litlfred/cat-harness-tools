@@ -58,7 +58,7 @@ import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from
 import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "@litlfred/cat-harness/schemas/kg/node-kind-index.ts";
 import { kindDirectories, nodesOfKind, type KindNode } from "@litlfred/cat-harness/schemas/kg/node-kind-nodes.ts";
 import { isNodeKind } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
-import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
 import { darkRules } from "./lib/scheme-css.ts";
 import type { VisualiserNavEntry } from "./lib/navbar.ts";
 import { themedPage } from "./lib/themed-page.ts";

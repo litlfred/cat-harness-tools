@@ -35,7 +35,7 @@ import type {
   QaCriterionDefinition,
 } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { COMPANION_ROLES } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";

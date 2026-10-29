@@ -345,7 +345,7 @@ export function invariantTokens(text: string): InvariantToken[] {
  *
  * ## What an entry says, and what it deliberately does not
  *
- * `translations/<locale>/glossary.po`, the slot `schemas/translation.ts`
+ * `translations/<locale>/glossary.po`, the slot `schemas/content/translation.ts`
  * already declares ("shared glossary PO (no POT — hand-authored)"). Three
  * shapes, and the third is the one that matters:
  *

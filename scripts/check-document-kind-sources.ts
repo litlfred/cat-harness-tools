@@ -4,7 +4,7 @@
  * instance can actually reach. Bean `qvxh`.
  *
  * `computedFrom` is how a document kind says *"this section is computable from
- * these assets"* (`schemas/document-kind.ts`). The schema says it names
+ * these assets"* (`schemas/content/document-kind.ts`). The schema says it names
  * DECLARED graph ids "so a reader can ask whether the graph exists rather than
  * take the prose's word for it" — and until this check nothing asked. A typo,
  * a renamed directory, or a graph that was never declared (the external
