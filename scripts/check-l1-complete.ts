@@ -64,6 +64,17 @@ import {
   isTabularMimetype,
 } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
 import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import {
+  RECORDING_FILENAME,
+  RECORDING_SCHEMA_ID,
+  RecordingSchema,
+  TRANSCRIPT_DIR,
+  TRANSCRIPT_SCHEMA_ID,
+  TranscriptSchema,
+  isRecordingMimetype,
+  segmentsCanonical,
+  type Transcript,
+} from "@litlfred/cat-harness/schemas/library/recording.ts";
 import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/content/vector-labels.ts";
 import {
@@ -156,7 +167,7 @@ export interface EntryReport {
  * about the entry rather than a claim about the file, which is the same
  * argument `nso8` makes for sniffing over extensions, one level up.
  */
-export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "undetermined";
+export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "recording" | "undetermined";
 
 /** Which sidecar identifies which shape. One place, so a fourth rung adds one line. */
 /**
@@ -205,7 +216,8 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "undete
 // `sheets/` is a workbook's grouping nodes, one per sheet, the tabular
 // counterpart of `sections/` (`pipeline/tabular-nodes.ts`, written by
 // gen-library-jsonld under its `GROUPING_DIRS`).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR];
+// `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, TRANSCRIPT_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
@@ -322,6 +334,8 @@ export const KIND_SIDECAR: ReadonlyArray<readonly [EntryKind, string]> = [
   ["archive", "contents.jsonld"],
   // Recorded, text withheld by licence — `referenced-source.py`, bean `scfh`.
   ["referenced", "referenced.json"],
+  // A recorded meeting or talk — `recording-transcript.py`, bean `1r0p`.
+  ["recording", RECORDING_FILENAME],
 ];
 
 /**
@@ -601,7 +615,8 @@ export const BLOCK_BEARING: readonly string[] = ["narrative-provenance"];
 
 export function appliesTo(requirement: string, kind: EntryKind): boolean {
   if (kind === "paged" || kind === "undetermined") return true;
-  if (BLOCK_BEARING.includes(requirement)) return kind === "tabular";
+  // A recording's transcripts are blocks too, each naming who drafted it.
+  if (BLOCK_BEARING.includes(requirement)) return kind === "tabular" || kind === "recording";
   return !PAGED_ONLY.includes(requirement);
 }
 
@@ -997,6 +1012,13 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     }
   }
 
+  // ── audio-transcripts — bean `1r0p` ─────────────────────────────────────
+  //
+  // Scoped like `archive-contents`: the entry's own sniffed mimetype says
+  // whether it is a recording, so every other entry reports a determined
+  // "not a recording" rather than nothing.
+  out.push(...audioTranscripts(dir));
+
   // ── referenced-record — bean `scfh` ──────────────────────────────────────
   //
   // A source RECORDED and not held: its licence forbids posting copies, so the
@@ -1382,16 +1404,10 @@ export interface NotDerivable {
   probe: string;
 }
 
-export const NOT_DERIVABLE: readonly NotDerivable[] = [
-  // `transcript`, NOT `transcript.json`. `1r0p`'s own Done-when says
-  // `library/<slug>/transcript/` holds the source-language transcript and
-  // each translation — a DIRECTORY. The first probe here guessed a filename
-  // and would therefore never have fired, which is a gate that cannot fail:
-  // the precise class of defect this probe was added to prevent, reproduced
-  // two PRs later by the person who added it. Read from the bean, not from
-  // the shape a sidecar usually takes.
-  { name: "audio-transcripts", bean: "1r0p", probe: "transcript" },
-];
+// EMPTY, and measured so: `audio-transcripts` was the last entry (bean
+// `1r0p`), and moved into {@link derivableRequirements} when its arm landed.
+// Its probe was `transcript`, the directory that arm writes.
+export const NOT_DERIVABLE: readonly NotDerivable[] = [];
 
 /**
  * Not-derivable claims the corpus has outgrown.
@@ -1403,13 +1419,113 @@ export const NOT_DERIVABLE: readonly NotDerivable[] = [
 export function expiredExceptions(
   entries: readonly string[],
   has: (dir: string, file: string) => boolean,
-): { name: string; bean: string; found: string }[] {
-  const out: { name: string; bean: string; found: string }[] = [];
-  for (const nd of NOT_DERIVABLE) {
+  list: readonly NotDerivable[] = NOT_DERIVABLE,
+): { name: string; bean: string; probe: string; found: string }[] {
+  const out: { name: string; bean: string; probe: string; found: string }[] = [];
+  for (const nd of list) {
     const found = entries.find((d) => has(d, nd.probe));
-    if (found) out.push({ name: nd.name, bean: nd.bean, found });
+    if (found) out.push({ name: nd.name, bean: nd.bean, probe: nd.probe, found });
   }
   return out;
+}
+
+/**
+ * A recording's transcripts — bean `1r0p`.
+ *
+ * `met` with "not a recording" for every other entry. For a recording:
+ * `recording.json` conforms; `transcript/` holds the source-language
+ * transcript, named `<lang>.json` for the language the recording is recorded
+ * in; every file there is a transcript of THESE bytes (`recording_sha256`),
+ * named for its own `lang`; and a translation is of the source language, cut
+ * at the source's segment times one for one.
+ *
+ * A translation whose `segments_sha256` no longer matches the source is
+ * reported as stale and does NOT fail: the source was corrected after it was
+ * translated, which is a backlog for a translator, as a stale block summary
+ * is. A draft is not a failure either; confirming one is a person's work.
+ */
+export function audioTranscripts(dir: string): Requirement[] {
+  const name = "audio-transcripts";
+  const src = sourceBlockOf(dir);
+  const mime = src?.mimetype_sniffed;
+  if (!isRecordingMimetype(mime)) {
+    return [{ name, state: "met", detail: `not a recording (${typeof mime === "string" && mime ? mime : "no sniffed mimetype"})` }];
+  }
+  const recPath = join(dir, RECORDING_FILENAME);
+  if (!existsSync(recPath)) {
+    return [{ name, state: "unmet", detail: `sniffed ${mime} but no ${RECORDING_FILENAME} — run scripts/recording-transcript.py record` }];
+  }
+  let rec: ReturnType<typeof RecordingSchema.safeParse>;
+  try {
+    rec = RecordingSchema.safeParse(JSON.parse(readFileSync(recPath, "utf-8")));
+  } catch (e) {
+    return [{ name, state: "unmet", detail: `${RECORDING_FILENAME} unparseable: ${String(e)}` }];
+  }
+  if (!rec.success) {
+    const i = rec.error.issues[0];
+    return [{ name, state: "unmet", detail: `${RECORDING_FILENAME} is not ${RECORDING_SCHEMA_ID}: ${i?.path.join(".")} ${i?.message ?? "invalid"}` }];
+  }
+  const spoken = rec.data.identity.language;
+  const tdir = join(dir, TRANSCRIPT_DIR);
+  const files = existsSync(tdir) && statSync(tdir).isDirectory() ? readdirSync(tdir).filter((f) => !f.startsWith(".")).sort() : [];
+  if (!files.includes(`${spoken}.json`)) {
+    return [{
+      name,
+      state: "unmet",
+      detail: `no ${TRANSCRIPT_DIR}/${spoken}.json, the transcript in the language it is recorded in — run scripts/recording-transcript.py transcript`,
+    }];
+  }
+  const problems: string[] = [];
+  const docs = new Map<string, Transcript>();
+  for (const f of files) {
+    if (!f.endsWith(".json")) {
+      problems.push(`${TRANSCRIPT_DIR}/${f}: not a transcript file`);
+      continue;
+    }
+    let r: ReturnType<typeof TranscriptSchema.safeParse>;
+    try {
+      r = TranscriptSchema.safeParse(JSON.parse(readFileSync(join(tdir, f), "utf-8")));
+    } catch (e) {
+      problems.push(`${TRANSCRIPT_DIR}/${f}: unparseable`);
+      continue;
+    }
+    if (!r.success) {
+      const i = r.error.issues[0];
+      problems.push(`${TRANSCRIPT_DIR}/${f}: not ${TRANSCRIPT_SCHEMA_ID}: ${i?.path.join(".")} ${i?.message ?? "invalid"}`);
+      continue;
+    }
+    if (f !== `${r.data.lang}.json`) problems.push(`${TRANSCRIPT_DIR}/${f}: holds lang ${r.data.lang}`);
+    if (r.data.recording_sha256 !== rec.data.source.sha256) problems.push(`${TRANSCRIPT_DIR}/${f}: transcribes other bytes than ${rec.data.source.file}`);
+    docs.set(r.data.lang, r.data);
+  }
+  const source = docs.get(spoken);
+  if (source && source.translated_from) problems.push(`${TRANSCRIPT_DIR}/${spoken}.json: the source-language transcript is marked as a translation`);
+  const stale: string[] = [];
+  const sourceSha = source ? createHash("sha256").update(segmentsCanonical(source.segments)).digest("hex") : undefined;
+  for (const [lang, t] of docs) {
+    if (lang === spoken) continue;
+    if (!t.translated_from) {
+      problems.push(`${TRANSCRIPT_DIR}/${lang}.json: a second recogniser transcript; only ${spoken} is spoken here`);
+      continue;
+    }
+    if (t.translated_from.lang !== spoken) problems.push(`${TRANSCRIPT_DIR}/${lang}.json: translated from ${t.translated_from.lang}, not ${spoken}`);
+    if (source) {
+      const same =
+        t.segments.length === source.segments.length &&
+        t.segments.every((s, i) => s.start_ms === source.segments[i]!.start_ms && s.end_ms === source.segments[i]!.end_ms);
+      if (!same) problems.push(`${TRANSCRIPT_DIR}/${lang}.json: its segments are not the source's, one for one`);
+      else if (t.translated_from.segments_sha256 !== sourceSha) stale.push(lang);
+    }
+  }
+  if (problems.length) return [{ name, state: "unmet", detail: problems.slice(0, 3).join("; ") }];
+  const parts = [...docs].map(([lang, t]) => `${lang} (${lang === spoken ? "source" : "translation"}, ${t.state})`);
+  return [{
+    name,
+    state: "met",
+    detail:
+      `${source!.segments.length} segment(s); ${parts.join(", ")}` +
+      (stale.length ? `; ${stale.length} stale translation(s), the source changed after: ${stale.join(", ")} — advisory` : ""),
+  }];
 }
 
 export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryReport {
@@ -1715,7 +1831,7 @@ if (import.meta.main) {
       if (expired.length) {
         console.error("A `not-derivable` claim has EXPIRED — the arm now runs:");
         for (const x of expired) {
-          console.error(`  ✗ ${x.name} (bean ${x.bean}) — ${x.found} has ${x.name === "audio-transcripts" ? "transcript.json" : "its artefact"}`);
+          console.error(`  ✗ ${x.name} (bean ${x.bean}) — ${x.found} has its artefact (\`${x.probe}\`)`);
         }
         console.error("\nMove it into `derivableRequirements` and check it. A third state");
         console.error("that never expires is an exemption, not a measurement.");

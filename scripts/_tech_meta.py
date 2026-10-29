@@ -70,6 +70,36 @@ def sniff_mimetype(path: str) -> str | None:
     # `ustar` sits at offset 257 in a tar header rather than at the start.
     if len(head) > 262 and head[257:262] == b"ustar":
         return "application/x-tar"
+    return sniff_media(head)
+
+
+# Recordings (bean `folio-assistant-1r0p`). Containers whose signature is not
+# a plain prefix, so they are read here rather than listed in `_MAGIC`.
+_ISO_AUDIO_BRANDS = {b"M4A ", b"M4B ", b"M4P "}
+_ISO_QUICKTIME_BRANDS = {b"qt  "}
+
+
+def sniff_media(head: bytes) -> str | None:
+    """An audio or video container, by its signature, or None."""
+    # ISO base media (MP4, M4A, MOV): a box size, then `ftyp`, then the brand.
+    if len(head) >= 12 and head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand in _ISO_AUDIO_BRANDS:
+            return "audio/mp4"
+        if brand in _ISO_QUICKTIME_BRANDS:
+            return "video/quicktime"
+        return "video/mp4"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+    if head[:4] == b"fLaC":
+        return "audio/flac"
+    if head[:4] == b"OggS":
+        return "audio/ogg"
+    if head[:3] == b"ID3" or (len(head) >= 2 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0 and head[1] & 0x06):
+        return "audio/mpeg"
+    # EBML: Matroska or WebM. The DocType says which.
+    if head[:4] == b"\x1aE\xdf\xa3":
+        return "video/webm" if b"webm" in head[:64] else "video/x-matroska"
     return None
 
 

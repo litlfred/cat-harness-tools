@@ -854,6 +854,19 @@ export function planFor(
     };
   }
 
+  // A recording (bean `1r0p`). Its transcript comes from a recogniser that
+  // does not run here, and its title, date and language from its meeting
+  // record, so this refuses with the route rather than opening it as a PDF.
+  if (mime !== null && /^(audio|video)\//.test(mime)) {
+    return {
+      rung: "undetermined",
+      why:
+        `sniffed ${mime} — a recording. File it with scripts/recording-transcript.py: \`record\` with an identity file, ` +
+        "then `transcript` with a recogniser's output (skill `audio-transcription`)",
+      steps: [],
+    };
+  }
+
   if (mime !== null && (ARCHIVE_MIMETYPES as readonly string[]).includes(mime)) {
     return {
       rung: "archive",
