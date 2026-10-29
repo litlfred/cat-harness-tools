@@ -16,7 +16,7 @@
  * - **`lane-role-legacy-binding`** (process) — a lane still bound by the
  *   deprecated `<bootstrap.processes:role ref>`, or carrying one that
  *   disagrees with its `partitionElementRef`. The text is `laneRoleRef`'s own
- *   warning (cat-harness `schemas/role-graph.ts`), carried on the lane by
+ *   warning (cat-harness `schemas/process/role-graph.ts`), carried on the lane by
  *   `loadProcessModel`: one reader, one sentence.
  * - **`task-skill-outside-lane-role`** (process) — a task's skill that is not
  *   among the skills of the Role its lane names, closed over `inherits`.
@@ -29,7 +29,7 @@
  *   mechanical role is a real role whose skills are its contract; a contract
  *   nothing tests is a promise nobody checks.
  */
-import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
 import type { LaneDef, ProcessNode } from "../../src/workflow/process-model.ts";
 import type { SkillEdges } from "./skill-edges.ts";

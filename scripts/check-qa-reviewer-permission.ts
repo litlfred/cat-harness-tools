@@ -74,7 +74,7 @@ import { join, relative } from "node:path";
 
 import type { QaCriterionEntry, QaReviewer } from "@litlfred/cat-harness/schemas/block-qa.ts";
 import { isCheckerWitness, isCouldNotDispatch } from "../pipeline/untainted-verification.ts";
-import { actorsDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { actorsDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";

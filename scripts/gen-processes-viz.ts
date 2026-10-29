@@ -85,7 +85,7 @@ import {
   type LaneBinding,
   type RoleGraph,
   type SkillProvenance,
-} from "@litlfred/cat-harness/schemas/role-graph.js";
+} from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
 import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";

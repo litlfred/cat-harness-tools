@@ -186,7 +186,7 @@ import { loadProcessModel, type ProcessModel } from "../src/workflow/process-mod
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
 import { readMemoryNodes } from "./agent-memory.ts";
 import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { z } from "zod";
 import { unportableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";

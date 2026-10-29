@@ -18,7 +18,7 @@ import { loadAccessContext, principalFromEnv, type AccessContext } from "../../s
 import { allows, principalOf } from "../../src/core/rbac.js";
 import { workflowFile } from "../known-skills.js";
 import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
-import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The access context, permissions and diagrams are the HARNESS's; this test moved up with the code (70lx).

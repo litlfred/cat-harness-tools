@@ -37,7 +37,7 @@ import {
   RequirementSchema,
   SkillDefinitionSchema,
 } from "@litlfred/cat-harness/schemas/skill-package.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
 

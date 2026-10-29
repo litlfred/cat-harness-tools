@@ -834,7 +834,7 @@ export const RULES: Rule[] = [
       // harness. Harness by definition — it exists for the harness alone.
       "schemas/assistant-package.ts",
       "schemas/assistant-types.ts",
-      "schemas/assistant-workflow.ts",
+      "schemas/process/assistant-workflow.ts",
       // The CatHarness root declaration is harness-layer by concept even
       // though it sits in schemas/. It declares its own HARNESS_NS rather than
       // importing the content vocabulary, so classifying it here adds no
@@ -870,7 +870,7 @@ export const RULES: Rule[] = [
       // Neither touches the content vocabulary, so classifying them here adds
       // no wrong-direction edge — and leaving them unclassified would have made
       // `src/workflow/` and `src/tools/workflow.ts` read as harness → core.
-      "schemas/role-graph.ts",
+      "schemas/process/role-graph.ts",
       "schemas/odrl.ts",                     // W3C ODRL 2.2 policies: what an Actor may do (issue #1180)
       "schemas/prov.ts",                     // W3C PROV-O task-run record (issue #1180)
       "schemas/kg-qa.ts",
@@ -1001,7 +1001,7 @@ export const RULES: Rule[] = [
       "schemas/carried-note.ts",
       // The BPMN process element id (#1168 B8): a leaf `carried-note`'s
       // TaskRef and the log / invocation records all reference.
-      "schemas/process-element-id.ts",
+      "schemas/process/process-element-id.ts",
       // Same argument as `memory.ts`, one step along: a waiver is a permission
       // a PERSON gives an AGENT about a gate in this repository's process. It
       // is declared over the same directory as agent memory and it fails the
@@ -1013,7 +1013,7 @@ export const RULES: Rule[] = [
       // How a DECISION is handed to a person. Harness by the same test again:
       // it is about the agent-human interaction this platform defines, and a
       // folio authors no decision requests.
-      "schemas/decision-request.ts",
+      "schemas/process/decision-request.ts",
       // Translation is cat-harness's, stated directly: "ui stuff like
       // translations (skills, tooling) are not in bootstrap, it is in
       // cat-harness/". These three are the gettext machinery and the registry
@@ -1492,7 +1492,7 @@ const PERMITTED_EDGES: readonly PermittedEdge[] = [
   // by harness schemas; the keyword rules classify them core. Where they
   // belong is the placement audit's question (bean `lthi`), not this one's.
   {
-    from: "schemas/role-graph.ts",
+    from: "schemas/process/role-graph.ts",
     to: "schemas/model-capabilities.ts", // declared-path-literal: an import-direction exception names its endpoints by path
     reason:
       "Known exception pending the placement audit (bean lthi; owner 2026-10-10: \"ok\"). " +

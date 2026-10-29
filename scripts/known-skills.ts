@@ -65,7 +65,7 @@ export type CorpusScope = "instance" | "checkout";
 export function corpusScopeFor(root: string): CorpusScope {
   return resolve(root) === OWN_INSTANCE ? "checkout" : "instance";
 }
-import { readRoleGraph, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readRoleGraph, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";

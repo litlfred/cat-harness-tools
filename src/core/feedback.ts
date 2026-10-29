@@ -35,7 +35,7 @@ import {
   ROLE_GRAPH_FILENAME,
   readActors,
   readRoleGraph,
-} from "@litlfred/cat-harness/schemas/role-graph.js";
+} from "@litlfred/cat-harness/schemas/process/role-graph.js";
 
 export const TodoTagsSchema = NoteTagsSchema;
 export type TodoTags = NoteTags;

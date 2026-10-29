@@ -56,7 +56,7 @@ import { availableParallelism, tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
 import { knownSkills } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

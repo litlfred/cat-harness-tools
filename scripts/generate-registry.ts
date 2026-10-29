@@ -20,7 +20,7 @@ import type { SkillPackageManifest } from "@litlfred/cat-harness/schemas/skill-p
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

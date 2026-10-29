@@ -6,7 +6,7 @@
  * implementation spec §2 and §4):
  *
  * - **`uses-methodology:`** — Skill → Methodology, the viewer thread's edge
- *   (litlfred/cat-harness#325, `schemas/methodology.ts`). The DEPENDENT node
+ *   (litlfred/cat-harness#325, `schemas/process/methodology.ts`). The DEPENDENT node
  *   names the general one: the skill names the methodology, the methodology
  *   names no skill. Same direction as task → skill.
  * - **`tested-by:`** — a CONTRACT skill names its tests: repo-relative paths
@@ -33,7 +33,7 @@ import { parse as parseYaml } from "yaml";
 
 import { isSkillMd, skillMdDirs } from "../known-skills.ts";
 
-/** Skill → Methodology, cat-harness `schemas/methodology.ts` (#325). */
+/** Skill → Methodology, cat-harness `schemas/process/methodology.ts` (#325). */
 export const USES_METHODOLOGY = "uses-methodology";
 /** A contract skill's tests, implementation spec §4. */
 export const TESTED_BY = "tested-by";
