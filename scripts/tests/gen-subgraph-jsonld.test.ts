@@ -43,7 +43,7 @@ import {
 } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
-import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 /** This instance's published document: its own nodes are fragments of it. */

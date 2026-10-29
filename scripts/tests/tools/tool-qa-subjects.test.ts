@@ -46,7 +46,7 @@ import {
   worstSeverity,
 } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { tools } from "@litlfred/cat-harness/tools/index.ts";
-import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
+import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = HARNESS_ROOT;

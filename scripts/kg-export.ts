@@ -125,7 +125,7 @@ import { auditSchemaNodes } from "./schema-nodes.js";
 import { loadSpecs } from "./external-schemas.js";
 import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
-import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,

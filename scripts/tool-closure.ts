@@ -11,7 +11,7 @@
  *
  * 1. **A mounted Tool brings BOTH halves** — its definition
  *    (`<tools dir>/<id>/<id>.ts` in the instance that declares it, the folder
- *    convention of cat-harness `schemas/tool-folders.ts`) AND its
+ *    convention of cat-harness `schemas/tools/tool-folders.ts`) AND its
  *    implementation (the module its `invoke` names), each with its import
  *    closure: a Tool that runs, never a definition whose code is absent or a
  *    module whose imports are.

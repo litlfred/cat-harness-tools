@@ -5,8 +5,8 @@
  * @module scripts/downstream-runs
  *
  * Bean `fq5u`. The owner's design: every downstream tool is a Tool node
- * declaring its output and inputs (`schemas/tool.ts#ToolDownstreamSchema`);
- * each run writes a `folio-tool-run/v1` record (`schemas/tool-run.ts`); QA
+ * declaring its output and inputs (`schemas/tools/tool.ts#ToolDownstreamSchema`);
+ * each run writes a `folio-tool-run/v1` record (`schemas/tools/tool-run.ts`); QA
  * reads **fresh** only for a successful run over the current inputs, **stale**
  * when an input moved since, and **not-run / failed** — never green — when
  * there is no successful record.
@@ -24,13 +24,13 @@
  *
  * {@link MEMBERS} maps a Tool id to the function that enumerates its targets
  * and reads each one's state with the tool's OWN fingerprint (see
- * `schemas/tool-run.ts` for why not a generic file hash). A `checkout`-judged
+ * `schemas/tools/tool-run.ts` for why not a generic file hash). A `checkout`-judged
  * declaration with no member cannot be judged, which is `unknown`, not a pass.
  * Adding a member is one entry here plus the Tool's declaration; the criteria
  * need no change.
  */
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
-import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "@litlfred/cat-harness/schemas/tool-run.ts";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
+import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "@litlfred/cat-harness/schemas/tools/tool-run.ts";
 import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.ts";
 import { graphVerdict, LSI_TOOL_ID, proseGraphs, targetOf } from "./lsi.ts";
 

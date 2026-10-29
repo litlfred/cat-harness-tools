@@ -39,7 +39,7 @@ import {
   checkoutRoleGraph,
   overlayRoleGraphs,
 } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
-import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
+import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.js";
 import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "../concern-groups.js";
 import { packageDirsIn } from "../skill-topics.js";

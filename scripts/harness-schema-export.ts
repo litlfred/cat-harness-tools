@@ -48,8 +48,8 @@ import {
 } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
 import { tools } from "../tools/discover.js";
-import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { withConcernGroupDirs } from "./concern-groups.ts";
@@ -150,7 +150,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
     description:
       "The shared types a Tool's io.inputs/io.outputs reference by absolute IRI. " +
       "Each is also published as its own document, tool-types/<Name>.schema.json (its own IRI). " +
-      "Generated from schemas/tool-types.ts, which is authoritative.",
+      "Generated from schemas/tools/tool-types.ts, which is authoritative.",
     $defs: defs,
   };
 }
@@ -162,7 +162,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
  * The owner, 2026-10-15: *"input ouput schemas should be their own files/json
  * schema when published w/ IRIs so can be referernced easy."* `toolTypeDocumentIri`
  * mints the IRI and `toolTypePath` the published path, from one definition in
- * `schemas/tool-types.ts`, so a port and the file it names cannot drift.
+ * `schemas/tools/tool-types.ts`, so a port and the file it names cannot drift.
  *
  * ## The combined document stays, inline
  *
@@ -214,7 +214,7 @@ export function buildToolSchema(opts: SchemaExportOptions = {}): Record<string, 
     description:
       "One concrete way to exercise a skill. A skill states a capability generically; " +
       "a Tool names the skills it satisfies and how to install and invoke it. " +
-      "Generated from schemas/tool.ts, which is authoritative.",
+      "Generated from schemas/tools/tool.ts, which is authoritative.",
   };
 }
 
@@ -231,7 +231,7 @@ export function buildToolSchema(opts: SchemaExportOptions = {}): Record<string, 
  *
  * That is the same defect `AGENTS.md` records for the README's chapter table —
  * a link COMPOSED by convention and checked against nothing — repeated one
- * layer down, and it matters more here. `schemas/tool.ts` requires a Tool's
+ * layer down, and it matters more here. `schemas/tools/tool.ts` requires a Tool's
  * `io.*.schema` to be an absolute IRI precisely so "the types it names have to
  * exist somewhere fetchable"; a Tool node pointing at a 403 would satisfy the
  * schema and mean nothing. So the contracts had to become fetchable before a
@@ -369,7 +369,7 @@ const SELF_INVOCATION = "bun run cat kg:schema";
  * Artefacts a Tool node declares itself authoritative for, by published path.
  *
  * Reads `maintains` off the `tools` graph — see {@link ToolMaintainsSchema} in
- * `schemas/tool.ts`. The base is irrelevant here: the comparison is on the
+ * `schemas/tools/tool.ts`. The base is irrelevant here: the comparison is on the
  * path relative to the instance base, which is what the declaration carries.
  */
 export function declaredArtefacts(): Map<string, { tool: string; source: string; producedBy?: string }> {

@@ -388,11 +388,11 @@ export const RULES: Rule[] = [
       // definitions it owns. Same defect as `lean-packages.ts`, at scale, and
       // the reason a `<graph>/<stub>/` layout would carry the answer in the
       // path instead of in this list.
-      "schemas/tool.ts",                     // what a Tool IS — `tools` is a harness graph typology
-      "schemas/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
+      "schemas/tools/tool.ts",                     // what a Tool IS — `tools` is a harness graph typology
+      "schemas/tools/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
       "schemas/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
-      "schemas/tool-types.ts",               // the Tool I/O type vocabulary
-      "schemas/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
+      "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
+      "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
       "schemas/skill-definitions-dir.ts",    // where the JSON skill definitions and conventions live (bean `rqao`)
@@ -409,7 +409,7 @@ export const RULES: Rule[] = [
       // the `schemas/` prefix rule they were core, and each citation was a
       // wrong-direction edge.
       "schemas/run-context.ts",              // declared-path-literal: a partition plan names modules by path. The run context every harness run record cites
-      "schemas/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
+      "schemas/tools/tool-release.ts",             // declared-path-literal: a partition plan names modules by path. A Tool release, resolved
       "schemas/binary-release.ts",           // declared-path-literal: a partition plan names modules by path. The digest of a release
       "schemas/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
       "schemas/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
@@ -463,7 +463,7 @@ export const RULES: Rule[] = [
       // `agentic-harness`, not by any folio — and this file imports only
       // `zod`, so it carries nothing of the content model with it. Its one
       // production consumer, `src/mcp/project.ts`, is the harness's too.
-      "schemas/tool-invocation.ts",
+      "schemas/tools/tool-invocation.ts",
       // A standing rule an actor holds while performing a task, bound to a
       // process, a lane or an activity. That is the HARNESS's vocabulary —
       // conventions are carried on BPMN nodes and resolved by

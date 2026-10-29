@@ -11,7 +11,7 @@ import {
   parseToolReleaseRef,
   toolReleaseLicenceProblem,
   toolReleaseRef,
-} from "@litlfred/cat-harness/schemas/tool-release.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 
