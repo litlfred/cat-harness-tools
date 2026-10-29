@@ -21,6 +21,7 @@ import {
   subjectPathOf,
 } from "../lib/subject-iri.ts";
 import { makeIri, migrationTombstones, writeSubjectDocuments } from "../kg-export.ts";
+import { SEARCH_EXCLUDE_MARKER } from "../publish-verify.ts";
 import { subgraphIri } from "../subgraph-node.ts";
 import { PUBLISHED_ELSEWHERE } from "../instance-exports.ts";
 
@@ -197,6 +198,9 @@ describe("every subject loads: its own .jsonld and page", () => {
       // The page carries the same JSON-LD, and no value can close its script early.
       const page = readFileSync(join(dir, "skill/a.html"), "utf-8");
       expect(page).toContain('<link rel="alternate" type="application/ld+json" href="a.jsonld">');
+      // Excluded from the site search on purpose, with the marker the
+      // publish check reads (fa#2683): a node page is not a page the index missed.
+      expect(page).toContain(SEARCH_EXCLUDE_MARKER);
       const script = /<script type="application\/ld\+json">\n([^]*?)\n<\/script>/.exec(page)![1]!;
       expect(script).not.toContain("</script>");
       expect(JSON.parse(script)["@graph"][0].title).toBe("</script><b>A</b>");

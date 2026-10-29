@@ -4172,6 +4172,22 @@ function valueHtml(v: unknown): string {
 }
 
 /**
+ * A subject page is excluded from the site search ON PURPOSE (fa#2683).
+ *
+ * There is one per graph node (about 3,000 on the folio-assistant site), and
+ * each repeats data a human page already carries: the skill, process or
+ * schema page that Jekyll indexes. They are written after Jekyll, so the
+ * theme's index never held them. But `rail-standalone-pages` gives them the
+ * theme's search box, and `publish-verify`'s `search-index` check counted
+ * them as pages the index failed to cover. That dropped coverage below its
+ * floor and refused every publish. The marker is the one `head_custom.html`
+ * writes for `search_exclude: true` (`SEARCH_EXCLUDE_MARKER` in
+ * `publish-verify.ts`), so the check counts these pages as excluded, and
+ * says how many, rather than as missing.
+ */
+const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
+
+/**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
@@ -4199,6 +4215,7 @@ function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readon
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${SUBJECT_SEARCH_EXCLUDE}
 <title>${escHtml(title)} · ${escHtml(type)}</title>
 <link rel="alternate" type="application/ld+json" href="${escHtml(jsonldHref)}">
 <script type="application/ld+json">
