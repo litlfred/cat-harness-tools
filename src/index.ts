@@ -63,7 +63,8 @@ if (args.includes("--check-deps")) {
   // above — `cat-harness/scenarios/capabilities/*.json` is what skills declare
   // `requiredCapabilities` against — and until now nothing executed them, so a
   // skill's prerequisite could be missing with no way to find out. The two
-  // hardcoded lists remain (here and in src/tools/check-deps.ts); unifying
+  // hardcoded lists remain (here and in folio-assistant-sci's
+  // adapters/paper/tools/check-deps.ts, moved there by bean `bbza`); unifying
   // them is a separate change.
   const { loadCapabilities, probeAll, formatCapabilityReport } = await import("./tools/capabilities.js");
   const instance = resolve(import.meta.dir, "..");
