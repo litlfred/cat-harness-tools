@@ -41,7 +41,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { EMPTY_NOTE_TAGS, KgRefSchema, type ArtefactRef, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/carried-note.js";
+import { EMPTY_NOTE_TAGS, KgRefSchema, type ArtefactRef, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 import { TODO_SCHEMA_TAG, TodoNodeSchema, type TodoNode } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";

@@ -3,7 +3,7 @@
  * Universal W3C N-Quads & SPARQL 1.1 Named Query Execution Engine.
  *
  * Implements the `named-query-execution` skill and conforms to
- * `schemas/nquads-distribution.ts`:
+ * `schemas/kg/nquads-distribution.ts`:
  * - Loads dataset topologies from local directory, manifest, or remote URL
  * - Validates Graph Availability before execution (guards against silent partial results)
  * - Binds typed parameters safely without SPARQL injection
@@ -21,7 +21,7 @@ import {
   NQuadsDistributionManifestSchema,
   type NamedQueryRequest,
   type NamedQueryResponse,
-} from "@litlfred/cat-harness/schemas/nquads-distribution.ts";
+} from "@litlfred/cat-harness/schemas/kg/nquads-distribution.ts";
 
 export class MissingPartitionError extends Error {
   constructor(public missingGraphs: string[]) {

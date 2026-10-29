@@ -21,7 +21,7 @@ import { join } from "node:path";
 
 import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { BEAN_GRAPH_FILE, parseBeanGraph } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.js";
-import { contentIsOffCheckout, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { contentIsOffCheckout, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../scripts/todos.js";
 import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";

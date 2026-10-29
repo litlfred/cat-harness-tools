@@ -77,7 +77,7 @@ import {
   documentContext,
   instancePrefixes,
 } from "@litlfred/cat-harness/schemas/content-context.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";

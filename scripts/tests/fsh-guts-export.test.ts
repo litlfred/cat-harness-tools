@@ -276,7 +276,7 @@ describe("a kind's own fields survive, because `kind` is open", () => {
 
 describe("a JSON node of THIS graph is read, and a log still is not", () => {
   test("the JSON carrier works, because front matter is flat", () => {
-    // Measured: `schemas/front-matter.ts` parses to Record<string, string |
+    // Measured: `schemas/kg/front-matter.ts` parses to Record<string, string |
     // string[]>, so a nested `staging:` block comes back as []. A record a
     // workflow writes and a tool reads cannot use that carrier.
     const r = readFshGutsNode(

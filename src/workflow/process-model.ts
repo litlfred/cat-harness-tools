@@ -41,7 +41,7 @@ import { WORK_PLAN_OPS, type WorkPlanOp } from "./bean-link.js";
 import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/library/code-list.js";
 import { directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { CANONICAL_EXTENSION_PREFIX, isOwnExtensionNamespace } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { CANONICAL_EXTENSION_PREFIX, isOwnExtensionNamespace } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 
 /** Element types the interpreter can walk faithfully. */
 const ACTIVITY_TYPES = [

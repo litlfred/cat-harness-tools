@@ -78,7 +78,7 @@
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { redirectStub } from "./compose-docs.ts";
 import { exportIdentity } from "./kg-export.js";
 import { instanceDocPath } from "./instance-exports.js";

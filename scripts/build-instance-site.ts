@@ -85,7 +85,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { publishSite } from "@litlfred/bootstrap-tools/scripts/publish-site.ts";
 import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";

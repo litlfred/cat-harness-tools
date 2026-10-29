@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { KG_NODE_KINDS, KgRefSchema } from "@litlfred/cat-harness/schemas/carried-note.js";
+import { KG_NODE_KINDS, KgRefSchema } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 
 describe("KgRef.kind is closed, and covers the graph", () => {
   test("every kind kg-export mints an IRI for is a KG_NODE_KIND", () => {

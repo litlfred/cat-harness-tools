@@ -86,9 +86,9 @@ import {
   type RoleGraph,
   type SkillProvenance,
 } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
-import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { pageParts, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { workflowInstanceLinks } from "./state-visualizer.ts";

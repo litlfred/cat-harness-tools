@@ -16,7 +16,7 @@ import {
   NQuadsDistributionManifestSchema,
   MAX_RECOMMENDED_PARTITION_BYTES,
   type NQuadsDistributionManifest,
-} from "@litlfred/cat-harness/schemas/nquads-distribution.ts";
+} from "@litlfred/cat-harness/schemas/kg/nquads-distribution.ts";
 import {
   bindSparqlParameters,
   executeNamedQuery,

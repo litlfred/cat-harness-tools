@@ -81,7 +81,7 @@ import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { spawnSync } from "node:child_process";
 import { glossaryLinksMd, schemasViewPuml } from "./gen-object-model-uml.js";
-import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

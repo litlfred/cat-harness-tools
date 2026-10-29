@@ -48,7 +48,7 @@
  * serve local bare repositories this way); a repository that is already a URL
  * or an absolute path is used as it stands.
  *
- * @graphNode none — a command-line tool; the lock's shape is `schemas/remote-mount.ts`
+ * @graphNode none — a command-line tool; the lock's shape is `schemas/kg/remote-mount.ts`
  * @covers none — replays a lock; `mount:remote:check` is the gate on the lock itself
  */
 import { spawnSync } from "node:child_process";
@@ -215,7 +215,7 @@ export function digestOf(dir: string, skip: readonly string[] = []): { treeDiges
 //
 // A mounted layer is CODE (`cat-harness`, `cat-harness-tools`, …), and code
 // with no `node_modules` does not run: `Cannot find module
-// '@litlfred/cat-harness/schemas/mount-trust.js'`. Until 2026-10-12 the
+// '@litlfred/cat-harness/schemas/kg/mount-trust.js'`. Until 2026-10-12 the
 // workaround was a hand `bun install` inside the mount, and that made the mount
 // read MODIFIED: `--check` said "the pinned bytes are not on disk:
 // cat-harness/ modified" and the next re-mount refused it.
@@ -356,7 +356,7 @@ export const LEGACY_LOCK_SUFFIX = ".mount-lock.json";
  * The lock file(s) beside `root`: `index.lock.json`, else every legacy
  * `*.mount-lock.json`. BOTH present is an error naming both, never a merge.
  *
- * RESTATED from `lockFilesIn` in `schemas/instance-roots.ts` rather than
+ * RESTATED from `lockFilesIn` in `schemas/kg/instance-roots.ts` rather than
  * imported, because this file imports nothing but `node:*` (the header says
  * why); `mount-from-lock.test.ts` holds the two to the same answers.
  */

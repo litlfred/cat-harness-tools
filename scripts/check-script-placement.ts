@@ -21,9 +21,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

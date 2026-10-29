@@ -66,7 +66,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 

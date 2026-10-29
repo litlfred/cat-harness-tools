@@ -68,7 +68,7 @@
 import { relative, resolve } from "node:path";
 
 import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
+import { dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.js";
 import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 /**

@@ -101,7 +101,7 @@ import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-co
 import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

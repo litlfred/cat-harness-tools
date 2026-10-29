@@ -126,8 +126,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { instanceStateBranch } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "./branch-store.ts";
 import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "./state-drift.ts";
 

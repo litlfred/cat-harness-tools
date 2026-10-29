@@ -52,7 +52,7 @@ import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
 import { documentContext } from "@litlfred/cat-harness/schemas/content-context.ts";
 import { serialisedAtInstanceContext } from "../pipeline/instance-document-context.ts";
 import { typesForKind } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { STRUCTURE_FILENAME, pagesOf, readStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 
 

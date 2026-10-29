@@ -11,7 +11,7 @@
  *
  * Issue #401. Owner, 2026-10-16: pins stay DECENTRALIZED (each site keeps its
  * own lock) with STANDING CONSENT. The rule and its trust semantics are the
- * harness's (`cat-harness/schemas/mount-trust.ts`, "Standing consent"); this is
+ * harness's (`cat-harness/schemas/kg/mount-trust.ts`, "Standing consent"); this is
  * the implementation.
  *
  *   bun run cat mount:repin:standing                 # resolve, re-pin, re-mount (writes index.config.json + index.lock.json)
@@ -49,8 +49,8 @@
 import { appendFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "@litlfred/cat-harness/schemas/mount-trust.js";
-import type { RemoteMount } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "@litlfred/cat-harness/schemas/kg/mount-trust.js";
+import type { RemoteMount } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 
 // ── The network, behind one seam ────────────────────────────────────────────
 
@@ -256,7 +256,7 @@ if (import.meta.main) {
   const dryRun = argv.includes("--dry-run");
   try {
     const { checkoutRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
-    const { readDeclaredMounts } = await import("@litlfred/cat-harness/schemas/index-config.js");
+    const { readDeclaredMounts } = await import("@litlfred/cat-harness/schemas/kg/index-config.js");
     const root = valueOf("--instance") ? resolve(valueOf("--instance")!) : checkoutRootFor(process.cwd());
     const depth = Number(valueOf("--depth") ?? 30);
     const plan = await planRepin(readDeclaredMounts(root).mounts, githubApi(), Number.isFinite(depth) && depth > 0 ? depth : 30);

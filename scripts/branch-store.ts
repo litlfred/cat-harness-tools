@@ -104,10 +104,10 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { lockFilesIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { mountScopeFor, readMountLock } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { lockFilesIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { mountScopeFor, readMountLock } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import { subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
 import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";

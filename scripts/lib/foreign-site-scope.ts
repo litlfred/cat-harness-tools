@@ -74,7 +74,7 @@ import { join, resolve } from "node:path";
 
 import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-tiles.ts";
 
 /** What the scoping needs to know about the site and the declarations. */

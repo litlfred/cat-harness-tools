@@ -91,7 +91,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { clearCheckoutCache, resolveImplementingPath } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { toolsOf } from "../tools/discover.js";

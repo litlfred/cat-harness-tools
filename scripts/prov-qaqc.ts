@@ -53,7 +53,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/prov-jsonld.js";
+import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
 import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
@@ -333,7 +333,7 @@ export async function buildReport(
 /**
  * The PROV log for one top-level instance and its subprocesses, in
  * PROV-JSONLD's shape with each agent, role and plan a link at its release
- * address (`schemas/prov-jsonld.ts`, beans `jcet`, `9y9j`). Until 2026-10-01
+ * address (`schemas/kg/prov-jsonld.ts`, beans `jcet`, `9y9j`). Until 2026-10-01
  * this emitted the activities as they are stored, with `prov:`-prefixed keys
  * nothing coerced, so every agent, role and plan was a string literal.
  */

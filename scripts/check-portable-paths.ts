@@ -53,7 +53,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { unportablePath, type UnportableReason } from "@litlfred/cat-harness/schemas/portable-path.ts";
+import { unportablePath, type UnportableReason } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 
 /** One tracked path a checkout would refuse, and why. */
 export interface UnportableFinding {
@@ -71,7 +71,7 @@ export interface PortablePathsReport {
 
 /** What each reason means and what to do about it, for the failure output. */
 const REMEDY: Record<UnportableReason, string> = {
-  "reserved-character": "Windows forbids < > : \" / \\ | ? * in a path component. Rename, or encode it (schemas/portable-path.ts).",
+  "reserved-character": "Windows forbids < > : \" / \\ | ? * in a path component. Rename, or encode it (schemas/kg/portable-path.ts).",
   "reserved-device-name": "A Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9) is reserved even with an extension. It must be renamed — no encoding rescues it.",
   "trailing-dot-or-space": "Windows strips a trailing dot or space, silently aliasing this onto another name. Rename it.",
   empty: "An empty path component.",

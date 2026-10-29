@@ -5,7 +5,7 @@
  * `…/folio-assistant-core/ns#Catalogue` — and the workflows publish one
  * document per layer so that IRI dereferences. The directory they publish
  * into was a LITERAL in a shell loop, and the IRI is a constant in
- * `schemas/namespaces.ts`. Nothing compared them.
+ * `schemas/kg/namespaces.ts`. Nothing compared them.
  *
  * They drifted. #477 renamed the core instance from `folio-assist-core` to
  * `folio-assistant-core` and moved `CORE_NS` with it; both workflows kept
@@ -41,7 +41,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { namespaceForLayer } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { namespaceForLayer } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */

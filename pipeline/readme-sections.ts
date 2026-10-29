@@ -41,8 +41,8 @@
  */
 
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve } from "path";

@@ -11,7 +11,7 @@
  * import core. `kg-instantiate.ts` writes the config and sits beside
  * `kg-subscribe.ts` in core. Reading a snapshot is the half both need, so it
  * lives here, below both, and the snapshot's node schema
- * (`schemas/substrate-snapshot.ts`) is harness for the same reason: the
+ * (`schemas/kg/substrate-snapshot.ts`) is harness for the same reason: the
  * harness registers the `substrate-snapshot` graph typology, and a kind's node
  * schema belongs with the kind.
  *
@@ -35,7 +35,7 @@ import {
   SubstrateSnapshotSchema,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/substrate-snapshot.js";
+} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
 import type { HarnessTile } from "./harness-tiles.js";
 import { type SubscribedTree, subscribedTrees } from "./subscribed-trees.js";
 

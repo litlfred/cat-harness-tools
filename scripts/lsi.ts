@@ -75,7 +75,7 @@ import {
   type LsiUnit,
 } from "../pipeline/lsi";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import type { LsiSidecar } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
+import type { LsiSidecar } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { LsiSidecar };
 

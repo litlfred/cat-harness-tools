@@ -21,7 +21,7 @@ import {
   type KgRef,
   type NoteTags,
   type TaskRef,
-} from "@litlfred/cat-harness/schemas/carried-note.js";
+} from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 import {
   DEFAULT_TODO_GRAPH_ROOT,
   TODO_GRAPH_FILE,

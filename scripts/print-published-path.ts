@@ -22,7 +22,7 @@
  * and is not published, which a workflow reads as "skip", never as an error.
  */
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 
 /** The exit status that means "declared not published". */
 export const NOT_PUBLISHED = 3;

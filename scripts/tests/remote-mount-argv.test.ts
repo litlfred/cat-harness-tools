@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { INDEX_CONFIG_SCHEMA } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { INDEX_CONFIG_SCHEMA } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 import { argvProblems, MOUNT_REMOTE_FLAGS, remoteFanOut, usageText } from "../remote-mount.ts";
 
 const SCRIPT = join(import.meta.dir, "..", "remote-mount.ts");

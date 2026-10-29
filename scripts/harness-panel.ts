@@ -25,7 +25,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { findDeclarationFile, sourceLinks, type CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { PROPERTY_SKILLS, type DeclarationProperty } from "@litlfred/cat-harness/schemas/property-skills.js";
+import { PROPERTY_SKILLS, type DeclarationProperty } from "@litlfred/cat-harness/schemas/kg/property-skills.js";
 
 export interface PanelSkill {
   name: string;

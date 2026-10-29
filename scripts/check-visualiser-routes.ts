@@ -16,7 +16,7 @@
  * > visualizer is renderedBy ....
  *
  * The route is `visualiserRoute({ harness, visualiser })`
- * (`schemas/visualiser-route.ts`). This gate is what makes a collision a
+ * (`schemas/kg/visualiser-route.ts`). This gate is what makes a collision a
  * DECLARATION error rather than a page that silently wins.
  *
  * ## The locale goes in front (folio-assistant#2527)
@@ -58,7 +58,7 @@ import { fileURLToPath } from "node:url";
 
 import { declarationPathIn, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
-import { aliasRoute, routeCollisions, routeOf, visualiserRoute, type RouteClaim } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { aliasRoute, routeCollisions, routeOf, visualiserRoute, type RouteClaim } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { discoverTools } from "../tools/discover.js";
 import {
   carriesRenders,
