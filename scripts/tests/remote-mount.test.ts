@@ -1325,6 +1325,38 @@ describe("Tools chosen by id, mounted runnable (bean `mo75` G3; owner, 2026-10-2
     }
   });
 
+  test("T5. an instance of ANOTHER entry the closure reaches shrinks to what it needs; an explicit list wins (owner, 2026-10-29, option B)", () => {
+    const two = (implMount: object = {}): string => {
+      const root = join(base, `tdown-${++n}`);
+      mkdirSync(root, { recursive: true });
+      git(root, "init", "-q", "-b", "main");
+      write(root, {
+        "down.json": decl("down", {
+          mountApprovers: ["test"],
+          remoteMounts: [
+            { harness: "def", repository: "o/tl", ref: tl.sha, ...consentFor(tl.sha), overrides: { def: { tools: ["alpha"] } } },
+            { harness: "impl", repository: "o/tl", ref: tl.sha, ...consentFor(tl.sha), ...implMount },
+          ],
+        }),
+      });
+      return root;
+    };
+    const dirs = (root: string, i: string) => readLock(root).instances.find((x) => x.instance === i)!.directories.map((d) => d.id).sort();
+
+    // impl's own entry names no directories: it shrinks to alpha's closure.
+    const shrinks = two();
+    const r = mountRemote({ instanceRoot: shrinks, urlFor: tUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "impl")!.state).toBe("mounted");
+    expect(dirs(shrinks, "impl")).toEqual(["impl-scripts", "impl-src"]);
+    expect(existsSync(join(shrinks, "impl/ui"))).toBe(false);
+
+    // An explicit list wins, and then it must bring what the closure needs.
+    const explicit = two({ overrides: { impl: { directories: ["impl-src", "impl-ui"] } } });
+    const e = mountRemote({ instanceRoot: explicit, urlFor: tUrl, install: false });
+    expect(e.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("missing");
+    expect(e.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("the closure needs `impl`'s `impl-scripts`, which its own mount entry (`impl`) does not bring");
+  });
+
   test("T4. `tools` with `hydrated` is refused at plan time: metadata brings no code", () => {
     const root = tdown("def", tl, "o/tl", { overrides: { def: { hydrated: true, tools: ["alpha"] } } });
     const p = planRemote({ instanceRoot: root, urlFor: tUrl });
