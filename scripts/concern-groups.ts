@@ -79,6 +79,23 @@ export function declaredGroupsIn(dir: string, kind: string, registry: GraphTypol
   } catch (e) {
     throw new Error(`${file} is not valid JSON: ${String(e)}`);
   }
+  const groups = groupsOfDeclaration(raw, kind, file);
+  for (const g of groups) {
+    const p = join(dir, g.path);
+    if (!existsSync(p) || !statSync(p).isDirectory()) {
+      throw new Error(`${file}: group "${g.code}" names ${g.path}/, which does not exist`);
+    }
+  }
+  return groups;
+}
+
+/**
+ * The groups one parsed declaration file names for `kind`, WITHOUT checking
+ * that their directories exist — for a reader holding only the declaration
+ * files at a pin (`upstream-directories.ts`, bean `mo75` concern names).
+ * Throws, naming `file`, on a malformed one.
+ */
+export function groupsOfDeclaration(raw: unknown, kind: string, file: string): DeclaredGroup[] {
   let groups: DeclaredGroup[];
   if (kind === "skills") {
     // `skills.json` predates the code list and names its groups `topics`,
@@ -90,12 +107,6 @@ export function declaredGroupsIn(dir: string, kind: string, registry: GraphTypol
     const r = ConcernGroupsSchema.safeParse(raw);
     if (!r.success) throw new Error(`${file}: ${r.error.issues[0]?.path.join(".") || "(root)"}: ${r.error.issues[0]?.message}`);
     groups = r.data.groups.map((c) => ({ code: c, path: c }));
-  }
-  for (const g of groups) {
-    const p = join(dir, g.path);
-    if (!existsSync(p) || !statSync(p).isDirectory()) {
-      throw new Error(`${file}: group "${g.code}" names ${g.path}/, which does not exist`);
-    }
   }
   return groups;
 }
