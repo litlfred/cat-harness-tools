@@ -1,6 +1,6 @@
 /**
  * `gates-third-state` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/gates-third-state.test.ts` (bean `7zz1`, owner
+ * `cat-harness-tools/scripts/tests/sdlc/gates-third-state.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the aggregate root's
  * `.github/workflows/code-quality-gates.yml`, which only the checkout holds.
  * Standing alone, cat-harness has none of it, and

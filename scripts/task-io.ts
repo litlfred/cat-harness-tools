@@ -144,6 +144,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "check:available-locales": READ_ONLY,
   "check:avatar-instances": TREE_READER,
   "check:bean-archive": TREE_READER,
+  "check:bean-calls": TREE_READER,
   "check:bean-blocks": TREE_READER,
   "check:bean-bodies": TREE_READER,
   "check:bean-front-matter": TREE_READER,

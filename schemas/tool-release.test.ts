@@ -180,7 +180,7 @@ describe("the seeded records", () => {
 
   test("T4: PlantUML, its JRE and graphviz are all present, and each parses", () => {
     const parsed = releases.map((r) => ToolReleaseSchema.parse(r));
-    expect(parsed.map((r) => r.name).sort()).toEqual(["graphviz", "plantuml", "temurin-jre"]);
+    expect(parsed.map((r) => r.name)).toEqual(expect.arrayContaining(["graphviz", "plantuml", "temurin-jre"]));
   });
 
   test("PlantUML's digest is the one `scripts/plantuml-render.ts` already pins — one fact, two places, checked", async () => {

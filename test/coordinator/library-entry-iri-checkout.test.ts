@@ -1,6 +1,6 @@
 /**
  * `library-entry-iri` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/library-entry-iri.test.ts` (bean `7zz1`, owner
+ * `cat-harness-tools/scripts/tests/library/library-entry-iri.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the library entries of
  * smart-base, smart-trust and fhir-harness, which only the checkout holds.
  * Standing alone, cat-harness has none of it, and

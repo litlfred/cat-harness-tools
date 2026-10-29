@@ -141,6 +141,32 @@ export async function evaluatePlanExitCriteria(
 }
 
 /**
+ * Open the bean this instance tracks, so the next enabled step is `A_Request`.
+ *
+ * `test-plan-execution.bpmn` starts `Start_Request → Call_BeanOpen →
+ * GW_BeanYours → A_Request`: the claim is drawn once, in `bean-open.bpmn`, and
+ * every process that works a bean calls it (bean `m8gz`, owner 2026-10-24).
+ * This walks `Process_BeanOpen` the way a runner that owns its bean does —
+ * check, then create it (`exists: false`) or find it is ours (`exists: true`),
+ * claim it — and takes `GW_BeanYours`'s `claimed` branch. A bean someone else
+ * holds is not opened here: that branch ends the run, and a caller that meets
+ * it should stop, not call this.
+ */
+export function openTrackedBean(
+  model: ProcessModel,
+  state: InstanceState,
+  opts: { exists: boolean; actor?: string; authz?: AuthzOptions },
+): InstanceState {
+  const by = { actor: opts.actor, authz: opts.authz };
+  complete(model, state, "Open_CheckExists", by);
+  complete(model, state, "Open_Exists", { ...by, outcome: opts.exists ? "yes" : "no" });
+  if (opts.exists) complete(model, state, "Open_Owner", { ...by, outcome: "mine / unclaimed" });
+  else complete(model, state, "Open_Create", by);
+  complete(model, state, "Open_Claim", by);
+  return complete(model, state, "GW_BeanYours", { ...by, outcome: "claimed" });
+}
+
+/**
  * Complete the GW_ExitCriteria gateway using the plan's own decision table.
  *
  * If the plan's table is resolvable, evaluates it and routes by its outcome.

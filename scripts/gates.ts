@@ -1509,6 +1509,12 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "SUBSUMED by `skill:register:check`, which CI runs: this is the same script with `--declarations-only`, which asks the declaration half and leaves out the chain checks (`STEPS`), so the gate performs this one's entire job besides. It exists for ONE caller, `regen-after-merge` via `pair-cover.ts` (bean `8qyc`): when every chain check is already asked in the same pool, the full gate would ask them a second time, so the pool asks the residual instead. As a CI step it would duplicate a subset of a step CI already runs",
   },
   {
+    script: "check:bean-calls",
+    kind: "covered-by",
+    reason:
+      "SUBSUMED by `check:workflow-refs`, which CI runs: that gate calls the same `beanCallFindings` over the same diagrams and fails on the same findings, so this one's entire job is done there. Kept as a script so the rule — claim, resolve and archive only inside Process_BeanOpen and Process_BeanClose, and every bean-working process calling both — can be asked on its own while a diagram is being redrawn. Bean `m8gz`",
+  },
+  {
     script: "split:baseline:check",
     kind: "report",
     reason:
@@ -1682,6 +1688,12 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     }),
   ),
   {
+    script: "check:unlinked-beans",
+    kind: "report",
+    reason:
+      "WRITES its QA sidecar and is a WARNING by the owner's ruling (bean `w2hn`, 2026-10-24: a bean tied to no BPMN task is \"not failure\"), so it has no gating form; `qa:refresh` runs it as a writer of the `qa` tree",
+  },
+  {
     script: "check:upload-names",
     kind: "report",
     reason:
@@ -1794,6 +1806,16 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     kind: "covered-by",
     reason:
       "RUN IN THIS LAYER'S OWN CI: cat-harness-tools' `pr-tests.yml` measures the layer standing alone on the pull request's base and head (`check-standalone.ts --layer cat-harness-tools --measured-out …`) and its `standalone` job fails on a test that newly fails. In folio-assistant the layer is a mount at a pin that has already passed that, the way `check:cat-harness-standalone` is the index's job for cat-harness",
+  },
+  {
+    // Bean `jbvi` (option D, owner 2026-10-24): the gate over each layer's
+    // generated `libraries/` (`scripts/libraries.ts`).
+    script: "libraries:check",
+    kind: "covered-by",
+    reason:
+      "RUN BY THE LAYER CHECKS: `layer-pr-checks.yml`'s `run-gates.py` runs every `check:` / `:check` script a layer declares, " +
+      "so it gates this layer's PRs and every layer above it. The index's `code-quality-gates.yml` does not name it yet: " +
+      "that is a folio-assistant change after the re-pin that brings `software-library` in, and this exemption goes with it",
   },
 ];
 

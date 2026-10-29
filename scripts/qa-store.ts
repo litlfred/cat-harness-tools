@@ -90,8 +90,12 @@ import { inputSiteReached, qaRefLine, quietly } from "@litlfred/cat-harness/sche
 /**
  * The branch's name, and the names it had before, newest first. Owner
  * 2026-10-02: special branches are `cat/<harness>/<name>` (note on `fs43`,
- * bean `tlk2`), superseding the interim `cat-` prefix of bean `32f6`. The
- * legacy list empties when bean `oycs` says every remote is renamed.
+ * bean `tlk2`), superseding the interim `cat-` prefix of bean `32f6`.
+ *
+ * The old names are RETIRED (bean `oycs`, 2026-10-24): `git ls-remote` shows
+ * no `qa-reports` or `cat-qa-reports` head on any litlfred or WHO remote. They
+ * are no longer read or written. A declaration that still spells one is
+ * taken to mean {@link QA_BRANCH}.
  */
 export const QA_BRANCH = "cat/cat-harness/qa-reports";
 export const LEGACY_QA_BRANCHES: readonly string[] = ["cat-qa-reports", "qa-reports"];
@@ -155,6 +159,11 @@ export interface QaManifest {
   bytes: number;
   written_at: string;
   producer?: { run?: string; gates?: string };
+  /**
+   * Content-addressed reference to the `folio-run-context/v1` record under
+   * which this QA store entry was produced (owner C1 = (a), bean `3sbm`).
+   */
+  runContext?: { sha256: string };
   /**
    * What `qa:refresh` said of the working copy this entry was built from (bean
    * `3hk4`): `tracked` (the commit's own committed copy) or `computed` (the
@@ -297,12 +306,13 @@ export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation 
 // ── Which name the branch has ────────────────────────────────────────────
 
 /**
- * The names to look for, in order. A declaration naming EITHER spelling of the
- * QA branch gets both, new first, so a folio whose declaration predates the
- * rename still finds a renamed remote; any other name is taken as given.
+ * The names to look for, in order. A declaration naming the QA branch, in its
+ * current or a retired spelling, gets the current name only (bean `oycs`), so
+ * a folio whose declaration predates the rename still finds the renamed
+ * remote. Any other name is taken as given.
  */
 export function qaBranchCandidates(declared: string): string[] {
-  return declared === QA_BRANCH || LEGACY_QA_BRANCHES.includes(declared) ? [QA_BRANCH, ...LEGACY_QA_BRANCHES] : [declared];
+  return declared === QA_BRANCH || LEGACY_QA_BRANCHES.includes(declared) ? [QA_BRANCH] : [declared];
 }
 
 /**

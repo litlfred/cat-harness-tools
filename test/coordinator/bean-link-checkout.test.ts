@@ -50,10 +50,10 @@ describe("the diagrams declare which operation each step performs", () => {
       const model = await loadProcessModel(file);
       for (const n of model.nodes.values()) {
         if (!n.touchesWorkPlan) continue;
-        // A closing `archive` step (bean m8gz) is counted apart: it is added
-        // to diagrams one by one, so it is checked for a valid op but not
-        // pinned in the count below.
-        if (n.workPlanOp !== "archive") marked++;
+        // Only the work's own `note` steps are left here: claim, resolve and
+        // archive are drawn once, in cat-harness's bean-open.bpmn and
+        // bean-close.bpmn, which these diagrams call (bean m8gz).
+        marked++;
         // Asserted as a defined string, not just "one of these": an activity
         // marked as touching the plan whose op is absent would silently do
         // nothing, and `toContain(undefined)` would not say so clearly.
@@ -61,6 +61,6 @@ describe("the diagrams declare which operation each step performs", () => {
         expect([...WORK_PLAN_OPS]).toContain(n.workPlanOp!);
       }
     }
-    expect(marked).toBe(11);
+    expect(marked).toBe(8);
   });
 });

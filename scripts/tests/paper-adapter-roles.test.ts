@@ -1,6 +1,6 @@
 /**
  * Verification for bean folio-assistant-3025:
- * folio-paper-adapter 44 of 47 skills modelled into roles.
+ * folio-paper-adapter skills modelled into roles (47 at the time; 53 after the syiq moves).
  *
  * Asserts:
  * 1. The 3 paper roles (lean-authoring-agent, proof-review-agent, compute-authoring-agent)
@@ -12,7 +12,7 @@
  * @module scripts/tests/paper-adapter-roles.test
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -57,7 +57,7 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     }
   });
 
-  test("all 47 skills in folio-paper-adapter are accounted for (bound or consulted: true)", () => {
+  test("every skill in folio-paper-adapter is accounted for (bound or consulted: true)", () => {
     // Locate folio-paper-adapter package manifest
     const manifestCandidates = [
       join(COORDINATOR, "folio-assistant-sci", "skills", "content", "folio-paper-adapter", "package-manifest.json"),
@@ -70,7 +70,15 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as { skills: string[] };
-    expect(manifest.skills.length).toBe(47);
+    // The manifest lists exactly the package's skill files. It was a fixed 47
+    // (bean 3025's snapshot) until the syiq moves into sci grew the package to
+    // 53; the set of files, not a count, is what the manifest must match.
+    const adapterFiles = readdirSync(resolve(manifestPath, ".."))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => f.slice(0, -3))
+      .sort();
+    expect([...manifest.skills].sort()).toEqual(adapterFiles);
+    expect(manifest.skills.length).toBeGreaterThanOrEqual(47);
 
     // Locate sci scenarios/roles.json extensions
     const sciRolesPathCandidates = [

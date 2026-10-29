@@ -97,20 +97,15 @@ if [ -f "$INTERACTION" ]; then
     if command -v bun >/dev/null 2>&1; then
       ID_KEYS=$(cd "$CHECKOUT_ROOT" && timeout 8 bun run --silent cat auth:login --all 2>/dev/null || true)
     fi
-    WHO_IDS=$(printf '%s\n' "$ID_KEYS" "${CLAUDE_CODE_USER_EMAIL:-}" "${GITHUB_ACTOR:-}" "$(git config user.email 2>/dev/null)" "$(git config user.name 2>/dev/null)" | grep -v '^$' | jq -R . | jq -s .)
+    WHO_IDS=$(printf '%s\n' "$ID_KEYS" "${CLAUDE_CODE_USER_EMAIL:-}" "${GITHUB_ACTOR:-}" $(printf '%s' "${CAT_HARNESS_PERSON:-}" | tr ',' ' ') "$(git config user.email 2>/dev/null)" "$(git config user.name 2>/dev/null)" | grep -v '^$' | jq -R . | jq -s .)
     jq -r --argjson ids "$WHO_IDS" '
       def line($k; $v): "- **\($k)** — profiles: \($v.profiles | join(", ") | if . == "" then "(none)" else . end)  \n  \($v.note // "")  \n  _source: \($v.source // "unrecorded")_";
       (.users // {}) as $u
       | [ $u | to_entries[] | select(([.key] + (.value.aliases // [])) as $names | any($ids[]; . as $i | $names | index($i))) ] as $hit
-      | if ($hit | length) == 1 then
-          "**This session is " + ($hit | map(.key) | join(", ")) + " — apply this to every question:**", ($hit[] | line(.key; .value))
-        elif ($hit | length) > 1 then
-          (if (($hit | map(.value.profiles | sort) | unique | length) > 1) then
-            ($hit | sort_by(-(.value.profiles | length))) as $strictHit
-            | "**Ambiguous multi-user session (" + ($hit | map(.key) | join(", ")) + " matched with conflicting profiles)** — apply the STRICTEST profile on record until disambiguated (`CAT_HARNESS_PROFILE` / `CAT_HARNESS_IDENTITY`):", line($strictHit[0].key; $strictHit[0].value)
-          else
-            "**This session is " + ($hit | map(.key) | join(", ")) + " — apply this to every question:**", ($hit[] | line(.key; .value))
-          end)
+      | if ($hit | length) > 0 then
+          (if ($hit | length) > 1
+            then "**This session matches several people: " + ($hit | map(.key) | join(", ")) + ". Apply the STRICTEST of their profiles to every question, not the first one listed (set `CAT_HARNESS_PROFILE` or `CAT_HARNESS_PERSON` to say which):**"
+            else "**This session is " + ($hit | map(.key) | join(", ")) + " — apply this to every question:**" end), ($hit[] | line(.key; .value))
         else
           ([ $u | to_entries[] | select((.value.profiles | length) > 0) ] | sort_by(-(.value.profiles | length))) as $strict
           | if ($strict | length) > 0 then

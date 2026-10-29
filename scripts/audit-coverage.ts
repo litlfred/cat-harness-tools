@@ -165,7 +165,7 @@ import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
-import { loadGatesCiRuns } from "./gates.js";
+import { loadGatesCiRuns, SCRIPT_EXEMPTIONS } from "./gates.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -510,6 +510,13 @@ export function scriptsFor(command: string, scripts: Record<string, string>): st
       const next = scripts[m[1]!];
       if (next !== undefined) walk(next, depth + 1);
     }
+    // `run-script.ts <name>` is how `run-gates.py` invokes a layer's declared
+    // `check:` / `:check` scripts; follow `<name>` through `scripts` just as
+    // `bun run cat <name>` and `publish-check.ts <writer>` do.
+    for (const m of cmd.matchAll(/run-script\.ts\s+([\w:.-]+)/g)) {
+      const next = scripts[m[1]!];
+      if (next !== undefined) walk(next, depth + 1);
+    }
   };
   walk(command, 0);
   return out;
@@ -555,6 +562,16 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   } catch {
     scripts = {};
   }
+  for (const dir of [repo, TOOLS_ROOT]) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8")) as { checkoutScripts?: Record<string, string> };
+      if (pkg.checkoutScripts && typeof pkg.checkoutScripts === "object") {
+        scripts = { ...pkg.checkoutScripts, ...scripts };
+      }
+    } catch {
+      // ignore unreadable manifest
+    }
+  }
   // `--all`: the browser jobs gate the corpus too, and a coverage report that
   // silently dropped them would under-count for a reason invisible in its own
   // output.
@@ -564,7 +581,18 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   // kind regardless of this tool's ability to invoke it. Using the runner's
   // list here made the census 209 and the "all N have declared" verdict narrower
   // than reality.
-  const gates = loadGatesCiRuns(repo, { all: true });
+  const gates = [
+    ...loadGatesCiRuns(repo, { all: true }),
+    ...(rootProfile(repo) === "content"
+      ? []
+      : // A `covered-by` script exemption whose reason is that layer CI
+        // (`layer-pr-checks.yml`'s `run-gates.py`) runs it on every layer PR
+        // (`libraries:check`, bean `jbvi`) is run by CI even before the index's
+        // `code-quality-gates.yml` names it directly.
+        SCRIPT_EXEMPTIONS.filter((e) => e.kind === "covered-by" && e.reason.startsWith("RUN BY THE LAYER CHECKS:")).map(
+          (e) => ({ job: "layer-pr-checks.yml", step: e.script, command: `bun run cat ${e.script}` }),
+        )),
+  ];
   const out: GateCoverage[] = [];
   const byCommand = new Map<string, GateCoverage>();
   for (const g of gates) {
@@ -593,6 +621,12 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
         const after = f.slice(chIdx + "cat-harness/".length);
         candidates.push(join(repo, "cat-harness", after));
         candidates.push(join(root, after));
+      }
+      const chtIdx = f.indexOf("cat-harness-tools/");
+      if (chtIdx !== -1) {
+        const after = f.slice(chtIdx + "cat-harness-tools/".length);
+        candidates.push(join(repo, "cat-harness-tools", after));
+        candidates.push(join(TOOLS_ROOT, after));
       }
       for (const cand of candidates) {
         try {
@@ -744,19 +778,26 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
     }
   }
 
-  const instances = instanceRootsIn(repo);
+  // Each instance's directories, resolved ONCE rather than once per kind. The
+  // resolution does not depend on the kind, and it was the run's cost: about
+  // 50 ms per pass over the checkout's instances, repeated for each of ~90
+  // kinds, so most of a `coverage()` call (measured 2026-10-26: 6.5 s, of
+  // which under 1 s was the gates, the universe and the census). An instance
+  // whose declaration will not resolve is skipped here as it was in the loop.
+  const dirsByInstance: ResolvedDirectory[][] = [];
+  for (const inst of instanceRootsIn(repo)) {
+    try {
+      dirsByInstance.push(resolveDirectories([{ name: "(local)", root: inst, own: true }]));
+    } catch {
+      continue;
+    }
+  }
   const rows: KindCoverage[] = [];
   for (const kind of kinds) {
     // `directoriesForGraph`, kept whole rather than reduced to paths, so the
     // census can see which directories are STORED (`storage`, bean `16ei`).
     const resolved = new Map<string, Pick<ResolvedDirectory, "id" | "absPath" | "storage">>();
-    for (const inst of instances) {
-      let dirsForInst;
-      try {
-        dirsForInst = resolveDirectories([{ name: "(local)", root: inst, own: true }]);
-      } catch {
-        continue;
-      }
+    for (const dirsForInst of dirsByInstance) {
       for (const d of dirsForInst) {
         if (d.graphTypologies.includes(kind as never) && !resolved.has(d.absPath)) resolved.set(d.absPath, d);
       }

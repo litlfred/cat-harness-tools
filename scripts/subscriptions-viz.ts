@@ -231,6 +231,13 @@ export function render(substrates: readonly SubstrateRow[], cards: readonly Subs
       if (p.slot.kind !== "subgraph" || (s.subgraphs ?? []).includes(p.slot.id)) continue;
       lines.push(`| subgraph \`${p.slot.id}\` | — | ⚠ recorded, and no longer chosen: ${cell(partState(p, s.ref))} |`);
     }
+    // A nested subgraph is chosen by its parent and held by path (owner, 2026-10-24, ruling 4).
+    for (const p of parts) {
+      if (p.slot.kind !== "nested") continue;
+      const parent = p.part?.kind === "subgraph" ? p.part.id : undefined;
+      const chosen = parent !== undefined && (s.subgraphs ?? []).includes(parent);
+      lines.push(`| nested subgraph \`${p.slot.path}\` | ${chosen ? `✓ by \`${parent}\`` : "—"} | ${chosen ? cell(partState(p, s.ref)) : `⚠ recorded, and its parent is not chosen: ${cell(partState(p, s.ref))}`} |`);
+    }
     lines.push(`| assets | policy \`${s.assets?.policy ?? "none"}\` | 🔗 each copy passes the materialisation gates |`);
     for (const p of parts) {
       if (p.slot.kind !== "asset") continue;

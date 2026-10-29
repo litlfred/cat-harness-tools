@@ -35,6 +35,7 @@ if (import.meta.main && process.argv.includes("--all")) {
       JSON.stringify(
         {
           identities: r.identities,
+          hosts: r.hosts,
           userConfig: r.userConfig.state,
           ...(r.activeProfile ? { activeProfile: r.activeProfile } : {}),
           multiUserStatus: r.multiUserStatus,

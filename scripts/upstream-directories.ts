@@ -1,0 +1,95 @@
+/**
+ * THE DIRECTORIES AN UPSTREAM INSTANCE DECLARES AT A PIN — its own entries and
+ * the ones it declares FROM WITHIN them — read from a {@link RemoteTree}
+ * without checking the instance out.
+ *
+ * @module scripts/upstream-directories
+ * @graphNode none — a library: it reads declarations at a pin and judges nothing
+ *
+ * Bean `mo75` G3. A remote mount (and anything else naming a subgraph of an
+ * instance it has not got) needs the id → path map of the instance AT THE PIN.
+ * The top-level `directories` of `<name>.json` are only half of it: an entry
+ * declared from within (`skills/skills.json` naming `voices/`, bean `cmsl`;
+ * `"subgraph": true`, bean `1g4s`) is an instance directory too, and bean
+ * `2j2r` moved every on-disk reader to `instanceDirectories` so that none of
+ * them would miss it. A planner reading only the top-level list refused a
+ * nested id as "not declared" — the defect this module removes for readers
+ * that hold a tree instead of a checkout.
+ *
+ * It does not walk the nesting itself. It checks out the declaration files
+ * only — `<name>.json` and every file a known kind names as its
+ * `declarationFile` — in one sparse checkout, and hands that skeleton to
+ * cat-harness's `instanceDirectories`, so the remote answer and the on-disk
+ * answer come from one resolver and cannot drift (the `2j2r` lesson: one
+ * fact, one reader).
+ *
+ * What it cannot see, it says: a declaration this checkout's schema or kind
+ * registry cannot read (a kind contributed by a layer not mounted here yet)
+ * is `{ ok: false, detail }`, never an empty list read as "declares nothing
+ * from within".
+ */
+import { join } from "node:path";
+
+import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { RemoteTree } from "./remote-tree.ts";
+
+/** One directory as a planner needs it: the id, its instance-relative path, and the fields that say it is not where its path says. */
+export interface UpstreamDirectory {
+  id: string;
+  path: string;
+  source?: unknown;
+  storage?: unknown;
+  /** The id of the directory that declared this one from within; absent for an entry of `<name>.json`. */
+  within?: string;
+}
+
+export type UpstreamDirectories = { ok: true; directories: UpstreamDirectory[] } | { ok: false; detail: string };
+
+/** Every file name a known kind declares its nested entries in (`skills.json`, `docs.json`, `graph.json`, …). */
+export function declarationFileNames(registry: GraphTypologyRegistry = defaultGraphTypologies): string[] {
+  const names = new Set<string>();
+  for (const k of registry.names()) {
+    const f = registry.get(k)?.declarationFile;
+    if (f) names.add(f);
+  }
+  return [...names].sort();
+}
+
+/**
+ * The directories instance `root` (repository-relative, `""` for the root)
+ * declares at the tree's pin, `<name>.json`'s own first, then those declared
+ * from within, each with an instance-relative `path`.
+ *
+ * Side effect, stated: it sets the tree's sparse checkout to the declaration
+ * files. A later {@link RemoteTree.checkout} replaces that set, so a mount that
+ * checks out afterwards gets exactly the paths it asks for.
+ */
+export function upstreamDirectories(
+  tree: RemoteTree,
+  root: string,
+  declarationFile: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): UpstreamDirectories {
+  const at = root.replace(/\/+$/, "");
+  const under = at ? `${at}/` : "";
+  let work: string;
+  try {
+    work = tree.checkout([declarationFile, ...declarationFileNames(registry).map((f) => `${under}**/${f}`)]);
+  } catch (e) {
+    return { ok: false, detail: `could not check the declaration files out at ${tree.sha.slice(0, 12)}: ${(e as Error).message}` };
+  }
+  try {
+    return {
+      ok: true,
+      directories: instanceDirectories(join(work, at), undefined, registry).map((d) => ({
+        id: d.id,
+        path: d.path,
+        ...(d.source !== undefined ? { source: d.source } : {}),
+        ...(d.storage !== undefined ? { storage: d.storage } : {}),
+        ...(d.within !== undefined ? { within: d.within } : {}),
+      })),
+    };
+  } catch (e) {
+    return { ok: false, detail: `its declaration at ${tree.sha.slice(0, 12)} could not be resolved here: ${(e as Error).message}` };
+  }
+}

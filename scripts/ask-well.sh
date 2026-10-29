@@ -36,7 +36,16 @@
 # rejected it for a reason worth keeping: a blocking hook that misfires removes
 # the escape hatch, leaving the agent unable even to report that the gate is
 # broken.
-set -euo pipefail
+#
+# ## The gate, 2026-10-24 — bean `hajp`, owner's Q3
+#
+# After the reminder, `ask-gate.ts` reads the session transcript and refuses
+# a `request_decision` card unless a post_message since the person's last
+# message names every option. It FAILS OPEN: only exit 2 from the gate (a
+# positive finding) blocks; a missing bun, a crash or an unreadable
+# transcript lets the card through, so the escape hatch above stays open.
+set -uo pipefail
+input="$(cat 2>/dev/null || true)"
 cat <<'EOF'
 ── Before this question (interaction-modality §4.1, STRICT) ──────────────────
 
@@ -81,3 +90,9 @@ cat <<'EOF'
   The schema:  cat-harness/schemas/decision-request.ts
 ──────────────────────────────────────────────────────────────────────────────
 EOF
+
+rc=0
+here="$(dirname "${BASH_SOURCE[0]}")"
+printf '%s' "$input" | bun "$here/ask-gate.ts" || rc=$?
+[ "$rc" -eq 2 ] && exit 2
+exit 0

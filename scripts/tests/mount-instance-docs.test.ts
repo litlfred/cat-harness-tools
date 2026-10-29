@@ -211,6 +211,22 @@ describe("which kind answers at the instance's own route", () => {
     expect(undetermined).toEqual([]);
   });
 
+  it("same-kind siblings with no root each get their OWN kind route — cat-harness-tools#681", () => {
+    // `ui/`, `viewer/` and `id-lookup/` all declared `code`. All three claimed
+    // `code/cat-harness-tools` and the walk refused two, which failed every
+    // site build that mounted the layer. Each now answers under its own
+    // directory, and nothing claims the shared route.
+    const dirs = ["ui", "viewer", "id-lookup"].map((d) => ({ ...m("cht", "code"), dir: `/repo/cht/${d}` }));
+    const { candidates } = withRoutes(dirs);
+    expect(candidates.map((c) => c.route).sort()).toEqual(["cht", "code/cht/id-lookup", "code/cht/ui", "code/cht/viewer"]);
+    expect(resolve_(candidates).refused).toEqual([]);
+  });
+
+  it("a lone directory of a kind keeps the plain kind route", () => {
+    const { candidates } = withRoutes([m("cht", "code"), m("cht", "docs", true)]);
+    expect(candidates.map((c) => c.route).sort()).toEqual(["cht", "code/cht", "docs/cht"]);
+  });
+
   it("with NO same-kind sibling the root still publishes at both routes", () => {
     // One docs directory, marked root. The yield rule must not take a URL
     // away from an instance it does not concern.

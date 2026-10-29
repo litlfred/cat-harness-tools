@@ -153,7 +153,7 @@ describe("check:term-mapping reads the files beside the schemes", () => {
       JSON.stringify({ $schema: TERM_ADJUDICATIONS_SCHEMA_ID, adjudications: [wrong] }),
     );
     const got = adjudications(r, [
-      { term: "participant", scheme: "kg-tools", target: "skos", exact: "unmapped", concept: "mapped", matches: [{ uri: "http://ex.org/actor", predicate: "skos:closeMatch", via: "Participant", scheme: "platform" }] },
+      { term: "participant", instance: "cat-harness", scheme: "kg-tools", target: "skos", exact: "unmapped", concept: "mapped", matches: [{ uri: "http://ex.org/actor", predicate: "skos:closeMatch", via: "Participant", scheme: "platform" }] },
     ]);
     expect(got).toEqual({ files: 1, invalid: [], status: [{ key: "kg-tools/participant on skos", status: "holds" }] });
   });

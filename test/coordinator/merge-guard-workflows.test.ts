@@ -5,7 +5,7 @@
  * `DEPLOY_ONLY_STEP`, so that string must be the name of the deploy step the
  * workflow really runs: renamed there and not here, the exemption would
  * silently stop matching and every give-up would block merges again. It lives
- * here rather than in `cat-harness/scripts/tests/merge-guard.test.ts` because a
+ * here rather than in `cat-harness-tools/scripts/tests/sdlc/merge-guard.test.ts` because a
  * standalone cat-harness layer has no workflows, and
  * `check:cat-harness-standalone` collects every test in that layer.
  *

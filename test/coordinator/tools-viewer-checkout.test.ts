@@ -1,6 +1,6 @@
 /**
  * `tools-viewer` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/tools-viewer.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/tools/tools-viewer.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each joins every Tool to the skills of
  * every instance in the checkout, which only the checkout holds. Standing
  * alone, cat-harness has none of it, and `check:cat-harness-standalone`

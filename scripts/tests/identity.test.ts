@@ -19,9 +19,6 @@ import {
   resolveIdentities,
   userConfigPath,
 } from "../../src/core/identity.js";
-import { loadAccessContext } from "../../src/core/access.js";
-import { whoami } from "../../src/tools/auth.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -107,50 +104,6 @@ describe("resolveIdentities", () => {
     expect(r.notes.some((n) => n.includes("not a JSON object"))).toBe(true);
   });
 
-  test("other agent hosts (Gemini CLI, Antigravity, Copilot, Codex, Cursor, CAT_HARNESS_IDENTITY) are resolved as self-asserted and never vouched for permissions", async () => {
-    const r = await resolveIdentities({
-      env: {
-        GEMINI_USER_EMAIL: "gem@example.org",
-        GOOGLE_CLOUD_ACCOUNT: "gcloud@example.org",
-        ANTIGRAVITY_USER_EMAIL: "agy@example.org",
-        COPILOT_USER: "copi-handle",
-        GITHUB_USER: "gh-env-handle",
-        CODEX_USER_EMAIL: "codex@example.org",
-        OPENAI_USER_EMAIL: "openai@example.org",
-        CURSOR_USER_EMAIL: "cursor@example.org",
-        CAT_HARNESS_IDENTITY: "custom:alice, bare-override",
-      },
-      home: home(),
-      git: noGit,
-    });
-    expect(r.identities.map(qualified)).toEqual([
-      "custom:alice",
-      "session:bare-override",
-      "gemini:gem@example.org",
-      "gemini:gcloud@example.org",
-      "antigravity:agy@example.org",
-      "copilot:copi-handle",
-      "github:gh-env-handle",
-      "codex:codex@example.org",
-      "codex:openai@example.org",
-      "cursor:cursor@example.org",
-    ]);
-    // Every single one of these env signals is self-asserted (never vouched).
-    expect(r.identities.every((i) => i.vouched === false)).toBe(true);
-
-    // And in auth_whoami, none of them grants permissions: caller remains Nobody.
-    const ctx = loadAccessContext(HARNESS_ROOT);
-    const md = whoami(ctx, r.github, { action: "content-authoring" }, r.identities);
-    expect(md).toContain("**Nobody:** the anyone floor only");
-    expect(md).toContain("**`content-authoring`:** unknown");
-    expect(md).toContain("`gemini:gem@example.org` (self-asserted, GEMINI_USER_EMAIL)");
-    expect(md).toContain("`antigravity:agy@example.org` (self-asserted, ANTIGRAVITY_USER_EMAIL)");
-    expect(md).toContain("`copilot:copi-handle` (self-asserted, COPILOT_USER)");
-    expect(md).toContain("`codex:codex@example.org` (self-asserted, CODEX_USER_EMAIL)");
-    expect(md).toContain("`cursor:cursor@example.org` (self-asserted, CURSOR_USER_EMAIL)");
-    expect(md).toContain("`custom:alice` (self-asserted, CAT_HARNESS_IDENTITY)");
-  });
-
   test("several accounts per provider for one person: map form (string | string[]) and array form with active flag", async () => {
     const h = home();
     userConfig(
@@ -191,7 +144,7 @@ describe("resolveIdentities", () => {
     ]);
   });
 
-  test("several people on one machine: explicit CAT_HARNESS_PROFILE / CAT_HARNESS_IDENTITY selects that person's profile, while ambiguous multi-user falls back to strictest profile", async () => {
+  test("several people on one machine: explicit CAT_HARNESS_PROFILE / CAT_HARNESS_PERSON selects that person's profile, while ambiguous multi-user falls back to strictest profile", async () => {
     const h = home();
     userConfig(
       h,
@@ -224,8 +177,8 @@ describe("resolveIdentities", () => {
     expect(asBob.identities.map(qualified)).toEqual(["github:bob-gh", "cursor:bob@example.org"]);
     expect(asBob.interaction.profiles).toEqual([]);
 
-    // 3. Explicit CAT_HARNESS_IDENTITY=github:alice-alt -> selects Alice and resolves all of Alice's accounts.
-    const asAlice = await resolveIdentities({ env: { CAT_HARNESS_IDENTITY: "github:alice-alt" }, home: h, git: noGit });
+    // 3. CAT_HARNESS_PERSON=github:alice-alt -> selects Alice and resolves all of Alice's accounts.
+    const asAlice = await resolveIdentities({ env: { CAT_HARNESS_PERSON: "github:alice-alt" }, home: h, git: noGit });
     expect(asAlice.multiUserStatus).toBe("selected");
     expect(asAlice.activeProfile).toBe("alice");
     expect(asAlice.identities.map(qualified)).toEqual([
@@ -250,9 +203,9 @@ describe("resolveIdentities", () => {
       },
     };
 
-    // Both Bob and Alice's signals are in the environment with no disambiguator.
+    // The session names both Bob and Alice, with no disambiguator.
     const ambig = await resolveIdentities({
-      env: { CURSOR_USER_EMAIL: "bob@example.org", GEMINI_USER_EMAIL: "alice@example.org" },
+      env: { CAT_HARNESS_PERSON: "cursor:bob@example.org,gemini:alice@example.org" },
       home: home(),
       git: noGit,
       users: repoUsers,
@@ -265,8 +218,7 @@ describe("resolveIdentities", () => {
     // Disambiguated by CAT_HARNESS_PROFILE="bob"
     const disambig = await resolveIdentities({
       env: {
-        CURSOR_USER_EMAIL: "bob@example.org",
-        GEMINI_USER_EMAIL: "alice@example.org",
+        CAT_HARNESS_PERSON: "cursor:bob@example.org,gemini:alice@example.org",
         CAT_HARNESS_PROFILE: "bob",
       },
       home: home(),
@@ -282,4 +234,35 @@ describe("resolveIdentities", () => {
 
 test("match keys: each handle bare (interaction.json's key form) and as provider:handle", () => {
   expect(matchKeys([{ provider: "gitlab", handle: "ann", via: "x", vouched: true }]).sort()).toEqual(["ann", "gitlab:ann"]);
+});
+
+describe("several people, several accounts, several hosts", () => {
+  test("CAT_HARNESS_PERSON names who is typing this session, self-asserted, before the store", async () => {
+    const h = home();
+    userConfig(h, JSON.stringify({ identities: [{ provider: "gitlab", handle: "ann" }] }));
+    const r = await resolveIdentities({ env: { CAT_HARNESS_PERSON: "gitlab:bob, nope" }, home: h, git: noGit });
+    expect(r.identities.map(qualified)).toEqual(["gitlab:bob", "gitlab:ann"]);
+    expect(r.identities[0]).toMatchObject({ via: "CAT_HARNESS_PERSON", vouched: false });
+    expect(r.notes.some((n) => n.includes("`nope` is not provider:handle"))).toBe(true);
+  });
+
+  test("several accounts on one provider are each a match key", async () => {
+    const h = home();
+    userConfig(h, JSON.stringify({ identities: [{ provider: "gitlab", handle: "ann" }, { provider: "gitlab", handle: "ann-work" }] }));
+    const r = await resolveIdentities({ env: {}, home: h, git: noGit });
+    expect(matchKeys(r.identities)).toEqual(expect.arrayContaining(["gitlab:ann", "gitlab:ann-work", "ann", "ann-work"]));
+  });
+
+  test("a host that passes no account is reported, with a note saying where the person comes from instead", async () => {
+    const r = await resolveIdentities({ env: { GEMINI_CLI: "1" }, home: home(), git: noGit });
+    expect(r.hosts).toEqual([{ id: "gemini-cli", name: "Gemini CLI", marker: "GEMINI_CLI", exposesIdentity: false }]);
+    expect(r.notes.some((n) => n.startsWith("gemini-cli: the host passes no account"))).toBe(true);
+  });
+
+  test("Claude Code's account is read and its host gets no 'no account' note", async () => {
+    const r = await resolveIdentities({ env: { CLAUDECODE: "1", CLAUDE_CODE_USER_EMAIL: "ann@example.org" }, home: home(), git: noGit });
+    expect(r.hosts.map((h) => h.id)).toEqual(["claude-code"]);
+    expect(r.identities.map(qualified)).toContain("claude:ann@example.org");
+    expect(r.notes.some((n) => n.startsWith("claude-code:"))).toBe(false);
+  });
 });

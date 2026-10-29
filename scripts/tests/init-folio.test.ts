@@ -186,7 +186,7 @@ describe("what gets written", () => {
     expect(readFileSync(join(d, ".gitignore"), "utf-8")).toContain("_site/");
   });
 
-  test("a new folio declares a todos graph with a feedback directory, so a review decision has somewhere to go (423d)", () => {
+  test("a new folio declares a todos graph with a feedback directory, so a review decision has somewhere to go (423d, c4rz)", () => {
     // Kept in the checkout (a `directory` override), so its files are on disk;
     // the branch default puts the same files in the seed — see `hp54` below.
     const d = tmp();
@@ -195,6 +195,7 @@ describe("what gets written", () => {
     const g = parseTodoGraph(JSON.parse(readFileSync(join(d, "todos", "todos.json"), "utf-8")));
     const fb = nodeOfKind(g, "todo-feedback");
     expect(fb?.path).toBe("feedback");
+    expect(scaffoldConfig(d).feedbackDir).toBe("todos/feedback");
     // Declared AND present: a declared-but-absent directory is the dh4f defect.
     for (const n of g.directories) expect(existsSync(join(d, "todos", n.path))).toBe(true);
   });

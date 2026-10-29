@@ -2,7 +2,7 @@
  * `staging-only-publish` tests that read the aggregate repository's own root —
  * the root-declared `fsh-guts` trashcan and
  * `.github/workflows/feature-staging.yml` — moved here from
- * `cat-harness/scripts/tests/staging-only-publish.test.ts` (bean `ho66`), as
+ * `cat-harness-tools/scripts/tests/sdlc/staging-only-publish.test.ts` (bean `ho66`), as
  * `merge-guard-workflows.test.ts` was: a standalone cat-harness layer has no
  * such root, and `check:cat-harness-standalone` collects every test in that
  * layer. The rest of that file's tests stay there.

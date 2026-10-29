@@ -7,7 +7,7 @@
  * and in record mode runs the candidates through `ci-cone.ts run`. Here
  * `GATE_CONE_CLI` replaces ci-cone.ts with a stub that answers from a JSON
  * spec, so these test the wiring only: the tracer and the exact-match decision
- * are ci-cone.ts's own, tested in `scripts/tests/ci-cone.test.ts`. Then
+ * are ci-cone.ts's own, tested in `scripts/tests/sdlc/ci-cone.test.ts`. Then
  * `merge-shards.py`, `compare-gates.py` and `merge-cone.py` on what it wrote.
  *
  * @module test/layer-pr-checks-cone.test
@@ -359,6 +359,40 @@ describe("compare-gates.py with cone-skipped gates", () => {
     const r = compare({ g: U }, { g: { command: "c", exit: 0, tail: "" } });
     expect(r.status).toBe(0);
     expect(r.out).toContain("| `g` | unchanged since abc | 0 | pass |");
+  });
+});
+
+describe("compare-gates.py with a gate main did not run", () => {
+  function compare(base: object, head: object): { status: number | null; out: string } {
+    const d = mkdtempSync(join(tmpdir(), "absent-compare-"));
+    writeFileSync(join(d, "base.json"), JSON.stringify(base));
+    writeFileSync(join(d, "head.json"), JSON.stringify(head));
+    const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
+    const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
+    return { status: r.status, out: r.stdout };
+  }
+
+  test("not applicable (78) on head, absent on base: listed, not counted", () => {
+    const r = compare({}, { g: { command: "c", exit: 78, tail: "NOT APPLICABLE" } });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("| `g` | — | 78 | not applicable here; main did not run it, so not counted |");
+  });
+
+  test("could not determine (2) on head, absent on base: listed, not counted", () => {
+    const r = compare({}, { g: { command: "c", exit: 2, tail: "?" } });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("could not determine; main did not run it, so not counted");
+  });
+
+  test("a plain failure on head, absent on base, is still NEW", () => {
+    const r = compare({}, { g: { command: "c", exit: 1, tail: "boom" } });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("NEW FAILURE");
+  });
+
+  test("not applicable (78) on head where base passed is still NEW", () => {
+    const r = compare({ g: { command: "c", exit: 0, tail: "" } }, { g: { command: "c", exit: 78, tail: "" } });
+    expect(r.status).toBe(1);
   });
 });
 

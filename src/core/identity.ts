@@ -17,14 +17,9 @@
  * | `github` | {@link githubIdentity}: a token's `GET /user`, or `GITHUB_ACTOR` in Actions | GitHub |
  * | `gitlab` | `GITLAB_USER_LOGIN`, set by GitLab CI for the user who started the pipeline | GitLab, in CI only |
  * | `claude` | `CLAUDE_CODE_USER_EMAIL`, the agent host's signed-in account | the agent host |
- * | `gemini` | `GEMINI_USER_EMAIL`, `GOOGLE_CLOUD_ACCOUNT` | nobody: self-asserted |
- * | `antigravity` | `ANTIGRAVITY_USER_EMAIL`, `ANTIGRAVITY_USER` | nobody: self-asserted |
- * | `copilot` | `COPILOT_USER` (and `GITHUB_USER` when not in `GITHUB_ACTIONS`) | nobody: self-asserted |
- * | `codex` | `CODEX_USER_EMAIL`, `OPENAI_USER_EMAIL` | nobody: self-asserted |
- * | `cursor` | `CURSOR_USER_EMAIL` | nobody: self-asserted |
- * | any | `CAT_HARNESS_IDENTITY` (`<provider>:<handle>` or comma-separated list) | nobody: self-asserted session override |
+ * | any | `CAT_HARNESS_PERSON`: `provider:handle`, comma-separated | nobody: self-asserted, per session |
  * | `git` | `git config user.email`, then `user.name` | nobody: self-asserted |
- * | any | the user-level config's `identities` / `profiles` | nobody: self-asserted, per machine |
+ * | any | the user-level config's `identities`, and the selected entry of its `profiles` | nobody: self-asserted, per machine |
  *
  * A self-asserted identity is good enough to choose how to TALK to someone,
  * which is what the interaction preferences are for. It is never good enough
@@ -41,13 +36,29 @@
  * file is the normal case and reads as empty; an unreadable one is reported,
  * never silently treated as empty.
  *
- * Supports:
- * - Several accounts per provider (`identities: { github: ["acct1", "acct2"] }`,
- *   `{ github: "acct1" }`, or `[{ provider, handle: string | string[], active? }]`).
- * - Several people on one machine/session (`profiles: { "<name>": { identities, interaction } }`
- *   disambiguated by `CAT_HARNESS_PROFILE`, `CAT_HARNESS_USER`, `CAT_HARNESS_IDENTITY`,
- *   or `activeProfile`; when ambiguous across conflicting interaction profiles, reports
- *   `ambiguous-multi-user` and falls back to the strictest profile on record).
+ * ## Several people, several accounts, several hosts
+ *
+ * One machine shared by several people: each has their own home directory,
+ * so each has their own user-level store. One session shared, or a shared
+ * login: `CAT_HARNESS_PERSON` names who is typing for this session only, and
+ * is put first among the self-asserted answers. One person with several
+ * accounts on a provider: list each in the store, either as entries or in the
+ * object form `identities: { github: ["acct1", "acct2"] }`; every one is a
+ * match key, and an entry marked `active: true` comes first.
+ *
+ * Several people in one store: `profiles: { "<name>": { identities,
+ * interaction } }`. The profile in use is the one `CAT_HARNESS_PROFILE` names,
+ * else the store's `activeProfile`, else the one whose identities match
+ * `CAT_HARNESS_PERSON`, else the only one. With several and nothing to choose
+ * between them, the state is `ambiguous-multi-user` and the strictest
+ * interaction profile on record applies until someone says who is typing. The
+ * same holds when the keys match more than one person in the repository's
+ * `interaction.json` (`users`): the strictest of their profiles, never the
+ * first one found.
+ *
+ * Which agent host runs the session is reported too ({@link detectAgentHosts}).
+ * A host that passes no account to a command gets a note saying so, so "nobody
+ * vouched" reads as a property of the host and not as a fault.
  *
  * @module folio-assistant/core/identity
  */
@@ -57,13 +68,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { detectAgentHosts, type AgentHost } from "./agent-host.js";
 import { githubIdentity, type GithubIdentity } from "./github-auth.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
 /** One identity a session can see. */
 export interface Identity {
-  /** `github`, `gitlab`, `claude`, `gemini`, `antigravity`, `copilot`, `codex`, `cursor`, `git`, or a provider a user config names. */
+  /** `github`, `gitlab`, `claude`, `git`, or a provider a user config names. */
   provider: string;
   handle: string;
   /** Where it was read. */
@@ -244,13 +256,15 @@ export interface IdentityResolution {
   /** The GitHub resolver's own answer, kept whole: permissions read it. */
   github: GithubIdentity;
   userConfig: UserConfigRead;
+  /** The agent hosts whose markers are set: usually one, none outside an agent. */
+  hosts: AgentHost[];
   /** Sources that were asked and could not answer, or ambiguity notes, in words. */
   notes: string[];
-  /** Selected person/profile name when disambiguated on a multi-user machine or session. */
+  /** The profile chosen on a store or `interaction.json` that names several people. */
   activeProfile?: string;
-  /** Whether the session resolved to a single user, an explicitly selected profile, or an ambiguous multi-user state. */
+  /** One person, a profile chosen among several, or several and none chosen. */
   multiUserStatus: MultiUserStatus;
-  /** Resolved interaction profile outcome (strictest profile on record when ambiguous-multi-user). */
+  /** The interaction profile to apply: the strictest on record when ambiguous. */
   interaction: ResolvedInteraction;
 }
 
@@ -261,27 +275,6 @@ function gitConfig(key: string, cwd?: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-/** Parse `CAT_HARNESS_IDENTITY` (`<provider>:<handle>` or comma-separated list, or bare `<handle>`). */
-export function parseSessionIdentityOverride(raw: string | undefined): Identity[] {
-  if (!raw) return [];
-  const out: Identity[] = [];
-  for (const token of raw.split(",")) {
-    const trimmed = token.trim();
-    if (!trimmed) continue;
-    const colon = trimmed.indexOf(":");
-    if (colon > 0) {
-      const provider = trimmed.slice(0, colon).trim();
-      const handle = trimmed.slice(colon + 1).trim();
-      if (provider && handle) {
-        out.push({ provider, handle, via: "CAT_HARNESS_IDENTITY", vouched: false });
-      }
-    } else {
-      out.push({ provider: "session", handle: trimmed, via: "CAT_HARNESS_IDENTITY", vouched: false });
-    }
-  }
-  return out;
 }
 
 function extractProfilesList(interaction: Record<string, unknown> | undefined): string[] {
@@ -340,7 +333,7 @@ export interface InteractionUserEntry {
  * Every identity this session can see, strongest first, de-duplicated by
  * (provider, handle). `github` is resolved by {@link githubIdentity} — the
  * same answer `auth_whoami` gives — and the rest are read from the
- * environment (including non-Claude agent hosts), git, and the user-level store.
+ * environment, git, and the user-level store.
  */
 export async function resolveIdentities(opts: {
   env: Env;
@@ -350,7 +343,7 @@ export async function resolveIdentities(opts: {
   fetch?: Parameters<typeof githubIdentity>[0]["fetch"];
   /** Injected for tests; default reads `git config`. */
   git?: (key: string) => string | undefined;
-  /** Optional repo-level `interaction.json` users map to check session-level multi-user ambiguity against. */
+  /** The repository's `interaction.json` users, to check who is typing against. */
   users?: Readonly<Record<string, InteractionUserEntry>>;
 }): Promise<IdentityResolution> {
   const { env } = opts;
@@ -361,7 +354,6 @@ export async function resolveIdentities(opts: {
     if (!out.some((o) => o.provider === i.provider && o.handle === i.handle)) out.push(i);
   };
 
-  // 1. Vouched forge / platform identities.
   const github = await githubIdentity({ env, repo: opts.repo, fetch: opts.fetch });
   if (github.login) add({ provider: "github", handle: github.login, via: github.via === "actions" ? "GITHUB_ACTOR" : "token", vouched: true });
   else notes.push(`github: ${github.reason ?? github.status}`);
@@ -369,49 +361,13 @@ export async function resolveIdentities(opts: {
   if (env.GITLAB_CI === "true" && env.GITLAB_USER_LOGIN) {
     add({ provider: "gitlab", handle: env.GITLAB_USER_LOGIN, via: "GITLAB_USER_LOGIN", vouched: true });
   }
-  if (env.CLAUDE_CODE_USER_EMAIL) {
-    add({ provider: "claude", handle: env.CLAUDE_CODE_USER_EMAIL, via: "CLAUDE_CODE_USER_EMAIL", vouched: true });
-  }
+  if (env.CLAUDE_CODE_USER_EMAIL) add({ provider: "claude", handle: env.CLAUDE_CODE_USER_EMAIL, via: "CLAUDE_CODE_USER_EMAIL", vouched: true });
 
-  // 2. Host-neutral session override (`CAT_HARNESS_IDENTITY`).
-  const sessionOverrides = parseSessionIdentityOverride(env.CAT_HARNESS_IDENTITY);
-  for (const s of sessionOverrides) add(s);
+  const person = parsePersons(env.CAT_HARNESS_PERSON);
+  const sessionOverrides: Identity[] = person.ok.map((i) => ({ ...i, via: "CAT_HARNESS_PERSON", vouched: false }));
+  for (const i of sessionOverrides) add(i);
+  for (const bad of person.bad) notes.push(`CAT_HARNESS_PERSON: \`${bad}\` is not provider:handle`);
 
-  // 3. Other agent hosts (self-asserted env signals; never vouched for permissions).
-  // Gemini CLI / Google Cloud
-  if (env.GEMINI_USER_EMAIL) {
-    add({ provider: "gemini", handle: env.GEMINI_USER_EMAIL, via: "GEMINI_USER_EMAIL", vouched: false });
-  }
-  if (env.GOOGLE_CLOUD_ACCOUNT) {
-    add({ provider: "gemini", handle: env.GOOGLE_CLOUD_ACCOUNT, via: "GOOGLE_CLOUD_ACCOUNT", vouched: false });
-  }
-  // Antigravity
-  if (env.ANTIGRAVITY_USER_EMAIL) {
-    add({ provider: "antigravity", handle: env.ANTIGRAVITY_USER_EMAIL, via: "ANTIGRAVITY_USER_EMAIL", vouched: false });
-  }
-  if (env.ANTIGRAVITY_USER) {
-    add({ provider: "antigravity", handle: env.ANTIGRAVITY_USER, via: "ANTIGRAVITY_USER", vouched: false });
-  }
-  // GitHub Copilot (and GITHUB_USER outside GitHub Actions)
-  if (env.COPILOT_USER) {
-    add({ provider: "copilot", handle: env.COPILOT_USER, via: "COPILOT_USER", vouched: false });
-  }
-  if (env.GITHUB_USER && env.GITHUB_ACTIONS !== "true") {
-    add({ provider: "github", handle: env.GITHUB_USER, via: "GITHUB_USER", vouched: false });
-  }
-  // OpenAI Codex CLI
-  if (env.CODEX_USER_EMAIL) {
-    add({ provider: "codex", handle: env.CODEX_USER_EMAIL, via: "CODEX_USER_EMAIL", vouched: false });
-  }
-  if (env.OPENAI_USER_EMAIL) {
-    add({ provider: "codex", handle: env.OPENAI_USER_EMAIL, via: "OPENAI_USER_EMAIL", vouched: false });
-  }
-  // Cursor
-  if (env.CURSOR_USER_EMAIL) {
-    add({ provider: "cursor", handle: env.CURSOR_USER_EMAIL, via: "CURSOR_USER_EMAIL", vouched: false });
-  }
-
-  // 4. User-level config store (`$XDG_CONFIG_HOME/cat-harness/identity.json`).
   const userConfig = readUserConfig(env, opts.home);
   let activeProfile: string | undefined;
   let multiUserStatus: MultiUserStatus = "single";
@@ -434,7 +390,7 @@ export async function resolveIdentities(opts: {
 
     const profileMap = cfg.profiles ? Object.entries(cfg.profiles) : [];
     if (profileMap.length > 0) {
-      const explicitSelector = env.CAT_HARNESS_PROFILE || env.CAT_HARNESS_USER || cfg.activeProfile;
+      const explicitSelector = env.CAT_HARNESS_PROFILE || cfg.activeProfile;
       let selectedEntry: [string, PersonProfileConfig] | undefined;
 
       if (explicitSelector) {
@@ -504,15 +460,19 @@ export async function resolveIdentities(opts: {
     notes.push(`user config ${userConfig.path}: ${userConfig.reason}`);
   }
 
-  // 5. Git author (`user.email`, `user.name`).
   const email = git("user.email");
   const name = git("user.name");
   if (email) add({ provider: "git", handle: email, via: "git config user.email", vouched: false });
   if (name) add({ provider: "git", handle: name, via: "git config user.name", vouched: false });
 
-  // 6. Optional repo-level `users` (`interaction.json`) resolution & multi-user session check.
+  const hosts = detectAgentHosts(env);
+  for (const h of hosts.filter((h) => !h.exposesIdentity)) {
+    notes.push(`${h.id}: the host passes no account to a command; who is typing comes from a forge token, CAT_HARNESS_PERSON, ${userConfigPath(env, opts.home)} or the git author`);
+  }
+
+  // The repository's `interaction.json` users, when the caller passes them.
   if (opts.users && Object.keys(opts.users).length > 0 && multiUserStatus !== "ambiguous-multi-user") {
-    const explicitUser = env.CAT_HARNESS_PROFILE || env.CAT_HARNESS_USER;
+    const explicitUser = env.CAT_HARNESS_PROFILE;
     const overrideKeys = new Set(matchKeys(sessionOverrides));
     const allKeys = new Set(matchKeys(out));
     const entries = Object.entries(opts.users);
@@ -522,7 +482,7 @@ export async function resolveIdentities(opts: {
       return names.some((n) => allKeys.has(n));
     });
 
-    // If an explicit disambiguator (`CAT_HARNESS_PROFILE`, `CAT_HARNESS_USER`, or `CAT_HARNESS_IDENTITY`)
+    // If an explicit disambiguator (`CAT_HARNESS_PROFILE`, or `CAT_HARNESS_PERSON`)
     // singles out one of the users, honour that selection.
     if (explicitUser) {
       const explicitHit = entries.filter(([userKey, u]) => {
@@ -596,11 +556,24 @@ export async function resolveIdentities(opts: {
     identities: out,
     github,
     userConfig,
+    hosts,
     notes,
     ...(activeProfile !== undefined ? { activeProfile } : {}),
     multiUserStatus,
     interaction: resolvedInteraction,
   };
+}
+
+/** `CAT_HARNESS_PERSON`: `provider:handle[,provider:handle…]`, blanks ignored. */
+export function parsePersons(value: string | undefined): { ok: { provider: string; handle: string }[]; bad: string[] } {
+  const ok: { provider: string; handle: string }[] = [];
+  const bad: string[] = [];
+  for (const part of (value ?? "").split(",").map((p) => p.trim()).filter(Boolean)) {
+    const at = part.indexOf(":");
+    if (at > 0 && at < part.length - 1) ok.push({ provider: part.slice(0, at), handle: part.slice(at + 1) });
+    else bad.push(part);
+  }
+  return { ok, bad };
 }
 
 /**

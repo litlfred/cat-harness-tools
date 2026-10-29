@@ -1,6 +1,6 @@
 /**
  * `gates.ts` held against the REAL CI workflows — moved here from
- * `cat-harness/scripts/tests/gates.test.ts` (bean `ho66`), beside
+ * `cat-harness-tools/scripts/tests/sdlc/gates.test.ts` (bean `ho66`), beside
  * `merge-guard-workflows.test.ts` and for the same reason: a standalone
  * cat-harness layer has no `.github/workflows/`, and
  * `check:cat-harness-standalone` collects every test in that layer. The
@@ -324,7 +324,7 @@ describe("every check script is accounted for — the direction nothing asked", 
     expect(commandsCiRuns(REPO).length).toBeGreaterThan(20);
   });
 
-  // Moved from `cat-harness/scripts/tests/gates.test.ts`: `SCRIPT_EXEMPTIONS`
+  // Moved from `cat-harness-tools/scripts/tests/sdlc/gates.test.ts`: `SCRIPT_EXEMPTIONS`
   // names scripts that layers ABOVE cat-harness declare (cat-harness-tools,
   // smart-base, smart-trust), so only the whole checkout's script table can
   // answer it — standing alone it read every one of them as stale.

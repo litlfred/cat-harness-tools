@@ -46,6 +46,7 @@ import { join, relative, resolve } from "node:path";
 import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
 import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 
 /** This instance's root (`<repo>/cat-harness`) and the repository above it. */
 const HARNESS = resolve(HARNESS_ROOT);
@@ -107,9 +108,11 @@ export interface ToolDiscovery {
 /**
  * Load every declared `tools` graph under `repoRoot`.
  *
- * `baseUrl` is passed through to each `tools(baseUrl)`, for the same reason
- * the barrel threaded it: a Tool's IO schema IRIs are minted against the base
- * the document is published at.
+ * `baseUrl` is the SITE base, as the barrel threaded it. Each `tools()` is
+ * handed the base the type vocabulary is published at, which is the host's
+ * own directory under it, `<base>/<name>` (`hostSchemaBase`, #676), so a
+ * port names `<base>/<name>/tool-types.schema.json#/$defs/<T>`, the address
+ * `harness-schema-export.ts` writes.
  */
 export function discoverTools(
   repoRoot: string = REPO,
@@ -152,7 +155,7 @@ export function discoverTools(
 
     let defs: unknown;
     try {
-      defs = (ns.tools as (b?: string) => unknown)(baseUrl);
+      defs = (ns.tools as (b?: string) => unknown)(baseUrl ? hostSchemaBase(baseUrl) : baseUrl);
     } catch (e) {
       out.failures.push({ ...where, reason: `tools() threw: ${(e as Error).message}` });
       continue;

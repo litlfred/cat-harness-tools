@@ -252,6 +252,22 @@ describe("(c) seeding a remote instance writes its consent", () => {
     expect(m.overrides?.lib?.whole).toBe(true);
   });
 
+  test("a re-pin over edited mounts is refused, unless --fresh will replace them (folio-assistant#2682)", () => {
+    const root = indexed([]);
+    seedRemote(root, [{ ...parseSeed(`lib=o/lib@${lib.sha}`), whole: true }], grant);
+    mountRemote({ instanceRoot: root, urlFor, install: false });
+    const lockPath = (p: string) => join(root, p);
+    const lockText = readFileSync(join(root, "index.lock.json"), "utf-8");
+    const mounted = JSON.parse(lockText).instances.find((i: { instance: string }) => i.instance === "lib");
+    writeFileSync(lockPath(join(mounted.path, "schemas/answer.ts")), "export const answer = 41;\n");
+    const before = readFileSync(join(root, "index.config.json"), "utf-8");
+    const moved = parseSeed(`lib=o/lib@${"c".repeat(40)}`);
+    expect(() => seedRemote(root, [moved], grant)).toThrow(/edits the lock does not hold.*lib/);
+    expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
+    seedRemote(root, [moved], grant, { discardEdits: true });
+    expect(readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!.ref).toBe("c".repeat(40));
+  });
+
   test("a seed spec must be <name>=<owner/repo>@<40-char sha>, and an empty grant writes nothing", () => {
     expect(() => parseSeed("lib=o/lib@main")).toThrow(/40-character/);
     const root = indexed([]);
