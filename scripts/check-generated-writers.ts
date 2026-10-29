@@ -21,12 +21,16 @@
  * - **Warn only.** A marker that names no writer, or one the checkout cannot
  *   find, is printed, and the run exits 0.
  *
- * ## What this cannot find yet
+ * ## Unmarked files, where a writer declares what it writes
  *
- * A generated file with NO marker. Nothing declares which paths a writer
- * writes (Tool outputs are typed data, and `builtAtPublish` covers only what
- * is never committed), so the unmarked file is invisible here. That needs a
- * `writes` declaration first.
+ * A generated file with NO marker is found through the `writes` declaration
+ * (litlfred/cat-harness#693, owner 2026-10-29, option C): each writer task
+ * lists the committed files it writes (`task-io.ts`'s `OWN_WRITES`, or an
+ * instance's `taskIo.<task>.writes`). Every file a glob matches must carry a
+ * marker, and a glob that matches nothing is reported too: it is a
+ * declaration about files that are not there. A writer that declares nothing
+ * is not checked for unmarked files yet; coverage grows one declaration at a
+ * time.
  *
  *   bun run cat check:generated-writers [--strict]
  */
@@ -36,6 +40,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { collectTaskWrites, type TaskWrites } from "./task-io.ts";
 
 const REPO = resolve(import.meta.dir, "../..");
 
@@ -44,7 +50,7 @@ const SCANNED = /\.(json|jsonld|md|html)$/;
 const MAX_BYTES = 4 * 1024 * 1024;
 const SKIP_DIRS = new Set(["node_modules", "_site", "_kg", "test-results"]);
 
-export type MarkerKind = "_generated" | "front-matter" | "registry" | "html-banner";
+export type MarkerKind = "_generated" | "front-matter" | "registry" | "html-banner" | "none";
 
 export interface Marker {
   kind: MarkerKind;
@@ -122,6 +128,40 @@ export function judge(abs: string, m: Marker, o: { repo: string; roots: readonly
   return `names a writer the checkout does not have: ${[...missingPaths, ...missingTasks.map((t) => `bun run cat ${t}`)].join(", ")}`;
 }
 
+/**
+ * Files a declared `writes` glob matches that carry no marker, and globs that
+ * match nothing. `byName` resolves an `<instance>:` prefix to its root.
+ */
+export function unmarkedWrites(
+  writes: readonly TaskWrites[],
+  o: { repo: string; byName: ReadonlyMap<string, string>; registry: ReadonlySet<string> },
+): Finding[] {
+  const out: Finding[] = [];
+  for (const w of writes) {
+    for (const g of w.globs) {
+      const m = /^([a-z0-9][a-z0-9-]*):(.+)$/.exec(g);
+      const base = m ? o.byName.get(m[1]!) : w.instance;
+      const pattern = m ? m[2]! : g;
+      if (base === undefined) {
+        out.push({ file: g, kind: "none", problem: `\`${w.task}\` declares writes in instance \`${m![1]}\`, which is not in this checkout` });
+        continue;
+      }
+      const files = [...new Bun.Glob(pattern).scanSync({ cwd: base, onlyFiles: true })].sort();
+      if (files.length === 0) {
+        out.push({ file: relative(o.repo, join(base, pattern)), kind: "none", problem: `\`${w.task}\` declares writes that match no file` });
+        continue;
+      }
+      for (const f of files) {
+        const abs = join(base, f);
+        if (markerOf(abs, readFileSync(abs, "utf-8"), o.registry) === undefined) {
+          out.push({ file: relative(o.repo, abs), kind: "none", problem: `written by \`${w.task}\` (its declared writes) but carries no generated marker` });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 function* filesUnder(dir: string): Generator<string> {
   let entries;
   try {
@@ -137,12 +177,12 @@ function* filesUnder(dir: string): Generator<string> {
   }
 }
 
-export function audit(repo: string = REPO): { scanned: number; marked: Record<MarkerKind, number>; findings: Finding[] } {
+export function audit(repo: string = REPO): { scanned: number; marked: Record<Exclude<MarkerKind, "none">, number>; findings: Finding[] } {
   const roots = instanceRootsIn(repo).map((r) => resolve(r));
   const tasks = new Set(scriptTable(repo).keys());
   const registry = generatedSchemas();
   const seen = new Set<string>();
-  const marked: Record<MarkerKind, number> = { _generated: 0, "front-matter": 0, registry: 0, "html-banner": 0 };
+  const marked: Record<Exclude<MarkerKind, "none">, number> = { _generated: 0, "front-matter": 0, registry: 0, "html-banner": 0 };
   const findings: Finding[] = [];
   for (const root of roots) {
     for (const abs of filesUnder(root)) {
@@ -151,11 +191,17 @@ export function audit(repo: string = REPO): { scanned: number; marked: Record<Ma
       if (statSync(abs).size > MAX_BYTES) continue;
       const m = markerOf(abs, readFileSync(abs, "utf-8"), registry);
       if (m === undefined) continue;
-      marked[m.kind]++;
+      marked[m.kind as Exclude<MarkerKind, "none">]++;
       const problem = judge(abs, m, { repo: resolve(repo), roots, tasks });
       if (problem) findings.push({ file: relative(repo, abs), kind: m.kind, problem });
     }
   }
+  const byName = new Map<string, string>();
+  for (const r of roots) {
+    const name = readDeclaration(r)?.name;
+    if (name !== undefined && !byName.has(name)) byName.set(name, r);
+  }
+  findings.push(...unmarkedWrites(collectTaskWrites(repo), { repo, byName, registry }));
   findings.sort((a, b) => a.file.localeCompare(b.file));
   return { scanned: seen.size, marked, findings };
 }
