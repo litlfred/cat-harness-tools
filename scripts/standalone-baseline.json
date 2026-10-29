@@ -284,7 +284,6 @@
         "test/coordinator/infrastructure-repo-root.test.ts > Unified paper-assistant image > no CI workflow regressed to a pre-unification image",
         "test/coordinator/infrastructure-repo-root.test.ts > Unified paper-assistant image > no containerised workflow hardcodes a folio's image",
         "test/coordinator/infrastructure-repo-root.test.ts > Unified paper-assistant image > publish.yml is callable by folios and takes builder_image",
-        "test/coordinator/ingest-ig-invocation-checkout.test.ts > over smart-trust's committed index > a missing LOCAL SOURCE names the index and its remote origin",
         "test/coordinator/init-folio-checkout.test.ts > a scaffold says what it stands on (zmdo) > a document folio stands on its adapter's instance, folio-assistant-core",
         "test/coordinator/init-folio-checkout.test.ts > a scaffold says what it stands on (zmdo) > a paper folio stands on folio-assistant-sci; a sibling link path is honoured",
         "test/coordinator/init-folio-checkout.test.ts > what gets written > the adapter path is normalised, and a non-default link path is honoured",
