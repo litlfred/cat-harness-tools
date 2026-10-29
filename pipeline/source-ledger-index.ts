@@ -2,7 +2,7 @@
 /**
  * Source-ledger indexer — migrate the source ledger's rows to the
  * `source-ledger/v1` shape and seed a row for every document in `uploads/`.
- * The ledger is read and written through `schemas/bib-attestations.ts`: the
+ * The ledger is read and written through `schemas/library/bib-attestations.ts`: the
  * attestation store's `bib-verification` family, or the legacy
  * `<folio>/bib-qa-verifications.json` while the store has none.
  *
@@ -50,7 +50,7 @@ import {
   SOURCE_LEDGER_AUTHORITATIVE_FOR,
   SOURCE_LEDGER_SCHEMA,
   writeSourceLedger,
-} from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+} from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { entryUrl, referenceEntries } from "./reference-entries.ts";
 

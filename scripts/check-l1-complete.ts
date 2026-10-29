@@ -97,7 +97,7 @@ function slotStates(slot: NarrativeSlot): string {
     .join(", ");
 }
 import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
-import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library-keywords.ts";
+import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";

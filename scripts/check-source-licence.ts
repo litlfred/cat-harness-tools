@@ -79,7 +79,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { licenceProblem, manifestLicence, type SourceLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
-import { checkLicenceExpression, loadSpdxLicenseList, type SpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { checkLicenceExpression, loadSpdxLicenseList, type SpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 import { gitScan } from "@litlfred/cat-harness/schemas/git-corpus.ts";
 import {
   buildQaResult,

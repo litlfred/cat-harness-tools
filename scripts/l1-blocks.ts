@@ -48,7 +48,7 @@ import { basename, join, resolve } from "node:path";
 // (2026-09-23). Two naming rules for one block is one rule too many.
 import { blockId, libraryInstanceOf, licenceProperties, sectionKey } from "../pipeline/gen-library-jsonld.ts";
 import { manifestLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
-import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
 import { serialisedAtInstanceContext } from "../pipeline/instance-document-context.ts";
 import { typesForKind } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";

@@ -25,7 +25,7 @@ import {
   SOURCE_LEDGER_AUTHORITATIVE_FOR,
   writeHumanReviews,
   writeSourceLedger,
-} from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+} from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import { jsonText } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
 
 const ROWS = [

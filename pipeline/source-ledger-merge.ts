@@ -41,7 +41,7 @@
  * @module pipeline/source-ledger-merge
  */
 
-import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import type {
