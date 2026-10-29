@@ -46,7 +46,7 @@ import {
   RenderedMeasuredSchema,
   type RenderedImpact,
   type RenderedMeasured,
-} from "@litlfred/cat-harness/schemas/rendered-impact.js";
+} from "@litlfred/cat-harness/schemas/ui/rendered-impact.js";
 
 /** The manifest main's publish writes at the publish root (`publish-main-site.ts`). */
 export const MAIN_SITE_MANIFEST = "_main-site.json";

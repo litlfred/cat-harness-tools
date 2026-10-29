@@ -1067,7 +1067,7 @@ export const RULES: Rule[] = [
       // (`apply-image-verdicts.ts`, the narrative and image schemas) may import
       // the harness — so the move adds no wrong-direction edge. Bean `3o5b`.
       "schemas/content/attribution.ts",
-      "schemas/note-anchor.ts",     // read only by `carried-note.ts`, already harness
+      "schemas/ui/note-anchor.ts",     // read only by `carried-note.ts`, already harness
       // Declaration vocabulary, by the same test as the four above: it imports
       // only zod, and it carries no part of the content model. The direction is
       // what forces it — `CatHarnessDeclarationSchema` (harness) holds the
@@ -1079,7 +1079,7 @@ export const RULES: Rule[] = [
       "schemas/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
-      "schemas/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
+      "schemas/ui/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
       "schemas/library/library-nodes.ts",   // the node schemas of `library`, a kind the harness registers; kind-validator routes by its class (cat-harness#402)
@@ -1361,7 +1361,7 @@ export const RULES: Rule[] = [
       // checker's finding, not a preference. It was classified harness first,
       // on the reasoning that it asks which INSTANCES are instantiated and
       // which are above the floor. `check:partition` answered with two
-      // wrong-direction edges: it imports `schemas/board.ts` and
+      // wrong-direction edges: it imports `schemas/ui/board.ts` and
       // `scripts/todos.ts`, both core, and the harness layer may not depend on
       // core. The imports were right and the classification was wrong — what
       // it PRODUCES is folio content, a board, whose type core owns. The

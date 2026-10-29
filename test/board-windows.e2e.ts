@@ -9,7 +9,7 @@
  *
  * ## Why this file mirrors `schemas/window-stack.test.ts` case for case
  *
- * The stack's rules are specified and unit-tested in `schemas/window-stack.ts`;
+ * The stack's rules are specified and unit-tested in `schemas/ui/window-stack.ts`;
  * `docs-ui.js` is a browser script and cannot import it, so there are two
  * implementations of one rule and they can drift. That cost is named rather
  * than hoped away: every rule the unit test pins has a case here against the

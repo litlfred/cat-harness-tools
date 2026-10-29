@@ -24,7 +24,7 @@
  *
  * ## And the model is the reference
  *
- * `docs-ui.js` cannot import `schemas/panel-chrome.ts`, so the two can drift.
+ * `docs-ui.js` cannot import `schemas/ui/panel-chrome.ts`, so the two can drift.
  * Same mitigation as `window-stack`: the browser's answer is checked against
  * the model's, case for case, from one fixture.
  */
@@ -33,7 +33,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { controlsFor, servableControls, validateControls } from "@litlfred/cat-harness/schemas/panel-chrome.ts";
+import { controlsFor, servableControls, validateControls } from "@litlfred/cat-harness/schemas/ui/panel-chrome.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

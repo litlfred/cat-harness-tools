@@ -55,7 +55,7 @@
     "scripts/partition/instance-rules.ts::schemas/conduct/memory.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/namespaces.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/node-kind.ts",
-    "scripts/partition/instance-rules.ts::schemas/note-anchor.ts",
+    "scripts/partition/instance-rules.ts::schemas/ui/note-anchor.ts",
     "scripts/partition/instance-rules.ts::schemas/content/odrl.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/portable-path.ts",
     "scripts/partition/instance-rules.ts::schemas/process/process-element-id.ts",

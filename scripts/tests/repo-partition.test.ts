@@ -12,7 +12,7 @@ describe("repo-partition classification", () => {
     // the partition still scans.
     // declared-path-literal: test VECTORS for the partition classifier — never read.
     expect(classify("schemas/content/avatars.ts")).toEqual({ repo: "harness", provenance: "rule" });
-    expect(classify("schemas/blank-avatar.ts")).toEqual({ repo: "harness", provenance: "rule" });
+    expect(classify("schemas/ui/blank-avatar.ts")).toEqual({ repo: "harness", provenance: "rule" });
   });
 
   test("a test is classified by what it IS, not by what it exercises", () => {

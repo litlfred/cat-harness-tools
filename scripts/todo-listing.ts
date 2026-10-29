@@ -54,7 +54,7 @@
  * value without exception, including ones that "cannot" contain markup.
  */
 import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
-import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
+import { safeHref } from "@litlfred/cat-harness/schemas/ui/safe-url.js";
 import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.js";
 
 /** How the caller turns a note's attachment into an href it can serve. */
@@ -206,7 +206,7 @@ function renderItem(item: TodoIndexItem, opts: TodoListingOptions): string {
   }
   lines.push(`      </div>`);
 
-  // EVERY href goes through `safeHref` — see `schemas/safe-url.ts`. Escaping
+  // EVERY href goes through `safeHref` — see `schemas/ui/safe-url.ts`. Escaping
   // closes tags and does nothing about a scheme, so an escaper here is the
   // wrong tool that looks like the right one. A refused URL renders as text
   // rather than as a link to nowhere (`pb04`).

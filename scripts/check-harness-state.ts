@@ -75,7 +75,7 @@ import { readQaTree } from "./qa-store.js";
 import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { parse as parseYaml } from "yaml";
-import { BOARD_POSITIONS_SCHEMA_TAG, BoardPositionsSchema, renderPositions } from "@litlfred/cat-harness/schemas/board-positions.ts";
+import { BOARD_POSITIONS_SCHEMA_TAG, BoardPositionsSchema, renderPositions } from "@litlfred/cat-harness/schemas/ui/board-positions.ts";
 
 const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);
@@ -845,7 +845,7 @@ function nodesUnder(dirs: readonly string[], ext: string): string[] {
  * — and nothing reported one. `orphanPositions` asks the note half and has no
  * caller outside its tests; the board half was asked nowhere.
  *
- * Canonical order is the second half. `schemas/board-positions.ts` calls it
+ * Canonical order is the second half. `schemas/ui/board-positions.ts` calls it
  * *"the mergeability guarantee, not a tidiness pass"*: two sessions placing two
  * notes merge cleanly only while the line order is a function of the content.
  * A hand edit or a writer that skipped `renderPositions` breaks that, and the
