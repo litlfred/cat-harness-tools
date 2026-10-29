@@ -32,13 +32,13 @@ import { materializedNodesIn, run } from "../check-read-only-graphs.js";
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
 /** An instance with one declared directory holding `nodes` materialized records. */
-function fixture(dir: Record<string, unknown>, nodes: number): string {
+function fixture(dir: Record<string, unknown>, nodes: number, top: Record<string, unknown> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "ro-"));
   const inst = join(root, "inst");
   mkdirSync(join(inst, "d"), { recursive: true });
   writeFileSync(
     join(inst, "inst.json"),
-    JSON.stringify({ name: "inst", directories: [{ id: "x", path: "d/", ...dir }] }),
+    JSON.stringify({ name: "inst", directories: [{ id: "x", path: "d/", ...dir }], ...top }),
   );
   for (let i = 0; i < nodes; i++) {
     writeFileSync(join(inst, "d", `n${i}.json`), JSON.stringify({ materialization: { state: "materialized" } }));
@@ -62,6 +62,45 @@ describe("the four verdicts stay apart", () => {
     // The mirror defect: freezing content nobody said was a copy. Different
     // from the other contradiction and it must not share a message.
     const r = fixture({ readOnly: true, readOnlyBasis: "copies" }, 0);
+    try {
+      expect(only(r).kind).toBe("contradicts");
+    } finally {
+      rmSync(r, { recursive: true, force: true });
+    }
+  });
+
+  it("declared read-only over nothing YET is not-applicable when its content is built at publish", () => {
+    // smart-base's and smart-trust's `fhir-artifact-index/`: the index is
+    // written by `ig-index:build` at publish and never committed, so a
+    // checkout holds none of it. Zero nodes is the declared state there.
+    const r = fixture({ readOnly: true, readOnlyBasis: "generated" }, 0, {
+      builtAtPublish: [{ path: "d/index.json", writer: ["w"], because: "checkout" }],
+    });
+    try {
+      const v = only(r);
+      expect(v.kind).toBe("not-applicable");
+      expect(v.why).toContain("built at publish");
+      expect(v.why).toContain("d/index.json");
+    } finally {
+      rmSync(r, { recursive: true, force: true });
+    }
+  });
+
+  it("...but a builtAtPublish path OUTSIDE the directory excuses nothing", () => {
+    // Only content the directory itself is built to hold explains its
+    // emptiness; a sibling `d2/` sharing the prefix must not.
+    const r = fixture({ readOnly: true, readOnlyBasis: "copies" }, 0, {
+      builtAtPublish: [{ path: "d2/index.json" }, { path: "e/" }],
+    });
+    try {
+      expect(only(r).kind).toBe("contradicts");
+    } finally {
+      rmSync(r, { recursive: true, force: true });
+    }
+  });
+
+  it("...and does not excuse a missing basis", () => {
+    const r = fixture({ readOnly: true }, 0, { builtAtPublish: [{ path: "d/index.json" }] });
     try {
       expect(only(r).kind).toBe("contradicts");
     } finally {

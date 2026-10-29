@@ -27,6 +27,14 @@
  *   declared `false` over materialized nodes **with no stated basis**.
  * - **exception** — declared `false` over materialized nodes, WITH a basis.
  * - **undeclared** — the directory holds materialized nodes and says nothing.
+ * - **not-applicable** — nothing to compare: silence over nothing materialized,
+ *   or a read-only directory whose materialized content the instance BUILDS AT
+ *   PUBLISH (`builtAtPublish` names a path inside it). Such content is never
+ *   committed, so a checkout holds none of it before the publish writer runs;
+ *   zero nodes there is the declared state, not a contradiction. Only
+ *   read-only over zero nodes is excused this way, and only when a
+ *   `builtAtPublish` entry lies inside the directory: the check is unchanged
+ *   for every directory nothing builds.
  *
  * ## `exception` exists because the corpus falsified the binary immediately
  *
@@ -61,7 +69,7 @@
  *   bun run cat-harness-tools/scripts/check-read-only-graphs.ts
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
@@ -139,15 +147,21 @@ function instances(repo: string): { name: string; dir: string; file: string }[] 
 export function run(repo: string = REPO): Verdict[] {
   const out: Verdict[] = [];
   for (const inst of instances(repo)) {
-    let decl: { directories?: { id?: string; path?: string; readOnly?: boolean; readOnlyBasis?: string }[] };
+    let decl: {
+      directories?: { id?: string; path?: string; readOnly?: boolean; readOnlyBasis?: string }[];
+      builtAtPublish?: { path?: string }[];
+    };
     try {
       decl = JSON.parse(readFileSync(inst.file, "utf-8"));
     } catch {
       continue;
     }
+    const builtPaths = (decl.builtAtPublish ?? []).flatMap((e) => (e.path ? [resolve(inst.dir, e.path)] : []));
     for (const d of decl.directories ?? []) {
       if (!d.path || !d.id) continue;
       const abs = join(inst.dir, d.path);
+      const absDir = resolve(abs);
+      const built = builtPaths.filter((b) => b === absDir || b.startsWith(absDir + sep));
       if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
       const n = materializedNodesIn(abs);
       const base = { instance: inst.name, id: d.id, path: d.path, declared: d.readOnly, materializedNodes: n };
@@ -162,6 +176,14 @@ export function run(repo: string = REPO): Verdict[] {
         // A declaration with no basis cannot be told from one nobody thought
         // about, which is the whole reason the field is required.
         out.push({ ...base, kind: "contradicts", why: "`readOnly` declared with no `readOnlyBasis`" });
+      } else if (d.readOnly && n === 0 && built.length > 0) {
+        // Its content is written at publish and never committed, so a checkout
+        // holds none of it until the writer runs: nothing to compare yet.
+        out.push({
+          ...base,
+          kind: "not-applicable",
+          why: `built at publish (\`builtAtPublish\`: ${built.map((b) => relative(inst.dir, b)).join(", ")}), nothing materialized in a checkout`,
+        });
       } else if (d.readOnly && n === 0) {
         out.push({ ...base, kind: "contradicts", why: "declared read-only, nothing materialized here" });
       } else if (!d.readOnly && n > 0) {
