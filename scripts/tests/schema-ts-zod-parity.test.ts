@@ -30,7 +30,7 @@ import {
   EquationSchema,
   DiagramSchema,
   TableSchema,
-} from "@litlfred/cat-harness/schemas/constraints.ts";
+} from "../../schemas/constraints.ts";
 import { join } from "path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

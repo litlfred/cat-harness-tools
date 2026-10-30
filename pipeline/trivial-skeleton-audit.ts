@@ -29,7 +29,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { glob } from "glob";
 import { findContentRepoRoot, findPapers } from "./repo-root";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 // Was `resolve(SCRIPT_DIR, "..", "..")` plus a hardcoded
 // `content/quantum-observable-universe` — a specific FOLIO paper named in

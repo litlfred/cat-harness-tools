@@ -35,4 +35,14 @@ describe("an entry's cover is page 1 of its held PDF (owner, 2026-10-16)", () =>
       source: "cover",
     });
   });
+
+  test("a PDF with no cover gets no avatar, never its first figure (owner, 2026-10-30)", () => {
+    mkdirSync(join(repo, "lib", "e4", "images"), { recursive: true });
+    writeFileSync(join(repo, "lib", "e4", "images", "fig.png"), "png");
+    const images = { images: [{ role: "figure", file: "images/fig.png" }] };
+    expect(avatarOf(join(repo, "lib"), "inst", "e4", images, repo, "e4.pdf")).toBeUndefined();
+    // A source that is not a PDF has no page 1 to render, so its figure still serves.
+    expect(avatarOf(join(repo, "lib"), "inst", "e4", images, repo, "e4.docx")?.source).toBe("figure");
+    expect(avatarOf(join(repo, "lib"), "inst", "e4", images, repo)?.source).toBe("figure");
+  });
 });

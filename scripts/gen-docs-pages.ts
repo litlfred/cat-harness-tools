@@ -37,11 +37,11 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
-import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
-import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
-import { resolveTarget } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import { instanceRepositories, type InstanceRepository } from "../schemas/kg/instance-repositories.ts";
+import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
+import { resolveTarget } from "../schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
-import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/kg/semantic-zoom.js";
+import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "../schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
   localesReadableFor,
@@ -71,8 +71,8 @@ import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { THEMES, themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
+import { resolveThemeBackdrop } from "../schemas/ui/theme.js";
+import { THEMES, themeById } from "../schemas/ui/themes.js";
 import {
   directoryForGraph,
   publishedAssetPath,
@@ -81,16 +81,17 @@ import {
   siteDirFor,
   sourceLinks,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/kg/cat-harness.ts";
 import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { DEFAULT_QA_BRANCH, resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.ts";
 import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
+import { loadManifestValue, manifestPath } from "../pipeline/json-manifest.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
@@ -851,9 +852,9 @@ function pageQaIcons(page: WebPage): string {
  */
 function blockLabel(page: WebPage, node: WebPageNode): string | undefined {
   const slug = page.slug.replace(/\//g, "-");
-  const file = join(CUR.srcDir, slug, `${node.id}.ts`);
+  const file = manifestPath(join(CUR.srcDir, slug), node.id);
   if (!existsSync(file)) return undefined;
-  const m = /^\s*label:\s*"([^"]+)"/m.exec(readFileSync(file, "utf-8"));
+  const m = /^\s*"?label"?:\s*"([^"]+)"/m.exec(readFileSync(file, "utf-8"));
   return m ? m[1] : undefined;
 }
 
@@ -1267,7 +1268,7 @@ if (import.meta.main) {
  */
 const blockByLabel = new Map<string, { page: string; node: string }>();
 const blockFileOf = (src: DocsSource, flat: string, node: string): string =>
-  relative(repoRootFor(INSTANCE_ROOT), join(src.srcDir, flat, `${node}.ts`)).split(sep).join("/");
+  relative(repoRootFor(INSTANCE_ROOT), manifestPath(join(src.srcDir, flat), node)).split(sep).join("/");
 /** The docs source that holds each plain label in {@link blockByLabel}. */
 const labelSource = new Map<string, DocsSource>();
 /** The file that declares each plain label, checkout-relative, for the warning. */
@@ -1300,9 +1301,9 @@ const slugs = readdirSync(src.srcDir, { withFileTypes: true })
 // missing page is stale and is reported as such.
 if (!src.base && !check) {
   for (const slug of slugs) {
-    const manifest = join(src.srcDir, slug, `${slug}.ts`);
+    const manifest = manifestPath(join(src.srcDir, slug), slug);
     if (!existsSync(manifest)) continue;
-    const page = ((await import(manifest)) as { default: WebPage }).default;
+    const page = (await loadManifestValue(manifest)) as WebPage;
     const outPath = join(src.outDir, `${page.slug}.md`);
     if (existsSync(outPath)) continue;
     mkdirSync(dirname(outPath), { recursive: true });
@@ -1310,13 +1311,12 @@ if (!src.base && !check) {
   }
 }
 for (const slug of slugs) {
-  const manifest = join(src.srcDir, slug, `${slug}.ts`);
+  const manifest = manifestPath(join(src.srcDir, slug), slug);
   if (!existsSync(manifest)) {
-    console.error(`  ! ${slug}/ has no ${slug}.ts manifest — skipped`);
+    console.error(`  ! ${slug}/ has no ${slug}.ts or ${slug}.json manifest — skipped`);
     continue;
   }
-  const mod = (await import(manifest)) as { default: WebPage };
-  const page = mod.default;
+  const page = (await loadManifestValue(manifest)) as WebPage;
   // A slug may carry a path (`guides/writing-a-paper`) because the published
   // site has a `guides/` subdirectory. The content DIRECTORY flattens it, so
   // one level of `docs/source/` holds every page and there is no second

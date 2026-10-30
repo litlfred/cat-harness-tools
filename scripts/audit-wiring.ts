@@ -53,7 +53,7 @@ import { readFileSync, mkdirSync, writeFileSync } from "fs";
 import { resolve, dirname, relative } from "path";
 import { globSync } from "glob";
 import { execSync } from "child_process";
-import type { ComputationWitness } from "@litlfred/cat-harness/schemas/types.ts";
+import type { ComputationWitness } from "../schemas/types.ts";
 import { findContentRepoRoot } from "../pipeline/repo-root";
 
 /**

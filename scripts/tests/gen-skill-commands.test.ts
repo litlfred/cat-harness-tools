@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { commandText, isGenerated, reconcile, write } from "../gen-skill-commands.ts";
+import { REPO_ROOT, commandText, isGenerated, packagesFor, reconcile, write } from "../gen-skill-commands.ts";
 import { userInvocableSkills } from "../../src/tools/skill-prompts.ts";
 
 const made: string[] = [];
@@ -103,10 +103,45 @@ describe("a command is a pointer, never a copy", () => {
   });
 });
 
+describe("instance vs index scope (bean t5zb)", () => {
+  test("packagesFor scopes an instance checkout to its own declared skills graph", () => {
+    const parent = mkdtempSync(join(tmpdir(), "skill-scope-"));
+    made.push(parent);
+    const base = join(parent, "base-inst");
+    const child = join(parent, "child-inst");
+    mkdirSync(join(base, "skills", "base-pkg"), { recursive: true });
+    writeFileSync(
+      join(base, "base-inst.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "base-inst",
+        directories: [{ id: "skills", path: "skills", graphTypologies: ["skills"] }],
+      }),
+    );
+    writeFileSync(join(base, "skills", "base-pkg", "b.md"), skill("b", true));
+
+    mkdirSync(join(child, "skills", "child-pkg"), { recursive: true });
+    writeFileSync(
+      join(child, "child-inst.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "child-inst",
+        needs: ["base-inst"],
+        directories: [{ id: "skills", path: "skills", graphTypologies: ["skills"] }],
+      }),
+    );
+    writeFileSync(join(child, "skills", "child-pkg", "c.md"), skill("c", true));
+
+    const pkgs = packagesFor(child);
+    expect(Object.keys(pkgs)).toEqual(["child-pkg"]);
+    expect(write(child)).toEqual([join(".claude", "commands", "c.md")]);
+    expect(reconcile(child).findings).toEqual([]);
+  });
+});
+
 describe("over this repository", () => {
   test("every user_invocable skill has a command and every command has a declared skill", () => {
-    const root = join(import.meta.dir, "..", "..", "..");
-    const r = reconcile(root);
+    const r = reconcile(REPO_ROOT);
     expect(r.findings).toEqual([]);
     expect(r.duplicates).toEqual([]);
   });

@@ -54,7 +54,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { plan } from "./merge-base.ts";
 import { git, parseMemberSpec, resolveMember, type GitResult } from "./merge-pipeline-git.ts";
 import { TASK_IO, type ScriptIO } from "./task-io.ts";

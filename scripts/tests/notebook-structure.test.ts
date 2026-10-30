@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { buildEntry, openingHeading } from "../notebook-structure.ts";
-import { structureOf } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
+import { structureOf } from "../../schemas/content/document-structure.ts";
 
 const SRC = { file: "t.ipynb", sha256: "b".repeat(64), bytes: 1, mtime: null };
 const md = (s: string) => ({ cell_type: "markdown", source: s });

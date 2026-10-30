@@ -67,7 +67,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "../schemas/kg/cat-harness.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
@@ -272,10 +272,8 @@ function model(
     // fsh-guts tile: a control for a trashcan nobody declared is a promise
     // with nothing behind it.
     ...(fshGuts ? { fshGuts: { label: "fsh-guts, discarded items" } } : {}),
-    // Home is last in the fixed bottom, outside the disclosure, so folding the
-    // harnesses away cannot take it with it — *"keep home at bottom for who
-    // iris."*
-    home: { href: "/", label: title, icon: "⌂" },
+    // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
+    // navbars"): the header's mark and name are the link to the landing page.
   };
 }
 

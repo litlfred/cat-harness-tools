@@ -23,9 +23,9 @@ import {
   SETTLED_BY_COMPUTATION,
   withEmptyNarrative,
   type DocumentImage,
-} from "@litlfred/cat-harness/schemas/content/document-image.ts";
+} from "../../schemas/content/document-image.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { narrativeFor } from "../../schemas/content/narrative.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 

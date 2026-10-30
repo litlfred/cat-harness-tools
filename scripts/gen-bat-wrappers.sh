@@ -13,7 +13,7 @@
 #
 # To add a script: append it to WRAPPED below and re-run. Deliberately NOT
 # wrapped — a .bat would only relocate the failure:
-#   deploy/*.sh, install-tex.sh, setup-sage.sh, setup-singular.sh,
+#   deploy/*.sh, install-tex.sh, setup-singular.sh,
 #   setup-elan-symlinks.sh, adapters/mcp-server/install.sh   (Linux host: apt/sudo/symlinks)
 #   scripts/lib/*.sh                                         (sourced, not run)
 #   scripts/git-hooks/auto-commit-feedback.sh                (git runs it via sh)
@@ -51,22 +51,17 @@ WRAPPED=(
   cat-harness-tools/scripts/install-bun.sh
   cat-harness-tools/scripts/install-lean-atlas.sh
   cat-harness-tools/scripts/lean-build-all.sh
-  cat-harness-tools/scripts/lean-build-bg.sh
   cat-harness-tools/scripts/lean-build-timed.sh
   cat-harness-tools/scripts/lean-cache-dump.sh
   cat-harness-tools/scripts/lean-closure-orchestrator.sh
-  cat-harness-tools/scripts/lean-compile-audit.sh
   cat-harness-tools/scripts/open-folio-assistant.sh
   cat-harness-tools/scripts/render-on-change.sh
   cat-harness-tools/scripts/render-pre-commit.sh
   cat-harness-tools/scripts/sage-mcp.sh
   cat-harness-tools/scripts/session-start-coord-sweep.sh
-  cat-harness-tools/scripts/session-status.sh
-  cat-harness-tools/scripts/setup-lean-toolchain.sh
   cat-harness-tools/scripts/start-folio-assistant.sh
   cat-harness-tools/scripts/start-viewer.sh
   cat-harness-tools/scripts/tests/run-tests.sh
-  cat-harness-tools/scripts/upload-bib-papers.sh
   cat-harness-tools/scripts/upload-to-uploads.sh
   cat-harness-tools/scripts/watch-main-prompt.sh
 )

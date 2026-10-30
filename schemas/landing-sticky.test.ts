@@ -22,7 +22,7 @@ import {
   stickyFromContribution,
   sourceLinks,
   type LandingSticky,
-} from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
+} from "./content/landing-sticky.js";
 import {
   STICKY_ORDER_LEADING,
   STICKY_ORDER_TRAILING,
@@ -31,10 +31,10 @@ import {
   composeContributions,
   readerText,
   type DeclaredContribution,
-} from "@litlfred/cat-harness/schemas/content/sticky-contribution.js";
-import { CatHarnessDeclarationSchema, siteDirFor, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
+} from "./content/sticky-contribution.js";
+import { CatHarnessDeclarationSchema, siteDirFor, declarationPathIn } from "./kg/cat-harness.js";
+import { THEMES } from "./ui/themes.js";
+import { resolveThemeBackdrop } from "./ui/theme.js";
 import { inAggregate } from "../test/support/checkout.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredDocsSources } from "../scripts/lib/docs-sources.ts";

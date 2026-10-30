@@ -13,9 +13,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { BoardSchema } from "@litlfred/cat-harness/schemas/ui/board.js";
-import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { BoardSchema } from "../../schemas/ui/board.js";
+import { isExemptFrom, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "../../schemas/kg/harness-config.js";
 import { boardsDir, harnessesOwedABoard } from "../../scripts/gen-default-boards.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */

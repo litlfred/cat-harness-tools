@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { HARNESS_ROOT } from "./roots.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 
 const NOT_LIGHT = `:root:not([data-fa-scheme="light"])`;
 const DARK = `:root[data-fa-scheme="dark"]`;

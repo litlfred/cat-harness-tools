@@ -43,7 +43,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { importClosure as walkImports } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { downstreamOf, type Edge, judge, readTree, renderingOrder } from "./check-derived-from.ts";
 
 export interface ConeDir {

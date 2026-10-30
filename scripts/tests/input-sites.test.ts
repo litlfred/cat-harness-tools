@@ -14,16 +14,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { declaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.ts";
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.ts";
+import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.ts";
+import { declaredDirectories } from "../../schemas/kg/declared-nodes.ts";
+import { orderedDependencies } from "../../schemas/kg/harness-config.ts";
+import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
+import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
-import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
 const isUndetermined = (f: Fingerprint, needle?: string) => {
@@ -282,7 +282,7 @@ describe("the runtime trace", () => {
 
   const inChild = (env: Record<string, string | undefined>, code: string) => {
     const file = join(root, "child.ts");
-    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(HARNESS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
+    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(TOOLS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
     const r = Bun.spawnSync(["bun", file], { env, stdout: "pipe", stderr: "pipe" });
     expect(r.exitCode).toBe(0);
   };

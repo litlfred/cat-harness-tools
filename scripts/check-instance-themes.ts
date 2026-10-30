@@ -56,14 +56,14 @@
 import {
   instanceRootsIn,
   readDeclaration,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import {
   explainThemeRefMiss,
   instanceThemes,
   THEMES_GRAPH_TYPOLOGY,
-} from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
-import { ResolvedThemeSchema } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/ui/theme-by-ref.js";
+import { ResolvedThemeSchema } from "../schemas/ui/theme.js";
+import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
 
 interface Finding {
   readonly instance: string;

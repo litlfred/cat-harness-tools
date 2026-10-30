@@ -176,3 +176,14 @@ msgstr "Tous"
     expect(result.removed).toEqual([]);
   });
 });
+
+describe("manifest() writes a TranslationNode as JSON data (bean y9r6)", () => {
+  test("valid against TranslationNodeSchema, with its $schema", async () => {
+    const { manifest, TRANSLATION_NODE_SCHEMA } = await import("../../translate-kg-viewer.ts");
+    const { TranslationNodeSchema } = await import("../../../schemas/content/translation.ts");
+    const v = JSON.parse(manifest("fr", 0, "abc123def456"));
+    expect(v.$schema).toBe(TRANSLATION_NODE_SCHEMA);
+    expect(v.label).toBe("trans:fr/kg-viewer");
+    expect(TranslationNodeSchema.safeParse(v).success).toBe(true);
+  });
+});

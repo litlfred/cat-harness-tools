@@ -35,7 +35,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
@@ -45,7 +45,7 @@ const ROOT = repoRootFor(INSTANCE);
 const LITERAL = /(?<![.\w])(?:join|resolve)\s*\([^,()]*(?:\([^()]*\))?[^,()]*,\s*"folio"\s*[,)]/;
 
 /** The one module that may spell it, because it is where the answer lives. */
-const BASE_CASE = "cat-harness/schemas/kg/cat-harness.ts";
+const BASE_CASE = "cat-harness-tools/schemas/kg/cat-harness.ts"; // moved up a layer in bean `8lcl`
 
 /**
  * The harness and the layer that implements its tools. The MCP server moved to
@@ -99,8 +99,12 @@ describe("the folio root is asked for, not spelled", () => {
     });
     // 41 → 39 on 2026-10-04 with no call site deleted: the glossary and
     // relevance routes moved UP to folio-assistant-core with their content
-    // (bean `70lx`, owner ruling), out of what this scans. A move is not the
+    // (bean `70lx`, owner ruling), out of what this scans. 39 → 36 in bean
+    // `saqd` as maths pipeline audits (`language-trap-audit`,
+    // `conjectural-propagation-audit`, `proof-narrative-lean-equiv-sweep`)
+    // moved UP to folio-assistant-sci, and 36 → 32 in `saqd` group 5 as the
+    // plugin-slot and Tool target scripts followed them. A move is not the
     // regression this floor exists to catch, so the floor follows it.
-    expect(callers.length).toBeGreaterThan(37);
+    expect(callers.length).toBeGreaterThan(31);
   });
 });

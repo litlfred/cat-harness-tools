@@ -56,8 +56,8 @@ import {
   repoRootFor,
   siteDirFor,
   sourceLinks,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+} from "../schemas/kg/cat-harness.ts";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";

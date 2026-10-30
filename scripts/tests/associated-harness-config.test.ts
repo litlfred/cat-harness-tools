@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { CatHarnessDeclarationSchema, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { CatHarnessDeclarationSchema, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { harnessPanel, summarise } from "../harness-panel.ts";
 import { instanceDirs } from "../harness-tiles.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -118,8 +118,14 @@ describe("associatedHarnesses: this tree", () => {
     expect(p.findings.filter((f) => f.includes("is a harness in this checkout"))).toEqual([]);
   });
 
-  test("cat-harness associates ihris (the first association, issue #1146)", () => {
+  // The first association (issue #1146) became the first subscription (issue
+  // #1719, bean `tmo5`). The schema allows one relation per remote thing, so
+  // cat-harness relates ihris exactly ONCE, by either relation. That holds on
+  // both sides of the cat-harness change, which this layer's CI reads at main.
+  test("cat-harness relates ihris exactly once: associated (#1146) or subscribed (#1719)", () => {
     const cat = entries.find((e) => e.decl.name === "cat-harness");
-    expect(cat?.decl.associatedHarnesses?.map((a) => a.name)).toContain("ihris");
+    const associated = (cat?.decl.associatedHarnesses ?? []).filter((a) => a.name === "ihris").length;
+    const subscribed = (cat?.decl.subscriptions ?? []).filter((s) => s.id === "ihris").length;
+    expect(associated + subscribed).toBe(1);
   });
 });

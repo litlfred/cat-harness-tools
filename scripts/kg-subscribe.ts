@@ -157,8 +157,8 @@ import {
   repoRootFor,
   siblingScopeFor,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/kg/repo-full-name.js";
+} from "../schemas/kg/cat-harness.js";
+import { RepoFullNameSchema } from "../schemas/kg/repo-full-name.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
@@ -167,8 +167,8 @@ import {
   type SubscriptionKind,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
-import { NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
+} from "../schemas/kg/substrate-snapshot.js";
+import { HARNESSES_DIR, NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
 import { git, pinnedRef, shallowFetch } from "./sync-remote-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -792,20 +792,27 @@ export function checkSubscriptions(instanceRoot: string): string[] {
 // subscribed trees (`subscribed-trees.ts`, harness) can share it: this module
 // is classified core, and the harness may not import core. Re-exported here
 // so every existing importer keeps its path.
-export { PART_RECORD_FILE, PART_TREE, NESTED_DIR, NODES_RECORD_FILE, NODES_DIR, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
+export { PART_RECORD_FILE, PART_TREE, NESTED_DIR, NODES_RECORD_FILE, NODES_DIR, HARNESSES_DIR, harnessHomeOf, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
 export type { KgPart, PartView } from "./kg-parts.js";
 
 /**
  * Every part record under one subscription's directory, and every STRAY: a
  * file, or a part directory with no record — bytes nobody accounts for.
- * `strays` are relative to the snapshot directory.
+ * `strays` are relative to the snapshot directory. `homes` are the
+ * instantiated harnesses' state homes under `harnesses/` (slice 7, G11),
+ * absolute: the subscriber's own working bytes, so never a stray, and never a
+ * part either, because nothing upstream is recorded there.
  */
-export function partRecordsIn(snapshotDir: string, subscription: string): { parts: PartView[]; strays: string[]; nodes: string[] } {
+export function partRecordsIn(
+  snapshotDir: string,
+  subscription: string,
+): { parts: PartView[]; strays: string[]; nodes: string[]; homes: string[] } {
   const base = join(snapshotDir, subscription);
   const parts: PartView[] = [];
   const strays: string[] = [];
   const nodes: string[] = [];
-  if (!existsSync(base)) return { parts, strays, nodes };
+  const homes: string[] = [];
+  if (!existsSync(base)) return { parts, strays, nodes, homes };
   const rel = (p: string): string => relative(snapshotDir, p).split("\\").join("/");
   for (const e of readdirSync(base, { withFileTypes: true })) {
     const p = join(base, e.name);
@@ -842,9 +849,16 @@ export function partRecordsIn(snapshotDir: string, subscription: string): { part
         }
       };
       walk(p);
+    } else if (e.name === HARNESSES_DIR && e.isDirectory()) {
+      // One directory per instantiated harness; a file directly here is nobody's.
+      for (const h of readdirSync(p, { withFileTypes: true })) {
+        const hd = join(p, h.name);
+        if (h.isDirectory() && !lstatSync(hd).isSymbolicLink()) homes.push(hd);
+        else strays.push(rel(hd));
+      }
     } else strays.push(rel(p));
   }
-  return { parts: parts.sort((a, b) => a.dir.localeCompare(b.dir)), strays: strays.sort(), nodes: nodes.sort() };
+  return { parts: parts.sort((a, b) => a.dir.localeCompare(b.dir)), strays: strays.sort(), nodes: nodes.sort(), homes: homes.sort() };
 }
 
 function flag(argv: string[], name: string): string | undefined {

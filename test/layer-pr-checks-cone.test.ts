@@ -144,8 +144,18 @@ describe("run-gates.py GATE_CONE=skip", () => {
     expect(r.log.length).toBe(1);
     const asked = r.log[0]!.split(" ");
     expect(asked[0]).toBe("decide-all");
-    // index-config:inline:check is a CHECKOUT_SCRIPTS gate, run as `bun run cat <script>` too.
-    expect(asked.slice(2).sort()).toEqual(["check:b-one", "check:b-three", "check:b-two", "check:c-one", "check:c-three", "check:c-two", "index-config:inline:check"]);
+    // CHECKOUT_SCRIPTS gates are run as `bun run cat <script>` too.
+    expect(asked.slice(2).sort()).toEqual([
+      "agent-memory:check",
+      "check:b-one",
+      "check:b-three",
+      "check:b-two",
+      "check:c-one",
+      "check:c-three",
+      "check:c-two",
+      "index-config:inline:check",
+      "skill:commands:check",
+    ]);
     expect(r.log.slice(1)).toEqual([]);
   });
 

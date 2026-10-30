@@ -42,7 +42,7 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
-import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
+import { documentContext } from "../schemas/content/content-context.ts";
 import { atInstanceContext } from "./instance-document-context.ts";
 import {
   DOCS_SITE_BASE,
@@ -50,15 +50,16 @@ import {
   SITE_PAGE_TYPES,
   SITE_NARRATIVE_TYPES,
   SITE_ASSET_TYPES,
-} from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
-import { docsSourceDirFor, repoRootFor, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/kg/jsonld.ts";
+import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
+import { docsSourceDirFor, repoRootFor, siteDirFor, sourceLinks } from "../schemas/kg/cat-harness.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { docsSources, sourceSiteNodePath, type DocsSource } from "../scripts/lib/docs-sources.ts";
+import { loadManifestValue, manifestPath } from "./json-manifest.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 const BASE_SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
@@ -217,12 +218,12 @@ if (flats.length === 0) {
 }
 
 for (const flat of flats) {
-  const manifest = join(SRC_DIR, flat, `${flat}.ts`);
+  const manifest = manifestPath(join(SRC_DIR, flat), flat);
   if (!existsSync(manifest)) {
-    console.error(`  ! ${flat}/ has no ${flat}.ts manifest — skipped`);
+    console.error(`  ! ${flat}/ has no ${flat}.ts or ${flat}.json manifest — skipped`);
     continue;
   }
-  const page = ((await import(manifest)) as { default: WebPage }).default;
+  const page = (await loadManifestValue(manifest)) as WebPage;
 
   emitBoth(join(SRC_DIR, flat, `${flat}.jsonld`), siteNodeSitePath(page.slug), {
     "@context": documentContext(SITE_PAGE_TYPES, { base: DOCS_SITE_BASE }),

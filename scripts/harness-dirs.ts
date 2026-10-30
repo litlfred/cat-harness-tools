@@ -23,7 +23,7 @@
  */
 
 import { resolve } from "node:path";
-import { materialiseDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { materialiseDeclaredDirectories } from "../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);

@@ -25,17 +25,17 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
-import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { GENERIC, avatarFor, hasAvatar } from "../schemas/content/avatars.js";
+import { type CatHarnessDeclaration, type Subscription, rootForScope } from "../schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
+import type { DeclarationScope } from "../schemas/kg/kg-node.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
   SubstrateSnapshotSchema,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
+} from "../schemas/kg/substrate-snapshot.js";
 import type { HarnessTile } from "./harness-tiles.js";
 import { type SubscribedTree, subscribedTrees } from "./subscribed-trees.js";
 

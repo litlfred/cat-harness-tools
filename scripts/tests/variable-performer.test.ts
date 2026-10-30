@@ -21,7 +21,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { laneBinding, type RoleGraph } from "../../schemas/process/role-graph.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

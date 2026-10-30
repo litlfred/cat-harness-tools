@@ -41,7 +41,7 @@ import {
   scriptExemptionFor,
   unrunScripts,
 } from "../../gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // THE REPOSITORY root — `GATES_WORKFLOW` is `.github/workflows/…`. See the

@@ -36,9 +36,9 @@ import { basename, join, resolve } from "node:path";
 
 import { baseDocsDir } from "../compose-docs.js";
 import { instancesCell, instancesRead, NO_INSTANCES, page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
+import { ownElementPattern } from "../../schemas/kg/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { siteRootFrom } from "../../schemas/kg/visualiser-route.js";
 import { PAGE_LOCALE, pageParts } from "../viewer-declarations.js";
 import { dirname } from "node:path";
 

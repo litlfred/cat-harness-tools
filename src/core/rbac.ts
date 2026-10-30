@@ -24,7 +24,7 @@
 
 import type { UserRole } from "../types.js";
 import { ROLE_LEVELS } from "../types.js";
-import { decide, type Decision, type RequestScope } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { decide, type Decision, type RequestScope } from "../../schemas/content/odrl.js";
 import { accessContext, type AccessContext, type Principal } from "./access.js";
 
 export interface HttpPrincipal extends Principal {

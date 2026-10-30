@@ -21,7 +21,7 @@ import {
   loadProcessModel,
   type Precondition,
 } from "../../src/workflow/process-model.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = repoRootFor(join(HARNESS_ROOT));

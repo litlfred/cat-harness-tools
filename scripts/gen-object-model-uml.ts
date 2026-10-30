@@ -45,21 +45,21 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { z } from "zod";
 
-import { toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.js";
+import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 
-import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { UserStorySchema } from "@litlfred/cat-harness/schemas/process/user-story.js";
-import { SkillDefinitionSchema } from "@litlfred/cat-harness/schemas/kg/skill-package.js";
-import { TaskRefSchema } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
-import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
-import { TestRunSchema } from "@litlfred/cat-harness/schemas/sdlc/test-run.js";
-import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { ExternalSchemaSchema } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
-import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/content/voices.js";
-import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { ActorDefSchema, RoleDefSchema } from "../schemas/process/role-graph.js";
+import { UserStorySchema } from "../schemas/process/user-story.js";
+import { SkillDefinitionSchema } from "../schemas/kg/skill-package.js";
+import { TaskRefSchema } from "../schemas/kg/carried-note.js";
+import { TodoNodeSchema } from "../schemas/sdlc/todo.js";
+import { TestRunSchema } from "../schemas/sdlc/test-run.js";
+import { KgQaReportSchema } from "../schemas/sdlc/kg-qa.js";
+import { ExternalSchemaSchema } from "../schemas/kg/external-schema.js";
+import { VoiceProfileSchema } from "../schemas/content/voices.js";
+import { instanceDirectoryForGraph, readDeclaration, siteDir } from "../schemas/kg/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { contentLayerInstance } from "../schemas/kg/graph-typology-registry.js";
 import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

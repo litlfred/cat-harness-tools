@@ -20,7 +20,7 @@ import {
   sidecarPaths,
   stateOf,
 } from "./qa-witness.ts";
-import { kgQaSidecarPath } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import { kgQaSidecarPath } from "../schemas/sdlc/kg-qa.ts";
 
 function inTmp(run: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), "qa-witness-"));

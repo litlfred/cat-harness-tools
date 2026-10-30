@@ -39,7 +39,7 @@ import { existsSync, readFileSync } from "fs";
 // The Lean lexer and qou's chapter profiles are the science layer's, so they
 // arrive through pipeline slots rather than imports (bean `squu`). Same names,
 // same behaviour; the slot is filled by a higher layer's contributions.
-import { declarationStarts, registerDefaultChapterProfiles, stripLeanComments } from "./pipeline-plugins.js";
+import { declarationStarts, stripLeanComments } from "./pipeline-plugins.js";
 import { sep } from "path";
 
 // Chapter profiles are FOLIO content and now arrive through a registry, the
@@ -48,9 +48,8 @@ import { sep } from "path";
 import {
   CHAPTER_EXPECTED_REGIMES, CATEGORICAL_CHAPTERS, ARCHIMEDEAN_CHAPTERS,
 } from "./chapter-profile-registry-di";
-// Side-effecting: registers qou's profiles as the default until the folio
-// supplies its own. `_folio-chapter-profiles.qou.ts` says how to finish that.
-registerDefaultChapterProfiles();
+// No defaults: a folio configures its own with `configureChapterProfiles`
+// (qou does so in `scripts/run-validate.ts`). Unconfigured reads as `n/a`.
 
 export interface QUsageHit {
   file: string;

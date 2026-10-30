@@ -40,7 +40,7 @@ import {
   instanceRootsIn,
   processMayWriteAsset,
   strayAssetRoleKeys,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 
 export interface AssetRoleReport {
   /** Roles every instance must declare that `ASSET_ROLES` does not govern. */

@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { fshGutsDirectory, withoutFrozenSubtrees } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
+import { fshGutsDirectory, withoutFrozenSubtrees } from "../../schemas/kg/fsh-guts.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

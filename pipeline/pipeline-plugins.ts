@@ -49,10 +49,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import type { TabularCsvwTables } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import { directoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
+import type { TabularCsvwTables } from "../schemas/library/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -74,12 +74,6 @@ export interface LeanLexerPlugin {
   stripLeanComments(src: string): string;
   /** Every declaration start in comment-stripped source, in order. */
   declarationStarts(stripped: string): LeanDeclStart[];
-}
-
-/** A folio's default chapter profiles — implemented by `_folio-chapter-profiles.qou.ts`. */
-export interface ChapterProfileDefaultsPlugin {
-  /** Configure `chapter-profile-registry-di` with this folio's profiles. */
-  registerDefaults(): void;
 }
 
 /** One issue the LaTeX preflight found. */
@@ -139,7 +133,6 @@ export interface TabularCsvwPlugin {
 /** Every slot, keyed by the kind string a contributor registers under. */
 export interface PipelinePlugins {
   "lean-lexer": LeanLexerPlugin;
-  "chapter-profile-defaults": ChapterProfileDefaultsPlugin;
   "latex-preflight": LatexPreflightPlugin;
   "lean-coverage": LeanCoveragePlugin;
   "tabular-csvw": TabularCsvwPlugin;
@@ -150,7 +143,6 @@ export type PipelinePluginKind = keyof PipelinePlugins;
 /** The kinds, as data — for reports and for the test that pins the set. */
 export const PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = [
   "lean-lexer",
-  "chapter-profile-defaults",
   "latex-preflight",
   "lean-coverage",
   "tabular-csvw",
@@ -304,23 +296,6 @@ export function declarationStarts(stripped: string): LeanDeclStart[] {
   return pipelinePlugin("lean-lexer").declarationStarts(stripped);
 }
 
-/**
- * `chapter-profile-defaults` slot: configure the folio's default chapter
- * profiles, IF a dependency supplies them.
- *
- * The one OPTIONAL slot, and on purpose. It runs at module load of
- * `qa-checkers-q-usage.ts`, and "no defaults" is already a documented state
- * of `chapter-profile-registry-di` (unconfigured, which reads as empty and is
- * reported by `chapterProfilesConfigured()`). A folio that does not depend on
- * the science layer, such as the fixture in `q-usage-audit-roots.test.ts`,
- * must still be able to load the checker and get its own "found NO blocks"
- * answer, rather than a load-time throw about a slot it never needed. A
- * contributor that is declared but broken still throws, from the loader.
- */
-export function registerDefaultChapterProfiles(): void {
-  optionalPipelinePlugin("chapter-profile-defaults")?.registerDefaults();
-}
-
 /** `latex-preflight` slot: macro lint over a generated compile unit. */
 export function runPreflight(mainTexPath: string): LatexPreflightResult {
   return pipelinePlugin("latex-preflight").runPreflight(mainTexPath);
@@ -334,6 +309,23 @@ export function resolveLeanFile(tsPath: string, src: string, leanRoot: string): 
 /** `lean-coverage` slot: sorry-freedom and validation state of a `.lean` file. */
 export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin["leanFileStatus"]> {
   return pipelinePlugin("lean-coverage").leanFileStatus(leanPath);
+}
+
+/** `lean-coverage` slot: coverage statistics for a paper. */
+export function computeStats(paperDir: string, contentRoot: string): {
+  provable: { total: number; with_lean_file: number; sorry_free: number; percent_sorry_free: number };
+  conjectures: {
+    total: number;
+    with_lean_file: number;
+    class_axiomatized: number;
+    percent_class_axiomatized: number;
+    primary: number;
+    primary_class_axiomatized: number;
+    percent_primary_class_axiomatized: number;
+  };
+  definitions: { total: number; with_lean_file: number };
+} {
+  return pipelinePlugin("lean-coverage").computeStats(paperDir, contentRoot) as ReturnType<typeof computeStats>;
 }
 
 /**

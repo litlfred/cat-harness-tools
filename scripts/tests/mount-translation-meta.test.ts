@@ -15,7 +15,7 @@ import { readFileSync } from "fs";
 import { join, resolve } from "path";
 
 import { TRANSLATION_META_ID, translationMetaBlock, withTranslationMeta } from "../lib/translation-meta.ts";
-import { UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { UN_LOCALES } from "../../schemas/content/translation.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

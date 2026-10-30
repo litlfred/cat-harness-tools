@@ -39,7 +39,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "../../../schemas/kg/cat-harness.js";
 // The table reader, its path and the set of names a row may carry all live in a
 // module rather than here: `kind:register` asks the same question, and two
 // parsers over one hand-written table drift the first time a column moves

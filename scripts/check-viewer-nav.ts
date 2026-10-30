@@ -70,14 +70,14 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor, siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import {
   VIEWER_NAV_QA_SCHEMA,
   ViewerNavQaSchema,
   type ViewerNavFlag,
   type ViewerNavPage,
   type ViewerNavQa,
-} from "@litlfred/cat-harness/schemas/sdlc/viewer-nav-qa.ts";
+} from "../schemas/sdlc/viewer-nav-qa.ts";
 import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
 import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "./lib/navbar.ts";
@@ -131,7 +131,12 @@ export function layoutFlags(html: string, marked: ReadonlySet<string> = new Set(
   const nav = html.slice(at, end < 0 ? undefined : end);
   const flags: ViewerNavFlag[] = [];
 
-  const head = /<label class="fa-nav-head"([^>]*)>([\s\S]*?)<\/label>/.exec(nav);
+  // Two header shapes: the open/close label alone, or (owner, 2026-10-30)
+  // the home link with the open/close label beside it. Either way the mark is
+  // drawn and the checkbox has a label in the header.
+  const labelHead = /<label class="fa-nav-head"([^>]*)>([\s\S]*?)<\/label>/.exec(nav);
+  const linkHead = /<div class="fa-nav-head fa-nav-head--home"><a class="fa-nav-head-link"[^>]*>([\s\S]*?)<\/a><label class="fa-nav-head-toggle"([^>]*)>/.exec(nav);
+  const head = labelHead ?? (linkHead ? [linkHead[0], linkHead[2]!, linkHead[1]!] : null);
   if (!head) flags.push("header");
   else {
     const control = /\bfor="fa-nav-open"/.test(head[1]!);

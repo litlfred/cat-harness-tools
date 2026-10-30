@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { buildFshGutsExport, fshGutsDirs } from "../../scripts/fsh-guts-export.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../support/instance-fixture.js";
 
 /**

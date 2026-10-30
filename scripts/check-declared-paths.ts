@@ -160,9 +160,11 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
+import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { isJsonManifest } from "../pipeline/json-manifest.ts";
 
 const root = resolve(HARNESS_ROOT);
 const update = process.argv.includes("--update");
@@ -298,6 +300,46 @@ const MARKER = /declared-path-literal:\s*\S/;
  * than its author meant; the marked literals are PRINTED with their reason on
  * every run, so an over-broad marker is visible rather than silent.
  */
+/**
+ * A Tool declared as data (`tools/<id>/<id>.json`, `"$schema": "tool-definition/v1"`,
+ * bean `y9r6`) is scanned like code. Its comments live in a trailing
+ * `$comment` list of `{ at, comment }`, `at` being a JSON pointer into `tool`.
+ * That list is blanked out of the scan, as comments are in `.ts` (a path in
+ * prose is not a reference), and a `declared-path-literal:` comment covers
+ * the lines carrying the string(s) at its pointer. `undefined` for other JSON.
+ */
+export function toolDefinitionText(raw: string): { code: string; cover: Map<number, string> } | undefined {
+  let parsed: { $schema?: unknown; tool?: unknown; $comment?: Array<{ at?: string; comment?: string }> };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    return undefined;
+  }
+  if (!parsed || parsed.$schema !== "tool-definition/v1") return undefined;
+  const lines = raw.split("\n");
+  const at = lines.findIndex((l) => /^\s*"\$comment":/.test(l));
+  const end = at === -1 ? lines.length : at;
+  const code = [...lines.slice(0, end), ...lines.slice(end).map((l) => " ".repeat(l.length))].join("\n");
+  const cover = new Map<number, string>();
+  const strings = (v: unknown): string[] =>
+    typeof v === "string" ? [v] : Array.isArray(v) ? v.flatMap(strings) : v && typeof v === "object" ? Object.values(v).flatMap(strings) : [];
+  for (const c of parsed.$comment ?? []) {
+    const m = /declared-path-literal:\s*([\s\S]+)$/.exec(c.comment ?? "");
+    if (m === null) continue;
+    const reason = m[1]!.replace(/\s+/g, " ").trim();
+    let node: unknown = parsed.tool;
+    for (const k of (c.at ?? "").split("/").slice(1)) {
+      const key = k.replace(/~1/g, "/").replace(/~0/g, "~");
+      node = node && typeof node === "object" ? (node as Record<string, unknown>)[key] : undefined;
+    }
+    for (const v of strings(node)) {
+      const quoted = JSON.stringify(v);
+      for (let n = 0; n < end; n++) if (lines[n]!.includes(quoted) && !cover.has(n)) cover.set(n, reason);
+    }
+  }
+  return { code, cover };
+}
+
 export function markerCoverage(rawLines: string[]): Map<number, string> {
   const cover = new Map<number, string>();
   for (let n = 0; n < rawLines.length; n++) {
@@ -466,9 +508,10 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
   const scan = (file: string): void => {
   const raw = readFileSync(file, "utf-8");
   const rawLines = raw.split("\n");
-  const code = stripComments(raw);
+  const tool = file.endsWith(".json") ? toolDefinitionText(raw) : undefined;
+  const code = tool ? tool.code : stripComments(raw);
   const lines = code.split("\n");
-  const cover = markerCoverage(rawLines);
+  const cover = tool ? tool.cover : markerCoverage(rawLines);
   const ranges = pathContextRanges(code);
   // Offset of each line's first character, so a literal's position in the
   // line maps back to a position in the file the ranges are measured in.
@@ -526,7 +569,14 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
         continue;
       }
 
-      const abs = join(root, value);
+      // A declared path the harness names may be code an implementing layer
+      // holds since bean `8lcl` moved it (`schemas/**/*.ts`); resolve it there
+      // as the readers do (`implementingRootFor`), so the witness survives.
+      let abs = join(root, value);
+      if (!existsSync(abs)) {
+        const r = resolveImplementingPath(root, value);
+        if (r.state === "found") abs = join(r.root, value);
+      }
       if (!existsSync(abs)) {
         refused.push({ ...site, why: "names nothing that resolves" });
         continue;
@@ -546,7 +596,7 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
       if (e.name === "node_modules" || e.name.startsWith(".")) continue;
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith(".ts")) scan(p);
+      else if (e.name.endsWith(".ts") || (e.name.endsWith(".json") && toolDefinitionText(readFileSync(p, "utf-8")))) scan(p);
     }
   };
 
@@ -555,7 +605,17 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
   // The docs graph's content-object manifests carry path literals too (a
   // page's processes). They lived under `content/` until 2026-10-09 and are
   // the docs graph's declared source now, so the declaration says where.
-  walk(docsSourceDirFor(root));
+  // A manifest there may be a `.json` one (bean `y9r6`); its literals are read the same way.
+  const walkDocs = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walkDocs(p);
+      else if (e.name.endsWith(".ts") || (e.name.endsWith(".json") && isJsonManifest(p))) scan(p);
+    }
+  };
+  walkDocs(docsSourceDirFor(root));
   return { prefixes, artefacts, marked, refused };
 }
 

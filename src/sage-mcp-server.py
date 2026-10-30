@@ -153,7 +153,7 @@ def sage_eval(code: str, timeout: int = 300) -> dict:
         return {
             "error": "SageMath is not available.",
             "detail": backend.get("reason", ""),
-            "hint": "Install Sage (`./scripts/setup-sage.sh`) or run a Docker "
+            "hint": "Install Sage (a folio may ship one, e.g. qou's `scripts/setup-sage.sh`) or run a Docker "
                     "daemon so the sagemath/sagemath image can be pulled on demand.",
         }
 

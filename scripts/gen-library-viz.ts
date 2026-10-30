@@ -62,23 +62,23 @@ import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
-import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
+import { SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
-import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
-import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
@@ -538,8 +538,16 @@ var COLS = [
       if (!refs.length) return pill;
       return '<details class="refs"><summary>'+pill+'</summary><ul>' + refs.map(function(r){
         return "<li>"+esc(r.from)+" ("+r.count+")</li>"; }).join("") + "</ul></details>"; } },
+  /* THE SOURCE FILE NAME OPENS IT -- owner, 2026-10-30: "the link to the
+     source should be clickable to view under source". An entry whose held
+     source has a viewer (e.viewable, set by the projection from viewableOf)
+     links to its own page's view panel, #lib-view, which opens on arrival,
+     in a NEW TAB (owner, 2026-10-30, option B) so the listing stays where the
+     reader left it. Any other entry keeps the plain name. */
   { k:"upload",   t:"source",   n:false, c:"t-source", f:function(e){ var s=uploadState(e);
-      return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"+(e.sourceFile?'<br><span class="slug" style="font-size:.72rem;color:var(--muted)">'+esc(e.sourceFile)+"</span>":""); } }
+      var name = '<span class="slug" style="font-size:.72rem;color:var(--muted)">'+esc(e.sourceFile)+"</span>";
+      if (e.sourceFile && e.viewable) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'#lib-view" target="_blank" rel="noopener">'+esc(e.sourceFile)+"</a>";
+      return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"+(e.sourceFile?"<br>"+name:""); } }
 ];
 
 function rows(){

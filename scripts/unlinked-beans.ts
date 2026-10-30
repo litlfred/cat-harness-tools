@@ -52,9 +52,9 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { buildLsi, buildTermMatrix, keywordsOf, type LsiIndex, type TermMatrix } from "../pipeline/lsi.ts";
-import { instanceRootsIn, declaredGraphs } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
-import type { QaResult } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
+import { instanceRootsIn, declaredGraphs } from "../schemas/kg/cat-harness.ts";
+import { BEAN_GRAPH_FILE } from "../schemas/sdlc/bean-graph.ts";
+import type { QaResult } from "../schemas/kg/qa-record-shapes.ts";
 import { beanDefsDir, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { BEAN_LSI_OPTS, epicMembers, epicOf, FIT_FLOOR, MARGIN_FLOOR, OPEN, rankEpicsForBean } from "./lsi-epics.ts";
 import { beansNamedBy, readInstances } from "./workflow-view.ts";
