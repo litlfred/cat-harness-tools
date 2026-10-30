@@ -150,6 +150,13 @@ export function discoverTools(
         out.failures.push({ ...where, reason: `tool folders did not load: ${(e as Error).message}` });
         continue;
       }
+      // A declared graph holding neither a loader nor a Tool folder is a
+      // failure, not zero tools: a moved or emptied directory must not read
+      // as an instance that simply declares none.
+      if (Array.isArray(defs) && defs.length === 0) {
+        out.failures.push({ ...where, reason: "declares a tools graph that holds no index.ts and no `<id>/<id>.json` Tool folder" });
+        continue;
+      }
     } else {
       let ns: Record<string, unknown>;
       try {
