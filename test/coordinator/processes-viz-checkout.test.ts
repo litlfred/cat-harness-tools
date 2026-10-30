@@ -14,6 +14,7 @@ import { join, resolve } from "node:path";
 
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { pageRelPath, publishedIndex, processRows } from "../../scripts/gen-processes-viz.js";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -25,8 +26,12 @@ const DOCS = baseDocsDir(REPO);
 const rows = await processRows(REPO);
 
 describe("the committed page is current", () => {
-
-  it("and matches what the generator produces now", () => {
+  // Standing alone the page is not built: `processes:viz` writes it at publish
+  // and `processes/` is gitignored (bean w1gy F18).
+  const rel = pageRelPath(REPO);
+  it.skipIf(
+    rel !== undefined && siteNotBuilt("the processes page `processes:viz` writes at publish (gitignored)", join(DOCS, rel)),
+  )("and matches what the generator produces now", () => {
     // A stale page fails the unit suite rather than only the gate, which is
     // where it is noticed first.
     expect(readFileSync(join(DOCS, pageRelPath(REPO)!), "utf-8")).toBe(publishedIndex(rows));

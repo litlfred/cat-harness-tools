@@ -36,6 +36,7 @@ import { describe, expect, test } from "bun:test";
 
 import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
+import { PAGE_LOCALE } from "../../viewer-declarations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // `siteDirFor`, never the literal — the site root is one answer, and a gate
@@ -84,7 +85,11 @@ function parses(source: string): string | undefined {
 // covering 12 of 25 pages, leaving `voices`, `uploads` and `auto-docs`
 // unexamined. Walking the generated tree means a new viewer family is covered
 // the day it is generated rather than the day somebody remembers. Bean `jfr6`.
-const pages = viewerPages(join(SITE, "cat-harness"));
+//
+// Both trees: the viewers moved under the page locale (folio-assistant#2527),
+// so `<site>/cat-harness/` alone holds only what is not yet regenerated, and a
+// walk of it examined none of the pages that moved (bean w1gy F18).
+const pages = [join(SITE, PAGE_LOCALE, "cat-harness"), join(SITE, "cat-harness")].flatMap((d) => viewerPages(d));
 
 describe("generated viewers ship JavaScript that is JavaScript", () => {
   test("the viewer trees are not empty — examined nothing is not a pass", () => {

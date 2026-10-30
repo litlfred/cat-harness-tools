@@ -471,13 +471,6 @@ describe("this repository's own corpus", () => {
     expect(translated).toBeGreaterThan(0);
   });
 
-  it("the committed index is up to date and valid", () => {
-    const r = checkTranslationIndex(INSTANCE_ROOT);
-    const bad = r.findings.filter((f) => f.severity !== "note").map((f) => `${f.where}: ${f.message}`);
-    expect(bad).toEqual([]);
-    expect(r.state, `run: bun run cat translation:index`).toBe("ok");
-  });
-
   // A key's second segment is the instance whose page it is. The committed
   // index also names pages a HIGHER instance builds into this site
   // (`en/folio-assistant-core/glossary`), and a checkout without that
@@ -493,6 +486,20 @@ describe("this repository's own corpus", () => {
       return []; // unreadable: the test below fails on it by name
     }
   })();
+  // The index is regenerated from the pages this checkout holds, so a checkout
+  // without the instance that builds a committed key's page draws an index
+  // without that key, and the committed one reads as stale by exactly those
+  // keys (bean w1gy F18).
+  it.skipIf(
+    higherKeys.length > 0 &&
+      notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site, so the index drawn here omits it`),
+  )("the committed index is up to date and valid", () => {
+    const r = checkTranslationIndex(INSTANCE_ROOT);
+    const bad = r.findings.filter((f) => f.severity !== "note").map((f) => `${f.where}: ${f.message}`);
+    expect(bad).toEqual([]);
+    expect(r.state, `run: bun run cat translation:index`).toBe("ok");
+  });
+
   it.skipIf(
     higherKeys.length > 0 &&
       notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site`),
