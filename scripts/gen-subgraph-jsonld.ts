@@ -151,6 +151,7 @@ import {
   SubgraphIndexSchema,
 } from "../schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
 
@@ -735,8 +736,16 @@ export function planSubgraphs(
     const abs = resolve(exportedFrom(id), p);
     const top = kgTops.find((t) => slash(abs).startsWith(t.abs));
     if (top === undefined) { placed.set(id, rootFor(abs)); continue; }
-    if (!existsSync(abs)) { problems.push(`${id}: source path ${p} is inside ${top.entry.harness}/${top.entry.rel} but not on disk`); continue; }
-    let dir = statSync(abs).isDirectory() ? slash(abs) : slash(dirname(abs));
+    // Bean `8lcl`: a Schema node's `module` is the implementing layer's file
+    // (cat-harness-tools holds cat-harness's code), so it is missing under the
+    // instance that declares it. The node still belongs to the subgraph the
+    // declaration names, so only a path NO layer holds is a problem.
+    const onDisk = existsSync(abs);
+    if (!onDisk && resolveImplementingPath(exportedFrom(id), p).state !== "found") {
+      problems.push(`${id}: source path ${p} is inside ${top.entry.harness}/${top.entry.rel} but not on disk`);
+      continue;
+    }
+    let dir = onDisk && statSync(abs).isDirectory() ? slash(abs) : slash(dirname(abs));
     while (!byDir.has(dir) && dir.length > top.abs.length) dir = slash(dirname(dir));
     const e = byDir.get(dir);
     if (e === undefined) { problems.push(`${id}: no walked subgraph contains ${p}`); continue; }
