@@ -1,7 +1,7 @@
 /**
  * The linear floor renders every note, in document order, with no JavaScript.
  *
- * The unit half. `test/linear-floor.e2e.ts` is the other half: it serves this
+ * The unit half. `test/content/linear-floor.e2e.ts` is the other half: it serves this
  * function's output to a browser with `javaScriptEnabled: false` and asserts a
  * reader can read it. Both are needed and neither replaces the other — this
  * one pins WHAT is emitted, that one pins that a browser given only those
