@@ -24,7 +24,6 @@ import { makeIri, migrationTombstones, writeSubjectDocuments } from "../kg-expor
 import { SEARCH_EXCLUDE_MARKER } from "../publish-verify.ts";
 import { subgraphIri } from "../subgraph-node.ts";
 import { diagramPages, owningProcess } from "../lib/diagram-pages.ts";
-import { PUBLISHED_ELSEWHERE } from "../instance-exports.ts";
 
 const HOST = "https://x.test/site/cat-harness.jsonld";
 const CORE = "https://x.test/site/folio-assistant-core/folio-assistant-core.jsonld";
@@ -104,24 +103,18 @@ describe("telling this document's subjects from everything else", () => {
   });
 });
 
-describe("a document still published with fragments keeps them until its own phase", () => {
+describe("bootstrap's document mints paths too (#958)", () => {
   const BOOT = "https://x.test/site/bootstrap/bootstrap.jsonld";
 
-  test("links into bootstrap's document name what that document holds", () => {
-    expect(mintsFragments(BOOT)).toBe(true);
-    expect(makeIri(BOOT, "skill", "discussion")).toBe(`${BOOT}#skill/discussion`);
-    expect(makeIri(BOOT, "process", "P/flow/F")).toBe(`${BOOT}#process/P/flow/F`);
-    expect(subjectPathOf(`${BOOT}#skill/discussion`, BOOT)).toBe("skill/discussion");
-    expect(legacyFragmentIri(`${BOOT}#skill/discussion`, BOOT)).toBeUndefined();
-    expect(subjectFileStem(`${BOOT}#skill/discussion`, BOOT)).toBeUndefined();
+  test("links into bootstrap's document name its subject paths", () => {
+    expect(mintsFragments(BOOT)).toBe(false);
+    expect(makeIri(BOOT, "skill", "discussion")).toBe("https://x.test/site/bootstrap/skill/discussion");
+    expect(makeIri(BOOT, "process", "P/flow/F")).toBe("https://x.test/site/bootstrap/process/P#flow/F");
+    expect(subjectPathOf("https://x.test/site/bootstrap/skill/discussion", BOOT)).toBe("skill/discussion");
   });
 
-  test("the list is exactly the documents a publisher other than kg-export writes", () => {
-    const elsewhere = Object.entries(PUBLISHED_ELSEWHERE)
-      .filter(([, p]) => !p.publisher.source.includes("kg-export"))
-      .map(([stub]) => stub)
-      .sort();
-    expect([...FRAGMENT_DOCUMENT_STUBS].sort()).toEqual(elsewhere);
+  test("no document is left on fragments", () => {
+    expect([...FRAGMENT_DOCUMENT_STUBS]).toEqual([]);
   });
 });
 

@@ -1160,7 +1160,7 @@ describe("exporting ANOTHER instance's graph", () => {
     // `skillHome` follows `exportIdentity`, so repointing the document moved
     // every link into it — which is the half of `dyd3`'s option B that needed
     // no separate change.
-    expect(ids.has(`${ALT_BASE}/bootstrap/bootstrap.jsonld#skill/discussion`)).toBe(true);
+    expect(ids.has(`${ALT_BASE}/bootstrap/skill/discussion`)).toBe(true);
   });
 
   test("it emits no link to a collector it did not run", async () => {
@@ -1187,7 +1187,7 @@ describe("exporting ANOTHER instance's graph", () => {
     const tool = (e["@graph"] as Array<Record<string, unknown>>).find(
       (n) => n["@id"] === toolIri(String(e["@id"]), "discuss"),
     )!;
-    expect(tool.satisfies).toEqual([`${ALT_BASE}/bootstrap/bootstrap.jsonld#skill/discussion`]);
+    expect(tool.satisfies).toEqual([`${ALT_BASE}/bootstrap/skill/discussion`]);
   });
 
   test("a skill THIS instance also declares stays here", async () => {
