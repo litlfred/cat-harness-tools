@@ -12,8 +12,6 @@ import {
   ProvConsentDecisionRecordSchema,
   ProvConsentRefSchema,
   ProvDecisionRecordSchema,
-  appendProvDecisionRecord,
-  buildProvHashChain,
   computeProvRecordHash,
   provActivityFor,
   provConsentDecisionRecordFor,

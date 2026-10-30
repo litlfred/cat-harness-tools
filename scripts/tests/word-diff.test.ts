@@ -38,7 +38,6 @@ describe("wordDiff", () => {
   });
 
   test("it is self-contained, so the page can embed exactly this function", () => {
-    // eslint-disable-next-line no-new-func
     const embedded = new Function(`return (${wordDiff.toString()})`)() as typeof wordDiff;
     expect(embedded("a b", "a c")).toEqual(wordDiff("a b", "a c"));
   });

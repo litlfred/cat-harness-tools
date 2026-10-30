@@ -30,7 +30,6 @@ import { parsePo } from "./po-inject";
 // module (bean `squu`).
 import { leanFileStatus, resolveLeanFile, runPreflight } from "./pipeline-plugins";
 import { findContentRepoRoot, findPapers } from "./repo-root";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 // ── Build ────────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { RENDER_OBLIGATIONS, isExemptFrom, readDeclaration, renderExemptionProblems, repoRootFor, type RenderExemption, findDeclarationFile } from "./kg/cat-harness.js";
 import { requireHarnessRoot } from "./harness-root.ts";

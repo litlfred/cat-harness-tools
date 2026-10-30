@@ -313,7 +313,7 @@ export function scanMarkers(
 
   // 1. Registered index-section types: declared or not, straight from the registry.
   const registryIds = new Set<string>();
-  for (const [id, def] of registry.entries()) {
+  for (const [, def] of registry.entries()) {
     if (typeof def.filename !== "object" || def.filename === null) continue;
     registryIds.add(def.filename.indexSection);
   }

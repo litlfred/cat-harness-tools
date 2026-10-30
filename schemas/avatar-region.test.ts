@@ -15,7 +15,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import {
   AVATAR_SQUARENESS_TOLERANCE_PX,

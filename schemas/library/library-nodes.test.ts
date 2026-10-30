@@ -4,7 +4,6 @@
  * with no `@type` (2026-10-21), and what regeneration made of it.
  */
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
 
 import { familyBody, nodeFamilyTag, resolveNodeSchemas } from "../kg/kind-validator.ts";
 import { LIBRARY_NODE_FAMILIES, LibraryBlockSchema, LibrarySectionSchema, LibrarySourceDocumentSchema, libraryNodeClass } from "./library-nodes.ts";

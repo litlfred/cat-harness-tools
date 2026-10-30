@@ -26,7 +26,6 @@
  * @module schemas/navbar-icons.test
  */
 import { describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
 
 import {
   NAVBAR_ICONS,

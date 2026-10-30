@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { CatHarnessDeclarationSchema } from "./cat-harness.ts";
 import { CONTENT_CONTEXT } from "./jsonld.ts";

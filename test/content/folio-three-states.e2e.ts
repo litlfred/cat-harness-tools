@@ -374,7 +374,7 @@ test.describe("rows that are rebuilt, which is what the real library view does",
   const rebuild = async (page: import("@playwright/test").Page) =>
     page.evaluate(() => {
       const body = document.querySelector("tbody")!;
-      body.innerHTML = body.innerHTML; // eslint-disable-line no-self-assign
+      body.innerHTML = body.innerHTML;
     });
 
   test("the control survives a wholesale re-render", async ({ page }) => {

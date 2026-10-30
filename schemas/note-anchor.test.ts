@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
 
 import {
   alsoAboutLabels,

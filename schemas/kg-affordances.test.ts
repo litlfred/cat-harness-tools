@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { AssetSourceSchema, KgAssetSchema } from "./kg/kg-node.ts";
 import { readRoleGraph, resolveRoleSkills } from "./process/role-graph.ts";
