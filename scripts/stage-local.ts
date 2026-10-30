@@ -812,6 +812,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
       "--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(branch)}`,
       "--branch-url", `${gh}/tree/${branch}`, "--issues-url", `${gh}/issues`,
       "--run-url", runUrl, "--main-site", pagesRoot, "--before-ref", base,
+      ...((mp) => (mp ? ["--main-pages", mp] : []))(mainPagesFile(repo, inputs.publish_branch, log)),
     ]);
   }
 
@@ -954,6 +955,39 @@ export async function openPrFor(owner: string, name: string, branch: string, log
  * is `folio/<instance>`, the conventional root; a checkout without one gets
  * the banner and no ChangeSet, and says so.
  */
+/**
+ * The pages the MAIN site holds, read from the publish ref, written one path
+ * per line for `staging-banner.ts --main-pages`, or undefined when the ref
+ * could not be read.
+ *
+ * Without it the banner cannot tell which pages main has, so every page's
+ * "compare with main" link fell back to the site root (owner, 2026-10-30:
+ * "compare with main should show same page as on main"). The ref is read in
+ * a throwaway bare repository, shallow and blob-less, so the checkout's own
+ * history and refs are never touched. STAGING/ and _render-log/ are not main
+ * pages, so they are left out.
+ */
+export function mainPagesFile(repo: string, publishBranch: string, log: (s: string) => void): string | undefined {
+  const tmp = mkdtempSync(join(tmpdir(), "main-pages-"));
+  try {
+    const remote = git(repo, ["remote", "get-url", "origin"]);
+    execFileSync("git", ["init", "-q", "--bare", tmp]);
+    execFileSync("git", ["-C", tmp, "fetch", "-q", "--depth=1", "--filter=blob:none", remote, publishBranch], { stdio: ["ignore", "pipe", "pipe"] });
+    const pages = execFileSync("git", ["-C", tmp, "ls-tree", "-r", "--name-only", "FETCH_HEAD"], { encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 })
+      .split("\n")
+      .filter((l) => l.endsWith(".html") && !l.startsWith("STAGING/") && !l.startsWith("_render-log/"));
+    const out = join(mkdtempSync(join(tmpdir(), "main-pages-list-")), "main-pages.txt");
+    writeFileSync(out, pages.join("\n") + "\n");
+    log(`· the publish ref ${publishBranch} holds ${pages.length} main page(s): compare links go to the same page on main`);
+    return out;
+  } catch (e) {
+    log(`⚠ could not read the publish ref ${publishBranch} (${(e as Error).message.split("\n")[0]}): compare links fall back to the site root`);
+    return undefined;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 export function previewData(
   repo: string,
   f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string; pr?: number },
@@ -1017,6 +1051,8 @@ export function previewData(
       : ["--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`]),
     "--branch-url", `${gh}/tree/${f.branch}`, "--issues-url", `${gh}/issues`,
     "--run-url", f.runUrl ?? `${gh}/commit/${f.sha}`, "--main-site", `https://${f.owner}.github.io/${f.name}/`, "--before-ref", f.base,
+    // declared-path-literal: site.build previews publish to gh-pages, as the plan says.
+    ...((mp) => (mp ? ["--main-pages", mp] : []))(mainPagesFile(repo, "gh-pages", log)),
   ]);
 }
 
