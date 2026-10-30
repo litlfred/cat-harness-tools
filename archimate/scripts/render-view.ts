@@ -26,11 +26,19 @@
  * dropped, so a broken reference shows where it is.
  *
  * A box drawn inside another already says how the two relate: ArchiMate's
- * nesting notation. So a connection between a box and one that encloses it,
- * for a relationship nesting can stand for, is not drawn — as Archi does by
- * default. Drawn, it runs from the inner box to the outer box's centre, which
- * lies inside or beside the inner box: its arrowhead lands in the middle of a
- * box and the line cuts across the boxes around it.
+ * nesting notation. So a connection between a box and one that encloses it is
+ * not drawn, as Archi does by default for the relationships nesting stands
+ * for. Drawn, it runs from the inner box to the outer box's centre, which lies
+ * inside or beside the inner box: its arrowhead lands in the middle of a box
+ * and the line cuts across the boxes around it. The element pages still list
+ * the relationship.
+ *
+ * Archi stores a bendpoint twice: as an offset from the source's centre and
+ * from the target's. The two agree when the line was routed; when a box was
+ * moved afterwards they no longer do, and the blend of the two (what Archi
+ * draws) twists the line back on itself. Such a line is drawn straight. Two or
+ * more straight lines between the same pair of boxes are drawn side by side,
+ * not on top of each other.
  *
  * A view with nothing on it says so, rather than drawing an empty frame.
  *
@@ -171,8 +179,10 @@ function lineStyle(r: ArchimateRelationship | undefined): { start?: string; end?
   }
 }
 
-/** The relationships a box nested in another may stand for (ArchiMate 3.2's nesting notation). */
-const NESTABLE = new Set(["Composition", "Aggregation", "Assignment", "Realization", "Specialization"]);
+/** How far apart, in px, a bendpoint's two stored positions may be before the line counts as stale. */
+const STALE = 40;
+/** The gap between side-by-side lines joining the same two boxes. */
+const PARALLEL_GAP = 8;
 
 const MARKERS = `<defs>
 <marker id="arrow-open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#333" stroke-width="1.3"/></marker>
@@ -283,10 +293,21 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     const m = mid.get(id);
     return m ? { at: m } : undefined;
   };
-  const pending = view.connections.filter((c) => {
-    const r = c.relationship ? relationships.get(c.relationship) : undefined;
-    return !(r && NESTABLE.has(r.type) && (within(c.source, c.target) || within(c.target, c.source)));
-  });
+  const pending = view.connections.filter((c) => !within(c.source, c.target) && !within(c.target, c.source));
+  // Straight lines per pair of boxes, so lines sharing both ends sit side by side.
+  const pairKey = (a: string, b: string) => (a < b ? `${a} ${b}` : `${b} ${a}`);
+  const stale = (c: (typeof pending)[number]): boolean => {
+    const s = nodes.get(c.source), t = nodes.get(c.target);
+    if (!s || !t) return false;
+    const cs = centre(s), ct = centre(t);
+    return c.bendpoints.some((b) => Math.hypot(cs.x + b.startX - ct.x - b.endX, cs.y + b.startY - ct.y - b.endY) > STALE);
+  };
+  const straight = new Map<string, string[]>();
+  for (const c of pending) {
+    if (c.bendpoints.length && !stale(c)) continue;
+    const key = pairKey(c.source, c.target);
+    straight.set(key, [...(straight.get(key) ?? []), c.id]);
+  }
   for (let guard = 0; pending.length && guard < 4; guard++) {
     for (let i = 0; i < pending.length; ) {
       const c = pending[i]!;
@@ -294,8 +315,9 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
       const t = ends(c.target);
       if (!s || !t) { i++; continue; }
       pending.splice(i, 1);
-      const k = c.bendpoints.length;
-      const bends = c.bendpoints.map((b, j) => {
+      const route = stale(c) ? [] : c.bendpoints;
+      const k = route.length;
+      const bends = route.map((b, j) => {
         const wgt = (j + 1) / (k + 1);
         return { x: (1 - wgt) * (s.at.x + b.startX) + wgt * (t.at.x + b.endX), y: (1 - wgt) * (s.at.y + b.startY) + wgt * (t.at.y + b.endY) };
       });
@@ -303,7 +325,17 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
       const last = bends[k - 1] ?? s.at;
       const a = s.node ? clip(s.node, first) : s.at;
       const z = t.node ? clip(t.node, last) : t.at;
-      const pts = [a, ...bends, z];
+      const pts = [a, ...bends, z].map((p) => ({ ...p }));
+      const twins = k === 0 ? straight.get(pairKey(c.source, c.target)) ?? [] : [];
+      if (twins.length > 1) {
+        // Shift sideways along the normal of the pair's own direction, so a line
+        // and its reverse move apart rather than together.
+        const [p, q] = c.source < c.target ? [a, z] : [z, a];
+        const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+        const off = (twins.indexOf(c.id) - (twins.length - 1) / 2) * PARALLEL_GAP;
+        const nx = (-(q.y - p.y) / len) * off, ny = ((q.x - p.x) / len) * off;
+        for (const pt of pts) { pt.x += nx; pt.y += ny; }
+      }
       const half = pts.length % 2 === 1 ? pts[(pts.length - 1) / 2]! : { x: (pts[pts.length / 2 - 1]!.x + pts[pts.length / 2]!.x) / 2, y: (pts[pts.length / 2 - 1]!.y + pts[pts.length / 2]!.y) / 2 };
       mid.set(c.id, half);
       for (const p of pts) grow(p.x, p.y);

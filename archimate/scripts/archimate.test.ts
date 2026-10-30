@@ -155,8 +155,28 @@ describe("drawing a view", () => {
     );
     const out = renderViewSvg(nested, nested.views[0]!);
     expect(out).not.toContain("<title>Realization</title>");
-    // A relationship nesting cannot stand for is still drawn.
-    expect(out).toContain("<title>Serving</title>");
+    // Only the model's own serving line, between boxes that do not nest.
+    expect(out.split("<title>Serving</title>").length).toBe(2);
+    // A line between boxes that do not nest is still drawn.
+    expect(out).toContain("<title>Access</title>");
+  });
+
+  it("draws a line straight when a box moved after its bendpoints were set, and two lines between one pair side by side", () => {
+    // id-c2's bendpoint: source centre + (0,80) and target centre + (-100,0) are far apart.
+    const twisted = parseArchimate(
+      XML.replace(
+        '<sourceConnection xsi:type="archimate:Connection" id="id-c1" source="id-db" target="id-da" archimateRelationship="id-r1"/>',
+        '<sourceConnection xsi:type="archimate:Connection" id="id-c1" source="id-db" target="id-da" archimateRelationship="id-r1"/>' +
+          '<sourceConnection xsi:type="archimate:Connection" id="id-c1b" source="id-db" target="id-da" archimateRelationship="id-r1"/>',
+      ),
+    );
+    const out = renderViewSvg(twisted, twisted.views[0]!);
+    // Each line's wide transparent twin carries the same path.
+    const paths = [...out.matchAll(/<path d="(M[^"]+)" fill="none" stroke="transparent"/g)].map((m) => m[1]!);
+    // Every line is a single segment: the stale bendpoint is dropped.
+    for (const d of paths) expect(d).toMatch(/^M[\d.-]+ [\d.-]+ L[\d.-]+ [\d.-]+$/);
+    // The two serving lines are distinct.
+    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it("says a view with nothing on it is empty, rather than drawing an empty frame", () => {
