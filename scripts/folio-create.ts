@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 /**
  * Create a document in the reader's folio, of any DOCUMENT KIND the loaded
- * knowledge graphs describe. Bean `95sk`, R28.
+ * knowledge graphs describe, or LINK an external document by URL into the
+ * library as a `referenced` node. Bean `95sk`, R28.
  *
  * @module scripts/folio-create
  * @covers folio
- * @graphNode none — a writer into the folio graph, not a schema itself
+ * @graphNode none — a writer into the folio and library graphs, not a schema itself
  *
  * ## The rule it implements
  *
@@ -16,40 +17,69 @@
  * > any that hey have KG to decribe/loaded in dep chain … /mounted
  *
  * So the kinds are not a list here. They are whatever `document-kinds`
- * directories the instances in this checkout declare, mounted layers included,
- * read by `gen-document-kinds-viz.ts`'s `readDocumentKinds`, which is the same
- * reader the document-kinds viewer draws from. A layer that adds a kind makes
- * it creatable with no change here. (A document the reader LINKS to is the
- * other half of R28, and goes to `library/` as a `referenced` node through
- * `ingest-document.ts`, not through this.)
+ * directories the instances in this checkout, its mounted layers
+ * (`index.lock.json`), and its dependency chain (`needs` and
+ * `dependencies.folioAssistant`) declare, read by
+ * `gen-document-kinds-viz.ts`'s `readDocumentKinds`, which is the same reader
+ * the document-kinds viewer draws from. A layer that adds a kind makes it
+ * creatable with no change here.
+ *
+ * A document the reader LINKS to by URL is the other half of R28: it goes into
+ * `library/<slug>/` as a `referenced` node (`referenced.json` validated against
+ * `ReferencedSourceSchema` + `manifest.jsonld` built by `buildEntryNodes`),
+ * holding the upstream URL and copying no text.
  *
  * ## What it writes
  *
- * `<folio>/<slug>/index.md`, where `<folio>` is the target repository's
- * DECLARED folio directory (`folioDir`), never a literal `folio/`. The page
- * carries the kind in its front matter as `<instance>:<id>`, and one heading
- * per section of the kind, its parent kind's (`extends`) first, each marked
- * required or optional, with the section's description as a comment. It
- * writes no subject matter, for the reason `init-folio.ts` gives: content
- * nobody asked for has to be deleted.
+ * - `--kind`: `<folio>/<slug>/index.md`, where `<folio>` is the target
+ *   repository's DECLARED folio directory (`folioDir`), falling back to the
+ *   conventional `folio/` when none is declared. The page carries the kind in
+ *   its front matter as `<instance>:<id>`, and one heading per section of the
+ *   kind, its parent kind's (`extends`) first, each marked required or
+ *   optional, with the section's description as a comment. It writes no
+ *   subject matter, for the reason `init-folio.ts` gives: content nobody asked
+ *   for has to be deleted.
+ * - `--link`: `<library>/<slug>/referenced.json` and
+ *   `<library>/<slug>/manifest.jsonld`, where `<library>` is the target
+ *   repository's declared `library` directory (`libraryRoot`), falling back to
+ *   the conventional `library/` when the repository declares none.
  *
- * It refuses to overwrite: an existing `<slug>/` is somebody's document.
+ * Both paths refuse to overwrite: an existing `<slug>/` is somebody's document
+ * or library entry.
  *
  * Usage:
- *   bun run cat folio:create --list
+ *   bun run cat folio:create --list [--root <repo>]
  *   bun run cat folio:create --kind l1 --slug my-guideline --title "My guideline" [--root <repo>]
+ *   bun run cat folio:create --link https://example.org/spec --slug my-spec --title "My spec" [--library <name>] [--root <repo>]
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import type { DocumentKind } from "@litlfred/cat-harness/schemas/content/document-kind.ts";
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { directoryForGraph, folioDir, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import {
+  REFERENCED_SOURCE_SCHEMA_ID,
+  ReferencedSourceSchema,
+  type ReferencedSource,
+} from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
+import { buildEntryNodes } from "../pipeline/gen-library-jsonld.ts";
 import { readDocumentKinds, type KindEntry } from "./gen-document-kinds-viz.ts";
+import { libraryRoot } from "./ingest-document.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
 /** A kind as a reader names it: `id`, or `instance:id` when two instances declare one id. */
 export function qualifiedKind(e: Pick<KindEntry, "instance" | "kind">): string {
   return `${e.instance}:${e.kind.id}`;
+}
+
+/**
+ * Every document kind reachable from `root` — its own instances, its mounted
+ * layers (`index.lock.json`), and its dependency chain (`needs` and
+ * `dependencies.folioAssistant`).
+ */
+export function loadedDocumentKinds(root: string = REPO_ROOT ?? HARNESS_ROOT): KindEntry[] {
+  return readDocumentKinds(root).kinds;
 }
 
 /**
@@ -111,18 +141,133 @@ export function documentPage(entry: KindEntry, entries: readonly KindEntry[], ti
 }
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Write the document; returns the path written, or why nothing was. */
-export function createDocument(opts: { root: string; kinds: readonly KindEntry[]; kind: string; slug: string; title: string }): { path: string } | { error: string } {
+export function createDocument(opts: {
+  root: string;
+  kinds?: readonly KindEntry[];
+  kind: string;
+  slug: string;
+  title: string;
+}): { path: string } | { error: string } {
   if (!SLUG.test(opts.slug)) return { error: `slug "${opts.slug}" must be lower-case letters, digits and hyphens` };
-  const entry = resolveKind(opts.kinds, opts.kind);
+  if (!opts.title.trim()) return { error: "title must not be empty" };
+  const kinds = opts.kinds ?? loadedDocumentKinds(opts.root);
+  const entry = resolveKind(kinds, opts.kind);
   if ("error" in entry) return entry;
   const dir = join(folioDir(opts.root), opts.slug);
   if (existsSync(dir)) return { error: `${relative(opts.root, dir) || dir} already exists; it is somebody's document, so nothing was written` };
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "index.md");
-  writeFileSync(path, documentPage(entry, opts.kinds, opts.title));
+  writeFileSync(path, documentPage(entry, kinds, opts.title));
   return { path };
+}
+
+/** Resolve the target library directory: declared `library` graph(s), else the `library/` convention (R27/R28). */
+function resolveTargetLibraryDir(root: string, library?: string): { dir: string } | { error: string } {
+  try {
+    if (readDeclaration(root) !== undefined || library !== undefined) {
+      const declared = corpusDirectoriesForGraph(root, "library");
+      if (declared.length > 0 || library !== undefined) {
+        return { dir: resolve(root, libraryRoot(root, library)) };
+      }
+    }
+    // declared-path-literal: the convention fallback when no declaration names
+    // a library graph (R27/R28 — the folio on any harness, by convention).
+    return { dir: join(root, "library") };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Link an external document by URL into the library as a `referenced` node
+ * (`<library>/<slug>/referenced.json` + `<library>/<slug>/manifest.jsonld`).
+ * Copies no text; records the upstream URL and provenance under
+ * `ReferencedSourceSchema`.
+ */
+export function linkDocument(opts: {
+  root: string;
+  slug: string;
+  title: string;
+  url: string;
+  library?: string;
+  date?: string;
+  publisher?: string;
+  version?: string;
+}): { path: string; manifestPath: string } | { error: string } {
+  if (!SLUG.test(opts.slug)) return { error: `slug "${opts.slug}" must be lower-case letters, digits and hyphens` };
+  const title = opts.title.trim();
+  if (!title) return { error: "title must not be empty" };
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(opts.url);
+  } catch {
+    return { error: `url "${opts.url}" is not a valid URL` };
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return { error: `url "${opts.url}" must use http:// or https://` };
+  }
+  const date = opts.date ?? new Date().toISOString().slice(0, 10);
+  if (!ISO_DATE.test(date)) return { error: `date "${date}" must be YYYY-MM-DD` };
+
+  const targetLib = resolveTargetLibraryDir(opts.root, opts.library);
+  if ("error" in targetLib) return targetLib;
+  const dir = join(targetLib.dir, opts.slug);
+  if (existsSync(dir)) {
+    return { error: `${relative(opts.root, dir) || dir} already exists; it is somebody's library entry, so nothing was written` };
+  }
+
+  const version = (opts.version ?? "linked").trim() || "linked";
+  const publisher = (opts.publisher ?? parsedUrl.hostname).trim() || parsedUrl.hostname;
+  const record: ReferencedSource = ReferencedSourceSchema.parse({
+    $schema: REFERENCED_SOURCE_SCHEMA_ID,
+    identity: {
+      title,
+      version,
+      document_number: opts.slug,
+      date,
+      publisher,
+    },
+    source: {
+      kind: "published",
+      url: parsedUrl.href,
+      canonical: parsedUrl.href,
+      package_id: opts.slug,
+      version,
+      read_from: "folio:create --link",
+      read_at: date,
+    },
+    outline: [],
+    outline_source: "none",
+    materialization: {
+      $schema: "folio-materialization/v1",
+      state: "referenced",
+      provenance: { upstream: { url: parsedUrl.href } },
+      note: `Linked external document (${parsedUrl.href}) recorded by folio-create; no bytes copied.`,
+    },
+    withheld: {
+      what: "Document body and full text",
+      why: "Linked by URL into the library as a referenced source; content remains at the upstream address.",
+    },
+    links: [{ label: "upstream document", url: parsedUrl.href }],
+  });
+
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, "referenced.json");
+  writeFileSync(path, JSON.stringify(record, null, 2) + "\n");
+
+  const nodes = buildEntryNodes(opts.slug, dir, dir);
+  if (nodes.state !== "built") {
+    return { error: `manifest generation failed for ${opts.slug}: ${nodes.state}` };
+  }
+  for (const f of nodes.files) {
+    const outPath = join(dir, f.path);
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, f.content);
+  }
+  return { path, manifestPath: join(dir, "manifest.jsonld") };
 }
 
 function arg(name: string): string | undefined {
@@ -132,8 +277,43 @@ function arg(name: string): string | undefined {
 
 if (import.meta.main) {
   const root = arg("--root") ?? process.cwd();
-  // The checkout: every instance mounted in it, which is the dependency chain.
-  const { kinds } = readDocumentKinds(REPO_ROOT ?? HARNESS_ROOT);
+  const link = arg("--link");
+  if (link !== undefined) {
+    const slug = arg("--slug"), title = arg("--title");
+    if (!slug || !title) {
+      console.error("usage: folio:create --link <url> --slug <slug> --title <title> [--library <name>] [--root <repo>]");
+      process.exit(2);
+    }
+    const r = linkDocument({
+      root,
+      slug,
+      title,
+      url: link,
+      library: arg("--library"),
+      date: arg("--date"),
+      publisher: arg("--publisher"),
+      version: arg("--version"),
+    });
+    if ("error" in r) {
+      console.error(`folio:create: ${r.error}`);
+      process.exit(1);
+    }
+    console.log(`wrote ${relative(root, r.path)}`);
+    process.exit(0);
+  }
+
+  // The target repository and its mounted / dependency layers, plus the ambient checkout.
+  const kinds = loadedDocumentKinds(root);
+  const checkoutRoot = REPO_ROOT ?? HARNESS_ROOT;
+  if (resolve(root) !== resolve(checkoutRoot)) {
+    const seen = new Set(kinds.map(qualifiedKind));
+    for (const k of loadedDocumentKinds(checkoutRoot)) {
+      if (!seen.has(qualifiedKind(k))) {
+        seen.add(qualifiedKind(k));
+        kinds.push(k);
+      }
+    }
+  }
   if (process.argv.includes("--list")) {
     for (const e of [...kinds].sort((a, b) => qualifiedKind(a).localeCompare(qualifiedKind(b)))) {
       console.log(`${qualifiedKind(e).padEnd(32)} ${e.kind.title}`);
@@ -143,7 +323,11 @@ if (import.meta.main) {
   }
   const kind = arg("--kind"), slug = arg("--slug"), title = arg("--title");
   if (!kind || !slug || !title) {
-    console.error("usage: folio:create --kind <id|instance:id> --slug <slug> --title <title> [--root <repo>]   |   folio:create --list");
+    console.error(
+      "usage: folio:create --kind <id|instance:id> --slug <slug> --title <title> [--root <repo>]   |   " +
+        "folio:create --link <url> --slug <slug> --title <title> [--library <name>] [--root <repo>]   |   " +
+        "folio:create --list [--root <repo>]",
+    );
     process.exit(2);
   }
   const r = createDocument({ root, kinds, kind, slug, title });

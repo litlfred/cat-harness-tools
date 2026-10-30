@@ -30,7 +30,7 @@
  *   bun run cat document-kinds:viz:check    # fail if a page is stale or orphaned
  */
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 import {
   DOCUMENT_KIND_COVERAGE_SCHEMA_TAG,
@@ -40,6 +40,8 @@ import {
   type DocumentKindCoverage,
 } from "@litlfred/cat-harness/schemas/content/document-kind.ts";
 import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { resolveInstanceGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -63,12 +65,38 @@ export interface KindEntry {
   coverage: DocumentKindCoverage[];
 }
 
+/**
+ * Every instance root reachable from `repoRoot`: the checkout's own instances,
+ * any mounted layers (`index.lock.json`, including overrides placed deeper than
+ * one level), and the dependency closure (`needs` and `dependencies.folioAssistant`)
+ * of each. Deduplicated in discovery order so the checkout's own order is
+ * preserved.
+ */
+export function documentKindInstanceRoots(repoRoot: string): string[] {
+  const seen = new Set<string>();
+  const roots: string[] = [];
+  const add = (r: string): void => {
+    const abs = resolve(r);
+    if (seen.has(abs) || !existsSync(abs)) return;
+    seen.add(abs);
+    roots.push(abs);
+  };
+  for (const r of instanceRootsIn(repoRoot)) add(r);
+  for (const r of mountedInstanceRoots(repoRoot).values()) add(r);
+  for (let i = 0; i < roots.length; i++) {
+    const r = roots[i]!;
+    for (const m of mountedInstanceRoots(r).values()) add(m);
+    for (const d of resolveInstanceGraph(r).order) add(d.rootPath);
+  }
+  return roots;
+}
+
 /** Every declared document kind in the checkout, validated; throws on an invalid one. */
 export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs: { instance: string; dir: string }[] } {
   const kinds: KindEntry[] = [];
   const dirs: { instance: string; dir: string }[] = [];
   const reports: { instance: string; dir: string; report: DocumentKindCoverage }[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of documentKindInstanceRoots(repoRoot)) {
     const instance = readDeclaration(root)?.name ?? basename(root);
     for (const dir of directoriesForGraph(root, GRAPH)) {
       dirs.push({ instance, dir });

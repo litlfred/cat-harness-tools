@@ -454,3 +454,28 @@ test.describe("the browser-only note can be dismissed, and brought back", () => 
     await expect(page.locator(note)).toHaveCount(1);
   });
 });
+
+
+test.describe("linking an external document on the glass (bean 95sk, R28)", () => {
+  test("Link a document opens the link panel, previews the CLI command, and places the linked card on the glass", async ({ page }) => {
+    await open(page);
+    const btn = page.locator('[data-fa-glass-action="link-document"]');
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(page.locator(".fa-glass-panel")).toHaveAttribute("data-fa-panel", "glass-link-document");
+
+    await page.fill("#fa-glass-link-url", "https://example.org/smart-dak");
+    await page.fill("#fa-glass-link-title", "SMART DAK Spec");
+    await expect(page.locator("[data-fa-link-command]")).toContainText(
+      'bun run cat folio:create --link "https://example.org/smart-dak" --slug smart-dak-spec --title "SMART DAK Spec"',
+    );
+
+    await page.click(".fa-glass-link-submit");
+    const card = page.locator('.fa-glass-asset[data-fa-asset="linked/smart-dak-spec"]');
+    await expect(card).toBeVisible();
+    await expect(card.locator("a.fa-glass-asset-name")).toHaveAttribute("href", "https://example.org/smart-dak");
+    await expect(page.locator('.fa-glass-linked-list [data-fa-library-item="linked/smart-dak-spec"] .fa-pullout-state')).toHaveText(
+      "On your folio glass",
+    );
+  });
+});
