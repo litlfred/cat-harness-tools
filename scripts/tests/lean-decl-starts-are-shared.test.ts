@@ -145,8 +145,8 @@ describe("there is exactly one declaration pattern", () => {
 
   test("neither converged module carries a local pattern any more", () => {
     // The scoped claim, and the only one this change earns. `DECL_RE` lives in
-    // the canonical module; `qa-checkers-q-usage` reads it through
-    // `declarationStarts` and defines nothing.
+    // the canonical module; `qa-checkers-q-usage` (in folio-assistant-sci
+    // since bean saqd) reads it through `declarationStarts` and defines nothing.
     expect(patternFiles()).not.toContain("cat-harness-tools/pipeline/qa-checkers-q-usage.ts");
   });
 

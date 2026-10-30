@@ -551,13 +551,17 @@ const WALL: QaCriterionDefinition[] = [
 // Owned by `q-usage-watcher`. Detects how a block treats the substrate
 // parameter `q` (symbolic, generic-R, real-positive, root-of-unity,
 // fixed-q0, …) and cross-checks the detected regime vector against
-// the chapter's narrative-expected profile. See
-// `qa-checkers-q-usage.ts` for the regime detector and the
-// chapter → expected-regime registry.
+// the chapter's narrative-expected profile. The rules stay here; the
+// checkers are the science layer's (bean saqd, 2026-10-30):
+// `folio-assistant-sci/pipeline/qa-checkers-q-usage.ts`, contributed through
+// its `qa-checkers/q-usage-*.json` nodes and run on their own by
+// `folio-assistant-sci/pipeline/q-usage-audit.ts`. See `checker_contributed`.
+// Chapter profiles stay in `chapter-profile-registry-di.ts`.
 
 const Q_USAGE: QaCriterionDefinition[] = [
   {
     id: "q-usage-regime-detected",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Infrastructure criterion — records the block's detected " +
@@ -572,10 +576,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     // and tolerates missing files (#1640-Copilot @ qa-criteria-registry.ts:300).
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-fixed-q0-leak",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Block in a categorical/symbolic chapter (braids-and-knots, " +
@@ -591,10 +595,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     // file (#1640-Copilot @ qa-criteria-registry.ts:317).
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-archimedean-in-categorical-chapter",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Block in a categorical/symbolic chapter uses archimedean " +
@@ -618,10 +622,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     // (CLAUDE.md §7c — do not infer the regime from the lean-tree path).
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-positivity-implicit",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Lean file uses positivity-dependent constructs (`Real.sqrt`, " +
@@ -634,10 +638,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     default_severity: "minor",
     depends_on: ["lean"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-modulus-vs-real-mismatch",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Formal-power-series / shuffle / Macdonald / Hall-Littlewood / " +
@@ -650,10 +654,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     default_severity: "minor",
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-root-of-unity-undeclared",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Block uses constructions that require `q` to be a root of unity " +
@@ -668,10 +672,10 @@ const Q_USAGE: QaCriterionDefinition[] = [
     // (#1640-Copilot @ qa-criteria-registry.ts:381).
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
   {
     id: "q-usage-narrative-chapter-mismatch",
+    checker_contributed: true,
     domain: "q-usage",
     description:
       "Block's detected regime vector is disjoint from its chapter's " +
@@ -686,7 +690,6 @@ const Q_USAGE: QaCriterionDefinition[] = [
     // (#1640-Copilot @ qa-criteria-registry.ts:397).
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-q-usage.ts",
   },
 ];
 

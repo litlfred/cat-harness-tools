@@ -110,9 +110,12 @@ describe("configured", () => {
 });
 
 describe("no shipped default", () => {
-  test("loading the checker configures nothing", async () => {
+  // The checker that reads these profiles moved to folio-assistant-sci (bean
+  // saqd); its "loading the checker configures nothing" twin is there. Here
+  // the registry module itself must ship no default.
+  test("loading the registry configures nothing", async () => {
     resetChapterProfiles();
-    await import("../../pipeline/qa-checkers-q-usage.ts");
+    await import("../../pipeline/chapter-profile-registry-di.ts");
     expect(chapterProfilesConfigured()).toBe(false);
     expect(getChapterProfiles().archimedeanChapters.size).toBe(0);
   });
