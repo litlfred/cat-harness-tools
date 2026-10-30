@@ -1485,6 +1485,14 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "link; wiring it as a gate is for after that drain, by an owner's decision, with the work plan's own CI as its home",
   },
   {
+    script: "check:bean-one-home",
+    kind: "report",
+    reason:
+      "IT JUDGES THE WORK PLAN ACROSS FOUR REPOSITORIES (#459): it fetches every bean store over the network and fails when a " +
+      "bean id is held by two of them or by the retired litlfred/cat-harness branch. No commit under review changes that answer, " +
+      "so as a PR gate it would red unrelated work; it is run after editing beans and before applying a dedupe",
+  },
+  {
     script: "check:change-size",
     kind: "report",
     reason:
