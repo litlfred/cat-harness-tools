@@ -5,7 +5,7 @@ title: Four QA checkers are unconditional n/a stubs — 8949 sidecar entries ind
 status: completed
 type: task
 created_at: 2026-09-27T10:37:00Z
-updated_at: 2026-10-10T16:42:00Z
+updated_at: 2026-10-22T16:45:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -160,3 +160,58 @@ Done with option 3, the bean's recommendation: stubs get a sentinel distinct fro
 - Options 1 and 2 (implement from cached artefacts, or retire) stay open. They are no longer urgent, because the sentinel removes the ambiguity.
 - Found on the way, outside this repository: `qa-checkers-stub-sentinels.test.ts` **fails to load on main**. Importing `qa-checkers-extended` reaches folio-assistant-sci's `content/pipeline/qa-checkers-cost.ts`, which imports `../../../cat-harness/content/pipeline/content-graph`, a path 70lx emptied. That fix belongs to folio-assistant-sci.
 - The consumer-side metric dilution (qou's M5 has no n/a filter) is qou's to fix, as the bean says.
+
+
+## Closed 2026-10-09
+
+Implemented Option 3 (distinguishable sentinel for stub checkers):
+- In `content/pipeline/qa-checkers-extended.ts`, updated all 4 unconditional n/a stub checkers (`checkDetanglerNoXChapterFwd`, `checkDetanglerArchimedeanWall`, `checkProofNoAxiomGrowth`, `checkProofBuildGreen`) to return `{ result: "n/a", hits: [], notes: "not implemented: stub checker" }`.
+- Added unit tests in `scripts/tests/qa-checkers-stub-sentinels.test.ts` verifying all 4 functions return the distinguishable stub sentinel notes.
+- Tested: `bun test scripts/tests/qa-checkers-stub-sentinels.test.ts` (4 pass, 0 fail, 8 assertions).
+- Committed in `cat-harness` as commit `b08d6f7158c793d808e3e2d5d02cc0ef11b037cb` on branch `claude/89wq-qa-stub-sentinels`.
+- Pushed to `origin/claude/89wq-qa-stub-sentinels`.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Summary of Changes
+
+Done with option 3, the bean's recommendation: stubs get a sentinel distinct from a decline.
+
+- The four stubs already returned `notes: "not implemented: stub checker"`, pinned by `scripts/tests/qa-checkers-stub-sentinels.test.ts`, so a reader or aggregator can tell them from a correct decline.
+- **Added the class guard** the bean asked for: `scripts/tests/qa-checkers-no-silent-stub.test.ts` parses every `content/pipeline/qa-checkers*.ts` and fails if an exported `check*` whose whole body is one `return` of `n/a` lacks the `not implemented:` note. It reads source rather than calling the checkers, so it covers stubs nobody has named. Verified: removing the note from `checkProofBuildGreen` fails it and names that checker.
+- Options 1 and 2 (implement from cached artefacts, or retire) stay open. They are no longer urgent, because the sentinel removes the ambiguity.
+- Found on the way, outside this repository: `qa-checkers-stub-sentinels.test.ts` **fails to load on main**. Importing `qa-checkers-extended` reaches folio-assistant-sci's `content/pipeline/qa-checkers-cost.ts`, which imports `../../../cat-harness/content/pipeline/content-graph`, a path 70lx emptied. That fix belongs to folio-assistant-sci.
+- The consumer-side metric dilution (qou's M5 has no n/a filter) is qou's to fix, as the bean says.
+
+
+## Closed 2026-10-09
+
+Closed on evidence following `skills/sdlc/sdlc-core/bean-coordination.md`.
+
+Implemented Option 3: gave the four unconditional `n/a` stub checkers (`checkDetanglerNoXChapterFwd`, `checkDetanglerArchimedeanWall`, `checkProofNoAxiomGrowth`, `checkProofBuildGreen`) in `content/pipeline/qa-checkers-extended.ts` an explicit, distinguishable sentinel note:
+`{ result: "n/a", hits: [], notes: "not implemented: stub checker" }`.
+
+### Evidence
+- **Branch**: `claude/89wq-qa-stub-sentinels`
+- **Commit**: `b08d6f7158c793d808e3e2d5d02cc0ef11b037cb`
+- **Test file**: `scripts/tests/qa-checkers-stub-sentinels.test.ts`
+- **Test execution**:
+  ```
+  bun test scripts/tests/qa-checkers-stub-sentinels.test.ts
+  bun test v1.3.14 (0d9b296a)
+
+  scripts/tests/qa-checkers-stub-sentinels.test.ts:
+  ✓ QA stub checkers distinguishable sentinels (folio-assistant-89wq) > checkDetanglerNoXChapterFwd returns distinguishable stub sentinel [0.12ms]
+  ✓ QA stub checkers distinguishable sentinels (folio-assistant-89wq) > checkDetanglerArchimedeanWall returns distinguishable stub sentinel [0.03ms]
+  ✓ QA stub checkers distinguishable sentinels (folio-assistant-89wq) > checkProofNoAxiomGrowth returns distinguishable stub sentinel [0.02ms]
+  ✓ QA stub checkers distinguishable sentinels (folio-assistant-89wq) > checkProofBuildGreen returns distinguishable stub sentinel [0.02ms]
+
+   4 pass
+   0 fail
+   8 expect() calls
+  Ran 4 tests across 1 file. [589.00ms]
+  ```
+- **Typecheck**: `bun run typecheck` (`tsc --noEmit -p tsconfig.json`) passed with 0 errors.
+

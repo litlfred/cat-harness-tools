@@ -27,3 +27,37 @@ Landed on main in PR #1895 (commits `4d9b2e291fbf`, `5dca4d08b154`, `5205ab34820
 1. `cat-harness-tools/scripts/merge-train.ts`, `merge-overlap.ts`, `merge-leftover.ts` implemented with unit tests in `cat-harness-tools/scripts/tests/merge-train.test.ts`, `merge-overlap.test.ts`, `merge-leftover.test.ts` (39 passing unit tests).
 2. Tool nodes registered: `cat-harness/test/results/kg-qa/tools/merge-train.kg-qa.json`, `merge-overlap.kg-qa.json`, `merge-leftover.kg-qa.json`, and process diagram `cat-harness/processes/sdlc/merge-train.bpmn`.
 3. Merged onto main; gates green.
+
+## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [x] three scripts with unit tests on fixtures, package.json scripts, Tool nodes
+- [x] draft PR open, gates green
+- [x] PR body carries a Tools section for the merge-queue skill on claude/merge-pipeline-epic
+
+## Evidence: Closed on Landed Work (2026-10-09)
+
+Landed on main in PR #1895 (commits `4d9b2e291fbf`, `5dca4d08b154`, `5205ab34820c`, `b028e5d65f92`):
+1. `cat-harness-tools/scripts/merge-train.ts`, `merge-overlap.ts`, `merge-leftover.ts` implemented with unit tests in `cat-harness-tools/scripts/tests/merge-train.test.ts`, `merge-overlap.test.ts`, `merge-leftover.test.ts` (39 passing unit tests).
+2. Tool nodes registered: `cat-harness/test/results/kg-qa/tools/merge-train.kg-qa.json`, `merge-overlap.kg-qa.json`, `merge-leftover.kg-qa.json`, and process diagram `cat-harness/processes/sdlc/merge-train.bpmn`.
+3. Merged onto main; gates green.
+
+```
+
+## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [ ] three scripts with unit tests on fixtures, package.json scripts, Tool nodes
+- [ ] draft PR open, gates green
+- [ ] PR body carries a Tools section for the merge-queue skill on claude/merge-pipeline-epic
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-09); commit 4d9b2e29 is on folio-assistant main, commit 5205ab34 is on folio-assistant main, commit 5dca4d08 is on folio-assistant main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+```

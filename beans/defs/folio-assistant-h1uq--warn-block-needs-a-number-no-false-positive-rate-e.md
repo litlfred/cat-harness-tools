@@ -82,3 +82,23 @@ published leaderboard, and this repository already has one by accident.
   5. Methodology adopted in `methodologies/agentic-pre-merge-review.md` and documented in `skills/sdlc/sdlc-core/merge-queue.md`.
   6. Comprehensive test suite in `scripts/tests/agentic-gate-promotion.test.ts` passed (18 tests, 78 assertions).
   7. Typecheck passed cleanly (`tsc --noEmit -p tsconfig.json`).
+
+## Closed 2026-10-09
+
+- **Branch**: `claude/h1uq-warn-block-fpr`
+- **Commit**: `f6f06e540a30ff5d6ff59d8959070fe6a183a81a`
+- **Verification Evidence**:
+  1. `WouldHaveBlockedRecordSchema` defined in `schemas/merge-queue.ts` (re-exported in `schemas/merge-review.ts`), binding each record to a 40-character `headSha`, `prNumber`, `evaluatedAt`, `findings` array (each with `id`, `rule`, `severity: "blocking"`, `explanation`, and optional `humanVerdict: "true_positive" | "false_positive" | "unknown"`), and calculated `metrics`.
+  2. Strict third-state calculation implemented in `calculateWouldHaveBlockedMetrics`: `unknown` findings are strictly tracked in `unknownCount` and never folded into true positives or false positives.
+  3. Pre-registered `AgenticPromotionCriteria`:
+     - `minimumPrWindow`: 50 PRs
+     - `maximumFalsePositiveRate`: <= 0.05 (5%)
+     - `minimumReviewCoverage`: >= 0.80 (80%)
+  4. Architectural decision formally recorded: **staying WARN-ONLY** with measured rationale (CodeAgent 48.6% unconfirmed flag rate, zero empirical FPR in SE literature, SWE-Router / SWE-Debate noise boundaries, and avoiding backlog inversion while keeping deterministic compile gates G5-G7 blocking).
+  5. Methodology adopted in `methodologies/agentic-pre-merge-review.md` and documented in `skills/sdlc/sdlc-core/merge-queue.md`.
+  6. Comprehensive test suite in `scripts/tests/agentic-gate-promotion.test.ts` passed (18 tests, 78 assertions).
+  7. Typecheck passed cleanly (`tsc --noEmit -p tsconfig.json`).
+
+
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-09); commit f6f06e54 is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.

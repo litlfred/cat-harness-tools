@@ -85,3 +85,34 @@ Landed in `cat-harness` commit `f88102b0` on branch `claude/7uao-qa-script-hashe
 The 27 files are corrected on this branch because `docs:pages` rewrites them as
 part of regenerating after a merge — that removes today's instance and leaves
 the gap. The gate is the fix, and it is a separate change.
+
+## Closed 2026-10-09
+
+Resolved on evidence: under the epic 3fva / bean 5hox architecture, committed
+QA witnesses and results on `main` were permanently retired and migrated to the
+orphan `qa-reports` branch.
+
+### 1. Architecture Migration (Epic 3fva / Bean 5hox)
+- Under PR #2080 (merge commit `2d7bffe046c5`, commit `4ecce20c1810`), committed
+  QA working copies, sidecars, and witness files were removed from `main`
+  (1,235 files, 228,483 deletions).
+- Derived QA results and witnesses are no longer kept in commits on `main`.
+  Verdicts are computed dynamically during CI (`qa:refresh`) and stored on the
+  orphan `qa-reports` branch (e.g. `origin/qa-reports` commit `26ea1444d1fb`),
+  while judgements remain on `main` strictly in the attestations graph
+  (`test/attestations/`).
+- All harness QA directories (`cat-harness/test/results/`, etc.) are gitignored,
+  preventing stale witness files from being committed on `main`.
+
+### 2. Verification & Re-measurement
+- Re-measured on `main` at `2026-10-09T07:05:00Z`:
+  - `git ls-files "**/witnesses/**" "**/test/results/**"`: 0 tracked files across
+    the repository.
+  - `git ls-files | grep -i "witness"`: 0 tracked QA witness files.
+  - In `cat-harness-tools-seed`: `test/results` does not exist on disk or in the index.
+  - The 27 stale QA witnesses that existed on `main` at `0844d868ddc` no longer
+    exist on `main`.
+- With no committed QA witnesses tracked on `main`, the defect of committed
+  witness files on `main` recording stale `scriptHash` while claiming fresh is
+  structurally eliminated.
+

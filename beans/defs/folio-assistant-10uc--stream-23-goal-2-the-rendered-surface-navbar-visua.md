@@ -2,11 +2,11 @@
 # folio-assistant-10uc
 $schema: bean/1.0.0
 title: 'RENDERED SURFACE: navbar, visualisers, stickies — GOAL 2''s stream, moved under GOAL 4 at GOAL 2''s sign-off'
-status: in-progress
+status: completed
 type: task
 priority: high
 created_at: 2026-09-22T18:09:11Z
-updated_at: 2026-10-16T10:30:00Z
+updated_at: 2026-10-30T12:00:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -197,3 +197,41 @@ _2026-10-16T10:30:00Z_ — Renamed from 'STREAM 2/3: GOAL 2 — the rendered sur
 _2026-10-21T18:13:00Z_ — Re-checked on `main` `3d586f5794`: `h32d`, `alox` (archived), `o3xy`, `ob3m`, and `603s` are all `completed`; only `g196`, `yj32`, `b5f0`, `6lb8` (waiting only on `q2wm`'s lazy-fetch box), and `supn` remain open. Changed `- [~]` on box 5 to `- [ ]` so `bun run cat health` (`DONE_WHEN_BOX`) counts 4/5 rather than falsely reporting 4/4 all-ticked.
 
 _2026-10-21T19:52:00Z_ — Box 5 dropped its last clause, "`alox`/`o3xy` still need a PAGE link, not the site root": both are `completed` (see the 18:13Z note), and the 18:13Z un-tick left an unchecked clause naming `alox` as a precondition, which `check:stale-paths` refuses index-wide (`✗ 10uc [done-when]: its path routes through alox`). The box stays open for what remains: `g196`, `yj32`, `b5f0`, `6lb8`, `supn`.
+
+
+_2026-10-16T10:30:00Z_ — Renamed from 'STREAM 2/3: GOAL 2 — the rendered surface…': GOAL 2 (p5wm) was signed off 2026-10-05 and this stream moved under GOAL 4 (rwmf), so the old title named the wrong goal (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-21T18:13:00Z_ — Re-checked on `main` `3d586f5794`: `h32d`, `alox` (archived), `o3xy`, `ob3m`, and `603s` are all `completed`; only `g196`, `yj32`, `b5f0`, `6lb8` (waiting only on `q2wm`'s lazy-fetch box), and `supn` remain open. Changed `- [~]` on box 5 to `- [ ]` so `bun run cat health` (`DONE_WHEN_BOX`) counts 4/5 rather than falsely reporting 4/4 all-ticked.
+
+_2026-10-21T19:52:00Z_ — Box 5 dropped its last clause, "`alox`/`o3xy` still need a PAGE link, not the site root": both are `completed` (see the 18:13Z note), and the 18:13Z un-tick left an unchecked clause naming `alox` as a precondition, which `check:stale-paths` refuses index-wide (`✗ 10uc [done-when]: its path routes through alox`). The box stays open for what remains: `g196`, `yj32`, `b5f0`, `6lb8`, `supn`.
+
+_2026-10-29T08:50:00Z_ — Re-checked (Lane B drain thread): `6lb8` is now completed (its last child `q2wm` closed today). Box 5 waits on `g196` (todo, the page-weight lane), `yj32` (todo), `b5f0` and `supn` (in progress, owner-held boxes). Left open.
+
+_2026-10-30T12:00Z_ — Coordination stream bean. Every box except 5 is ticked. Box 5's remaining work is tracked on its own beans (g196, yj32, b5f0, supn), and 6lb8, 603s, ob3m and q2wm are completed. Nothing is owned by 10uc alone. (https://claude.ai/code/session_01Qmmkt7iaCtGYwZbW9x7eYe)
+
+
+_2026-10-16T10:30:00Z_ — Renamed from 'STREAM 2/3: GOAL 2 — the rendered surface…': GOAL 2 (p5wm) was signed off 2026-10-05 and this stream moved under GOAL 4 (rwmf), so the old title named the wrong goal (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-29T08:50:00Z_ — Re-checked (Lane B drain thread): `6lb8` is now completed (its last child `q2wm` closed today). Box 5 waits on `g196` (todo, the page-weight lane), `yj32` (todo), `b5f0` and `supn` (in progress, owner-held boxes). Left open.
+
+## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+$schema: bean/1.0.0
+title: 'RENDERED SURFACE: navbar, visualisers, stickies — GOAL 2''s stream, moved under GOAL 4 at GOAL 2''s sign-off'
+status: completed
+```
+
+## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+title: 'RENDERED SURFACE: navbar, visualisers, stickies — GOAL 2''s stream, moved under GOAL 4 at GOAL 2''s sign-off'
+```

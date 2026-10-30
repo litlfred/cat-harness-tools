@@ -40,3 +40,15 @@ Verify by building `preview:site` and looking at a badge and the heat map (`rend
 ## Reasons for Scrapping
 
 Mirror copy. Scrapped in litlfred/cat-harness-tools' store by drain lane B as superseded by tfqf and 8wj1, which own the qa-reports readers.
+
+
+
+## Reasons for Scrapping
+
+Superseded by the reader audit's fix beans (lane B drain, 2026-10-10), as `gxvk` intended ("the fix beans refine and split `oqe3` and `2ae2`"):
+
+- **Docs site, feature staging, badges, review heat map** (`publish-block-qa.ts`, `review-heat.ts`, `gen-review-page.ts`): owned by `folio-assistant-tfqf` (QA READERS F6, in progress), which says it "refines and supersedes the docs-site and staging half of `2ae2`". Its rendered-verification done-when (before/after screenshots) is this bean's.
+- **MCP: `lsi_query`, `src/tools/degradation.ts`, the `tools/index.ts` lsi entry**: not readers of committed QA (gxvk §5.4), so there is nothing to migrate.
+- **`src/qa-agent-write.ts`**: agent verdicts are attestations (D2), and that writer is owned by `folio-assistant-8wj1` (QA READERS F4).
+
+`7mwa`'s blocked-by on 2ae2 is cleared by this scrap. Its real blockers are tfqf and 8wj1.

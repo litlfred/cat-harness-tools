@@ -59,3 +59,13 @@ Owner's default choice, 2026-10-06 (https://claude.ai/code/session_012qoycyCSGid
 ## Summary of Changes
 
 Mirror copy. Owned by litlfred/cat-harness-tools' store, where drain lane B closed it: already implemented in install-bun.sh plus the sweep. The gap it exposed for this checkout is carried by a new bean (root hooks and the cat script point at paths 70lx moved).
+
+
+
+## Summary of Changes
+
+Re-triaged 2026-10-10 (lane B drain). The implementation was already on main, so this commit records its state:
+
+- [x] `scripts/install-bun.sh` (+ `.bat`) installs the version in `.bun-version` through `npm pack @oven/bun-<os>-<arch>@<pin>` into `$HOME/.local/bin`. `scripts/session-start-coord-sweep.sh` (§ "Bun runtime alignment") calls it whenever `bun --version` differs. In these containers `~/.local/bin` comes before `~/.bun/bin` on PATH, so the pinned Bun wins without touching the container's own. Covered by `scripts/tests/session-start-bun.test.ts`.
+- [x] An install that cannot complete says so ("Could not determine pinned Bun version…") and leaves the container's Bun in place.
+- [ ] A fresh container reporting the pin: **not true today, and the cause is outside this repository.** folio-assistant's `.claude/settings.json` SessionStart hook still runs `bash cat-harness/scripts/session-start-coord-sweep.sh`. Its `ask-well.sh` and `decisions-named-not-asked.ts` hooks have the same problem. All three scripts moved to `cat-harness-tools/scripts/` in 70lx, so the hook fails and the sweep never runs. That path fix belongs to the folio-assistant root and was handed to the coordinating session (lane A). Once it lands, the existing sweep satisfies this item with no change here.

@@ -6,7 +6,7 @@ status: completed
 type: task
 priority: high
 created_at: 2026-10-01T08:47:13Z
-updated_at: 2026-10-21T19:15:00Z
+updated_at: 2026-10-22T16:45:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -78,6 +78,74 @@ _2026-10-21T19:15:00Z_ — Completed: all 11 self-sidecar gates pass on `main` (
 ## From this store's earlier copy (store reconciliation, 2026-10-22)
 
 *2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
+
+Checked against origin/main, prompted by the coordinator's sweep for "todo
+with a Summary of Changes". The 2026-10-01 summary records branch work; the
+2026-10-10 re-triage confirmed it is on main (`judgeQaResult` is used by
+`audit-coverage.ts`, `root-scan-census.ts`, `check-reference-direction.ts`,
+`check-term-mapping.ts` and others). Done-when #1 is still open and still
+blocked: `oq1j` and `2gst` are both `in-progress`. The folio-assistant root's
+`cat` script now points at `cat-harness-tools/scripts/run-script.ts`, so the
+`qa:refresh` cause named in the re-triage is gone. Re-run done-when #1 once
+the two blockers close.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Re-triage 2026-10-10 (lane B drain)
+
+The compute-and-judge work is on main: `judgeQaResult` is used by audit-coverage, root-scan-census, check-reference-direction, check-term-mapping and subgraph-readmes in cat-harness-tools/scripts, and `scripts/tests/qa-baseline.test.ts` covers it. The one open done-when (every gate green with the results directories absent) now waits on:
+
+- **skill:register:check**: its verify chain is red on kg:detangle/LSI (`oq1j`, in progress) and kg:audit (`2gst`, in progress). Both are now set as blockers.
+- **readme:subgraphs:check**: with `cat-harness/test/results`, `cat-harness/test/health/results` and `folio-assistant-core/test/results` moved aside, it exits 2 (UNKNOWN) before it reaches its own check. The cause is `bun run cat qa:refresh`: folio-assistant's root `"cat"` script still points at `cat-harness/scripts/run-script.ts`, which now lives at `cat-harness-tools/scripts/run-script.ts`. That fix belongs to the folio-assistant root, and I have passed it on.
+
+Re-run done-when #1 once oq1j and 2gst close.
+
+_2026-10-15T16:49Z_ — Block lifted: `16ei` is completed (qa-store landed via #1764, closed 2026-10-06 on re-measured evidence). The edge was the work plan's "Block never lifted" finding (owner, 2026-10-15). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, item 9: "based on semantic content"): the 2026-10-10 re-triage, which was only in the cat-harness-tools copy, is copied in, with its blockers `oq1j` and `2gst` (both still in progress; `skill:register:check` is red on them). All three copies now agree. Session https://claude.ai/code/session_01K9Xi9QSxCNYju8QNu7EuHg.
+
+_2026-10-21T19:15:00Z_ — Completed: all 11 self-sidecar gates pass on `main` (`3d586f5794`) with `*/test/results` and `*/test/health/results` absent from the checkout (`audit:coverage`, `root-scan-census:check --against main`, `check:reference-direction:check --against main`, `check:term-mapping --against main`, `readme:subgraphs:check --against main`, `check:viewer-nav --against main`, `check:l1-complete --check`, `skill:register:check` and its full verify chain, `check:glossary --against main`, `check:harness-state:check --against main`). Blockers `oq1j` (completed) and `2gst` (`skill:register:check` verify chain green) lifted.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
+
+Checked against origin/main, prompted by the coordinator's sweep for "todo
+with a Summary of Changes". The 2026-10-01 summary records branch work; the
+2026-10-10 re-triage confirmed it is on main (`judgeQaResult` is used by
+`audit-coverage.ts`, `root-scan-census.ts`, `check-reference-direction.ts`,
+`check-term-mapping.ts` and others). Done-when #1 is still open and still
+blocked: `oq1j` and `2gst` are both `in-progress`. The folio-assistant root's
+`cat` script now points at `cat-harness-tools/scripts/run-script.ts`, so the
+`qa:refresh` cause named in the re-triage is gone. Re-run done-when #1 once
+the two blockers close.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Re-triage 2026-10-10 (lane B drain)
+
+The compute-and-judge work is on main: `judgeQaResult` is used by audit-coverage, root-scan-census, check-reference-direction, check-term-mapping and subgraph-readmes in cat-harness-tools/scripts, and `scripts/tests/qa-baseline.test.ts` covers it. The one open done-when (every gate green with the results directories absent) now waits on:
+
+- **skill:register:check**: its verify chain is red on kg:detangle/LSI (`oq1j`, in progress) and kg:audit (`2gst`, in progress). Both are now set as blockers.
+- **readme:subgraphs:check**: with `cat-harness/test/results`, `cat-harness/test/health/results` and `folio-assistant-core/test/results` moved aside, it exits 2 (UNKNOWN) before it reaches its own check. The cause is `bun run cat qa:refresh`: folio-assistant's root `"cat"` script still points at `cat-harness/scripts/run-script.ts`, which now lives at `cat-harness-tools/scripts/run-script.ts`. That fix belongs to the folio-assistant root, and I have passed it on.
+
+Re-run done-when #1 once oq1j and 2gst close.
+
+_2026-10-15T16:49Z_ — Block lifted: `16ei` is completed (qa-store landed via #1764, closed 2026-10-06 on re-measured evidence). The edge was the work plan's "Block never lifted" finding (owner, 2026-10-15). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-16T07:00:00Z_ — Store reconciliation (owner ruling 2026-10-16, item 9: "based on semantic content"): the 2026-10-10 re-triage, which was only in the cat-harness-tools copy, is copied in, with its blockers `oq1j` and `2gst` (both still in progress; `skill:register:check` is red on them). All three copies now agree. Session https://claude.ai/code/session_01K9Xi9QSxCNYju8QNu7EuHg.
+
+_2026-10-21T19:15:00Z_ — Completed: all 11 self-sidecar gates pass on `main` (`3d586f5794`) with `*/test/results` and `*/test/health/results` absent from the checkout (`audit:coverage`, `root-scan-census:check --against main`, `check:reference-direction:check --against main`, `check:term-mapping --against main`, `readme:subgraphs:check --against main`, `check:viewer-nav --against main`, `check:l1-complete --check`, `skill:register:check` and its full verify chain, `check:glossary --against main`, `check:harness-state:check --against main`). Blockers `oq1j` (completed) and `2gst` (`skill:register:check` verify chain green) lifted.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
 
 ### Re-measured 2026-10-20 — status `todo` is correct; the section above is a work log, not a close
 

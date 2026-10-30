@@ -6,7 +6,7 @@ status: completed
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-21T17:17:00Z
+updated_at: 2026-10-22T16:45:00Z
 parent: folio-assistant-nok9
 ---
 
@@ -118,6 +118,134 @@ _2026-10-21T17:17:00Z_ — Completed (`status: completed`, 6/6 Done-when boxes v
 ## From this store's earlier copy (store reconciliation, 2026-10-22)
 
 *2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
+
+### Progress 2026-10-10 (lane B drain re-triage)
+
+- [x] **Provenance, with the negative case:** `detectAgentProvenance` reads trailers (Co-Authored-By Claude, Claude-Session), agent branch prefixes, bot actors and PR markers. A human-only PR requires nothing. All covered in `scripts/tests/adversarial-review-gate.test.ts`.
+- [x] **Independence and head SHA:** a review by the same session is rejected, an agent reviewer without a model is incomplete, and a moved head makes the review `stale`. Tested.
+- [x] **Whole diff:** truncated coverage, or a changed file left unreviewed, is `unknown`, never a pass, and (warn-only) not blocking. Open red flags report `would-have-blocked`. Tested.
+- [~] **Sidecar and required check:** the verdict shape (`merge-review/v1`, `adversarial_reviews[]`) is done (abmq), and `check:adversarial-review` (`scripts/check-adversarial-review.ts`) reads it. **Not wired:** no folio-assistant workflow runs it as a check, so nothing reads the verdict on a PR. That wiring belongs to folio-assistant.
+- [ ] **Merge-train composition:** not verified here.
+- [ ] **BPMN:** `code-change-review.bpmn` `Task_Review` documents the adversarial review but its `skill ref` is `code-node-review`, and no `prepare-merge` step checks the verdict. Those edits belong to cat-harness (process definitions).
+
+### Re-measured 2026-10-20 — status `todo` is correct; two items landed since 10-10, two remain
+
+- [x] **Required check wired:** folio-assistant `code-quality-gates.yml` runs
+  `bun run cat check:adversarial-review` (warn-only), wired 2026-10-14.
+- [x] **`prepare-merge` checks the verdict:** step "Check the adversarial review
+  verdict" in cat-harness `skills/sdlc/sdlc-core/prepare-merge.md`.
+- [ ] **BPMN:** cat-harness `processes/sdlc/code-change-review.bpmn`
+  `Task_Review` still has `skill ref="code-node-review"` (plus `staging-review`).
+  Its documentation mentions the adversarial review, but no adversarial-review
+  skill exists in cat-harness `skills/` to reference. Belongs to cat-harness.
+- [ ] **Merge-train composition:** `merge-train.bpmn` does not mention the
+  adversarial review, and nothing states that the train re-checks only the
+  compile gates. Still unverified.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+## Closed 2026-10-09
+
+- **Branch**: `claude/w8jq-adversarial-review-gate`
+- **Commits**:
+  - `1565cce3`: `feat(qa): implement adversarial review gate and provenance detection (folio-assistant-w8jq)`
+  - `2bf2180c`: `docs(sdlc): connect adversarial review gate to Task_Review and prepare-merge (folio-assistant-w8jq)`
+- **Implementation**:
+  - `scripts/agent-provenance.ts`:
+    - Implemented `detectAgentProvenance`: checks `Co-Authored-By: Claude...` (and other agent models), `Claude-Session:` / `Agent-Session:` trailers (extracts session IDs), head branch prefixes (`claude/`, `agent/`, `bot/`, `dependabot/`), bot author/committer identities (`[bot]`, `github-actions`, `copilot`, `dependabot`, `noreply@anthropic.com`), and PR body text markers ("Generated with Claude Code").
+    - Negative case specified and tested: a human-only change (no agent trailers, human committer/author, non-agent branch) reports `hasAgentProvenance: false`, `isHumanOnly: true`, and returns summary `"human-only PR: no adversarial review required"`.
+  - `scripts/check-adversarial-review.ts`:
+    - Evaluates PR head against adversarial review gate requirements.
+    - Negative case bypass: human-only PRs cleanly skip without requiring any review or verdict.
+    - Bound to head SHA: compares verdict head SHA to current PR head SHA; reports `stale` if head moved after review.
+    - Whole-diff coverage: verifies that `coverage.truncated` is not true and that changed files are fully covered; truncated or partial coverage reports `unknown` (never silent pass, never truncated pass).
+    - Reviewer independence: enforces `reviewer.session !== author.session` across all author sessions, and requires that agent reviewers record model and session ID.
+    - Findings evaluation: uses `evaluateMergeReviewGateState` / `evaluateFindingGateState` from `schemas/red-flag.ts`.
+    - Under the 2026-10-03 owner ruling (warn-only mode by default): open blocking red flags report as `would-have-blocked`, recording calibration data for future gate promotion without holding the merge. Missing, stale, or partial verdicts report as `unknown` / `stale` and exit 0 (following the `dependency-advisories` pattern). Under `--strict`, blocking findings and `unknown`/`stale` exit 1.
+  - `package.json`: Registered `check:adversarial-review` in `scripts` and `checkoutScripts`.
+  - `processes/sdlc/code-change-review.bpmn`: Updated `Task_Review` documentation to name the adversarial code review and RED FLAG taxonomy.
+  - `skills/sdlc/sdlc-core/prepare-merge.md`: Added verification step for `bun run cat check:adversarial-review` to check adversarial review verdicts on agent-touched branches.
+- **Test Evidence**:
+  - `scripts/tests/adversarial-review-gate.test.ts`: 22 tests passing (69 expect assertions), verifying positive and negative provenance detection, human-only skip, missing verdict reporting, SHA binding and staleness on head move, reviewer independence checks, truncated diff coverage checks, unreviewed changed files diff coverage checks, clean pass, open red flags as `would-have-blocked` in warn-only and `open` in hard mode, overridden red flags, and report rendering (ensuring `unknown` is never rendered as clean).
+  - `scripts/tests/red-flag-taxonomy.test.ts`: 25 tests passing (133 expect assertions).
+  - Total: 47 tests passing across 2 files.
+  - `bun run typecheck`: clean pass (`tsc --noEmit -p tsconfig.json`).
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `completed` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: lane B re-triage 2026-10-10: merge-train composition unverified, and Task_Review in code-change-review.bpmn on cat-harness main still names skill code-node-review; check:adversarial-review is now wired in folio-assistant code-quality-gates.yml, so that box is met. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-21T17:17:00Z_ — Completed (`status: completed`, 6/6 Done-when boxes verified on current `main` after `PR #2611` repin):
+- `cat-harness-tools/scripts/agent-provenance.ts` + `cat-harness-tools/scripts/check-adversarial-review.ts` + `cat-harness/schemas/red-flag.ts` pass 47/47 tests across `adversarial-review-gate.test.ts` and `red-flag-taxonomy.test.ts` (202 `expect()` assertions).
+- Wired in `.github/workflows/code-quality-gates.yml:3847` (`bun run cat check:adversarial-review`) and `cat-harness/skills/sdlc/sdlc-core/prepare-merge.md:139`.
+- `cat-harness/processes/sdlc/code-change-review.bpmn` `Task_Review` (lines 299–313) specifies adversarial code review against the RED FLAG taxonomy with committed verdict and links `code-node-review` (`cat-harness/skills/sdlc/sdlc-core/code-node-review.md`).
+- Composes with `merge-queue.md`: adversarial review binds per-PR to `head_sha`, while merge-train stacking re-runs `tsc` and the compile/gate set on the combined stack.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Progress 2026-10-10 (lane B drain re-triage)
+
+- [x] **Provenance, with the negative case:** `detectAgentProvenance` reads trailers (Co-Authored-By Claude, Claude-Session), agent branch prefixes, bot actors and PR markers. A human-only PR requires nothing. All covered in `scripts/tests/adversarial-review-gate.test.ts`.
+- [x] **Independence and head SHA:** a review by the same session is rejected, an agent reviewer without a model is incomplete, and a moved head makes the review `stale`. Tested.
+- [x] **Whole diff:** truncated coverage, or a changed file left unreviewed, is `unknown`, never a pass, and (warn-only) not blocking. Open red flags report `would-have-blocked`. Tested.
+- [~] **Sidecar and required check:** the verdict shape (`merge-review/v1`, `adversarial_reviews[]`) is done (abmq), and `check:adversarial-review` (`scripts/check-adversarial-review.ts`) reads it. **Not wired:** no folio-assistant workflow runs it as a check, so nothing reads the verdict on a PR. That wiring belongs to folio-assistant.
+- [ ] **Merge-train composition:** not verified here.
+- [ ] **BPMN:** `code-change-review.bpmn` `Task_Review` documents the adversarial review but its `skill ref` is `code-node-review`, and no `prepare-merge` step checks the verdict. Those edits belong to cat-harness (process definitions).
+
+### Re-measured 2026-10-20 — status `todo` is correct; two items landed since 10-10, two remain
+
+- [x] **Required check wired:** folio-assistant `code-quality-gates.yml` runs
+  `bun run cat check:adversarial-review` (warn-only), wired 2026-10-14.
+- [x] **`prepare-merge` checks the verdict:** step "Check the adversarial review
+  verdict" in cat-harness `skills/sdlc/sdlc-core/prepare-merge.md`.
+- [ ] **BPMN:** cat-harness `processes/sdlc/code-change-review.bpmn`
+  `Task_Review` still has `skill ref="code-node-review"` (plus `staging-review`).
+  Its documentation mentions the adversarial review, but no adversarial-review
+  skill exists in cat-harness `skills/` to reference. Belongs to cat-harness.
+- [ ] **Merge-train composition:** `merge-train.bpmn` does not mention the
+  adversarial review, and nothing states that the train re-checks only the
+  compile gates. Still unverified.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+## Closed 2026-10-09
+
+- **Branch**: `claude/w8jq-adversarial-review-gate`
+- **Commits**:
+  - `1565cce3`: `feat(qa): implement adversarial review gate and provenance detection (folio-assistant-w8jq)`
+  - `2bf2180c`: `docs(sdlc): connect adversarial review gate to Task_Review and prepare-merge (folio-assistant-w8jq)`
+- **Implementation**:
+  - `scripts/agent-provenance.ts`:
+    - Implemented `detectAgentProvenance`: checks `Co-Authored-By: Claude...` (and other agent models), `Claude-Session:` / `Agent-Session:` trailers (extracts session IDs), head branch prefixes (`claude/`, `agent/`, `bot/`, `dependabot/`), bot author/committer identities (`[bot]`, `github-actions`, `copilot`, `dependabot`, `noreply@anthropic.com`), and PR body text markers ("Generated with Claude Code").
+    - Negative case specified and tested: a human-only change (no agent trailers, human committer/author, non-agent branch) reports `hasAgentProvenance: false`, `isHumanOnly: true`, and returns summary `"human-only PR: no adversarial review required"`.
+  - `scripts/check-adversarial-review.ts`:
+    - Evaluates PR head against adversarial review gate requirements.
+    - Negative case bypass: human-only PRs cleanly skip without requiring any review or verdict.
+    - Bound to head SHA: compares verdict head SHA to current PR head SHA; reports `stale` if head moved after review.
+    - Whole-diff coverage: verifies that `coverage.truncated` is not true and that changed files are fully covered; truncated or partial coverage reports `unknown` (never silent pass, never truncated pass).
+    - Reviewer independence: enforces `reviewer.session !== author.session` across all author sessions, and requires that agent reviewers record model and session ID.
+    - Findings evaluation: uses `evaluateMergeReviewGateState` / `evaluateFindingGateState` from `schemas/red-flag.ts`.
+    - Under the 2026-10-03 owner ruling (warn-only mode by default): open blocking red flags report as `would-have-blocked`, recording calibration data for future gate promotion without holding the merge. Missing, stale, or partial verdicts report as `unknown` / `stale` and exit 0 (following the `dependency-advisories` pattern). Under `--strict`, blocking findings and `unknown`/`stale` exit 1.
+  - `package.json`: Registered `check:adversarial-review` in `scripts` and `checkoutScripts`.
+  - `processes/sdlc/code-change-review.bpmn`: Updated `Task_Review` documentation to name the adversarial code review and RED FLAG taxonomy.
+  - `skills/sdlc/sdlc-core/prepare-merge.md`: Added verification step for `bun run cat check:adversarial-review` to check adversarial review verdicts on agent-touched branches.
+- **Test Evidence**:
+  - `scripts/tests/adversarial-review-gate.test.ts`: 22 tests passing (69 expect assertions), verifying positive and negative provenance detection, human-only skip, missing verdict reporting, SHA binding and staleness on head move, reviewer independence checks, truncated diff coverage checks, unreviewed changed files diff coverage checks, clean pass, open red flags as `would-have-blocked` in warn-only and `open` in hard mode, overridden red flags, and report rendering (ensuring `unknown` is never rendered as clean).
+  - `scripts/tests/red-flag-taxonomy.test.ts`: 25 tests passing (133 expect assertions).
+  - Total: 47 tests passing across 2 files.
+  - `bun run typecheck`: clean pass (`tsc --noEmit -p tsconfig.json`).
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `completed` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: lane B re-triage 2026-10-10: merge-train composition unverified, and Task_Review in code-change-review.bpmn on cat-harness main still names skill code-node-review; check:adversarial-review is now wired in folio-assistant code-quality-gates.yml, so that box is met. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-21T17:17:00Z_ — Completed (`status: completed`, 6/6 Done-when boxes verified on current `main` after `PR #2611` repin):
+- `cat-harness-tools/scripts/agent-provenance.ts` + `cat-harness-tools/scripts/check-adversarial-review.ts` + `cat-harness/schemas/red-flag.ts` pass 47/47 tests across `adversarial-review-gate.test.ts` and `red-flag-taxonomy.test.ts` (202 `expect()` assertions).
+- Wired in `.github/workflows/code-quality-gates.yml:3847` (`bun run cat check:adversarial-review`) and `cat-harness/skills/sdlc/sdlc-core/prepare-merge.md:139`.
+- `cat-harness/processes/sdlc/code-change-review.bpmn` `Task_Review` (lines 299–313) specifies adversarial code review against the RED FLAG taxonomy with committed verdict and links `code-node-review` (`cat-harness/skills/sdlc/sdlc-core/code-node-review.md`).
+- Composes with `merge-queue.md`: adversarial review binds per-PR to `head_sha`, while merge-train stacking re-runs `tsc` and the compile/gate set on the combined stack.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
 
 ### Progress 2026-10-10 (lane B drain re-triage)
 

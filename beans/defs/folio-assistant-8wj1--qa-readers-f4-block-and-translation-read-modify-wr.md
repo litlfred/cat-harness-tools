@@ -165,3 +165,43 @@ Stays in-progress until #563 and #568 land.
 - #568 (`--prior-from` on every block writer), 3db526d
 
 **Still open:** the MCP wrapper (folio-assistant-core `adapters/document/tools/audit.ts`) must pass `--against main`, routed to lane C. The index also has to re-pin to these mains, which lane C does via folio-assistant#2628. Stays in-progress until the wrapper lands.
+
+
+_2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Owner ruling 2026-10-16 (item 1): lift the stale blocks on claimed beans whose blocker is closed; the claim itself is untouched. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-22T16:46:00Z_ — Claim released in a stale-claims sweep by lane B2 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr), applied here by the coordinator. The coordinator's standard: release only on evidence, and never a claim from the last 48 hours. What was checked:
+- No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The only later ones are a blocker withdrawal (10-06) and a store reconciliation (10-16), and neither is work.
+- No remote branch in any of the three repositories names this bean.
+- The holding branch `claude/quirky-davinci-ixuymr` was last committed to on 2026-10-03, and the claim recorded its work as "NOT pushed".
+
+The unticked Done-when boxes above are what remains. Back to `todo` so a sibling session is not misled. Nothing was deleted. The tools-store copy matches: litlfred/cat-harness-tools#558.
+
+_2026-10-22T17:05:00Z_ — Open PRs for the third Done-when box (`translation:block-qa:check` and `qa_staleness` with `test/results/` absent and `qa-reports` fetched): `litlfred/cat-harness-tools#563` (`translation:block-qa:check` reads each prior from the store) and `litlfred/cat-harness-tools#564` (`qa-staleness --against <ref>` reads block sidecars from `qa-reports`).
+
+_2026-10-22T16:51:00Z_ — Claimed by lane B2 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr) for the one open box. Measured at index 1730012 with qa-reports f92e2d2: `translation:block-qa:check` exits 0 both ways, but the inherited baseline findings are 6 with `test/results/` present and 3 with it absent. The cause is that `mergeWithAttestations` takes the prior from the working copy. The planned fix is in cat-harness-tools: in a stored dir with `--against`, read the prior from the branch (`readBaseline` → `readQa`) and refuse if it is unreadable. MCP `qa_staleness` and `qa_sweep` follow. Recorded by the coordinator.
+
+_2026-10-22T17:05:00Z_ — **Owner ruling, 2026-10-22: option B** on what QA *writers* (qa_sweep and every block writer) do when `test/results/` is absent. Writers take `--prior-from <ref>` and read the prior sidecar from qa-reports, so a rewrite carries the other writers' entries. An unreadable branch read refuses (exit 2) and never falls back to the working copy. Rejected: A (recompose and accept a temporary thinning) and C (refuse when the folder is absent). Lane B2 implements it. The bean closes when B, cat-harness-tools#563 and the qa-staleness PR have all landed. Recorded by the coordinator, session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6.
+
+_2026-10-23T08:00:00Z_ — `litlfred/cat-harness-tools#564` (`qa-staleness --against <ref>: read block sidecars from qa-reports (8wj1)`) merged as `67240eb12d`; `litlfred/cat-harness-tools#563` (`translation:block-qa:check reads each prior from the store`, `78c7cbf340`) and `litlfred/cat-harness-tools#568` (`Block writers: --prior-from <ref> reads the prior report from qa-reports (8wj1, option B)`, `1955471643`) are open in CI.
+
+_2026-10-23T08:38:00Z_ — `litlfred/cat-harness-tools#563` (`05fa7f1`) and `litlfred/cat-harness-tools#568` (`3db526d4f9`) merged on `cat-harness-tools` `main`; `litlfred/folio-assistant-core#177` (`qa_staleness MCP tool: pass --against main (bean 8wj1)`, `cc0025146d`) and index re-pin `litlfred/folio-assistant#2628` (`85ece35fe6`) are open in CI.
+
+
+_2026-10-16T06:30:00Z_ — Block lifted: `16ei` is completed in every store. Owner ruling 2026-10-16 (item 1): lift the stale blocks on claimed beans whose blocker is closed; the claim itself is untouched. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-22T16:46:00Z_ — Claim released in a stale-claims sweep by lane B2 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr), applied here by the coordinator. The coordinator's standard: release only on evidence, and never a claim from the last 48 hours. What was checked:
+- No commit naming this bean on the main branch of folio-assistant, cat-harness or cat-harness-tools after 2026-10-06. The only later ones are a blocker withdrawal (10-06) and a store reconciliation (10-16), and neither is work.
+- No remote branch in any of the three repositories names this bean.
+- The holding branch `claude/quirky-davinci-ixuymr` was last committed to on 2026-10-03, and the claim recorded its work as "NOT pushed".
+
+The unticked Done-when boxes above are what remains. Back to `todo` so a sibling session is not misled. Nothing was deleted. The tools-store copy matches: litlfred/cat-harness-tools#558.
+
+_2026-10-22T17:05:00Z_ — Open PRs for the third Done-when box (`translation:block-qa:check` and `qa_staleness` with `test/results/` absent and `qa-reports` fetched): `litlfred/cat-harness-tools#563` (`translation:block-qa:check` reads each prior from the store) and `litlfred/cat-harness-tools#564` (`qa-staleness --against <ref>` reads block sidecars from `qa-reports`).
+
+_2026-10-22T16:51:00Z_ — Claimed by lane B2 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr) for the one open box. Measured at index 1730012 with qa-reports f92e2d2: `translation:block-qa:check` exits 0 both ways, but the inherited baseline findings are 6 with `test/results/` present and 3 with it absent. The cause is that `mergeWithAttestations` takes the prior from the working copy. The planned fix is in cat-harness-tools: in a stored dir with `--against`, read the prior from the branch (`readBaseline` → `readQa`) and refuse if it is unreadable. MCP `qa_staleness` and `qa_sweep` follow. Recorded by the coordinator.
+
+_2026-10-22T17:05:00Z_ — **Owner ruling, 2026-10-22: option B** on what QA *writers* (qa_sweep and every block writer) do when `test/results/` is absent. Writers take `--prior-from <ref>` and read the prior sidecar from qa-reports, so a rewrite carries the other writers' entries. An unreadable branch read refuses (exit 2) and never falls back to the working copy. Rejected: A (recompose and accept a temporary thinning) and C (refuse when the folder is absent). Lane B2 implements it. The bean closes when B, cat-harness-tools#563 and the qa-staleness PR have all landed. Recorded by the coordinator, session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6.
+
+_2026-10-23T08:00:00Z_ — `litlfred/cat-harness-tools#564` (`qa-staleness --against <ref>: read block sidecars from qa-reports (8wj1)`) merged as `67240eb12d`; `litlfred/cat-harness-tools#563` (`translation:block-qa:check reads each prior from the store`, `78c7cbf340`) and `litlfred/cat-harness-tools#568` (`Block writers: --prior-from <ref> reads the prior report from qa-reports (8wj1, option B)`, `1955471643`) are open in CI.
+
+_2026-10-23T08:38:00Z_ — `litlfred/cat-harness-tools#563` (`05fa7f1`) and `litlfred/cat-harness-tools#568` (`3db526d4f9`) merged on `cat-harness-tools` `main`; `litlfred/folio-assistant-core#177` (`qa_staleness MCP tool: pass --against main (bean 8wj1)`, `cc0025146d`) and index re-pin `litlfred/folio-assistant#2628` (`85ece35fe6`) are open in CI.

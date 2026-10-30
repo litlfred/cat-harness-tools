@@ -2,11 +2,11 @@
 # folio-assistant-nytj
 $schema: bean/1.0.0
 title: A sidecar records its auditor's hash, so two concurrent PRs go green alone and red together
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-09-19T00:26:19Z
-updated_at: 2026-10-16T10:30:00Z
+updated_at: 2026-10-29T09:15:00Z
 parent: folio-assistant-1swy
 ---
 
@@ -119,9 +119,10 @@ cannot be asked to.
 
 ## Adds to the Todo
 
-- [ ] instance 5's class is named in whatever the owner decides: a workflow-YAML
+- [x] instance 5's class is named in whatever the owner decides: a workflow-YAML
       change has derived `kg-qa` process sidecars, and no bot can know that
-- [ ] MEASURED AFTER the queue is on: bump an action pin by hand, with the seven
+      (named in the 2026-10-29 note below)
+- [x] ~~MEASURED AFTER the queue is on~~ CLOSED NOT DONE: no merge queue on a user-owned repository (2026-10-29 note): bump an action pin by hand, with the seven
       sidecars left stale, and confirm the queue rejects it rather than `main`
       discovering it
 
@@ -130,3 +131,27 @@ cannot be asked to.
 Asked after roughly seven red-main incidents in one day, each a PR green against an older main. The owner chose the recommended option: turn on the merge queue for `main`. The switch is a repository setting, so the box above stays with the owner until the queue is actually on. Nothing in the workflows needs to change: both gating workflows already carry `merge_group:`. One caution was passed on: if `stage` (the preview deploy) is a *required* check, it must be unticked, because it does not run in the queue.
 
 _2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+
+_2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-29T07:55:00Z_ (drain lane E, https://claude.ai/code/session_01Qmmkt6hTCZSkeyx315exLo). Re-derived:
+
+- **Instance 5's class, named.** *A bot-authored change to an input of a derived artefact.* The case here is a workflow-YAML bump whose `kg-qa` process sidecars are derived from that YAML. The bot can't know the convention, and `/prepare-merge` never runs for a bot. Only a check on the merged commit covers it.
+- **The last box can't be done here.** `litlfred/folio-assistant` is owned by a user account, not an organization. GitHub offers merge queues only on organization-owned repositories. This matches bean `1hjm`'s 2026-09-30 measurement: no "Require merge queue" rule in the ruleset form. So the owner's "Turn on merge queue" (2026-09-30) can't be carried out on this repository, and the measurement box can never be ticked. The `merge_group:` triggers stay as they are and do nothing.
+- The owner's standing rule (2026-10-29) is to merge ready PRs and deal with red main afterwards. That accepts instances 1–3 as a cost, not a gate.
+
+**Owner, 2026-10-29T09:14Z: "A. Close it".** Closed. The last box can't be done on this repository, and the owner's standing "merge, then fix" rule covers red main.
+
+
+_2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+status: completed
+```
