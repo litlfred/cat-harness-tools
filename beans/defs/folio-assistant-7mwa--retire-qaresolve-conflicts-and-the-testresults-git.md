@@ -6,10 +6,9 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-30T11:32:00Z
+updated_at: 2026-10-30T19:45:00Z
 parent: folio-assistant-3fva
 blocked_by:
-    - folio-assistant-oqe3
     - folio-assistant-tfqf
 ---
 
@@ -21,7 +20,7 @@ The per-instance `test/results/` dirs (`folio-assistant-sci`, `fhir-harness`, `s
 
 ## Done when
 - [ ] no gate or test references a committed `test/results` file
-- [ ] a freshly initialised folio publishes to its own qa-reports branch
+- [x] a freshly initialised folio publishes to its own qa-reports branch
 
 
 
@@ -41,33 +40,11 @@ _2026-10-16T06:30:00Z_ — Blocker `2ae2` (scrapped; replaced by `tfqf` and `8wj
 
 _2026-10-23T13:53:00Z_ — Block lifted: `folio-assistant-8wj1` is completed (`cat-harness-tools#563`, `#564`, `#568` and `folio-assistant-core#177` merged).
 
-
-_2026-10-16T06:30:00Z_ — Blocker `2ae2` (scrapped; replaced by `tfqf` and `8wj1`) swapped for those two, both still in progress. Owner ruling 2026-10-16 (item 3). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
-
-_2026-10-23T13:53:00Z_ — Block lifted: `folio-assistant-8wj1` is completed (`cat-harness-tools#563`, `#564`, `#568` and `folio-assistant-core#177` merged).
-
 _2026-10-30T11:32:00Z_ — Block lifted: `folio-assistant-oqe3` is completed (all 16 gates + 2 sidecar readers verified exiting 0 with `test/results/` absent on `folio-assistant` `main` `3bea400b24` following `cat-harness-tools#618`, `#622`, `#787` and the `folio-assistant` `#2681`–`#2726` re-pins).
 
+_2026-10-30T18:40:00Z_ — Completed the `folio_init` / `qa-sweep.yml` template half and the `regen-after-merge.ts` judge-check registration:
+- Updated `templates/document/github/workflows/qa-sweep.yml` (`permissions: contents: write` and a `Publish QA verdicts to qa-reports` step publishing `pr/<n>/<sha>` on same-repo PRs and `main/<sha>` on `main`/dispatch via `qa-store.ts publish --ref "$QA_REF" --root test/results`, matching `qa-sweep-nightly.yml` and `folio-staging.yml`) and pinned both workflows in `scripts/tests/init-folio.test.ts`. Combined with `5qy8` (`init-folio.ts` `.gitignore` ignoring `test/results/` and `AGENTS.md` documenting `qa-reports`), a freshly initialised folio now publishes to its own `qa-reports` branch (Done-when box 2 ticked).
+- Updated `JUDGE_CHECKS` in `scripts/regen-after-merge.ts` and `JUDGE_GATES` in `scripts/tests/sdlc/judge-gates-against.test.ts` to cover all 13 `--against main` judge-mode gates from `oqe3` (including `lsi:skills:check` and `kg:detangle:check`).
+- Remaining G-class sites (`qa-resolve-conflicts.ts`, `qa-resolve-conflicts.test.ts`, `.gitattributes`, `gitattributes.test.ts`, and the `regen-after-merge.ts` writer overrides pinned by `regen-after-merge.test.ts`) stay until `cat-harness/test/results` is removed from `litlfred/cat-harness` `main` (and per the owner's 2026-10-23 ruling on `-merge` in `gitattributes.test.ts`). Removed `folio-assistant-oqe3` from `blocked_by` and deduplicated the repeated notes.
 
-_2026-10-16T06:30:00Z_ — Blocker `2ae2` (scrapped; replaced by `tfqf` and `8wj1`) swapped for those two, both still in progress. Owner ruling 2026-10-16 (item 3). Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
-
-## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
-
-These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
-
-Where: (three-way hunk)
-
-```text
-    - folio-assistant-tfqf
-```
-
-## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
-
-These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
-
-Where: (three-way hunk)
-
-```text
-    - folio-assistant-tfqf
-    - folio-assistant-8wj1
-```
+_2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#949 merged as `6414778` (owner card 19:40Z): qa-sweep now publishes to qa-reports. Still open: no gate or test references a committed `test/results` file. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").

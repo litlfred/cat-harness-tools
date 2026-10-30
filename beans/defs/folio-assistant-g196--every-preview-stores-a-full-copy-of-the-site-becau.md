@@ -6,7 +6,7 @@ status: todo
 type: feature
 priority: normal
 created_at: 2026-09-19T12:53:43Z
-updated_at: 2026-10-30T12:45:00Z
+updated_at: 2026-10-30T19:45:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -692,3 +692,7 @@ _2026-10-30T12:00Z_ — Measured on gh-pages aa92ccd. The two newest previews sh
 _2026-10-30T12:45Z_ — Owner, 2026-10-30 12:39Z (card "A. Apply all"): (1) keep the per-preview IRIs in node HTML, because that is deliberate and stops a preview claiming to be the canonical graph. (2) Give the rail data a stable filename and do the cache-busting outside the page, so railed pages stop changing whenever the rail does. Next: build two previews from the same main commit to close the re-measure row. (https://claude.ai/code/session_01Qmmkt7iaCtGYwZbW9x7eYe)
 
 _2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-30T14:40Z_ — Implemented owner ruling (2) in `cat-harness-tools#904`: `railDataAsset` (`scripts/lib/harness-rail.ts`) now hashes the rail's scope (`instance`, `root`, `pages` scope and `documentIndex` header) rather than the full `RailShared` JSON, and `navbarRowAsset` uses a constant filename (`assets/navbar/row-c3p1k2f55u.js`), so railed HTML pages stay byte-identical when links, pages, harnesses, marks or row counts change. Pinned by unit test in `scripts/tests/ui/navbar-assets.test.ts`. Remaining: once pinned in `folio-assistant`, build two previews from the same `main` commit to close the re-measure row.
+
+_2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#904 merged as `bfaaa9f` (owner card 19:40Z): shared rail and row assets are named by scope, not content. Takes effect on the site after folio-assistant re-pins cat-harness-tools past `bfaaa9f` (CI speed thread). Open boxes above are unchanged. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").

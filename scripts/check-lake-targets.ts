@@ -20,7 +20,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
 import { folioDir } from "../schemas/kg/cat-harness.js";
-import { fileDeclaresName } from "../pipeline/lean-formal-ref.ts";
+import { fileDeclaresName } from "../pipeline/lean-lexer.ts";
 
 export type LeanRefClassification = "built" | "sibling_only" | "dangling" | "unknown";
 
@@ -52,7 +52,7 @@ export interface LakeTargetLeanAuditOptions {
 
 /**
  * Does `file` textually declare a top-level `name`? The one implementation
- * lives with the `lean.ref` grammar, in `pipeline/lean-formal-ref.ts`; this
+ * lives in `pipeline/lean-lexer.ts`; this
  * module carried a copy of it, and so a sixth declaration pattern.
  */
 export { fileDeclaresName };

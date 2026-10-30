@@ -11,8 +11,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { instanceDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { instanceDirectories } from "../../../schemas/kg/cat-harness.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { overviewFilesFor, sectionsOf, umlOrphans } from "../../gen-uml-overview.ts";
 
 const made: string[] = [];
@@ -126,15 +126,23 @@ describe("declared vs undeclared sub-subgraphs (f8wp falsifier 3)", () => {
     ]);
   });
 
-  test("cat-harness emits one .puml/.mmd pair per declared directory/sub-subgraph and resolves schemas/schemas.json", async () => {
+  // The Zod schemas, and `schemas/schemas.json` with them, live in
+  // cat-harness-tools since bean `8lcl`, so the concern-groups declaration is
+  // read off this repository's `cat-harness-tools-schemas` directory.
+  test("cat-harness-tools resolves schemas/schemas.json as concern-groups/v1", async () => {
+    const sections = await sectionsOf(TOOLS_ROOT);
+    expect(sections.map((s) => s.id)).toEqual(instanceDirectories(TOOLS_ROOT).map((d) => d.id));
+
+    const schemasSection = sections.find((s) => s.id === "cat-harness-tools-schemas")!;
+    expect(schemasSection).toBeDefined();
+    expect(schemasSection.undetermined.filter((u) => u.kind.startsWith("json"))).toEqual([]);
+    expect(schemasSection.classes.some((c) => c.title === "concern-groups/v1" && c.source === "json: ConcernGroupsSchema")).toBe(true);
+  });
+
+  test("cat-harness emits one .puml/.mmd pair per declared directory/sub-subgraph", async () => {
     const expectedIds = instanceDirectories(HARNESS_ROOT).map((d) => d.id);
     const sections = await sectionsOf(HARNESS_ROOT);
     expect(sections.map((s) => s.id)).toEqual(expectedIds);
-
-    const schemasSection = sections.find((s) => s.id === "schemas")!;
-    expect(schemasSection).toBeDefined();
-    expect(schemasSection.undetermined).toEqual([]);
-    expect(schemasSection.classes.some((c) => c.title === "concern-groups/v1" && c.source === "json: ConcernGroupsSchema")).toBe(true);
 
     const { files } = await overviewFilesFor([HARNESS_ROOT]);
     const writtenPaths = [...files.keys()].map((p) => p.replace(/\\/g, "/"));

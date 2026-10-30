@@ -261,10 +261,7 @@ describe("this repository", () => {
     // Sci-bound leaves that still sit here and import a slot filler directly.
     // That edge is sci → sci, so it is fine; they move together. The move PR
     // empties this list, because the files leave this directory.
-    const sciBoundHere = new Set([
-      "lean-atlas-ingest.ts",
-      "lean-signature.ts",
-    ]);
+    const sciBoundHere = new Set<string>([]);
     const offenders: string[] = [];
     for (const f of readdirSync(import.meta.dir)) {
       if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
