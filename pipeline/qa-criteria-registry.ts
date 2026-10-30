@@ -720,6 +720,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-no-bare-sorries",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Every `sorry` in the block's `.lean` carries a `-- Ref: [key] <url>` " +
@@ -739,6 +740,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-no-axiom-growth",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block's `#print axioms` set is a subset of the same block's axiom " +
@@ -751,6 +753,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-build-green",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block's Lake package builds clean. On failure routes to " +
@@ -795,6 +798,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-substantive",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block's Lean does NOT use the abstract `holds : Prop` placeholder " +
@@ -807,6 +811,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-no-conj-propagation-violation",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Provable block (theorem/proposition/lemma/corollary) whose " +
@@ -822,6 +827,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-no-trivial-skeleton",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block's `.lean` does not contain a trivial-skeleton pattern " +
@@ -841,6 +847,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-conditional-class-banner",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block classified as conditional-on-class by the conjectural- " +
@@ -856,6 +863,7 @@ const PROOF: QaCriterionDefinition[] = [
   },
   {
     id: "proof-lean-compiles",
+    checker_contributed: true,
     domain: "proof",
     description:
       "Block's `.lean` file compiles without errors. Uses the lean-lsp " +
@@ -1232,6 +1240,7 @@ const PROOF: QaCriterionDefinition[] = [
 const CANONICAL: QaCriterionDefinition[] = [
   {
     id: "canonical-calibration-count",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Block declares at most 3 calibration anchors (CODATA m_e + α + " +
@@ -1245,6 +1254,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-no-numerology",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Block does not claim numerical coincidence without a categorical " +
@@ -1261,6 +1271,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-witness-pinned",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Every `:val[…]` directive in the .md references an existing " +
@@ -1273,6 +1284,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-script-not-deprecated",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "The block's `computation.script` does not reference a deprecated " +
@@ -1286,6 +1298,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-dilogarithm-context",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Φ_q (Faddeev) appears only in mass-anchor blocks; Li_2^q " +
@@ -1300,6 +1313,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-no-hardcoded-observable",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Block .md does not use exact-equality (`=`) with hardcoded " +
@@ -1313,6 +1327,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-cal4-acknowledged",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Blocks whose .ts or .md contains a CAL-4 caveat comment " +
@@ -1328,6 +1343,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-ck-tiered-not-binary",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Complement to `canonical-no-negative-result-in-paper` (#1574, " +
@@ -1354,6 +1370,7 @@ const CANONICAL: QaCriterionDefinition[] = [
   },
   {
     id: "canonical-no-negative-result-in-paper",
+    checker_contributed: true,
     domain: "canonical",
     description:
       "Paper block whose primary content is a negative empirical " +
@@ -1385,6 +1402,7 @@ const CANONICAL: QaCriterionDefinition[] = [
 const COMPUTE: QaCriterionDefinition[] = [
   {
     id: "compute-prop-has-probe",
+    checker_contributed: true,
     domain: "compute",
     description:
       "Every `prop:`/`theorem:` block has a corresponding probe witness " +
@@ -1401,6 +1419,7 @@ const COMPUTE: QaCriterionDefinition[] = [
   },
   {
     id: "compute-prop-has-consumer",
+    checker_contributed: true,
     domain: "compute",
     description:
       "Every `prop:` is consumed by at least one production script (I2- " +
@@ -1413,6 +1432,7 @@ const COMPUTE: QaCriterionDefinition[] = [
   },
   {
     id: "compute-witness-exists",
+    checker_contributed: true,
     domain: "compute",
     description:
       "If the block's `.ts` declares `computation: { witness: '…' }`, " +
@@ -1424,6 +1444,7 @@ const COMPUTE: QaCriterionDefinition[] = [
   },
   {
     id: "compute-lp-dual-present",
+    checker_contributed: true,
     domain: "compute",
     description:
       "For LP/SDP/operator-selection witnesses (matched per CLAUDE.md " +
@@ -1768,6 +1789,7 @@ const USES: QaCriterionDefinition[] = [
   },
   {
     id: "uses-formal-coverage",
+    checker_contributed: true,
     domain: "uses",
     description:
       "ADVISORY ONLY — never a gate, never auto-fixed. Reports formal Lean " +
@@ -1796,6 +1818,7 @@ const USES: QaCriterionDefinition[] = [
   },
   {
     id: "lean-ref-owns-decl",
+    checker_contributed: true,
     domain: "uses",
     description:
       "MECHANICAL. A block's `lean.ref` declaration is not also claimed by " +

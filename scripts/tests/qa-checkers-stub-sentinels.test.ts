@@ -1,24 +1,28 @@
 /**
- * Tests that unconditional n/a QA stub checkers return a distinguishable
- * sentinel note so that downstream consumers and aggregators can distinguish
- * an unimplemented stub from a genuine decline (folio-assistant-89wq).
+ * Regression test for bean `folio-assistant-89wq`:
+ * Generic detangler QA checkers in `pipeline/qa-checkers-extended.ts` that are
+ * unconditional `n/a` stubs must return an explicit, distinguishable sentinel
+ * note (`"not implemented: stub checker"`) rather than a bare
+ * `{ result: "n/a", hits: [] }` indistinguishable from a legitimate
+ * applicability check.
+ *
+ * (The `proof-*` stub checkers moved to `folio-assistant-sci/pipeline/qa-checkers-extended.ts`
+ * in bean `saqd` Group 8 and are tested there.)
  */
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import {
   checkDetanglerNoXChapterFwd,
   checkDetanglerArchimedeanWall,
-  checkProofNoAxiomGrowth,
-  checkProofBuildGreen,
 } from "../../pipeline/qa-checkers-extended";
 
-describe("QA stub checkers distinguishable sentinels (folio-assistant-89wq)", () => {
-  const EXPECTED_SENTINEL: CheckerResult = {
-    result: "n/a",
-    hits: [],
-    notes: "not implemented: stub checker",
-  };
+const EXPECTED_SENTINEL: CheckerResult = {
+  result: "n/a",
+  hits: [],
+  notes: "not implemented: stub checker",
+};
 
+describe("QA stub checkers return distinguishable sentinel notes (folio-assistant-89wq)", () => {
   test("checkDetanglerNoXChapterFwd returns distinguishable stub sentinel", () => {
     expect(checkDetanglerNoXChapterFwd(undefined)).toEqual(EXPECTED_SENTINEL);
     expect(checkDetanglerNoXChapterFwd("some/path/to/block.ts")).toEqual(EXPECTED_SENTINEL);
@@ -29,15 +33,5 @@ describe("QA stub checkers distinguishable sentinels (folio-assistant-89wq)", ()
     expect(
       checkDetanglerArchimedeanWall("some/path/to/block.ts", "some/path/to/block.lean")
     ).toEqual(EXPECTED_SENTINEL);
-  });
-
-  test("checkProofNoAxiomGrowth returns distinguishable stub sentinel", () => {
-    expect(checkProofNoAxiomGrowth(undefined)).toEqual(EXPECTED_SENTINEL);
-    expect(checkProofNoAxiomGrowth("some/path/to/block.lean")).toEqual(EXPECTED_SENTINEL);
-  });
-
-  test("checkProofBuildGreen returns distinguishable stub sentinel", () => {
-    expect(checkProofBuildGreen(undefined)).toEqual(EXPECTED_SENTINEL);
-    expect(checkProofBuildGreen("some/path/to/block.lean")).toEqual(EXPECTED_SENTINEL);
   });
 });
