@@ -28,9 +28,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { QA_WRITERS, assess, carriedByMount, claimants, globToRegExp, mayRestore, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
+import { QA_WRITERS, assess, carriedByMount, claimants, globToRegExp, hostedKgWrites, mayRestore, notApplicableWriters, runRestoring, trackedQaFiles, writerSideEffects, type QaWriter } from "../qa-refresh.ts";
 import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "../qa-store.ts";
 import { movedRoots, type MovedInventory } from "../qa-verify-moved.ts";
+import { rootProfile } from "../lib/root-gate-set.ts";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 
@@ -67,8 +68,15 @@ describe("the declaration", () => {
     const ids = QA_WRITERS.map((w) => w.id);
     expect(new Set(ids).size).toBe(ids.length);
     const scripts = scriptsOf(REPO);
+    const na = new Set(
+      notApplicableWriters(QA_WRITERS, {
+        profile: rootProfile(REPO),
+        declares: (s) => scripts[s] !== undefined,
+        stateMounted: true,
+      }).map((n) => n.id),
+    );
     for (const w of QA_WRITERS) {
-      if (w.run === "external") continue;
+      if (w.run === "external" || na.has(w.id)) continue;
       const head = w.run[0]!;
       expect(scripts[head] !== undefined || existsSync(join(REPO, head)), `${w.id}: \`${head}\` is neither an npm script nor a file`).toBe(true);
     }
@@ -125,6 +133,14 @@ describe("the declaration", () => {
   test("the two folded instances' orphans are claimed by nobody — the record loses them, and says so", () => {
     expect(claimants("cat-harness/test/results/agent-skills/kg-qa/scenarios/kg.kg-qa.json")).toEqual([]);
     expect(claimants("cat-harness/test/results/large-datasets/kg-qa.manifest.json")).toEqual([]);
+  });
+
+  test("a content root's own hosted instance is claimed by kg:audit:all without globbing orphans (bean rn24)", () => {
+    const dir = tmp("hosted");
+    writeFileSync(join(dir, "sample-folio.json"), JSON.stringify({ name: "sample-folio", directories: [] }));
+    const writes = hostedKgWrites(dir);
+    expect(writes).toContain("cat-harness/test/results/sample-folio/**");
+    expect(writes).not.toContain("cat-harness/test/results/agent-skills/**");
   });
 
   test("globs: `*` is one segment, `**` any depth, and dots are literal", () => {
