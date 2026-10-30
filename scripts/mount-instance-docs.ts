@@ -2228,7 +2228,7 @@ export async function renderMountedMarkdown(
             // Nor does one this site leaves unpublished: a page or directory the
             // copy left out (a held visualiser page, a withheld path), or a
             // Jekyll page (`x.md` with front matter) that is never rendered to
-            // the `x.html` the link becomes — who-iris's docs README linking
+            // the `x.html` the link becomes — an IRIS catalogue site's docs README linking
             // `catalogue/` and `site-home.md` (aai-programme#26). Those too are
             // cited by repository.
             if (inMount && !bareDir && !unpublishedHere(abs, join(dest, relative(source.dir, abs)))) return undefined;
