@@ -107,7 +107,7 @@ import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "@li
 import { lockFilesIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
 import { mountScopeFor, readMountLock } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import { subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+import { resolveSubgraphSource, type SubgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
 import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
@@ -289,12 +289,17 @@ export function branchPathOf(loc: Pick<TipLocation, "path" | "branchPath">): str
  * `storage`: the source union has no member for either yet, so the resolver
  * would refuse them.
  */
-function keptAt(inst: string, repoRoot: string, d: ResolvedDirectory): { branch: string; keyedBy: string } | undefined {
+function keptAt(
+  inst: string,
+  repoRoot: string,
+  d: ResolvedDirectory,
+  overrides: () => SubgraphSourceOverrides = () => subgraphSourceOverrides(inst, repoRoot),
+): { branch: string; keyedBy: string } | undefined {
   if (d.storage?.keyedBy === "route" || d.storage?.keyedBy === "route-family") {
     // Non-null by DirectoryStorageSchema's refine: every keying but `family` requires `branch`.
     return { branch: d.storage.branch!, keyedBy: d.storage.keyedBy };
   }
-  const src = resolveSubgraphSource(d, subgraphSourceOverrides(inst, repoRoot));
+  const src = resolveSubgraphSource(d, overrides());
   switch (src.kind) {
     case "directory":
       return undefined;
@@ -362,12 +367,18 @@ function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = 
   const found: Array<TipLocation & { instRoot: string }> = [];
   const remotes = new Map<string, RemoteInstance | undefined>();
   for (const inst of instanceRootsIn(repoRoot)) {
+    // The instance's overrides, read ONCE for all its directories and only
+    // when one needs them. Read per directory, they were ~4.5 s of a ~9 s
+    // `gen-docs-pages` run (2026-10-30, #871): `subgraphSourceOverrides` re-reads
+    // the instance's and the checkout's config each time.
+    let overrides: SubgraphSourceOverrides | undefined;
+    const overridesOf = (): SubgraphSourceOverrides => (overrides ??= subgraphSourceOverrides(inst, repoRoot));
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       // Filtered BEFORE `keptAt`, which reads the instance's config: resolving
       // every directory of an index costs ~27 s, one id ~0.2 s (measured
       // 2026-10-11), and `resolveTipLocation` asks about one id.
       if (!wantId(d.id)) continue;
-      const at = keptAt(inst, repoRoot, d);
+      const at = keptAt(inst, repoRoot, d, overridesOf);
       const k = at?.keyedBy;
       if (k !== "tip" && k !== "route" && k !== "route-family") continue;
       const path = repoRelative(repoRoot, d.absPath);
