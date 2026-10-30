@@ -3,7 +3,8 @@
  *
  * Runs three levels of validation:
  *   1. Zod schema validation (shape + types)
- *   2. Constraint rules (file existence, cross-refs, lean requirements)
+ *   2. Constraint rules (file existence, cross-refs, and each vocabulary
+ *      module's own rules over the context it contributes)
  *   3. AST validation (rendered LaTeX parses cleanly)
  *
  * Supports two modes:
@@ -26,7 +27,7 @@ import {
 } from "../schemas/constraints.ts";
 // A block is parsed by the schema its kind is typed by: a vocabulary module's
 // (a layer above cat-harness typing its own kinds), else BlockSchema.
-import { allConstraintRules, parseBlock } from "../schemas/content/vocabulary-modules.ts";
+import { allConstraintContextContributors, allConstraintRules, parseBlock } from "../schemas/content/vocabulary-modules.ts";
 import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "../schemas/types.ts";
 import { resolveRenderTarget } from "./render-discovery";
 import { readDeclaredFolioProfile } from "./profile-check";
@@ -808,12 +809,9 @@ export async function validateObjects(
   // across Phase 2 (constraint rules) and Phase 3 (AST validation).
   // Store undefined for missing files to preserve the distinction from empty files.
   const mdCache = new Map<string, string | undefined>();
-  const leanCache = new Map<string, string | undefined>();
   for (const [name, { dir }] of allBlocks) {
     const mdPath = join(dir, `${name}.md`);
     mdCache.set(name, existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : undefined);
-    const leanPath = join(dir, `${name}.lean`);
-    leanCache.set(name, existsSync(leanPath) ? readFileSync(leanPath, "utf-8") : undefined);
   }
 
   // PR #565: harvest \label{eq:foo} declarations from .md content
@@ -838,41 +836,12 @@ export async function validateObjects(
     }
   }
 
-  // Per-lake-tree basename cache, populated lazily.  Some constraints
-  // (e.g. `lean-file-exists`) need to look up whether a `.lean` file
-  // with a given basename exists anywhere under a package's Lake root —
-  // the cluster-migration pattern allows the file path to differ from
-  // the `lean.ref` decl prefix, so we fall back to a basename scan.
-  // `LEAN_PACKAGES.lakeRoot` is CONTENT-repo-relative, so it must be resolved
-  // against the folio — not against `import.meta.dir`, which lands in
-  // folio-assistant's own tree because the folio embeds the platform as a
-  // symlink. With the old computation this scanned a Lake tree that does not
-  // exist here, so `lean-file-exists`'s basename fallback never found anything.
+  // A vocabulary module's rules may read what only its own layer can supply
+  // (the science layer's sibling `.lean` and Lake-tree lookup, bean `saqd`):
+  // each module that contributes context is set up once per run, against the
+  // folio's content root, and asked per block below.
   const REPO_ROOT = findContentRepoRoot();
-  const lakeTreeBasenameCache = new Map<string, Set<string>>();
-  function lakeTreeContainsBasename(lakeRoot: string, basename: string): boolean {
-    const absRoot = resolve(REPO_ROOT, lakeRoot);
-    let cached = lakeTreeBasenameCache.get(absRoot);
-    if (!cached) {
-      cached = new Set<string>();
-      try {
-        const stack: string[] = [absRoot];
-        while (stack.length) {
-          const dir = stack.pop()!;
-          for (const entry of readdirSync(dir, { withFileTypes: true })) {
-            if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.lake' || entry.name === 'build') continue;
-            const full = join(dir, entry.name);
-            if (entry.isDirectory()) stack.push(full);
-            else if (entry.isFile() && entry.name.endsWith(".lean")) cached.add(entry.name);
-          }
-        }
-      } catch {
-        // Lake root missing — leave the set empty (constraint will fail downstream).
-      }
-      lakeTreeBasenameCache.set(absRoot, cached);
-    }
-    return cached.has(basename);
-  }
+  const contextContributors = allConstraintContextContributors().map((c) => c({ repoRoot: REPO_ROOT }));
 
   // Phase 2: Constraint rules
   // `dir` comes from the MAP ENTRY, not from the enclosing scope. Every
@@ -905,14 +874,13 @@ export async function validateObjects(
   for (const [name, { block, dir }] of allBlocks) {
     const mdContent = mdCache.get(name);
     const ctx: ConstraintContext = {
+      ...Object.assign({}, ...contextContributors.map((perBlock) => perBlock({ rootName: name, dir }))),
       rootName: name,
       dir,
       allLabels,
       allRefIds,
       fileExists: (p: string) => existsSync(p),
-      lakeTreeContainsBasename,
       mdContent,
-      leanContent: leanCache.get(name),
     };
 
     for (const rule of allConstraintRules()) {

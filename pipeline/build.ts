@@ -25,10 +25,10 @@ import { generateMainTex, resolvePaperPreamble } from "./generate-main-tex";
 import { collectReferencedTerms } from "./markdown-ast";
 import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
 import { parsePo } from "./po-inject";
-// The LaTeX preflight and Lean coverage are the science layer's: reached
-// through pipeline slots that a higher layer fills through its `contributes`
-// module (bean `squu`).
-import { leanFileStatus, resolveLeanFile, runPreflight } from "./pipeline-plugins";
+// The LaTeX preflight and the live block-status overlay are the science
+// layer's: reached through pipeline slots that a higher layer fills through
+// its `pipeline-plugins` graph (beans `squu`, `saqd`).
+import { optionalPipelinePlugin, runPreflight } from "./pipeline-plugins";
 import { findContentRepoRoot, findPapers } from "./repo-root";
 
 // ── Build ────────────────────────────────────────────────────────
@@ -74,9 +74,6 @@ export async function buildPaper(
 ): Promise<BuildResult> {
   const issues: { level: string; message: string }[] = [];
   const paperDir = dirname(paperPath);
-  // Lake library root for this paper — used to resolve each block's `.lean`
-  // (sibling or lean.ref) when overlaying live formalisation status below.
-  const leanRoot = join(paperDir, "lean");
 
   // 1. Load paper manifest
   const paperMod = await import(paperPath);
@@ -135,22 +132,13 @@ export async function buildPaper(
             // sourceDir relative to repo root (one level above content/)
             const repoRoot = resolve(paperDir, "..");
             const sourceDir = relative(repoRoot, chDir);
-            // Overlay LIVE Lean status so the PDF ∀ margin marks reflect the
-            // actual .lean, not the (usually `not_checked`) hand-set field.
-            // Without this every mark defaults to "drafted" even when the
-            // proof is sorry-free. Resolve sibling-or-ref, then classify.
-            if (block && "lean" in block && block.lean) {
-              const leanFile = resolveLeanFile(tsPath, readFileSync(tsPath, "utf-8"), leanRoot);
-              if (leanFile) {
-                const st = leanFileStatus(leanFile);
-                block.lean.sorryFree = st.sorryFree;
-                // Keep an explicit validation only when the manifest hasn't
-                // already recorded a stronger CI verdict.
-                if (!block.lean.validation || block.lean.validation === "not_checked") {
-                  block.lean.validation = st.validation;
-                }
-              }
-            }
+            // Overlay LIVE status so the PDF margin marks reflect the actual
+            // formalisation, not the (usually `not_checked`) hand-set field —
+            // the science layer's Lean overlay (bean `saqd`). When no mounted
+            // layer fills the slot the block keeps what its manifest records.
+            // Looked up here, inside the per-block `try`, so a contributor
+            // that fails to load is reported against the block as before.
+            optionalPipelinePlugin("block-status-overlay")?.overlay(block, tsPath, paperDir);
             blocks.set(rootName, { block, mdContent, sourceDir });
           } catch (e) {
             issues.push({

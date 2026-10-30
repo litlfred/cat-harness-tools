@@ -586,13 +586,24 @@ export interface ConstraintContext {
   allRefIds?: Set<string>;
   /** File existence checker. */
   fileExists: (path: string) => boolean;
-  /** Basename lookup under a Lake package root (for lean.ref fallback). */
-  lakeTreeContainsBasename?: (lakeRoot: string, basename: string) => boolean;
   /** Markdown content of the companion .md file (for cross-ref scanning). */
   mdContent?: string;
-  /** Lean sibling stub content (for §3b-cond kind-check), if the file exists. */
-  leanContent?: string;
+  // A vocabulary module's rules may read more than this: whatever its
+  // `constraintContext` contributes (below), typed in that module's own layer
+  // by extending this interface — the science layer's sibling `.lean` and
+  // Lake-tree lookup, for one (bean `saqd`). They are not this layer's to name.
 }
+
+/**
+ * A vocabulary module's contribution to every block's {@link ConstraintContext}:
+ * called once per validation run with the folio's content root, then once per
+ * block; what the inner call returns is merged into that block's context
+ * before the rules run. Fields the generic context already has are not
+ * overridden.
+ */
+export type ConstraintContextContributor = (run: {
+  repoRoot: string;
+}) => (block: { rootName: string; dir: string }) => Readonly<Record<string, unknown>>;
 
 /**
  * Built-in constraint rules.
