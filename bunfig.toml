@@ -7,3 +7,10 @@
 # scans at load.
 [test]
 preload = ["./schemas/test-fixture-preload.ts", "./schemas/test-preload.ts"]
+
+# The linker the index uses for the same lockfile (its root bunfig.toml).
+# Bun's default for a workspace lockfile is the isolated linker, which in a
+# sibling layout leaves 28 of the 46 direct dependencies (zod among them)
+# unlinked while `bun install --frozen-lockfile` still exits 0 (bean w1gy, F20).
+[install]
+linker = "hoisted"
