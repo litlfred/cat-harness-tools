@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DECLARATION_SUFFIX } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { DECLARATION_SUFFIX } from "../../schemas/kg/cat-harness.ts";
 import { sidecarRootFor } from "../check-l1-complete.ts";
 
 const made: string[] = [];

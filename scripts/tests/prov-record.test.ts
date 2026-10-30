@@ -21,7 +21,7 @@ import {
   verifyProvHashChain,
 } from "../../src/workflow/prov-record.js";
 import { loadAccessContext, type Principal } from "../../src/core/access.js";
-import { ProvActivitySchema, ProvAgreementRefSchema } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, ProvAgreementRefSchema } from "../../schemas/content/prov.js";
 import { reportInstance } from "../prov-qaqc.js";
 import { roleGraphFor, workflowFile } from "../known-skills.js";
 import type { TaskAuthVerdict } from "../../src/workflow/authorize.js";

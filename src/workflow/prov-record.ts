@@ -48,7 +48,7 @@ import {
   type ProvConsentDecisionRecord,
   type ProvConsentRef,
   type ProvDecisionRecord,
-} from "@litlfred/cat-harness/schemas/content/prov.js";
+} from "../../schemas/content/prov.js";
 import type { TaskAuthVerdict } from "./authorize.js";
 
 export {

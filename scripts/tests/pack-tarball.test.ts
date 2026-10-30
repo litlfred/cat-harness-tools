@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { BINARY_RELEASE_SCHEMA_TAG, BinaryReleaseSchema } from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
+import { BINARY_RELEASE_SCHEMA_TAG, BinaryReleaseSchema } from "../../schemas/sdlc/binary-release.js";
 import { packTarball } from "../pack-tarball.js";
 import { retrieveNpmKg } from "../kg-retrieve-npm.js";
 

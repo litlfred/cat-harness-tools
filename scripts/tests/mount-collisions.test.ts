@@ -28,7 +28,7 @@ import {
   visualizerAliasRoute,
   visualizerUrl,
   checkVisualizerRouteCollisions,
-} from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+} from "../../schemas/kg/remote-mount.js";
 import { checkAllCollisions } from "../check-mount-collisions.js";
 
 describe("RESERVED_ROOT_AND_ROUTE_NAMES", () => {

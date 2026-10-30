@@ -71,7 +71,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const INSTANCE_ROOT = resolve(dirname(__filename), "..");
 
-import { GIT_SHA_UNKNOWN, applicabilityGap, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
+import { GIT_SHA_UNKNOWN, applicabilityGap, scriptSidecarTarget, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
 import {
   qaCriteriaFor,
   qaCriteriaByIdFor,
@@ -80,25 +80,25 @@ import {
 } from "./qa-criteria-registry";
 import { discoverBlockCheckers } from "./qa-checker-discovery";
 import { isCriterionSourceMiss, resolveCriterionSource } from "./criterion-source";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, composedKindOwner, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../schemas/kg/harness-config.ts";
+import { ContributionRegistry, composedKindOwner, type FolioContribution } from "../schemas/content/contributions.ts";
 import { usesGraphHash } from "./uses-graph-hash";
 import { blockQaPath, findContentRepoRoot } from "./qa-paths";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "../schemas/sdlc/qa-attestations.ts";
 import { contributionsRoot } from "./repo-root";
 
 
-import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "../schemas/sdlc/block-qa.ts";
 import {
   criterionAdapters,
   criterionProfiles,
   profileExcludesCriterion,
   voiceExcludesCriterion,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { adapterForKind } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/sdlc/block-qa.ts";
+import { adapterForKind } from "../schemas/content/block-kinds.ts";
 import { readDeclaredFolioProfile } from "./profile-check";
-import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
+import { readActiveVoices } from "../schemas/content/voices.ts";
 import { isJsonManifest } from "./json-manifest.ts";
 
 
@@ -804,7 +804,11 @@ async function run(): Promise<void> {
   // Write one script sidecar per automated criterion under sweep
   // to `pipeline/script-sidecars/<criterion-id>.script.json`.
   // Skipped under --dry-run.
-  if (!args.dryRun) {
+  const sidecarTarget = scriptSidecarTarget(args.scriptSidecarRoot, INSTANCE_ROOT);
+  if (!args.dryRun && sidecarTarget === null) {
+    console.log(`script sidecars: not written — ${INSTANCE_ROOT} is a mounted copy of the platform, not its checkout (pass --script-sidecar-root to write them elsewhere)`);
+  }
+  if (!args.dryRun && sidecarTarget !== null) {
     for (const [id, hashes] of Object.entries(scriptHashesByCriterion)) {
       if (!hashes.script_hash) continue; // source file absent — skip
       // KEEP THE STORED PROVENANCE WHEN THIS CHECKOUT CANNOT ESTABLISH IT.
@@ -816,7 +820,7 @@ async function run(): Promise<void> {
       // one — measured 2026-09-18, a sweep in a 102-commit checkout
       // flattened 77 of 78 sidecars from nine distinct shas to the single
       // boundary sha. An older true answer beats a fresh false one.
-      const sidecarRoot = args.scriptSidecarRoot ?? INSTANCE_ROOT;
+      const sidecarRoot = sidecarTarget;
       const previous = loadQaScriptSidecar(id, sidecarRoot);
       const commitSha =
         hashes.script_commit_sha === GIT_SHA_UNKNOWN && previous?.script_commit_sha

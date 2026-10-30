@@ -39,14 +39,14 @@ import {
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
-import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceConfigFilename } from "../../schemas/kg/harness-config.js";
+import { IndexConfigSchema, checkIgnoreBlock } from "../../schemas/kg/index-config.ts";
+import { instanceDeclarationFilename, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
-import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { instanceStateBranch } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+import { declarationChain, resolveSkillDirs } from "../../schemas/kg/harness-config.js";
+import { nodeOfKind, parseTodoGraph } from "../../schemas/sdlc/todo-graph.js";
+import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.js";
+import { instanceStateBranch } from "../../schemas/kg/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -262,7 +262,7 @@ describe("what gets written", () => {
     const d = tmp();
     initFolio(opts(d, { assistantPath: "vendor/fa" }));
     expect(readFileSync(join(d, "folio/schema/builders.ts"), "utf-8")).toContain(
-      "../../vendor/fa/cat-harness/schemas/builders",
+      "../../vendor/fa/cat-harness-tools/schemas/builders",
     );
     // Manifests reach the platform only through the shim, so re-linking the
     // platform is a two-file edit rather than a sweep over the corpus.
@@ -887,7 +887,7 @@ describe("remote link mode (--link remote, bean c4lg)", () => {
     expect(gitignoreText).toContain("/folio-assistant-core/");
 
     const builders = readFileSync(join(d, "folio/schema/builders.ts"), "utf-8");
-    expect(builders).toContain('export * from "../../cat-harness/schemas/builders";');
+    expect(builders).toContain('export * from "../../cat-harness-tools/schemas/builders";');
 
     const wf = readFileSync(join(d, ".github/workflows/staging.yml"), "utf-8");
     expect(wf).toContain("bun run folio-assistant-core/scripts/build-document-site.ts --out _site");

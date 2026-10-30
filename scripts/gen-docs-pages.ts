@@ -37,11 +37,11 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
-import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
-import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
-import { resolveTarget } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import { instanceRepositories, type InstanceRepository } from "../schemas/kg/instance-repositories.ts";
+import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
+import { resolveTarget } from "../schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
-import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/kg/semantic-zoom.js";
+import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "../schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
   localesReadableFor,
@@ -71,8 +71,8 @@ import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { THEMES, themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
+import { resolveThemeBackdrop } from "../schemas/ui/theme.js";
+import { THEMES, themeById } from "../schemas/ui/themes.js";
 import {
   directoryForGraph,
   publishedAssetPath,
@@ -81,15 +81,15 @@ import {
   siteDirFor,
   sourceLinks,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/kg/cat-harness.ts";
 import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { DEFAULT_QA_BRANCH, resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.ts";
 import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
 import { loadManifestValue, manifestPath } from "../pipeline/json-manifest.ts";
 

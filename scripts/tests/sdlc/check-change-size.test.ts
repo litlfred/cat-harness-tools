@@ -4,7 +4,7 @@ import {
   classifyFilePath,
   DEFAULT_CHANGE_SIZE_THRESHOLD,
   formatSc005Metric,
-} from "@litlfred/cat-harness/schemas/sdlc/change-size.ts";
+} from "../../../schemas/sdlc/change-size.ts";
 
 describe("classifyFilePath — file categorization", () => {
   test("identifies executable code files", () => {

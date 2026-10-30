@@ -22,8 +22,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import * as builders from "@litlfred/cat-harness/schemas/builders.ts";
-import { webpage } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
+import * as builders from "../schemas/builders.ts";
+import { webpage } from "../schemas/ui/webpage.ts";
 
 /** The `$schema` value that marks a JSON file as a manifest. */
 export const JSON_MANIFEST_SCHEMA = "block-manifest/v1";

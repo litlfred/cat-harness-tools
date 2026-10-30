@@ -20,7 +20,7 @@
  * would have passed on all three.
  */
 import { describe, expect, test } from "bun:test";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -279,7 +279,8 @@ export const NodeSchema: z.ZodTypeAny = z.lazy(() => z.object({ child: NodeSchem
 });
 
 describe("the real schema graph", () => {
-  const root = HARNESS_ROOT;
+  // The schema corpus is this layer's since bean 8lcl moved it out of cat-harness.
+  const root = TOOLS_ROOT;
 
   test("reads, and is not empty", () => {
     const g = readSchemaGraph(root);

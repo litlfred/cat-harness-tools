@@ -9,7 +9,7 @@
  * Usage: npx ts-node cat-harness/scripts/generate-schemas.ts
  */
 
-import { namedJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.ts";
+import { namedJsonSchema } from "../schemas/kg/to-json-schema.ts";
 import { writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -32,7 +32,7 @@ import {
   SkillPackageRefSchema,
   RemotePackageRefSchema,
   RemoteSyncConfigSchema,
-} from "@litlfred/cat-harness/schemas/constraints.js";
+} from "../schemas/constraints.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

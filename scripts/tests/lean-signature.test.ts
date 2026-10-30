@@ -6,7 +6,7 @@ import { leanSignatures } from "../../pipeline/lean-signature";
 // so the statement-granularity freshness test cannot pass without this line.
 import "../../pipeline/lean-formal-ref.ts";
 import { entryIsFresh, hashBlockFiles } from "../../pipeline/qa-utils";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { QaCriterionEntry } from "../../schemas/sdlc/block-qa.ts";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";

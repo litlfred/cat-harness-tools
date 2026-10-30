@@ -31,13 +31,13 @@
 
 import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
-import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import type { ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
+import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "../../schemas/process/role-graph.js";
+import type { ConventionScope } from "../../schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "../../schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import {
   validateWorkflowModel,
   validateLaneModelCapabilities,

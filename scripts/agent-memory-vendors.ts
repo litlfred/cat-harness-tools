@@ -50,14 +50,14 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
-import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "@litlfred/cat-harness/schemas/conduct/memory.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { parseFrontMatter } from "../schemas/kg/front-matter.js";
+import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "../schemas/conduct/memory.js";
 
 import {
   COPILOT_AGENT_CHAR_BUDGET,
+  DEFAULT_ROOT,
   ROOT,
   VENDOR_AGENT_BYTE_BUDGET,
   agentNames,
@@ -70,7 +70,7 @@ import {
 export { COPILOT_AGENT_CHAR_BUDGET, VENDOR_AGENT_BYTE_BUDGET };
 
 /** Where Claude's agent definitions live — the source of each prompt. */
-export const CLAUDE_AGENTS_DIR = join(repoRootFor(ROOT), ".claude", "agents");
+export const CLAUDE_AGENTS_DIR = join(DEFAULT_ROOT, ".claude", "agents");
 
 
 /** Marks a file as generated, so a stale one can be removed safely. */
@@ -166,7 +166,7 @@ export function isReadonly(tools: readonly string[] | undefined): boolean {
  * pointer names the sidecar by its path from the root, since the sidecar sits
  * beside Claude's `MEMORY.md`, not beside this file.
  */
-export function renderVendorMemory(agent: string, entries: readonly MemoryNode[]): string {
+export function renderVendorMemory(agent: string, entries: readonly MemoryNode[], root?: string): string {
   if (entries.length === 0) return "";
   const rank = (m: MemoryNode): number => MEMORY_LABELS.indexOf(m.label);
   const sorted = [...entries].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
@@ -176,7 +176,7 @@ export function renderVendorMemory(agent: string, entries: readonly MemoryNode[]
       ? `\n\n> Measured \`${m.measured.command}\` on ${m.measured.date}: ${m.measured.result}`
       : "";
     const more = m.detail ? `\n\nMore: \`.claude/agent-memory/${agent}/detail/${detailFileName(m.id)}\`` : "";
-    return `${head}\n\n${rebaseRuleLinks(m.comment)}${meas}${more}`;
+    return `${head}\n\n${rebaseRuleLinks(m.comment, root)}${meas}${more}`;
   });
   return (
     `## Memory\n\n` +
@@ -282,42 +282,44 @@ export interface VendorTargetDef {
   budget: { unit: "bytes" | "chars"; limit: number };
 }
 
-const root = (): string => repoRootFor(ROOT);
+export function vendorTargetsFor(rootDir: string = DEFAULT_ROOT): VendorTargetDef[] {
+  return [
+    {
+      id: "gemini",
+      vendor: "Gemini CLI",
+      dir: join(rootDir, ".gemini", "agents"),
+      fileName: (a) => `${a}.md`,
+      render: renderGeminiAgent,
+      budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+    },
+    {
+      id: "codex",
+      vendor: "OpenAI Codex",
+      dir: join(rootDir, ".codex", "agents"),
+      fileName: (a) => `${a}.toml`,
+      render: renderCodexAgent,
+      budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+    },
+    {
+      id: "cursor",
+      vendor: "Cursor",
+      dir: join(rootDir, ".cursor", "agents"),
+      fileName: (a) => `${a}.md`,
+      render: renderCursorAgent,
+      budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
+    },
+    {
+      id: "copilot",
+      vendor: "GitHub Copilot",
+      dir: join(rootDir, ".github", "agents"),
+      fileName: (a) => `${a}.agent.md`,
+      render: renderCopilotAgent,
+      budget: { unit: "chars", limit: COPILOT_AGENT_CHAR_BUDGET },
+    },
+  ];
+}
 
-export const VENDOR_TARGETS: readonly VendorTargetDef[] = [
-  {
-    id: "gemini",
-    vendor: "Gemini CLI",
-    dir: join(root(), ".gemini", "agents"),
-    fileName: (a) => `${a}.md`,
-    render: renderGeminiAgent,
-    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
-  },
-  {
-    id: "codex",
-    vendor: "OpenAI Codex",
-    dir: join(root(), ".codex", "agents"),
-    fileName: (a) => `${a}.toml`,
-    render: renderCodexAgent,
-    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
-  },
-  {
-    id: "cursor",
-    vendor: "Cursor",
-    dir: join(root(), ".cursor", "agents"),
-    fileName: (a) => `${a}.md`,
-    render: renderCursorAgent,
-    budget: { unit: "bytes", limit: VENDOR_AGENT_BYTE_BUDGET },
-  },
-  {
-    id: "copilot",
-    vendor: "GitHub Copilot",
-    dir: join(root(), ".github", "agents"),
-    fileName: (a) => `${a}.agent.md`,
-    render: renderCopilotAgent,
-    budget: { unit: "chars", limit: COPILOT_AGENT_CHAR_BUDGET },
-  },
-];
+export const VENDOR_TARGETS: readonly VendorTargetDef[] = vendorTargetsFor(DEFAULT_ROOT);
 
 function measure(text: string, unit: "bytes" | "chars"): number {
   return unit === "bytes" ? Buffer.byteLength(text, "utf8") : [...text].length;
@@ -339,11 +341,12 @@ export function renderVendorAgent(
   agent: string,
   def: ClaudeAgentDef,
   entries: readonly MemoryNode[],
+  root?: string,
 ): RenderVendorAgentResult {
   const live = entries.filter((n) => !n.archived);
   const promptOnly = target.render === renderCopilotAgent;
   const sizeOf = (active: readonly MemoryNode[]): { content: string; size: number } => {
-    const memory = renderVendorMemory(agent, active);
+    const memory = renderVendorMemory(agent, active, root);
     const content = target.render(def, memory);
     return { content, size: measure(promptOnly ? promptWithMemory(def, memory) : content, target.budget.unit) };
   };
@@ -392,6 +395,7 @@ export function syncVendorAgents(
   const targets = opts.targets ?? VENDOR_TARGETS;
   const out: VendorAgentResult[] = [];
   for (const target of targets) {
+    const targetRoot = resolve(target.dir, "../..");
     const wanted = new Set<string>();
     for (const agent of agents) {
       const path = join(target.dir, target.fileName(agent));
@@ -402,7 +406,7 @@ export function syncVendorAgents(
       }
       wanted.add(target.fileName(agent));
       const entries = memoryForAgent([...nodes], agent);
-      const { content, dropped, size } = renderVendorAgent(target, agent, def, entries);
+      const { content, dropped, size } = renderVendorAgent(target, agent, def, entries, targetRoot);
       const kept = entries.filter((n) => !n.archived).length - dropped.length;
       const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
       if (current === content) {

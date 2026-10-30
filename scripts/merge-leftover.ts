@@ -41,7 +41,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { isAncestor } from "./git-ancestry.ts";
 import { git, parseMemberSpec, resolveMember } from "./merge-pipeline-git.ts";
 import { differsOnlyInRegions, pathClass } from "./merge-pipeline-paths.ts";

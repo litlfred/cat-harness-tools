@@ -92,9 +92,9 @@ import {
   instanceRootsIn,
   readDeclaration,
   siteFileFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { THEME_KINDS, type ThemeKind } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { instanceThemes } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+} from "../schemas/kg/cat-harness.js";
+import { THEME_KINDS, type ThemeKind } from "../schemas/ui/theme.js";
+import { instanceThemes } from "../schemas/ui/theme-by-ref.js";
 import { instanceThemesDataPath } from "./gen-themes-css.js";
 import { KIND_TILE_ICONS } from "./graph-tiles.js";
 

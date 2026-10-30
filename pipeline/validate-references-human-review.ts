@@ -24,12 +24,12 @@
  * @module pipeline/validate-references-human-review
  */
 
-import { deferResolution } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { deferResolution } from "../schemas/kg/cat-harness.js";
 import { createHash } from "crypto";
 import { references } from "./references-registry-di";
 import type { Data as CSLData } from "csl-json";
 import { findContentRepoRoot } from "./repo-root";
-import { BIB_REVIEW_STATUSES, readHumanReviews } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
+import { BIB_REVIEW_STATUSES, readHumanReviews } from "../schemas/library/bib-attestations.ts";
 
 /** The status vocabulary — the schema's (`BIB_REVIEW_STATUSES`), not a second copy. */
 const STATUS_ENUM = BIB_REVIEW_STATUSES;

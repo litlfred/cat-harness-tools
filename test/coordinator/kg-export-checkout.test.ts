@@ -15,8 +15,8 @@ import { readFileSync } from "node:fs";
 
 import { buildExport } from "../../scripts/kg-export.js";
 import { declaresOwnCanonical } from "../../scripts/instance-exports.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.js";
+import { termIri } from "../../schemas/kg/namespaces.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

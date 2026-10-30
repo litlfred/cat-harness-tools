@@ -30,7 +30,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 
 import { indexSummary, orphanPages, twinsInCheckout, unpublishedTwins } from "../gen-skill-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";

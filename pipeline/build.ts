@@ -11,16 +11,16 @@
  * @module pipeline/build
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname, resolve, relative } from "path";
-import type { Paper, Chapter, Section, Block, RenderOptions } from "@litlfred/cat-harness/schemas/types.ts";
-import { extractBlockLabel, isCrossPaperRef } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper, Chapter, Section, Block, RenderOptions } from "../schemas/types.ts";
+import { extractBlockLabel, isCrossPaperRef } from "../schemas/types.ts";
 import {
   renderChapter,
   validateLatexAst,
 } from "./render-latex";
-import { generateMainTex } from "./generate-main-tex";
+import { generateMainTex, resolvePaperPreamble } from "./generate-main-tex";
 import { collectReferencedTerms } from "./markdown-ast";
 // The LaTeX preflight and Lean coverage are the science layer's: reached
 // through pipeline slots that a higher layer fills through its `contributes`
@@ -396,16 +396,16 @@ if (import.meta.main) {
     const mainOutIdx = args.indexOf("--main-out");
     const mainOutPath = resolve(mainOutIdx >= 0 ? args[mainOutIdx + 1] : "main.tex");
     const preambleIdx = args.indexOf("--preamble");
-    const preamblePath = resolve(
-      preambleIdx >= 0 ? args[preambleIdx + 1] : join(HARNESS_ROOT, "latex", "preamble.tex"),
+    const preamblePath = await resolvePaperPreamble(
+      preambleIdx >= 0 ? args[preambleIdx + 1] : undefined,
     );
     // The platform carries no preamble since bean 0uu2 (it was one folio's,
-    // and the folio keeps the corrected copy), so the default above resolves
-    // only in a checkout that still has one. Say that, rather than ENOENT.
+    // and the folio keeps the corrected copy); the paper adapter supplies its
+    // print template when installed (bean 4dj5). Say that, rather than ENOENT.
     if (!existsSync(preamblePath)) {
       console.error(
         `--generate-main needs a preamble and ${preamblePath} does not exist. ` +
-          "Pass --preamble <the folio's preamble.tex>: the platform no longer carries one (bean 0uu2).",
+          "Install the paper content adapter or pass --preamble <the folio's preamble.tex>.",
       );
       process.exit(2);
     }

@@ -18,7 +18,7 @@ import {
   frontMatterOf,
   resolveEvidence,
 } from "../check-methodology-evidence.ts";
-import { MethodologyFrontMatterSchema, METHODOLOGY_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/process/methodology.ts";
+import { MethodologyFrontMatterSchema, METHODOLOGY_SCHEMA_TAG } from "../../schemas/process/methodology.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);

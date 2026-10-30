@@ -25,7 +25,7 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import type { CheckerPaths } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { CheckerPaths } from "../schemas/sdlc/block-qa.ts";
 
 export interface CheckerHit {
   file: string;

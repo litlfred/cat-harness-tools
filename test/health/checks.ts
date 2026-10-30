@@ -48,7 +48,7 @@ import type {
   HealthMeasurement,
   HealthThreshold,
   PagesServingObservation,
-} from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
+} from "../../schemas/sdlc/health-report.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import {
   EXPIRY_BASIS,

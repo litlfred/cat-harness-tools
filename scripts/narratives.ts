@@ -31,13 +31,13 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/content/narrative.ts";
-import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
-import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
-import { VECTOR_FIGURES_FILE } from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
-import { FIGURE_DESCRIPTIONS_FILE } from "@litlfred/cat-harness/schemas/content/figure-description.ts";
+import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "../schemas/content/narrative.ts";
+import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
+import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
+import { VECTOR_FIGURES_FILE } from "../schemas/content/vector-figure.ts";
+import { FIGURE_DESCRIPTIONS_FILE } from "../schemas/content/figure-description.ts";
 import { entryItems } from "./summaries.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

@@ -52,10 +52,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
-import { ProvActivitySchema, ProvConsentRefSchema, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
-import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { addressBook, provJsonldDocument, type AddressBook } from "../schemas/kg/prov-jsonld.js";
+import { ProvActivitySchema, ProvConsentRefSchema, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
+import { laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
 import type { HistoryEntry, InstanceState } from "../src/workflow/instance.js";

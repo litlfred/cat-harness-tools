@@ -154,9 +154,9 @@ import {
   isDerivedGraph,
   isStateGraph,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+} from "../schemas/kg/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds, type LayerRule } from "../schemas/kg/layer-direction.js";
 import {
   classifyReference,
   occurrencesOf,
@@ -164,9 +164,9 @@ import {
   type Occurrence,
   type ReferenceExemption,
   type ReferenceVerdict,
-} from "@litlfred/cat-harness/schemas/kg/reference-direction.js";
+} from "../schemas/kg/reference-direction.js";
 import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
   againstOrUsage,
@@ -693,6 +693,11 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
     file: /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.tsx?$|(^|\/)eval\//,
     reason:
       "TEST MATERIAL. Not a carve invented here — it is the rule the import axis already applies, stated in `partition/instance-rules.ts`: *\"A test may reach anywhere it needs to; that is what a test is for.\"* A fixture naming a downstream instance is exercising the layering, not depending on it, and the two axes agreeing on this is the point of absorbing one into the other. `check:partition` buckets 486 modules as `(test material)` on the same ground",
+  },
+  {
+    pattern: /^\s*"(?:[^"\/]+\/)*(test|tests|__tests__)\/[^"]*",?\s*$/,
+    reason:
+      "a PATH INTO TEST MATERIAL, alone on its line as a quoted string (a file list such as the content-code-free ratchet). The instance name is a directory inside a test fixture, so the line points at the fixture, which the TEST MATERIAL rule above already exempts; listing a fixture's path is not depending on the instance its folder is named after",
   },
   {
     pattern: /^\s*(\/\/|\*|#)?\s*declared-path-literal:/,

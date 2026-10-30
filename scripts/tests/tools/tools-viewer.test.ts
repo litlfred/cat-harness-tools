@@ -54,7 +54,7 @@ const REPO = resolve(dirname(HARNESS_ROOT));
  */
 const DOCS = baseDocsDir(REPO);
 
-const { tools } = (await import("@litlfred/cat-harness/tools/index.js")) as { tools: () => unknown[] };
+const { tools } = (await import("../../../schemas/tools/harness-tools.js")) as { tools: () => unknown[] };
 const rows = toolRows(tools());
 
 describe("the page reports the join in both directions", () => {

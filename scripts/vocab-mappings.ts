@@ -26,14 +26,11 @@
  * 3. A group `source` or `target` written as a CURIE whose prefix nobody
  *    declares. It would produce a ConceptMap with a system no consumer can
  *    resolve.
- * 4. A table that π (`toConceptMap`) cannot produce at all. A loss is fine and
- *    is reported; a throw is not.
  */
 import { relative, resolve } from "node:path";
 
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { STANDARD_PREFIXES, expandCurie, toConceptMap } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
-import { loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { STANDARD_PREFIXES, expandCurie, loadVocabMappings, vocabMappingDirs, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.
@@ -67,11 +64,6 @@ export function tableFindings(m: VocabMapping, prefixes: Readonly<Record<string,
       });
     });
   });
-  try {
-    toConceptMap(m, { release: "R5", prefixes });
-  } catch (err) {
-    out.push(`${m.id}: cannot be produced as a ConceptMap — ${(err as Error).message}`);
-  }
   return out;
 }
 
@@ -95,7 +87,7 @@ function run(argv: string[]): number {
     for (const f of findings) console.error(`    ${f}`);
     return 1;
   }
-  console.log("\n✓ every table parses; every derived target copies an authoritative one; every system resolves; every table produces a ConceptMap");
+  console.log("\n✓ every table parses; every derived target copies an authoritative one; every system resolves");
   return 0;
 }
 

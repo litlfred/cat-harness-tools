@@ -4,13 +4,13 @@
  * `en/cat-harness/library/`, and nothing noticed).
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expectedPages, legacyOnlyPages, instanceSubgraph, missingPages, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
+import { expectedPages, igIndexSubjects, INDEX_PAGE_NEEDS_SUBJECTS, legacyOnlyPages, instanceSubgraph, missingPages, SUBJECT_READERS, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 
 const page = (route: string, legacyRoute: string): ExpectedPage => ({ route, legacyRoute, harness: "h", visualiser: "v" });
 
@@ -84,6 +84,28 @@ describe("subjectInstances: the guard asks the writer's own reader which instanc
   test("a reader that throws falls back to the sub-directory test rather than expecting nothing", () => {
     const readers = { "tools-viewer": (): string[] => { throw new Error("a declared tools graph did not load"); } };
     expect(subjectInstances({ renderedBy: "tools-viewer" }, at, dirs, readers)).toEqual(["cat-harness", "smart-immunizations"]);
+    rmSync(at, { recursive: true, force: true });
+  });
+});
+
+describe("ig-pages: an IG's artefact pages are owed only where its index is built (smart-ra#103)", () => {
+  test("the guard reads the ig-pages writer's subjects, and owes its index page only with one", () => {
+    expect(SUBJECT_READERS["ig-pages"]).toBe(igIndexSubjects);
+    expect(INDEX_PAGE_NEEDS_SUBJECTS.has("ig-pages")).toBe(true);
+  });
+
+  test("only an instance whose index.json is there is a subject; a README or retired sidecars are not", () => {
+    const at = mkdtempSync(join(tmpdir(), "site-coverage-ig-"));
+    const built = join(at, "smart-trust", "fhir-artifact-index");
+    const unbuilt = join(at, "smart-base", "fhir-artifact-index");
+    mkdirSync(built, { recursive: true });
+    mkdirSync(join(unbuilt, "dak"), { recursive: true });
+    writeFileSync(join(built, "index.json"), "{}");
+    writeFileSync(join(unbuilt, "README.md"), "built at publish");
+    const dirs = [{ instance: "smart-base", absPath: unbuilt }, { instance: "smart-trust", absPath: built }];
+    expect(igIndexSubjects(at, dirs)).toEqual(["smart-trust"]);
+    expect(subjectInstances({ renderedBy: "ig-pages" }, at, dirs)).toEqual(["smart-trust"]);
+    expect(igIndexSubjects(at, [dirs[0]!])).toEqual([]);
     rmSync(at, { recursive: true, force: true });
   });
 });

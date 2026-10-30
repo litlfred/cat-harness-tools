@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { resolveChromium } from "../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { ensureThemesCss } from "./support/themes-css.ts";
