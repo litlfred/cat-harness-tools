@@ -11,12 +11,17 @@
  *
  * ## Known substrates are DERIVED where a fact exists
  *
- * Three sources, merged by `name`, the later overriding the earlier:
+ * Four sources, merged by `name`, the later overriding the earlier:
  *
  * 1. every instance in the checkout that declares a planned `repository` other
  *    than the one it lives in today (#1652), which is `planned`;
  * 2. every `associatedHarnesses` entry, which is `exists` (it has a site);
- * 3. every `knownSubstrates` hand row, for what no declaration can say.
+ * 3. every `subscriptions` entry, which is `exists` (it is pinned to a commit
+ *    of a repository that was read). A subscription may not also be an
+ *    associated harness (issue #1719), so without this row the first real
+ *    subscription (`litlfred/ihris`, bean `tmo5`) would fall out of the
+ *    registry the moment it stopped being associated;
+ * 4. every `knownSubstrates` hand row, for what no declaration can say.
  *
  * So a staged instance appears the moment it declares its planned home, and
  * nobody keeps a second list of it.
@@ -51,13 +56,14 @@ import { instanceRepositories } from "@litlfred/cat-harness/schemas/kg/instance-
 import { partRecordsIn, snapshotDirOf, type PartView } from "./kg-subscribe.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { SNAPSHOT_SUFFIX } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE = resolve(HARNESS_ROOT);
 // declared-path-literal: the page's route under the site directory, not the `subscriptions/` snapshot directory of the same name
 export const OUT = join(INSTANCE, siteDirFor(INSTANCE), "subscriptions", "index.md");
 
-export type SubstrateSource = "staged instance" | "associated harness" | "hand-entered";
+export type SubstrateSource = "staged instance" | "associated harness" | "subscription" | "hand-entered";
 
 export interface SubstrateRow extends KnownSubstrate {
   /** Where the row came from, so a reader can tell a derived fact from a hand-kept one. */
@@ -70,7 +76,18 @@ export function repoFromUrl(url: string | undefined): string | undefined {
   return m?.[1];
 }
 
-/** Merge the three sources by name; a later source overrides an earlier one field by field. */
+/** The substrate's title as its cached snapshot records it; undefined when there is none or it cannot be read. */
+function snapshotTitle(snapshotDir: string | undefined, id: string): string | undefined {
+  if (!snapshotDir) return undefined;
+  try {
+    const j = JSON.parse(readFileSync(join(snapshotDir, `${id}${SNAPSHOT_SUFFIX}`), "utf-8")) as { summary?: { title?: unknown } };
+    return typeof j.summary?.title === "string" ? j.summary.title : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Merge the four sources by name; a later source overrides an earlier one field by field. */
 export function knownSubstrates(repoRoot: string): SubstrateRow[] {
   const rows = new Map<string, SubstrateRow>();
   const put = (row: SubstrateRow) => rows.set(row.name, { ...(rows.get(row.name) ?? {}), ...row });
@@ -91,6 +108,22 @@ export function knownSubstrates(repoRoot: string): SubstrateRow[] {
         ...(repoFromUrl(a.repository) ? { repository: repoFromUrl(a.repository) } : {}),
         status: "exists",
         source: "associated harness",
+      });
+    }
+  }
+  for (const r of instanceRootsIn(repoRoot)) {
+    const d = readDeclaration(r);
+    if (!d?.subscriptions?.length) continue;
+    const declName = findDeclarationFile(r);
+    const raw = declName ? (JSON.parse(readFileSync(join(r, declName), "utf-8")) as Record<string, unknown>) : {};
+    const snapshotDir = snapshotDirOf(r, raw);
+    for (const s of d.subscriptions) {
+      put({
+        name: s.id,
+        ...(snapshotTitle(snapshotDir, s.id) ? { title: snapshotTitle(snapshotDir, s.id) } : {}),
+        repository: s.repository,
+        status: "exists",
+        source: "subscription",
       });
     }
   }
@@ -184,12 +217,12 @@ export function render(substrates: readonly SubstrateRow[], cards: readonly Subs
     "## Known substrates",
     "",
     "Derived from the declarations wherever a fact exists: a staged instance's planned repository, " +
-      "and an associated harness's site. Only what no declaration can say is hand-entered, in " +
+      "an associated harness's site, and a subscription's pinned repository. Only what no declaration can say is hand-entered, in " +
       "`knownSubstrates`.",
     "",
   ];
   if (substrates.length === 0) {
-    lines.push("_No substrate is known: no staged instance, associated harness or hand-entered row._", "");
+    lines.push("_No substrate is known: no staged instance, associated harness, subscription or hand-entered row._", "");
   } else {
     lines.push("| substrate | repository | status | tools repository | source | note |", "|---|---|---|---|---|---|");
     for (const r of substrates) {

@@ -46,11 +46,19 @@
  *
  * ## Where the state directories go
  *
- * Under `<instantiation root>/<harness>/`, at each directory's declared path,
- * with a `.gitkeep` so an empty directory survives a commit. The harness has no
+ * Under the subscriber's own `substrate-snapshot` directory, at
+ * `<snapshot dir>/<subscription>/harnesses/<harness>/`, at each directory's
+ * declared path, with a `.gitkeep` so an empty directory survives a commit —
+ * the layout slices 5 and 6 already use for materialised parts
+ * (`harnessHomeOf` in `kg-parts.ts`, stated once beside `partDirOf`).
+ *
+ * Slice 7 first wrote them under `<instantiation root>/<harness>/`. That was
+ * arc gap G11, settled by the owner on 2026-10-30 (bean `tmo5`): the root is
+ * not a declared directory, and a harness named after a staged instance
+ * (`who-iris`) would write into that instance's directory. The harness has no
  * local declaration (its declaration is the snapshot, on purpose: see
- * `schemas/kg/substrate-snapshot.ts`), so `<harness>/` is where its local bytes
- * live; no scanner reads it as an instance because it carries no declaration.
+ * `schemas/kg/substrate-snapshot.ts`), and no scanner reads its home as an
+ * instance because it carries none.
  *
  * ## Idempotent, and the config is never overwritten
  *
@@ -88,7 +96,8 @@ import {
 } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
-import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot } from "./subscribed-harnesses.js";
+import { harnessHomeOf } from "./kg-parts.js";
+import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot, snapshotDirFor } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
@@ -135,9 +144,13 @@ export function stateDirectoriesOf(decl: HarnessDeclaration): StateDirectories {
   return { state: "determined", dirs };
 }
 
-/** Where a subscribed harness's local bytes live: `<root>/<harness>/`. */
-export function harnessHome(instantiationRoot: string, harness: string): string {
-  return join(instantiationRoot, harness);
+/**
+ * Where a subscribed harness's local bytes live:
+ * `<snapshot dir>/<subscription>/harnesses/<harness>/` (G11). `snapshotDir` is
+ * the subscriber's declared `substrate-snapshot` directory.
+ */
+export function harnessHome(snapshotDir: string, subscription: string, harness: string): string {
+  return harnessHomeOf(snapshotDir, subscription, harness);
 }
 
 export type InstantiateResult =
@@ -270,7 +283,8 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
     if (why) return refuse(`state directory \`${d.id}\` (\`${d.path}\`) ${why}; nothing was written`);
   }
 
-  const home = harnessHome(root, opts.harness);
+  // readSnapshot read the snapshot from this directory, so it is declared.
+  const home = harnessHome(snapshotDirFor(instanceRoot, subscriber)!, sub.id, opts.harness);
   const stateDirs = states.dirs.map((d) => join(home, d.path));
   const written: string[] = [];
   for (const dir of stateDirs) {
@@ -287,7 +301,7 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
     _comment:
       `${opts.harness.toUpperCase()}, INSTANTIATED from a KG subscription: \`${subscriber.name}\` subscribes to ${sub.repository} ` +
       `as \`${sub.id}\`, pinned at ${sub.ref}, and chose this harness. Its declaration is the cached snapshot, not a local ` +
-      `\`${opts.harness}.json\`; its state directories live under \`${opts.harness}/\`. Written by \`bun run cat kg:instantiate\`; ` +
+      `\`${opts.harness}.json\`; its state directories live under \`${relative(root, home).split("\\").join("/")}/\`. Written by \`bun run cat kg:instantiate\`; ` +
       `re-running reports this entry rather than overwriting it.`,
     _subscription: { subscriber: subscriber.name, id: sub.id, repository: sub.repository, ref: sub.ref },
   };
