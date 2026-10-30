@@ -18,10 +18,10 @@ import {
   FIGURE_DESCRIPTIONS_FILE,
   FigureDescriptionSchema,
   FigureDescriptionsFileSchema,
-} from "@litlfred/cat-harness/schemas/content/figure-description.ts";
+} from "../../schemas/content/figure-description.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
-import { narrativesOfSlot } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { narrativesOfSlot } from "../../schemas/content/narrative.ts";
 
 const REPO = join(dirname(HARNESS_ROOT));
 

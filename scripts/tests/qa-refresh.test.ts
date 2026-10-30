@@ -32,7 +32,7 @@ import { QA_WRITERS, assess, carriedByMount, claimants, globToRegExp, mayRestore
 import { clearQaCache, publishQa, readQaManifest, refreshReportComplete, REFRESH_SCHEMA, type QaStoreOptions } from "../qa-store.ts";
 import { movedRoots, type MovedInventory } from "../qa-verify-moved.ts";
 import { TOOLS_ROOT } from "../lib/roots.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 const STORE_CLI = join(TOOLS_ROOT, "scripts", "qa-store.ts");

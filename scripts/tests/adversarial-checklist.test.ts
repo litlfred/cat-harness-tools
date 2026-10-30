@@ -15,7 +15,7 @@ import {
   SKILL_ADVERSARIAL_CHECKLIST,
   TOOL_ADVERSARIAL_CHECKLIST,
   type AdversarialContentKind,
-} from "@litlfred/cat-harness/schemas/sdlc/adversarial-checklist.ts";
+} from "../../schemas/sdlc/adversarial-checklist.ts";
 import {
   executeBackfillBatch,
   GATE_PATH_NODES,
@@ -28,9 +28,9 @@ import {
   asRecord,
   coverage,
 } from "../audit-coverage.ts";
-import { AdversarialReviewSchema } from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
+import { AdversarialReviewSchema } from "../../schemas/sdlc/red-flag.ts";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

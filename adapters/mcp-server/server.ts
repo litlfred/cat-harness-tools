@@ -19,9 +19,9 @@
  * @module scripts/mcp-server/server
  */
 
-import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "@litlfred/cat-harness/schemas/types.ts";
-import { FeedbackItemSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
+import { folioDir, folioDirDeferred } from "../../schemas/kg/cat-harness.js";
+import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "../../schemas/types.ts";
+import { FeedbackItemSchema } from "../../schemas/constraints.ts";
 import {
   INVALID_ENUM, parseTodoPriority, parseTodoStatus, TODO_PRIORITIES, TODO_STATUSES,
 } from "../../src/core/feedback.js";
@@ -41,7 +41,7 @@ import { readDeclaredFolioProfile } from "../../pipeline/profile-check.js";
 import { registerServedToolGroups } from "../../src/tool-groups.js";
 import { createContentAdapter } from "../../src/content-adapter.js";
 import { GitHelper } from "../../src/core/git.js";
-import { leanStatusBucket } from "@litlfred/cat-harness/schemas/types.ts";
+import { leanStatusBucket } from "../../schemas/types.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
@@ -73,8 +73,8 @@ import { detectRepoUrl } from "../../src/core/git-refs.js";
 import { declarationLine, leanSourceUrl } from "../../src/core/lean-source-link.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../../schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "../../schemas/content/contributions.ts";
 import { contributionsRoot } from "../../pipeline/repo-root.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "../../src/core/handover-screen.js";
@@ -130,7 +130,7 @@ function parseFeedbackTs(content: string): unknown[] {
 /** Serialize feedback items to TypeScript source. */
 function serializeFeedbackTs(items: FeedbackItem[]): string {
   const json = JSON.stringify(items, null, 2);
-  return `import type { FeedbackItem } from "../../../cat-harness/schemas/types";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
+  return `import type { FeedbackItem } from "../../schemas/types";\n\nexport default ${json} satisfies FeedbackItem[];\n`;
 }
 
 /**
@@ -332,7 +332,7 @@ const GRAPH_ROOTS = [
     dir,
   })),
 ];
-import { resolveFormalRef } from "@litlfred/cat-harness/schemas/formal-ref.js";
+import { resolveFormalRef } from "../../schemas/formal-ref.js";
 import {
   blockCaption, blockExamples, blockLean, blockProofs, blockTex,
   isSectionRef, sectionBlockNames,

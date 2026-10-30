@@ -17,11 +17,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import jsonld from "jsonld";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { TodoIndexSchema, type TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.ts";
+import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "../../schemas/kg/jsonld.ts";
+import { TodoIndexSchema, type TodoIndexItem } from "../../schemas/sdlc/todo-index.ts";
 import { thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
+import { propertyIri, termIri } from "../../schemas/kg/namespaces.ts";
 import { subgraphPublicationFindings } from "../subgraph-node.ts";
 import {
   segment,

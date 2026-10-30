@@ -18,7 +18,7 @@ import {
   type GraphTile,
   type TiledDirectory,
 } from "../../graph-tiles.js";
-import { GlassStripSchema, SubgraphCoverageSchema, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { GlassStripSchema, SubgraphCoverageSchema, visualisationsOf } from "../../../schemas/kg/cat-harness.js";
 
 const dir = (id: string, coverage?: unknown, theme?: string): TiledDirectory => ({
   id,

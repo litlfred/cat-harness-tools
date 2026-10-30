@@ -24,8 +24,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { BEGIN, END, plan, TEMPLATES } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { harnessInstances, harnessPlan, isStored, repoArg, subdirDescriptions } from "../../subgraph-readmes.ts";
-import { siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
+import { siteDir } from "../../../schemas/kg/cat-harness.ts";
+import { isDirectoryReadme } from "../../../schemas/kg/kg-node.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

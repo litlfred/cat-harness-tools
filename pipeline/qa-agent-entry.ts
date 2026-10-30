@@ -27,7 +27,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "../schemas/sdlc/qa-attestations.ts";
 import { hashBlockFiles, loadPriorBlockReport, priorRefusalLine, resolveCanonicalLean } from "./qa-utils";
 import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

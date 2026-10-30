@@ -19,7 +19,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // The site root is `siteDirFor`'s ANSWER, never the literal `docs` —
@@ -68,7 +68,7 @@ describe("the library projection's refScan", () => {
 
 describe("the schema refuses the field rather than merely omitting it", () => {
   test("refScan is a STRICT object, so `filesRead` is rejected, not ignored", async () => {
-    const { LibraryIndexSchema } = await import("@litlfred/cat-harness/schemas/ui/site-indexes.ts") as {
+    const { LibraryIndexSchema } = await import("../../../schemas/ui/site-indexes.ts") as {
       LibraryIndexSchema?: { shape?: Record<string, unknown> };
     };
     // Guard the import itself: a renamed export would make every assertion

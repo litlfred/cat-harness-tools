@@ -22,9 +22,9 @@ import {
   loadBlocksUnder,
   verifyEditedBlock,
 } from "../../pipeline/block-module";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const BUILDERS = join(HARNESS_ROOT, "schemas", "builders");
+const BUILDERS = join(TOOLS_ROOT, "schemas", "builders");
 
 let root: string;
 

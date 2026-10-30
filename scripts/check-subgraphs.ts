@@ -68,7 +68,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.ts";
 
 import {
   defaultGraphTypologies,
@@ -78,9 +78,9 @@ import {
   owningDirectory,
   resolveDirectories,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import type { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+} from "../schemas/kg/cat-harness.js";
+import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

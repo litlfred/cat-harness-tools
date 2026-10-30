@@ -7,7 +7,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteFileFor } from "../../../schemas/kg/cat-harness.ts";
 import { layoutFlags, stripFlags, untippedControls } from "../../check-viewer-nav.ts";
 import { injectRail } from "../../lib/harness-rail.ts";
 import { withHeadingIds } from "../../viewer-page.ts";

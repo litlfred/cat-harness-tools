@@ -22,7 +22,7 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";

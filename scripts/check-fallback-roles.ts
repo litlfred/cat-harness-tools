@@ -57,10 +57,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
 import { workflowFiles, corpusScopeFor, roleGraphFor } from "./known-skills.js";
-import { fulfilmentKindsForBpmnType } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { fulfilmentKindsForBpmnType } from "../schemas/process/role-graph.js";
 import { isActivity, loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
-import { CAPABILITIES_DIRNAME, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { instanceDirectoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { CAPABILITIES_DIRNAME, capabilitiesDir } from "../schemas/process/role-graph.ts";
+import { instanceDirectoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

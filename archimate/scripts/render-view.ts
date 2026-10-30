@@ -28,7 +28,7 @@
  * Every string from the model is escaped: the model is its authors', and a
  * name is text, never markup.
  */
-import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewNode } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
+import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewNode } from "../schemas/archimate.ts";
 
 /** Archi's default fill per layer. */
 export const LAYER_FILL: Record<ArchimateLayer, string> = {

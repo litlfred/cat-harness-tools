@@ -15,7 +15,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { parseBeanGraph, nodeOfKind, DEFAULT_BEAN_GRAPH } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { parseBeanGraph, nodeOfKind, DEFAULT_BEAN_GRAPH } from "../../schemas/sdlc/bean-graph.ts";
 import { INSTANCE_SCHEMA } from "../../src/workflow/instance.ts";
 import { loadInstance, saveInstance } from "../../src/workflow/store.ts";
 import type { InstanceState } from "../../src/workflow/instance.ts";

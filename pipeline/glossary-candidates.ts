@@ -23,8 +23,8 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { basename, join, resolve } from "path";
-import type { Block, Chapter, Paper, Section } from "@litlfred/cat-harness/schemas/types.ts";
-import { ChapterSchema, PaperSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
+import type { Block, Chapter, Paper, Section } from "../schemas/types.ts";
+import { ChapterSchema, PaperSchema } from "../schemas/constraints.ts";
 
 // ── Types ────────────────────────────────────────────────────────
 

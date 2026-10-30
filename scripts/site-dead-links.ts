@@ -39,7 +39,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 
-import { UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { UN_LOCALES } from "../schemas/content/translation.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
 export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter((l) => l !== "en"));

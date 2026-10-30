@@ -44,7 +44,7 @@ import {
   findInstanceRoot,
   readDeclaration,
   isExemptFrom,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/kg/cat-harness.ts";
 import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

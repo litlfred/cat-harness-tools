@@ -20,8 +20,8 @@
  */
 import { dirname, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
+import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
 
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

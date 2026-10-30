@@ -15,13 +15,13 @@ import { fileURLToPath } from "url";
 import type {
   ActorDefinition, CapabilityDefinition, HookCommand, Requirement, RoleAssignment,
   SessionHook, SkillDefinition, SkillRegistry,
-} from "@litlfred/cat-harness/schemas/conduct/assistant-types.ts";
-import type { SkillPackageManifest } from "@litlfred/cat-harness/schemas/kg/skill-package.ts";
+} from "../schemas/conduct/assistant-types.ts";
+import type { SkillPackageManifest } from "../schemas/kg/skill-package.ts";
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { actorsDir, capabilitiesDir } from "../schemas/process/role-graph.ts";
+import { skillDefinitionDirs } from "../schemas/kg/skill-definitions-dir.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**

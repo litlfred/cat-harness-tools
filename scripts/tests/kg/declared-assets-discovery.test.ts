@@ -28,7 +28,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredInstances } from "../../check-declared-assets.js";
-import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readDeclaration, repoRootFor } from "../../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 const ROOT = repoRootFor(resolve(import.meta.dir, "..", "..", ".."));

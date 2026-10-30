@@ -60,11 +60,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { instanceThemes } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
-import type { ImageRegion, KgImage } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "../schemas/ui/theme.js";
+import { instanceThemes } from "../schemas/ui/theme-by-ref.js";
+import { THEMES } from "../schemas/ui/themes.js";
+import type { ImageRegion, KgImage } from "../schemas/kg/kg-node.js";
 import { avatarClip, dataUri } from "./render-avatar-crops.js";
 import { declaredContributions } from "./ensure-landing-sticky.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";

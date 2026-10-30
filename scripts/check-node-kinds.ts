@@ -45,9 +45,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { defaultGraphTypologies, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { defaultGraphTypologies, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import {
   baselinePath,
   NodeKindIndexFileKind,
@@ -60,7 +60,7 @@ import {
   unkindedKey,
   type NodeKindIndex,
   type Unkinded,
-} from "@litlfred/cat-harness/schemas/kg/node-kind-index.js";
+} from "../schemas/kg/node-kind-index.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
 const repoRoot = REPO_ROOT ?? join(HARNESS_ROOT, "..");

@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
 import { harnessPanel } from "../../harness-panel.ts";
 import { instantiate } from "../../kg-instantiate.ts";
 import { type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";

@@ -20,7 +20,7 @@
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
-import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 

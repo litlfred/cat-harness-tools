@@ -22,10 +22,10 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import type { ContentProfile } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
-import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import type { ContentProfile } from "../schemas/content/block-kinds.ts";
+import type { ContributionRegistry } from "../schemas/content/contributions.ts";
+import { RENDER_TARGETS } from "../schemas/ui/render-targets.ts";
+import { implementingRootFor } from "../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { resolveAdapterPreamble } from "../src/builtin-adapters.ts";
 

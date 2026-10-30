@@ -22,7 +22,7 @@ import {
   repoRootFor,
   readDeclaration,
   artefactStub,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../schemas/kg/cat-harness.js";
 import { sitePathOf } from "../../scripts/print-published-path.ts";
 
 /**

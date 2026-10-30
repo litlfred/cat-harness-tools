@@ -12,8 +12,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { ImagesSidecarSchema } from "../../schemas/content/document-image.ts";
+import { narrativeFor } from "../../schemas/content/narrative.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

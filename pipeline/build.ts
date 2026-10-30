@@ -11,11 +11,11 @@
  * @module pipeline/build
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname, resolve, relative } from "path";
-import type { Paper, Chapter, Section, Block, RenderOptions } from "@litlfred/cat-harness/schemas/types.ts";
-import { extractBlockLabel, isCrossPaperRef } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper, Chapter, Section, Block, RenderOptions } from "../schemas/types.ts";
+import { extractBlockLabel, isCrossPaperRef } from "../schemas/types.ts";
 import {
   renderChapter,
   validateLatexAst,

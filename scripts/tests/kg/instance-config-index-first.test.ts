@@ -14,7 +14,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readHarnessConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readHarnessConfig } from "../../../schemas/kg/harness-config.ts";
 
 import { recipeFromConfig, recipeRead } from "../../build-instance-site.ts";
 import { dependencyRefs } from "../../check-published-refs.ts";

@@ -100,10 +100,10 @@
  */
 
 import { readdirSync, readFileSync } from "node:fs";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceRootsIn, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { historicalPrefixes } from "../src/docs/declaration-claims.js";
 
 /**

@@ -68,17 +68,17 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ARCHIVE_MIMETYPES } from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
+import { ARCHIVE_MIMETYPES } from "../schemas/library/archive-contents.ts";
 import { checkEntry, type Requirement } from "./check-l1-complete.ts";
 import { catalogueRecordFor, dcValue } from "../pipeline/library-title.ts";
-import { TABULAR_MIMETYPES } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
-import { SLIDE_MIMETYPES } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
+import { TABULAR_MIMETYPES } from "../schemas/library/tabular-records.ts";
+import { SLIDE_MIMETYPES } from "../schemas/ui/pdf-structure.ts";
 import { refreshLibraryIndex } from "./lsi.ts";
-import { IntakeSchema } from "@litlfred/cat-harness/schemas/library/intake.ts";
+import { IntakeSchema } from "../schemas/library/intake.ts";
 import { LICENCE_FILENAME, buildEntryNodes, readLicence } from "../pipeline/gen-library-jsonld.ts";
-import { STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { STRUCTURE_FILENAME } from "../schemas/content/document-structure.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 
