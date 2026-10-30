@@ -39,6 +39,6 @@ const CHECKOUT = repoRootFor(harnessRoot() ?? resolve(import.meta.dir, ".."));
 
 const holdsVocabulary = instanceRootsIn(CHECKOUT).some((r) => ownDeclaredDirectories(r, "block-kinds", CHECKOUT).length > 0);
 if (!holdsVocabulary && process.env.FOLIO_FIXTURE_CHECKOUT === undefined) {
-  const harness = harnessRoot();
-  if (harness) process.env.FOLIO_FIXTURE_CHECKOUT = resolve(harness, "test", "fixtures", "standalone-checkout");
+  // The fixture moved here from cat-harness with the tests that read it (bean `8lcl`).
+  process.env.FOLIO_FIXTURE_CHECKOUT = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
 }
