@@ -85,7 +85,6 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`types.ts`](types.ts) | a file |  |
 | [`verdict-record.schema.json`](verdict-record.schema.json) | Verdict record |  |
 | [`viz-generators.test.ts`](viz-generators.test.ts) | a file |  |
-| [`vocab-mapping-fhir.ts`](vocab-mapping-fhir.ts) | a file |  |
 | [`voice-inheritance.test.ts`](voice-inheritance.test.ts) | a file |  |
 | [`block-qa-schema/`](block-qa-schema/README.md) | described in its own README | |
 | [`conduct/`](conduct/) | _nothing declares what this holds_ | |
