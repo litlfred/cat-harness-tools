@@ -19,16 +19,12 @@
  * @covers schemas, docs
  */
 
-import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
-import { detectRepoUrl } from "../src/core/git-refs.js";
+import { markdownEditLink } from "../src/core/edit-links.js";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "fs";
 import { join, relative, resolve } from "path";
-import { repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { instanceDirectories, instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-
-/** The repository the links name: this checkout's origin, else folio-assistant (bean v433). */
-const SCHEMA_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
 
 /**
  * THIS INSTANCE'S OWN `schemas` directory, or the convention.
@@ -61,6 +57,30 @@ function schemasRoot(root: string): string {
 
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+
+/**
+ * The repository the links name: the one the instance's own declaration names
+ * (`"repository"` in `cat-harness.json`), never the cwd's git remote.
+ *
+ * Bean `w1gy`, finding F12. This was `repoOf(detectRepoUrl(process.cwd()))`
+ * with the prefix taken relative to `repoRootFor(INSTANCE_ROOT)`, so the
+ * committed pages depended on where the generator ran: in the composed index
+ * the links read `litlfred/folio-assistant/blob/main/cat-harness/schemas/…`
+ * (a path that repository does not hold since the separation, so every one was
+ * dead), and in a sibling clone `--check` failed and a write rewrote all of
+ * them. The skills directory is inside the instance, and the instance's root
+ * is its repository's root, so the declared repository plus an
+ * instance-relative path names the same file from every layout.
+ */
+const SCHEMA_DOCS_REPO = declaredRepository(INSTANCE_ROOT);
+
+function declaredRepository(root: string): string {
+  const repo = readDeclaration(root)?.repository;
+  if (typeof repo !== "string" || !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    throw new Error(`gen-schema-docs: ${root}'s declaration names no "repository" (owner/name); the edit links need it`);
+  }
+  return repo;
+}
 // Same pencil as gen-skill-docs.ts, and for the same reason: a text glyph
 // rather than an inline SVG repeated once per generated page.
 const EDIT_GLYPH = "\u270E";
@@ -85,8 +105,13 @@ const SKILLS_DIR = join(schemasRoot(INSTANCE_ROOT), "skills");
  * DERIVED from `SKILLS_DIR` rather than written out, since a literal is
  * precisely what went stale: the two roots were the same directory until the
  * `wggr` stub inversion moved the instance into `cat-harness/`, so this read
- * correctly for as long as it did and broke with no edit to this file. */
-const SKILLS_REPO_PREFIX = relative(repoRootFor(INSTANCE_ROOT), SKILLS_DIR);
+ * correctly for as long as it did and broke with no edit to this file.
+ *
+ * Since the separation the links name the instance's DECLARED repository
+ * (F12, above), whose root is the instance root — the index mounts
+ * `litlfred/cat-harness` whole — so the repository-relative path is now the
+ * instance-relative one, and reads the same from the index and a sibling clone. */
+const SKILLS_REPO_PREFIX = relative(INSTANCE_ROOT, SKILLS_DIR).split("\\").join("/");
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "reference", "skills");
 
 /**
