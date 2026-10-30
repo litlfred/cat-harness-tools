@@ -319,14 +319,14 @@ export function toRootFor(route: string, fileUnder: string): string {
 }
 
 /**
- * Write a rail's shared data into the built site, once per content — bean
- * `lnoy`. The file is named by its content's hash, so a second page with the
- * same rail finds it already there.
+ * Write a rail's shared data into the built site, once per scope — beans
+ * `lnoy`, `g196`. Named by the rail's scope rather than its content so railed
+ * pages stay byte-identical when the rail's links, pages or counts change.
  */
 export function railDataWriter(siteAbs: string): (file: string, body: string) => void {
   return (file, body) => {
     const abs = join(siteAbs, file);
-    if (existsSync(abs)) return;
+    if (existsSync(abs) && readFileSync(abs, "utf-8") === body) return;
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, body);
   };
