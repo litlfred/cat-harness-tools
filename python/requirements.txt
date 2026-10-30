@@ -12,7 +12,7 @@ cffi
 # imports: cryptography
 cryptography
 
-# lxml: `smart-base-transform.py` and both translation extract/inject scripts — XML with namespaces, which `xml.etree` handles poorly enough to matter here.
+# lxml: Both translation extract/inject scripts — XML with namespaces, which `xml.etree` handles poorly enough to matter here.
 # imports: lxml
 lxml
 
