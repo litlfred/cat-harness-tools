@@ -11,10 +11,12 @@
  * so the after-check reads a record rather than reconstructing one.
  *
  * For computable Data Sharing Agreements (DSA B4, bean `3z44`, issue #2702),
- * decision records also cite their agreement (`url` + `sha256` digest, and
- * optional `grant` id for B5) and form an append-only hash chain
- * (`cat-harness:previousHash` → `cat-harness:recordHash`) verified by
- * {@link verifyProvHashChain}.
+ * decision records also cite their agreement — a `prov:used` entity whose `@id`
+ * is the DCAT 3 distribution of the agreement text, with its `spdx:checksum` —
+ * and, for B5, their grant as a `prov:used` entity whose `@id` is the W3C VC
+ * 2.0 credential `id` (bean `yy40`). They form an append-only hash chain
+ * (`cat-harness:previousHash` → `cat-harness:recordHash`, a local extension:
+ * no open standard defines one) verified by {@link verifyProvHashChain}.
  *
  * Same rule as the after-check, and for the same reason: **no activity is
  * invented.** A step with no actor, or in a lane that binds no role, gets none,
@@ -30,17 +32,22 @@ import {
   ProvConsentDecisionRecordSchema,
   ProvConsentRefSchema,
   ProvDecisionRecordSchema,
+  agreementDistribution,
+  agreementsCited,
   appendProvDecisionRecord,
   buildProvHashChain,
   canonicalProvRecord,
   computeProvRecordHash,
+  grantCredential,
+  grantsCited,
   isConsentBasedRecord,
   isConsentPolicyUid,
   stampProvDecisionRecord,
   stampProvRecord,
   verifyProvHashChain,
   type ProvActivity,
-  type ProvAgreementRef,
+  type ProvAgreementDistribution,
+  type ProvUsed,
   type ProvChainError,
   type ProvChainErrorKind,
   type ProvChainVerification,
@@ -55,16 +62,20 @@ export {
   ProvConsentDecisionRecordSchema,
   ProvConsentRefSchema,
   ProvDecisionRecordSchema,
+  agreementDistribution,
+  agreementsCited,
   appendProvDecisionRecord,
   buildProvHashChain,
   canonicalProvRecord,
   computeProvRecordHash,
+  grantCredential,
+  grantsCited,
   isConsentBasedRecord,
   isConsentPolicyUid,
   stampProvDecisionRecord,
   stampProvRecord,
   verifyProvHashChain,
-  type ProvAgreementRef,
+  type ProvAgreementDistribution,
   type ProvChainError,
   type ProvChainErrorKind,
   type ProvChainVerification,
@@ -92,11 +103,12 @@ export interface ProvRecordInput {
   /** The content the step acted on. */
   target?: string;
   /**
-   * The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id)
-   * when the step/decision was evaluated under an agreement (DSA B4, bean `3z44`).
+   * The agreement the step/decision was evaluated under (DSA B4, beans `3z44`,
+   * `yy40`): its DCAT distribution and `spdx:checksum`, written into
+   * `prov:used`. Build one with {@link agreementDistribution}.
    */
-  agreement?: ProvAgreementRef;
-  /** Optional grant identifier (DSA B5). */
+  agreement?: ProvAgreementDistribution;
+  /** The grant's W3C VC 2.0 credential `id` (DSA B5), written into `prov:used`. */
   grant?: string;
   /**
    * The IHE PCF / FHIR R4 `Consent` (`id` + `versionId`) cited when the
@@ -120,8 +132,8 @@ export interface ProvRecordInput {
 }
 
 export interface ProvDecisionRecordInput extends ProvRecordInput {
-  /** Required on every decision record: the agreement URL + SHA-256 digest. */
-  agreement: ProvAgreementRef;
+  /** Required on every decision record: the agreement's DCAT distribution + `spdx:checksum`. */
+  agreement: ProvAgreementDistribution;
   /** Optional preceding record in the chain, from which `previousHash` is read. */
   previousRecord?: Pick<ProvActivity, "cat-harness:recordHash"> | null;
 }
@@ -136,6 +148,11 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
   const { verdict: v } = input;
   if (!v.allowed || !v.actor || !v.role || input.policies.length === 0) return undefined;
   const policies = [...input.policies].sort();
+  const used: ProvUsed[] = [
+    ...(input.target ? [input.target] : []),
+    ...(input.agreement ? [input.agreement] : []),
+    ...(input.grant ? [grantCredential(input.grant)] : []),
+  ];
   const baseActivity = {
     "@type": "prov:Activity" as const,
     "@id": input.id,
@@ -145,10 +162,8 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
       "prov:hadRole": v.role,
       "prov:hadPlan": `${planStem(input.source)}#${input.node}`,
     },
-    ...(input.target ? { "prov:used": [input.target] } : {}),
+    ...(used.length > 0 ? { "prov:used": used } : {}),
     "cat-harness:underPolicy": policies.length === 1 ? policies[0]! : policies,
-    ...(input.agreement ? { "cat-harness:agreement": input.agreement } : {}),
-    ...(input.grant ? { "cat-harness:grant": input.grant } : {}),
     ...(input.consent ? { "cat-harness:consent": input.consent } : {}),
     ...(input.consentBased !== undefined ? { "cat-harness:consentBased": input.consentBased } : {}),
   };
@@ -179,7 +194,7 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
 
 /**
  * Build a hash-chained PROV decision record (DSA B4, bean `3z44`) naming its
- * agreement (URL + SHA-256 digest, and optional grant id) — and its Consent
+ * agreement (DCAT distribution + `spdx:checksum`, and optional VC grant) — and its Consent
  * (`id` + `versionId`, PCF8, bean `2egb`) when consent-based — chained to
  * `previousRecord` / `previousHash`. Returns `undefined` when the verdict was
  * refused or lacks actor/role/policies.
@@ -201,7 +216,7 @@ export function provDecisionRecordFor(
 
 /**
  * Build a hash-chained consent-based PROV decision record (PCF8, bean `2egb`)
- * requiring both `agreement` (`url` + `sha256`) and `consent` (`id` + `versionId`).
+ * requiring both `agreement` (DCAT distribution + `spdx:checksum`) and `consent` (`id` + `versionId`).
  */
 export function provConsentDecisionRecordFor(
   input: ProvConsentDecisionRecordInput,

@@ -29,6 +29,7 @@ import { join } from "node:path";
 import { exitCodeFor, siteLinks, verifySiteLinks } from "../../site-links.js";
 import { siteDirFor, siteFileFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const DECL = { name: "folio-assistant", stub: "folio-assistant" };
 
@@ -149,8 +150,11 @@ describe("verifySiteLinks", () => {
 
 describe("the template and the data agree", () => {
   const ROOT = join(HARNESS_ROOT);
+  /** Standing alone, `_data/harness.json` is not built: `docs:harness` writes it at publish, and it is gitignored. */
+  const NOT_BUILT = (): boolean =>
+    siteNotBuilt("the harness data `docs:harness` writes at publish (gitignored)", join(ROOT, siteDirFor(ROOT), "_data/harness.json"));
 
-  test("harness.json carries links, each with exactly one destination", () => {
+  test.skipIf(NOT_BUILT())("harness.json carries links, each with exactly one destination", () => {
     const h = JSON.parse(readFileSync(join(ROOT, siteDirFor(ROOT), "_data/harness.json"), "utf8")) as {
       links?: { id: string; path?: string; url?: string }[];
     };
@@ -164,7 +168,7 @@ describe("the template and the data agree", () => {
     }
   });
 
-  test("no published link has the `/kg/` segment", () => {
+  test.skipIf(NOT_BUILT())("no published link has the `/kg/` segment", () => {
     const h = JSON.parse(readFileSync(join(ROOT, siteDirFor(ROOT), "_data/harness.json"), "utf8")) as {
       links: { path?: string }[];
     };

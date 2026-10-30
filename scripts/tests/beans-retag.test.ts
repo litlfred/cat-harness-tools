@@ -13,7 +13,7 @@ import { BEAN_SCHEMA_TAG } from "../../schemas/sdlc/bean-graph.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG } from "../../schemas/kg/cat-harness.ts";
 
 import { RETAG_COMMAND, retagBeanText, retagDir } from "../beans-retag.ts";
-import { retagDeclarations, retagDeclarationText } from "../declarations-retag.ts";
+import { needsOfRoots, retagDeclarations, retagDeclarationText } from "../declarations-retag.ts";
 import { retagBeansBeforePush } from "../state-push.ts";
 
 const dirs: string[] = [];
@@ -129,14 +129,15 @@ describe("retagDeclarationText", () => {
     const root = scratch();
     const inst = join(root, "demo");
     mkdirSync(inst);
-    writeFileSync(join(inst, "demo.json"), DECL);
+    // Above the harness (it needs it), so it is one this script tags.
+    writeFileSync(join(inst, "demo.json"), '{\n  "name": "demo",\n  "needs": ["cat-harness"]\n}\n');
     writeFileSync(join(inst, "demo.config.json"), '{\n  "site": {}\n}\n');
     const r = retagDeclarations([inst], root, { write: true });
     expect(r.added).toEqual(["demo/demo.json"]);
     expect(readFileSync(join(inst, "demo.config.json"), "utf-8")).toBe('{\n  "site": {}\n}\n');
   });
 
-  test("instances below the harness — what cat-harness transitively needs — are left untagged", () => {
+  test("instances below the harness — those that do not reach cat-harness through `needs` — are left untagged", () => {
     const root = scratch();
     const decl = (name: string, needs: string[]) => {
       mkdirSync(join(root, name));
@@ -148,6 +149,31 @@ describe("retagDeclarationText", () => {
     expect(r.below.sort()).toEqual(["boot-tools/boot-tools.json", "boot/boot.json"]);
     expect(r.added.sort()).toEqual(["above/above.json", "cat-harness/cat-harness.json"]);
     expect(readFileSync(join(root, "boot", "boot.json"), "utf-8")).not.toContain("$schema");
+  });
+
+  test("bootstrap-tools stays below the harness when cat-harness no longer needs it (cat-harness#787, bean w1gy)", () => {
+    const root = scratch();
+    const decl = (name: string, needs: string[]) => {
+      mkdirSync(join(root, name));
+      writeFileSync(join(root, name, `${name}.json`), `{\n  "name": "${name}",\n  "needs": ${JSON.stringify(needs)}\n}\n`);
+      return join(root, name);
+    };
+    // The real shape since cat-harness#787: the harness needs bootstrap only, and
+    // the tools layer above it is what still names bootstrap-tools.
+    const roots = [
+      decl("bootstrap", []),
+      decl("bootstrap-tools", ["bootstrap"]),
+      decl("cat-harness", ["bootstrap"]),
+      decl("cat-harness-tools", ["cat-harness", "bootstrap-tools"]),
+    ];
+    const r = retagDeclarations(roots, root, { write: false });
+    expect(r.below.sort()).toEqual(["bootstrap-tools/bootstrap-tools.json", "bootstrap/bootstrap.json"]);
+    expect(r.added.sort()).toEqual(["cat-harness-tools/cat-harness-tools.json", "cat-harness/cat-harness.json"]);
+
+    // One instance at a time (`--instance`), judged by the checkout's graph.
+    const one = retagDeclarations([roots[1]!], root, { write: false, needs: needsOfRoots(roots) });
+    expect(one.below).toEqual(["bootstrap-tools/bootstrap-tools.json"]);
+    expect(one.files).toBe(0);
   });
 });
 

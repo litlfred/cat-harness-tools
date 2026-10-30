@@ -20,7 +20,7 @@ import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unf
 import { firstSentence } from "../kg-export.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
-import { inAggregate } from "../../test/support/checkout.ts";
+import { inAggregate, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;
 const REPO = repoRootFor(HARNESS);
@@ -184,10 +184,18 @@ describe("the committed subgraph JSON-LD", () => {
   test("with no `seeAlso`, an unframed instance's diagrams are NOT counted", () => {
     expect(unframedProcesses([], framed, REPO).byPath.size).toBe(0);
   });
-  test("the shipped viewer reads the same rows from the same files", () => {
+  const VIEWED = ["cat-harness/processes", "folio-assistant-core/processes"];
+  // Standing alone the hydrated subgraphs are not built: `subgraph:jsonld`
+  // writes them at publish and the subgraph tree is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt(
+      "the hydrated processes subgraphs `subgraph:jsonld` writes at publish (gitignored)",
+      ...VIEWED.map((sub) => join(OUT, sub, "index.hydrated.jsonld")),
+    ),
+  )("the shipped viewer reads the same rows from the same files", () => {
     const api = viewerApi();
     let n = 0;
-    for (const sub of ["cat-harness/processes", "folio-assistant-core/processes"]) {
+    for (const sub of VIEWED) {
       const doc = JSON.parse(readFileSync(join(OUT, sub, "index.hydrated.jsonld"), "utf-8"));
       n += api.rowsFromHydrated(doc, sub.split("/")[0]!).length;
     }

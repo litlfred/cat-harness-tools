@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-content-graph-analysis.py — Editorial graph analysis for the QOU paper.
+content-graph-analysis.py — Editorial graph analysis for one paper of a folio.
 
 Builds a block-level and chapter/section-level dependency graph from content
 .ts manifests.  Applies heuristics to detect forward references,
@@ -8,9 +8,20 @@ cross-chapter/cross-section coupling, sparse/dense sections, and isolated
 blocks.  Outputs a ranked report and optional Graphviz SVG visualisations.
 
 Usage:
-    cd content && python3 pipeline/content-graph-analysis.py [options]
+    python3 cat-harness-tools/pipeline/content-graph-analysis.py [options]
+
+    Run it from the folio (content) repository. The paper is `--paper`, or
+    the folio's only paper when it holds exactly one; there is no default
+    paper name, because the platform must not privilege one folio.
 
 Options:
+    --paper <dir>     The paper: a directory name under the folio directory,
+                      or a path to the paper directory. Required when the
+                      folio holds several papers.
+    --content-root <dir>
+                      The folio directory that holds the papers. Default: the
+                      nearest `folio/` or `content/` directory, walking up
+                      from the current directory, that holds a paper.
     --chapter <dir>   Restrict analysis to one chapter directory
     --visualise       Render Graphviz DOT files to SVG (requires graphviz)
     --json            Emit full graph as JSON to stdout and exit
@@ -28,9 +39,64 @@ from pathlib import Path
 
 # ── Paths ───────────────────────────────────────────────────────────────────
 
-SCRIPT_DIR   = Path(__file__).parent
-CONTENT_ROOT = SCRIPT_DIR.parent
-PAPER_DIR    = CONTENT_ROOT / "quantum-observable-universe"
+# A paper is a directory `<root>/<paper>/` holding a same-named manifest
+# `<paper>.ts` (the same rule as `findPapers` in pipeline/repo-root.ts, which
+# Python cannot import). The folio directory is declared per instance and
+# defaults to `folio/`; `content/` is still accepted for folios that keep it.
+FOLIO_DIR_NAMES = ("folio", "content")
+
+
+def find_papers(root: Path) -> list[str]:
+    """Paper directory names under `root`, sorted."""
+    if not root.is_dir():
+        return []
+    return sorted(
+        d.name for d in root.iterdir()
+        if d.is_dir() and not d.name.startswith(".") and (d / f"{d.name}.ts").is_file()
+    )
+
+
+def find_content_root(start: Path) -> Path | None:
+    """The nearest folio directory holding at least one paper, walking up from `start`."""
+    for d in [start, *start.parents][:12]:
+        for name in FOLIO_DIR_NAMES:
+            cand = d / name
+            if find_papers(cand):
+                return cand
+    return None
+
+
+def resolve_paper_dir(paper: str | None, content_root: str | None,
+                      cwd: Path | None = None) -> Path:
+    """
+    The paper directory to analyse: `paper` if given (a path, or a name under
+    the folio directory), else the folio's only paper. Exits with the folio's
+    actual contents when there is no unambiguous answer, rather than guessing
+    a paper name.
+    """
+    cwd = cwd or Path.cwd()
+    if paper and Path(paper).is_dir() and (Path(paper) / f"{Path(paper).name}.ts").is_file():
+        return Path(paper).resolve()
+    root = Path(content_root).resolve() if content_root else find_content_root(cwd)
+    if root is None:
+        sys.exit(
+            "content-graph-analysis: no folio directory with a paper found above "
+            f"{cwd}. Run it from the folio repository, or pass --content-root."
+        )
+    if paper:
+        if not (root / paper / f"{paper}.ts").is_file():
+            sys.exit(f"content-graph-analysis: no paper '{paper}' under {root} "
+                     f"(papers: {', '.join(find_papers(root)) or 'none'}).")
+        return root / paper
+    papers = find_papers(root)
+    if len(papers) == 1:
+        return root / papers[0]
+    sys.exit(
+        f"content-graph-analysis: no paper under {root}; pass --paper."
+        if not papers else
+        f"content-graph-analysis: {len(papers)} papers under {root} "
+        f"({', '.join(papers)}); name one with --paper."
+    )
 
 # ── Regex helpers ────────────────────────────────────────────────────────────
 
@@ -345,7 +411,7 @@ def _is_statement_to_own_proof(from_label: str, to_label: str) -> bool:
     Documented in `.claude/skills/local/detangler-integration-watcher.md`
     Slot D under "Excluded forward-reference patterns". The earlier
     detangler heuristic flagged 143+ such pairs as H1 false positives
-    on QOU paper main; this filter eliminates that class. The
+    on one paper's main; this filter eliminates that class. The
     qualified-variant rule (`prf:foo-bar`) trades a slight risk of
     false-negatives (a real forward ref where the proof name happens
     to share a `-`-prefixed segment with an unrelated earlier
@@ -683,9 +749,10 @@ def format_report(
     chapter_edges: dict[tuple[int, int], int],
     section_edges: dict[tuple[str, str], int],
     findings: list[Finding],
+    paper_name: str,
 ) -> str:
     lines = []
-    lines.append("# Content Graph Analysis: quantum-observable-universe")
+    lines.append(f"# Content Graph Analysis: {paper_name}")
     lines.append("")
 
     # Summary
@@ -1068,7 +1135,7 @@ def generate_proposals(
     label_to_block: dict[str, BlockInfo],
     edges: list[tuple[str, str, str]],
     chapter_edges: dict[tuple[int, int], int],
-    paper_dir: Path = PAPER_DIR,
+    paper_dir: Path,
 ) -> list[Proposal]:
     """
     Generate concrete, implementable reorganisation proposals from the findings.
@@ -1113,7 +1180,7 @@ def generate_proposals(
                 impact=f"Breaks {count}-block monolith into focused subsections of 5–20 blocks.",
                 blocks=sec.blocks[:5],
                 details={
-                    "chapter_manifest": str(PAPER_DIR / ch.dir / f"{ch.dir}.ts"),
+                    "chapter_manifest": str(paper_dir / ch.dir / f"{ch.dir}.ts"),
                     "section_label": sec.label,
                     "current_block_count": count,
                     "action": (
@@ -1156,7 +1223,7 @@ def generate_proposals(
                     impact=f"Reduces section count by 1; improves narrative flow.",
                     blocks=s1.blocks + s2.blocks,
                     details={
-                        "chapter_manifest": str(PAPER_DIR / ch.dir / f"{ch.dir}.ts"),
+                        "chapter_manifest": str(paper_dir / ch.dir / f"{ch.dir}.ts"),
                         "keep_label": s1.label,
                         "remove_label": s2.label,
                         "merged_blocks": s1.blocks + s2.blocks,
@@ -1347,11 +1414,14 @@ def main():
     parser.add_argument("--proposals", action="store_true",
                         help="Generate concrete reorganisation proposals (outputs /tmp/content-graph-proposals.md)")
     parser.add_argument("--paper", metavar="DIR",
-                        help="Paper directory name (default: quantum-observable-universe)",
-                        default="quantum-observable-universe")
+                        help="Paper directory name under the folio directory, or a path to it "
+                             "(default: the folio's only paper; required when it has several)")
+    parser.add_argument("--content-root", metavar="DIR",
+                        help="Folio directory holding the papers (default: nearest folio/ or "
+                             "content/ above the current directory that holds a paper)")
     args = parser.parse_args()
 
-    paper_dir = CONTENT_ROOT / args.paper
+    paper_dir = resolve_paper_dir(args.paper, args.content_root)
     print("Parsing content tree…", file=sys.stderr)
     chapters, blocks = parse_paper(paper_dir, chapter_filter=args.chapter)
     print(
@@ -1401,7 +1471,8 @@ def main():
         return
 
     report = format_report(
-        chapters, blocks, edges, chapter_edges, section_edges, findings
+        chapters, blocks, edges, chapter_edges, section_edges, findings,
+        paper_name=paper_dir.name,
     )
 
     if args.md:

@@ -757,6 +757,21 @@ jobs:
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
             ../ci/.github/scripts/layer-pr-checks/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
+      - &derive-cache
+        name: Restore the derive:publish writer cache (cat-harness-tools#400)
+        # Owner, 2026-10-30: reuse is ON for layer PR checks only, to measure
+        # hit rates before the published site relies on the keys. Entries are
+        # keyed by each writer's inputs and script closure (#409), so a stale
+        # entry is a key defect, which the derive log's "reused" lines show.
+        # Saved per side and run; restored from the newest of this repository.
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        uses: actions/cache@v6
+        with:
+          path: fa/build/derive-cache
+          key: derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-
+            derive-cache-v1-${{ github.repository }}-
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
         # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
@@ -835,7 +850,11 @@ jobs:
           # recording below (smart-ra#66, job 116366855337). `|| code=$?` keeps
           # the step alive with derive:publish's own exit (tee's is 0).
           code=0
+          # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
+          # CI unless a cache directory is named.
+          export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
           bun run cat derive:publish 2>&1 | tee "$log" || code=$?
+          echo "derive cache: $(grep -c '^  reused ' "$log" || true) writer(s) reused, $(grep -c '^  ran ' "$log" || true) ran"
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
           # A root that is not the folio-assistant index (no
           # code-quality-gates.yml: a folio, an IG repository) mounts fewer
@@ -1165,6 +1184,7 @@ jobs:
       - *chromium
       - *state-mount
       - *root-gates
+      - *derive-cache
       - *derive
       - *timings-restore
       - *snapshot-save

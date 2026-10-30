@@ -159,6 +159,7 @@
     "schemas/ui/slides-accessibility.ts",
     "schemas/ui/theme.ts",
     "schemas/ui/tile-count.ts",
+    "scripts/gen-kind-json-schemas.ts",
     "scripts/gen-object-model-uml.ts",
     "scripts/gen-slice-sqlite.ts",
     "scripts/gen-uml-overview.ts",

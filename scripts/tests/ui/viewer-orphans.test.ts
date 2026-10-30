@@ -29,6 +29,7 @@ import { orphanSubjectPages, viewerHtml } from "../../gen-schema-viz.ts";
 import { readDeclaration, siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
 /**
@@ -127,7 +128,14 @@ describe("the committed tree carries no orphan", () => {
   });
 
   for (const kind of ["schemas", "library"]) {
-    it(`${kind} subject pages all declare themselves`, () => {
+    // Standing alone the viewer's subject pages are not built: its generator
+    // writes them at publish and they are gitignored (bean w1gy F18). An
+    // undeclared route guards nothing, so the assertion below still names it.
+    const route = declaredPageRoute(INSTANCE, VIEWER_OF[kind]!);
+    const unbuilt =
+      route !== undefined &&
+      siteNotBuilt(`the ${kind} viewer's subject pages its generator writes at publish (gitignored)`, join(SITE, route));
+    it.skipIf(unbuilt)(`${kind} subject pages all declare themselves`, () => {
       const route = declaredPageRoute(INSTANCE, VIEWER_OF[kind]!);
       expect(route, `${kind}: no declared viewer route`).toBeDefined();
       const dir = join(SITE, route!);

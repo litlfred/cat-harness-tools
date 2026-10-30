@@ -185,7 +185,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
     // Bean `ug4r`. The absence is an assertion: the performer is whoever
     // called the sub-process, so there is no persona to define. Without
     // `laneBinding` this would be indistinguishable from a lane nobody bound.
-    const actor = concepts(doc).find((c) => String(c["@id"]).includes("#process/Process_LogMessage/lane/Lane_Actor"));
+    const actor = concepts(doc).find((c) => String(c["@id"]).includes("/process/Process_LogMessage/lane/Lane_Actor"));
     expect(actor).toBeDefined();
     expect(actor!.definition).toBeUndefined();
     expect(actor!.performerVaries).toBe(true);
@@ -347,7 +347,9 @@ describe("the host glossary's old root address", () => {
       const stones = new Map((old["@graph"] as Node[]).map((t) => [String(t.isReplacedBy), String(t["@id"])]));
       for (const u of us) {
         const id = String(u["@id"]);
-        expect(stones.get(id)).toBe(id.replace(`${BASE}/cat-harness/cat-harness.jsonld#`, `${BASE}/cat-harness.jsonld#`));
+        // A usage is a fragment of the glossary that holds it (#961); its tombstone keeps the pre-move address.
+        expect(id.startsWith(`${BASE}/cat-harness/cat-harness-glossary.jsonld#glossary-usage/`)).toBe(true);
+        expect(stones.get(id)).toBe(id.replace(`${BASE}/cat-harness/cat-harness-glossary.jsonld#`, `${BASE}/cat-harness.jsonld#`));
       }
       // Anywhere but the published path, the site root is unknown: nothing.
       expect(legacyGlossaryDocuments(doc, join(site, "x.jsonld"), undefined, BASE)).toBeUndefined();

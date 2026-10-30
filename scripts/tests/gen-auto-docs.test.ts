@@ -23,6 +23,7 @@ import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } f
 import { knownSkills } from "../known-skills.ts";
 import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).
 const INSTANCE = HARNESS_ROOT;
@@ -265,6 +266,14 @@ describe("what is published", () => {
 });
 
 describe("the LEVEL pages — a route that reads like a section must answer", () => {
+  // Standing alone the level pages are not built: `auto:docs` writes them at
+  // publish and `auto-docs/` is gitignored (bean w1gy F18).
+  const notBuilt = (...levels: string[][]): boolean =>
+    siteNotBuilt(
+      "the auto-docs level pages `auto:docs` writes at publish (gitignored)",
+      ...levels.map((l) => join(SITE, HANDLER ?? "", "auto-docs", ...l, "index.html")),
+    );
+
   it("every level above a built type has an index", () => {
     // Bean `06e3`: a type id may carry a slash, so `viewerPlacement` nests its
     // page directory and the levels above came into existence holding nothing.
@@ -283,7 +292,7 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
     }
   });
 
-  it("a level page names ITSELF, so the one pruner can read its ownership", () => {
+  it.skipIf(notBuilt([], ["index"]))("a level page names ITSELF, so the one pruner can read its ownership", () => {
     // `orphanSubjectPages` establishes ownership from `var SCOPE`, and a page
     // whose SCOPE does not match its own directory is FOREIGN — reported and
     // left. A level page that got this wrong would be unprunable forever, and
@@ -294,7 +303,7 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
     expect(mid).toContain('var SCOPE = "index";');
   });
 
-  it("its links are relative to itself, so the tree can move", () => {
+  it.skipIf(notBuilt(["index"]))("its links are relative to itself, so the tree can move", () => {
     const mid = readFileSync(join(SITE, HANDLER!, "auto-docs", "index", "index.html"), "utf-8");
     for (const t of TYPES) {
       const seg = t.id.split("/").pop()!;

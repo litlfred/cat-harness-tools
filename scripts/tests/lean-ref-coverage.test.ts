@@ -14,7 +14,7 @@ import { describe, test, expect } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "fs";
 import { join, resolve, relative } from "path";
 
-import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
@@ -62,14 +62,6 @@ describe("import + SSOT hygiene guards", () => {
     }
     expect(offenders).toEqual([]);
   });
-
-  test("q-usage-audit carries no private resolver/walker (single source of truth)", () => {
-    const src = readFileSync(
-      join(TOOLS_ROOT, "pipeline", "q-usage-audit.ts"),
-      "utf-8",
-    );
-    expect(src).toContain('from "./qa-utils');
-    expect(src).not.toContain("function resolveLakeTreePath");
-    expect(src).not.toContain("function lakeTreeContains");
-  });
+  // "q-usage-audit carries no private resolver/walker" moved to
+  // folio-assistant-sci with the script (bean saqd).
 });
