@@ -15,7 +15,7 @@ const pipelineDir = join(contentDir, "pipeline");
 const buildMod = await import(pathToFileURL(join(pipelineDir, "build.ts")).href);
 const { buildPaper } = buildMod;
 const mainTexMod = await import(pathToFileURL(join(pipelineDir, "generate-main-tex.ts")).href);
-const { generateMainTex, generateStandaloneAppendixTex } = mainTexMod;
+const { generateMainTex, generateStandaloneAppendixTex, resolvePaperPreamble } = mainTexMod;
 
 // ── Argument parsing with bounds checking ───────────────────────
 function getArgValue(args: string[], flag: string, fallback: string): string {
@@ -67,7 +67,10 @@ for (const [num, latex] of result.chapters) {
 // Generate main.tex from paper manifest + shared preamble
 if (args.includes("--generate-main")) {
   const mainOutPath = resolve(getArgValue(args, "--main-out", "main.tex"));
-  const preamblePath = resolve(getArgValue(args, "--preamble", join(contentDir, "../latex/preamble.tex")));
+  const preambleIdx = args.indexOf("--preamble");
+  const preamblePath = await resolvePaperPreamble(
+    preambleIdx >= 0 ? getArgValue(args, "--preamble", "") : undefined,
+  );
   const chaptersDir = getArgValue(args, "--chapters-dir", "chapters/");
 
   const paperMod = await import(pathToFileURL(paperPath).href);
