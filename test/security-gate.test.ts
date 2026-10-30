@@ -129,7 +129,10 @@ describe("action pinning follows the owner's staging ruling", () => {
   });
 
   test("first-party reusable workflows are not third-party", () => {
-    const root = repo("    uses: litlfred/folio-assistant/.github/workflows/publish.yml@main\n");
+    const root = repo(
+      "    uses: litlfred/folio-assistant/.github/workflows/publish.yml@main\n" +
+        "    uses: litlfred/cat-harness-tools/.github/workflows/layer-cancel-on-close.yml@main\n",
+    );
     expect(unpinnedActions(root)!.total).toBe(0);
   });
 });
