@@ -13,7 +13,7 @@ import { sweep } from "../../check-instance-config.ts";
 import { harnessTiles } from "../../harness-tiles.ts";
 import { harnessHome, instantiate, stateDirectoriesOf, unsafePathReason } from "../../kg-instantiate.ts";
 import { subscribedHarnesses, subscribedTile } from "../../subscribed-harnesses.ts";
-import { partRecordsIn, type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";
+import { checkSubscriptions, partRecordsIn, type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";
 import { render, subscriptionCards } from "../../subscriptions-viz.ts";
 import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
 
@@ -68,6 +68,12 @@ function checkout(extraInstances: string[] = []): { repo: string; host: string; 
       "path": "subscriptions/",
       "dependents": "skip",
       "graphTypologies": ["substrate-snapshot"]
+    },
+    {
+      "id": "subscribed-harnesses",
+      "path": "subscribed-harnesses/",
+      "dependents": "skip",
+      "graphTypologies": ["subscribed-harnesses"]
     }
   ]
 }
@@ -80,9 +86,9 @@ function checkout(extraInstances: string[] = []): { repo: string; host: string; 
   return { repo, host, file };
 }
 
-/** Where `kg:instantiate` puts a subscribed harness's state (G11): under the subscriber's snapshot directory. */
+/** Where `kg:instantiate` puts a subscribed harness's state: the subscriber's `subscribed-harnesses` directory (bean `w1gy` finding 1). */
 function home(c: { host: string }, subscription = "ihris-kb", harness = "ihris-kb"): string {
-  return harnessHome(join(c.host, "subscriptions"), subscription, harness);
+  return harnessHome(join(c.host, "subscribed-harnesses"), subscription, harness);
 }
 
 /** Subscribe `host` to `decl` at SHA, then record `harnesses` as chosen. */
@@ -172,9 +178,30 @@ describe("instantiate: writes the config and the state directories", () => {
   });
 });
 
-describe("instantiate: the state home is slice 5's snapshot layout (G11)", () => {
-  test("the home is <snapshot dir>/<subscription>/harnesses/<harness>/", () => {
-    expect(harnessHome("/x/host/subscriptions", "sub", "kb")).toBe(join("/x/host/subscriptions", "sub", "harnesses", "kb"));
+describe("instantiate: the state home is its own state directory, never the snapshot directory (G11, w1gy finding 1)", () => {
+  test("the home is <state dir>/<subscription>/<harness>/", () => {
+    expect(harnessHome("/x/host/subscribed-harnesses", "sub", "kb")).toBe(join("/x/host/subscribed-harnesses", "sub", "kb"));
+  });
+
+  test("nothing is written under the read-only snapshot directory", async () => {
+    const c = checkout();
+    await subscribed(c);
+    const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(r.ok && r.state).toBe("instantiated");
+    expect(r.ok && r.written.some((f) => f.startsWith(join(c.host, "subscriptions") + "/"))).toBe(false);
+    expect(existsSync(join(c.host, "subscriptions", "ihris-kb"))).toBe(false);
+  });
+
+  test("a subscriber that declares no `subscribed-harnesses` directory is refused, and nothing is written", async () => {
+    const c = checkout();
+    await subscribed(c);
+    const raw = JSON.parse(readFileSync(c.file, "utf8")) as { directories: { id: string }[] };
+    writeFileSync(c.file, setTopLevelKey(readFileSync(c.file, "utf8"), "directories", raw.directories.filter((d) => d.id !== "subscribed-harnesses")));
+    const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(!r.ok && r.state).toBe("refused");
+    expect(!r.ok && r.reason).toMatch(/declares no `subscribed-harnesses` directory/);
+    expect(existsSync(join(c.host, "subscribed-harnesses"))).toBe(false);
+    expect(existsSync(join(c.repo, "ihris-kb.config.json"))).toBe(false);
   });
 
   test("a staged instance directory carrying the harness's name at the root is left untouched", async () => {
@@ -197,20 +224,49 @@ describe("instantiate: the state home is slice 5's snapshot layout (G11)", () =>
     await subscribed(c);
     instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
     const body = JSON.parse(readFileSync(join(c.repo, "ihris-kb.config.json"), "utf8"));
-    expect(body._comment).toContain("`host/subscriptions/ihris-kb/harnesses/ihris-kb/`");
+    expect(body._comment).toContain("`host/subscribed-harnesses/ihris-kb/ihris-kb/`");
   });
 
-  test("the home is a harness home to the part reader: no stray, no part", async () => {
+  test("an old-layout `harnesses/` under the snapshot directory is a stray to the part reader", async () => {
     const c = checkout();
     await subscribed(c);
     instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
-    const read = partRecordsIn(join(c.host, "subscriptions"), "ihris-kb");
-    expect(read.strays).toEqual([]);
-    expect(read.parts).toEqual([]);
-    expect(read.homes).toEqual([home(c)]);
-    // A file directly under harnesses/ is nobody's.
-    writeFileSync(join(c.host, "subscriptions", "ihris-kb", "harnesses", "loose.txt"), "x");
-    expect(partRecordsIn(join(c.host, "subscriptions"), "ihris-kb").strays).toEqual(["ihris-kb/harnesses/loose.txt"]);
+    expect(partRecordsIn(join(c.host, "subscriptions"), "ihris-kb")).toEqual({ parts: [], strays: [], nodes: [] });
+    mkdirSync(join(c.host, "subscriptions", "ihris-kb", "harnesses", "ihris-kb"), { recursive: true });
+    expect(partRecordsIn(join(c.host, "subscriptions"), "ihris-kb").strays).toEqual(["ihris-kb/harnesses"]);
+  });
+});
+
+describe("kg:subscribe:check judges the subscribed-harnesses directory (w1gy finding 1)", () => {
+  test("an instantiated harness's home is clean", async () => {
+    const c = checkout();
+    await subscribed(c);
+    instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(checkSubscriptions(c.host)).toEqual([]);
+  });
+
+  test("a home in the old snapshot-directory layout is a finding that says where to move it", async () => {
+    const c = checkout();
+    await subscribed(c);
+    mkdirSync(join(c.host, "subscriptions", "ihris-kb", "harnesses", "ihris-kb"), { recursive: true });
+    const f = checkSubscriptions(c.host);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toContain("subscriptions/ihris-kb/harnesses/: instantiated-harness state in the read-only snapshot directory");
+  });
+
+  test("a home for an unchosen harness, an undeclared subscription, or a loose file is orphaned", async () => {
+    const c = checkout();
+    await subscribed(c);
+    instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    mkdirSync(join(c.host, "subscribed-harnesses", "ihris-kb", "other"), { recursive: true });
+    mkdirSync(join(c.host, "subscribed-harnesses", "gone", "x"), { recursive: true });
+    writeFileSync(join(c.host, "subscribed-harnesses", "loose.txt"), "x");
+    writeFileSync(join(c.host, "subscribed-harnesses", "README.md"), "generated\n");
+    const f = checkSubscriptions(c.host).sort();
+    expect(f).toHaveLength(3);
+    expect(f.some((x) => x.includes("subscribed-harnesses/gone/: state for subscription `gone`"))).toBe(true);
+    expect(f.some((x) => x.includes("subscribed-harnesses/ihris-kb/other/: state for harness `other`"))).toBe(true);
+    expect(f.some((x) => x.includes("subscribed-harnesses/loose.txt: not a subscription's directory"))).toBe(true);
   });
 });
 

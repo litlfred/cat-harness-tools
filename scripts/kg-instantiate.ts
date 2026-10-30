@@ -46,11 +46,13 @@
  *
  * ## Where the state directories go
  *
- * Under the subscriber's own `substrate-snapshot` directory, at
- * `<snapshot dir>/<subscription>/harnesses/<harness>/`, at each directory's
- * declared path, with a `.gitkeep` so an empty directory survives a commit —
- * the layout slices 5 and 6 already use for materialised parts
- * (`harnessHomeOf` in `kg-parts.ts`, stated once beside `partDirOf`).
+ * Under the subscriber's own `subscribed-harnesses` directory (graph typology
+ * `subscribed-harnesses`, `holds: "state"`), at
+ * `<state dir>/<subscription>/<harness>/`, at each directory's declared path,
+ * with a `.gitkeep` so an empty directory survives a commit
+ * (`harnessHomeOf` in `kg-parts.ts`). A subscriber that declares no such
+ * directory is refused, with what to declare, as `kg:subscribe` refuses one
+ * that declares no snapshot directory.
  *
  * Slice 7 first wrote them under `<instantiation root>/<harness>/`. That was
  * arc gap G11, settled by the owner on 2026-10-30 (bean `tmo5`): the root is
@@ -59,6 +61,13 @@
  * local declaration (its declaration is the snapshot, on purpose: see
  * `schemas/kg/substrate-snapshot.ts`), and no scanner reads its home as an
  * instance because it carries none.
+ *
+ * G11 then put them under the snapshot directory, at
+ * `<snapshot dir>/<subscription>/harnesses/<harness>/`. That made one
+ * directory hold both upstream's read-only bytes and the subscriber's working
+ * state, so it could not declare `readOnly` either way. The owner split it on
+ * 2026-10-30 (bean `w1gy` finding 1, option C): the snapshots stay read-only,
+ * and the state has a directory of its own.
  *
  * ## Idempotent, and the config is never overwritten
  *
@@ -97,7 +106,8 @@ import {
 import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
 import { addIndexInstance, readIndexConfig } from "../schemas/kg/index-config.js";
 import { harnessHomeOf } from "./kg-parts.js";
-import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot, snapshotDirFor } from "./subscribed-harnesses.js";
+import { HARNESS_STATE_GRAPH_TYPOLOGY } from "../schemas/kg/substrate-snapshot.js";
+import { type HarnessDeclaration, harnessDeclarationIn, harnessStateDirFor, readSnapshot } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
@@ -145,12 +155,12 @@ export function stateDirectoriesOf(decl: HarnessDeclaration): StateDirectories {
 }
 
 /**
- * Where a subscribed harness's local bytes live:
- * `<snapshot dir>/<subscription>/harnesses/<harness>/` (G11). `snapshotDir` is
- * the subscriber's declared `substrate-snapshot` directory.
+ * Where a subscribed harness's local state lives:
+ * `<state dir>/<subscription>/<harness>/`. `stateDir` is the subscriber's
+ * declared `subscribed-harnesses` directory (bean `w1gy` finding 1).
  */
-export function harnessHome(snapshotDir: string, subscription: string, harness: string): string {
-  return harnessHomeOf(snapshotDir, subscription, harness);
+export function harnessHome(stateDir: string, subscription: string, harness: string): string {
+  return harnessHomeOf(stateDir, subscription, harness);
 }
 
 export type InstantiateResult =
@@ -283,8 +293,15 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
     if (why) return refuse(`state directory \`${d.id}\` (\`${d.path}\`) ${why}; nothing was written`);
   }
 
-  // readSnapshot read the snapshot from this directory, so it is declared.
-  const home = harnessHome(snapshotDirFor(instanceRoot, subscriber)!, sub.id, opts.harness);
+  const stateDir = harnessStateDirFor(instanceRoot, subscriber);
+  if (!stateDir) {
+    return refuse(
+      `${subscriber.name} declares no \`${HARNESS_STATE_GRAPH_TYPOLOGY}\` directory, so an instantiated harness's state has nowhere to go. ` +
+        `Declare one (e.g. \`{"id": "${HARNESS_STATE_GRAPH_TYPOLOGY}", "path": "${HARNESS_STATE_GRAPH_TYPOLOGY}/", "graphTypologies": ["${HARNESS_STATE_GRAPH_TYPOLOGY}"]}\`) ` +
+        `and re-run; the snapshot directory is upstream's bytes and is never written here`,
+    );
+  }
+  const home = harnessHome(stateDir, sub.id, opts.harness);
   const stateDirs = states.dirs.map((d) => join(home, d.path));
   const written: string[] = [];
   for (const dir of stateDirs) {

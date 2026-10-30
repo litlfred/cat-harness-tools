@@ -2870,6 +2870,29 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "the pinned commit with its fixity, and what the substrate judgement found in it; and each chosen " +
       "subgraph or asset materialised from it, with its fixity, provenance and gate answers.",
   },
+  // The other half of `subscriptions/`, split off by the owner on 2026-10-30
+  // (bean `w1gy` finding 1, option C, "split the directory"). The snapshot
+  // directory holds upstream's bytes and is declared `readOnly`; what
+  // `kg:instantiate` writes is the subscriber's own working state, so it gets
+  // a directory of its own whose layer says so. Before the split the state
+  // sat at `<snapshot dir>/<subscription>/harnesses/<harness>/` (gap G11),
+  // and one directory could not answer `readOnly` for both.
+  "subscribed-harnesses": {
+    description:
+      "the STATE directories of each harness this instance instantiated from a KG subscription (`kg:instantiate`): `<subscription>/<harness>/<state path>/`, one home per chosen harness, keyed by subscription first so two subscriptions never share one, each state directory the harness declares created with a `.gitkeep`. The harness's processes write here. Apart from `substrate-snapshot` on purpose: that directory is somebody else's bytes, read-only, and this one is the subscriber's own working state (owner, 2026-10-30, bean `w1gy` finding 1, option C). Issue #1719.",
+    title: "Subscribed harness state",
+    renderable: false,
+    holds: "state",
+    recordsWork: false, // the homes are made here; what a harness's processes then write is typed by that harness's own kinds
+    // declared-path-literal: this table IS the declaration, as on `health`.
+    validatorNotApplicable:
+      "a home holds the subscribed harness's own state directories, whose nodes are typed by THAT harness's " +
+      "graph typologies (its snapshot names them), not by this one; `kg:instantiate` writes only directories " +
+      "and `.gitkeep` files, which have no shape to parse.",
+    summary:
+      "The state directories of each harness instantiated from a KG subscription, one home per subscription " +
+      "and harness, kept apart from the read-only snapshots.",
+  },
   "translation-sources": {
     description:
       "the gettext side of translation — `.pot` templates, `.po` catalogues and their `TranslationNode` manifests, one directory per target locale. The INPUT to injection; there is deliberately **no kind for the rendered output**. Read with the [`translation-manager`](../../library/library-core/translation-manager.md) skill; shape in `schemas/content/translation.ts`.",

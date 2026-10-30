@@ -30,6 +30,7 @@ import { type CatHarnessDeclaration, type Subscription, rootForScope } from "../
 import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
 import type { DeclarationScope } from "../schemas/kg/kg-node.js";
 import {
+  HARNESS_STATE_GRAPH_TYPOLOGY,
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
   SubstrateSnapshotSchema,
@@ -44,6 +45,18 @@ type DirLike = { path: string; graphTypologies?: readonly string[]; scope?: Decl
 /** The directory an instance keeps its substrate snapshots in, or undefined when it declares none. */
 export function snapshotDirFor(instanceRoot: string, decl: { directories?: readonly DirLike[] }): string | undefined {
   const d = (decl.directories ?? []).find((x) => (x.graphTypologies ?? []).includes(SNAPSHOT_GRAPH_TYPOLOGY));
+  return d ? resolve(rootForScope(instanceRoot, d.scope), d.path) : undefined;
+}
+
+/**
+ * The directory an instance keeps its instantiated subscribed harnesses' state
+ * in (`subscribed-harnesses`, `holds: "state"`), or undefined when it declares
+ * none. Separate from {@link snapshotDirFor}: the snapshot directory holds
+ * upstream's bytes and is read-only; this one is written by `kg:instantiate`
+ * (owner, 2026-10-30, bean `w1gy` finding 1, option C).
+ */
+export function harnessStateDirFor(instanceRoot: string, decl: { directories?: readonly DirLike[] }): string | undefined {
+  const d = (decl.directories ?? []).find((x) => (x.graphTypologies ?? []).includes(HARNESS_STATE_GRAPH_TYPOLOGY));
   return d ? resolve(rootForScope(instanceRoot, d.scope), d.path) : undefined;
 }
 

@@ -53,6 +53,15 @@ export const KG_NODES_RECORD_SCHEMA = "folio-kg-nodes/v1";
 /** The graph typology of the directory an instance keeps its snapshots in. Found through the declaration, never by path. */
 export const SNAPSHOT_GRAPH_TYPOLOGY = "substrate-snapshot";
 
+/**
+ * The graph typology of the directory an instance keeps its INSTANTIATED
+ * subscribed harnesses' state in (`kg:instantiate`): `holds: "state"`, apart
+ * from the snapshot directory, which holds upstream's bytes and is declared
+ * `readOnly`. Owner, 2026-10-30 (bean `w1gy` finding 1, option C, "split the
+ * directory"). Found through the declaration, never by path.
+ */
+export const HARNESS_STATE_GRAPH_TYPOLOGY = "subscribed-harnesses";
+
 /** A snapshot's filename: `<subscription id>.substrate.json`. */
 export const SNAPSHOT_SUFFIX = ".substrate.json";
 
