@@ -40,9 +40,9 @@
  * @covers docs
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { folioDir } from "../schemas/kg/cat-harness.js";
+import { mountScopeFor } from "../schemas/kg/remote-mount.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { basename, dirname, join, relative, resolve } from "path";
@@ -69,8 +69,8 @@ export function isForeignRoot(dir: string): boolean {
 import { discoverPapers, injectSection, loadReadmeConfig, renderToc, type ReadmeTocConfig } from "./readme-toc";
 import { findContentRepoRoot } from "./repo-root";
 import { optionalPipelinePlugin } from "./pipeline-plugins";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readEffectiveConfig } from "../schemas/kg/harness-config.ts";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "../schemas/kg/cat-harness.ts";
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
 import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";

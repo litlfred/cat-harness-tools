@@ -33,7 +33,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { SWEEP_MARK_TAG, SweepMarkSchema, type SweepMark } from "@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts";
+import { SWEEP_MARK_TAG, SweepMarkSchema, type SweepMark } from "../schemas/sdlc/sweep-mark.ts";
 
 import { resolveBeanGraphNode } from "./beans.ts";
 import { REPO_ROOT } from "./lib/roots.ts";

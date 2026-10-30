@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { build, census, censusRepository } from "../root-scan-census.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 function repo(files: Record<string, string>): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "census-"));
@@ -152,7 +152,7 @@ describe("the git-helper roster is derived from git-corpus.ts", () => {
   test("EVERY exported helper is recognised as git-aware", () => {
     // The regression test for defect 2, written against the real module so a
     // helper added tomorrow is covered without anybody editing this file.
-    const src = readFileSync(resolve(HARNESS_ROOT, "schemas", "sdlc", "git-corpus.ts"), "utf-8");
+    const src = readFileSync(resolve(TOOLS_ROOT, "schemas", "sdlc", "git-corpus.ts"), "utf-8");
     const helpers = [...src.matchAll(/^export function (\w+)/gm)].map((m) => m[1]!);
     expect(helpers.length).toBeGreaterThan(3);
 

@@ -16,7 +16,7 @@ import {
   blankAvatar,
   GENERIC,
   hasAvatar,
-} from "@litlfred/cat-harness/schemas/content/avatars.js";
+} from "../../schemas/content/avatars.js";
 import { navMarkFields } from "../lib/harness-mark.js";
 import { navbarCss, navbarRegionsHtml } from "../lib/navbar.js";
 import { railModel } from "../lib/harness-rail.js";
@@ -79,7 +79,7 @@ describe("navbar rendering of themed blank mark", () => {
 
     const at = html.indexOf('<div class="fa-nav-bottom">');
     const bottomHtml = html.slice(at);
-    expect(bottomHtml).toContain('<span class="fa-nav-glyph fa-nav-tone fa-nav-blank" style="background:hsl(215 45% 28%)" aria-hidden="true"></span>');
+    expect(bottomHtml).toContain('<span class="fa-nav-glyph fa-nav-tone fa-nav-blank" style="--fa-nav-hue:215" aria-hidden="true"></span>');
     // Ensure no SVG glyph path or initial letter text was rendered inside the blank mark
     expect(bottomHtml).not.toContain('<svg viewBox="0 0 24 24"');
   });

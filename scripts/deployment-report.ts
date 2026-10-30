@@ -25,24 +25,24 @@
 
 import { dirname, join, relative, resolve } from "node:path";
 
-import { repoRootFor, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor, findInstanceRoot } from "../schemas/kg/cat-harness.ts";
 import {
   DEPLOYMENTS_DIRNAME,
   deploymentProblems,
   readDeployments,
-} from "@litlfred/cat-harness/schemas/process/deployment-description.ts";
+} from "../schemas/process/deployment-description.ts";
 import {
   resolveDeployment,
   type DeploymentReport,
   type ResolverTask,
   type ResolverTool,
-} from "@litlfred/cat-harness/schemas/process/deployment-resolver.ts";
+} from "../schemas/process/deployment-resolver.ts";
 import {
   actorsDir,
   fulfilmentKindsForBpmnType,
   readRoleGraph,
-} from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { checkoutActors } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
+} from "../schemas/process/role-graph.ts";
+import { checkoutActors } from "../schemas/process/scenario-overlay.js";
 
 import { tools } from "../tools/discover.js";
 import { processFiles } from "../src/workflow/process-files.js";

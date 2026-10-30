@@ -25,7 +25,7 @@ import { describe, test, expect } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { repoRootFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor, siteFileFor } from "../../../schemas/kg/cat-harness.js";
 import {
   run,
   injectInto,

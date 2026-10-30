@@ -18,8 +18,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { RunContextSchema, runContextRef } from "@litlfred/cat-harness/schemas/sdlc/run-context.ts";
-import { PdfStructureSchema } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
+import { RunContextSchema, runContextRef } from "../../../schemas/sdlc/run-context.ts";
+import { PdfStructureSchema } from "../../../schemas/ui/pdf-structure.ts";
 
 import { knownTitle, withKnownTitle, type Plan } from "../../ingest-document.ts";
 

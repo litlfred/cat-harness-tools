@@ -27,7 +27,7 @@ import {
   supportedLocales,
   targetLocales,
 } from "./translation-index.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);

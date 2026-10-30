@@ -52,7 +52,7 @@
  * @module scripts/lib/navbar
  */
 
-import { BLANK_AVATAR } from "@litlfred/cat-harness/schemas/ui/blank-avatar.js";
+import { BLANK_AVATAR } from "../../schemas/ui/blank-avatar.js";
 import {
   NAV_COLLAPSED_PX,
   NAV_MARK_PX as NAV_GLYPH_PX,
@@ -581,6 +581,14 @@ export function navbarCss(): string {
     `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
     `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX}px}`,
     `.fa-nav-tone{border-radius:3px}`,
+    // A TONED MARK CARRIES ITS OWN INK. Its glyph strokes in `currentColor`,
+    // which was the rail's ink: light on the dark rail, but #1f2328 on a 28%
+    // ground in light mode, about 1.5:1. Dark: a deep ground under light ink.
+    // Light: a pale tint of the hue under a deep shade of it. Over all 360
+    // hues the worst pair is 5.5:1 dark and 7.2:1 light (WCAG AA is 4.5:1).
+    `.fa-nav-tone[style*="--fa-nav-hue"]{background:hsl(var(--fa-nav-hue) 45% 28%);color:#f6f8fa}`,
+    `:root[data-fa-scheme="light"] .fa-nav-tone[style*="--fa-nav-hue"]{background:hsl(var(--fa-nav-hue) 50% 90%);color:hsl(var(--fa-nav-hue) 60% 20%)}`,
+    `@media(prefers-color-scheme:light){:root:not([data-fa-scheme]) .fa-nav-tone[style*="--fa-nav-hue"]{background:hsl(var(--fa-nav-hue) 50% 90%);color:hsl(var(--fa-nav-hue) 60% 20%)}}`,
     // Labels are held invisible at rest rather than merely clipped: clipping
     // is a geometry argument, and a host stylesheet moves where a label starts
     // without touching any of these numbers. `opacity`, not `display:none` --
@@ -669,7 +677,10 @@ const IMG_LAZY = ` loading="lazy" decoding="async"`;
 /** An item's mark: its avatar when it has one, its glyph otherwise. */
 function mark(i: NavItem, c: Ctx): string {
   // No tone behind an image that declares its ground `none` (issue #46, gap 5).
-  const tone = i.tone && i.avatar?.ground !== "none" ? ` style="background:hsl(${i.tone} 45% 28%)"` : "";
+  // The tone is passed as a HUE; the ground and the ink on it are chosen by
+  // the scheme in `navbarCss` (owner, 2026-10-30: dark glyph on a dark ground
+  // in light mode, "bad contrasting colors").
+  const tone = i.tone && i.avatar?.ground !== "none" ? ` style="--fa-nav-hue:${i.tone}"` : "";
   if (i.avatar) {
     const t = i.avatar.title ? ` title="${esc(i.avatar.title)}"` : "";
     const r = i.avatar.region;
@@ -700,7 +711,7 @@ function mark(i: NavItem, c: Ctx): string {
   // Themed blank mark: an instance or kind with no declared avatar draws a blank
   // in its theme's colour rather than an initial letter or generic question mark.
   if (i.blank || i.glyphPath === BLANK_AVATAR.glyph) {
-    const blankTone = typeof i.tone === "number" ? ` style="background:hsl(${i.tone} 45% 28%)"` : "";
+    const blankTone = typeof i.tone === "number" ? ` style="--fa-nav-hue:${i.tone}"` : "";
     return `<span class="fa-nav-glyph fa-nav-tone fa-nav-blank"${blankTone} aria-hidden="true"></span>`;
   }
   // An initial, not a question mark. `603s` reports "no avatar declared" as a

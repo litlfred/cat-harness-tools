@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDir } from "../../schemas/kg/cat-harness.ts";
 
 import {
   addedFiles,

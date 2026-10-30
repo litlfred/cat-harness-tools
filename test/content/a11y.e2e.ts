@@ -43,7 +43,7 @@ import { test, expect } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { artefactStubFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { artefactStubFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** This file's own repo root: it resolves assets from three different

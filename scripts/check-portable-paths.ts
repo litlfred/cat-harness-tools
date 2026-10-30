@@ -53,7 +53,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { unportablePath, type UnportableReason } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { unportablePath, type UnportableReason } from "../schemas/kg/portable-path.ts";
 
 /** One tracked path a checkout would refuse, and why. */
 export interface UnportableFinding {

@@ -14,7 +14,7 @@ import {
   processReach,
 } from "../audit-reachability.ts";
 import { loadDecisionTable, unreadableExpressions } from "../../src/workflow/decision-table.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds already (4.5-4.7 s measured on

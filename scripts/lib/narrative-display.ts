@@ -11,7 +11,7 @@
  *
  * @module scripts/lib/narrative-display
  */
-import { NarrativeSlotSchema, narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { NarrativeSlotSchema, narrativeFor } from "../../schemas/content/narrative.ts";
 
 /**
  * The language a narrative is written in when its writer does not say.

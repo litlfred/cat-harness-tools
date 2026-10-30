@@ -16,8 +16,8 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "path";
 import { contributionsRoot } from "./repo-root";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const PLATFORM_INSTANCE = resolve(HARNESS_ROOT);

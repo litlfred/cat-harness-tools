@@ -15,7 +15,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import "../../schemas/kg/folio-graph-typology.js";
 import { migrateFamily } from "../migrate-bib-attestations";
 import {
   BibAttestationError,
@@ -25,8 +25,8 @@ import {
   SOURCE_LEDGER_AUTHORITATIVE_FOR,
   writeHumanReviews,
   writeSourceLedger,
-} from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
-import { jsonText } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+} from "../../schemas/library/bib-attestations.ts";
+import { jsonText } from "../../schemas/sdlc/qa-attestations.ts";
 
 const ROWS = [
   { id: "a2004", status: "verified-clean", verified_at: "2026-05-19T06:38:00Z", verified_by: { kind: "agent", model: "claude-opus-4-7" }, note: "§5.5 → §5.2 — ✓", source: { kind: "upload", file: "library/a/a.pdf" } },

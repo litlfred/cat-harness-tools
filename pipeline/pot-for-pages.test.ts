@@ -28,7 +28,7 @@ import { join } from "node:path";
 
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "../schemas/kg/cat-harness.js";
 import { needingCatalogue, owned, plan, sourceFor } from "./pot-for-pages.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

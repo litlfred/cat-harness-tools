@@ -18,7 +18,7 @@ import {
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type TermAdjudication,
-} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
+} from "./content/term-adjudication.ts";
 
 const subject = (over: Record<string, unknown> = {}) => ({
   scheme: "kg-tools",

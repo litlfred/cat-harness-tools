@@ -47,7 +47,7 @@ import { describe, expect, test } from "bun:test";
 import { join, relative, resolve } from "node:path";
 
 import { loadProcessModel, isActivity, processDiagrams } from "../../src/workflow/process-model.js";
-import { readRoleGraph, roleForLane } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { readRoleGraph, roleForLane } from "../../schemas/process/role-graph.js";
 import { workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

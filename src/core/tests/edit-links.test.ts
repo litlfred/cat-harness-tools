@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../../schemas/kg/cat-harness.js";
 import { BLOCK_URLS_JS, SUGGEST_TOKENS_JS, editLinkHtml, editLinksAsset, editUrl, feedbackUrl, sourceUrl } from "../edit-links.js";
 import { HARNESS_ROOT } from "../../../scripts/lib/roots.ts";
 

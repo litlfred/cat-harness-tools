@@ -21,8 +21,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DEFAULT_TODO_GRAPH, TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
-import { danglingTags, resolveTodoTags } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
+import { DEFAULT_TODO_GRAPH, TODO_GRAPH_FILE } from "../../../schemas/sdlc/todo-graph.js";
+import { danglingTags, resolveTodoTags } from "../../../schemas/sdlc/todo.js";
 import { readFolioContentConfig } from "../../content-adapter.js";
 import {
   FeedbackStore,

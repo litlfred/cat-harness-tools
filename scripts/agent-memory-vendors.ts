@@ -52,8 +52,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
-import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "@litlfred/cat-harness/schemas/conduct/memory.js";
+import { parseFrontMatter } from "../schemas/kg/front-matter.js";
+import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "../schemas/conduct/memory.js";
 
 import {
   COPILOT_AGENT_CHAR_BUDGET,

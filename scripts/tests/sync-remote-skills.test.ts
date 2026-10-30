@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { RemotePackageRefSchema } from "@litlfred/cat-harness/schemas/kg/skill-package.ts";
+import { RemotePackageRefSchema } from "../../schemas/kg/skill-package.ts";
 import { buildRecord, checkMaterialized, checkNotice, pinnedRef, RECORD_FILE, upstreamSkillDir, type Wrapper } from "../sync-remote-skills.ts";
 
 const SHA = "49c6e97775eaa18ba791bebe23162a70ae601c18";

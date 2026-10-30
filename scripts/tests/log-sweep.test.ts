@@ -14,10 +14,10 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, symlinkSync, writeFile
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { logDirs } from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
+import { logDirs } from "../../schemas/sdlc/log-entry.ts";
 import { writeLogEntry } from "../../src/logging/log-writer.ts";
 import { describeSweep, emptyLog, type LogSelector } from "../../src/logging/log-sweep.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 function instance(): string {

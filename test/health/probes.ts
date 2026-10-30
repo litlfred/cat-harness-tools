@@ -37,19 +37,19 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind as beanNodeOfKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+} from "../../schemas/sdlc/bean-graph.ts";
 import {
   DEFAULT_TODO_GRAPH,
   DEFAULT_TODO_GRAPH_ROOT,
   TODO_GRAPH_FILE,
   nodeOfKind as todoNodeOfKind,
   parseTodoGraph,
-} from "@litlfred/cat-harness/schemas/sdlc/todo-graph.ts";
+} from "../../schemas/sdlc/todo-graph.ts";
 import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
-} from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../../schemas/sdlc/health-report.ts";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
 import {

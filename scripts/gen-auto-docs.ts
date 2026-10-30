@@ -86,7 +86,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { classify } from "./check-docs-populated.ts";
 import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "./known-skills.ts";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { readRoleGraph } from "../schemas/process/role-graph.ts";
 import {
   findDeclarationFile,
   instanceRootsIn,
@@ -96,14 +96,14 @@ import {
   resolveDirectories,
   siteDirFor,
   forgeLocation,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
-import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.ts";
+} from "../schemas/kg/cat-harness.ts";
+import { checkoutDirectories } from "../schemas/kg/harness-config.ts";
+import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
+import { withInlineCode } from "../schemas/content/inline-code.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownElementPattern } from "../schemas/kg/namespaces.js";
 import { declaredRoute, declaredVisualisers, forwardingParts, pageParts, renderedPath, siteOwnerDir, tileCountsForPages, visualiserPageDir, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";

@@ -64,7 +64,7 @@ import {
   nodeOfKind,
   type BeanNodeKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+} from "../schemas/sdlc/bean-graph.ts";
 // Bean `9ofm` row D. No cycle: `graph-read` reads the declaration, git and the
 // mount marker, and knows nothing about beans.
 import { graphReadPath } from "./graph-read.ts";

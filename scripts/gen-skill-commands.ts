@@ -46,7 +46,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
 import { userInvocableSkills, type InvocableSkill } from "./invocable-skills.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { discoverLocalPackages } from "./skill-packages.ts";

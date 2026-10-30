@@ -32,13 +32,13 @@
  */
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import {
   orderedDependencies,
   repositoryMirrors,
   resolveInstanceGraph,
   type InstanceGraphProblem,
-} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+} from "../schemas/kg/harness-config.js";
 
 /** The declaration-level findings this gate adds to the graph's own (#1548). */
 export type DeclarationProblem =

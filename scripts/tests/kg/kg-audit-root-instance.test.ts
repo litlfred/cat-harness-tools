@@ -35,8 +35,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
+import { checkoutRootFor } from "../../../schemas/kg/harness-config.js";
 import { inAggregate } from "../../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";

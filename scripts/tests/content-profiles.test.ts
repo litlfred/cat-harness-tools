@@ -22,9 +22,9 @@ import {
   profileAcceptsKind,
   kindsOutsideProfile,
   profileForContentType,
-} from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../../schemas/content/block-kinds.ts";
 import { pathToFileURL } from "node:url";
-import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
+import { vocabularies } from "../../schemas/content/vocabulary-modules.ts";
 
 describe("the profile partition", () => {
   test("document and math are disjoint and cover the built-in kinds", () => {

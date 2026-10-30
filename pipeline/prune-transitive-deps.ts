@@ -34,10 +34,10 @@
  * @module pipeline/prune-transitive-deps
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import type { Paper, Chapter, Section, Block } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper, Chapter, Section, Block } from "../schemas/types.ts";
 import { findContentRepoRoot } from "./repo-root";
 import { requirePaper } from "./repo-root";
 import { findUsesField, replaceUsesArray, removeUsesField } from "./uses-field";

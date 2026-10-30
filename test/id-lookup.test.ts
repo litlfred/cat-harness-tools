@@ -32,7 +32,7 @@ import {
   shardFile,
   splitId,
   type IdEntry,
-} from "@litlfred/cat-harness/schemas/kg/id-lookup.ts";
+} from "../schemas/kg/id-lookup.ts";
 
 // The one corpus the checkout hosts a lookup for, read off the declarations
 // rather than named here (bean `j7ql`).

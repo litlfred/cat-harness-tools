@@ -177,9 +177,9 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/kg/mount-trust.js";
-import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
+import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "../schemas/kg/mount-trust.js";
+import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "../schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
   MountDefaultsSchema,
@@ -192,16 +192,16 @@ import {
   type RemoteMount,
   WHOLE_INSTANCE_ID,
   checkMountPathCollisions,
-} from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
-import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
-import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
+} from "../schemas/kg/remote-mount.js";
+import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
+import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
-import { ConcernGroupCodeSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
+import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the

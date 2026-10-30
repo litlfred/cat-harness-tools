@@ -33,9 +33,9 @@
  */
 import { describe, test, expect } from "bun:test";
 import { z } from "zod";
-import { BlockBaseSchema, BlockSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
-import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/types.ts";
-import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
+import { BlockBaseSchema, BlockSchema } from "../../schemas/constraints.ts";
+import { BLOCK_KINDS } from "../../schemas/types.ts";
+import { vocabularies } from "../../schemas/content/vocabulary-modules.ts";
 
 /**
  * `BlockSchema` is `z.discriminatedUnion(...).superRefine(...)`, and its

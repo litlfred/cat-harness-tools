@@ -68,7 +68,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readEffectiveConfig } from "../schemas/kg/harness-config.ts";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -78,9 +78,9 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 /** Re-exported so a caller that already reads pages through this module needs no second import. */
 export { permalinkDefaultsIn };
 
-import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
-import { isTranslatable } from "@litlfred/cat-harness/schemas/library/translation-tools.ts";
-import { ownDirectoryById, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { LOCALE_RTL, UN_LOCALES } from "../schemas/content/translation.ts";
+import { isTranslatable } from "../schemas/library/translation-tools.ts";
+import { ownDirectoryById, siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 const REPO_ROOT = resolve(HARNESS_ROOT);
 

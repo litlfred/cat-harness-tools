@@ -144,21 +144,21 @@ import {
   siteDirFor,
   type CatHarnessDeclaration,
   visualisationsOf,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
-import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+} from "../schemas/kg/cat-harness.js";
+import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import { parseFrontMatter } from "../schemas/kg/front-matter.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
-import { MergeQueueEntrySchema } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
-import { getReviewFindings, MergeReviewSchema } from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
+import { MergeQueueEntrySchema } from "../schemas/sdlc/merge-queue.ts";
+import { getReviewFindings, MergeReviewSchema } from "../schemas/sdlc/red-flag.ts";
 import { graphReadPath } from "./graph-read.ts";
-import { SessionSurveySchema } from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
-import { SweepMarkSchema } from "@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts";
-import { BoardSchema } from "@litlfred/cat-harness/schemas/ui/board.ts";
-import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "@litlfred/cat-harness/schemas/ui/board-positions.ts";
+import { SessionSurveySchema } from "../schemas/sdlc/session-survey.ts";
+import { SweepMarkSchema } from "../schemas/sdlc/sweep-mark.ts";
+import { BoardSchema } from "../schemas/ui/board.ts";
+import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "../schemas/ui/board-positions.ts";
 import { parseTodoFile, readTodos, TODO_ROOT } from "./todos.ts";
 import {
   beanPositions,
@@ -180,6 +180,7 @@ import {
   type BeanPosition,
   type InstanceLink,
   type DiagramLevel,
+  type DynamicStateDocument,
   type DynamicStateInput,
   type StuckState,
   type TodoLike,
@@ -188,11 +189,11 @@ import { positionOf, type InstanceState } from "../src/workflow/instance.js";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
 import { readMemoryNodes } from "./agent-memory.ts";
-import type { MemoryNode } from "@litlfred/cat-harness/schemas/conduct/memory.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { MemoryNode } from "../schemas/conduct/memory.js";
+import type { RoleGraph } from "../schemas/process/role-graph.js";
 import type { z } from "zod";
-import { unportableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { unportableSegment } from "../schemas/kg/portable-path.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { carriesMarker, orphanSubjectPages } from "./orphan-pages.ts";
 import { withViewerNav } from "./viewer-page.ts";
 import {
@@ -1737,6 +1738,40 @@ export function dynamicStateTarget(): string {
   return dynamicStatePath(SITE, harnessOf());
 }
 
+/**
+ * Build the dynamic-state document from this checkout and write it to `out`:
+ * the one writer, shared by render stage 3 (`dynamic-state-export.ts`) and by
+ * this generator whenever it draws a workflow page that links the document.
+ *
+ * Why the generator writes it too: a workflow page links
+ * `<site>/<harness>/state.jsonld`, and only `render-pipeline.ts` ran stage 3,
+ * so a site built any other way — an instance site (`build-instance-site.ts`,
+ * which runs this generator as a declared visualiser writer) — published pages
+ * linking a file it never wrote, and its link gate refused the publish
+ * (smart-ra, cat-harness-tools 9326f5d onward). The page's writer now
+ * guarantees its own link target; stage 3 still rewrites it afterwards, once
+ * every stage-2 renderer has contributed.
+ */
+export async function writeDynamicState(
+  out: string = dynamicStateTarget(),
+  opts: { root?: string; now?: Date } = {},
+): Promise<{ doc: DynamicStateDocument; unread: string[]; out: string }> {
+  const { harness, inputs, unread } = await dynamicStateInputs(opts.root ?? ROOT);
+  const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
+  return { doc, unread, out };
+}
+
+/**
+ * The link a page in `pageDir` gives the dynamic-state document: relative to the
+ * page, to the file {@link writeDynamicState} writes by default, so the two
+ * cannot name different files.
+ */
+export function dynamicStateHref(pageDir: string, target: string = dynamicStateTarget()): string {
+  return relative(pageDir, target).split(sep).join("/");
+}
+
 /** Where the dynamic-state document is published on `site`: `<site>/<harness>/state.jsonld`. */
 export function dynamicStatePath(site: string, harness: string): string {
   return join(site, harness, DYNAMIC_STATE_FILE);
@@ -2949,7 +2984,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
       now: NOW,
       ...(rolesForView ? { roles: rolesForView } : {}),
       ...(memoryForView ? { memory: memoryForView } : {}),
-      stateDocument: relative(pageDir, dynamicStatePath(SITE, harnessOf())).split(sep).join("/"),
+      stateDocument: dynamicStateHref(pageDir),
       drawingFor: (bpmn) => {
         const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
         return existsSync(svg) ? relative(pageDir, svg).split(sep).join("/") : undefined;
@@ -3066,13 +3101,11 @@ if (check) {
   // but a folio's site build runs this writer and no stage 3, so its pages
   // linked a file that was never there (smart-ra, 2026-10-30: the publish's
   // link check refused it). The writer of the pages writes the file they read,
-  // from the same inputs the exporter uses; stage 3, where it runs, rewrites it.
+  // with the one writer stage 3 uses ({@link writeDynamicState}); stage 3,
+  // where it runs, rewrites it.
   if (workflowPagesDrawn > 0) {
-    const { harness, inputs, unread } = await dynamicStateInputs();
-    const target = dynamicStateTarget();
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, JSON.stringify(dynamicStateDocument(harness, inputs, NOW, unread), null, 2) + "\n");
-    console.log(`  wrote ${relative(ROOT, target)} for ${workflowPagesDrawn} workflow page(s)`);
+    const { out } = await writeDynamicState(undefined, { now: NOW });
+    console.log(`  wrote ${relative(ROOT, out)} for ${workflowPagesDrawn} workflow page(s)`);
   }
   console.log(`\nWrote ${wrote} dashboard(s) under ${relative(ROOT, SITE)}/`);
   if (taken.length > 0) process.exit(1);

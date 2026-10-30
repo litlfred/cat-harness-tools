@@ -40,7 +40,7 @@
 import { spawnSync } from "node:child_process";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 
-import { PYTHON_DEPS, importNameOf, type PythonDep } from "@litlfred/cat-harness/schemas/sdlc/python-deps.ts";
+import { PYTHON_DEPS, importNameOf, type PythonDep } from "../schemas/sdlc/python-deps.ts";
 
 // THE INSTANCE root — this module scans `scripts/**/*.py`, and those scripts
 // are the instance's. Distinct from the root `gen-python-deps.ts` uses for

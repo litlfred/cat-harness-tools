@@ -50,4 +50,16 @@ describe("snapshot + ignoredBy, over a real tree", () => {
   test("no paths asks git nothing", () => {
     expect(ignoredBy([], [join(root, "inst")], root).size).toBe(0);
   });
+
+  test("top-level build output directories (_kg, build, _site, dist) are skipped when the root itself is an instance, while sub-instance _kg is kept", () => {
+    const cr = mkdtempSync(join(tmpdir(), "publish-check-content-root-"));
+    mkdirSync(join(cr, "_kg/cat-harness"), { recursive: true });
+    mkdirSync(join(cr, "build/plantuml"), { recursive: true });
+    mkdirSync(join(cr, "bootstrap/_kg"), { recursive: true });
+    writeFileSync(join(cr, "dpi-h-ra.json"), "{}");
+    writeFileSync(join(cr, "_kg/cat-harness/cat-harness.jsonld"), "{}");
+    writeFileSync(join(cr, "build/plantuml/plantuml.jar"), "");
+    writeFileSync(join(cr, "bootstrap/_kg/bootstrap.jsonld"), "{}");
+    expect([...snapshot([cr, join(cr, "bootstrap")], cr).keys()].sort()).toEqual(["bootstrap/_kg/bootstrap.jsonld", "dpi-h-ra.json"]);
+  });
 });
