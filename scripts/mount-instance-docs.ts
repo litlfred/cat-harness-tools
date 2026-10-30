@@ -2173,6 +2173,22 @@ export function generatedOnlyFrontMatter(text: string): string | undefined {
   return keys.length === 1 && /^generated:\s*\S/.test(keys[0]!) ? m[0] : undefined;
 }
 
+/**
+ * Whether `instanceAbs`, which exists in the instance, is left unpublished at
+ * `destAbs` — the place the mount's copy would have put it. Not copied (held
+ * or withheld), or a `.md` page with Jekyll front matter and no `.html`
+ * beside it, which {@link renderMountedMarkdown} never renders. A target that
+ * does not exist in the instance is not judged here.
+ */
+function unpublishedHere(instanceAbs: string, destAbs: string): boolean {
+  if (!existsSync(instanceAbs)) return false;
+  if (!existsSync(destAbs)) return true;
+  if (!instanceAbs.endsWith(".md") || !statSync(instanceAbs).isFile()) return false;
+  if (existsSync(destAbs.replace(/\.md$/, ".html"))) return false;
+  const raw = readFileSync(instanceAbs, "utf-8");
+  return /^---\r?\n/.test(raw) && generatedOnlyFrontMatter(raw) === undefined;
+}
+
 export async function renderMountedMarkdown(
   dest: string,
   source?: { dir: string; instanceDir: string; repository?: string },
@@ -2209,7 +2225,13 @@ export async function renderMountedMarkdown(
             const abs = join(source.instanceDir, target);
             const bareDir =
               existsSync(abs) && statSync(abs).isDirectory() && !existsSync(join(abs, "index.html")) && !existsSync(join(abs, "README.md"));
-            if (inMount && !bareDir) return undefined;
+            // Nor does one this site leaves unpublished: a page or directory the
+            // copy left out (a held visualiser page, a withheld path), or a
+            // Jekyll page (`x.md` with front matter) that is never rendered to
+            // the `x.html` the link becomes — who-iris's docs README linking
+            // `catalogue/` and `site-home.md` (aai-programme#26). Those too are
+            // cited by repository.
+            if (inMount && !bareDir && !unpublishedHere(abs, join(dest, relative(source.dir, abs)))) return undefined;
             if (target === ".." || target.startsWith("../") || !source.repository) {
               unresolved.push(`${rel}: "${href}" ${source.repository ? "climbs out of the instance" : "leaves the mount, and the declaration names no repository"}`);
               return undefined;
