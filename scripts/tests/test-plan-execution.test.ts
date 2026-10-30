@@ -304,7 +304,8 @@ describe("the system-under-test actor facet", () => {
     const agent = { id: "a", systemUnderTest: { kind: "agent" as const, version: "1" } };
     expect(sutRefFor(agent, undefined, { model: "claude-opus-5", configuration: "bare" })).toMatchObject({ kind: "agent", model: "claude-opus-5", configuration: "bare" });
     expect(sutRefFor(sutActor, undefined, { model: "claude-opus-5", configuration: "bare" })).not.toHaveProperty("model");
-    expect(sutRefFor({ id: "x", systemUnderTest: { kind: "agent", version: "1" } })?.reach).toBe("unknown");
+    expect(sutRefFor({ id: "x", systemUnderTest: { kind: "agent", version: "1" } }, undefined, { model: "m", configuration: "bare" })?.reach).toBe("unknown");
+    expect(() => sutRefFor({ id: "x", systemUnderTest: { kind: "agent", version: "1" } })).toThrow(/FR-002/);
     expect(sutRefFor({ id: "y" })).toBeUndefined();
   });
   test("the kind is the closed SUT list", () => {
