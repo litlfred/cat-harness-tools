@@ -310,6 +310,7 @@ export function provJsonldDocument(
       plan: field("plan", q["prov:hadPlan"]),
     });
   }
+  const describesEntities = activities.some((a) => (a["prov:used"] ?? []).some((u) => typeof u !== "string"));
   // Label the hash-chain terms as the local extension they are, in the data.
   for (const [term, comment] of Object.entries(PROV_LOCAL_EXTENSION_TERMS)) {
     if (activities.some((a) => (a as Record<string, unknown>)[term] !== undefined)) {
@@ -323,13 +324,19 @@ export function provJsonldDocument(
         {
           "@base": FOLIO_BASE,
           "cat-harness": CAT_HARNESS_NS,
-          dcat: DCAT_NS,
-          spdx: SPDX_NS,
-          cred: CRED_NS,
           "cat-harness:underPolicy": { "@type": "@id" },
-          "spdx:algorithm": { "@type": "@id" },
-          "spdx:checksumValue": { "@type": "xsd:hexBinary" },
-          "dcat:downloadURL": { "@type": "@id" },
+          // Only a document that cites a described entity carries these, so
+          // every other document is byte-for-byte what it was.
+          ...(describesEntities
+            ? {
+                dcat: DCAT_NS,
+                spdx: SPDX_NS,
+                cred: CRED_NS,
+                "spdx:algorithm": { "@type": "@id" },
+                "spdx:checksumValue": { "@type": "xsd:hexBinary" },
+                "dcat:downloadURL": { "@type": "@id" },
+              }
+            : {}),
         },
       ],
       "@id": id,
