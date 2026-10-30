@@ -311,6 +311,23 @@ export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin[
   return pipelinePlugin("lean-coverage").leanFileStatus(leanPath);
 }
 
+/** `lean-coverage` slot: coverage statistics for a paper. */
+export function computeStats(paperDir: string, contentRoot: string): {
+  provable: { total: number; with_lean_file: number; sorry_free: number; percent_sorry_free: number };
+  conjectures: {
+    total: number;
+    with_lean_file: number;
+    class_axiomatized: number;
+    percent_class_axiomatized: number;
+    primary: number;
+    primary_class_axiomatized: number;
+    percent_primary_class_axiomatized: number;
+  };
+  definitions: { total: number; with_lean_file: number };
+} {
+  return pipelinePlugin("lean-coverage").computeStats(paperDir, contentRoot) as ReturnType<typeof computeStats>;
+}
+
 /**
  * `tabular-csvw` slot: a delimited-text or workbook source as CSVW, or `null`.
  * Required, not optional: an ingest that reaches here with nothing filling the

@@ -20,7 +20,7 @@
 import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { computeStats } from "./lean-coverage";
+import { computeStats } from "../pipeline/pipeline-plugins";
 import { findContentRepoRoot, findPapers, soleFolioPaper } from "../pipeline/repo-root";
 import { paperArg } from "../pipeline/cli-args";
 

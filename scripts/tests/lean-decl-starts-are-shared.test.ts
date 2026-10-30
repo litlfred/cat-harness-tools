@@ -188,7 +188,6 @@ describe("there is exactly one declaration pattern", () => {
       "cat-harness-tools/pipeline/lean-formal-ref.ts",
       "cat-harness-tools/pipeline/lean-lexer.ts",
       "cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts",
-      "cat-harness-tools/scripts/lean-coverage.ts",
     ]);
   });
 

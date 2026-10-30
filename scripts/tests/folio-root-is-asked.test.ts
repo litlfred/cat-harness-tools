@@ -101,6 +101,6 @@ describe("the folio root is asked for, not spelled", () => {
     // relevance routes moved UP to folio-assistant-core with their content
     // (bean `70lx`, owner ruling), out of what this scans. A move is not the
     // regression this floor exists to catch, so the floor follows it.
-    expect(callers.length).toBeGreaterThan(37);
+    expect(callers.length).toBeGreaterThan(33);
   });
 });
