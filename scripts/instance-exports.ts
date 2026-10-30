@@ -56,7 +56,9 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { artefactStub, instanceRootsIn, ownDirectories, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { loadCodeLists } from "../schemas/library/code-list.ts";
+import { buildCodeListsDoc } from "./code-lists.ts";
 import { isPublished, publishedPath } from "../schemas/kg/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
 import { stagingFields } from "./staging-stamp.js";
@@ -136,6 +138,25 @@ export function instanceSitePath(name: string, rel: string): string {
 /** Where a foreign instance's export document is served: `<name>/<stub>.jsonld`. */
 export function instanceDocPath(d: { name: string; stub: string }): string {
   return instanceSitePath(d.name, `${d.stub}.jsonld`);
+}
+
+/**
+ * The instance's OWN code lists as one SKOS document, `@id` `docIri`, or
+ * `undefined` when it declares none (litlfred/cat-harness-tools#960).
+ *
+ * The host's lists are published by `glossary-export` beside its glossary
+ * (`<stub>/<stub>-code-lists.jsonld`); no other instance's were published at
+ * all, so a concept IRI into, say, folio-assistant-core's
+ * `grade-recommendation-strength` named a document nobody wrote. Only the
+ * instance's own directories are read: a dependency's lists are that
+ * dependency's document.
+ */
+export function ownCodeListsDocument(instanceRoot: string, name: string, docIri: string): Record<string, unknown> | undefined {
+  const dirs = ownDirectories({ name, root: instanceRoot, own: true })
+    .filter((d) => d.graphTypologies.includes("code-list"))
+    .map((d) => d.absPath);
+  const lists = [...loadCodeLists(dirs).values()];
+  return lists.length === 0 ? undefined : buildCodeListsDoc(lists, docIri);
 }
 
 /**
@@ -269,6 +290,17 @@ if (import.meta.main) {
         const out = join(schemaDir, rel);
         mkdirSync(dirname(out), { recursive: true });
         writeFileSync(out, JSON.stringify({ ...body, ...staging }, null, 2) + "\n");
+      }
+      // ── AND ITS CODE LISTS, beside it, at the address the host's take
+      // (`<stub>/<stub>-code-lists.jsonld`), so each concept IRI loads (#960).
+      if (siteBase) {
+        const clPath = instanceDocPath(p).replace(/\.jsonld$/, "-code-lists.jsonld");
+        const cl = ownCodeListsDocument(resolve(REPO, p.path), p.name, `${siteBase}/${clPath}`);
+        if (cl !== undefined) {
+          const clOut = join(outDir, clPath);
+          writeFileSync(clOut, JSON.stringify({ ...cl, ...staging }, null, 2) + "\n");
+          copyFileSync(clOut, clOut.replace(/\.jsonld$/, ".json"));
+        }
       }
       const zod = built.zodScanned ? `${built.zod.length} Zod schema(s)` : "Zod schemas NOT scanned";
       // A module that would not import or an export that would not render is
