@@ -39,8 +39,11 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
+import { patternHits } from "./changed-paths.ts";
 import { loadGates } from "./gates.ts";
-import { COVERED } from "./pair-cover.ts";
+import { TRACKED } from "./input-hash.ts";
+import { COVERED, foldable, settleCovered } from "./pair-cover.ts";
+import { BUILDING_ENV } from "./qa-working-copy.ts";
 import {
   DEFAULT_MAX_PASSES,
   UNGATED_INPUTS,
@@ -451,13 +454,22 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     ]);
   }
 
+  // Bean `p7mb`: `post-merge:regen` already checks and repairs every QA writer
+  // (`kg:audit:all`, `kg:detangle`, `translation:block-qa`, `skill:register`,
+  // `readme:subgraphs`, etc.) as its own pair over the mounted instances'
+  // committed QA working copy (`test/results/`). Setting `BUILDING_ENV = "1"`
+  // prevents `uml:overview:check` (`publish-check.ts uml:overview` ->
+  // `gen-uml-overview.ts` -> `requireCurrentWorkingCopy`) from recursively
+  // spawning a 25-minute `qa:refresh` rebuild inside the check call on every
+  // pass (measured on cat-harness runs 40897480812 and 40900325607, where
+  // recursive `qa:refresh` runs exhausted the 2-hour job timeout).
   const baseRunner: Runner =
     opts.runner ??
     (async (script: string): Promise<boolean> => {
       const r = spawnSync("bun", ["run", "cat", script], {
         cwd: repoRoot,
         encoding: "utf-8",
-        env: process.env,
+        env: { ...process.env, [BUILDING_ENV]: "1" },
       });
       return r.status === 0;
     });
@@ -465,9 +477,8 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   // publish-time outputs is told apart from a stale one after the repair pass.
   // Watch both `p.writer` and `p.check`: checks routed through `publish-check.ts <writer>`
   // execute `<writer>` on disk inside the check call itself.
-  const tracker =
-    opts.tracker ??
-    (opts.runner === undefined ? treeMoveTracker(repoRoot, publishTimeDeclarations(repoRoot), opts.instance) : undefined);
+  const decls = opts.tracker === undefined && opts.runner === undefined ? publishTimeDeclarations(repoRoot) : [];
+  const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot, decls, opts.instance) : undefined);
   const moves = new Map<string, WriterMoves>();
   const scriptToWriter = new Map<string, string>();
   for (const p of pairs) {
@@ -476,7 +487,13 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       scriptToWriter.set(p.check, p.writer);
     }
   }
-  const runner: Runner = tracker === undefined ? baseRunner : watchWriters(baseRunner, scriptToWriter, tracker, moves);
+  const lastOk = new Map<string, boolean>();
+  const watchedRunner: Runner = tracker === undefined ? baseRunner : watchWriters(baseRunner, scriptToWriter, tracker, moves);
+  const runner: Runner = async (script: string): Promise<boolean> => {
+    const ok = await watchedRunner(script);
+    lastOk.set(script, ok);
+    return ok;
+  };
 
   // Step 1: Audit pass with dryRun: true to inspect current state of derived artefacts
   const { results: auditResults } = await regenPass(pairs, runner, { dryRun: true });
@@ -570,9 +587,80 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     };
   }
 
-  // Execute repair: run regenToFixpoint to apply writers and verify convergence
-  const fixpoint = await regenToFixpoint(pairs, runner, maxPasses);
-  const unrepaired = fixpoint.results.filter(
+  // Execute repair: run regenToFixpoint to apply writers and verify convergence.
+  // Bean `p7mb`:
+  // - Pass 1 skips pairs whose own check (or residual, if folded) already passed
+  //   in the audit pass above, avoiding re-running ~65 clean checks (including
+  //   multi-minute `translation:block-qa:check` and `kg:audit:all:check`) when
+  //   only `builtAtPublish` checks failed in the audit pass.
+  // - Pass 2+ skips pairs that already passed unless a COMMITTED file moved in
+  //   the previous pass that touches the pair's declared inputs; pairs still
+  //   failing re-run whenever any file (`committed` or `builtAtPublish`) moved
+  //   in the previous pass (in case an out-of-order writer built their input).
+  // - `narrow.begin` measures per-pass file moves so `regenToFixpoint` stops
+  //   immediately on a barren pass instead of looping through `maxPasses`.
+  const folds = foldable(pairs.map((p) => p.check));
+  const ownPassed = (pair: Pair): boolean => {
+    const fold = folds.get(pair.check);
+    const ask = fold === undefined ? pair.check : fold.residual;
+    return ask === undefined || lastOk.get(ask) === true;
+  };
+  const committedHitsPair = (pair: Pair, committed: ReadonlySet<string>): boolean => {
+    const inputs = pair.io?.inputs;
+    if (inputs === undefined || inputs.length === 0 || inputs.includes(TRACKED)) return true;
+    const patterns = [...inputs, ...(pair.io?.outputs ?? [])];
+    for (const p of committed) {
+      const slash = p.indexOf("/");
+      const candidates = slash > 0 ? [p, p.slice(slash + 1)] : [p];
+      if (patterns.some((pat) => candidates.some((c) => patternHits(pat, c)))) return true;
+    }
+    return false;
+  };
+  let passIndex = 0;
+  let lastCommittedMoves = new Set<string>();
+  let lastPublishMoves = new Set<string>();
+  const fixpoint = await regenToFixpoint(pairs, runner, maxPasses, {
+    narrow: {
+      begin: () => {
+        passIndex++;
+        const before = new Map<string, { b: number; c: number }>();
+        for (const [k, m] of moves) {
+          before.set(k, { b: m.builtAtPublish.length, c: m.committed.length });
+        }
+        return () => {
+          const committed = new Set<string>();
+          const publish = new Set<string>();
+          for (const [k, m] of moves) {
+            const prev = before.get(k) ?? { b: 0, c: 0 };
+            for (let i = prev.c; i < m.committed.length; i++) committed.add(m.committed[i]!);
+            for (let i = prev.b; i < m.builtAtPublish.length; i++) publish.add(m.builtAtPublish[i]!);
+          }
+          lastCommittedMoves = committed;
+          lastPublishMoves = publish;
+          return new Set([...committed, ...publish]);
+        };
+      },
+      affects: () => ({ affected: true, why: "narrowed by skip so foldable keeps full pair set" }),
+    },
+    skip: (pair: Pair) => {
+      if (passIndex <= 1) {
+        return ownPassed(pair) ? { skip: true, why: "passed in audit pass" } : { skip: false };
+      }
+      if (!ownPassed(pair)) {
+        return lastCommittedMoves.size > 0 || lastPublishMoves.size > 0
+          ? { skip: false }
+          : { skip: true, why: "no files moved in previous pass" };
+      }
+      if (lastCommittedMoves.size === 0) {
+        return { skip: true, why: "already current and no committed files moved" };
+      }
+      return committedHitsPair(pair, lastCommittedMoves)
+        ? { skip: false }
+        : { skip: true, why: "no declared input moved in previous pass" };
+    },
+  });
+  const settledResults = settleCovered(fixpoint.results, folds);
+  const unrepaired = settledResults.filter(
     (r) => r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer",
   );
   // A repair whose writer moved only `builtAtPublish` paths (or, when a check
@@ -586,7 +674,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   const hasCommittedMove = (writer: string | undefined): boolean =>
     tracker !== undefined && writer !== undefined && (moves.get(writer)?.committed.length ?? 0) > 0;
   const directPublishTime = new Set(
-    fixpoint.results
+    settledResults
       .filter(
         (r) =>
           COVERED[r.check] === undefined &&
@@ -595,7 +683,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
       )
       .map((r) => r.check),
   );
-  const builtAtPublishCheckNames = fixpoint.results
+  const builtAtPublishCheckNames = settledResults
     .filter((r) => {
       if (directPublishTime.has(r.check)) return true;
       const cov = COVERED[r.check];
@@ -609,7 +697,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     })
     .map((r) => r.check);
   const publishTime = new Set(builtAtPublishCheckNames);
-  const repaired = fixpoint.results.filter(
+  const repaired = settledResults.filter(
     (r) =>
       !publishTime.has(r.check) &&
       (r.outcome === "regenerated" || (staleSet.has(r.check) && r.outcome === "current" && hasCommittedMove(r.writer))),
