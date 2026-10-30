@@ -59,9 +59,8 @@ step as `exit 2` ("could not determine"), never as nothing.
 
 A declared gate that cannot determine anything here is not run, and is
 written with a `skipped` reason in place of `exit` (owner, 2026-10-15, "b1"):
-one that judges the remote's live state (`LIVE_STATE_SCRIPTS`), one that needs
-an argument or artefact this runner never supplies (`NEEDS_INPUT_SCRIPTS`),
-and one whose prerequisite file is absent at the root (`PREREQUISITE_FILES`).
+one that judges the remote's live state (`LIVE_STATE_SCRIPTS`), and one that
+needs an argument or artefact this runner never supplies (`NEEDS_INPUT_SCRIPTS`).
 
 A gate whose input this runner DOES have is given it instead
 (`SUPPLIED_INPUTS`): `check:corpus-gate` gets `--since $GATE_DIFF_BASE`, the
@@ -180,32 +179,11 @@ NEEDS_INPUT_SCRIPTS = {
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
     "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
 }
-# Gates that read something only a root with a given file can build: skipped
-# where that file is absent, run wherever it is present, so the rule follows
-# the root rather than naming any repository. uml:overview and readme:subgraphs
-# read the QA working copy that `qa:refresh` builds, and a root without the
-# harness's gates workflow is a CONTENT root.
-#
-# Since cat-harness-tools#281 ("hold smart-ra to its own gate set") a content
-# root is no longer measured against that workflow: `audit:coverage` reads the
-# gate set `derive` below gives it, and `qa:refresh` reports the writers that
-# do not apply there (an undeclared script, unmounted state branches) as not
-# applicable. So the workflow's absence no longer makes the copy unbuildable by
-# itself. The skip stays because qa:refresh in a content root still ends
-# INCOMPLETE on the root's own content gaps, and the gate would exit 2 on both
-# sides: measured in smart-ra on 2026-10-15, `check:l1-complete` (L1 entries
-# with no manifest.jsonld / images.json) and `check:wireframes` (two surfaces
-# with no wireframe, a catalogue naming an undeclared instance) fail. Those are
-# the root's to fix; when its qa:refresh is COMPLETE this skip is what to drop.
-GATES_WORKFLOW = ".github/workflows/code-quality-gates.yml"
-QA_WORKING_COPY = ("marks a content root, where the QA working copy these read is built by qa:refresh "
-                   "against the root's own gate set and stays INCOMPLETE while the root has content gaps "
-                   "of its own (failed writers such as check:l1-complete, check:wireframes), so the gate "
-                   "could only report UNKNOWN (cat-harness-tools#281)")
-PREREQUISITE_FILES = {
-    "uml:overview:check": (GATES_WORKFLOW, QA_WORKING_COPY),
-    "readme:subgraphs:check": (GATES_WORKFLOW, QA_WORKING_COPY),
-}
+# The `PREREQUISITE_FILES` skip for `uml:overview:check` and
+# `readme:subgraphs:check` (cat-harness-tools#281) was dropped in bean `rn24`:
+# a content root's `qa:refresh` now claims its hosted instance's KG-QA tree,
+# `qa:working-copy` runs `glossary:page` when `skill:register` is skipped as
+# `readsState`, and the PlantUML jar fetches from Maven Central.
 
 
 # Gates whose input this runner DOES have, given it when it has it: the
@@ -276,10 +254,6 @@ def skip_reason(root, script):
         return "live-state", "judges the remote's live state, not the checkout"
     if script in NEEDS_INPUT_SCRIPTS:
         return "needs-input", NEEDS_INPUT_SCRIPTS[script]
-    if script in PREREQUISITE_FILES:
-        path, why = PREREQUISITE_FILES[script]
-        if not os.path.exists(os.path.join(root, path)):
-            return "prerequisite", f"{path} is absent at the root; it {why}"
     return None, None
 
 

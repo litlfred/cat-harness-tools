@@ -52,6 +52,7 @@ import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts
 import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
+import { BUILD_OUTPUT_DIRS } from "./input-hash.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
@@ -60,16 +61,22 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "_site", "build"]);
 
 /** sha256 of every file under each root, keyed repo-relative. */
 export function snapshot(roots: readonly string[], repoRoot = REPO_ROOT): Map<string, string> {
+  const rootAbs = resolve(repoRoot);
   const out = new Map<string, string>();
   const walk = (d: string): void => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       if (SKIP_DIRS.has(e.name)) continue;
+      // Top-level build-output directories (`_kg/`, `dist/`, …) are written by
+      // `kg:export` during `qa:refresh` with a fresh timestamp; in a content
+      // root that declares an instance at `.` (`repoRoot` is in `roots`), they
+      // sit at `rootAbs` without belonging to the root instance's commit.
+      if (d === rootAbs && (BUILD_OUTPUT_DIRS as readonly string[]).includes(e.name)) continue;
       const abs = join(d, e.name);
       if (e.isDirectory()) walk(abs);
       else if (e.isFile()) out.set(relative(repoRoot, abs), createHash("sha256").update(readFileSync(abs)).digest("hex"));
     }
   };
-  for (const r of roots) if (existsSync(r)) walk(r);
+  for (const r of roots) if (existsSync(r)) walk(resolve(r));
   return out;
 }
 
