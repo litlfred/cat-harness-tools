@@ -50,7 +50,7 @@
  *
  * @module cat-harness-tools/scripts/staging-changes
  * @covers none — it reports what a preview changed and judges no declared
- * graph; its logic is covered by `scripts/tests/staging-changes.test.ts`
+ * graph; its logic is covered by `scripts/tests/sdlc/staging-changes.test.ts`
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -68,7 +68,7 @@ import {
   type RenderedFile,
   type RenderedImpact,
   type RenderedRole,
-} from "@litlfred/cat-harness/schemas/rendered-impact.ts";
+} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
 
 export const STAGING_CHANGES_TAG = "staging-changes/v1" as const;
 

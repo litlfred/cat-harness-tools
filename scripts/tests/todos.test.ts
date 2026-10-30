@@ -2,7 +2,7 @@
  * The todo graph is declared, present, and READ.
  *
  * All three, because the failure mode is the middle one going missing.
- * `schemas/todo.ts`, `schemas/todo-graph.ts` and the `todos` / `todo-items`
+ * `schemas/sdlc/todo.ts`, `schemas/sdlc/todo-graph.ts` and the `todos` / `todo-items`
  * graph typologies existed before any todo did, and `harness.json` did not
  * declare `todos/`. A schema ahead of its graph is harmless. A **declared
  * directory nothing reads** is the bean `dh4f` defect — a consumer scans
@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ROOT } from "../todos.js";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 describe("the published process hierarchy", () => {
   const index = () =>

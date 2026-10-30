@@ -19,7 +19,7 @@
  * @module scripts/lean-audit
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, existsSync } from "fs";
 import { resolve, basename, relative } from "path";
 import { globSync } from "glob";
@@ -644,4 +644,4 @@ if (import.meta.main) {
   }
 }
 
-export { runAudit, type AuditReport, type ChapterAudit, type LeanFileStatus };
+export { runAudit, extractSorries, extractAxioms, type AuditReport, type ChapterAudit, type LeanFileStatus };

@@ -50,7 +50,7 @@
  * entry" meant "regeneration would destroy it", because the writers kept those
  * entries only by reading the file being regenerated. Since `8wj1` every block
  * and translation writer reads them from `test/attestations/` instead
- * (`schemas/qa-attestations.ts`), so a file whose non-script entries
+ * (`schemas/sdlc/qa-attestations.ts`), so a file whose non-script entries
  * are ALL held there, byte for byte, regenerates without losing one, and is
  * resolved. One the store does not hold, a store file that is itself
  * conflicted, or a store that cannot be read, is still refused: those are the
@@ -91,9 +91,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { attestationKeyForDerived, attestationPath, entryIdentity, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { attestationKeyForDerived, attestationPath, entryIdentity, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

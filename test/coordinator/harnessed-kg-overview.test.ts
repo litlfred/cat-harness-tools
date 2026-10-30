@@ -24,8 +24,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { ActorDefSchema } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { ActorDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 import { ownKgRoots, workflowFile } from "../../scripts/known-skills.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -59,12 +59,9 @@ function skillFile(name: string): string {
 }
 
 describe("living deck: every claim about the KG still holds", () => {
-  test("slide 1 — the layers page lists all five SMART layers", () => {
-    const t = read(join(H, "docs/source/fhir-fhir-content/the-three-layers.md"));
-    for (const l of ["**L1** Narrative", "**L2** Operational", "**L3** Machine readable", "L4 Executable", "L5 Dynamic"]) {
-      expect(t).toContain(l);
-    }
-  });
+  // Slide 1's claim (the layers page lists all five SMART layers) moved to
+  // smart-base/scripts/who-smart-content-types.test.ts with the section it
+  // reads, which is now smart-base's (bean p9bu).
 
   test("slide 6 — the lifecycle process still has the six lanes and eight tasks shown", () => {
     const x = read(workflowFile(H, "content-lifecycle.bpmn"));

@@ -5,15 +5,23 @@
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Named subgraphs — one
  * IRI, two files, framed from one graph" (bean `c1m4`), and the schema both
- * files validate against is `schemas/subgraph-manifest.ts`.
+ * files validate against is `schemas/kg/subgraph-manifest.ts`.
  *
  * ## What is a subgraph here
  *
  * Every directory under each of this instance's declared knowledge-graph
  * directories (`kgDirectories(…, "instance")`: today `skills/`, `scenarios/`
- * and `processes/`), nested ones included — so `skills/` and `skills/sdlc/`
- * are both subgraphs, and the second is a child of the first. Above them is the
- * ROOT, the harness instance itself, whose IRI is `<BASE_URL>/subgraph/<HARNESS>/`.
+ * and `processes/`) and under each framed instance's declared `tools` graph
+ * ({@link subgraphDirectories}), nested ones included — so `skills/` and
+ * `skills/sdlc/` are both subgraphs, and the second is a child of the first.
+ * Above them is the ROOT, the harness instance itself, whose IRI is
+ * `<BASE_URL>/subgraph/<HARNESS>/`.
+ *
+ * `tools/` is here for bean `mo75` G1 (owner, 2026-10-09, Option C of
+ * `docs/proposals/semantic-subgraphs-2026-10-09.md`: *"load the tools/skills
+ * metadata, review the skills description and then materialize a set of
+ * Tools"*). Until then every Tool node fell to the root, which has no
+ * hydrated file, so there was no Tools metadata to load in one fetch.
  *
  * ## Membership is containment, and every node lands exactly once
  *
@@ -27,7 +35,11 @@
  *   tree, `<BASE_URL>/subgraph/<ITS NAME>/…`, by the same containment rule
  *   over its declared directories (bean `ax6r`) — a path outside them falls
  *   to that instance's root.
- * - Everything else — schemas, tools, roles, graph typologies — is a direct member
+ * - A Tool node has no source path: it is placed by the folder convention
+ *   (`schemas/tools/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
+ *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
+ *   else the `tools/` directory itself.
+ * - Everything else — schemas, roles, graph typologies — is a direct member
  *   of its own harness's ROOT.
  *
  * ## Each instance is framed from its OWN export (bean `4ak5` item 2)
@@ -76,7 +88,7 @@
  * literal over {@link HEAVY_LITERAL_BYTES} rather than trimming it, because a
  * body that has crept into the graph is a kg-export defect to fix there.
  *
- * For the fields `HEAVY_POINTERS` names (`schemas/subgraph-manifest.ts`), the
+ * For the fields `HEAVY_POINTERS` names (`schemas/kg/subgraph-manifest.ts`), the
  * TARGET is published as a PAYLOAD: one immutable file per distinct body at
  * `docs/payload/sha256/<hex>`, served at `<BASE_URL>/payload/sha256/<hex>`,
  * with its media type in `<hex>.json` beside it. The node carries a `payload`
@@ -108,7 +120,7 @@
  * docs workflows, beside `ns/content/v1.jsonld`).
  *
  * @module scripts/gen-subgraph-jsonld
- * @covers computed — the subgraphs are every directory under `kgDirectories(instance)`
+ * @covers computed — the subgraphs are every directory under `kgDirectories(instance)` and the declared `tools` graphs
  */
 
 import { createHash } from "node:crypto";
@@ -117,12 +129,12 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import jsonld from "jsonld";
 import { buildContext, buildExport, graphTypologyId } from "./kg-export.js";
 import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js";
-import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   HEAVY_POINTERS,
   PAYLOAD_MEDIA_TYPES,
@@ -137,8 +149,9 @@ import {
   SUBGRAPH_INDEX_FILE,
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
-} from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -498,6 +511,41 @@ export function framedInstances(root: string = ROOT): string[] {
   return [own, ...[...out].sort()];
 }
 
+/** The graph typology whose directories hold Tool nodes (`schemas/tools/tool-folders.ts`). */
+const TOOLS_GRAPH = "tools";
+/**
+ * The graph typology whose directories hold library entries (cat-harness#180;
+ * owner, 2026-10-11 and 2026-10-29: each `library/<doc>/` is a subgraph, nested
+ * under its instance's `library` subgraph by the containment rule).
+ */
+const LIBRARY_GRAPH = "library";
+
+/**
+ * Every directory this build heads a subgraph tree at: the knowledge-graph
+ * directories the corpus reaches (`kgDirectories`), then each framed
+ * instance's declared `tools` directories (bean `mo75` G1). Same shape as
+ * `kgDirectories`, so {@link planSubgraphs} walks both one way.
+ *
+ * Not folded into `kgDirectories`: that list is also the SKILL corpus's, and a
+ * `tools/` directory holds `.ts` definitions, not skill bodies. Only the
+ * instances {@link framedInstances} names are asked, because only their
+ * exports are framed — a `tools/` tree for an unframed instance would be a
+ * tree of empty subgraphs.
+ */
+export function subgraphDirectories(root: string = ROOT): Array<{ id: string; path: string; absPath: string }> {
+  const out = kgDirectories(root, corpusScopeFor(root)).map((d) => ({ id: d.id, path: d.path, absPath: d.absPath }));
+  for (const inst of framedInstances(root)) {
+    const ids = new Map(instanceDirectories(inst).map((d) => [resolve(inst, d.path), d.id]));
+    for (const abs of [...instanceDirectoriesForGraph(inst, TOOLS_GRAPH), ...instanceDirectoriesForGraph(inst, LIBRARY_GRAPH)]) {
+      if (!existsSync(abs)) continue;
+      const id = ids.get(resolve(abs));
+      if (id === undefined) continue; // declared FROM WITHIN another entry: its parent's tree already walks it
+      out.push({ id, path: relative(root, abs).replace(/\\/g, "/"), absPath: abs });
+    }
+  }
+  return out;
+}
+
 const PATH_KEYS = ["instructionsPath", "module", "sourcePath", "path"] as const;
 
 function pathOf(n: Node): string | undefined {
@@ -513,7 +561,7 @@ function pathOf(n: Node): string | undefined {
  * a tracked or unignored file, and each of its ancestors — as `rel`-prefixed,
  * `/`-terminated paths in sorted order (parents before children).
  *
- * Asked of git, never of the disk (`schemas/git-corpus.ts`): a walk would mint
+ * Asked of git, never of the disk (`schemas/sdlc/git-corpus.ts`): a walk would mint
  * a subgraph for one machine's ignored residue, and the committed output would
  * then differ by checkout. `undefined` when git cannot answer.
  */
@@ -588,7 +636,7 @@ export function planSubgraphs(
     }
     return declOf.get(inst);
   };
-  const kgDirs = kgDirectories(opts.root, corpusScopeFor(opts.root)).flatMap((d) => {
+  const kgDirs = subgraphDirectories(opts.root).flatMap((d) => {
     const inst = findInstanceRoot(d.absPath);
     if (inst === undefined) {
       problems.push(`${d.absPath}: no instance declaration above this knowledge-graph directory`);
@@ -652,8 +700,31 @@ export function planSubgraphs(
   };
   /** Where a node's paths are relative to: the instance that exported it. */
   const exportedFrom = (id: string): string => resolve(opts.rootOf?.get(id) ?? opts.root);
-  /** A node with no path and no parent: its own instance's root. */
-  const homeOf = (id: string): SubgraphEntry => harnessRoots.get(exportedFrom(id)) ?? root;
+  /**
+   * A Tool's home (bean `mo75` G1): its own instance's `tools/<id>/` folder,
+   * else that `tools/` directory, else — no `tools` graph walked — its root.
+   */
+  const toolsTops = new Map<string, string[]>();
+  for (const d of kgDirs) {
+    if (!d.graphTypologies.includes(TOOLS_GRAPH)) continue;
+    toolsTops.set(d.inst, [...(toolsTops.get(d.inst) ?? []), slash(resolve(d.absPath))]);
+  }
+  const toolType = termIri("Tool");
+  const toolHome = (n: Node): SubgraphEntry | undefined => {
+    if (!([] as unknown[]).concat(n["@type"]).includes(toolType)) return undefined;
+    const name = typeof n.name === "string" ? n.name : undefined;
+    for (const top of toolsTops.get(exportedFrom(String(n["@id"]))) ?? []) {
+      const own = name === undefined ? undefined : byDir.get(slash(join(top, name)));
+      if (own !== undefined) return own;
+    }
+    const first = toolsTops.get(exportedFrom(String(n["@id"])))?.[0];
+    return first === undefined ? undefined : byDir.get(first);
+  };
+  /** A node with no path and no parent: a Tool's folder, else its own instance's root. */
+  const homeOf = (id: string): SubgraphEntry => {
+    const n = nodes.get(id);
+    return (n && toolHome(n)) ?? harnessRoots.get(exportedFrom(id)) ?? root;
+  };
 
   // Place by path.
   const placed = new Map<string, SubgraphEntry>();
@@ -912,6 +983,8 @@ export async function generateSubgraphs(
   payloadPlan: PayloadPlan;
   payloadFiles: Map<string, Buffer | string>;
   payloadDir: string;
+  /** Library entry files left out of the tree, and why — printed, never fatal. */
+  warnings: string[];
 }> {
   const root = opts.root ?? ROOT;
   const decl = readDeclaration(root);
@@ -930,6 +1003,11 @@ export async function generateSubgraphs(
   const rootOf = new Map<string, string>();
   const payloadPlans: PayloadPlan[] = [];
   const exportProblems: string[] = [];
+  // Library entry files that cannot be read as nodes are WARNINGS, not
+  // problems: they are the entry's own defect (its writer's to fix), and a
+  // publish must not stop over committed data this generator only points at.
+  const warnings: string[] = [];
+  const libraryLoader = libraryContextLoader(checkoutRootFor(root));
   for (const inst of framedInstances(root)) {
     const data = await buildExport({ instanceRoot: inst, scope: "instance" });
     const name = readDeclaration(inst)?.name ?? basename(inst);
@@ -937,6 +1015,15 @@ export async function generateSubgraphs(
     const own = (data["@graph"] as Node[]).filter((n) => n.deprecated !== true && !rootOf.has(String(n["@id"])));
     for (const n of own) rootOf.set(String(n["@id"]), inst);
     exported.push(...own);
+    // Library entries, which kg-export does not read (cat-harness#180): one
+    // pointer per entry file, placed by its path under the `library` subgraph.
+    const lib = await libraryEntryNodes(inst, libraryLoader);
+    for (const p of lib.problems) warnings.push(`library (${name}): ${p}`);
+    for (const n of lib.nodes as Node[]) {
+      if (rootOf.has(String(n["@id"]))) continue;
+      rootOf.set(String(n["@id"]), inst);
+      exported.push(n);
+    }
     // Payloads first, so every node carries its link into both frames — each
     // against the instance its paths are relative to.
     payloadPlans.push(planPayloads(own, { root: inst, baseUrl }));
@@ -959,7 +1046,7 @@ export async function generateSubgraphs(
   const files = await renderSubgraphFiles(plan, decl.name, outDir);
   const payloadDir = payloadOutDir(root);
   const payloadFiles = renderPayloadFiles(payloadPlan, payloadDir);
-  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir };
+  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir, warnings };
 }
 
 function listFiles(abs: string): string[] {
@@ -975,7 +1062,8 @@ function listFiles(abs: string): string[] {
 
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
-  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir } = await generateSubgraphs();
+  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir, warnings } = await generateSubgraphs();
+  for (const w of warnings) console.error(`  ⚠ ${w}`);
 
   if (plan.problems.length > 0) {
     console.error(`gen-subgraph-jsonld: ${plan.problems.length} problem(s) — nothing written:`);

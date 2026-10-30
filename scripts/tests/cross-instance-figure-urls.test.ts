@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { WebPage, WebPageAsset, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
+import type { WebPage, WebPageAsset, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
 import { editTarget } from "../gen-docs-pages.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

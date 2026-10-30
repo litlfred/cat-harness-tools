@@ -14,7 +14,7 @@
  * test pinning this rule originally imported from `kg-detangle.ts`, and its
  * output carried the proof:
  *
- *     $ bun test cat-harness/scripts/tests/detangle-group-depth.test.ts
+ *     $ bun test cat-harness-tools/scripts/tests/kg/detangle-group-depth.test.ts
  *       wrote 29 pinned measurement(s) to cat-harness/test/results/detangle/
  *      10 pass
  *

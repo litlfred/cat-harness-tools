@@ -160,8 +160,8 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -257,7 +257,7 @@ export function underAbsentResults(root: string, literal: string, absent: readon
 
 /**
  * Is `literal` (relative to `root`) an artefact `root` declares it BUILDS AT
- * PUBLISH (`builtAtPublish`, `schemas/built-at-publish.ts`; owner,
+ * PUBLISH (`builtAtPublish`, `schemas/kg/built-at-publish.ts`; owner,
  * 2026-10-14, "B1")? Such a file is never committed and is on disk only after
  * `derive:publish`, so a recorded witness naming it is held by the
  * declaration when this checkout has not built it: absent is its correct
@@ -275,7 +275,7 @@ export function underBuiltAtPublish(root: string, literal: string): boolean {
  */
 const HELPERS: Record<string, string> = {
   skills: "skillMdDirs() / workflowDirs() / workflowFiles() in scripts/known-skills.ts",
-  schemas: "resolveDirectories() in schemas/cat-harness.ts",
+  schemas: "resolveDirectories() in schemas/kg/cat-harness.ts",
 };
 
 /** Source trees this instance authors. Generated output is not code. */
@@ -445,7 +445,7 @@ export const LITERAL = /(["'`])((?:[^\\\n]|\\.)*?)\1/g;
 /**
  * Every declared-path literal in the instance's own source, classified.
  *
- * Exported so `scripts/tests/declared-paths.test.ts` asserts the property
+ * Exported so `scripts/tests/kg/declared-paths.test.ts` asserts the property
  * rather than shelling out to the CLI and reading its exit code — the pattern
  * `activity-skill-coverage.test.ts` set, and for its reason: a test that
  * parses console output breaks on a wording change and proves nothing about

@@ -20,8 +20,8 @@ import { join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import { builtDocsRoute, docsRouteFor } from "../docs-route.ts";
 import {
   pagePermalink,
@@ -99,8 +99,9 @@ describe("the scopes mean the same thing to Jekyll 3 and 4", () => {
 describe("what moves and what stays — read off the real tree", () => {
   // The chapters the docs graph groups its pages into (bean `xka5`), and the
   // one top-level page beside the landing page. Each is authored in this
-  // folder; each publishes under the route.
-  const MOVED_DIRS = ["start", "concepts", "guides", "process", "fhir", "research-and-analysis", "quality"];
+  // folder; each publishes under the route. `fhir/` is not among them: its
+  // pages are fhir-harness's now, published from that layer's own docs.
+  const MOVED_DIRS = ["start", "concepts", "guides", "process", "research-and-analysis", "quality"];
 
   test("every authored chapter's pages move, locale copies with them", () => {
     for (const d of MOVED_DIRS) {

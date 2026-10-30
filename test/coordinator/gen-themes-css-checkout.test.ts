@@ -1,6 +1,6 @@
 /**
  * `gen-themes-css` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/gen-themes-css.test.ts` (bean `7zz1`, owner
+ * `cat-harness-tools/scripts/tests/ui/gen-themes-css.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads every instance's sticky
  * themes, which only the checkout holds. Standing alone, cat-harness has none
  * of it, and `check:cat-harness-standalone` collects every test in that layer.
@@ -18,8 +18,8 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceStickyThemes } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
+import { instanceStickyThemes } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import { ensureThemesCss } from "../support/themes-css.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */

@@ -13,7 +13,7 @@
  * is nothing to filter.
  *
  * Generic on purpose: core knows that document kinds exist and never which
- * (`schemas/document-kind.ts`). The WHO DAK and L1 kinds are the DAK base
+ * (`schemas/content/document-kind.ts`). The WHO DAK and L1 kinds are the DAK base
  * layer's DATA, and this page draws them because that layer declares them — the same
  * way it would draw any other harness's. Stage D5 of the smart-* separation,
  * #1767, bean `qvxh`.
@@ -38,8 +38,8 @@ import {
   DocumentKindSchema,
   type DocumentKind,
   type DocumentKindCoverage,
-} from "@litlfred/cat-harness/schemas/document-kind.ts";
-import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/content/document-kind.ts";
+import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";

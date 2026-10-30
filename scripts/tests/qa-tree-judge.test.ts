@@ -28,7 +28,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { judgeSidecarTree, type FreshSidecar } from "../qa-results.ts";
 import { clearQaCache, publishQa, type QaStoreOptions } from "../qa-store.ts";
-import { KG_CRITERIA, KG_QA_SCHEMA, gradedKgFindings, type KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { KG_CRITERIA, KG_QA_SCHEMA, gradedKgFindings, type KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import { gradedTranslationFindings } from "../../pipeline/translation-block-qa.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

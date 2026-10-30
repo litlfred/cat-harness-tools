@@ -34,7 +34,7 @@
  *
  * Measured 2026-09-22, and the last row is why a naive rule is wrong rather
  * than merely imprecise: `viewHref`/`editHref` come from
- * `schemas/cat-harness.ts` as `${repoUrl}/blob/${branch}/${path}`. A check
+ * `schemas/kg/cat-harness.ts` as `${repoUrl}/blob/${branch}/${path}`. A check
  * that demanded a filter everywhere would report two working links as
  * defects, and the obvious "fix" would 404 them both.
  *
@@ -48,7 +48,7 @@
  */
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 

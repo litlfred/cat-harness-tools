@@ -26,8 +26,8 @@
  * has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
-import { EXTERNAL_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/external-schema.ts";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { EXTERNAL_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/kg/external-schema.ts";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { workflowFiles } from "../known-skills.ts";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -41,14 +41,14 @@ import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishe
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
-import { toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
-import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
+import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { dirname } from "node:path";
 
 /**
@@ -659,7 +659,7 @@ describe("every self-URL the export publishes resolves to something published", 
    *
    * Moving the renderings from `<base>/kg/` to `<base>/` touched six places.
    * Five were found by searching the two exporters; the sixth was
-   * `toolTypeIri` in `schemas/tool-types.ts`, which computed its FRAGMENT with
+   * `toolTypeIri` in `schemas/tools/tool-types.ts`, which computed its FRAGMENT with
    * a function and wrote `kg/tool-types.schema.json` as a literal. Every `@id`
    * in the document moved correctly and **95 `schema` refs still pointed at a
    * URL that 404s** — the document they named sat one directory away, and

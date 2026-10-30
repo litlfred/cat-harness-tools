@@ -12,7 +12,7 @@
  * `RemoteSyncStrategySchema`; `src/tools/skill-fetch.ts` and
  * `scripts/generate-registry.ts` contain no mention of `skills/remote-packages/`;
  * and that generator is the directory's only substantive reader, for the Docker
- * requirements `schemas/skill-package.ts` documents the wrappers as providing.
+ * requirements `schemas/kg/skill-package.ts` documents the wrappers as providing.
  * Two packages declare **five** skills between them, none fetchable here.
  *
  * **A docs page is the one place a reader cannot check the claim against the
@@ -29,8 +29,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { codeWithoutComments } from "../repo-files.js";
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.js";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -141,7 +141,7 @@ describe("the reason the page has to say that is still true", () => {
   });
 
   test("`sync` is optional, so a Docker-only wrapper need not claim a strategy", () => {
-    expect(readFileSync(join(ROOT, "schemas/skill-package.ts"), "utf8")).toContain(
+    expect(readFileSync(join(ROOT, "schemas/kg/skill-package.ts"), "utf8")).toContain(
       "sync: RemoteSyncConfigSchema.optional()",
     );
   });

@@ -322,6 +322,25 @@ def test_pdf_structure_records_the_layout_method():
     assert got == [("Introduction", 1), ("Background", 2), ("Results", 3), ("Discussion", 4)], got
 
 
+def test_annex_numbers_keep_their_series():
+    # folio-assistant#2302: "Annex 1" and chapter "1" were both number "1".
+    assert H.split_number("Annex 1. Tally sheets for routine childhood vaccinations") == (
+        "Annex 1", "Tally sheets for routine childhood vaccinations")
+    assert H.split_number("Appendix B.2 Proofs") == ("Appendix B.2", "Proofs")
+    assert H.split_number("Section 1. Introduction") == ("1", "Introduction")
+    assert H.split_number("Chapter 3 Results") == ("3", "Results")
+    assert H._depth("Annex 2.1") == 2 and H._depth("Annex 1") == 1
+    contents = [ln(2, 60, "Contents", size=14, bold=True)]
+    entries = [("1 Introduction", 1), ("2 Methods", 3), ("3 Results", 4), ("Annex 1. Tally sheets", 5), ("Annex 2. Worksheets", 7)]
+    for i, (t, pg) in enumerate(entries):
+        contents.append(ln(2, 100 + 20 * i, f"{t} {'.' * 20} {pg}"))
+    toc = [ln(1, 100, "A Report", size=20)] + contents
+    for i, (t, pg) in enumerate(entries):
+        toc += [ln(pg + 3, 80 + i, t, size=14, bold=True)] + body(pg + 3, 120, 3)
+    nums = [h.number for h in H.contents_headings(toc)]
+    assert nums == ["1", "2", "3", "Annex 1", "Annex 2"], nums
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

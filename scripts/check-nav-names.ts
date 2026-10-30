@@ -71,10 +71,10 @@ import { RAIL_DATA_DIR, expandRail, railDataJson } from "./lib/harness-rail.ts";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { normaliseDestination } from "./lib/nav-label.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, writeQaResult, type QaResult, type QaVerdict } from "./qa-results.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.

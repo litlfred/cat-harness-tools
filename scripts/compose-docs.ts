@@ -108,15 +108,15 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { declarationPathIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { declarationPathIn, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
 import { coneForCheckout, type ConeDecision } from "./staging-cone.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 import { foreignScopeFor, isHostProjection, scopeHarnessData, scopeSiteConfig, scopeStickies } from "./lib/foreign-site-scope.ts";
 import { subscribedTrees } from "./subscribed-trees.ts";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
+import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
 import { declaredVisualisers, forwardingParts, heldVisualiserPages, pageParts } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { declaredDocsSources } from "./lib/docs-sources.ts";
@@ -209,7 +209,7 @@ export function chromeLayers(repo = REPO): DocsLayer[] {
 
 /**
  * The directories an instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
- * cat-harness `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
+ * cat-harness `schemas/kg/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
  * absolute paths ending in the separator. Read as `check-declared-dirs.ts`
  * `builtAtPublishDirs` reads them.
  */

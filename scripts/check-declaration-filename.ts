@@ -10,7 +10,7 @@
  *
  * ## The defect this exists for
  *
- * `RETIRED_DECLARATION` has been exported from `schemas/cat-harness.ts` the
+ * `RETIRED_DECLARATION` has been exported from `schemas/kg/cat-harness.ts` the
  * whole time, and call sites built the path from a literal instead. That is
  * not a style complaint. A constant nothing uses is a constant that does not
  * do its job: the rename it exists to make cheap costs a hand-edit at every
@@ -100,10 +100,10 @@
  */
 
 import { readdirSync, readFileSync } from "node:fs";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { historicalPrefixes } from "../src/docs/declaration-claims.js";
 
 /**
@@ -111,7 +111,7 @@ import { historicalPrefixes } from "../src/docs/declaration-claims.js";
  *
  * Kept as a constant so this gate can FIND it, never so a reader can fall back
  * to it — the same shape as `LEGACY_HARNESS_CONFIG` in
- * `schemas/harness-config.ts`, and for the reason recorded there: the previous
+ * `schemas/kg/harness-config.ts`, and for the reason recorded there: the previous
  * rename was a silent hard break, and `9ici` is what that cost.
  */
 const RETIRED_DECLARATION = "harness.json";
@@ -119,7 +119,7 @@ const RETIRED_DECLARATION = "harness.json";
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 
 /** Where the constant itself is defined — the one legitimate literal. */
-const DEFINITION_SITE = "cat-harness/schemas/cat-harness.ts";
+const DEFINITION_SITE = "cat-harness/schemas/kg/cat-harness.ts";
 
 /** This gate itself — the one file that must still name the retired string. */
 const THIS_GATE = "cat-harness-tools/scripts/check-declaration-filename.ts";

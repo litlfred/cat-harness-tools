@@ -57,9 +57,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
 import { workflowFiles, corpusScopeFor, roleGraphFor } from "./known-skills.js";
-import { fulfilmentKindsForBpmnType } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { fulfilmentKindsForBpmnType } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { isActivity, loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
-import { capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { CAPABILITIES_DIRNAME, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { instanceDirectoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -102,32 +103,56 @@ export function declaredCapabilityFacts(root: string): Map<string, CapabilityFac
   // The declared home inside `scenarios` (bean rqao) — the same place
   // `src/tools/capabilities.ts` reads. Both bases are still tried, because a
   // caller may hand this an instance root or the repository root.
-  for (const base of new Set([root, resolve(root, "..")])) {
-    const dir = capabilitiesDir(base) ?? "";
-    let names: string[];
-    try {
-      names = readdirSync(dir);
-    } catch {
-      continue;
-    }
-    for (const f of names.filter((n) => n.endsWith(".json"))) {
-      try {
-        const j = JSON.parse(readFileSync(join(dir, f), "utf-8")) as Record<string, unknown>;
-        const id = typeof j.id === "string" ? j.id : basename(f, ".json");
-        out.set(id, {
-          id,
-          requires: Array.isArray(j.requires) ? j.requires.map(String) : [],
-          ...(typeof j.fallbackTo === "string" ? { fallbackTo: j.fallbackTo } : {}),
-        });
-      } catch {
-        // A capability file that will not parse is not a declared
-        // capability. It is also not this check's business to report —
-        // `kg:validate` owns that — so it is skipped rather than swallowed
-        // into a pass.
-      }
+  for (const base of new Set([root, resolve(root, "..")])) readCapabilityDir(capabilitiesDir(base) ?? "", out);
+  return out;
+}
+
+/**
+ * Every capability the CHECKOUT declares: each instance's own `capabilities`
+ * registry inside its declared `scenarios` graph.
+ *
+ * {@link declaredCapabilityFacts} reads the platform's registry only, and a
+ * capability is declared by the instance its subject belongs to: the Lean pair
+ * moved up to the layer that writes papers, and the platform's registry has no
+ * `fallbackTo` left. The instances are DISCOVERED (`instanceRootsIn`), never
+ * named, because this layer may not name the layers above it.
+ */
+export function checkoutCapabilityFacts(repoRoot: string): Map<string, CapabilityFacts> {
+  const out = new Map<string, CapabilityFacts>();
+  for (const root of instanceRootsIn(repoRoot)) {
+    // Its OWN `scenarios` directories: an instance may declare more than one,
+    // and a dependency's, which it can see, is read where that one is visited.
+    for (const scenarios of instanceDirectoriesForGraph(root, "scenarios")) {
+      readCapabilityDir(join(scenarios, CAPABILITIES_DIRNAME), out);
     }
   }
   return out;
+}
+
+/** Read one `capabilities` directory into `out`; an absent one adds nothing. */
+function readCapabilityDir(dir: string, out: Map<string, CapabilityFacts>): void {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const f of names.filter((n) => n.endsWith(".json"))) {
+    try {
+      const j = JSON.parse(readFileSync(join(dir, f), "utf-8")) as Record<string, unknown>;
+      const id = typeof j.id === "string" ? j.id : basename(f, ".json");
+      out.set(id, {
+        id,
+        requires: Array.isArray(j.requires) ? j.requires.map(String) : [],
+        ...(typeof j.fallbackTo === "string" ? { fallbackTo: j.fallbackTo } : {}),
+      });
+    } catch {
+      // A capability file that will not parse is not a declared
+      // capability. It is also not this check's business to report —
+      // `kg:validate` owns that — so it is skipped rather than swallowed
+      // into a pass.
+    }
+  }
 }
 
 /**
@@ -135,7 +160,7 @@ export function declaredCapabilityFacts(root: string): Map<string, CapabilityFac
  *
  * Not cosmetic. This file's own header discusses `degradation: "fallback"`
  * in prose, and the first run of the rewritten check reported
- * `schemas/assistant-types.ts` as a skill with an unresolvable fallback —
+ * `schemas/conduct/assistant-types.ts` as a skill with an unresolvable fallback —
  * it had matched a JSDoc table. A scanner that reads its own documentation
  * as corpus is the "measured the wrong thing" failure in miniature.
  *

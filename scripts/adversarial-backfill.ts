@@ -36,16 +36,16 @@ import { dirname, join, relative, resolve } from "node:path";
 import {
   getChecklistForKind,
   type AdversarialContentKind,
-} from "@litlfred/cat-harness/schemas/adversarial-checklist.js";
+} from "@litlfred/cat-harness/schemas/sdlc/adversarial-checklist.js";
 import {
   AdversarialFindingSchema,
   type AdversarialFinding,
   type AdversarialReview,
-} from "@litlfred/cat-harness/schemas/red-flag.js";
-import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/kg-qa.js";
+} from "@litlfred/cat-harness/schemas/sdlc/red-flag.js";
+import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -106,7 +106,7 @@ export const GATE_PATH_NODES: readonly { id: string; kind: AdversarialContentKin
   { id: "merge-base", kind: "tool", path: "scripts/merge-base.ts" },
   { id: "regen-after-merge", kind: "tool", path: "scripts/regen-after-merge.ts" },
   { id: "merge-conflict-patterns", kind: "skill", path: "skills/sdlc/sdlc-core/merge-conflict-patterns.md" },
-  { id: "kg-qa", kind: "schema", path: "schemas/kg-qa.ts" },
+  { id: "kg-qa", kind: "schema", path: "schemas/sdlc/kg-qa.ts" },
 ] as const;
 
 /**

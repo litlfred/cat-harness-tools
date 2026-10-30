@@ -37,7 +37,7 @@ import { dirname, isAbsolute, join, resolve } from "path";
 
 import type { Block, Chapter, Paper, Section } from "@litlfred/cat-harness/schemas/types.ts";
 import { isSectionRef } from "../adapters/manifest-entries";
-import { kindHeading } from "@litlfred/cat-harness/schemas/translation.ts";
+import { kindHeading } from "@litlfred/cat-harness/schemas/content/translation.ts";
 
 // ── Block headers ────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ import { kindHeading } from "@litlfred/cat-harness/schemas/translation.ts";
  * normative statement.
  *
  * This lookup now delegates to `kindHeading(kind, locale)` from
- * `schemas/translation.ts`, which carries translations in all six UN
+ * `schemas/content/translation.ts`, which carries translations in all six UN
  * languages and falls back to English → title-cased kind name. The old
  * English-only `KIND_HEADING` map is retired; the function preserves
  * the same design intent (prose returns `undefined`).

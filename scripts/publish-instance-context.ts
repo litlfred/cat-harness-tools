@@ -50,7 +50,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";
@@ -126,7 +126,7 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * The instance's own VOCABULARY, served where its term IRIs point.
  *
  * Owner, 2026-10-15 ("2 Serve vocab at own iriBase"): a term IRI is
- * `<iriBase>v<major>/ns#Term` (`cat-harness/schemas/namespaces.ts`), so the
+ * `<iriBase>v<major>/ns#Term` (`cat-harness/schemas/kg/namespaces.ts`), so the
  * document `<iriBase>v<major>/ns` has to exist on the instance's own Pages or
  * every term it mints answers 404 — which was the state of two instances,
  * cat-harness one of them, when this was written (no `0.1.0/` on either

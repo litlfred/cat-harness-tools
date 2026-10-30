@@ -39,7 +39,7 @@
  *      owner, 2026-09-19: *"narrative/audio/visual content with text should be
  *      translatable. its not so much the node schema itself but its content
  *      (e.g. markdown, bpmn) should be translatable."* That model already
- *      exists — `schemas/translation-tools.ts` declares per content type which
+ *      exists — `schemas/library/translation-tools.ts` declares per content type which
  *      formats have an extract/inject pair, and {@link isTranslatable} is the
  *      predicate. This module asks IT rather than inventing a second answer.
  *
@@ -68,7 +68,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -78,9 +78,9 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 /** Re-exported so a caller that already reads pages through this module needs no second import. */
 export { permalinkDefaultsIn };
 
-import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
-import { isTranslatable } from "@litlfred/cat-harness/schemas/translation-tools.ts";
-import { ownDirectoryById, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { LOCALE_RTL, UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { isTranslatable } from "@litlfred/cat-harness/schemas/library/translation-tools.ts";
+import { ownDirectoryById, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const REPO_ROOT = resolve(HARNESS_ROOT);
 

@@ -157,8 +157,8 @@ import {
   repoRootFor,
   siblingScopeFor,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/repo-full-name.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { RepoFullNameSchema } from "@litlfred/cat-harness/schemas/kg/repo-full-name.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
@@ -167,8 +167,8 @@ import {
   type SubscriptionKind,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/substrate-snapshot.js";
-import { NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
+} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
+import { NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
 import { git, pinnedRef, shallowFetch } from "./sync-remote-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -792,7 +792,7 @@ export function checkSubscriptions(instanceRoot: string): string[] {
 // subscribed trees (`subscribed-trees.ts`, harness) can share it: this module
 // is classified core, and the harness may not import core. Re-exported here
 // so every existing importer keeps its path.
-export { PART_RECORD_FILE, PART_TREE, NODES_RECORD_FILE, NODES_DIR, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
+export { PART_RECORD_FILE, PART_TREE, NESTED_DIR, NODES_RECORD_FILE, NODES_DIR, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
 export type { KgPart, PartView } from "./kg-parts.js";
 
 /**
@@ -815,12 +815,14 @@ export function partRecordsIn(snapshotDir: string, subscription: string): { part
         if (g.isDirectory() && existsSync(join(gd, PART_RECORD_FILE))) parts.push(viewOf(gd, { kind: "subgraph", id: g.name }));
         else strays.push(rel(gd));
       }
-    } else if (e.name === "assets" && e.isDirectory()) {
+    } else if ((e.name === "assets" || e.name === NESTED_DIR) && e.isDirectory()) {
+      // Both keyed by path: a directory holding a record is one part.
       const walk = (d: string): void => {
         for (const a of readdirSync(d, { withFileTypes: true })) {
           const ad = join(d, a.name);
           if (a.isDirectory() && !lstatSync(ad).isSymbolicLink()) {
-            if (existsSync(join(ad, PART_RECORD_FILE))) parts.push(viewOf(ad, { kind: "asset", path: relative(p, ad).split("\\").join("/") }));
+            const path = relative(p, ad).split("\\").join("/");
+            if (existsSync(join(ad, PART_RECORD_FILE))) parts.push(viewOf(ad, e.name === NESTED_DIR ? { kind: "nested", path } : { kind: "asset", path }));
             else walk(ad);
           } else strays.push(rel(ad));
         }

@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
-import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 import type { QaTreeRead } from "../../scripts/qa-store.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import {
@@ -34,6 +34,7 @@ import {
   HEALTH_CHECKS,
   PAGES_OBSERVATION_HORIZON_DAYS,
   pagesPublishHealthCheck,
+  remoteMountHealthCheck,
   ORPHAN_THRESHOLDS,
   RECENT_COMMIT_MINUTES,
   TRACKED_MAJOR_BYTES,
@@ -93,6 +94,36 @@ function healthyContext(over: Partial<HealthContext> = {}): HealthContext {
     ...over,
   };
 }
+
+describe("remote-mounts (folio-assistant#2467, decision 3)", () => {
+  const ev = (outcomes: { instance: string; state: string; detail?: string }[]): HealthContext["remoteMounts"] => ({
+    state: "ok",
+    value: { outcomes, command: "fixture" },
+  });
+
+  it("every declared instance mounted is ok; nothing declared is not applicable", () => {
+    expect(remoteMountHealthCheck(healthyContext({ remoteMounts: ev([{ instance: "a", state: "mounted" }, { instance: "b", state: "local" }]) })).state).toBe("ok");
+    expect(remoteMountHealthCheck(healthyContext({ remoteMounts: { state: "absent", reason: "no `remoteMounts` declared" } })).reason).toContain("not applicable");
+    expect(remoteMountHealthCheck(healthyContext({ remoteMounts: { state: "unknown", reason: "x" } })).state).toBe("unknown");
+  });
+
+  it("one not mounted is a major finding whose action names what a person does", () => {
+    const r = remoteMountHealthCheck(
+      healthyContext({
+        remoteMounts: ev([
+          { instance: "a", state: "mounted" },
+          { instance: "b", state: "missing", detail: "`b/` already exists, no lock says this mount put it there, and it is not the pinned bytes (differ: `b/x.ts`)" },
+          { instance: "c", state: "missing", detail: "not mounted: no consent for this pin" },
+        ]),
+      }),
+    );
+    expect(r.state).toBe("finding");
+    expect(r.findings.map((f) => f.severity)).toEqual(["major", "major"]);
+    expect(r.findings[0]!.action).toContain("Move the edits upstream");
+    expect(r.findings[1]!.action).toContain("consent");
+    expect(r.measurements.find((m) => m.metric === "remote-mounts-not-mounted")!.value).toBe(2);
+  });
+});
 
 function previews(n: number, each: number): StagingPreview[] {
   return Array.from({ length: n }, (_, i) => ({ slug: `claude-p${i}`, bytes: each, files: 700 }));

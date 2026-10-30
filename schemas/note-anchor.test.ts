@@ -21,7 +21,7 @@ import {
   NoteAnchorSchema,
   notesAt,
   type Related,
-} from "@litlfred/cat-harness/schemas/note-anchor.js";
+} from "@litlfred/cat-harness/schemas/ui/note-anchor.js";
 
 const NOTE = { id: "t1", summary: "s" };
 
@@ -150,7 +150,7 @@ describe("beans carry no anchor — the owner's rule, guarded", () => {
   // Deliberately NOT a count of anything. A number here would make "the rule
   // still holds" indistinguishable from "somebody renamed the file", which is
   // the mistake this session already made twice with coverage counts.
-  const BEAN_MODULES = ["schemas/bean-graph.ts", "src/workflow/bean-link.ts"];
+  const BEAN_MODULES = ["schemas/sdlc/bean-graph.ts", "src/workflow/bean-link.ts"];
 
   test.each(BEAN_MODULES)("%s does not reach for an anchor", async (rel) => {
     const file = Bun.file(rel.startsWith("schemas/") ? join(HARNESS_ROOT, rel) : join(TOOLS_ROOT, rel));

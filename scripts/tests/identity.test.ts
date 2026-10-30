@@ -11,7 +11,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { matchKeys, qualified, readUserConfig, resolveIdentities, userConfigPath } from "../../src/core/identity.js";
+import {
+  matchKeys,
+  normalizeDeclaredIdentities,
+  qualified,
+  readUserConfig,
+  resolveIdentities,
+  userConfigPath,
+} from "../../src/core/identity.js";
 
 const made: string[] = [];
 afterEach(() => {
@@ -95,6 +102,133 @@ describe("resolveIdentities", () => {
     const r = await resolveIdentities({ env: {}, home: h, git: noGit });
     expect(r.userConfig.state).toBe("unreadable");
     expect(r.notes.some((n) => n.includes("not a JSON object"))).toBe(true);
+  });
+
+  test("several accounts per provider for one person: map form (string | string[]) and array form with active flag", async () => {
+    const h = home();
+    userConfig(
+      h,
+      JSON.stringify({
+        identities: {
+          github: ["litlfred", "litlfred-bot"],
+          claude: ["fred-personal@example.org", "fred-work@example.org"],
+          gitlab: "fred-gl",
+        },
+      }),
+    );
+    const r = await resolveIdentities({ env: {}, home: h, git: noGit });
+    expect(r.identities.map(qualified)).toEqual([
+      "github:litlfred",
+      "github:litlfred-bot",
+      "claude:fred-personal@example.org",
+      "claude:fred-work@example.org",
+      "gitlab:fred-gl",
+    ]);
+    const keys = matchKeys(r.identities);
+    expect(keys).toContain("litlfred");
+    expect(keys).toContain("litlfred-bot");
+    expect(keys).toContain("github:litlfred");
+    expect(keys).toContain("github:litlfred-bot");
+    expect(keys).toContain("claude:fred-personal@example.org");
+    expect(keys).toContain("claude:fred-work@example.org");
+
+    // Array form with active: true puts active handles first while keeping all accounts.
+    const norm = normalizeDeclaredIdentities([
+      { provider: "github", handle: "secondary-gh", active: false },
+      { provider: "github", handle: ["primary-gh", "team-gh"], active: true },
+    ]);
+    expect(norm.map((x) => `${x.provider}:${x.handle}`)).toEqual([
+      "github:primary-gh",
+      "github:team-gh",
+      "github:secondary-gh",
+    ]);
+  });
+
+  test("several people on one machine: explicit CAT_HARNESS_PROFILE / CAT_HARNESS_PERSON selects that person's profile, while ambiguous multi-user falls back to strictest profile", async () => {
+    const h = home();
+    userConfig(
+      h,
+      JSON.stringify({
+        profiles: {
+          // Listed first with looser profile [] to prove we never silently pick the first/looser profile!
+          bob: {
+            identities: { github: "bob-gh", cursor: "bob@example.org" },
+            interaction: { profiles: [], note: "Ordinary chat" },
+          },
+          alice: {
+            identities: { github: ["alice-gh", "alice-alt"], gemini: "alice@example.org" },
+            interaction: { profiles: ["low-dexterity"], note: "Selectable options only" },
+          },
+        },
+      }),
+    );
+
+    // 1. No disambiguator -> ambiguous-multi-user, falls back to Alice's strictest profile ("low-dexterity").
+    const ambig = await resolveIdentities({ env: {}, home: h, git: noGit });
+    expect(ambig.multiUserStatus).toBe("ambiguous-multi-user");
+    expect(ambig.interaction.status).toBe("ambiguous-multi-user");
+    expect(ambig.interaction.profiles).toEqual(["low-dexterity"]);
+    expect(ambig.notes.some((n) => n.includes("ambiguous-multi-user"))).toBe(true);
+
+    // 2. Explicit CAT_HARNESS_PROFILE=bob -> resolves Bob's identities and Bob's profile.
+    const asBob = await resolveIdentities({ env: { CAT_HARNESS_PROFILE: "bob" }, home: h, git: noGit });
+    expect(asBob.multiUserStatus).toBe("selected");
+    expect(asBob.activeProfile).toBe("bob");
+    expect(asBob.identities.map(qualified)).toEqual(["github:bob-gh", "cursor:bob@example.org"]);
+    expect(asBob.interaction.profiles).toEqual([]);
+
+    // 3. CAT_HARNESS_PERSON=github:alice-alt -> selects Alice and resolves all of Alice's accounts.
+    const asAlice = await resolveIdentities({ env: { CAT_HARNESS_PERSON: "github:alice-alt" }, home: h, git: noGit });
+    expect(asAlice.multiUserStatus).toBe("selected");
+    expect(asAlice.activeProfile).toBe("alice");
+    expect(asAlice.identities.map(qualified)).toEqual([
+      "github:alice-alt",
+      "github:alice-gh",
+      "gemini:alice@example.org",
+    ]);
+    expect(asAlice.interaction.profiles).toEqual(["low-dexterity"]);
+  });
+
+  test("several people in one session matching repo interaction.json users: detects ambiguity and falls back to strictest profile unless disambiguated", async () => {
+    const repoUsers = {
+      bob: {
+        aliases: ["cursor:bob@example.org"],
+        profiles: [],
+        note: "Ordinary chat",
+      },
+      alice: {
+        aliases: ["gemini:alice@example.org"],
+        profiles: ["low-dexterity"],
+        note: "Selectable options only",
+      },
+    };
+
+    // The session names both Bob and Alice, with no disambiguator.
+    const ambig = await resolveIdentities({
+      env: { CAT_HARNESS_PERSON: "cursor:bob@example.org,gemini:alice@example.org" },
+      home: home(),
+      git: noGit,
+      users: repoUsers,
+    });
+    expect(ambig.multiUserStatus).toBe("ambiguous-multi-user");
+    expect(ambig.interaction.status).toBe("ambiguous-multi-user");
+    expect(ambig.interaction.matchedUsers).toEqual(["bob", "alice"]);
+    expect(ambig.interaction.profiles).toEqual(["low-dexterity"]);
+
+    // Disambiguated by CAT_HARNESS_PROFILE="bob"
+    const disambig = await resolveIdentities({
+      env: {
+        CAT_HARNESS_PERSON: "cursor:bob@example.org,gemini:alice@example.org",
+        CAT_HARNESS_PROFILE: "bob",
+      },
+      home: home(),
+      git: noGit,
+      users: repoUsers,
+    });
+    expect(disambig.multiUserStatus).toBe("selected");
+    expect(disambig.activeProfile).toBe("bob");
+    expect(disambig.interaction.status).toBe("selected");
+    expect(disambig.interaction.profiles).toEqual([]);
   });
 });
 

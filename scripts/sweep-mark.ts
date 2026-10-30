@@ -7,7 +7,7 @@
  * agent holds). A session that skipped it left no trace. The owner ruled on
  * 2026-10-10: **timestamp** — the check writes a last-checked mark to the
  * state branch, and the sweep reads it back, so a skipped step is visible
- * after the terminal scrolls. Shape: `@litlfred/cat-harness/schemas/sweep-mark.ts`.
+ * after the terminal scrolls. Shape: `@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts`.
  *
  * The directory is the bean graph's `sweep-marks` node, asked of the graph
  * and never composed here. Reading has five answers, and only one of them is
@@ -33,7 +33,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { SWEEP_MARK_TAG, SweepMarkSchema, type SweepMark } from "@litlfred/cat-harness/schemas/sweep-mark.ts";
+import { SWEEP_MARK_TAG, SweepMarkSchema, type SweepMark } from "@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts";
 
 import { resolveBeanGraphNode } from "./beans.ts";
 import { REPO_ROOT } from "./lib/roots.ts";

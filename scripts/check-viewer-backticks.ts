@@ -49,8 +49,8 @@
 import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 /** The line that opens a page template, and the only thing that selects a file. */
 export const PAGE_TEMPLATE_OPENER = /return\s+`<!doctype html>/i;
@@ -72,7 +72,7 @@ export const PAGE_TEMPLATE_OPENER = /return\s+`<!doctype html>/i;
  * still found — including in the two that could not be scanned at all before.
  *
  * **Tests are excluded by shape, and that is measured rather than tidy.**
- * `scripts/tests/check-viewer-backticks.test.ts` carries a PLANTED stray at
+ * `scripts/tests/ui/check-viewer-backticks.test.ts` carries a PLANTED stray at
  * line 28 as a fixture; scanning it would fail the gate on its own evidence.
  * The `.e2e.ts` files report clean today, so they are excluded for the other
  * reason: a test is not a generator, and a gate that watches fixtures reports

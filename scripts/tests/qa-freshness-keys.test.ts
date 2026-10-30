@@ -5,7 +5,7 @@ import {
   criterionDefHash,
 } from "../../pipeline/qa-utils";
 import { QA_CRITERIA_BY_ID } from "../../pipeline/qa-criteria-registry";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 /**
  * `depends_on` carries two meanings — applicability and freshness — and

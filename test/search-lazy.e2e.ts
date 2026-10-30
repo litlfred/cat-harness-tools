@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { Liquid } from "liquidjs";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**

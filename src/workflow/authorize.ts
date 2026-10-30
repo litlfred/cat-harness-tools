@@ -32,7 +32,7 @@
  * @module folio-assistant/workflow/authorize
  */
 
-import { decide, PERFORM_TASK, type Decision } from "@litlfred/cat-harness/schemas/odrl.js";
+import { decide, PERFORM_TASK, type Decision } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import type { AccessContext, AuthMethod, Principal } from "../core/access.js";
 
 export interface TaskAuthRequest {

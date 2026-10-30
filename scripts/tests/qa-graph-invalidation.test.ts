@@ -9,7 +9,7 @@ import {
   QA_CRITERIA_BY_ID,
   QA_CRITERIA_REGISTRY,
 } from "../../pipeline/qa-criteria-registry";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 /**
  * Derived, not pinned. This list was eight hardcoded ids until

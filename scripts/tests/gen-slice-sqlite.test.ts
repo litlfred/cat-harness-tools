@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { inAggregate } from "../../test/support/checkout.ts";
 import { readBeans, type BeanNode } from "../beans.ts";
 import { auditPayloadTree } from "../gen-subgraph-jsonld.ts";
@@ -390,6 +390,13 @@ describe("gen-slice-sqlite — kg", () => {
       expect(hit).toEqual([{ iri: "skill/a" }]);
       db.close();
       expect(d.probe).toEqual({ phrase: "materialization skill", column: "iri", value: "skill/b" });
+    }));
+
+  test("a one-release tombstone is not a row: it has no type and no text, only a forwarding address (bean 0exf)", () =>
+    withDir((dir) => {
+      const moved = { "@id": "https://example.org/site/x.jsonld#skill/a", deprecated: true, isReplacedBy: `${DIR}skill/a`, sameAs: `${DIR}skill/a` };
+      const d = kgData({ ...doc, "@context": { ...doc["@context"], isReplacedBy: { "@id": "ex:isReplacedBy", "@type": "@id" }, sameAs: { "@id": "ex:sameAs", "@type": "@id" } }, "@graph": [...doc["@graph"], moved] }, emptyPlan());
+      expect(buildSlice(KG_SLICE, d, dir).rows).toEqual({ nodes: 3, edges: 4, dangling: 1 });
     }));
 
   test("a pointer at a payload the published tree does not hold fails --check", () => {

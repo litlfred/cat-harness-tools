@@ -31,7 +31,7 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations,
   type CriteriaMap,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { derivedReports, migrateCriteria } from "../scripts/migrate-qa-attestations";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -404,6 +404,31 @@ describe("the D2 split, measured over a fixture corpus", () => {
       expect(second.added).toBe(0);
       expect(second.storeFilesWritten).toBe(0);
       expect(second.alreadyHeld).toBe(FIXTURE_JUDGEMENTS);
+    } finally {
+      t.cleanup();
+    }
+  });
+
+  test("a store file moved with its content directory has its stale subject.path repaired by migrateCriteria", () => {
+    const t = corpusInstance(true);
+    try {
+      const key = blockAttestationKey(t.root, join(t.root, "content", "a"));
+      const path = attestationPath(t.root, key);
+      const stale = JSON.parse(readFileSync(path, "utf-8"));
+      stale.subject = { kind: "block", id: "old/a", path: "old/a" };
+      writeFileSync(path, jsonText(stale, false) + "\n");
+
+      const checkBefore = migrateCriteria(t.root, { check: true });
+      expect(checkBefore.unreadable).toEqual([]);
+      expect(checkBefore.missing).toContain(`${relative(t.root, path)} subject.path`);
+
+      const migrated = migrateCriteria(t.root);
+      expect(migrated.unreadable).toEqual([]);
+      expect(migrated.storeFilesWritten).toBe(1);
+
+      const checkAfter = migrateCriteria(t.root, { check: true });
+      expect(checkAfter.unreadable).toEqual([]);
+      expect(checkAfter.missing).toEqual([]);
     } finally {
       t.cleanup();
     }

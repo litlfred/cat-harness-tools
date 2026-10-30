@@ -73,7 +73,7 @@ export { schemeKey, withSavedScheme } from "./lib/scheme-css.js";
 import { VISUALISER_NAV_ATTR, visualiserNavDeclaration, type VisualiserNavEntry } from "./lib/navbar.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { declaredGraphs, instanceMark, instantiatedHarnesses, navbarRowData, publishedGraphs, railNames } from "./mount-instance-docs.js";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The opt-out a visualisation writes into its own page.

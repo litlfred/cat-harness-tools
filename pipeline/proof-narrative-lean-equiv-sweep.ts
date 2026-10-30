@@ -12,7 +12,7 @@
  *   bun run cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts <chapter-dir> --json
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, basename, dirname, relative as pathRelative, join } from "path";
 import { findContentRepoRoot } from "./repo-root";
@@ -27,14 +27,14 @@ import {
 } from "./qa-utils";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
 import type {
-  QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
+  QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 // The one contract for where a block's verdict lives — see
 // pipeline/qa-paths.ts. `blockQaPath` for writing (results tree
 // only, mirroring REPO_ROOT — the content repo root the module comment above
 // anchors everything else to); `existingBlockQaPath` for reading (results
 // tree first, legacy `<block>.qa.json` sibling as fallback).
 import { blockQaPath } from "./qa-paths";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 
 /**
  * Root of the CONTENT repo being swept.

@@ -24,8 +24,8 @@ import {
   ContributionCollisionError,
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {
   UnregisteredPipelinePluginError,
@@ -265,8 +265,6 @@ describe("this repository", () => {
     const sciBoundHere = new Set([
       "lean-atlas-ingest.ts",
       "qa-checkers-vacuity.ts",
-      "conditional-class-banner-audit.ts",
-      "lean-triviality-probe.ts",
       "lean-signature.ts",
     ]);
     const offenders: string[] = [];

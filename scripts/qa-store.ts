@@ -76,14 +76,14 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `check-declared-dirs.ts` carries, same reason.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
-import { inputSiteReached, qaRefLine, quietly } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached, qaRefLine, quietly } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -159,6 +159,11 @@ export interface QaManifest {
   bytes: number;
   written_at: string;
   producer?: { run?: string; gates?: string };
+  /**
+   * Content-addressed reference to the `folio-run-context/v1` record under
+   * which this QA store entry was produced (owner C1 = (a), bean `3sbm`).
+   */
+  runContext?: { sha256: string };
   /**
    * What `qa:refresh` said of the working copy this entry was built from (bean
    * `3hk4`): `tracked` (the commit's own committed copy) or `computed` (the
@@ -246,7 +251,7 @@ export interface QaDirectory {
   path: string;
   absPath: string;
   present: boolean;
-  storage?: import("@litlfred/cat-harness/schemas/cat-harness.js").DirectoryStorage;
+  storage?: import("@litlfred/cat-harness/schemas/kg/cat-harness.js").DirectoryStorage;
 }
 
 export interface QaLocation {

@@ -8,7 +8,7 @@
  *
  * Owner, 2026-09-23: *"list of codes and corresponding narrative desc and
  * source should be part of a node/asset"*, published through the existing
- * SKOS tooling. The shape is `schemas/code-list.ts`; this is its gate.
+ * SKOS tooling. The shape is `schemas/library/code-list.ts`; this is its gate.
  *
  *   bun run cat-harness-tools/scripts/code-lists.ts --check
  *
@@ -34,9 +34,9 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { codeListDirs, codeListToSkos, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/code-list.ts";
+import { codeListDirs, codeListToSkos, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/library/code-list.ts";
 import { workflowFiles } from "./known-skills";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

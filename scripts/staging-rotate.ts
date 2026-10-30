@@ -97,8 +97,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 
-import { RENDER_LOG_DIR, readRenderLog } from "@litlfred/cat-harness/schemas/render-log.ts";
-import { readStagingPreview, retireStagingPreview, serializeStagingPreview } from "@litlfred/cat-harness/schemas/staging-preview.ts";
+import { RENDER_LOG_DIR, readRenderLog } from "@litlfred/cat-harness/schemas/ui/render-log.ts";
+import { readStagingPreview, retireStagingPreview, serializeStagingPreview } from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
 import { appendEntry, buildEntry } from "./render-log.ts";
 import { RETIRED_DIR, SLUG_PATTERN, STAGING_PREFIX } from "./restore-staging.ts";
 import { loadExisting } from "./staging-record.ts";

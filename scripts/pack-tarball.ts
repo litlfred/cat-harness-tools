@@ -9,7 +9,7 @@
  * Packaging & binary release tooling for the Knowledge Graph:
  * - Builds the npm .tgz tarball via `bun pm pack`.
  * - Records size in bytes and sha256 digest into a `folio-binary-release/v1` state document.
- * - Conforms to `schemas/binary-release.ts` (BinaryReleaseSchema).
+ * - Conforms to `schemas/sdlc/binary-release.ts` (BinaryReleaseSchema).
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -30,8 +30,8 @@ import {
   BINARY_RELEASE_SCHEMA_TAG,
   BinaryReleaseSchema,
   type BinaryRelease,
-} from "@litlfred/cat-harness/schemas/binary-release.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // declared-path-literal: the pack-time exclusions for the binary assets a
 // PACKAGED instance may hold, written into that package's ignore list. They
@@ -62,6 +62,11 @@ export interface PackTarballOptions {
   repository?: string;
   /** Public release URL or base URL for fetchedFrom. */
   releaseUrl?: string;
+  /**
+   * The release's git tag. Default `v<version>`; a per-pin package
+   * (`subgraph-index-package`, bean `mo75` G2b) is released under its own.
+   */
+  tag?: string;
   /**
    * Whether to build the hydrated package (including binary media assets).
    * When false (default), binary assets in library/ and uploads/ are excluded
@@ -224,16 +229,16 @@ export function packTarball(opts: PackTarballOptions = {}): PackResult {
   }
 
   // Determine fetchedFrom URL
+  const tag = opts.tag ?? `v${version}`;
   const fetchedFrom = opts.releaseUrl
     ? (opts.releaseUrl.endsWith(".tgz") ? opts.releaseUrl : `${opts.releaseUrl.replace(/\/+$/, "")}/${tarballName}`)
     : repository.includes("/")
-    ? `https://github.com/${repository}/releases/download/v${version}/${tarballName}`
+    ? `https://github.com/${repository}/releases/download/${tag}/${tarballName}`
     : `https://registry.npmjs.org/${name}/-/${tarballName}`;
 
   const releaseId = opts.hydrated
     ? `${name.replace(/^@/, "").replace("/", "-")}-v${version}-hydrated`
     : `${name.replace(/^@/, "").replace("/", "-")}-v${version}`;
-  const tag = `v${version}`;
   const now = new Date().toISOString();
 
   const releaseRecord: BinaryRelease = {
@@ -243,7 +248,7 @@ export function packTarball(opts: PackTarballOptions = {}): PackResult {
       version,
       tag,
       publishedAt: now,
-      url: repository.includes("/") ? `https://github.com/${repository}/releases/tag/v${version}` : undefined,
+      url: repository.includes("/") ? `https://github.com/${repository}/releases/tag/${tag}` : undefined,
     },
     origin: {
       kind: "github-release",

@@ -50,9 +50,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceDirectories, instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { findDeclarationFile, instanceDirectories, instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 /** Extensions read as code. Lower-case, with the dot. */
 export const CODE_EXTENSIONS: readonly string[] = [

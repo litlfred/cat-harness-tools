@@ -42,9 +42,9 @@
  * @module pipeline/voice-criteria
  */
 
-import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/voices.ts";
-import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "@litlfred/cat-harness/schemas/content/voices.ts";
+import { instanceRootsIn, readDeclaration, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 /**
  * A voice, plus the instance that ships it.
@@ -98,7 +98,7 @@ export function overlayCriterionId(voiceId: string): string {
  * `who-publication-design` carries `critical` rules and is registered `major`;
  * `milnor`'s worst rule is `major` and it is registered `minor`. Deriving it
  * would have silently re-graded half the corpus, which is why
- * `overlaySeverity` is a declared field. See `schemas/voices.ts`.
+ * `overlaySeverity` is a declared field. See `schemas/content/voices.ts`.
  */
 export function overlaySeverityOf(v: VoiceProfile): "critical" | "major" | "minor" {
   const declared = (v as { overlaySeverity?: unknown }).overlaySeverity;
@@ -123,7 +123,7 @@ function provenancePhrase(v: VoiceProfile): string {
  * One criterion per voice.
  *
  * Every field except `description` matches what the hand-written entries
- * carried, and `scripts/tests/voice-criteria.test.ts` asserts that against the
+ * carried, and `scripts/tests/content/voice-criteria.test.ts` asserts that against the
  * four this repository ships rather than trusting it.
  */
 export function voiceOverlayCriteria(instanceRoot: string): QaCriterionDefinition[] {

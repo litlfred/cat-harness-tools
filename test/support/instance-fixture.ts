@@ -25,7 +25,7 @@ import {
   findDeclarationFile,
   instanceConfigFilename,
   instanceDeclarationFilename,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The fallback name, used only where a fixture has no directory of its own.

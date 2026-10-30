@@ -14,7 +14,7 @@ import { resolve } from "path";
 import { FolioServer } from "./server.js";
 import { createContentAdapter, readFolioContentConfig } from "./content-adapter.js";
 import { GitHelper } from "./core/git.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // ── Parse CLI args ───────────────────────────────────────────────
 
@@ -63,8 +63,9 @@ if (args.includes("--check-deps")) {
   // above — `cat-harness/scenarios/capabilities/*.json` is what skills declare
   // `requiredCapabilities` against — and until now nothing executed them, so a
   // skill's prerequisite could be missing with no way to find out. The two
-  // hardcoded lists remain (here and in src/tools/check-deps.ts); unifying
-  // them is a separate change.
+  // hardcoded lists remain (here and in the `check_dependencies` Tool, which
+  // bean `bbza` moved up to the content layer that owns the paper adapter);
+  // unifying them is a separate change.
   const { loadCapabilities, probeAll, formatCapabilityReport } = await import("./tools/capabilities.js");
   const instance = resolve(import.meta.dir, "..");
   const caps = loadCapabilities(repoRootFor(instance));

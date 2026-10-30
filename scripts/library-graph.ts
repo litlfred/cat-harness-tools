@@ -80,7 +80,7 @@ import type { LibraryRef } from "./library-refs.ts";
 import { dirname, extname, join, relative } from "node:path";
 import { createHash } from "node:crypto";
 
-import { checkoutRootFor, directoriesForGraph, repoRootFor, sourceLinks } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, repoRootFor, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { arxivId } from "./library-readmes.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -91,17 +91,17 @@ const REPO_URL = (root: string): string | undefined => {
   if (!repoUrls.has(root)) repoUrls.set(root, detectRepoUrl(root));
   return repoUrls.get(root);
 };
-import { proseBody, type SummaryStatus } from "@litlfred/cat-harness/schemas/block-summary.ts";
+import { proseBody, type SummaryStatus } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
 import { withheldEntryFor } from "./lib/withheld.ts";
 import { entryItems, type SummaryTally } from "./summaries.ts";
 import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
-import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/document-structure.ts";
-import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
+import { pagesOf, readStructure, STRUCTURE_FILENAME } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
+import { corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { displayNarrative } from "./lib/narrative-display.ts";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/narrative.ts";
+import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 
 /**
  * Whether a library entry's source upload is still on disk, and whether it is
@@ -243,7 +243,7 @@ export interface LibraryEntry {
   viewable?: "pdf" | "image";
   /**
    * Where else a reader can go for this entry — read from a `referenced`
-   * entry's own `links` (`schemas/referenced-source.ts`). Owner, 2026-10-02:
+   * entry's own `links` (`schemas/library/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,
    * so the row has nothing of its own to open and must say where the thing is.
    *

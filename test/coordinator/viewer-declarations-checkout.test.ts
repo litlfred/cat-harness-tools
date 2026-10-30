@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn, instanceRootsIn, visualisationResolves } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { declarationPathIn, instanceRootsIn, visualisationResolves } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { declaredVisualisers, PAGE_LOCALE, viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */

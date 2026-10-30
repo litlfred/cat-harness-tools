@@ -25,7 +25,7 @@ import { test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { join } from "node:path";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** The slice of the vendored encoder's API this file uses. It attaches to the

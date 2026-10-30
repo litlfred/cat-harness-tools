@@ -15,16 +15,16 @@
  */
 
 import type { ProcessModel } from "./process-model.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { roleForLane } from "@litlfred/cat-harness/schemas/role-graph.js";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { roleForLane } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   checkModelCapabilities,
   type ModelCapabilities,
   type ModelCapabilityViolation,
   type ModelConfig,
-} from "@litlfred/cat-harness/schemas/model-capabilities.js";
+} from "@litlfred/cat-harness/schemas/conduct/model-capabilities.js";
 
-export * from "@litlfred/cat-harness/schemas/model-capabilities.js";
+export * from "@litlfred/cat-harness/schemas/conduct/model-capabilities.js";
 
 /**
  * Structured refusal error thrown when a workflow or lane demands capabilities

@@ -65,10 +65,10 @@ import type {
   CheckerResult,
   QaCriterionDefinition,
   QaCriterionSubject,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { QA_CRITERIA_REGISTRY } from "./qa-criteria-registry";
 import { isCriterionSourceMiss, resolveCriterionSource } from "./criterion-source";
-import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
+import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

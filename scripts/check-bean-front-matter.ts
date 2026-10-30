@@ -99,7 +99,7 @@ import { join } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   beanDefsDir,
   readBeanStore,

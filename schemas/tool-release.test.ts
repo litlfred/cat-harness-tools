@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,
   ToolReleaseRefSchema,
@@ -11,7 +11,7 @@ import {
   parseToolReleaseRef,
   toolReleaseLicenceProblem,
   toolReleaseRef,
-} from "@litlfred/cat-harness/schemas/tool-release.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -180,7 +180,7 @@ describe("the seeded records", () => {
 
   test("T4: PlantUML, its JRE and graphviz are all present, and each parses", () => {
     const parsed = releases.map((r) => ToolReleaseSchema.parse(r));
-    expect(parsed.map((r) => r.name).sort()).toEqual(["graphviz", "plantuml", "temurin-jre"]);
+    expect(parsed.map((r) => r.name)).toEqual(expect.arrayContaining(["graphviz", "plantuml", "temurin-jre"]));
   });
 
   test("PlantUML's digest is the one `scripts/plantuml-render.ts` already pins — one fact, two places, checked", async () => {

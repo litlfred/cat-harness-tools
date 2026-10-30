@@ -8,8 +8,8 @@
  * | `bib-qa-verifications.json` | `bib-verification`, one file per reference (orphan sources by file) |
  * | `schema/references.review.json` | `bib-human-review`, one file per reference |
  *
- * Shapes: `schemas/qa-attestations.ts`. Reading and writing:
- * `schemas/bib-attestations.ts`, which falls back to the legacy file while a
+ * Shapes: `schemas/sdlc/qa-attestations.ts`. Reading and writing:
+ * `schemas/library/bib-attestations.ts`, which falls back to the legacy file while a
  * family is absent from the store — so a folio keeps working before and after.
  *
  * ## The round trip is the licence
@@ -23,7 +23,7 @@
  *
  * For the review ledger the round trip covers `reviews`; its `_meta` block is
  * format documentation and is refused unless its `statusEnum` is the schema's
- * own (see `schemas/bib-attestations.ts`).
+ * own (see `schemas/library/bib-attestations.ts`).
  *
  * Nothing is deleted: the legacy files stay until a person removes them, and
  * the reader ignores them (saying so) once the store holds the family. A
@@ -50,7 +50,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import {
   BIB_HUMAN_REVIEW_FAMILY,
   BIB_REVIEW_STATUSES,
@@ -67,8 +67,8 @@ import {
   writeSourceLedger,
   type BibFamily,
   type BibReview,
-} from "@litlfred/cat-harness/schemas/bib-attestations.js";
-import type { SourceLedger } from "@litlfred/cat-harness/schemas/bib-verification.js";
+} from "@litlfred/cat-harness/schemas/library/bib-attestations.js";
+import type { SourceLedger } from "@litlfred/cat-harness/schemas/library/bib-verification.js";
 
 export interface FamilyReport {
   family: BibFamily;

@@ -35,10 +35,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { baseDocsDir } from "../compose-docs.js";
-import { page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { instancesCell, instancesRead, NO_INSTANCES, page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
+import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteRootFrom } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { PAGE_LOCALE, pageParts } from "../viewer-declarations.js";
 import { dirname } from "node:path";
 
@@ -281,5 +281,39 @@ describe("the skill → run-by table links what resolves (qgjh)", () => {
   it("leaves a skill with no page as code, never a link that 404s", () => {
     const line = tableRow(page(rows, new Set()));
     expect(line.startsWith(`| \`${skill}\` |`)).toBe(true);
+  });
+});
+
+describe("running instances: links and counts, never a position (bean v49e)", () => {
+  const read = instancesRead({
+    links: [
+      { store: "cat-harness", id: "crdm--a", status: "running", processIds: ["Process_CRDM", "Process_CRDM_Needs"], route: "en/cat-harness/beans/cat-harness/workflows/crdm--a/" },
+      { store: "cat-harness", id: "crdm--b", status: "completed", processIds: ["Process_CRDM"], route: "en/cat-harness/beans/cat-harness/workflows/crdm--b/" },
+    ],
+    unread: [],
+  });
+
+  it("links each instance page by the site root plus its declared route", () => {
+    expect(instancesCell(read, "Process_CRDM", "../../../")).toBe(
+      "[`crdm--a`](../../../en/cat-harness/beans/cat-harness/workflows/crdm--a/); " +
+        "1 finished: [`crdm--b`](../../../en/cat-harness/beans/cat-harness/workflows/crdm--b/)",
+    );
+  });
+
+  it("a subprocess lists the instances that call it", () => {
+    expect(instancesCell(read, "Process_CRDM_Needs", "/")).toBe("[`crdm--a`](/en/cat-harness/beans/cat-harness/workflows/crdm--a/)");
+  });
+
+  it("says none recorded, and none running when only finished ones exist", () => {
+    expect(instancesCell(NO_INSTANCES, "Process_CRDM", "/")).toBe("none recorded");
+    const onlyDone = instancesRead({ links: [{ store: "s", id: "x", status: "completed", processIds: ["P"], route: "r/" }], unread: [] });
+    expect(instancesCell(onlyDone, "P", "/")).toBe("none running; 1 finished: [`x`](/r/)");
+  });
+
+  it("the index carries the column, and names a store it could not read", () => {
+    const md = page(rows, new Set(), instancesRead({ links: [], unread: ["cat-harness"] }));
+    expect(md).toContain("| process | steps | undocumented steps | running instances |");
+    expect(md).toContain("none recorded |");
+    expect(md).toContain("Instances of `cat-harness` could not be read in this build");
   });
 });

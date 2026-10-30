@@ -22,9 +22,9 @@ import {
   LogExecutionSchema,
   LogReferenceSchema,
   logDirs,
-} from "@litlfred/cat-harness/schemas/log-entry.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
 import { describeCapture, writeLogEntry } from "../../src/logging/log-writer.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /** An instance whose declaration names a trashcan, so there is somewhere to log. */

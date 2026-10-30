@@ -19,8 +19,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { FORGES, MODEL_PROVENANCES, NETWORK_REACHES, PUBLICATION_HOSTS, TopologyConflictError, readDeclaration, topologyConflicts } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { FORGES, MODEL_PROVENANCES, NETWORK_REACHES, PUBLICATION_HOSTS, TopologyConflictError, readDeclaration, topologyConflicts } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

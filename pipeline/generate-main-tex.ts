@@ -20,7 +20,7 @@
  * @module pipeline/generate-main-tex
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import type { Paper } from "@litlfred/cat-harness/schemas/types.ts";

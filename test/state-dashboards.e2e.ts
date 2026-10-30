@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredVisualisers } from "../scripts/viewer-declarations.ts";
 import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "./support/site-pages.ts";

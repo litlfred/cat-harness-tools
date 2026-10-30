@@ -1,7 +1,7 @@
 /**
  * `regen-after-merge` tests that read the aggregate repository's own root —
  * `.github/workflows/code-quality-gates.yml` — moved here from
- * `cat-harness/scripts/tests/regen-after-merge.test.ts` (bean `ho66`), as
+ * `cat-harness-tools/scripts/tests/sdlc/regen-after-merge.test.ts` (bean `ho66`), as
  * `merge-guard-workflows.test.ts` was: a standalone cat-harness layer has no
  * such root, and `check:cat-harness-standalone` collects every test in that
  * layer. The rest of that file's tests stay there.
@@ -25,8 +25,8 @@ import {
   writerFor,
 } from "../../scripts/regen-after-merge.ts";
 import { loadGates } from "../../scripts/gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -53,7 +53,7 @@ describe("a writer that is not <check minus :check> is DECLARED (bean eowd)", ()
     }
   });
 
-  // Moved from `cat-harness/scripts/tests/regen-after-merge.test.ts`: the
+  // Moved from `cat-harness-tools/scripts/tests/sdlc/regen-after-merge.test.ts`: the
   // overrides name writers declared by layers above cat-harness, so only the
   // whole checkout's script table can answer it.
   test("every override names a writer that exists — a renamed writer is a finding, not a guess", () => {
@@ -83,7 +83,7 @@ describe("a `check:X` gate is paired only by DECLARATION — bean `uju6`", () =>
     }
   });
 
-  // Moved from `cat-harness/scripts/tests/regen-after-merge.test.ts`, for the
+  // Moved from `cat-harness-tools/scripts/tests/sdlc/regen-after-merge.test.ts`, for the
   // same reason: the recorded non-writers are scripts declared above cat-harness.
   test("the recorded non-writers are real scripts, and none is also paired", () => {
     for (const check of Object.keys(NO_WRITER)) {

@@ -8,7 +8,7 @@
  * `remote-mount.ts` (bean `0mpw`) PLANS a mount: it reads the harness's
  * declaration at the pin, follows `needs` across the closure, checks trust and
  * writes the lock. To do that it reads declarations through
- * `schemas/cat-harness.ts`, whose import closure reaches six modules under
+ * `schemas/kg/cat-harness.ts`, whose import closure reaches six modules under
  * `bootstrap-tools/schemas/` (measured 2026-10-07: `declared-order`, `graph`,
  * `requirement`, `model-registry`, `release-iri`, `declaration`). That is fine
  * while `bootstrap-tools` arrives as a git submodule. It is a bootstrapping
@@ -48,7 +48,7 @@
  * serve local bare repositories this way); a repository that is already a URL
  * or an absolute path is used as it stands.
  *
- * @graphNode none — a command-line tool; the lock's shape is `schemas/remote-mount.ts`
+ * @graphNode none — a command-line tool; the lock's shape is `schemas/kg/remote-mount.ts`
  * @covers none — replays a lock; `mount:remote:check` is the gate on the lock itself
  */
 import { spawnSync } from "node:child_process";
@@ -64,6 +64,12 @@ export interface LockDir {
   upstreamPath: string;
   treeDigest: string;
   files: number;
+  /**
+   * A hydrated directory whose file came from the pin's subgraph index
+   * PACKAGE, not its git tree (bean `mo75` G2b): the tarball, its sha256, and
+   * the file's path inside it.
+   */
+  package?: { url: string; sha256: string; member: string };
 }
 export interface LockAsset {
   src: string;
@@ -78,7 +84,16 @@ export interface LockInstance {
   declaration: { file: string; sha256: string };
   directories: LockDir[];
   assets?: LockAsset[];
+  /**
+   * Hydrated metadata (bean `mo75` G2): each directory is one
+   * `index.hydrated.jsonld` read from the `upstreamPath` directory, and the
+   * declaration is recorded but never laid down.
+   */
+  hydrated?: true;
 }
+
+/** The one file a hydrated directory holds — `SUBGRAPH_HYDRATED_FILE`, spelled here because this file reads the lock structurally (see the header). */
+const HYDRATED_FILE = "index.hydrated.jsonld";
 
 export type State = "mounted" | "current" | "missing" | "could-not-determine";
 export interface Outcome {
@@ -200,7 +215,7 @@ export function digestOf(dir: string, skip: readonly string[] = []): { treeDiges
 //
 // A mounted layer is CODE (`cat-harness`, `cat-harness-tools`, …), and code
 // with no `node_modules` does not run: `Cannot find module
-// '@litlfred/cat-harness/schemas/mount-trust.js'`. Until 2026-10-12 the
+// '@litlfred/cat-harness/schemas/kg/mount-trust.js'`. Until 2026-10-12 the
 // workaround was a hand `bun install` inside the mount, and that made the mount
 // read MODIFIED: `--check` said "the pinned bytes are not on disk:
 // cat-harness/ modified" and the next re-mount refused it.
@@ -341,7 +356,7 @@ export const LEGACY_LOCK_SUFFIX = ".mount-lock.json";
  * The lock file(s) beside `root`: `index.lock.json`, else every legacy
  * `*.mount-lock.json`. BOTH present is an error naming both, never a merge.
  *
- * RESTATED from `lockFilesIn` in `schemas/instance-roots.ts` rather than
+ * RESTATED from `lockFilesIn` in `schemas/kg/instance-roots.ts` rather than
  * imported, because this file imports nothing but `node:*` (the header says
  * why); `mount-from-lock.test.ts` holds the two to the same answers.
  */
@@ -426,6 +441,61 @@ function ensureIgnored(root: string, rel: string): void {
   appendFileSync(file, `# remote mount (bean nn8e) — bun run cat mount:lock\n/${prefix}${rel}/\n`);
 }
 
+// ── packages (bean `mo75` G2b) ───────────────────────────────────────────────
+
+/**
+ * A release-asset URL as fetched: `CAT_MOUNT_URL_PREFIX` replaces
+ * `https://github.com`, as it does for a repository (tests serve `file://`).
+ */
+export function packageFetchUrl(url: string): string {
+  const prefix = process.env.CAT_MOUNT_URL_PREFIX;
+  return prefix && url.startsWith("https://github.com/") ? `${prefix.replace(/\/+$/, "")}/${url.slice("https://github.com/".length)}` : url;
+}
+
+/**
+ * Download `url` to `dest` with curl, following redirects (a release asset
+ * redirects to its storage). `absent` is a 404 — or, for `file://`, no such
+ * file — which a caller may read as "not published"; every other failure is a
+ * fetch that failed, never an absence.
+ */
+export function download(url: string, dest: string): { ok: true } | { ok: false; absent: boolean; error: string } {
+  mkdirSync(dirname(dest), { recursive: true });
+  const r = spawnSync("curl", ["-fsSL", "--retry", "2", "-o", dest, url], { encoding: "utf-8" });
+  if (r.error) return { ok: false, absent: false, error: `curl could not run: ${r.error.message}` };
+  if (r.status === 0) return { ok: true };
+  rmSync(dest, { force: true });
+  // 22: an HTTP error (curl -f) — a 404 for an unpublished asset; 37: a file:// that is not there.
+  const absent = r.status === 37 || (r.status === 22 && /\b404\b/.test(r.stderr ?? ""));
+  return { ok: false, absent, error: (r.stderr ?? "").trim().split("\n").pop() || `curl exited ${r.status}` };
+}
+
+/**
+ * Fetch a package tarball, refuse it unless it hashes to `sha256`, and unpack
+ * it. Returns the package root (npm's `package/`); the caller removes `dir`.
+ */
+export function fetchPackage(url: string, expectSha256: string): { ok: true; dir: string; root: string } | { ok: false; absent: boolean; refused: boolean; error: string } {
+  const dir = mkdtempSync(join(tmpdir(), "mount-package-"));
+  const tgz = join(dir, "package.tgz");
+  const got = download(packageFetchUrl(url), tgz);
+  if (!got.ok) {
+    rmSync(dir, { recursive: true, force: true });
+    return { ok: false, absent: got.absent, refused: false, error: got.error };
+  }
+  const digest = sha256(readFileSync(tgz));
+  if (digest !== expectSha256) {
+    rmSync(dir, { recursive: true, force: true });
+    return { ok: false, absent: false, refused: true, error: `${url} hashes to ${digest.slice(0, 12)}, expected ${expectSha256.slice(0, 12)} — refused` };
+  }
+  const out = join(dir, "x");
+  mkdirSync(out);
+  const t = spawnSync("tar", ["-xzf", tgz, "-C", out], { encoding: "utf-8" });
+  if (t.status !== 0) {
+    rmSync(dir, { recursive: true, force: true });
+    return { ok: false, absent: false, refused: true, error: `${url} is not a gzipped tarball: ${(t.stderr ?? "").trim()}` };
+  }
+  return { ok: true, dir, root: join(out, "package") };
+}
+
 /** Shallow, blobless fetch of one commit, then a sparse checkout of `paths`. Returns the work tree. */
 function fetchAt(repository: string, sha: string, paths: string[]): string {
   const dir = mkdtempSync(join(tmpdir(), "mount-from-lock-"));
@@ -457,8 +527,9 @@ function drift(root: string, inst: LockInstance): { absent: string[]; changed: s
   const absent: string[] = [];
   const changed: string[] = [];
   const decl = join(root, inst.path, inst.declaration.file);
-  if (!existsSync(decl)) absent.push(`${inst.path}/${inst.declaration.file}`);
-  else if (sha256(readFileSync(decl)) !== inst.declaration.sha256) changed.push(`${inst.path}/${inst.declaration.file}`);
+  // A hydrated mount's declaration is recorded, never laid down: nothing to compare.
+  if (!inst.hydrated && !existsSync(decl)) absent.push(`${inst.path}/${inst.declaration.file}`);
+  else if (!inst.hydrated && sha256(readFileSync(decl)) !== inst.declaration.sha256) changed.push(`${inst.path}/${inst.declaration.file}`);
   const skip = stateMountedDirs(root);
   for (const d of inst.directories) {
     const abs = join(root, d.path);
@@ -578,7 +649,9 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
   const trackedPath = inst.directories.map((d) => d.path).find((p) => tracked(root, p));
   if (trackedPath) return { instance: id, state: "missing", detail: `\`${trackedPath}/\` holds tracked files — a mount never lands on tracked bytes` };
 
-  const cacheDir = mountCacheDir();
+  // A hydrated mount is one small file per directory: re-fetched, never cached,
+  // because the cache restores a declaration this mount must not lay down.
+  const cacheDir = inst.hydrated ? undefined : mountCacheDir();
   if (cacheDir) {
     const cached = tryMountFromCache(root, inst, absent, cacheDir);
     if (cached) return cached;
@@ -589,7 +662,16 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
     const p = inst.upstreamRoot ? `${inst.upstreamRoot.replace(/\/+$/, "")}/${a.src}` : a.src;
     return `/${p}`;
   });
-  const sparse = [`/${upstreamDecl}`, ...inst.directories.map((d) => (d.upstreamPath === "." ? "/*" : `/${d.upstreamPath.replace(/\/+$/, "")}/`)), ...assetPaths];
+  const sparse = [
+    `/${upstreamDecl}`,
+    // A directory from the pin's package is not in its git tree (G2b).
+    ...inst.directories.filter((d) => !d.package).map((d) =>
+      inst.hydrated ? `/${d.upstreamPath.replace(/\/+$/, "")}/${HYDRATED_FILE}` : d.upstreamPath === "." ? "/*" : `/${d.upstreamPath.replace(/\/+$/, "")}/`,
+    ),
+    ...assetPaths,
+  ];
+  /** Unpacked packages, by URL: one fetch per tarball, removed below. */
+  const packages = new Map<string, string>();
   let work: string;
   try {
     work = fetchAt(inst.repository, inst.sha, sparse);
@@ -604,14 +686,30 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
     }
     for (const d of inst.directories) {
       if (!absent.includes(d.path)) continue;
-      const src = d.upstreamPath === "." ? work : join(work, d.upstreamPath);
+      let src = d.upstreamPath === "." ? work : join(work, d.upstreamPath, ...(inst.hydrated ? [HYDRATED_FILE] : []));
+      if (d.package) {
+        let pkgRoot = packages.get(d.package.url);
+        if (!pkgRoot) {
+          const got = fetchPackage(d.package.url, d.package.sha256);
+          if (!got.ok) {
+            for (const w of written) rmSync(join(root, w), { recursive: true, force: true });
+            return { instance: id, state: got.absent ? "missing" : "could-not-determine", detail: `the subgraph index package for \`${d.path}\`: ${got.error}` };
+          }
+          packages.set(d.package.url, got.root);
+          pkgRoot = got.root;
+        }
+        const member = d.package.member.split("/");
+        if (member.some((seg) => seg === ".." || seg === "")) return { instance: id, state: "could-not-determine", detail: `lock package member \`${d.package.member}\` climbs or is empty` };
+        src = join(pkgRoot, ...member);
+      }
       if (!existsSync(src)) {
         for (const w of written) rmSync(join(root, w), { recursive: true, force: true });
-        return { instance: id, state: "missing", detail: `\`${d.upstreamPath}\` is not in ${inst.repository}@${inst.sha.slice(0, 12)}, though the lock records it` };
+        return { instance: id, state: "missing", detail: `\`${inst.hydrated ? `${d.upstreamPath}/${HYDRATED_FILE}` : d.upstreamPath}\` is not in ${inst.repository}@${inst.sha.slice(0, 12)}, though the lock records it` };
       }
       const dst = join(root, d.path);
-      mkdirSync(dirname(dst), { recursive: true });
-      cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true, filter: (from) => from !== join(work, ".git") });
+      mkdirSync(inst.hydrated ? dst : dirname(dst), { recursive: true });
+      if (inst.hydrated) cpSync(src, join(dst, HYDRATED_FILE), { force: true });
+      else cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true, filter: (from) => from !== join(work, ".git") });
       written.push(d.path);
       const got = digestOf(dst).treeDigest;
       if (got !== d.treeDigest) {
@@ -638,7 +736,7 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
       }
     }
     const declDst = join(root, inst.path, inst.declaration.file);
-    if (!existsSync(declDst)) {
+    if (!inst.hydrated && !existsSync(declDst)) {
       mkdirSync(dirname(declDst), { recursive: true });
       cpSync(declSrc, declDst);
     }
@@ -649,6 +747,7 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
     return { instance: id, state: "mounted", detail: `${written.length} director${written.length === 1 ? "y" : "ies"}, ${files} file(s) from ${inst.repository}@${inst.sha.slice(0, 12)}` };
   } finally {
     rmSync(work, { recursive: true, force: true });
+    for (const r of packages.values()) rmSync(dirname(dirname(r)), { recursive: true, force: true });
   }
 }
 

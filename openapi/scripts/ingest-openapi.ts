@@ -45,7 +45,7 @@ import {
   type OpenApiProvenance,
   type OpenApiRenderedProvenance,
 } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-openapi.config.json";
 

@@ -27,7 +27,7 @@ import { join } from "node:path";
 
 import { CannotDerive, firstActivity, render } from "../gen-upload-step-docs.ts";
 import { loadProcessModel, type ProcessModel } from "../../src/workflow/process-model.ts";
-import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
+import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
 
 const NS = [
   'xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"',
@@ -209,7 +209,7 @@ describe("the page", () => {
     const model = await diagram(ACTIVITY);
     const page = render(model, firstActivity(model), [tool()]);
     expect(page.startsWith("---\n")).toBe(true);
-    expect(page).toContain("generated: cat-harness/scripts/gen-upload-step-docs.ts");
+    expect(page).toContain("generated: cat-harness-tools/scripts/gen-upload-step-docs.ts");
     expect(page).toContain("do not hand-edit");
   });
 });

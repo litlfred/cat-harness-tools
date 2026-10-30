@@ -8,7 +8,7 @@
  *
  * `readDeclaration` validates EVERY kind in the declaration, not just the one
  * being asked for. This repository declares a `folio` directory whose kind is
- * registered by CORE, on importing `schemas/folio-graph-typology.ts` — and the
+ * registered by CORE, on importing `schemas/kg/folio-graph-typology.ts` — and the
  * argument written on that module is that *a layer that cannot render must
  * not own the renderable kind*. So the harness layer cannot resolve ANY graph
  * kind here, because resolving one reads the whole declaration and the whole
@@ -33,7 +33,7 @@
  */
 import { relative, sep } from "node:path";
 
-import { directoriesForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 if (import.meta.main) {

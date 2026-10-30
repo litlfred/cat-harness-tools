@@ -6,7 +6,7 @@
  *
  * ## Why this is here and not only in cat-harness
  *
- * cat-harness#257 adds the same rule to `schemas/content-context.ts`
+ * cat-harness#257 adds the same rule to `schemas/content/content-context.ts`
  * (`instanceContext`, `instanceDocumentContext`, `atInstanceContext`). This
  * layer's checks run against cat-harness `main`, which does not have it yet,
  * so the emitters importing it could not typecheck until that merged. The
@@ -20,8 +20,8 @@
  */
 import { dirname, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

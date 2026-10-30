@@ -4,8 +4,11 @@
  * `.claude/skills/capabilities/*.json` has always described how to detect each
  * external tool — a command, an env var, a file — and `requires` edges between
  * them. Nothing executed them: `--check-deps` carried its own hardcoded list,
- * and so did `src/tools/check-deps.ts`. So the probes were documentation, and
- * a skill declaring `requiredCapabilities` had nothing to check against.
+ * and so did the `check_dependencies` MCP tool (once `src/tools/check-deps.ts`
+ * here; bean `bbza` moved it up to the content layer that owns the paper
+ * adapter, and this layer does not name it). So the probes
+ * were documentation, and a skill declaring `requiredCapabilities` had
+ * nothing to check against.
  *
  * That matters beyond tidiness. The integration contract in
  * `docs/proposals/rag-document-ingestion.md` §5 rests on **absent tool ⇒
@@ -23,8 +26,8 @@
 import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
-import { capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { checkoutCapabilities } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+import { capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { checkoutCapabilities } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 
 export interface CapabilityDetection {
   method: "command" | "env-var" | "file-exists" | "mcp-probe" | "always";

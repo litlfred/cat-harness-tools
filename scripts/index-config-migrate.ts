@@ -3,7 +3,7 @@
  * Convert a checkout to `index.config.json` (`folio-index-config/v1`).
  *
  * @module scripts/index-config-migrate
- * @graphNode none — a one-shot converter over a checkout's root files; the schema is `schemas/index-config.ts`
+ * @graphNode none — a one-shot converter over a checkout's root files; the schema is `schemas/kg/index-config.ts`
  * @covers cat-harness — the instance axis: under --check, a converted checkout's index.config.json, its generated .gitignore block and its lock name are what the converter would write, and no `remoteMounts` is left on the declaration
  *
  *   bun run cat index-config:migrate                 # print the index it would write, and its findings
@@ -56,7 +56,7 @@
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { INDEX_LOCK_FILENAME, findDeclarationFile, lockFilesIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
+import { INDEX_LOCK_FILENAME, findDeclarationFile, lockFilesIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
 import {
   INDEX_CONFIG_FILENAME,
   buildIndexConfig,
@@ -68,7 +68,7 @@ import {
   type IndexConfig,
   type IndexInstance,
   type IndexMigration,
-} from "@litlfred/cat-harness/schemas/index-config.js";
+} from "@litlfred/cat-harness/schemas/kg/index-config.js";
 
 import { overlayConfig } from "./instance-config.ts";
 

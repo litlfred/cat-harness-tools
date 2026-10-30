@@ -1,6 +1,6 @@
 /**
  * `library-links` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/library-links.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/library/library-links.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads the library entries of the
  * content instances, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
@@ -12,10 +12,10 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { forgeLocation, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { forgeLocation, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../scripts/lib/library-links.ts";
 import { pageParts } from "../../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

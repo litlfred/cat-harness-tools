@@ -81,15 +81,15 @@ import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
-import { readPolicyGrants } from "@litlfred/cat-harness/schemas/odrl.js";
-import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/depends-on.js";
-import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.js";
+import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import {
   artefactStub,
   defaultGraphTypologies,
@@ -105,7 +105,7 @@ import {
   renderingPath,
   siteDirFor,
   UNPUBLISHED_GRAPH_TYPOLOGIES,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { firstHeading, frontMatter } from "./front-matter.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
@@ -123,9 +123,9 @@ import {
 } from "./known-skills.js";
 import { auditSchemaNodes } from "./schema-nodes.js";
 import { loadSpecs } from "./external-schemas.js";
-import { declaredNamespaces } from "@litlfred/cat-harness/schemas/external-schema.js";
+import { declaredNamespaces } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
-import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,
@@ -159,8 +159,8 @@ import {
   declaredSubgraph,
   subgraphSourceOverrides,
   type DeclaredSubgraph,
-} from "@litlfred/cat-harness/schemas/harness-config.js";
-import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
 import { placedOut, siteRootOf } from "./lib/moved-document.ts";
@@ -392,7 +392,7 @@ export function buildContext(): Record<string, unknown> {
     // role is the general node and must not name its lanes (data-modelling
     // step 8).
     //
-    // REUSED, not coined. `schemas/role-graph.ts`'s own JSON-LD projection
+    // REUSED, not coined. `schemas/process/role-graph.ts`'s own JSON-LD projection
     // already publishes exactly these two relations under these two IRIs, so
     // a second spelling here would put one concept in the vocabulary twice --
     // the drift this repo keeps paying for. `ns:check` is what caught it, by
@@ -575,7 +575,7 @@ export function buildContext(): Record<string, unknown> {
     // Present only when the file exists, so its absence is a fact, not a gap.
     readmePath: termIri("readmePath"),
     // Where a declared subgraph gets its content — `dcterms:source`, with its
-    // `kind`/`branch` scoped (bean `l4ay`; `schemas/subgraph-source.ts`).
+    // `kind`/`branch` scoped (bean `l4ay`; `schemas/kg/subgraph-source.ts`).
     contentSource: contentSourceContext(),
     instructionLines: { "@id": termIri("instructionLines"), "@type": `${XSD}integer` },
     // How many COMMITTED files a declared directory holds, at any depth. Bean
@@ -708,7 +708,7 @@ export function buildContext(): Record<string, unknown> {
     // Scoped, for `staging`'s reason: `change`, `kind`, `before`, `after`,
     // `source` and `pages` are words a node could use for something else.
     // `before` / `after` / `title` are `StagingPageComparison`'s field names
-    // (cat-harness `schemas/staging.ts`), so a page row reads as one.
+    // (cat-harness `schemas/sdlc/staging.ts`), so a page row reads as one.
     changedAssets: {
       "@id": termIri("changedAssets"),
       "@container": "@list",
@@ -3213,8 +3213,8 @@ export async function scannedInstanceSchemas(instanceRoot: string, baseUrl?: str
 // FRAGMENT, so without this a consumer holding `cat-harness.jsonld#skill/x`
 // would fetch the document and find nothing at the fragment, with nothing to
 // say where it went. The precedent is the vocabulary's own retired terms
-// (`schemas/vocabulary.ts` `replacedBy`) and a role's former names
-// (`schemas/role-graph.ts` `formerNames`).
+// (`schemas/content/vocabulary.ts` `replacedBy`) and a role's former names
+// (`schemas/process/role-graph.ts` `formerNames`).
 //
 // Removal: delete `tombstonesFor`, its call in `buildExport`, and the two
 // context terms. `kg-export.test.ts` holds every tombstone to a replacement
@@ -3973,10 +3973,24 @@ export function writeToolDocuments(published: Record<string, unknown>, out: stri
  *
  * Build output, like the Tool documents: never committed.
  *
+ * ## A COPY, when the document is served somewhere its IRI does not name
+ *
+ * An instance with its own `canonicalUrl` (smart-base:
+ * `http://smart.who.int/base`) mints its subjects there, and that site serves
+ * none of them. Owner, 2026-10-29 (litlfred/cat-harness-tools#638, option B):
+ * publish a copy on THIS site and link it to the canonical IRI with
+ * `owl:sameAs`. So when `servedDocIri` (where `--out` is served) sits in
+ * another directory than the document's `@id`, each subject document is
+ * named by where it is served, is `partOf` the served document, and is
+ * `sameAs` its canonical subject document. Its `@context` is the copy beside
+ * it, which loads. The nodes inside keep their canonical `@id`s: the
+ * canonical address stays the identity.
+ *
  * @returns the paths written
  */
-export function writeSubjectDocuments(published: Record<string, unknown>, out: string): string[] {
+export function writeSubjectDocuments(published: Record<string, unknown>, out: string, servedDocIri?: string): string[] {
   const docIri = String(published["@id"]);
+  const copyBase = servedDocIri !== undefined && subjectBase(servedDocIri) !== subjectBase(docIri) ? subjectBase(servedDocIri) : undefined;
   const graph = (published["@graph"] ?? []) as Node[];
   const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
   // A flow's `<process>#flow/F` belongs on its process's page.
@@ -4016,25 +4030,30 @@ export function writeSubjectDocuments(published: Record<string, unknown>, out: s
     const name = stem.split("/").pop()!;
     const doc = {
       // Absolute where the document is; relative to the subject's file otherwise.
-      "@context": /^https?:\/\//.test(docIri)
-        ? `${subjectBase(docIri)}${contextName}`
-        : `${"../".repeat(stem.split("/").length - 1)}${contextName}`,
-      "@id": `${id}.jsonld`,
-      partOf: docIri,
+      "@context":
+        copyBase !== undefined
+          ? `${copyBase}${contextName}`
+          : /^https?:\/\//.test(docIri)
+            ? `${subjectBase(docIri)}${contextName}`
+            : `${"../".repeat(stem.split("/").length - 1)}${contextName}`,
+      ...(copyBase !== undefined
+        ? { "@id": `${copyBase}${stem}.jsonld`, partOf: servedDocIri, sameAs: `${id}.jsonld` }
+        : { "@id": `${id}.jsonld`, partOf: docIri }),
       ...stamp,
       "@graph": [node, ...(fragmentsOf.get(id) ?? [])],
     };
+    const pageDoc = copyBase !== undefined ? servedDocIri! : docIri;
     const file = join(dir, `${stem}.jsonld`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
     written.push(file);
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, docIri));
+    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, docIri));
+      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc));
       written.push(index);
     }
   }
@@ -4153,6 +4172,22 @@ function valueHtml(v: unknown): string {
 }
 
 /**
+ * A subject page is excluded from the site search ON PURPOSE (fa#2683).
+ *
+ * There is one per graph node (about 3,000 on the folio-assistant site), and
+ * each repeats data a human page already carries: the skill, process or
+ * schema page that Jekyll indexes. They are written after Jekyll, so the
+ * theme's index never held them. But `rail-standalone-pages` gives them the
+ * theme's search box, and `publish-verify`'s `search-index` check counted
+ * them as pages the index failed to cover. That dropped coverage below its
+ * floor and refused every publish. The marker is the one `head_custom.html`
+ * writes for `search_exclude: true` (`SEARCH_EXCLUDE_MARKER` in
+ * `publish-verify.ts`), so the check counts these pages as excluded, and
+ * says how many, rather than as missing.
+ */
+const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
+
+/**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
@@ -4180,6 +4215,7 @@ function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readon
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${SUBJECT_SEARCH_EXCLUDE}
 <title>${escHtml(title)} · ${escHtml(type)}</title>
 <link rel="alternate" type="application/ld+json" href="${escHtml(jsonldHref)}">
 <script type="application/ld+json">
@@ -4201,7 +4237,9 @@ a { color: inherit; }
 <p class="muted">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
 <p class="iri">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>
+<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>${
+    typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
+  }
 <table>
 ${rows(node)}
 </table>
@@ -4295,7 +4333,11 @@ if (import.meta.main) {
   const published = { ...publishedDocument(data), ...stagingFields() };
   writeFileSync(out, JSON.stringify(published, null, 2) + "\n");
   const toolDocs = writeToolDocuments(published, out);
-  const subjectDocs = writeSubjectDocuments(published, out);
+  // `--served-at <url>`: where `--out` is served, when that is not its `@id`
+  // (an own-canonical instance published on this site, #638). Its subject
+  // documents are then copies named by where they are served.
+  const servedAt = arg("--served-at");
+  const subjectDocs = writeSubjectDocuments(published, out, servedAt);
   const legacyDocs = writeLegacyDocuments(published, out, docPath, legacyDocPath);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);

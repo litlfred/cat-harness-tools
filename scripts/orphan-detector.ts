@@ -18,8 +18,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { resolveBeanDefs } from "./beans.ts";
 
 export interface BeanReferenceCandidate {

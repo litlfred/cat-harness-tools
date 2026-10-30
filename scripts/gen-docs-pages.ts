@@ -37,11 +37,11 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
-import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
-import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/webpage.ts";
-import { resolveTarget } from "@litlfred/cat-harness/schemas/todo-index.js";
+import { instanceRepositories, type InstanceRepository } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
+import type { WebPage, WebPageNode } from "@litlfred/cat-harness/schemas/ui/webpage.ts";
+import { resolveTarget } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
-import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/semantic-zoom.js";
+import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "@litlfred/cat-harness/schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
   localesReadableFor,
@@ -66,11 +66,13 @@ import { isTodoPage, todoPageHtml } from "./todo-page.ts";
 import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, readBeans } from "./beans.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.js";
 import { milestoneRollup } from "./milestone-rollup.js";
+import { BURNDOWN_SCHEMA, DEFAULT_BURNDOWN_DAYS, buildBurndownFeed, burndownTargets, fetchBeanHistory, type BurndownFeed } from "./bean-burndown-feed.ts";
+import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
-import { THEMES, themeById } from "@litlfred/cat-harness/schemas/themes.js";
+import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { THEMES, themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import {
   directoryForGraph,
   publishedAssetPath,
@@ -79,14 +81,14 @@ import {
   siteDirFor,
   sourceLinks,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { isQaGraphUnknown, projectQaGraph } from "../pipeline/qa-graph-index.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
@@ -255,6 +257,13 @@ export function readQaSummary(blockDir: string, block: string): QaSummary | unde
 }
 
 const check = process.argv.includes("--check");
+/**
+ * Publish only (owner, 2026-10-24, bean `tk99` option C): fetch the bean
+ * store's history and write `assets/beans/burndown.json`. Off by default, so a
+ * local run or a `--check` never touches the network and never writes a file
+ * that would be stale on the next bean edit. See `bean-burndown-feed.ts`.
+ */
+const burndownHistory = process.argv.includes("--burndown-history") && !check;
 let stale = 0;
 let written = 0;
 let qaWritten = 0;
@@ -514,6 +523,8 @@ const BEANS_ASSET = join(OUT_DIR, "assets", "beans", "index.json");
  */
 const TODO_COUNT_ASSET = join(OUT_DIR, "assets", "todos", "count.json");
 const BEANS_COUNT_ASSET = join(OUT_DIR, "assets", "beans", "count.json");
+/** The board's burn-down feed, written by a publish build only (`--burndown-history`). */
+const BEANS_BURNDOWN_ASSET = join(OUT_DIR, "assets", "beans", "burndown.json");
 
 /**
  * How much of a bean's body the projection carries.
@@ -1666,7 +1677,7 @@ function processHierarchy(): Record<string, string[]> {
       // card: the author asked for something and got nothing, and the failure
       // is invisible on the page.
       throw new Error(
-        `a todo declares theme "${id}", which no theme in schemas/themes.ts defines. ` +
+        `a todo declares theme "${id}", which no theme in schemas/ui/themes.ts defines. ` +
           `Declared themes: ${THEMES.map((t) => t.id).join(", ")}`,
       );
     }
@@ -1687,7 +1698,7 @@ function processHierarchy(): Record<string, string[]> {
         $schema: "folio-todo-index/v1",
         // The tile's headline number, declared here because only this
         // generator knows WHICH of the projection's arrays is the one — see
-        // `schemas/tile-count.ts`. `items`, not `processes`: a process is a
+        // `schemas/ui/tile-count.ts`. `items`, not `processes`: a process is a
         // lane the board draws, not a todo somebody owes.
         ...tileCounts({ todos: [items.length, "todos"] }),
         repoWeb: REPO_WEB,
@@ -1937,7 +1948,7 @@ function processHierarchy(): Record<string, string[]> {
         // board's "open" (bean `v215`): it was `items.length`, every bean
         // ever filed, so the tile read 943 beside the icon row's 541. Not
         // `findings` either: a finding is a defect ABOUT the work plan, not
-        // an item on it. See `schemas/tile-count.ts` for why the number is
+        // an item on it. See `schemas/ui/tile-count.ts` for why the number is
         // declared here rather than inferred by the reader.
         ...tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }),
         // The forge, so `work-plan.js` composes its links from DATA rather
@@ -1994,6 +2005,17 @@ function processHierarchy(): Record<string, string[]> {
       // publishing so what a reader fetches is current regardless.
       "verdict",
     );
+    if (burndownHistory) {
+      // Written directly, not through `emit`: it is never committed, so there
+      // is nothing for `--check` to compare it with.
+      const feed = burndownFeedFor(beans);
+      writeFileSync(BEANS_BURNDOWN_ASSET, JSON.stringify(feed) + "\n");
+      console.log(
+        feed.available
+          ? `  ✓ assets/beans/burndown.json (${feed.series.length} series over ${feed.days.length} day(s) of ${feed.branch})`
+          : `  · assets/beans/burndown.json — no history: ${feed.reason}`,
+      );
+    }
     // Existence-gated for the same reason as the index: every session moves it.
     emit(BEANS_COUNT_ASSET, JSON.stringify(tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }), null, 2) + "\n", "verdict");
     const both = edges.filter((e) => e.declaredOn.length > 1).length;
@@ -2243,4 +2265,27 @@ console.log(
     ? "\ngenerated pages are up to date"
     : `\nWrote ${written} page(s) to ${OUT_DIR} and ${qaWritten} QA witness file(s) to ${QA_ASSET_DIR}`,
 );
+}
+
+/**
+ * The burn-down feed for the store `beans` came from: fetch its branch's
+ * history, read one snapshot per day, one series per open milestone and epic.
+ * A failure anywhere is `available: false` with the reason, never an empty feed.
+ */
+function burndownFeedFor(beans: ReadonlyArray<{ id: string; title: string; type: string; status: string }>): BurndownFeed {
+  const root = repoRootFor(INSTANCE_ROOT);
+  try {
+    const dir = beanDefsDir(root);
+    if (dir === null) return { $schema: BURNDOWN_SCHEMA, available: false, reason: "no bean store is declared" };
+    const loc = branchKeptLocation(root, relative(root, dir).split(sep).join("/"), REPO_WEB);
+    const got = fetchBeanHistory(root, { branch: loc.ref, web: loc.web, repoWeb: REPO_WEB, days: DEFAULT_BURNDOWN_DAYS });
+    if ("reason" in got) return { $schema: BURNDOWN_SCHEMA, available: false, reason: got.reason };
+    const snapshots = snapshotsFromGit(root, got.ref, loc.path, DEFAULT_BURNDOWN_DAYS);
+    if (snapshots.length === 0) {
+      return { $schema: BURNDOWN_SCHEMA, available: false, reason: `no commit to ${loc.path} on ${loc.ref} in the last ${DEFAULT_BURNDOWN_DAYS} days` };
+    }
+    return buildBurndownFeed(snapshots, burndownTargets(beans), { web: loc.web, branch: loc.ref, path: loc.path });
+  } catch (e) {
+    return { $schema: BURNDOWN_SCHEMA, available: false, reason: (e as Error).message };
+  }
 }

@@ -55,8 +55,8 @@ import { voiceCriteriaFor } from "./voice-criteria.ts";
  * @module pipeline/qa-criteria-registry
  */
 
-import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import type { QaCriterionDefinition } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 // ── Domain: voice ───────────────────────────────────────────────
 
@@ -1883,7 +1883,7 @@ const BIBLIOGRAPHY: QaCriterionDefinition[] = [
 //
 // Audits **script files** (not content blocks). Sidecar is
 // per-script `.script-qa.json`, schema in
-// `schemas/script-qa.ts`. Driven by
+// `schemas/sdlc/script-qa.ts`. Driven by
 // `pipeline/script-sweep.ts`.
 //
 // Planned criteria (one PR per checker):

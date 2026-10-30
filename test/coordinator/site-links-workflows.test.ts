@@ -1,7 +1,7 @@
 /**
  * `site-links` tests that read the aggregate repository's own root —
  * `.github/workflows/docs-site.yml` — moved here from
- * `cat-harness/scripts/tests/site-links.test.ts` (bean `ho66`), as
+ * `cat-harness-tools/scripts/tests/ui/site-links.test.ts` (bean `ho66`), as
  * `merge-guard-workflows.test.ts` was: a standalone cat-harness layer has no
  * such root, and `check:cat-harness-standalone` collects every test in that
  * layer. The rest of that file's tests stay there.
@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

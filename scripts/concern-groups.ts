@@ -38,11 +38,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/skill-topics.ts";
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/kg/skill-topics.ts";
 
 /** The code list every group id is drawn from, by its `id`. */
 export const CONCERN_GROUP_LIST = "concern-group";
@@ -79,6 +79,47 @@ export function declaredGroupsIn(dir: string, kind: string, registry: GraphTypol
   } catch (e) {
     throw new Error(`${file} is not valid JSON: ${String(e)}`);
   }
+  const groups = groupsOfDeclaration(raw, kind, file);
+  for (const g of groups) {
+    const p = join(dir, g.path);
+    if (!existsSync(p) || !statSync(p).isDirectory()) {
+      throw new Error(`${file}: group "${g.code}" names ${g.path}/, which does not exist`);
+    }
+  }
+  return groups;
+}
+
+/**
+ * `dirs` followed by each one's declared concern-group directories for `kind`
+ * — the directories a reader of a grouped graph walks when it reads one level
+ * deep, as the schema readers do (bean `f8wp`, placement PR8). A directory
+ * that declares no groups contributes only itself, so an ungrouped graph reads
+ * exactly as before.
+ */
+export function withConcernGroupDirs(
+  dirs: readonly string[],
+  kind: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const dir of dirs) {
+    for (const d of [dir, ...declaredGroupsIn(dir, kind, registry).map((g) => join(dir, g.path))]) {
+      if (seen.has(d)) continue;
+      seen.add(d);
+      out.push(d);
+    }
+  }
+  return out;
+}
+
+/**
+ * The groups one parsed declaration file names for `kind`, WITHOUT checking
+ * that their directories exist — for a reader holding only the declaration
+ * files at a pin (`upstream-directories.ts`, bean `mo75` concern names).
+ * Throws, naming `file`, on a malformed one.
+ */
+export function groupsOfDeclaration(raw: unknown, kind: string, file: string): DeclaredGroup[] {
   let groups: DeclaredGroup[];
   if (kind === "skills") {
     // `skills.json` predates the code list and names its groups `topics`,
@@ -90,12 +131,6 @@ export function declaredGroupsIn(dir: string, kind: string, registry: GraphTypol
     const r = ConcernGroupsSchema.safeParse(raw);
     if (!r.success) throw new Error(`${file}: ${r.error.issues[0]?.path.join(".") || "(root)"}: ${r.error.issues[0]?.message}`);
     groups = r.data.groups.map((c) => ({ code: c, path: c }));
-  }
-  for (const g of groups) {
-    const p = join(dir, g.path);
-    if (!existsSync(p) || !statSync(p).isDirectory()) {
-      throw new Error(`${file}: group "${g.code}" names ${g.path}/, which does not exist`);
-    }
   }
   return groups;
 }

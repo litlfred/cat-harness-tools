@@ -1,6 +1,6 @@
 /**
  * `tools-viewer` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/tools-viewer.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/tools/tools-viewer.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each joins every Tool to the skills of
  * every instance in the checkout, which only the checkout holds. Standing
  * alone, cat-harness has none of it, and `check:cat-harness-standalone`
@@ -12,8 +12,8 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";

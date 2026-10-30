@@ -25,8 +25,8 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { readDeclaredMounts, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { instanceRootsIn, readDeclaration, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readDeclaredMounts, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 import {
   RESERVED_ROOT_AND_ROUTE_NAMES,
   checkMountPathCollisions,
@@ -34,7 +34,7 @@ import {
   type MountCollisionFinding,
   type RouteCollisionFinding,
   type VisualizerRouteClaim,
-} from "@litlfred/cat-harness/schemas/remote-mount.js";
+} from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 
 export {
   RESERVED_ROOT_AND_ROUTE_NAMES,

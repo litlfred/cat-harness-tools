@@ -53,8 +53,8 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.ts";
 import type { SuggestTokenRule } from "../src/core/edit-links.ts";
 
 export const EDITOR_CHECKER_SCHEMA = "folio-editor-checker/v1";

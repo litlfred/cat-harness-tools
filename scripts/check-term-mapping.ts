@@ -5,7 +5,7 @@
  * Bean `7wou`, under `5yhm`. The check the owner asked for on 2026-09-29:
  * *"extracting exsiting glossary needs compaision to existing
  * termonology/coding."* The contract, the three states and why `exact` and
- * `concept` are a pair are in `schemas/term-mapping.ts` and are not restated
+ * `concept` are a pair are in `schemas/content/term-mapping.ts` and are not restated
  * here. Three things decide what the code below does:
  *
  *   * TWO TARGETS, NEVER MERGED. `skos` is authoritative for meaning, `fhir`
@@ -42,8 +42,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+
+import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
 
 import {
   MAPPING_TARGETS,
@@ -53,18 +55,18 @@ import {
   type TermMapping,
   TermMappingsFileSchema,
   normaliseLabel,
-} from "@litlfred/cat-harness/schemas/term-mapping.ts";
-import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/pinned-terminology.ts";
+} from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
+import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/content/pinned-terminology.ts";
 import {
   TERM_ADJUDICATIONS_SUFFIX,
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type AdjudicationStatus,
-} from "@litlfred/cat-harness/schemas/term-adjudication.ts";
+} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
@@ -88,11 +90,17 @@ interface GlossTerm {
   altLabel?: string[];
   exactMatch?: string[];
   status?: string;
+  source?: string;
 }
 interface GlossScheme {
   id: string;
   terms: GlossTerm[];
-  file: string;
+  /**
+   * The instance that owns the scheme, by {@link schemeOwner}. With `id` it
+   * is the scheme's key (bean `q3n9`, owner ruling A, 2026-10-24): a scheme
+   * id such as `kg-tools` is every instance's Tool extraction.
+   */
+  instance: string;
 }
 
 /**
@@ -106,7 +114,13 @@ interface GlossScheme {
  * stands alone (separation placement review, 2026-10-06, bean `0r7u` step 0).
  */
 function glossaryFiles(root: string, suffix: string): string[] {
-  const out: string[] = [];
+  return declaredGlossaryFiles(root, suffix).map((f) => f.abs);
+}
+
+/** {@link glossaryFiles}, each with the instance whose declared directory holds it. */
+function declaredGlossaryFiles(root: string, suffix: string): { abs: string; declaredBy: string }[] {
+  const out: { abs: string; declaredBy: string }[] = [];
+  let declaredBy = "";
   const walk = (dir: string) => {
     let names: string[];
     try {
@@ -124,10 +138,11 @@ function glossaryFiles(root: string, suffix: string): string[] {
         continue;
       }
       if (s.isDirectory()) walk(abs);
-      else if (n.endsWith(suffix)) out.push(abs);
+      else if (n.endsWith(suffix)) out.push({ abs, declaredBy });
     }
   };
   for (const instance of instanceRootsIn(root)) {
+    declaredBy = readDeclaration(instance)?.name ?? "";
     for (const dir of instanceDirectoriesForGraph(instance, "glossary")) walk(dir);
   }
   return out;
@@ -174,13 +189,26 @@ export function adjudications(
   return { files: files.length, invalid, status };
 }
 
-/** Every `*.glossary.json` in the checkout, authored and generated alike. */
+/**
+ * Every `*.glossary.json` in the checkout, authored and generated alike, each
+ * keyed by its owning instance.
+ *
+ * The owner is {@link schemeOwner}'s answer, the same rule the glossary page
+ * places terms by, so the record and the page cannot key one scheme two ways.
+ * Where it has no answer (terms sourced in several instances, no defining
+ * source) the page drops the scheme and `check:glossary` reports it; this
+ * drops it too, rather than guess an owner the page does not show.
+ */
 export function glossarySchemes(root: string): GlossScheme[] {
   const out: GlossScheme[] = [];
-  for (const abs of glossaryFiles(root, ".glossary.json")) {
+  const owners = instanceRoots(root);
+  for (const { abs, declaredBy } of declaredGlossaryFiles(root, ".glossary.json")) {
     try {
-      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; terms?: GlossTerm[] };
-      if (d.terms) out.push({ id: d.id ?? basename(abs), terms: d.terms, file: abs.slice(root.length + 1) });
+      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; source?: string; terms?: GlossTerm[] };
+      if (!d.terms) continue;
+      const own = schemeOwner(root, { source: d.source, terms: d.terms }, declaredBy, owners);
+      if ("error" in own) continue;
+      out.push({ id: d.id ?? basename(abs), terms: d.terms, instance: own.owner });
     } catch {
       // A scheme that will not parse is `check:glossary`'s finding, not
       // this one's. Saying it twice would make one defect look like two.
@@ -222,18 +250,25 @@ export function skosIndex(schemes: GlossScheme[]): Map<string, ConceptMatch[]> {
   return idx;
 }
 
+/** A candidate term, with its scheme's key: (instance, scheme). */
+export interface Candidate {
+  term: GlossTerm;
+  instance: string;
+  scheme: string;
+}
+
 /** Candidates, which are what the check is ABOUT. */
-export function candidates(schemes: GlossScheme[]): { term: GlossTerm; scheme: string }[] {
+export function candidates(schemes: GlossScheme[]): Candidate[] {
   return schemes.flatMap((s) =>
-    s.terms.filter((t) => t.status !== "authored").map((term) => ({ term, scheme: s.id })),
+    s.terms.filter((t) => t.status !== "authored").map((term) => ({ term, instance: s.instance, scheme: s.id })),
   );
 }
 
 export function resolveSkos(
-  cands: { term: GlossTerm; scheme: string }[],
+  cands: Candidate[],
   idx: Map<string, ConceptMatch[]>,
 ): TermMapping[] {
-  return cands.map(({ term, scheme }) => {
+  return cands.map(({ term, instance, scheme }) => {
     const key = normaliseLabel(term.prefLabel);
     const hits = idx.get(key) ?? [];
     const exactHit = hits.filter((h) => h.predicate === "skos:exactMatch");
@@ -241,6 +276,7 @@ export function resolveSkos(
     const concept: MatchState = hits.length ? "mapped" : "unmapped";
     return {
       term: term.id,
+      instance,
       scheme,
       target: "skos" as const,
       exact,
@@ -267,13 +303,14 @@ export function resolveSkos(
  * only field the two share. A code match would be a coincidence of spelling.
  */
 export function resolveFhir(
-  cands: { term: GlossTerm; scheme: string }[],
+  cands: Candidate[],
   pinned: PinnedTerminology | string,
 ): TermMapping[] {
   if (typeof pinned === "string") {
     // No snapshot: undetermined WITH the reason, never `unmapped`.
-    return cands.map(({ term, scheme }) => ({
+    return cands.map(({ term, instance, scheme }) => ({
       term: term.id,
+      instance,
       scheme,
       target: "fhir" as const,
       exact: "undetermined" as const,
@@ -295,7 +332,7 @@ export function resolveFhir(
       },
     ]);
   }
-  return cands.map(({ term, scheme }) => {
+  return cands.map(({ term, instance, scheme }) => {
     const hits = idx.get(normaliseLabel(term.prefLabel)) ?? [];
     // `closeMatch`, never `exactMatch`: a label matching a code's display
     // means the two are about the same thing, not that the glossary term IS
@@ -303,6 +340,7 @@ export function resolveFhir(
     // `vocabulary-authority` exists to prevent.
     return {
       term: term.id,
+      instance,
       scheme,
       target: "fhir" as const,
       exact: "unmapped" as const,
@@ -438,13 +476,20 @@ export interface MappedTerm {
 }
 
 /**
- * One row per (scheme, target), with all three counts and the mapped terms.
+ * One row per (instance, scheme, target), with all three counts and the mapped terms.
  *
  * Exported because `glossary-page.ts` renders these rows and must not have a
  * second idea of their shape — the page and the record disagreeing about what
  * a state means is the drift a shared type prevents.
  */
 export interface SchemeState {
+  /**
+   * The instance that owns the scheme. A row is keyed by (instance, scheme,
+   * target), because a scheme id alone is shared across instances: `kg-tools`
+   * is every instance's Tool extraction (beans `wvzp`, `q3n9`; owner ruling A,
+   * 2026-10-24).
+   */
+  instance: string;
   scheme: string;
   target: string;
   mapped: number;
@@ -472,7 +517,7 @@ export interface SchemeState {
  * page reports mapped / unmapped / undetermined per term").
  *
  * `unknown` is a fourth answer and is NOT a mapping state. It means the
- * committed record cannot say: there is no row for the scheme, there is more
+ * committed record cannot say: there is no row for the (instance, scheme), there is more
  * than one, or a mixed row does not name its undetermined terms. It is never
  * folded into `unmapped`, for the same reason `undetermined` is not (bean
  * `dh4f`).
@@ -485,17 +530,33 @@ export type TermStateAnswer =
 
 export function termState(
   states: readonly SchemeState[],
-  scheme: string,
+  key: { instance: string; scheme: string } | string,
   target: string,
   term: string,
 ): TermStateAnswer {
-  const rows = states.filter((s) => s.scheme === scheme && s.target === target);
+  if (typeof key === "string") {
+    const scheme = key;
+    const rows = states.filter((s) => s.scheme === scheme && s.target === target);
+    const which = `scheme \`${scheme}\``;
+    if (rows.length === 0) return { state: "unknown", why: `no row for ${which} on \`${target}\`` };
+    const hits = rows.flatMap((r) => r.mappedTerms.filter((m) => m.term === term));
+    if (hits.length > 1) return { state: "unknown", why: `${hits.length} rows match \`${term}\` in ${which} on \`${target}\`` };
+    if (hits.length === 1) return { state: "mapped", exact: hits[0]!.exact, concepts: hits[0]!.concepts };
+    const reason = rows.find((r) => r.reason)?.reason;
+    const undetermined = (): TermStateAnswer => ({ state: "undetermined", ...(reason ? { reason } : {}) });
+    if (rows.every((r) => r.undetermined === 0)) return { state: "unmapped" };
+    if (rows.every((r) => r.unmapped === 0)) return undetermined();
+    return { state: "unknown", why: `${which} on \`${target}\` mixes unmapped and undetermined terms` };
+  }
+  const { instance, scheme } = key;
+  const rows = states.filter((s) => s.instance === instance && s.scheme === scheme && s.target === target);
+  const which = `scheme \`${scheme}\` of \`${instance}\``;
   if (rows.length !== 1) {
     return {
       state: "unknown",
       why: rows.length
-        ? `${rows.length} rows for scheme \`${scheme}\` on \`${target}\`, so the record is ambiguous`
-        : `no row for scheme \`${scheme}\` on \`${target}\``,
+        ? `${rows.length} rows for ${which} on \`${target}\`, so the record is ambiguous`
+        : `no row for ${which} on \`${target}\``,
     };
   }
   const row = rows[0]!;
@@ -507,7 +568,7 @@ export function termState(
   if (row.unmapped === 0) return undetermined();
   return {
     state: "unknown",
-    why: `scheme \`${scheme}\` on \`${target}\` mixes unmapped and undetermined terms and names neither`,
+    why: `${which} on \`${target}\` mixes unmapped and undetermined terms and names neither`,
   };
 }
 
@@ -518,14 +579,20 @@ export function perScheme(
 ): SchemeState[] {
   const of = ms.filter((m) => m.target === target);
   const reason = scope.find((s) => s.target === target)?.unreachable_reason;
-  const schemes = [...new Set(of.map((m) => m.scheme))].sort();
-  return schemes.map((scheme) => {
-    const rows = of.filter((m) => m.scheme === scheme);
+  // One row per (instance, scheme): a scheme id is shared across instances
+  // (bean `wvzp`), and folding them into one row mixed their terms.
+  const keyOf = (m: TermMapping) => `${m.instance}\0${m.scheme}`;
+  const keys = [...new Map(of.map((m) => [keyOf(m), m] as const)).entries()]
+    .map(([k, m]) => ({ k, instance: m.instance, scheme: m.scheme }))
+    .sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0));
+  return keys.map(({ k, instance, scheme }) => {
+    const rows = of.filter((m) => keyOf(m) === k);
     const n = (k: MatchState) => rows.filter((r) => r.concept === k).length;
     const unmapped = n("unmapped");
     const undetermined = n("undetermined");
     const byTerm = (a: { term: string }, b: { term: string }) => (a.term < b.term ? -1 : a.term > b.term ? 1 : 0);
     return {
+      instance,
       scheme,
       target,
       mapped: n("mapped"),

@@ -1,6 +1,6 @@
 /**
  * `harness-tiles` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/harness-tiles.test.ts` (bean `7zz1`, owner ruling
+ * `cat-harness-tools/scripts/tests/kg/harness-tiles.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads who-iris's own theme, which
  * only the checkout holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
@@ -27,8 +27,8 @@ describe("an instance's OWN theme tones its tile (bean v8n5)", () => {
   const tiles = harnessTiles(REPO, HOST, ["who-iris", "cat-harness", "bootstrap"]);
 
   test("who-iris's tile tone is the hue of its own theme's accent, not the avatar's", async () => {
-    const { themeByRef } = await import("@litlfred/cat-harness/schemas/theme-by-ref.js");
-    const { hexHue } = await import("@litlfred/cat-harness/schemas/theme.js");
+    const { themeByRef } = await import("@litlfred/cat-harness/schemas/ui/theme-by-ref.js");
+    const { hexHue } = await import("@litlfred/cat-harness/schemas/ui/theme.js");
     const r = themeByRef({ instance: "who-iris", themeId: "iris-sticky" }, REPO);
     expect(r.ok).toBe(true);
     const who = tiles.find((t) => t.name === "who-iris")!;

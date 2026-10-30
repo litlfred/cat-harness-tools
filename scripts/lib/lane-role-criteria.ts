@@ -5,7 +5,7 @@
  *
  * Owner, 2026-10-16 (thread "BPMN lane, role and skill modelling"; the
  * implementation spec's §5): *"These are report entries, not gates."* The
- * criteria are DECLARED in cat-harness `schemas/kg-qa.ts` — ids, applies-to,
+ * criteria are DECLARED in cat-harness `schemas/sdlc/kg-qa.ts` — ids, applies-to,
  * severity `minor`, which is below what `--check` and `--strict` fail on — and
  * computed here, beside the other criteria `kg-audit.ts` computes, as pure
  * functions so each case is testable without a checkout. The model they look
@@ -16,7 +16,7 @@
  * - **`lane-role-legacy-binding`** (process) — a lane still bound by the
  *   deprecated `<bootstrap.processes:role ref>`, or carrying one that
  *   disagrees with its `partitionElementRef`. The text is `laneRoleRef`'s own
- *   warning (cat-harness `schemas/role-graph.ts`), carried on the lane by
+ *   warning (cat-harness `schemas/process/role-graph.ts`), carried on the lane by
  *   `loadProcessModel`: one reader, one sentence.
  * - **`task-skill-outside-lane-role`** (process) — a task's skill that is not
  *   among the skills of the Role its lane names, closed over `inherits`.
@@ -29,8 +29,8 @@
  *   mechanical role is a real role whose skills are its contract; a contract
  *   nothing tests is a promise nobody checks.
  */
-import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import type { LaneDef, ProcessNode } from "../../src/workflow/process-model.ts";
 import type { SkillEdges } from "./skill-edges.ts";
 

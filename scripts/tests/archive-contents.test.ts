@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/archive-contents.ts";
+import { ARCHIVE_CONTENTS_SCHEMA_ID, ArchiveContentsSchema, isArchiveMimetype } from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
 import { checkAll, checkEntry } from "../check-l1-complete.ts";
 import { planFor, sniffMimetype } from "../ingest-document.ts";
 
@@ -271,7 +271,7 @@ describe("the real corpus", () => {
 
 // ── The record is real JSON-LD — bean `yh6u` ───────────────────────────────
 
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { checkDeclaredKeys } from "../check-content-keys.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 

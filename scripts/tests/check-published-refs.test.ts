@@ -19,7 +19,7 @@ import {
   formatReport,
   publishedGraphRefs,
 } from "../check-published-refs";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration, writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 describe("classifyRef", () => {

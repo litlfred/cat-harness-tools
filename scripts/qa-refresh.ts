@@ -98,8 +98,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
@@ -244,6 +244,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["check:lane-documentation", "lane-documentation"],
       ["check:methodology-evidence", "methodology-evidence"],
       ["check:avatar-coverage", "avatar-coverage"],
+      ["check:unlinked-beans", "unlinked-beans"],
       ["kg:export", "kg-export"],
     ] as const
   ).map(([script, stem]): QaWriter => ({
@@ -277,7 +278,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     // runs `skills:docs`, which reads the todo graph, and check:harness-state
     // judges the issue-marks, merge-queue, session-survey, todo-feedback and
     // board-positions graphs; all of them live on state branches.
-    ...(script === "skill:register" || script === "check:harness-state" ? { readsState: true as const } : {}),
+    // check:unlinked-beans (bean `w2hn`) reads the beans graph and its workflow instances.
+    ...(script === "skill:register" || script === "check:harness-state" || script === "check:unlinked-beans" ? { readsState: true as const } : {}),
     because: "a whole-artefact review; its writer form writes the sidecar",
   })),
   {

@@ -64,18 +64,18 @@ import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { readSchemaGraph, schemaRoots, type SchemaGraph } from "./schema-graph.ts";
-import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { nodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
-import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kind-validator.ts";
+import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { nodeKindIndex } from "@litlfred/cat-harness/schemas/kg/node-kind-index.ts";
+import { parseValidatorRef, rootOf } from "@litlfred/cat-harness/schemas/kg/kind-validator.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { rootInstanceName } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import {
   SOURCE_DESCRIPTOR_SCHEMA_TAG,
   SourceDescriptorSchema,
   enumerationCost,
-} from "@litlfred/cat-harness/schemas/source-descriptor.ts";
+} from "@litlfred/cat-harness/schemas/library/source-descriptor.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
@@ -508,10 +508,10 @@ export function viewerPlacement(
  * to ask an ownership question. */
 import { orphanSubjectPages } from "./orphan-pages.ts";
 import { makeEmit } from "./viewer-page.ts";
-import { declaredPageRoute, declaredRoute, withRenderedBy, withViewers } from "./viewer-declarations.js";
+import { declaredPageRoute, declaredRoute, withRenderedBy, tileDirectories } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -744,7 +744,7 @@ function esc(s) {
 }
 /* A field's doc is prose that names things in markdown inline code; escaped
    verbatim, "bean \x60abc\x60" showed its backticks. Escape first, then turn each
-   PAIRED span into <code>, the rule schemas/inline-code.ts applies server-side.
+   PAIRED span into <code>, the rule schemas/content/inline-code.ts applies server-side.
    An unpaired backtick stays as written. \x60 is the backtick: the character
    itself would end the template literal that carries this script. */
 function withCode(s) {
@@ -1679,9 +1679,10 @@ if (import.meta.main) {
    * a zero: it is a page with no tile, so there is nothing to badge, and an
    * invented entry would be a count for a directory nobody declared.
    */
-  // THIS INSTANCE'S declaration only, because that is the one that produces
-  // tiles: `sync-docs-harness.ts` calls `graphTiles(readDeclaration(ROOT)
-  // .directories)`. Scanning every instance was the first draft and it was
+  // THE LANDING HARNESS'S directories only, because those are the ones that
+  // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
+  // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
+  // a cat-harness id once the landing moved to folio-assistant-core). Scanning every instance was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
@@ -1693,7 +1694,7 @@ if (import.meta.main) {
   //
   // The rule that falls out: look the ref up in the SAME list the tiles came
   // from, or the ids do not correspond to tiles at all.
-  const byRef = directoryByVisualisationRef(withViewers(readDeclaration(ROOT)?.directories ?? [], ROOT));
+  const byRef = directoryByVisualisationRef(tileDirectories(REPO_ROOT, ROOT));
   const scoped: Record<string, readonly [number, string]> = {};
   /** The repo-relative ref of a page this run emits, as a declaration spells it. */
   const refOf = (dirPath: string): string =>

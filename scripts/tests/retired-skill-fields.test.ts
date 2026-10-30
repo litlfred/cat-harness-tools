@@ -30,7 +30,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
 
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.js";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
 import { kgRoots } from "../known-skills.js";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -51,7 +51,7 @@ const RETIRED: Record<string, string> = {
   // Inside the DECLARED trashcan, never a spelled `fsh-guts/` (bean `gz47`):
   // the trashcan is moving to its own branch (`9c7h`).
   roles: join(relative(resolve(ROOT, ".."), fshGutsDirectory(resolve(ROOT, ".."))), "retired", "skill-definition-roles.md"),
-  schemaRefs: "cat-harness/schemas/assistant-types.ts",
+  schemaRefs: "cat-harness/schemas/conduct/assistant-types.ts",
 };
 
 function skillDefinitionFiles(): string[] {

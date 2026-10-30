@@ -19,6 +19,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   SCANNED,
+  checkoutCapabilityFacts,
   declaredCapabilities,
   declaredCapabilityFacts,
   declaredRoles,
@@ -27,6 +28,7 @@ import {
   fallbackUses,
   transitivelyRequires,
 } from "../check-fallback-roles.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -46,19 +48,24 @@ describe("the registries it resolves against", () => {
 });
 
 describe("the derivation that replaced the declaration", () => {
-  test("qa-report-signing falls back to publication-manager, from the DIAGRAM", async () => {
+  test("qa-report-signing falls back to publication-manager, from the DIAGRAM", () => {
     // The exact value `fallbackRole` used to declare. `Task_HumanSign` is a
     // `userTask` in `Lane_Human`, which binds `publication-manager`; the
     // declaration was a second copy of this with nothing asserting they
     // agreed.
-    expect(await fallbackRoleFor(ROOT, "qa-report-signing")).toEqual(["publication-manager"]);
+    //
+    // Read from the hoisted BATCH — `fallbackRoleFor` is `BATCH.get(skill) ?? []`
+    // over the same pass — rather than a second corpus pass of its own (bean
+    // `sff8`). The bounded sample at the end of this file is what pins the
+    // single-skill path to BATCH.
+    expect(BATCH.get("qa-report-signing") ?? []).toEqual(["publication-manager"]);
   });
 
-  test("a skill with no human-only lane derives nothing, rather than guessing", async () => {
+  test("a skill with no human-only lane derives nothing, rather than guessing", () => {
     // The failure that would make the whole approach unsafe is a derivation
     // that returns SOMETHING for every skill — then a fallback with no
-    // route would silently resolve.
-    expect(await fallbackRoleFor(ROOT, "formalizer")).toEqual([]);
+    // route would silently resolve. Against the hoisted BATCH, as above.
+    expect(BATCH.get("formalizer") ?? []).toEqual([]);
     // The `no-such-skill-anywhere` case that used to sit here is asserted in
     // `describe("the batch pass agrees...")` below, through BOTH paths rather than
     // one. It was a second full pass over 74 diagrams for a claim already made,
@@ -72,7 +79,7 @@ describe("the derivation that replaced the declaration", () => {
     // read by nothing AND invisible to the type checker, since the schema
     // is not applied to these modules at build time.
     const { readFileSync } = await import("node:fs");
-    for (const f of ["schemas/assistant-types.ts", "schemas/skill-package.ts"]) {
+    for (const f of ["schemas/conduct/assistant-types.ts", "schemas/kg/skill-package.ts"]) {
       const src = readFileSync(resolve(ROOT, f), "utf-8");
       // Mentioned in prose (the record of why it went), never re-declared.
       expect(src).not.toMatch(/^\s*fallbackRole[?]?:/m);
@@ -140,7 +147,11 @@ describe("the scan", () => {
 });
 
 describe("the capability-level fallback, and the contradiction it exposed", () => {
-  const facts = declaredCapabilityFacts(ROOT);
+  /** The platform's own registry — what the id-set helper below is compared against. */
+  const own = declaredCapabilityFacts(ROOT);
+  // The whole checkout's: a capability is declared by the instance its
+  // subject belongs to, and the Lean pair is no longer the platform's.
+  const facts = checkoutCapabilityFacts(repoRootFor(ROOT));
 
   test("`fallbackTo` is declared ONCE, on the capability it is a property of", () => {
     // Five skill modules each carried `fallbackCapabilityId: "lean-mcp"`.
@@ -205,7 +216,7 @@ describe("the capability-level fallback, and the contradiction it exposed", () =
   });
 
   test("the id-set helper still agrees with the facts map", () => {
-    expect(declaredCapabilities(ROOT)).toEqual(new Set(facts.keys()));
+    expect(declaredCapabilities(ROOT)).toEqual(new Set(own.keys()));
   });
 });
 
@@ -216,7 +227,11 @@ describe("the capability-level fallback, and the contradiction it exposed", () =
  * inherently one full pass per skill: that is the cost the batch exists to remove, so
  * the test proving it correct necessarily pays it. Measured 2026-09-27 at ~1.5 s per
  * single-skill call, and the first version of this test — exhaustive over all skills —
- * took **36 s** and timed out on bun's 5000 ms default.
+ * took **36 s** and timed out on bun's 5000 ms default. Re-measured 2026-10-24 over
+ * 101 diagrams: ~6.4 s quiet, every test here over budget — instance-layout discovery
+ * redone per diagram, not the corpus outgrowing the formula. With the layout resolved
+ * once per instance root in `process-model.ts`: **~1.6 s quiet, ~2.9 s cold**, so the
+ * budget below stands as derived.
  *
  * Two moves, both from this bean's own taxonomy, and then a judgement:
  *
@@ -260,16 +275,22 @@ describe("the batch pass agrees with asking per skill — bounded regression che
       for (const [skill, roles] of SAMPLE) {
         expect(await fallbackRoleFor(ROOT, skill), `skill ${skill}`).toEqual(roles);
       }
+      // ONE single-path call beyond the sample, inside its budget rather than added to
+      // it (the budget stays `SAMPLE.length * PER_SKILL_BUDGET_MS`, so this only
+      // tightens it): absence, which the tests above now read from BATCH alone. The
+      // sample is what pins the single path to the batch for skills that ARE present.
+      expect(await fallbackRoleFor(ROOT, "no-such-skill-anywhere")).toEqual([]);
     },
     SAMPLE.length * PER_SKILL_BUDGET_MS,
   );
 
-  test("a skill in NO diagram is absent from the batch and empty from the single path", async () => {
+  test("a skill in NO diagram is absent from the batch and empty from the single path", () => {
     // The two must agree on absence as well as presence: a batch that simply omitted
     // unknown skills while the single path returned something would disagree exactly
-    // where a caller reads "no fallback route".
+    // where a caller reads "no fallback route". The single-path half is asked inside
+    // the bounded sample above, not by a further corpus pass here (bean `sff8`).
     expect(BATCH.has("no-such-skill-anywhere")).toBe(false);
-    expect(await fallbackRoleFor(ROOT, "no-such-skill-anywhere")).toEqual([]);
+    expect(BATCH.get("no-such-skill-anywhere") ?? []).toEqual([]);
   });
 
   test("roles are sorted for EVERY skill, so two callers cannot see different orders", () => {

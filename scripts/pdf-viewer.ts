@@ -54,7 +54,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, wri
 import { tmpdir } from "os";
 import { join } from "path";
 import { spawnSync } from "child_process";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 /** The pinned pdf.js release. `upstream-pins.json` reads this line by pattern. */
 export const PDFJS_VERSION = "6.4.299";

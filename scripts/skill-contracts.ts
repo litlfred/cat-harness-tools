@@ -20,7 +20,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
-import { findInstanceRoot } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { frontMatter } from "./front-matter.js";
 import { isSkillMd, skillMdDirs, corpusScopeFor, type CorpusScope } from "./known-skills.js";
 

@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 
 import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } from "../gen-auto-docs.ts";
 import { knownSkills } from "../known-skills.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).
@@ -62,7 +62,13 @@ describe("index/skills agrees with knownSkills, exactly", () => {
     // walk has reached renderings or supporting pages; a subset means it has
     // stopped seeing a declared directory.
     const mine = new Set(items.map((i) => i.name));
-    const known = knownSkills(INSTANCE);
+    const known = new Set(knownSkills(INSTANCE));
+    for (const inst of instanceRootsIn(resolve(INSTANCE, ".."))) {
+      const decl = readDeclaration(inst);
+      if (decl && !isExemptFrom(decl, "visualiser")) {
+        for (const s of knownSkills(inst, "instance")) known.add(s);
+      }
+    }
     expect([...known].filter((n) => !mine.has(n))).toEqual([]);
     expect([...mine].filter((n) => !known.has(n))).toEqual([]);
   });

@@ -55,10 +55,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { basename, dirname, join, resolve } from "node:path";
 
 import { loadProcessModel, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { tools } from "@litlfred/cat-harness/tools/index.ts";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
@@ -249,7 +249,7 @@ export function render(model: ProcessModel, step: ProcessNode, matched: ToolDefi
   const L: string[] = [];
   L.push("---");
   L.push("layout: default");
-  L.push("generated: cat-harness/scripts/gen-upload-step-docs.ts — do not hand-edit; edit the Tool nodes");
+  L.push("generated: cat-harness-tools/scripts/gen-upload-step-docs.ts — do not hand-edit; edit the Tool nodes");
   L.push("title: The upload step");
   L.push("nav_order: 44");
   L.push("---");

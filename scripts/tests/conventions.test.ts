@@ -17,10 +17,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { ConventionSchema, conventionsInForce } from "@litlfred/cat-harness/schemas/convention.ts";
+import { ConventionSchema, conventionsInForce } from "@litlfred/cat-harness/schemas/process/convention.ts";
 import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { conventionsDir } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { conventionsDir } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
 import { workflowFile, workflowFiles } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

@@ -106,7 +106,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
-import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
 import { injectRailOnce } from "./lib/rail-once.js";
 import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
@@ -117,7 +117,7 @@ import { withSavedScheme } from "./lib/scheme-css.js";
 import { heldVisualiserPaths, viewersOf } from "./viewer-declarations.js";
 import { translationMetaBlock, withTranslationMeta } from "./lib/translation-meta.ts";
 import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.ts";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
@@ -125,8 +125,8 @@ import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar }
 import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
-import { isPublished } from "@litlfred/cat-harness/schemas/url-space.js";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
+import { isPublished } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
 
 /**
@@ -228,6 +228,12 @@ export interface Mountable {
  * and the sibling keeps the kind route. With no same-kind sibling nothing
  * changes — a lone root still publishes at both routes.
  *
+ * **Same-kind siblings that keep the kind route get a route each.** Left
+ * over after that yield, two or more directories of one kind would all claim
+ * `/<kind>/<instance>/`. Each is published at `/<kind>/<instance>/<dir>/`
+ * instead, named by its own directory, and nothing answers at the shared
+ * route.
+ *
  * With several renderable kinds and none marked, the root is returned as
  * UNDETERMINED. The deterministic order still picks one, because a site has to
  * serve something at that URL — but the caller reports that nobody chose it,
@@ -266,8 +272,18 @@ export function withRoutes<T extends Mountable>(
   // declares the same kind — see the rule above.
   const yieldsKindRoute = (m: T): boolean =>
     m.instanceRoot && found.some((o) => o !== m && o.name === m.name && o.kind === m.kind && !o.instanceRoot);
+  // Several directories of one instance that still share a kind route after
+  // the yield above would all claim `/<kind>/<instance>/`, and the walk
+  // refuses every one but the first. Each then takes its own sub-route,
+  // `/<kind>/<instance>/<directory>/`, and none takes the shared one: picking
+  // one would be the alphabet choosing again. (cat-harness-tools#681 declared
+  // `ui/` and `viewer/` beside `id-lookup/`, all `code`, and every site that
+  // mounted cat-harness-tools stopped publishing.)
+  const sharesKindRoute = (m: T): boolean =>
+    found.filter((o) => o.name === m.name && o.kind === m.kind && !yieldsKindRoute(o)).length > 1;
+  const kindRoute = (m: T): string => (sharesKindRoute(m) ? `${m.kind}/${m.name}/${posix.basename(m.dir.split(sep).join("/"))}` : `${m.kind}/${m.name}`);
   const candidates = found.flatMap((m) => {
-    const byKind = yieldsKindRoute(m) ? [] : [{ ...m, route: `${m.kind}/${m.name}` }];
+    const byKind = yieldsKindRoute(m) ? [] : [{ ...m, route: kindRoute(m) }];
     if (rooted.has(m.name) || rootTaken.has(m.name)) return byKind;
     // A declared root waits for its own entry rather than letting whichever
     // kind comes first claim the route.
@@ -798,6 +814,14 @@ export interface RailPassOptions {
   themeSource?: string;
 }
 
+const HTML_LANG = /<html\b[^>]*\blang=["']([^"']+)["']/i;
+
+/** The page's declared `<html lang="…">`, or `"en"` when the page omits it — bean `xka5`. */
+export function pageLangOf(html: string): string {
+  const m = HTML_LANG.exec(html);
+  return m?.[1]?.trim() || "en";
+}
+
 /**
  * The platform's generated DATA `docs-ui.js` reads, shipped with a foreign
  * site beside {@link PINNED_CHROME_FILES} — owner, 2026-10-15, "Yes, ship
@@ -1059,7 +1083,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       // other themed page (`railStandalonePages`), or the page shows both.
       const before = pageTree !== undefined && hasThemeSidebar(read) ? stripThemeSidebar(read) : read;
       const mark = instanceMark(built, m.name, toRoot);
-      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
       const railed = injectRailOnce(before, {
         ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
@@ -1494,7 +1518,7 @@ export function railStandalonePages(
       // The landing's mark is not this site's: a site with no instance of its own draws none.
       const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
       // The page tree, cut to the instance's own pages when the page is inside one.
-      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot }).items : undefined;
+      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
       const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
       const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),

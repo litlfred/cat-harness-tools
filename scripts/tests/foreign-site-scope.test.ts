@@ -33,7 +33,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { compose, EMPTY_TODO_LISTING } from "../compose-docs.ts";
 import {
   HOST_DATA_PROJECTIONS,

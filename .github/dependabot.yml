@@ -6,7 +6,7 @@
 # instance's manifests are updated from the instance's own repository.
 #
 # - pip: `python/requirements.txt` is `requirementsPath` in cat-harness's
-#   `schemas/python-deps.ts`. `requirements-extended.txt` may not be matched by
+#   `schemas/sdlc/python-deps.ts`. `requirements-extended.txt` may not be matched by
 #   Dependabot's pip file discovery; it is not asserted here.
 # - npm / bun is NOT listed yet: this repository's `package.json` resolves
 #   `@litlfred/cat-harness` and `@litlfred/bootstrap-tools` only through a

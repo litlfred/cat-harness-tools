@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** One entry, as data when it is a file and as source text when it is a `ref({…})` call. */
 export type ReferenceEntry =
@@ -45,7 +45,9 @@ export function referenceDirs(repoRoot: string): string[] {
     folio = undefined;
   }
   const conventional = folio ? join(folio, "references") : undefined;
-  return conventional && existsSync(conventional) ? [conventional] : [];
+  if (conventional && existsSync(conventional)) return [conventional];
+  const rootConventional = join(repoRoot, "references");
+  return existsSync(rootConventional) ? [rootConventional] : [];
 }
 
 /** `<folio>/schema/references.ts`, when the folio has one. */
@@ -84,19 +86,62 @@ export function referenceEntries(repoRoot: string): ReferenceEntry[] {
     .map(({ e }) => e);
 }
 
+/** All reference keys present on disk (`.json`, `.jsonld`, or `schema/references.ts`). */
+export function referenceEntryIds(repoRoot: string): Set<string> {
+  return new Set(referenceEntries(repoRoot).map((e) => e.id));
+}
+
+function normaliseJsonLdData(raw: Record<string, unknown>): Record<string, unknown> {
+  const data: Record<string, unknown> = { ...raw };
+  if (typeof data.id !== "string" && typeof data["@id"] === "string") {
+    data.id = (data["@id"] as string).replace(/^references\//, "");
+  }
+  if (typeof data.title !== "string" && typeof data["dcterms:title"] === "string") {
+    data.title = data["dcterms:title"];
+  }
+  if (!Array.isArray(data.author) && Array.isArray(data["dcterms:creator"])) {
+    data.author = (data["dcterms:creator"] as unknown[])
+      .filter((c): c is string => typeof c === "string")
+      .map((c) => {
+        const i = c.indexOf(",");
+        return i < 0 ? { literal: c.trim() } : { family: c.slice(0, i).trim(), given: c.slice(i + 1).trim() };
+      });
+  }
+  if (data.issued === undefined && typeof data["dcterms:issued"] === "string") {
+    const m = /^(\d{4})/.exec(data["dcterms:issued"] as string);
+    if (m) data.issued = { "date-parts": [[Number(m[1])]] };
+  }
+  if (typeof data.DOI !== "string" && typeof data["bibo:doi"] === "string") {
+    data.DOI = data["bibo:doi"];
+  }
+  if (typeof data.URL !== "string" && typeof data["dcterms:identifier"] === "string") {
+    data.URL = data["dcterms:identifier"];
+  }
+  return data;
+}
+
 function unorderedEntries(repoRoot: string): ReferenceEntry[] {
   const out: ReferenceEntry[] = [];
   const seen = new Set<string>();
   for (const dir of referenceDirs(repoRoot)) {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".json") || f.endsWith(".jsonld"))
+      .sort((a, b) => {
+        // Prefer `.json` before `.jsonld` when both exist for the same key.
+        const aBase = a.replace(/\.jsonld$|\.json$/, "");
+        const bBase = b.replace(/\.jsonld$|\.json$/, "");
+        return aBase.localeCompare(bBase) || a.length - b.length;
+      });
+    for (const f of files) {
       const file = join(dir, f);
       const text = readFileSync(file, "utf-8");
-      let data: Record<string, unknown>;
+      let parsed: Record<string, unknown>;
       try {
-        data = JSON.parse(text) as Record<string, unknown>;
+        parsed = JSON.parse(text) as Record<string, unknown>;
       } catch {
         continue;
       }
+      const data = f.endsWith(".jsonld") ? normaliseJsonLdData(parsed) : parsed;
       const id = typeof data.id === "string" ? data.id : undefined;
       if (!id || seen.has(id)) continue;
       seen.add(id);

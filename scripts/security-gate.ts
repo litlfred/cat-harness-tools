@@ -52,7 +52,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { scriptTable, type ScriptEntry } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptTable, type ScriptEntry } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { parseDockerUses, parseUses, stagingExempt } from "./pin-actions.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
@@ -63,6 +63,14 @@ export interface GateResult {
   blocking: boolean;
   state: GateState;
   detail: string;
+}
+
+/** Machine-readable output of `security:gate --json`, optionally referencing its `folio-run-context/v1` record (`C1 = (a)`). */
+export interface SecurityGateReport {
+  $schema: "folio-security-gate/v1";
+  results: GateResult[];
+  blocked: boolean;
+  runContext?: { sha256: string };
 }
 
 /** The security checks, each a `package.json` script, in the order a reader meets them. */

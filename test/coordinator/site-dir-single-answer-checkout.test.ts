@@ -1,6 +1,6 @@
 /**
  * `site-dir-single-answer` tests about the WHOLE CHECKOUT, moved here from
- * `cat-harness/scripts/tests/site-dir-single-answer.test.ts` (bean `7zz1`,
+ * `cat-harness-tools/scripts/tests/ui/site-dir-single-answer.test.ts` (bean `7zz1`,
  * owner ruling 2026-10-06 "Top-level instance"): each reads the aggregate
  * root's `.gitignore`, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
@@ -14,7 +14,7 @@ import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

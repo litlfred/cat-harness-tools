@@ -39,14 +39,14 @@ import {
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { IndexConfigSchema, checkIgnoreBlock } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { instanceDeclarationFilename, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
-import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { instanceStateBranch } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { nodeOfKind, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { instanceStateBranch } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -186,7 +186,7 @@ describe("what gets written", () => {
     expect(readFileSync(join(d, ".gitignore"), "utf-8")).toContain("_site/");
   });
 
-  test("a new folio declares a todos graph with a feedback directory, so a review decision has somewhere to go (423d)", () => {
+  test("a new folio declares a todos graph with a feedback directory, so a review decision has somewhere to go (423d, c4rz)", () => {
     // Kept in the checkout (a `directory` override), so its files are on disk;
     // the branch default puts the same files in the seed — see `hp54` below.
     const d = tmp();
@@ -195,6 +195,7 @@ describe("what gets written", () => {
     const g = parseTodoGraph(JSON.parse(readFileSync(join(d, "todos", "todos.json"), "utf-8")));
     const fb = nodeOfKind(g, "todo-feedback");
     expect(fb?.path).toBe("feedback");
+    expect(scaffoldConfig(d).feedbackDir).toBe("todos/feedback");
     // Declared AND present: a declared-but-absent directory is the dh4f defect.
     for (const n of g.directories) expect(existsSync(join(d, "todos", n.path))).toBe(true);
   });

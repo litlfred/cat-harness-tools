@@ -9,7 +9,7 @@
  * `remote-mount.test.ts`). Nothing here imports above cat-harness either, so
  * it runs in a standalone cat-harness checkout: the GATES' formatting, the
  * folded scanners in cat-harness-tools and this monorepo's own index are
- * tested in `cat-harness-tools/scripts/tests/index-config-gates.test.ts`.
+ * tested in `cat-harness-tools/scripts/tests/sdlc/index-config-gates.test.ts`.
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -22,7 +22,7 @@ import {
   instantiatedHarnessNames,
   readHarnessConfig,
   resolveLandingInstance,
-} from "@litlfred/cat-harness/schemas/harness-config.ts";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import {
   IGNORE_BLOCK_BEGIN,
   IGNORE_BLOCK_END,
@@ -37,10 +37,10 @@ import {
   syncIgnoreBlock,
   writeDeclaredMounts,
   type IndexConfig,
-} from "@litlfred/cat-harness/schemas/index-config.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { findDeclarationFile, instanceRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { mountLockPathFor, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+} from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { findDeclarationFile, instanceRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { mountLockPathFor, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { applyMigration, planMigration } from "../index-config-migrate.ts";
 import { lockNames, readLocks } from "../mount-from-lock.ts";
 import { newFolioIndex } from "../init-folio.ts";

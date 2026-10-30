@@ -63,25 +63,25 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 
-import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
+import { toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.js";
 
 import { compareRoute } from "./route-authority.ts";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg-node.ts";
-import { instanceDirectoryForGraph, instanceRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { BASE_GRAPH_TYPOLOGIES, resolveGraphTypology } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
+import { instanceDirectoryForGraph, instanceRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { BASE_GRAPH_TYPOLOGIES, resolveGraphTypology } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { bothViews, gridLinks, renderSvgs, safeId, sha256, svgStamp, views, type RenderJob } from "./plantuml-render.js";
-import { detangleResultsDir, sidecarFor } from "@litlfred/cat-harness/schemas/detangle-sidecar.js";
+import { detangleResultsDir, sidecarFor } from "@litlfred/cat-harness/schemas/kg/detangle-sidecar.js";
 import { readQaManifest, readQaTree } from "./qa-store.ts";
 import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { spawnSync } from "node:child_process";
 import { glossaryLinksMd, schemasViewPuml } from "./gen-object-model-uml.js";
-import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

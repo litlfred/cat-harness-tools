@@ -14,7 +14,7 @@
  * ```
  *
  * Fixing the owner exposed the second half: the `qa` kind's validator refs
- * (`schemas/kg-qa.ts#…`) are relative to the instance whose registry DEFINES
+ * (`schemas/sdlc/kg-qa.ts#…`) are relative to the instance whose registry DEFINES
  * the kind, and resolving them against `smart-dak/` reported "does not exist".
  * Both halves are asserted here, over the REAL corpus, because the question is
  * whether the committed sidecars a reader picks up parse — not whether a
@@ -42,7 +42,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { owningInstanceRoot, validatePath } from "../../scripts/kg-validate.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */

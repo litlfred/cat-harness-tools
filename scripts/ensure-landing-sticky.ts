@@ -72,20 +72,20 @@ import {
   readDeclaration,
   rootForScope,
   declarationPathIn,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import {
   LandingStickySchema,
   stickyFromContribution,
   type LandingSticky,
-} from "@litlfred/cat-harness/schemas/landing-sticky.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/portable-path.ts";
+} from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
+import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
 import {
   StickyContributionSchema,
   composeContributions,
   readerText,
   type DeclaredContribution,
-} from "@litlfred/cat-harness/schemas/sticky-contribution.js";
+} from "@litlfred/cat-harness/schemas/content/sticky-contribution.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The graph typology, and the conventional directory an instance keeps it in. */
@@ -712,6 +712,14 @@ export function ensureLandingSticky(
   };
   if (opts.check) return report;
 
+  // ONE-TIME REPAIR, NOT MAINTENANCE (`content-context-and-state-graphs` §"A
+  // declared ASSET carries a layer too", bean `b5f0` §2: "A process may CREATE
+  // or REPAIR the declaration. It never maintains it"). `<name>.json` is a
+  // hand-authored declaration, not a `state` file that a running process keeps
+  // current: this write fires only when the `folio` directory entry is missing
+  // (`!already`) and returns on `already` every time thereafter. Do not take
+  // this call as evidence that the declaration is process-maintained state.
+  //
   // Written back to the file it was READ from — never composed. Production
   // code must not reach for the test-support writer, which names the file from
   // the body; here the declaration already exists and keeping its path is the

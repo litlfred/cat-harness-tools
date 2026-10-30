@@ -31,7 +31,7 @@ describe("reading one declaration", () => {
 
   test("a registry ref names its module, with or without an instance prefix", () => {
     expect(refModule("folio-assistant-core:schemas/dublin-core.ts#X", "cat-harness")).toBe("folio-assistant-core/schemas/dublin-core.ts");
-    expect(refModule("schemas/odrl.ts#OdrlPolicySchema", "cat-harness")).toBe("cat-harness/schemas/odrl.ts");
+    expect(refModule("schemas/content/odrl.ts#OdrlPolicySchema", "cat-harness")).toBe("cat-harness/schemas/content/odrl.ts");
   });
 });
 

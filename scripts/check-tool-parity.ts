@@ -23,7 +23,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { tools } from "@litlfred/cat-harness/tools/index.js";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 

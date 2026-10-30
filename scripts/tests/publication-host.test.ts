@@ -14,9 +14,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { PUBLICATION_HOSTS, publicationHost, publicationLinkStyleConflict } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { PUBLICATION_HOSTS, publicationHost, publicationLinkStyleConflict } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

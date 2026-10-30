@@ -25,8 +25,8 @@ import { TRACKED, expandGlobs } from "../input-hash.ts";
 import { regenArgs } from "../merge-base.ts";
 import { exitCodeFor, regenToFixpoint, type Pair, type Runner } from "../regen-after-merge.ts";
 import { TASK_IO, pairIO } from "../task-io.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = repoRootFor(join(HARNESS_ROOT));

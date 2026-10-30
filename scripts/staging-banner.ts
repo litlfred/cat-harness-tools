@@ -110,7 +110,7 @@ export interface StagingFacts {
   sha: string;
   /** `date -u +%Y-%m-%dT%H:%M:%SZ`. The reason the old banner defeated dedup. */
   built: string;
-  /** PR number, or `"n/a"` when the build has no PR. */
+  /** PR number, or `"n/a"` when no open PR was found; the banner then says so in words, never "PR #n/a" (bean zvl0). */
   pr: string;
   prUrl: string;
   branchUrl: string;
@@ -286,7 +286,7 @@ function fill(d,f,r){
   var b=link(f.branchUrl,'');b.appendChild(chip(f.branch));d.appendChild(b);
   d.appendChild(sep());d.appendChild(document.createTextNode('commit '));d.appendChild(chip(f.sha));
   d.appendChild(sep());d.appendChild(document.createTextNode('built '+f.built));
-  d.appendChild(sep());d.appendChild(link(f.prUrl,'PR #'+f.pr));
+  d.appendChild(sep());d.appendChild(link(f.prUrl,f.pr&&f.pr!=='n/a'?'PR #'+f.pr:'no open PR found'));
   if(f.issue){d.appendChild(sep());d.appendChild(link(f.issueUrl,'issue #'+f.issue));}
   d.appendChild(sep());
   var rel=location.pathname.slice(r.length);

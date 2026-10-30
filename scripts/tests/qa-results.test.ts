@@ -25,8 +25,8 @@ import {
   writeQaResult,
   QA_RESULTS_DIR,
 } from "../qa-results.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { docsSources } from "../lib/docs-sources.ts";
 

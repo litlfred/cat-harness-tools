@@ -14,7 +14,7 @@
  * So each kind row now gets, from sources that already exist rather than a
  * table written here:
  *
- *   - a **distinct glyph** — the kind's own SVG mark from `schemas/avatars.ts`,
+ *   - a **distinct glyph** — the kind's own SVG mark from `schemas/content/avatars.ts`,
  *     which already draws `library` as books on a shelf and `docs` as a page
  *     under a magnifier, and its **hue** from the same entry, so two adjacent
  *     rows differ in shape AND colour;
@@ -30,8 +30,8 @@
  * avatar, even when there is none (always have default blank/themecolor if no
  * avatar. etc)"*.
  */
-import { BLANK_AVATAR, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { BLANK_AVATAR, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /**
  * The first clause of a kind's registered summary — up to the first dash,

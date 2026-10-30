@@ -1,7 +1,7 @@
 /**
  * `staging-stamp` tests that read the aggregate repository's own root —
  * `.github/workflows/feature-staging.yml` — moved here from
- * `cat-harness/scripts/tests/staging-stamp.test.ts` (bean `ho66`), as
+ * `cat-harness-tools/scripts/tests/sdlc/staging-stamp.test.ts` (bean `ho66`), as
  * `merge-guard-workflows.test.ts` was: a standalone cat-harness layer has no
  * such root, and `check:cat-harness-standalone` collects every test in that
  * layer. The rest of that file's tests stay there.
@@ -16,7 +16,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** The directory this test was written in (`cat-harness-tools/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness-tools/scripts/tests");

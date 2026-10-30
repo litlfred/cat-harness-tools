@@ -45,12 +45,12 @@ import {
   siteDirFor,
   type KnownSubstrate,
   type Subscription,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { instanceRepositories } from "@litlfred/cat-harness/schemas/instance-repositories.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { instanceRepositories } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
 import { partRecordsIn, snapshotDirOf, type PartView } from "./kg-subscribe.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE = resolve(HARNESS_ROOT);
@@ -230,6 +230,13 @@ export function render(substrates: readonly SubstrateRow[], cards: readonly Subs
     for (const p of parts) {
       if (p.slot.kind !== "subgraph" || (s.subgraphs ?? []).includes(p.slot.id)) continue;
       lines.push(`| subgraph \`${p.slot.id}\` | — | ⚠ recorded, and no longer chosen: ${cell(partState(p, s.ref))} |`);
+    }
+    // A nested subgraph is chosen by its parent and held by path (owner, 2026-10-24, ruling 4).
+    for (const p of parts) {
+      if (p.slot.kind !== "nested") continue;
+      const parent = p.part?.kind === "subgraph" ? p.part.id : undefined;
+      const chosen = parent !== undefined && (s.subgraphs ?? []).includes(parent);
+      lines.push(`| nested subgraph \`${p.slot.path}\` | ${chosen ? `✓ by \`${parent}\`` : "—"} | ${chosen ? cell(partState(p, s.ref)) : `⚠ recorded, and its parent is not chosen: ${cell(partState(p, s.ref))}`} |`);
     }
     lines.push(`| assets | policy \`${s.assets?.policy ?? "none"}\` | 🔗 each copy passes the materialisation gates |`);
     for (const p of parts) {

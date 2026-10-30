@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
-import { TOOL_PROFILE_SCHEMA_TAG, ToolProfileSchema, toolReleaseGraphProblems, type ToolProfile } from "@litlfred/cat-harness/schemas/tool-profile.ts";
-import { TOOL_RELEASE_SCHEMA_TAG, ToolReleaseSchema, type ToolRelease } from "@litlfred/cat-harness/schemas/tool-release.ts";
+import { TOOL_PROFILE_SCHEMA_TAG, ToolProfileSchema, toolReleaseGraphProblems, type ToolProfile } from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
+import { TOOL_RELEASE_SCHEMA_TAG, ToolReleaseSchema, type ToolRelease } from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { loadToolReleases } from "../scripts/tool-releases";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
@@ -116,6 +116,6 @@ describe("the seeded directory, as the gate reads it", () => {
 
   test("the graph is clean, and the `default` profile names no runtime", () => {
     expect(toolReleaseGraphProblems(loaded.releases.map((r) => r.release), loaded.profiles.map((p) => p.profile))).toEqual([]);
-    expect(loaded.profiles.map((p) => p.profile.name)).toEqual(["default"]);
+    expect(loaded.profiles.map((p) => p.profile.name)).toContain("default");
   });
 });

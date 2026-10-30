@@ -62,23 +62,23 @@ import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
-import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
 import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
-import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
-import { tileCounts } from "@litlfred/cat-harness/schemas/tile-count.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
-import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, withViewers } from "./viewer-declarations.js";
-import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
+import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
@@ -107,7 +107,7 @@ export function projection(
 ): unknown {
   return {
     $schema: "folio-library-index/v1",
-    // TWO tiles, ONE dataset — the case `schemas/tile-count.ts` is keyed by
+    // TWO tiles, ONE dataset — the case `schemas/ui/tile-count.ts` is keyed by
     // directory for. `flh4` put the queue block here rather than under a
     // second projection, "since two projections over it would be two answers
     // to how many are queued", and `gen-uploads-viz.ts` publishes a viewer
@@ -798,7 +798,7 @@ function renderBlocks(id, data, err, entry){
    as text rather than colour alone, and none is styled as an error: "not yet
    summarised" is the drain's backlog, which is expected and slow on purpose.
    A draft names its MODEL, because "a model wrote this" without which one is
-   the provenance gap schemas/attribution.ts closes. */
+   the provenance gap schemas/content/attribution.ts closes. */
 function summaryLabel(s){
   var d = s.draftedBy;
   switch (s.status) {
@@ -989,6 +989,21 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
 }
 
 /**
+ * One entry's own subgraph JSON-LD (cat-harness#180): since library entries
+ * are framed, `library/<doc>/` is a subgraph of its instance's tree, at the
+ * entry's path relative to its instance. `undefined` when it is not on disk
+ * (subgraphs are built before this writer, and not on every run).
+ */
+export function entrySubgraphFile(harnessRoot: string, site: string, instance: string, entryAbs: string): string | undefined {
+  const inst = findInstanceRoot(entryAbs);
+  if (inst === undefined) return undefined;
+  const base = instanceSubgraphFile(harnessRoot, site, instance);
+  if (base === undefined) return undefined;
+  const abs = join(dirname(base), relative(inst, entryAbs), SUBGRAPH_INDEX_FILE);
+  return existsSync(abs) ? abs : undefined;
+}
+
+/**
  * The instance roots a site COMPOSES — owner, 2026-10-15: *"a harness should
  * combine it libray/ (or whatever) sites of it and all its depndencies"*.
  * When the checkout's root declares an instance (a per-repository site such
@@ -1033,6 +1048,8 @@ export function entrySources(
     files: readonly EntryGraphFile[];
     /** The source file and the KG files in the repository that holds the entry (`entryRepoLinks`). */
     repo?: readonly RepoLink[];
+    /** The entry's own subgraph index ({@link entrySubgraphFile}), when published. */
+    subgraph?: string;
   },
 ): SourceLink[] {
   const { site, shellDir, instance, entry: e } = o;
@@ -1040,6 +1057,7 @@ export function entrySources(
   const data = entryDataFiles(o.dataDir, e.id);
   return [
     ...(o.manifest ? [{ label: "manifest.jsonld", href: at(libraryAssetSitePath(instance, e.id)), what: "the entry's JSON-LD" }] : []),
+    ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(shellDir, o.subgraph), what: "the entry's subgraph (JSON-LD)" }] : []),
     ...o.files.map((f) => ({
       label: f.rel,
       href: at(entryGraphSitePath(instance, e.id, f.rel)),
@@ -1631,9 +1649,10 @@ if (import.meta.main) {
    * cat-harness's entries — zero — and not the eight entries the graph holds
    * across every instance.
    */
-  // THIS INSTANCE'S declaration only, because that is the one that produces
-  // tiles: `sync-docs-harness.ts` calls `graphTiles(readDeclaration(ROOT)
-  // .directories)`. Scanning every instance was the first draft and it was
+  // THE LANDING HARNESS'S directories only, because those are the ones that
+  // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
+  // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
+  // a cat-harness id once the landing moved to folio-assistant-core). Scanning every instance was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
@@ -1645,7 +1664,7 @@ if (import.meta.main) {
   //
   // The rule that falls out: look the ref up in the SAME list the tiles came
   // from, or the ids do not correspond to tiles at all.
-  const byRef = directoryByVisualisationRef(withViewers(readDeclaration(ROOT)?.directories ?? [], ROOT));
+  const byRef = directoryByVisualisationRef(tileDirectories(REPO_ROOT, ROOT));
   const refOf = (dirPath: string): string =>
     relative(REPO_ROOT, join(viewerPlacement(site, dirPath, seg).pageDir, "index.html"))
       .split(sep)
@@ -1846,7 +1865,7 @@ if (import.meta.main) {
       const src = join(repoRoot, e.dir, "manifest.jsonld");
       let jsonld: string | undefined;
       if (existsSync(src)) {
-        // At the path its IRI names (`schemas/library-iri.ts`), so the entry's
+        // At the path its IRI names (`schemas/library/library-iri.ts`), so the entry's
         // `@id` dereferences to exactly this file — one function decides both.
         const dest = join(site, libraryAssetSitePath(subject, e.id));
         wantedJsonld.add(dest);
@@ -1892,6 +1911,7 @@ if (import.meta.main) {
           })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,
+            subgraph: entrySubgraphFile(ROOT, site, subject, join(repoRoot, e.dir)),
             repo: entryRepoLinks({
               repoRoot,
               dir: e.dir,

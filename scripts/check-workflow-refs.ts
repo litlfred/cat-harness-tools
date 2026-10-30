@@ -37,7 +37,8 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { beanCallFindings, noteTakers, type DiagramFacts } from "./check-bean-lifecycle-calls.ts";
 
 interface Dangling { file: string; node: string; ref: string }
 interface Coverage { file: string; covered: number; total: number; uncovered: string[] }
@@ -143,6 +144,15 @@ const adjudicationCalls = {
 let knownCount = 0;
 let fileCount = 0;
 
+/**
+ * Every loaded diagram, for the bean-lifecycle rule (bean `m8gz`, owner
+ * 2026-10-24): claim, resolve and archive live only in Process_BeanOpen and
+ * Process_BeanClose, and a process that calls one calls both. Judged here,
+ * on the models this loop already loads, because this is the gate CI runs
+ * over every diagram; `check:bean-calls` runs the same rule on its own.
+ */
+const beanFacts: DiagramFacts[] = [];
+
 for (const root of INSTANCES) {
 const skills = knownSkills(root, corpusScopeFor(root));
 knownCount += skills.size;
@@ -155,6 +165,7 @@ fileCount += files.length;
 
 for (const file of files) {
   const model = await loadProcessModel(file);
+  beanFacts.push({ file: relative(INSTANCE_ROOT, file), model });
   const activities = [...model.nodes.values()].filter(isActivity);
   const uncovered: string[] = [];
 
@@ -274,14 +285,14 @@ if (adjTotal > 0) {
 }
 
 /*
- * The same failure, one layer over: `schemas/translation-tools.ts` lists
+ * The same failure, one layer over: `schemas/library/translation-tools.ts` lists
  * `bpmnDiagrams` per content type — the diagrams whose labels need
  * re-rendering after translation. One entry named
  * `processes/publication-workflow.bpmn`, which has never existed, so the
  * re-render skipped it silently and a skipped diagram is indistinguishable
  * from a diagram that needed no work.
  */
-const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/translation-tools.js");
+const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/library/translation-tools.js");
 const missingDeclared: string[] = [];
 for (const ct of CONTENT_TYPE_TRANSLATIONS) {
   for (const rel of ct.bpmnDiagrams ?? []) {
@@ -340,6 +351,14 @@ if (branches.undeclared.length) {
 // exactly the gate that cannot fire — bean `1xhc`, which is how this defect
 // survived from 2026-09-19 in the first place. An instance that exists and
 // holds no diagram is a different fact and stays a report.
+const beanFindings = beanCallFindings(beanFacts);
+const takers = noteTakers(beanFacts);
+console.log(
+  `\nBean lifecycle — ${beanFacts.filter((d) => [...d.model.nodes.values()].some((n) => n.calledElement === "Process_BeanOpen")).length} ` +
+    `process(es) call Process_BeanOpen and Process_BeanClose; ${takers.length} note-taker(s) own no lifecycle (reported).`,
+);
+for (const f of beanFindings) console.log(`  \u2717 ${f.file} \u00b7 ${f.process} [${f.kind}]: ${f.detail}`);
+
 if (absentInstances.length) process.exit(1);
-if (dangling.length || missingDeclared.length) process.exit(1);
+if (dangling.length || missingDeclared.length || beanFindings.length) process.exit(1);
 if (strict && totalUncovered) process.exit(1);

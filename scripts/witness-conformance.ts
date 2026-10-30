@@ -30,7 +30,7 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { Glob } from "bun";
-import { directoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   ComputationWitnessConformanceSchema,
   ComputationWitnessSchema,

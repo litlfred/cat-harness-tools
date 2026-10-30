@@ -22,7 +22,7 @@
  * ```
  *
  * The status vocabulary belongs to the third-party CLI, and `BeanStatusSchema`
- * in `schemas/tool-types.ts` is defined as *"exactly what `beans update
+ * in `schemas/tools/tool-types.ts` is defined as *"exactly what `beans update
  * --status` accepts"*. A sixth value here would desync the schema from the
  * tool it documents on the next `beans` release.
  *
@@ -46,7 +46,7 @@
 
 import { resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { CLOSED_STATUSES, readBeanFiles } from "./bean-store-read.ts";
 

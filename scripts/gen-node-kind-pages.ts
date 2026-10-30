@@ -53,12 +53,12 @@
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
-import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
-import { kindDirectories, nodesOfKind, type KindNode } from "@litlfred/cat-harness/schemas/node-kind-nodes.ts";
-import { isNodeKind } from "@litlfred/cat-harness/schemas/node-kind.ts";
-import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
+import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "@litlfred/cat-harness/schemas/kg/node-kind-index.ts";
+import { kindDirectories, nodesOfKind, type KindNode } from "@litlfred/cat-harness/schemas/kg/node-kind-nodes.ts";
+import { isNodeKind } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
 import { darkRules } from "./lib/scheme-css.ts";
 import type { VisualiserNavEntry } from "./lib/navbar.ts";
 import { themedPage } from "./lib/themed-page.ts";

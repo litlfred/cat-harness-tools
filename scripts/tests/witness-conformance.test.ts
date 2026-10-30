@@ -14,7 +14,7 @@ import {
   ComputationWitnessConformanceSchema as Contract,
   ComputationWitnessSchema as Envelope,
 } from "@litlfred/cat-harness/schemas/computation-witness.ts";
-import { BASE_GRAPH_TYPOLOGIES, contentLayerInstance, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { BASE_GRAPH_TYPOLOGIES, contentLayerInstance, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { checkWitnesses } from "../witness-conformance.ts";
 
 const CONFORMING = {

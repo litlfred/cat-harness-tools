@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/tabular-records.ts";
+import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
 import { checkAll, checkEntry } from "../check-l1-complete.ts";
 import { planFor, sniffMimetype, tabularDelimiter } from "../ingest-document.ts";
 
@@ -297,7 +297,7 @@ describe("the real corpus", () => {
 // emits the PUBLISHED context, and every key it writes is a declared term —
 // checked by the same function the CI gate runs, over the arm's real output.
 
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { checkDeclaredKeys } from "../check-content-keys.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 

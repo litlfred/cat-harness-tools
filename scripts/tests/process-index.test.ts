@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";
 import { firstSentence } from "../kg-export.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { inAggregate } from "../../test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;

@@ -63,14 +63,14 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   kgAttestationFor,
   priorKgJudgements,
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 import { workflowsImplementing } from "./workflow-bpmn.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -251,7 +251,7 @@ export function evaluatePairsFrom(
 /**
  * Rewrite a subject's attestations to the current hashes, with who and why.
  *
- * Works on the STORE file (`schemas/qa-attestations.ts`), never on a kg-qa
+ * Works on the STORE file (`schemas/sdlc/qa-attestations.ts`), never on a kg-qa
  * sidecar. Refuses anything but a hit: attesting over a corrupt file would
  * overwrite a judgement nobody has read, and attesting where none is recorded
  * has no pair to attest — run `kg:audit` first.

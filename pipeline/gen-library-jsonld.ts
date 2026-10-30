@@ -71,28 +71,35 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
-import { typesForKind } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { typesForKind } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import {
   defaultInstancePrefixes,
   documentContext,
   instancePrefixes,
-} from "@litlfred/cat-harness/schemas/content-context.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/namespaces.ts";
+} from "@litlfred/cat-harness/schemas/content/content-context.ts";
+import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/document-image.ts";
+import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/content/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
-import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/tabular-csvw.ts";
-import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/document-structure.ts";
-import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
-import type { SourceLicence } from "@litlfred/cat-harness/schemas/source-licence.ts";
-import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library-iri.ts";
-import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import {
+  RECORDING_FILENAME,
+  RecordingSchema,
+  TRANSCRIPT_DIR,
+  TranscriptSchema,
+  type Transcript,
+} from "@litlfred/cat-harness/schemas/library/recording.ts";
+import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
+import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
+import type { SourceLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
+import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
+import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   readTitleCandidates,
   resolveLibraryTitle,
@@ -334,7 +341,7 @@ function docIri(docId: string, rest: string): string {
  * The entry's node IRIs. Every node keeps its relative `library/<id>/…` id
  * EXCEPT the manifest — the asset itself — which is named by the address its
  * JSON-LD is published at when the entry's instance is known (#1881,
- * `schemas/library-iri.ts`). A staged entry, outside any library, has no
+ * `schemas/library/library-iri.ts`). A staged entry, outside any library, has no
  * instance yet and keeps the relative form until it is promoted and
  * regenerated; `--check` then reports it stale, so it cannot linger.
  */
@@ -412,7 +419,7 @@ export function buildDocumentNodes(
 
   // Figures, by the page they sit on. Only FIGURES: of 164 placed images in
   // this corpus 140 are page scans, and a scan is the page itself rather than
-  // something on it — `schemas/document-image.ts` carries the measurement.
+  // something on it — `schemas/content/document-image.ts` carries the measurement.
   // `images: null` means the extractor could not look, which is not the same
   // as "no figures" and must not become an empty map silently; it does become
   // one here, but the sidecar keeps the reason and `pdf-images.py` exits 2.
@@ -656,6 +663,10 @@ export const RUNG_INPUT: ReadonlyArray<readonly [IngestRung, readonly string[]]>
   // A source RECORDED and not held (bean `scfh`): `referenced-source.py`
   // writes the record, and this writes the manifest, as for every other rung.
   ["referenced", ["referenced.json"]],
+  // A recorded meeting or talk (bean `1r0p`): `recording-transcript.py`
+  // writes the record and the transcripts, and this writes the manifest and
+  // one `transcript` block per language.
+  ["recording", [RECORDING_FILENAME]],
 ];
 
 /**
@@ -917,7 +928,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       identity?: { title?: string };
       source?: { file?: string; sha256?: string; kind?: string; url?: string; canonical?: string; version?: string };
     }>(join(dir, "referenced.json"));
-    // Two shapes of source (`schemas/referenced-source.ts`): one FILE, whose
+    // Two shapes of source (`schemas/library/referenced-source.ts`): one FILE, whose
     // bytes were hashed, or a PUBLICATION — a FHIR IG — identified by its
     // canonical and version, with nothing to hash. A record that is neither
     // is unreadable, and is reported so rather than guessed at.
@@ -965,6 +976,70 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       rung,
       files: [{ path: "manifest.jsonld", content: JSON.stringify(manifest, null, 2) + "\n" }],
     };
+  }
+
+  if (rung === "recording") {
+    const parsed = RecordingSchema.safeParse(readJson<unknown>(join(dir, RECORDING_FILENAME)));
+    if (!parsed.success) return { state: "unreadable", rung };
+    const record = parsed.data;
+    const titled = entryTitle(dir, docId, { sourceFiles: [record.source.file] }, locatedAt);
+    if (!titled) return { state: "unreadable", rung };
+    // The source-language transcript first, then each translation by tag.
+    const tdir = join(dir, TRANSCRIPT_DIR);
+    const transcripts: Transcript[] = [];
+    if (existsSync(tdir)) {
+      for (const f of readdirSync(tdir).filter((x) => x.endsWith(".json")).sort()) {
+        const t = TranscriptSchema.safeParse(readJson<unknown>(join(tdir, f)));
+        // check:l1-complete names a transcript that will not parse; the
+        // manifest lists only what is there to read.
+        if (t.success && f === `${t.data.lang}.json`) transcripts.push(t.data);
+      }
+    }
+    const spoken = record.identity.language;
+    transcripts.sort((a, b) => (a.lang === spoken ? -1 : b.lang === spoken ? 1 : a.lang.localeCompare(b.lang)));
+    const files: Array<{ path: string; content: string }> = [];
+    const contains: string[] = [];
+    for (const t of transcripts) {
+      const bId = `transcript-${t.lang}`;
+      const bIri = iri(`blocks/${bId}`);
+      contains.push(bIri);
+      files.push({
+        path: `blocks/${bId}.jsonld`,
+        content: node({
+          "@id": bIri,
+          "@type": [termCurie("Block")],
+          kind: "transcript",
+          lang: t.lang,
+          label: t.translated_from ? `Transcript (${t.lang}, translated from ${t.translated_from.lang})` : `Transcript (${t.lang})`,
+          // The text, its segments and its review state are in the file.
+          file: `../${TRANSCRIPT_DIR}/${t.lang}.json`,
+          state: t.state,
+          derivedFrom: iri("manifest"),
+          sourceDocument: iri("manifest"),
+          // Authored (LIBRARY_BLOCK_ORIGIN.transcript): who drafted it.
+          provenance: t.drafted_by,
+        }),
+      });
+    }
+    const manifest = {
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@id": iri("manifest"),
+      "@type": [termCurie("SourceDocument")],
+      title: titled.title,
+      contains,
+      provenance: "ingested",
+      ...(librarySubgraph ? memberOf(librarySubgraph.iri) : {}),
+      ...licenceProperties(readLicence(dir)),
+      meta: {
+        doc_id: docId,
+        ...titleMeta(titled),
+        source_file: record.source.file,
+        source_sha256: record.source.sha256,
+        disposition: "recorded speech — the recording's transcripts, one per language",
+      },
+    };
+    files.unshift({ path: "manifest.jsonld", content: JSON.stringify(manifest, null, 2) + "\n" });
+    return { state: "built", rung, files };
   }
 
   // Not a parse failure to hide: an entry with no ingest input simply has not

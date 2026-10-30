@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /**
@@ -17,7 +17,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  *
  * ## Why this file exists
  *
- * `scripts/tests/navbar.test.ts` covers the RAIL — `lib/navbar.ts` renders
+ * `scripts/tests/ui/navbar.test.ts` covers the RAIL — `lib/navbar.ts` renders
  * markup for a mounted page and its output is a string a unit test can read.
  * The Jekyll sidebar is a different construction: `mountNavIconRow`,
  * `mountDocumentIndex` and `mountInstanceGraphs` build the same three regions

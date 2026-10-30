@@ -49,7 +49,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 
-import { renderingMediaType, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { renderingMediaType, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 export interface ServeOptions {
   /** Directory to serve. */

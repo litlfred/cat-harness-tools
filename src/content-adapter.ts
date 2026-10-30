@@ -21,9 +21,10 @@ import { resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 
 import { resolveBuiltinAdapter } from "./builtin-adapters.js";
+import { LEGACY_FEEDBACK_DIRNAME, resolveDeclaredFeedbackDir } from "./core/feedback.js";
 import type { GitHelper } from "./core/git.js";
 import { log } from "./core/logging.js";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { NoContentAdapter } from "./no-content-adapter.js";
 import type { ContentAdapter } from "./types.js";
 
@@ -38,10 +39,11 @@ export interface FolioContentConfig {
 
 /** Read the instance's own `<name>.config.json`, with the defaults that stand when there is none. */
 export function readFolioContentConfig(repoRoot: string): FolioContentConfig {
+  const declaredFeedback = resolveDeclaredFeedbackDir(repoRoot);
   const out: FolioContentConfig = {
     adapterType: "paper",
     contentDeclared: false,
-    feedbackDir: resolve(repoRoot, ".folio-feedback"),
+    feedbackDir: declaredFeedback ?? resolve(repoRoot, LEGACY_FEEDBACK_DIRNAME),
   };
 
   // The instance's own config, INDEX FIRST (bean `ymvt`): its
@@ -60,7 +62,12 @@ export function readFolioContentConfig(repoRoot: string): FolioContentConfig {
     out.adapterType = config.contentType || config.adapter || "paper";
     out.contentDeclared = Boolean(config.contentType || config.adapter);
     out.adapterModule = config.adapterModule;
-    if (config.feedbackDir) out.feedbackDir = resolve(repoRoot, config.feedbackDir);
+    if (config.feedbackDir) {
+      out.feedbackDir =
+        config.feedbackDir === LEGACY_FEEDBACK_DIRNAME && declaredFeedback
+          ? declaredFeedback
+          : resolve(repoRoot, config.feedbackDir);
+    }
     if (config.viewer?.port) out.viewerPort = config.viewer.port;
     // NAME THE SOURCE ACTUALLY READ. A hardcoded `harness.config.json` here
     // once told an operator to look at a file that does not exist.

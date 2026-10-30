@@ -91,7 +91,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { RENDER_LOG_DIR } from "@litlfred/cat-harness/schemas/render-log.ts";
+import { RENDER_LOG_DIR } from "@litlfred/cat-harness/schemas/ui/render-log.ts";
 
 /** Where the previews live on the publish branch. */
 export const STAGING_PREFIX = "STAGING";

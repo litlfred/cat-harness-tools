@@ -19,7 +19,7 @@
  * @module scripts/mcp-server/server
  */
 
-import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import type { Paper, Chapter, Block, PaperMacro, FeedbackItem, Section, RenderedAsset, Folio } from "@litlfred/cat-harness/schemas/types.ts";
 import { FeedbackItemSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
 import {
@@ -35,7 +35,7 @@ import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../..
 // The LaTeX renderer itself is no longer imported: this is a GENERIC server
 // and the TeX renderer belongs to the science layer, so it is resolved from
 // the folio's declared profile through `resolveRenderTarget`. See
-// `schemas/render-targets.ts`.
+// `schemas/ui/render-targets.ts`.
 import { resolveRenderTarget } from "../../pipeline/render-discovery.js";
 import { readDeclaredFolioProfile } from "../../pipeline/profile-check.js";
 import { registerServedToolGroups } from "../../src/tool-groups.js";
@@ -73,8 +73,8 @@ import { detectRepoUrl } from "../../src/core/git-refs.js";
 import { declarationLine, leanSourceUrl } from "../../src/core/lean-source-link.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
 import { join, relative, resolve, extname, basename } from "path";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { contributionsRoot } from "../../pipeline/repo-root.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "../../src/core/handover-screen.js";

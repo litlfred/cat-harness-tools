@@ -7,7 +7,7 @@
  * Bean `ujiv`, issue litlfred/cat-harness#88.
  *
  * A declaration is a node kind (`cat-harness-declaration/1.0.0`,
- * `schemas/cat-harness.ts#CatHarnessDeclarationKind`), found by its name rather
+ * `schemas/kg/cat-harness.ts#CatHarnessDeclarationKind`), found by its name rather
  * than by a typology directory. New ones are tagged when `init-folio` writes
  * them, and `CatHarnessDeclarationSchema` keeps the key through a parse, so
  * unlike a bean a declaration does not lose its tag in normal use. This script
@@ -45,9 +45,9 @@ import {
   CAT_HARNESS_DECLARATION_SCHEMA_TAG,
   CatHarnessDeclarationKind,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 
 import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
 

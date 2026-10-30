@@ -26,8 +26,8 @@ import {
   type AdversarialReview,
   type MergeReview,
   type RedFlagOverride,
-} from "@litlfred/cat-harness/schemas/red-flag.ts";
-import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
+import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 
 const NOW = "2026-10-09T12:00:00Z";
 const HEAD_SHA = "a1b2c3d4e5f6789012345678901234567890abcd";
@@ -180,7 +180,7 @@ describe("AdversarialFindingSchema validation", () => {
       id: "praise-1",
       severity: "minor",
       weight: "praise",
-      where: "schemas/red-flag.ts:1",
+      where: "schemas/sdlc/red-flag.ts:1",
       evidence: "",
       detail: "Clean separation of finding weight and severity.",
       status: "open",

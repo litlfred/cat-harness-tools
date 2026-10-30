@@ -47,7 +47,7 @@
 import { dirname, join, relative } from "node:path";
 import { existsSync, statSync } from "node:fs";
 
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 /** Where block verdicts live now, relative to the instance root. */
 export const BLOCK_QA_RESULTS_DIR = join("test", "results", "block-qa");

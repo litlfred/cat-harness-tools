@@ -24,7 +24,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync } from "fs";
 import { resolve, join, extname, relative } from "path";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
-import { readSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { readSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import type { Data as CSLData, Person as CSLPerson } from "csl-json";
 
 // Content repo root (was import-relative, which pointed at
@@ -358,14 +358,14 @@ async function checkUrl(
 
 // ── Verification status (added 2026-05-19; Verifier union 2026-05-31) ───
 //
-// The canonical schema lives in schemas/bib-verification.ts.
+// The canonical schema lives in schemas/library/bib-verification.ts.
 // We re-declare the consumer-side shape here to avoid a pipeline →
 // folio-assistant import edge (the content pipeline must stay in the
 // content/ tree).  The shapes must stay in sync.
 
-import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/bib-verification.ts";
-import { verifierLabel } from "@litlfred/cat-harness/schemas/bib-verification.ts";
-import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 interface VerificationEntry {
   id: string;

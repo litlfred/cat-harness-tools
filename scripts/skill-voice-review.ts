@@ -25,7 +25,7 @@
  *
  * ## Where a review lives
  *
- * In the attestation store (`schemas/qa-attestations.ts`), as `voice_reviews`
+ * In the attestation store (`schemas/sdlc/qa-attestations.ts`), as `voice_reviews`
  * in the skill's `test/attestations/kg-qa/…attestations.json`, beside its
  * `pair_attestations`. It sat in the kg-qa sidecar until bean `2gst`
  * (2026-10-01): a review is a judgement, and owner ruling D2 (a) keeps
@@ -46,9 +46,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "@litlfred/cat-harness/schemas/voices.ts";
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import type { KgCriterionEntry, KgFinding, KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "@litlfred/cat-harness/schemas/content/voices.ts";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import type { KgCriterionEntry, KgFinding, KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import {
   kgAttestationFor,
   priorKgJudgements,
@@ -56,7 +56,7 @@ import {
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export const VOICE_REVIEW_CRITERION = "skill-voice-review-current";

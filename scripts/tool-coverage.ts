@@ -73,7 +73,7 @@ import { tools } from "../tools/discover.js";
 import { isGlobalTasksFile, loadProcessModel } from "../src/workflow/process-model.js";
 import { isSkillMd, kgRoots, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
@@ -154,7 +154,7 @@ export const UNCOVERED_BY_DESIGN: UncoveredByDesign[] = [
     state: "folio-mechanism",
     reason:
       "bean `w5h0`. Its group is 14 files: 13 are LIBRARIES (`block-module` alone " +
-      "is imported by `schemas/jsonld.ts`, `gen-block-jsonld`, `qa-utils`, " +
+      "is imported by `schemas/kg/jsonld.ts`, `gen-block-jsonld`, `qa-utils`, " +
       "`graph-index`, `verify-block-walk` and two audits) and the 14th, " +
       "`check-voices.ts`, was a categoriser bug since re-filed. A Tool node needs " +
       "an `invoke`, and the command that authors a block is in a folio's " +

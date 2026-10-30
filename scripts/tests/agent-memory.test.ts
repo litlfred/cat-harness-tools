@@ -23,7 +23,7 @@ import {
   MemoryNodeSchema,
   memoryForAgent,
 } from "@litlfred/cat-harness/schemas/memory.js";
-import { EMPTY_NOTE_TAGS } from "@litlfred/cat-harness/schemas/carried-note.js";
+import { EMPTY_NOTE_TAGS } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 import {
   AGENT_MEMORY_TARGETS,
   AGENTS_MD_BEGIN,
@@ -426,6 +426,10 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
       "antigravity-skill",
       "antigravity-rule",
       "agents-md",
+      "gemini-agent",
+      "codex-agent",
+      "cursor-agent",
+      "copilot-agent",
     ]);
     expect(AGENT_MEMORY_TARGETS.find((t) => t.id === "claude-agent-memory")?.budget).toEqual({
       unit: "lines",

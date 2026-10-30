@@ -33,7 +33,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { isTranslatable } from "@litlfred/cat-harness/schemas/translation-tools.ts";
+import { isTranslatable } from "@litlfred/cat-harness/schemas/library/translation-tools.ts";
 import {
   INDEX_PATH,
   INDEX_SCHEMA,

@@ -9,7 +9,7 @@
  *
  * ## Why this file mirrors `schemas/window-stack.test.ts` case for case
  *
- * The stack's rules are specified and unit-tested in `schemas/window-stack.ts`;
+ * The stack's rules are specified and unit-tested in `schemas/ui/window-stack.ts`;
  * `docs-ui.js` is a browser script and cannot import it, so there are two
  * implementations of one rule and they can drift. That cost is named rather
  * than hoped away: every rule the unit test pins has a case here against the
@@ -28,7 +28,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

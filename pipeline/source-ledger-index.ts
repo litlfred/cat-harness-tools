@@ -2,7 +2,7 @@
 /**
  * Source-ledger indexer — migrate the source ledger's rows to the
  * `source-ledger/v1` shape and seed a row for every document in `uploads/`.
- * The ledger is read and written through `schemas/bib-attestations.ts`: the
+ * The ledger is read and written through `schemas/library/bib-attestations.ts`: the
  * attestation store's `bib-verification` family, or the legacy
  * `<folio>/bib-qa-verifications.json` while the store has none.
  *
@@ -31,7 +31,7 @@
  *
  * This script writes judgements and joins only.  It never copies a title,
  * author, year, or DOI out of `references.ts` — see the schema header in
- * `schemas/bib-verification.ts`.
+ * `schemas/library/bib-verification.ts`.
  *
  * ## Usage
  *
@@ -44,14 +44,14 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import type { LedgerEntry, SourceLedger, SourceRef } from "@litlfred/cat-harness/schemas/bib-verification.ts";
+import type { LedgerEntry, SourceLedger, SourceRef } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
 import {
   readSourceLedger,
   SOURCE_LEDGER_AUTHORITATIVE_FOR,
   SOURCE_LEDGER_SCHEMA,
   writeSourceLedger,
-} from "@litlfred/cat-harness/schemas/bib-attestations.ts";
-import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
+import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { entryUrl, referenceEntries } from "./reference-entries.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();
