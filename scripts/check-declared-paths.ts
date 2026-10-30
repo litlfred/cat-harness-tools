@@ -163,6 +163,7 @@ import { join, relative, resolve } from "node:path";
 import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { isJsonManifest } from "../pipeline/json-manifest.ts";
 
 const root = resolve(HARNESS_ROOT);
 const update = process.argv.includes("--update");
@@ -555,7 +556,17 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
   // The docs graph's content-object manifests carry path literals too (a
   // page's processes). They lived under `content/` until 2026-10-09 and are
   // the docs graph's declared source now, so the declaration says where.
-  walk(docsSourceDirFor(root));
+  // A manifest there may be a `.json` one (bean `y9r6`); its literals are read the same way.
+  const walkDocs = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walkDocs(p);
+      else if (e.name.endsWith(".ts") || (e.name.endsWith(".json") && isJsonManifest(p))) scan(p);
+    }
+  };
+  walkDocs(docsSourceDirFor(root));
   return { prefixes, artefacts, marked, refused };
 }
 
