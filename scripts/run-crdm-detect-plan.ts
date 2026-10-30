@@ -56,7 +56,7 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 export interface CorpusItem { number: number; title: string; isFeature: boolean; why: string; text: string }
 
 /** The system under test — `cat-harness/scenarios/actors/crdm-detect-signals.json`. */
-export const SUT: SutRef = { actor: "crdm-detect-signals", version: "1", reach: "air-gapped" };
+export const SUT: SutRef = { kind: "skill", actor: "crdm-detect-signals", version: "1", reach: "air-gapped" };
 
 /** The tester: this script, on the CI pipeline's authority — never the system under test. */
 export const TESTER = { kind: "script" as const, id: "cat-harness-tools/scripts/run-crdm-detect-plan.ts", actor: "ci-pipeline" };

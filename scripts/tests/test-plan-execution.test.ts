@@ -299,7 +299,11 @@ describe("test-certification.dmn — three outcomes, and the third is reached ho
 
 describe("the system-under-test actor facet", () => {
   test("sutRefFor reads reach from the actor, and absent reach is unknown", () => {
-    expect(sutRefFor(sutActor)).toEqual({ actor: "fixture-workflow-tool", version: "0.1.0", reach: "air-gapped" });
+    expect(sutRefFor(sutActor)).toEqual({ kind: "tool", actor: "fixture-workflow-tool", version: "0.1.0", reach: "air-gapped" });
+    // FR-002: an agent's ref carries the model and configuration the run used, and no other kind's does.
+    const agent = { id: "a", systemUnderTest: { kind: "agent" as const, version: "1" } };
+    expect(sutRefFor(agent, undefined, { model: "claude-opus-5", configuration: "bare" })).toMatchObject({ kind: "agent", model: "claude-opus-5", configuration: "bare" });
+    expect(sutRefFor(sutActor, undefined, { model: "claude-opus-5", configuration: "bare" })).not.toHaveProperty("model");
     expect(sutRefFor({ id: "x", systemUnderTest: { kind: "agent", version: "1" } })?.reach).toBe("unknown");
     expect(sutRefFor({ id: "y" })).toBeUndefined();
   });

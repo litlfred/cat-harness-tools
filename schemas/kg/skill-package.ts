@@ -152,17 +152,33 @@ export type SystemUnderTestFacet = z.infer<typeof SystemUnderTestFacetSchema>;
 export const SUT_ACTOR_KINDS = ["agent", "system"] as const;
 
 /**
- * The `sut` a `folio-test-run/v1` records for this actor: id, version, reach.
- * `undefined` when the actor declares no facet — it has not said it can be
- * tested, and a run against it is a finding rather than a default.
+ * The `sut` a `folio-test-run/v1` records for this actor: kind, id, version,
+ * reach, and for an `agent` the model and configuration the run used, which
+ * only the run knows. `undefined` when the actor declares no facet — it has
+ * not said it can be tested, and a run against it is a finding rather than a
+ * default. An agent's ref without `run` lacks its model, and `SutRefSchema`
+ * refuses it (FR-002).
  */
 export function sutRefFor(
   actor: { id: string; reach?: (typeof NETWORK_REACHES)[number]; systemUnderTest?: SystemUnderTestFacet },
   version?: string,
-): { actor: string; version: string; reach: (typeof NETWORK_REACHES)[number] | "unknown" } | undefined {
-  if (actor.systemUnderTest === undefined) return undefined;
-  return { actor: actor.id, version: version ?? actor.systemUnderTest.version, reach: actor.reach ?? "unknown" };
+  run?: { model: string; configuration: string },
+): SutRefInput | undefined {
+  const facet = actor.systemUnderTest;
+  if (facet === undefined) return undefined;
+  const base = { kind: facet.kind, actor: actor.id, version: version ?? facet.version, reach: actor.reach ?? ("unknown" as const) };
+  return facet.kind === "agent" ? { ...base, ...run } : base;
 }
+
+/** What {@link sutRefFor} builds, before `SutRefSchema` checks it. */
+export type SutRefInput = {
+  kind: SystemUnderTestFacet["kind"];
+  actor: string;
+  version: string;
+  reach: (typeof NETWORK_REACHES)[number] | "unknown";
+  model?: string;
+  configuration?: string;
+};
 
 // ─── ActorDefinition ─────────────────────────────────────────────────────────
 
