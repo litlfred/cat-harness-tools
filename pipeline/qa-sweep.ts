@@ -71,7 +71,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const INSTANCE_ROOT = resolve(dirname(__filename), "..");
 
-import { GIT_SHA_UNKNOWN, applicabilityGap, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
+import { GIT_SHA_UNKNOWN, applicabilityGap, scriptSidecarTarget, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
 import {
   qaCriteriaFor,
   qaCriteriaByIdFor,
@@ -804,7 +804,11 @@ async function run(): Promise<void> {
   // Write one script sidecar per automated criterion under sweep
   // to `pipeline/script-sidecars/<criterion-id>.script.json`.
   // Skipped under --dry-run.
-  if (!args.dryRun) {
+  const sidecarTarget = scriptSidecarTarget(args.scriptSidecarRoot, INSTANCE_ROOT);
+  if (!args.dryRun && sidecarTarget === null) {
+    console.log(`script sidecars: not written — ${INSTANCE_ROOT} is a mounted copy of the platform, not its checkout (pass --script-sidecar-root to write them elsewhere)`);
+  }
+  if (!args.dryRun && sidecarTarget !== null) {
     for (const [id, hashes] of Object.entries(scriptHashesByCriterion)) {
       if (!hashes.script_hash) continue; // source file absent — skip
       // KEEP THE STORED PROVENANCE WHEN THIS CHECKOUT CANNOT ESTABLISH IT.
@@ -816,7 +820,7 @@ async function run(): Promise<void> {
       // one — measured 2026-09-18, a sweep in a 102-commit checkout
       // flattened 77 of 78 sidecars from nine distinct shas to the single
       // boundary sha. An older true answer beats a fresh false one.
-      const sidecarRoot = args.scriptSidecarRoot ?? INSTANCE_ROOT;
+      const sidecarRoot = sidecarTarget;
       const previous = loadQaScriptSidecar(id, sidecarRoot);
       const commitSha =
         hashes.script_commit_sha === GIT_SHA_UNKNOWN && previous?.script_commit_sha

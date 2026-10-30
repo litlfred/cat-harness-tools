@@ -1747,3 +1747,20 @@ export const LOCAL_SWEEP_ACTOR = "local-sweep";
 export function sweepActor(env: Record<string, string | undefined> = process.env): string {
   return env.CI === "true" || env.GITHUB_ACTIONS === "true" ? CI_SWEEP_ACTOR : LOCAL_SWEEP_ACTOR;
 }
+
+/**
+ * Where the script sidecars go: the `--script-sidecar-root` the caller gave,
+ * else the platform folder when it is the platform's own checkout, else
+ * nowhere (`null`).
+ *
+ * A folio runs this sweep from a remote-mounted copy of the platform
+ * (`cat-harness-tools/` at its root, laid down by `remote-mount.ts`). That
+ * copy has no `.git` and is fixity-checked against the lock, so a sidecar
+ * written into it is a change nobody can commit, and the next mount refuses
+ * the copy as "somebody's work" (smart-ra, 2026-10-30: a local
+ * `qa-sweep.ts folio` blocked the staging publish).
+ */
+export function scriptSidecarTarget(explicit: string | undefined, platformRoot: string): string | null {
+  if (explicit !== undefined) return explicit;
+  return existsSync(join(platformRoot, ".git")) ? platformRoot : null;
+}
