@@ -93,10 +93,25 @@ describe("countResults / countPublished", () => {
 describe("decideSource", () => {
   const counts = { witnesses: 5, results: 4, files: 30 };
 
-  test("a checkout holding the corpus publishes it as checked out, even when the store has an entry", () => {
+  test("on a PR preview, a checkout holding the corpus publishes it as checked out, even when the store has a PR entry", () => {
     const d = decideSource({ ...counts, corpus: true }, { index: 0, key: "pr/1/abc", counts: { witnesses: 9, results: 9, files: 99 } });
     expect(d.source).toBe("checkout");
     expect(d.expected).toEqual(counts);
+  });
+
+  test("on a main build, an exact main/<sha> hit wins over a committed checkout corpus (tfqf precedence rule)", () => {
+    const fetchedCounts = { witnesses: 9, results: 9, files: 99 };
+    const d = decideSource({ ...counts, corpus: true }, { index: 0, key: "main/abc", counts: fetchedCounts });
+    expect(d.source).toBe("fetched");
+    expect(d.expected).toEqual(fetchedCounts);
+    expect(d.reason).toContain("exact main/<sha> entry for this commit wins over the checkout");
+  });
+
+  test("on a main build, a fallback or floating/non-corpus hit does NOT override a committed checkout corpus", () => {
+    const fetchedCounts = { witnesses: 9, results: 9, files: 99 };
+    expect(decideSource({ ...counts, corpus: true }, { index: 1, key: "main/older", counts: fetchedCounts }).source).toBe("checkout");
+    expect(decideSource({ ...counts, corpus: true }, { index: 0, key: "main/abc", counts: fetchedCounts, exact: false }).source).toBe("checkout");
+    expect(decideSource({ ...counts, corpus: true }, { index: 0, key: "main/abc", counts: fetchedCounts, corpus: false }).source).toBe("checkout");
   });
 
   test("an absent corpus with an exact hit is `fetched`, judged against the ENTRY's counts", () => {

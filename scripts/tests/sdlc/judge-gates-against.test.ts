@@ -25,6 +25,8 @@ const SCRIPTS = { ...PKG.scripts, ...PKG.checkoutScripts };
 
 /** The bean's gates that judge against a `qa-reports` baseline. */
 const JUDGE_GATES = [
+  "lsi:skills:check",
+  "kg:detangle:check",
   "kg:audit:check",
   "kg:audit:all:check",
   "translation:block-qa:check",
@@ -43,7 +45,7 @@ describe("bean oqe3: judge gates name their baseline", () => {
     test(`${gate} passes --against main`, () => {
       const cmd = SCRIPTS[gate];
       expect(cmd, `${gate} is not a script in cat-harness-tools/package.json`).toBeString();
-      expect(cmd!.split(/\s+/).join(" ")).toContain("--check");
+      expect(cmd!.split(/\s+/).join(" ")).toMatch(/(?:--check|\bcheck\b)/);
       expect(cmd!.split(/\s+/).join(" ")).toContain("--against main");
     });
   }

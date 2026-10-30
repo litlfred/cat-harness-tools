@@ -62,6 +62,7 @@ import {
   type RenderedFile,
   type RenderedImpact,
 } from "../schemas/ui/rendered-impact.ts";
+import { BranchStore, type BranchStoreOptions, storeOptionsFor } from "./branch-store.ts";
 
 export const DOCS_CONE_DRYRUN_TAG = "docs-cone-dryrun/v1" as const;
 
@@ -70,19 +71,42 @@ export const DOCS_CONE_DRYRUN_TAG = "docs-cone-dryrun/v1" as const;
 /** `build.json` as `docs-site.yml` writes it; `mounts` since this dry run. */
 export interface DeployStamp {
   sha?: string;
-  /** Branch-mount id → the tip the deploy mounted. */
+  /** Branch-mount key (`<instance>.<id>` or `<id>`) → the tip the deploy mounted. */
   mounts?: Record<string, string>;
 }
 
-/** `state:mount`'s marker for one branch-mounted subgraph (`<git-dir>/branch-mounts/<id>.json`). */
+/** `state:mount`'s marker for one branch-mounted subgraph (`<git-dir>/branch-mounts/<key>.json`). */
 export interface MountMarker {
   id: string;
+  /** `locationKey`: `<instance>.<id>` when an instance owns the mount (`state:mount`). */
+  key?: string;
   branch: string;
-  /** The subtree on the branch. */
+  /** The checkout path declared on the directory. */
   path: string;
+  /** The subtree on the branch when it differs from `path` (`source.branchPath`). */
+  branchPath?: string;
+  /** The `owner/repo` the branch lives in when it is not this checkout's origin (`source.repository`). */
+  repository?: string;
   /** Where it is mounted in this checkout. */
   into: string;
   tip: string;
+}
+
+/** The key a branch mount is recorded under in `build.json`: its disambiguated `key` (`<instance>.<id>`), else `id`. */
+export function markerKey(m: Pick<MountMarker, "id" | "key">): string {
+  return m.key ?? m.id;
+}
+
+/** The `mounts` map a `build.json` stamp should record for the checkout's active branch mounts. */
+export function mountsForStamp(markers: readonly Pick<MountMarker, "id" | "key" | "tip">[]): Record<string, string> {
+  const idCounts = new Map<string, number>();
+  for (const m of markers) idCounts.set(m.id, (idCounts.get(m.id) ?? 0) + 1);
+  const out: Record<string, string> = {};
+  for (const m of markers) {
+    out[markerKey(m)] = m.tip;
+    if ((idCounts.get(m.id) ?? 0) === 1) out[m.id] = m.tip;
+  }
+  return out;
 }
 
 /** Changed paths, as `staging-changes.ts expand` reads them: `status<TAB>path[<TAB>from]`. */
@@ -107,13 +131,33 @@ export function nameStatus(text: string): ChangedEntry[] {
   return out;
 }
 
-/** A branch path under the mount's `path`, at its place in the checkout; undefined when outside it. */
-export function intoCheckout(branchPath: string, m: Pick<MountMarker, "path" | "into">): string | undefined {
-  const from = m.path.replace(/\/+$/, "");
+/** A branch path under the mount's subtree on the branch (`branchPath ?? path`), at its place in the checkout; undefined when outside it. */
+export function intoCheckout(branchPath: string, m: Pick<MountMarker, "path" | "branchPath" | "into">): string | undefined {
+  const from = (m.branchPath ?? m.path).replace(/^\/+|\/+$/g, "");
   const to = m.into.replace(/\/+$/, "");
   if (from === "" || from === ".") return `${to}/${branchPath}`;
   if (!branchPath.startsWith(`${from}/`)) return undefined;
   return `${to}/${branchPath.slice(from.length + 1)}`;
+}
+
+/**
+ * `git diff --name-status` between two tips of a branch mount, read from the
+ * bare `BranchStore` that `state:mount` fetched the branch into (which may
+ * point at `m.repository` rather than `origin`).
+ */
+export function diffBranchMount(root: string, m: MountMarker, from: string, to: string, storeOpts?: BranchStoreOptions): string {
+  const store = BranchStore.open(m.branch, { repoRoot: root, ...storeOptionsFor(m, root, storeOpts) });
+  for (const sha of [from, to]) {
+    if (store.git(["cat-file", "-e", `${sha}^{commit}`]).status === 0) continue;
+    const bySha = store.git(["fetch", "-q", "--no-tags", "--depth=1", "--filter=blob:none", "origin", sha]);
+    if (bySha.status !== 0 && store.git(["cat-file", "-e", `${sha}^{commit}`]).status !== 0) {
+      store.must(["fetch", "-q", "--no-tags", "--filter=blob:none", "origin", `+refs/heads/${m.branch}:${store.privateRef("diff")}`]);
+    }
+    if (store.git(["cat-file", "-e", `${sha}^{commit}`]).status !== 0) {
+      throw new Error(`commit ${sha} is not in ${m.branch}`);
+    }
+  }
+  return store.must(["diff", "--name-status", "--no-renames", from, to]);
 }
 
 /**
@@ -128,6 +172,8 @@ export function collectInputs(o: {
   markers: readonly MountMarker[];
   /** `git diff --name-status from to`, or throws. */
   diff: (from: string, to: string) => string;
+  /** `git diff --name-status from to` for a branch mount; defaults to `diff(from, to)`. */
+  diffMount?: (m: MountMarker, from: string, to: string) => string;
 }): { changed: ChangedEntry[]; doubts: string[] } {
   const doubts: string[] = [];
   const changed: ChangedEntry[] = [];
@@ -137,22 +183,26 @@ export function collectInputs(o: {
   } catch (e) {
     doubts.push(`the diff ${o.stamp.sha.slice(0, 7)}..${o.head.slice(0, 7)} could not be read: ${(e as Error).message.split("\n")[0]}`);
   }
+  const idCounts = new Map<string, number>();
+  for (const m of o.markers) idCounts.set(m.id, (idCounts.get(m.id) ?? 0) + 1);
+  const diffMount = o.diffMount ?? ((_m, from, to) => o.diff(from, to));
   for (const m of o.markers) {
-    const was = o.stamp.mounts?.[m.id];
+    const key = markerKey(m);
+    const was = o.stamp.mounts?.[key] ?? ((idCounts.get(m.id) ?? 0) > 1 ? undefined : o.stamp.mounts?.[m.id]);
     if (!was) {
-      doubts.push(`the deployed stamp records no tip for the branch mount '${m.id}' (${m.branch}): its changes since the deploy are unknown`);
+      doubts.push(`the deployed stamp records no tip for the branch mount '${key}' (${m.branch}): its changes since the deploy are unknown`);
       continue;
     }
     if (was === m.tip) continue;
     try {
-      for (const e of nameStatus(o.diff(was, m.tip))) {
+      for (const e of nameStatus(diffMount(m, was, m.tip))) {
         const path = intoCheckout(e.path, m);
         if (path === undefined) continue;
         const from = e.from === undefined ? undefined : intoCheckout(e.from, m);
         changed.push({ status: e.status, path, ...(from ? { from } : {}) });
       }
     } catch (e) {
-      doubts.push(`the branch mount '${m.id}' moved ${was.slice(0, 7)}..${m.tip.slice(0, 7)} and its diff could not be read: ${(e as Error).message.split("\n")[0]}`);
+      doubts.push(`the branch mount '${key}' moved ${was.slice(0, 7)}..${m.tip.slice(0, 7)} and its diff could not be read: ${(e as Error).message.split("\n")[0]}`);
     }
   }
   return { changed, doubts };
@@ -176,6 +226,13 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   // The build provenance every published schema and tool document carries:
   // `"staging": {"branch", "sha", "pr", "run"}` — the run that wrote it.
   [/"staging":\s*\{[^{}]*"run":[^{}]*\}/g, '"staging":{}'],
+  // `jekyll-remote-theme` unpacks the theme into `/tmp/jekyll-remote-theme-YYYYMMDD-PID-RAND`
+  // on each build, and Sass writes that temp directory into `.css.map` `sources`.
+  [/(jekyll-remote-theme)-\d{8}-\d+-[a-z0-9]+/g, "$1"],
+  // `qa:working-copy` runs live checkers on each build and stamps `"at":"<ISO>","sha":"<head>"`
+  // into their witness entries, and `qa-site-assets` links the sidecars under `main/<head>`.
+  [/("at":\s*)"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z"(,\s*"sha":\s*)"[0-9a-f]{40}"/g, '$1""$2""'],
+  [/\bmain\/[0-9a-f]{40}\b/g, "main/<sha>"],
 ];
 
 /** Files every deploy rewrites whole: compared by neither side. */
@@ -184,7 +241,8 @@ export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll)$/;
 /** On the publish root, not the main site: other previews, the render log, git. */
 export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;
 
-const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md)$/i;
+const SPLIT_SEARCH_INDEX = /^assets\/js\/search\/[^/]+\.json$/;
+const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md|map)$/i;
 
 export function stampedHash(path: string, bytes: Buffer): string {
   if (!TEXTUAL.test(path)) return createHash("sha256").update(bytes).digest("hex");
@@ -215,7 +273,7 @@ function walk(root: string): Map<string, string> {
 export function measureDeploy(before: string, after: string): RenderedFile[] {
   const a = walk(before);
   const b = walk(after);
-  const role = (p: string): RenderedFile["role"] => (isGenericIndex(p) ? "index" : p.endsWith(".html") ? "content" : "data");
+  const role = (p: string): RenderedFile["role"] => (isGenericIndex(p) || SPLIT_SEARCH_INDEX.test(p) ? "index" : p.endsWith(".html") ? "content" : "data");
   const files: RenderedFile[] = [];
   for (const [p, h] of b) {
     const old = a.get(p);
@@ -262,7 +320,14 @@ export function judge(o: {
   for (const r of o.sources?.repins ?? []) if (r.doubt || r.files === null) fallback.push(`re-pinned mount ${r.instance}: ${r.doubt ?? "not expanded"}`);
   if (!o.predicted && !o.noInputs) fallback.push("no docs prediction (rendered-impact.json) was written");
   for (const u of o.predicted?.undetermined ?? []) fallback.push(`${u.input}: ${u.reason}`);
-  const predicted = o.predicted ?? RenderedImpactSchema.parse({ $schema: "rendered-impact/v1", renderer: "none", method: "cone", files: [] });
+  const basePredicted = o.predicted ?? RenderedImpactSchema.parse({ $schema: "rendered-impact/v1", renderer: "none", method: "cone", files: [] });
+  // `search-split.ts` cuts `assets/js/search-data.json` into `assets/js/search/*.json` after Jekyll runs:
+  // when the whole search index is in the cone, the scopes it splits into are covered by it.
+  const hasSearchIndex = basePredicted.files.some((f) => f.path === "assets/js/search-data.json");
+  const splitSearch = hasSearchIndex
+    ? o.measured.filter((f) => SPLIT_SEARCH_INDEX.test(f.path)).map((f) => ({ path: f.path, change: f.change, role: "index" as const, via: ["assets/js/search-data.json"] }))
+    : [];
+  const predicted = splitSearch.length ? { ...basePredicted, files: [...basePredicted.files, ...splitSearch] } : basePredicted;
   const measured = RenderedImpactSchema.parse({ $schema: "rendered-impact/v1", renderer: "build-diff", method: "build-diff", files: o.measured });
   const check = comparePrediction(predicted, measured);
   const byPath = new Map(o.measured.map((f) => [f.path, f]));
@@ -272,11 +337,11 @@ export function judge(o: {
     $schema: DOCS_CONE_DRYRUN_TAG,
     verdict,
     fallback,
-    predicted: predicted.files.length,
+    predicted: basePredicted.files.length,
     measured: o.measured.length,
     missed,
     unconfirmed: check.unconfirmed.length,
-    pages: predicted.files.filter((f) => f.role === "content" && /\.html$/.test(f.path)).length,
+    pages: basePredicted.files.filter((f) => f.role === "content" && /\.html$/.test(f.path)).length,
   };
 }
 
@@ -351,6 +416,7 @@ if (import.meta.main) {
         }
         return git("diff", "--name-status", "-M", "-l0", from, to);
       },
+      diffMount: (m, from, to) => diffBranchMount(root, m, from, to),
     });
     const lines = changed.map((c) => [c.status, c.path, ...(c.from ? [c.from] : [])].join("\t"));
     writeFileSync(arg("--out-changed") ?? "changed.txt", lines.join("\n") + (lines.length ? "\n" : ""));
@@ -362,6 +428,15 @@ if (import.meta.main) {
     if (!before || !after || !out) {
       console.error("usage: docs-cone-dryrun.ts judge --before <publish root> --after <built site> --out <json> [--predicted f] [--sources f] [--doubts f] [--summary f]");
       process.exit(2);
+    }
+    const buildStampPath = join(after, "build.json");
+    const markers = readMarkers(root);
+    if (markers.length && existsSync(buildStampPath)) {
+      const existing = readJson<Record<string, unknown>>(buildStampPath);
+      if (existing) {
+        const prevMounts = typeof existing.mounts === "object" && existing.mounts !== null ? (existing.mounts as Record<string, string>) : {};
+        writeFileSync(buildStampPath, JSON.stringify({ ...existing, mounts: { ...prevMounts, ...mountsForStamp(markers) } }, null, 2) + "\n");
+      }
     }
     const raw = readJson<unknown>(arg("--predicted"));
     const predicted = raw === undefined ? undefined : RenderedImpactSchema.parse(raw);
