@@ -2236,9 +2236,17 @@ if (import.meta.main) {
   // `gates` that follows a `regen` costs nothing here — while one built from
   // another tree, or edited since, is. "Present" was the test until
   // 2026-10-06, and a present-but-stale copy was judged as current.
+  //
+  // Not for `--list`, which promises to run nothing (bean `61tg`, measured
+  // 2026-10-24): producing the copy wrote `test/results/` into five mounted
+  // layers (549 files in cat-harness alone), and on a mount that cannot be
+  // re-cloned, such as an air-gapped one, `mount:remote:check` then reports
+  // those layers as modified. The list says what state the copy is in instead.
   const qaRoots = movedRoots(ROOT);
   const qaCopy = workingCopyState(ROOT);
-  if (qaRoots.length > 0 && qaCopy.state !== "current") {
+  if (listOnly && qaRoots.length > 0 && qaCopy.state !== "current") {
+    console.log(`QA working copy is ${qaCopy.state} (${qaCopy.why}); --list does not produce it. A gate run would, first.\n`);
+  } else if (qaRoots.length > 0 && qaCopy.state !== "current") {
     console.log(`QA working copy is ${qaCopy.state} (${qaCopy.why}) — producing it first, as CI does:\n`);
     for (const cmd of [["bun", "run", "cat", "qa:working-copy"]]) {
       console.log(`$ ${cmd.join(" ")}`);
