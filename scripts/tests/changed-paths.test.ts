@@ -255,8 +255,11 @@ describe("the change set is MEASURED from git", () => {
 
 describe("merge:main hands regen the fork point, or nothing", () => {
   test("a fork point becomes --changed; none (shallow, --full-regen) is the full run", () => {
-    expect(regenArgs("abc123")).toEqual(["--changed", "abc123"]);
-    expect(regenArgs(undefined)).toEqual([]);
+    // Both lead with `--no-mount`: merge:main has just run `state:mount`
+    // against the merged declarations, so regen must not mount again
+    // (asserted from regen's side in regen-after-merge.test.ts).
+    expect(regenArgs("abc123")).toEqual(["--no-mount", "--changed", "abc123"]);
+    expect(regenArgs(undefined)).toEqual(["--no-mount"]);
   });
 
   test("the fork-point union sees a path EITHER side changed (bean lxpq's case)", () => {
