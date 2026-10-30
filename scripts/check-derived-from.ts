@@ -292,7 +292,7 @@ export function readTree(repoRoot = REPO_ROOT): Inst[] {
         index,
         derived: d.graphTypologies.some((k) => graphLayer(k) === "derived"),
         ...(d.derivedFrom ? { derivedFrom: d.derivedFrom } : {}),
-        path: `${relative(repoRoot, join(i.root, d.path)).replace(/\/$/, "")}/`,
+        path: `${relative(repoRoot, join(d.scope === "repository" ? repoRoot : i.root, d.path)).replace(/\/$/, "")}/`,
         ...(d.writer ? { writer: d.writer } : {}),
         onBranch: (d.source !== undefined && d.source.kind !== "directory") || d.storage !== undefined,
         // The harness-declared visualisers that BUILD AT PUBLISH — those

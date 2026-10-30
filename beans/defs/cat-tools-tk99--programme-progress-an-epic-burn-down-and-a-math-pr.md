@@ -2,13 +2,13 @@
 # cat-tools-tk99
 $schema: bean/1.0.0
 title: 'PROGRAMME PROGRESS: an epic burn-down and a math-progress heat map as a board feed'
-status: in-progress
+status: completed
 type: feature
 priority: normal
 tags:
     - rehomed-from-core
 created_at: 2026-10-10T16:33:42Z
-updated_at: 2026-10-22T16:42:41Z
+updated_at: 2026-10-29T07:38:35Z
 parent: folio-assistant-6lb8
 ---
 
@@ -56,3 +56,7 @@ Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-too
   3. Terminal and JSON only. No board feed.
 
 *2026-10-24T14:25:00Z* — Copy sync (cat-harness-tools drain lane, session https://claude.ai/code/session_01RzLVMhhApyXYiw4bb9RwG8). The live record of this work is `folio-assistant-hf2q` on the folio-assistant bean branch, held by the "Drain KG tools beans" thread. Its 2026-10-24 notes say slice 1 is merged (#559, `d7cf0807b7`). The heat map's last blocker, CONJECTURE REGISTER `ckej`, closed at 2026-10-24T11:26Z (litlfred/folio-assistant-sci#66). The board-feed history question is now with the owner, and the recommended option is a daily job that appends one row to a committed series. That is because drains edit beans with plain commits, so a writer on `state:push` would miss most edits. Work on this goes through hf2q, not this copy.
+
+_2026-10-26T10:32:00Z_ — Verified merges: `litlfred/cat-harness-tools#755` (`10771f3e99`, 2026-10-24T15:52:42Z) and `litlfred/cat-harness-tools#768` (`af98510434`, 2026-10-24T16:15:34Z). Remaining: slice 4 (board drawing the series).
+
+_2026-10-29T07:38:35Z_ — Completed: slice 4, the board draws each goal's burn-down line from assets/beans/burndown.json, merged as cat-harness#665 (c35d6bc). It shows on the live site once folio-assistant re-pins cat-harness past c35d6bc. Session https://claude.ai/code/session_01Qmmkt62KVMxDU9gjVV1mm2 (synced from `folio-assistant-hf2q` commit `9bea5ab737` before dedupe `d7e9d84405`).
