@@ -14,11 +14,9 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | file | what it is | used by |
 |---|---|---|
 | [`bean-dedupe.test.ts`](bean-dedupe.test.ts) | a file |  |
-| [`bean-homes.test.ts`](bean-homes.test.ts) | a file |  |
 | [`beans-count-agrees.e2e.ts`](beans-count-agrees.e2e.ts) | a file |  |
 | [`beans-page-search.e2e.ts`](beans-page-search.e2e.ts) | a file |  |
 | [`built-at-publish-directories.test.ts`](built-at-publish-directories.test.ts) | a file |  |
-| [`code.json`](code.json) | data |  |
 | [`composition-roots.test.ts`](composition-roots.test.ts) | a file |  |
 | [`e2e-global-setup.ts`](e2e-global-setup.ts) | a file |  |
 | [`folio-scheme.e2e.ts`](folio-scheme.e2e.ts) | a file |  |
@@ -81,19 +79,10 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`translation-drawer.e2e.ts`](translation-drawer.e2e.ts) | a file |  |
 | [`typecheck-coverage.test.ts`](typecheck-coverage.test.ts) | a file |  |
 | [`who-iris-search.e2e.ts`](who-iris-search.e2e.ts) | a file |  |
-| [`conduct/`](conduct/) | _nothing declares what this holds_ | |
-| [`content/`](content/) | _nothing declares what this holds_ | |
 | [`coordinator/`](coordinator/README.md) | described in its own README | |
-| [`fixtures/`](fixtures/) | _nothing declares what this holds_ | |
 | [`health/`](health/) | _nothing declares what this holds_ | |
-| [`kg/`](kg/) | _nothing declares what this holds_ | |
-| [`library/`](library/) | _nothing declares what this holds_ | |
-| [`process/`](process/) | _nothing declares what this holds_ | |
 | [`results/`](results/) | _nothing declares what this holds_ | |
-| [`sdlc/`](sdlc/) | _nothing declares what this holds_ | |
 | [`support/`](support/) | _nothing declares what this holds_ | |
-| [`tools/`](tools/) | _nothing declares what this holds_ | |
-| [`ui/`](ui/) | _nothing declares what this holds_ | |
 | [`workflow/`](workflow/) | _nothing declares what this holds_ | |
 
 <!-- kg:subgraph:end -->
