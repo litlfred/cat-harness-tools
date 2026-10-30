@@ -19,13 +19,26 @@
  * tree. The schema refuses the `needs` overlap; this is the half the schema
  * cannot see, because it parses one declaration at a time.
  *
+ * ## Subscribed, and not instantiated here
+ *
+ * A harness a KG subscription reaches (issue #1719) is listed under
+ * **Subscribed ↗ remote** until it is instantiated, which is when it becomes a
+ * tile of its own (`kg:instantiate`, `subscribed-harnesses.ts`). Without this
+ * group, turning an association into a subscription (bean `tmo5`: iHRIS, whose
+ * harness is deliberately not instantiated) would make it vanish from the
+ * panel. One row per harness the cached snapshot declares at the pin, read
+ * offline; a snapshot that cannot be read is still a row, plus a finding,
+ * never silence.
+ *
  * @module scripts/harness-panel
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { findDeclarationFile, sourceLinks, type CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { PROPERTY_SKILLS, type DeclarationProperty } from "@litlfred/cat-harness/schemas/kg/property-skills.js";
+import { readSnapshot } from "./subscribed-harnesses.js";
 
 export interface PanelSkill {
   name: string;
@@ -65,10 +78,32 @@ export interface PanelAssociated {
   declaredBy: string[];
 }
 
+/** A harness a subscription reaches and this checkout has not instantiated (issue #1719). */
+export interface PanelSubscribed {
+  name: string;
+  title: string;
+  /** `owner/repo` of the substrate. */
+  repository: string;
+  /** The pinned commit. */
+  ref: string;
+  /** The substrate's tree at the pin. */
+  url: string;
+  /** ✎ goes to the substrate's OWN repository, never this checkout's. */
+  editHref: string;
+  /** The subscription's id in the declaring instance. */
+  subscription: string;
+  /** Whether the subscription CHOSE this harness for instantiation (it is still not instantiated here). */
+  chosen: boolean;
+  note?: string;
+  /** The local harnesses whose subscriptions reach it. */
+  declaredBy: string[];
+}
+
 export interface HarnessPanel {
   properties: PanelProperty[];
   harnesses: PanelHarness[];
   associated: PanelAssociated[];
+  subscribed: PanelSubscribed[];
   findings: string[];
 }
 
@@ -169,7 +204,53 @@ export function harnessPanel(
     }
   }
   const associated = [...byName.values()].sort((x, y) => x.name.localeCompare(y.name));
-  return { properties, harnesses, associated, findings };
+
+  // SUBSCRIBED: every harness a subscription's snapshot declares that is
+  // neither a local harness nor instantiated here. An unreadable index
+  // instantiates nothing for this purpose; `check:landing-instance` fails on it.
+  let instantiated: Set<string>;
+  try {
+    instantiated = new Set(instantiatedHarnessNames(repoRoot));
+  } catch {
+    instantiated = new Set();
+  }
+  const subByName = new Map<string, PanelSubscribed>();
+  for (const { dir, decl } of entries) {
+    for (const s of decl.subscriptions ?? []) {
+      if (s.kind === "content") continue; // a content KG declares no harness (owner, 2026-10-06)
+      const read = readSnapshot(dir, decl, s);
+      let offered: { name: string; title: string }[];
+      if (read.state === "read") {
+        const summary = read.snapshot.summary;
+        offered = summary.harnesses.map((h) => ({ name: h, title: h === summary.name ? (summary.title ?? h) : h }));
+      } else {
+        findings.push(`${decl.name}: subscription \`${s.id}\` — ${read.reason}; its harnesses are drawn from the subscription alone.`);
+        offered = [{ name: s.id, title: s.id }];
+      }
+      for (const h of offered) {
+        if (local.has(h.name) || instantiated.has(h.name)) continue;
+        const prev = subByName.get(h.name);
+        if (prev) {
+          if (!prev.declaredBy.includes(decl.name)) prev.declaredBy.push(decl.name);
+          continue;
+        }
+        subByName.set(h.name, {
+          name: h.name,
+          title: h.title,
+          repository: s.repository,
+          ref: s.ref,
+          url: `https://github.com/${s.repository}/tree/${s.ref}`,
+          editHref: `https://github.com/${s.repository}`,
+          subscription: s.id,
+          chosen: (s.harnesses ?? []).includes(h.name),
+          ...(s.note ? { note: s.note } : {}),
+          declaredBy: [decl.name],
+        });
+      }
+    }
+  }
+  const subscribed = [...subByName.values()].sort((x, y) => x.name.localeCompare(y.name));
+  return { properties, harnesses, associated, subscribed, findings };
 }
 
 /** The published page of a skill, when `reference/skill-instructions/<name>.md` exists in the site. */
