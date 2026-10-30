@@ -18,7 +18,7 @@
  * the subtler version — a truncated document that still parses.
  */
 import { describe, expect, test } from "bun:test";
-import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
