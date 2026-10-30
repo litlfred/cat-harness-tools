@@ -654,7 +654,9 @@ export function corpus(repo: string): { file: string; corpus: Corpus }[] {
   for (const f of existsSync(join(repo, ".claude/skills")) ? walkMarkdown(join(repo, ".claude/skills")) : []) {
     out.push({ file: f.slice(repo.length + 1), corpus: "skill" });
   }
-  for (const graph of [...KG_CONTENT_GRAPH_TYPOLOGIES, "methodology"]) {
+  // `docs` too: the onboarding translations and `docs/start/installation.md`
+  // rotted unseen while only the English entry page was read (folio-assistant#740).
+  for (const graph of [...KG_CONTENT_GRAPH_TYPOLOGIES, "methodology", "docs"]) {
     for (const dir of corpusDirectoriesForGraph(INSTANCE_ROOT, graph)) {
       if (!existsSync(dir)) continue;
       for (const f of walkMarkdown(dir)) out.push({ file: f.slice(repo.length + 1), corpus: "skill" });
