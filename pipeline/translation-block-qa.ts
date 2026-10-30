@@ -107,6 +107,7 @@ import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
 import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
+import { manifestPath } from "./json-manifest.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
 
@@ -225,9 +226,9 @@ export const TRANSLATION_CRITERIA = [
  */
 export function chapterSlugOf(chapterDir: string): string {
   const dir = basename(chapterDir);
-  const manifest = join(chapterDir, `${dir}.ts`);
+  const manifest = manifestPath(chapterDir, dir);
   if (existsSync(manifest)) {
-    const m = /\bslug:\s*["']([^"']+)["']/.exec(readFileSync(manifest, "utf-8"));
+    const m = /\b"?slug"?:\s*["']([^"']+)["']/.exec(readFileSync(manifest, "utf-8"));
     if (m) return m[1]!;
   }
   return dir;
@@ -620,7 +621,7 @@ export function buildReport(
   if (m.translated === 0) return undefined;
 
   const stem = basename(blockMd).replace(/\.md$/, "");
-  const tsPath = blockMd.replace(/\.md$/, ".ts");
+  const tsPath = manifestPath(dirname(blockMd), stem);
   const poRel = relative(INSTANCE_ROOT, poPaths[poPaths.length - 1]!);
   const hashes: TranslationFieldHash = {
     md: hashFile(blockMd),

@@ -66,7 +66,7 @@ import {
   memoryForAgent,
   type MemoryLabel,
   type MemoryNode,
-} from "@litlfred/cat-harness/schemas/memory.js";
+} from "@litlfred/cat-harness/schemas/conduct/memory.js";
 import {
   checkoutRootFor,
   deferResolution,

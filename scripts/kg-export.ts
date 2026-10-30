@@ -83,8 +83,7 @@ import { fileURLToPath } from "node:url";
 
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
-import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
+import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.js";
@@ -166,6 +165,7 @@ import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPat
 import { placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { diagramPages, owningProcess } from "./lib/diagram-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 
@@ -3986,9 +3986,20 @@ export function writeToolDocuments(published: Record<string, unknown>, out: stri
  * it, which loads. The nodes inside keep their canonical `@id`s: the
  * canonical address stays the identity.
  *
+ * ## A link to the diagram
+ *
+ * `diagrams` maps a process IRI to its diagram page (`lib/diagram-pages.ts`).
+ * A process's page, and each of its steps' and lanes' pages, link to it
+ * (owner's 3a on #620, 2026-10-23, done in #638). No entry, no link.
+ *
  * @returns the paths written
  */
-export function writeSubjectDocuments(published: Record<string, unknown>, out: string, servedDocIri?: string): string[] {
+export function writeSubjectDocuments(
+  published: Record<string, unknown>,
+  out: string,
+  servedDocIri?: string,
+  diagrams: ReadonlyMap<string, string> = new Map(),
+): string[] {
   const docIri = String(published["@id"]);
   const copyBase = servedDocIri !== undefined && subjectBase(servedDocIri) !== subjectBase(docIri) ? subjectBase(servedDocIri) : undefined;
   const graph = (published["@graph"] ?? []) as Node[];
@@ -4043,17 +4054,19 @@ export function writeSubjectDocuments(published: Record<string, unknown>, out: s
       "@graph": [node, ...(fragmentsOf.get(id) ?? [])],
     };
     const pageDoc = copyBase !== undefined ? servedDocIri! : docIri;
+    const proc = owningProcess(id, stem);
+    const diagram = proc === undefined ? undefined : diagrams.get(proc);
     const file = join(dir, `${stem}.jsonld`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
     written.push(file);
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc));
+    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc));
+      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram));
       written.push(index);
     }
   }
@@ -4192,7 +4205,7 @@ const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
  */
-function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readonly Node[], jsonldHref: string, docIri: string): string {
+function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readonly Node[], jsonldHref: string, docIri: string, diagram?: string): string {
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
   const type = stripNamespace(String(node["@type"]));
@@ -4237,7 +4250,7 @@ a { color: inherit; }
 <p class="muted">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
 <p class="iri">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a> · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>${
+<p><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>${
     typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
   }
 <table>
@@ -4337,7 +4350,7 @@ if (import.meta.main) {
   // (an own-canonical instance published on this site, #638). Its subject
   // documents are then copies named by where they are served.
   const servedAt = arg("--served-at");
-  const subjectDocs = writeSubjectDocuments(published, out, servedAt);
+  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published));
   const legacyDocs = writeLegacyDocuments(published, out, docPath, legacyDocPath);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);

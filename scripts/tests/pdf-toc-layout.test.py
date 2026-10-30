@@ -341,6 +341,162 @@ def test_annex_numbers_keep_their_series():
     assert nums == ["1", "2", "3", "Annex 1", "Annex 2"], nums
 
 
+def test_contents_levels_consistent_with_nesting():
+    # Defect 2 (bean inkl, folio-assistant#2302):
+    # - In LNOB, "Section 1" is at x0=65.2, "Annex 1" at x0=76.2 (both depth 1),
+    #   and "Introduction" + "1.1..1.2" at x0=87.1 (depth 2). "Introduction"
+    #   must be level 2 under Section 1, not level 3.
+    lnob = [
+        ln(1, 100, "LNOB Guidance", size=20),
+        ln(2, 60, "Contents", size=14, bold=True, x0=65.2),
+        ln(2, 90, "Acknowledgements ............ iv", bold=True, x0=65.2),
+        ln(2, 110, "Section 1. Principles ............ 1", size=11, bold=True, x0=65.2),
+        ln(2, 130, "Introduction ............ 1", x0=87.1),
+        ln(2, 150, "1.1 Policy ............ 2", x0=87.1),
+        ln(2, 170, "1.2 Supplies ............ 3", x0=87.1),
+        ln(2, 190, "References ............ 4", size=11, bold=True, x0=65.2),
+        ln(2, 210, "Annex 1. Schedules ............ 5", x0=76.2),
+    ]
+    lnob += [ln(6, 80, "Acknowledgements", size=14, bold=True)] + body(6, 120, 2)
+    for pg, title in [(11, "Section 1. Principles"), (11, "Introduction"), (12, "1.1 Policy"),
+                      (13, "1.2 Supplies"), (14, "References"), (15, "Annex 1. Schedules")]:
+        lnob += [ln(pg, 80, title, size=14, bold=True)] + body(pg, 120, 2)
+    got_lnob = [(h.level, h.number, h.title, h.page) for h in H.contents_headings(lnob)]
+    assert got_lnob == [
+        (1, None, "Acknowledgements", 6),
+        (1, "1", "Principles", 11),
+        (2, None, "Introduction", 11),
+        (2, "1.1", "Policy", 12),
+        (2, "1.2", "Supplies", 13),
+        (1, None, "References", 14),
+        (1, "Annex 1", "Schedules", 15),
+    ], got_lnob
+
+    # - In DDCC, "Executive Summary" and "Annexes" sit at x0=110.4 while
+    #   "SECTION 1", "1.1", "References" and "Annex 1" sit at x0=111.4 (1pt jitter).
+    #   Neither "Annexes" nor "References" may be pushed to level 2 or 3.
+    ddcc = [
+        ln(1, 100, "DDCC Guidance", size=20),
+        ln(2, 60, "Contents", size=14, bold=True, x0=111.4),
+        ln(2, 90, "Executive Summary     xi", size=12, bold=True, x0=110.6),
+        ln(2, 110, "SECTION 1 Introduction     1", size=12, bold=True, x0=111.4),
+        ln(2, 130, "1.1 Purpose     1", size=11, x0=111.4),
+        ln(2, 150, "References     2", size=11, x0=111.4),
+        ln(2, 170, "Annexes     3", size=12, bold=True, x0=110.4),
+        ln(2, 190, "Annex 1: Example     4", size=11, x0=111.4),
+    ]
+    ddcc += [ln(13, 80, "Executive Summary", size=14, bold=True)] + body(13, 120, 2)
+    for pg, title in [(18, "SECTION 1 Introduction"), (18, "1.1 Purpose"),
+                      (19, "References"), (20, "Annexes"), (21, "Annex 1: Example")]:
+        ddcc += [ln(pg, 80, title, size=14, bold=True)] + body(pg, 120, 2)
+    got_ddcc = [(h.level, h.number, h.title, h.page) for h in H.contents_headings(ddcc)]
+    assert got_ddcc == [
+        (1, None, "Executive Summary", 13),
+        (1, "1", "Introduction", 18),
+        (2, "1.1", "Purpose", 18),
+        (1, None, "References", 19),
+        (1, None, "Annexes", 20),
+        (1, "Annex 1", "Example", 21),
+    ], got_ddcc
+
+
+def test_running_header_not_parsed_as_contents_entry():
+    # Defect 3 (bean inkl, folio-assistant#2302): DDCC's running header
+    # "Page" + "DDCC:VS - Technical Specifications and Implementation Guidance, 27 August 2021"
+    # ended in "2021" and became a bogus contents entry on page 2021.
+    assert H._parse_entry("DDCC:VS - Technical Specifications and Implementation Guidance, 27 August 2021") is None
+    lines = [ln(1, 100, "DDCC:VS Guidance", size=20)]
+    for p in range(2, 9):
+        lines.append(ln(p, 22, "Page", size=8, x0=552.9))
+        lines.append(ln(p, 27, "DDCC:VS - Technical Specifications and Implementation Guidance, 27 August 2021", size=8, x0=34.0))
+        if p > 2:
+            lines += body(p, 120, 3)
+    entries = [("SECTION 1 Introduction", 1), ("1.1 Purpose", 1), ("1.2 Scope", 2),
+               ("SECTION 2 Ethics", 3), ("References", 4), ("Annex 1: Example", 5)]
+    for i, (t, pg) in enumerate(entries):
+        lines.append(ln(2, 100 + 24 * i, f"{t}     {pg}", size=11, x0=111.4))
+        lines.append(ln(pg + 3, 80 + i, t, size=14, bold=True))
+    heads = H.contents_headings(lines)
+    assert all("27 August" not in h.title for h in heads), heads
+    assert len(heads) == 6, heads
+
+
+def test_contents_entries_located_across_wraps_inflections_and_roman_labels():
+    # Defect 4 (bean inkl, folio-assistant#2302):
+    # - LNOB p. 41 prints "Annex 5. Tally sheet for routine childhood vaccinations – example 1"
+    #   for the contents entry "Annex 5. Tally sheets for routine childhood vaccinations".
+    # - DDCC p. 63 wraps "National Trust / Architecture for / the DDCC:VS" across 3 lines.
+    ps = load("pdf-structure.py")
+    pages = [
+        "Cover",
+        "Annex 5. Tally sheet for routine childhood vaccinations – example 1\n" + ("Body text. " * 10),
+        "SECTION\nNational Trust\nArchitecture for\nthe DDCC:VS\n6\n" + ("Body text. " * 10),
+    ]
+    toc = [
+        ps.TocEntry(1, "Tally sheets for routine childhood vaccinations", 2, "inferred", "Annex 5", 0.95),
+        ps.TocEntry(1, "National Trust Architecture", 3, "inferred", "6", 0.8),
+    ]
+    secs = [s for s in ps.split_sections(pages, toc) if s.id != "sec-front-matter"]
+    assert [s.title for s in secs] == [
+        "Tally sheets for routine childhood vaccinations",
+        "National Trust Architecture",
+    ], secs
+
+
+def test_dak_components_and_part_divider_do_not_collapse():
+    # Defect 5 (bean inkl, folio-assistant#2302):
+    # - "Part 1. Overview of SMART guideline digital adaptation kits" (16pt bold,
+    #   unpaginated) above "Background . . . 2" (9pt regular) must not merge into
+    #   "Overview ... Background".
+    # - "Component 1. Health interventions and recommendations" splits as number "1"
+    #   at level 1, matches "Health interventions and / recommended interventions"
+    #   even when InDesign writes the banner at the end of the page stream, and
+    #   cuts at line 0 so Component 1 keeps both §1.1 and §1.2.
+    ps = load("pdf-structure.py")
+    contents = [
+        ln(2, 60, "Contents", size=14, bold=True, x0=36.0),
+        ln(2, 108, "Part 1. Overview of SMART guideline digital adaptation kits", size=16, bold=True, x0=36.0),
+        ln(2, 132, "Background . . . . . . 1", size=9, bold=False, x0=36.0),
+        ln(2, 150, "Objectives . . . . . . 2", size=9, bold=False, x0=36.0),
+        ln(2, 168, "Links to the broader digital health ecosystem . . . . . . 3", size=9, bold=False, x0=36.0),
+        ln(2, 231, "Part 2. Digital adaptation kit content for immunizations", size=16, bold=True, x0=36.0),
+        ln(2, 262, "Component 1. Health interventions and recommendations . . . . . . 4", size=9, bold=True, x0=40.3),
+        ln(2, 280, "Component 2. Generic personas . . . . . . 6", size=9, bold=True, x0=40.3),
+    ]
+    lines = [ln(1, 100, "DAK", size=20)] + contents
+    lines += [ln(4, 80, "Background", size=16, bold=True)] + body(4, 120, 3)
+    lines += [ln(5, 80, "Objectives", size=16, bold=True)] + body(5, 120, 3)
+    lines += [ln(6, 80, "Linkages to the broader digital health ecosystem", size=16, bold=True)] + body(6, 120, 3)
+    # Tight-leaded 30pt banner lines (y1=111.5 > next y0=100.8).
+    lines += [
+        H.Line(7, "Health interventions and", 30.0, True, False, False, "Times", 1.0, 340.0, 68.8, 500.0, 111.5, PAGE_H, PAGE_W),
+        H.Line(7, "recommended interventions", 30.0, True, False, False, "Times", 1.0, 340.0, 100.8, 500.0, 143.5, PAGE_H, PAGE_W),
+    ] + body(7, 180, 3)
+    lines += [ln(9, 84, "Generic personas", size=30, bold=True)] + body(9, 180, 3)
+    scored = H.consensus_headings(lines)
+    got = [(s.heading.level, s.heading.number, s.heading.title, s.heading.page, s.confidence >= 0.9) for s in scored]
+    assert got == [
+        (1, None, "Background", 4, True),
+        (1, None, "Objectives", 5, True),
+        (1, None, "Links to the broader digital health ecosystem", 6, True),
+        (1, "1", "Health interventions and recommendations", 7, True),
+        (1, "2", "Generic personas", 9, True),
+    ], got
+
+    # Stream-end banner on page 7 (Component 1) and page 9 (Component 2):
+    p7 = "\n".join([f"header {i}" for i in range(10)] + ["1.1 List of interventions", "Vaccine A", "1", "Health interventions and", "recommended interventions", "Component"])
+    p8 = "1.2 WHO guidelines, recommendations and guidance\nLeave no one behind (31)"
+    p9 = "\n".join([f"header {i}" for i in range(10)] + ["2.1 Targeted generic personas", "Nurse persona", "2", "Generic personas", "Component"])
+    pages = ["Cover", "Contents", "Blank", "Background\nBody", "Objectives\nBody",
+             "Linkages to the broader digital health ecosystem\nBody", p7, p8, p9]
+    toc = [ps.TocEntry(s.heading.level, s.heading.title, s.heading.page, "inferred", s.heading.number, s.confidence) for s in scored]
+    secs = {s.title: s for s in ps.split_sections(pages, toc) if s.id != "sec-front-matter"}
+    assert len(secs) == 5, list(secs)
+    c1 = secs["Health interventions and recommendations"]
+    assert "1.1 List of interventions" in c1.text and "1.2 WHO guidelines" in c1.text, c1.text
+    assert "2.1 Targeted generic personas" not in c1.text, c1.text
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

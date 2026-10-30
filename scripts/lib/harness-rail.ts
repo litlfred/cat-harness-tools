@@ -209,7 +209,9 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: o.pages, collapsible: true, open: false } } : {}),
     graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
-    home: { href: `${o.toRoot}/`, label: o.homeLabel ?? "folio-assistant", icon: "\u2302" },
+    // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
+    // navbars"): the header's mark and name are the link to the landing page.
+    headHref: `${o.toRoot}/`,
   };
 }
 

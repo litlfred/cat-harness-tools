@@ -250,3 +250,26 @@ export async function resolveBuiltinAdapter(
       `A server with no adapter can serve no content, so it does not start.`,
   );
 }
+
+/**
+ * Resolve the print preamble template path supplied by the built-in adapter for
+ * `contentType` (default `"paper"`).
+ *
+ * Returns `undefined` when the requested adapter is not installed (even if
+ * {@link resolveBuiltinAdapter} would fall back to its base) or declares no
+ * `preamblePath`, so a fallback adapter is never mistaken for a paper preamble.
+ */
+export async function resolveAdapterPreamble(
+  contentType: string = "paper",
+  adapters: readonly BuiltinAdapterDeclaration[] = BUILTIN_ADAPTERS,
+  problems: readonly string[] = DISCOVERED.problems,
+): Promise<string | undefined> {
+  try {
+    const r = await resolveBuiltinAdapter(contentType, adapters, problems);
+    if (r.used.contentType !== contentType) return undefined;
+    const preamblePath = (r.ctor as { preamblePath?: unknown }).preamblePath;
+    return typeof preamblePath === "string" ? preamblePath : undefined;
+  } catch {
+    return undefined;
+  }
+}

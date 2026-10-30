@@ -114,7 +114,7 @@
       "coverage": { "exempt": { "visualiser": "Owner, 2026-10-29 (cat-harness#691): no viewer by design. Each node is an outside package whose registry tarball and SPDX licence the node already links, so a viewer would only repeat the registry." } },
       "path": "libraries/",
       "title": "Software libraries",
-      "description": "The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions.",
+      "description": "The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions. `held/<layer>/` holds the nodes of each layer below the kind, which may not name it (bootstrap-tools): `software-library/1.2.0` with `layer` naming the layer it describes, derived at this layer's pins (owner, 2026-10-30, bootstrap-tools#44).",
       "graphTypologies": [
         "software-library"
       ]
@@ -150,6 +150,14 @@
       "id": "cat-harness-tools-deploy",
       "path": "deploy/",
       "description": "How a folio-assistant host is stood up and kept current: `provision.sh`, `deploy.sh`, `self-update.sh`, `docker-compose.yml`, `Caddyfile.template` and `GOOGLE_OAUTH_SETUP.md`. Reached from outside the graph today -- the `deploy-access` capability detects on `cat-harness/deploy/.env` -- which is exactly the shape of a directory no declaration-walking consumer could see. Its governing skill is `deployment-auth`, whose architecture diagram is of these files. Moved here from `cat-harness/deploy/` by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-upstream",
+      "path": "upstream/",
+      "description": "This layer's pinned-upstream registry, `upstream-pins.json` (`\"$schema\": \"folio-upstream-pins/v1\"`). It has one row for each upstream dependency whose pin literal is in a file this layer holds. Today that is only the pdf.js viewer, pinned in `scripts/pdf-viewer.ts`. Each row names the file the pin is READ from (`pinnedIn`, resolved against this instance's root), the pattern that reads it, and what of ours binds to the dependency. It holds no version. `bun run cat check:upstream-pins` reads it together with cat-harness's `upstream/` registry (`cat-harness-upstream`), which keeps the rows whose files are in the harness. It is a separate registry because a harness row naming a file in this layer is a wrong-direction reference (folio-assistant#1481). `code`: the checker's input table, not content any reader renders.",
       "graphTypologies": [
         "code"
       ]

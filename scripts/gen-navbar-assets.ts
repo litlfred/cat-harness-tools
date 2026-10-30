@@ -12,7 +12,7 @@
  *   the browser cannot draw a different rail from the build's audit.
  *
  * Both are GENERATED, never edited, and committed; `navbar-assets.test.ts`
- * fails when either differs from what this writes. Bun is pinned (1.3.14,
+ * fails when either differs from what this writes. Bun is pinned (1.4.4,
  * `.bun-version` and every workflow), which is what makes a committed bundle
  * checkable byte for byte.
  *

@@ -22,7 +22,7 @@ import {
   MEMORY_SCHEMA_TAG,
   MemoryNodeSchema,
   memoryForAgent,
-} from "@litlfred/cat-harness/schemas/memory.js";
+} from "@litlfred/cat-harness/schemas/conduct/memory.js";
 import { EMPTY_NOTE_TAGS } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 import {
   AGENT_MEMORY_TARGETS,

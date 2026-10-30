@@ -270,3 +270,165 @@ These notes were only in this copy. The newer copy from the bean branch is above
 ### Reasons for Scrapping
 
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It tracks litlfred/folio-assistant issue #215 and that repository's `.github/workflows/feature-staging.yml`; its done-when is the issue's author closing it. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+
+## Note (2026-10-10, drain ml9h)
+
+Lane B scrapped the cat-harness-tools copy because the subject lives in folio-assistant / cat-harness; THIS copy is the owning one and stays open.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It tracks litlfred/folio-assistant issue #215 and that repository's `.github/workflows/feature-staging.yml`; its done-when is the issue's author closing it. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; folio-assistant issue #215 is still open. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+## OWNER, 2026-10-23: the deploy root's stamp file stamps everything under it (option A)
+
+Asked in the Preview storage thread (session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9). The owner chose **A** over B (a per-file manifest with content hashes) and C (leave open).
+
+What "all rendered content is stamped" means:
+
+- **One stamp file per deploy root names the build for everything under that root.** On the live site it is `build.json` (`sha`, `built`, `runUrl`). On a preview it is `STAGING/<slug>/staging.json` (branch, sha, PR, run), written by `staging-banner.ts`.
+- **HTML pages carry no build identity in their bytes** (bean `g196`), so an unchanged page is shared by every preview and the live site. The preview banner and the footer read the stamp file when the page loads.
+- **The JSON-LD and schema exports** keep their in-band `staging` stamp (2026-09-19).
+- **CSS, JS, images and PDFs** are stamped by the file beside them. A file opened on its own does not say its build. That is accepted.
+
+Revisit B (a per-path manifest) when bean `fwtz`'s cone deploy is switched on, because a cone deploy leaves untouched files from older builds.
+
+Remaining: walk issue #215's immunization-schedule scenario end to end. Closing #215 is the owner's.
+
+_2026-10-24T08:35:00Z_ — **Owner, 2026-10-24 (structured question Q8, 08:29Z): "A".** Walk issue #215's scenario on **litlfred/smart-immunizations-uganda**. One small sample schedule change (for example the HPV single-dose age) goes on a branch. Its preview at `STAGING/<branch>/` (`site-publish.yml`) is compared with main, and the walk records where it breaks. The branch is never merged. `xp72`'s Done-when 3 is walked on the same branch. Closing #215 stays the owner's. Session https://claude.ai/code/session_01FABZmtqnNeBaTcHsXrtyK7.
+
+_2026-10-24T09:00:00Z_ — Claimed by the Preview storage thread for the #215 walk on a never-merged smart-immunizations-uganda branch (owner Q8 "A"). No agy claim found. Session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9.
+
+## The #215 walk, 2026-10-24 (owner Q8 "A"): where it breaks
+
+Walked on litlfred/smart-immunizations-uganda#12, a draft that never merges. The sample change: the single HPV dose for girls at 9 years instead of 10. Session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9.
+
+| # | Step of the scenario | What happened | Verdict |
+|---|---|---|---|
+| 1 | Author changes the schedule | Branch `claude/sample-215-hpv-9y-do-not-merge`: narrative (`schedule`, `decision-logic`, `differences`, `testing`), CQL, the L2 record, test patient UGHPV01, and the workbook's HPV Q26/R26 | works |
+| 2 | Agent keeps narrative and logic together | The `logic` gate (`checks.yml`: `logic:generate` then `git diff`) **caught** a hand edit of the generated FSH: the workbook is the logic's source. Fixed in c24e688; `logic:generate` and `logic:examples` pass locally | works |
+| 3 | Agent surfaces downstream implications | **No tool did.** The nine places were found by grep. Two stay silent: the CQL is hand-completed and no gate compares its due date with the workbook's R26, and the L2 record still cites P10, which says 10 years, with nothing flagging that the adaptation now contradicts its evidence | **breaks** |
+| 4 | Preview on STAGING | `site-publish.yml` run 40078592557 **refused**: `ig-site:ast`, "the AST is stale-inputs". The workflow refreshes the AST only for the default branch, `ig-ast-refresh.yml` seeds only from it, and no input sets `SITE_ACCEPT_STALE_AST`. The error's advice ("run the IG's Site publish") is the run that failed. **No branch that changes an IG's inputs can get a preview** | **breaks** |
+| 5 | Preview with the preview-only override (built locally, not published) | The site mixes two builds. Narrative pages say **9 years** (branch). `PlanDefinition-…HPVSingleDose`, `Library-…HPVSingleDoseLogic` and `ast-data/` say **10 years** (AST from main's 91b2b5a). `folio-build.json` names the branch commit 3369fc0 as the source of the whole site, so the stamp is wrong for the artefacts: option A's "one stamp names the build for everything under it" does not hold on this route | **breaks** |
+| 6 | Committee compares before and after | The IG route (`stage-local-ig.ts`) writes no `staging.json`, no banner, no ChangeSet, no `rendered-impact.json` and no review page. The committee has nothing that shows what changed. The live root's stamp here is `folio-build.json`, not `build.json` | **breaks** |
+| 7 | Approve, then merge, then publish | Not reached | — |
+
+### What would fix each break (for the owner to choose)
+
+- **4 and 5:** the IG preview uses an AST built from the branch. `ig-ast-refresh.yml` already uploads a non-default branch's AST as a run artefact; `site-publish.yml` would pass `ref: github.ref` and the publish job would restore that artefact for a preview. fhir-harness template plus the workflow.
+- **6:** the IG route gets what the folio route has: `staging.json`, the banner, and a ChangeSet over the IG's narrative pages so the review page works. This is also xp72's Done-when 3.
+- **3:** a check that each CQL due-date constant matches its workbook row, and an evidence check that an L2 `change:` does not contradict its cited L1 rows.
+
+#215 should stay open: steps 3 to 6 break.
+
+### Owner chose C, "fix all 4 now" (2026-10-24)
+
+| Break | Fix | State |
+|---|---|---|
+| 3 | `logic:check-cql` and `l2:evidence` in the Uganda `logic` gate | smart-immunizations-uganda#14, merged |
+| 4, 5 | a preview builds from its own branch's AST; the stamp records the AST verdict | smart-immunizations-uganda#13 merged; fhir-harness#156 |
+| 6 | IG previews get `staging.json`, the banner, a ChangeSet and `review/` | fhir-harness#158; cat-harness-tools#709 (review links name the IG page) |
+
+Breaks 4 and 5 are verified on the hosted preview of #12 (both the PlanDefinition and `schedule.html` say 9 years). Break 6 is verified on a local build; on the hosted preview it needs #158 and #709 merged and Uganda's `index.lock.json` repinned. Then re-walk #12.
+
+### Re-walk on the hosted preview passed (2026-10-24)
+
+All 4 breaks are merged, and the hosted preview of smart-immunizations-uganda#12 (commit b903659, site-publish run 40096121778) was walked end to end. Getting it to publish also needed cat-harness-tools#738 (same-kind route collision), #741 (dead `ui/` script tags), fhir-harness#163 (exclusions test fixture), and a repin of Uganda's layers to main (smart-immunizations-uganda#15, still open on upstream gates).
+
+- Banner on all 819 pages; `staging.json` written.
+- `review/` lists main → branch as 9 changed, 60 unchanged. That matches the branch's 9 changed files.
+- The word diff shows 10 struck and 9 inserted.
+- `logic` refuses the change, as break 3's fix intends.
+
+Gaps left, none blocking: the banner says "PR #n/a" on a manually dispatched build, and the IG build publishes no `outline.json` or `rendered-impact.json`. Results and screenshots: folio-assistant#215 (comment 6384579655), smart-immunizations-uganda#12.
+
+### Closed (2026-10-24)
+
+The owner chose "A Close, file gaps as beans". #215 is closed and the #12 sample is closed unmerged. The two gaps are now folio-assistant-zvl0 (banner names the PR) and folio-assistant-0om7 (outline and rendered impact).
+
+
+## Note (2026-10-10, drain ml9h)
+
+Lane B scrapped the cat-harness-tools copy because the subject lives in folio-assistant / cat-harness; THIS copy is the owning one and stays open.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It tracks litlfred/folio-assistant issue #215 and that repository's `.github/workflows/feature-staging.yml`; its done-when is the issue's author closing it. The copy in the `cat/cat-harness/beans` store (litlfred/folio-assistant) is the live one. Keep it open there.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; folio-assistant issue #215 is still open. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+## OWNER, 2026-10-23: the deploy root's stamp file stamps everything under it (option A)
+
+Asked in the Preview storage thread (session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9). The owner chose **A** over B (a per-file manifest with content hashes) and C (leave open).
+
+What "all rendered content is stamped" means:
+
+- **One stamp file per deploy root names the build for everything under that root.** On the live site it is `build.json` (`sha`, `built`, `runUrl`). On a preview it is `STAGING/<slug>/staging.json` (branch, sha, PR, run), written by `staging-banner.ts`.
+- **HTML pages carry no build identity in their bytes** (bean `g196`), so an unchanged page is shared by every preview and the live site. The preview banner and the footer read the stamp file when the page loads.
+- **The JSON-LD and schema exports** keep their in-band `staging` stamp (2026-09-19).
+- **CSS, JS, images and PDFs** are stamped by the file beside them. A file opened on its own does not say its build. That is accepted.
+
+Revisit B (a per-path manifest) when bean `fwtz`'s cone deploy is switched on, because a cone deploy leaves untouched files from older builds.
+
+Remaining: walk issue #215's immunization-schedule scenario end to end. Closing #215 is the owner's.
+
+_2026-10-24T08:35:00Z_ — **Owner, 2026-10-24 (structured question Q8, 08:29Z): "A".** Walk issue #215's scenario on **litlfred/smart-immunizations-uganda**. One small sample schedule change (for example the HPV single-dose age) goes on a branch. Its preview at `STAGING/<branch>/` (`site-publish.yml`) is compared with main, and the walk records where it breaks. The branch is never merged. `xp72`'s Done-when 3 is walked on the same branch. Closing #215 stays the owner's. Session https://claude.ai/code/session_01FABZmtqnNeBaTcHsXrtyK7.
+
+_2026-10-24T09:00:00Z_ — Claimed by the Preview storage thread for the #215 walk on a never-merged smart-immunizations-uganda branch (owner Q8 "A"). No agy claim found. Session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9.
+
+## The #215 walk, 2026-10-24 (owner Q8 "A"): where it breaks
+
+Walked on litlfred/smart-immunizations-uganda#12, a draft that never merges. The sample change: the single HPV dose for girls at 9 years instead of 10. Session https://claude.ai/code/session_01GQmP3RJREp5xXnAFSYYMi9.
+
+| # | Step of the scenario | What happened | Verdict |
+|---|---|---|---|
+| 1 | Author changes the schedule | Branch `claude/sample-215-hpv-9y-do-not-merge`: narrative (`schedule`, `decision-logic`, `differences`, `testing`), CQL, the L2 record, test patient UGHPV01, and the workbook's HPV Q26/R26 | works |
+| 2 | Agent keeps narrative and logic together | The `logic` gate (`checks.yml`: `logic:generate` then `git diff`) **caught** a hand edit of the generated FSH: the workbook is the logic's source. Fixed in c24e688; `logic:generate` and `logic:examples` pass locally | works |
+| 3 | Agent surfaces downstream implications | **No tool did.** The nine places were found by grep. Two stay silent: the CQL is hand-completed and no gate compares its due date with the workbook's R26, and the L2 record still cites P10, which says 10 years, with nothing flagging that the adaptation now contradicts its evidence | **breaks** |
+| 4 | Preview on STAGING | `site-publish.yml` run 40078592557 **refused**: `ig-site:ast`, "the AST is stale-inputs". The workflow refreshes the AST only for the default branch, `ig-ast-refresh.yml` seeds only from it, and no input sets `SITE_ACCEPT_STALE_AST`. The error's advice ("run the IG's Site publish") is the run that failed. **No branch that changes an IG's inputs can get a preview** | **breaks** |
+| 5 | Preview with the preview-only override (built locally, not published) | The site mixes two builds. Narrative pages say **9 years** (branch). `PlanDefinition-…HPVSingleDose`, `Library-…HPVSingleDoseLogic` and `ast-data/` say **10 years** (AST from main's 91b2b5a). `folio-build.json` names the branch commit 3369fc0 as the source of the whole site, so the stamp is wrong for the artefacts: option A's "one stamp names the build for everything under it" does not hold on this route | **breaks** |
+| 6 | Committee compares before and after | The IG route (`stage-local-ig.ts`) writes no `staging.json`, no banner, no ChangeSet, no `rendered-impact.json` and no review page. The committee has nothing that shows what changed. The live root's stamp here is `folio-build.json`, not `build.json` | **breaks** |
+| 7 | Approve, then merge, then publish | Not reached | — |
+
+### What would fix each break (for the owner to choose)
+
+- **4 and 5:** the IG preview uses an AST built from the branch. `ig-ast-refresh.yml` already uploads a non-default branch's AST as a run artefact; `site-publish.yml` would pass `ref: github.ref` and the publish job would restore that artefact for a preview. fhir-harness template plus the workflow.
+- **6:** the IG route gets what the folio route has: `staging.json`, the banner, and a ChangeSet over the IG's narrative pages so the review page works. This is also xp72's Done-when 3.
+- **3:** a check that each CQL due-date constant matches its workbook row, and an evidence check that an L2 `change:` does not contradict its cited L1 rows.
+
+#215 should stay open: steps 3 to 6 break.
+
+### Owner chose C, "fix all 4 now" (2026-10-24)
+
+| Break | Fix | State |
+|---|---|---|
+| 3 | `logic:check-cql` and `l2:evidence` in the Uganda `logic` gate | smart-immunizations-uganda#14, merged |
+| 4, 5 | a preview builds from its own branch's AST; the stamp records the AST verdict | smart-immunizations-uganda#13 merged; fhir-harness#156 |
+| 6 | IG previews get `staging.json`, the banner, a ChangeSet and `review/` | fhir-harness#158; cat-harness-tools#709 (review links name the IG page) |
+
+Breaks 4 and 5 are verified on the hosted preview of #12 (both the PlanDefinition and `schedule.html` say 9 years). Break 6 is verified on a local build; on the hosted preview it needs #158 and #709 merged and Uganda's `index.lock.json` repinned. Then re-walk #12.
+
+### Re-walk on the hosted preview passed (2026-10-24)
+
+All 4 breaks are merged, and the hosted preview of smart-immunizations-uganda#12 (commit b903659, site-publish run 40096121778) was walked end to end. Getting it to publish also needed cat-harness-tools#738 (same-kind route collision), #741 (dead `ui/` script tags), fhir-harness#163 (exclusions test fixture), and a repin of Uganda's layers to main (smart-immunizations-uganda#15, still open on upstream gates).
+
+- Banner on all 819 pages; `staging.json` written.
+- `review/` lists main → branch as 9 changed, 60 unchanged. That matches the branch's 9 changed files.
+- The word diff shows 10 struck and 9 inserted.
+- `logic` refuses the change, as break 3's fix intends.
+
+Gaps left, none blocking: the banner says "PR #n/a" on a manually dispatched build, and the IG build publishes no `outline.json` or `rendered-impact.json`. Results and screenshots: folio-assistant#215 (comment 6384579655), smart-immunizations-uganda#12.
+
+### Closed (2026-10-24)
+
+The owner chose "A Close, file gaps as beans". #215 is closed and the #12 sample is closed unmerged. The two gaps are now folio-assistant-zvl0 (banner names the PR) and folio-assistant-0om7 (outline and rendered impact).

@@ -99,8 +99,11 @@ describe("the folio root is asked for, not spelled", () => {
     });
     // 41 → 39 on 2026-10-04 with no call site deleted: the glossary and
     // relevance routes moved UP to folio-assistant-core with their content
-    // (bean `70lx`, owner ruling), out of what this scans. A move is not the
-    // regression this floor exists to catch, so the floor follows it.
-    expect(callers.length).toBeGreaterThan(37);
+    // (bean `70lx`, owner ruling), out of what this scans. 39 → 36 in bean
+    // `saqd` as maths pipeline audits (`language-trap-audit`,
+    // `conjectural-propagation-audit`, `proof-narrative-lean-equiv-sweep`)
+    // moved UP to folio-assistant-sci. A move is not the regression this floor
+    // exists to catch, so the floor follows it.
+    expect(callers.length).toBeGreaterThan(34);
   });
 });

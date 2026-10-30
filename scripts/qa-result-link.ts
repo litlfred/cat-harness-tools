@@ -49,7 +49,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 
 import { qaStorageOf } from "./qa-results.ts";
-import { INDEX_FILE, parseQaKey } from "./qa-store.ts";
+import { INDEX_FILE, parseQaKey, type QaLocation } from "./qa-store.ts";
 import type { QaFetchState } from "./qa-site-assets.ts";
 
 /** How a link addresses its file — so a renderer can say which it is. */
@@ -105,14 +105,16 @@ export function qaResultHref(i: {
 
 /**
  * The declaration-aware form: an absolute path in the checkout, addressed by
- * whether its `qa` directory declares `storage`.
+ * whether its `qa` directory declares `storage`. A caller linking many files
+ * passes `location`, resolved once for `repoRoot`: resolving it walks every
+ * instance's declarations, per call.
  */
 export function qaResultLinkFor(
   absPath: string,
-  ctx: { repoRoot: string; repoWeb: string | undefined; key?: string },
+  ctx: { repoRoot: string; repoWeb: string | undefined; key?: string; location?: QaLocation },
 ): QaResultLink {
   const repoPath = relative(ctx.repoRoot, resolve(absPath)).split(sep).join("/");
-  return qaResultHref({ repoWeb: ctx.repoWeb, repoPath, storedOn: qaStorageOf(absPath, ctx.repoRoot), key: ctx.key });
+  return qaResultHref({ repoWeb: ctx.repoWeb, repoPath, storedOn: qaStorageOf(absPath, ctx.repoRoot, ctx.location), key: ctx.key });
 }
 
 /**
