@@ -147,7 +147,9 @@ const STYLE = `
   /* A cell with something to look at is filled (.h1-.h3 below). */
   .minimap .cell:not(.h0) { border-color: transparent; }
   .minimap .cell:focus-visible { outline: 3px solid var(--link); outline-offset: 1px; }
-  @media (max-width: 62rem) { .minimap ol { max-height: 40vh; overflow: auto; } }
+  .minimap .mm-ch { margin: .6rem 0 .15rem; font-size: .8rem; line-height: 1.3; font-weight: 600; }
+  .minimap .mm-count { font-weight: 400; color: var(--muted); }
+  @media (max-width: 62rem) { .minimap { max-height: 50vh; overflow: auto; } }
   a { color: var(--link); }
   a:focus-visible, button:focus-visible, li:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
   .nav { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; align-items: center; }

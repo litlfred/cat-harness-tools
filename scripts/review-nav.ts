@@ -225,17 +225,29 @@ export function renderMinimap(
   box.appendChild(h);
   const help = doc.createElement("p");
   help.className = "muted";
-  help.textContent = "One square per block, in reading order. Arrow keys move, Enter jumps. Filled squares need a look: Δ changed, + added, ● open comments, ! QA failing.";
+  help.textContent = "One square per block, one row of squares per chapter, in reading order. Arrow keys move, Enter jumps. Filled squares need a look: Δ changed, + added, ● open comments, ! QA failing.";
   box.appendChild(help);
-  const ol = doc.createElement("ol");
-  ol.setAttribute("aria-labelledby", "minimap-h");
+  // One labelled row per chapter, so a reader sees WHICH chapter a change is
+  // in, not only that there is one (owner, 2026-10-30, option A). The cells
+  // stay one roving list across chapters: one tab stop for the whole map.
   const cells: HTMLButtonElement[] = [];
+  const many = outline.documents.length > 1;
+  let n = 0;
   for (const d of outline.documents)
-    for (const ch of d.chapters)
+    for (const ch of d.chapters) {
+      const id = "minimap-ch-" + n++;
+      const cap = doc.createElement("p");
+      cap.className = "mm-ch";
+      cap.id = id;
+      cap.textContent = many ? d.title + " \u203A " + ch.title : ch.title;
+      const ol = doc.createElement("ol");
+      ol.setAttribute("aria-labelledby", id);
+      let flagged = 0;
       for (const s of ch.sections)
         for (const label of s.blocks) {
           const m = mark(label);
           const reasons = (m.change ? 1 : 0) + (m.open ? 1 : 0) + (m.qaFailing ? 1 : 0);
+          if (reasons) flagged++;
           const li = doc.createElement("li");
           const b = doc.createElement("button");
           b.type = "button";
@@ -253,10 +265,20 @@ export function renderMinimap(
           ol.appendChild(li);
           cells.push(b);
         }
+      if (!ol.childNodes.length) continue;
+      if (flagged) {
+        const q = doc.createElement("span");
+        q.className = "mm-count";
+        q.textContent = " \u00B7 " + flagged + " to look at";
+        cap.appendChild(q);
+      }
+      box.appendChild(cap);
+      box.appendChild(ol);
+    }
   // One tab stop: the first cell with something to look at, else the first.
   const first = cells.find((c) => !/\bh0\b/.test(c.className)) || cells[0];
   if (first) first.tabIndex = 0;
-  ol.addEventListener("keydown", (e) => {
+  box.addEventListener("keydown", (e) => {
     const i = cells.indexOf(e.target as HTMLButtonElement);
     if (i < 0) return;
     let j = -1;
@@ -271,6 +293,5 @@ export function renderMinimap(
     cells[j]!.tabIndex = 0;
     cells[j]!.focus();
   });
-  box.appendChild(ol);
   return box;
 }
