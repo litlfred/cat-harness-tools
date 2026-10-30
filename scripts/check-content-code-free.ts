@@ -22,6 +22,12 @@
  * The bean names four; the module variants are the same languages, and `.rb`
  * is how Jekyll plugins are written. Git decides what is tracked.
  *
+ * Browser assets are not code in this sense, by rule (owner card 2026-10-30,
+ * option A, keeping the 2026-10-09 chrome-subgraph layout): a `.js`/`.mjs`
+ * under `site-chrome/assets/`, `site-chrome/_includes/` or `docs/assets/` is a
+ * file the site ships to the browser, sitting next to the include that loads
+ * it. The Jekyll plugins (`_plugins/*.rb`) run at build time and stay counted.
+ *
  * Usage: bun run cat check:content-code-free [--update] [--no-baseline]
  * Exit:  0 when every code file is listed · 1 otherwise
  */
@@ -36,7 +42,14 @@ export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-b
 /** File extensions that count as code. */
 export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py", ".sh", ".rb"] as const;
 
-export const isCode = (rel: string): boolean => CODE_EXTENSIONS.some((e) => rel.endsWith(e));
+/** Directories whose `.js`/`.mjs` files are shipped browser assets, not code. */
+export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
+
+export const isBrowserAsset = (rel: string): boolean =>
+  /\.m?js$/.test(rel) && BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d));
+
+export const isCode = (rel: string): boolean =>
+  CODE_EXTENSIONS.some((e) => rel.endsWith(e)) && !isBrowserAsset(rel);
 
 /** Every tracked code file under `root`, as root-relative POSIX paths, sorted. */
 export function codeFiles(root: string): string[] {
