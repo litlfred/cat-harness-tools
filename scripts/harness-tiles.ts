@@ -87,6 +87,7 @@ import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/vi
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";
+import { publishedPagePath } from "./lib/jekyll-permalink.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The
@@ -789,9 +790,13 @@ function tileFor(
       const abs = join(instanceDir, d.path);
       const rel = relative(siteDir, abs);
       if (rel === "" || rel.startsWith("..")) continue;
-      if (existsSync(join(abs, "index.html")) || existsSync(join(abs, "index.md"))) {
-        return publishedUrlOf(`${rel.split(sep).join("/").replace(/\/*$/, "")}/`);
-      }
+      const dir = rel.split(sep).join("/").replace(/\/*$/, "");
+      if (existsSync(join(abs, "index.html"))) return publishedUrlOf(`${dir}/`);
+      // An `index.md` is published where the site's permalink defaults put
+      // it, not at its source path: `docs/start/index.md` is served at
+      // `/docs/cat-harness/start/` (bean `kc7k`), and the tile linked a
+      // `/start/` nothing serves (fa#2739).
+      if (existsSync(join(abs, "index.md"))) return publishedUrlOf(publishedPagePath(siteDir, `${dir}/index`));
     }
     return undefined;
   };
