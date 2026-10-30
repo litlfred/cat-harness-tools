@@ -17,19 +17,4 @@ export interface BindingBaselineEntry {
 }
 
 // declared-path-literal: baseline entries key wrong-direction bindings by the repo-relative file that holds them
-export const BASELINE: readonly BindingBaselineEntry[] = [
-  {
-    file: "cat-harness/scenarios/roles.json",
-    node: "qc-reviewer",
-    ref: "ig-ast-delta",
-    reason: "ig-ast-delta lives in a higher layer; move the role→skill binding to that layer's role extensions",
-    bean: "folio-assistant-4fv8",
-  },
-  {
-    file: "cat-harness/scenarios/roles.json",
-    node: "build-pipeline",
-    ref: "ig-ast-delta",
-    reason: "ig-ast-delta lives in a higher layer; move the role→skill binding to that layer's role extensions",
-    bean: "folio-assistant-4fv8",
-  },
-];
+export const BASELINE: readonly BindingBaselineEntry[] = [];
