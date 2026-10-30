@@ -89,6 +89,7 @@ import { CLOSED_STATUSES } from "./bean-store-read.ts";
 import { appendNoteToText, findBean, noteBean, setFieldInText, updateBean } from "./beans-fallback.js";
 import { BranchStore, resolveTipLocation, type BranchStoreOptions } from "./branch-store.ts";
 import { graphReadPath } from "./graph-read.ts";
+import { HOMES_LINE, originRepo, retiredBeanStore } from "./lib/bean-homes.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 
 /** The claim line `noteBean` just appended, exactly as it was written. */
@@ -326,6 +327,11 @@ export function claimOnBranchStore(
   } catch (e) {
     return unknown(`the bean graph is not a tip-keyed branch store here: ${(e as Error).message}`);
   }
+
+  // A store that keeps no beans any more (#459): say where the bean lives
+  // instead of reporting it missing, so the claim goes to its one home.
+  const target = loc.repository ?? originRepo(repo);
+  if (retiredBeanStore(target, loc.branch)) return unknown(`${target} ${loc.branch} keeps no beans any more; claim ${id} from a checkout of its home: ${HOMES_LINE}`);
 
   // `opts.store` is passed through for the same reason `mountTip` takes one:
   // the interesting behaviour here is what happens when a sibling writes

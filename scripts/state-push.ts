@@ -74,6 +74,7 @@ import {
 } from "./branch-store.js";
 import { repoRootOf } from "./state-mount.js";
 import { locateStore, retagDir } from "./beans-retag.ts";
+import { HOMES_LINE, isBeanFile, originRepo, retiredBeanStore } from "./lib/bean-homes.ts";
 
 export interface PushOptions {
   repoRoot?: string;
@@ -191,8 +192,11 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         const emptying = changes === undefined || opts.allowEmpty ? undefined : mountEmptyingReason(loc, { repoRoot: root });
         const massDel =
           changes === undefined || opts.allowEmpty || opts.allowMassDelete ? undefined : mountMassDeletionReason(loc, { repoRoot: root });
+        const retired = changes === undefined ? undefined : retiredBeanWrite(root, loc, changes);
         if (changes === undefined) {
           graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
+        } else if (retired) {
+          graphs.push({ ...base, state: "refused", reason: retired, changes });
         } else if (emptying) {
           graphs.push({ ...base, state: "refused", reason: emptying, changes });
         } else if (massDel) {
@@ -203,6 +207,11 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         continue;
       }
       const changes = pendingMountChanges(loc, { repoRoot: root });
+      const retired = changes === undefined ? undefined : retiredBeanWrite(root, loc, changes);
+      if (retired !== undefined) {
+        graphs.push({ ...base, state: "refused", reason: retired, changes });
+        continue;
+      }
       const emptied = changes === undefined || opts.allowEmpty ? undefined : emptiedGraph(root, loc, changes);
       if (emptied !== undefined) {
         graphs.push({ ...base, state: "refused", reason: emptied, changes });
@@ -253,6 +262,21 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
     reason: `${settled.length} of ${n} declared graph(s) settled; ${stuck.map((g) => `${g.id} (${g.state})`).join(", ")} did not`,
     graphs,
   };
+}
+
+/**
+ * Why a push of `loc` would write a bean file to a store that keeps no beans
+ * any more, or `undefined` when it would not (cat-harness-tools#459, owner
+ * card Q4 "A. Fix writers + duplicate check", 2026-10-30). Deleting a bean
+ * file there is allowed: that is the cleanup.
+ */
+export function retiredBeanWrite(root: string, loc: Pick<TipLocation, "id" | "branch" | "repository">, changes: readonly Change[]): string | undefined {
+  if (loc.id !== "beans") return undefined;
+  const repo = loc.repository ?? originRepo(root);
+  if (!retiredBeanStore(repo, loc.branch)) return undefined;
+  const writes = changes.filter((c) => c.content !== null && isBeanFile(c.path));
+  if (writes.length === 0) return undefined;
+  return `${repo} ${loc.branch} keeps no bean files any more, and this push would write ${writes.length} (${writes[0]!.path}${writes.length > 1 ? ", ..." : ""}). Write them to their home instead: ${HOMES_LINE}.`;
 }
 
 export function pushState(opts: PushOptions = {}): PushResult {
