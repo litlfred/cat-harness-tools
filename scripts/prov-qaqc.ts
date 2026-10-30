@@ -54,7 +54,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
-import { ProvActivitySchema, verifyProvHashChain, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, ProvConsentRefSchema, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
@@ -255,11 +255,44 @@ export function reportInstance(
       },
       "cat-harness:underPolicy": policies.length === 1 ? policies[0]! : policies,
     };
+    const consentPolicyUids = new Set<string>(
+      [...ctx.policies.values()]
+        .filter((p) => {
+          if (isConsentPolicyUid(p.uid)) return true;
+          const duties = [
+            ...((p as { obligation?: readonly { action?: string }[] }).obligation ?? []),
+            ...p.permission.flatMap((rule) => (rule as { duty?: readonly { action?: string }[] }).duty ?? []),
+          ];
+          return duties.some((d) => d.action === "odrl:obtainConsent" || d.action === "obtainConsent");
+        })
+        .map((p) => p.uid),
+    );
+    const actRecord = activity as unknown as Record<string, unknown>;
+    if (
+      isConsentBasedRecord(actRecord, { consentPolicyUids }) &&
+      !ProvConsentRefSchema.safeParse(actRecord["cat-harness:consent"]).success
+    ) {
+      invalid.push(
+        `${id}#${i}: missing-consent: consent-based decision record does not name a valid cat-harness:consent (id + versionId)`,
+      );
+    }
     const r = ProvActivitySchema.safeParse(activity);
     if (r.success) activities.push(r.data);
     else invalid.push(`${id}#${i}: ${r.error.issues.map((x) => `${x.path.join(".")} ${x.message}`).join("; ")}`);
   });
 
+  const consentPolicyUids = new Set<string>(
+    [...ctx.policies.values()]
+      .filter((p) => {
+        if (isConsentPolicyUid(p.uid)) return true;
+        const duties = [
+          ...((p as { obligation?: readonly { action?: string }[] }).obligation ?? []),
+          ...p.permission.flatMap((rule) => (rule as { duty?: readonly { action?: string }[] }).duty ?? []),
+        ];
+        return duties.some((d) => d.action === "odrl:obtainConsent" || d.action === "obtainConsent");
+      })
+      .map((p) => p.uid),
+  );
   const hasChainedOrAgreement = activities.some(
     (a) =>
       a["cat-harness:recordHash"] !== undefined ||
@@ -268,7 +301,7 @@ export function reportInstance(
   );
   if (hasChainedOrAgreement) {
     const requireAgreement = activities.some((a) => a["cat-harness:agreement"] !== undefined);
-    const chainCheck = verifyProvHashChain(activities, { requireAgreement });
+    const chainCheck = verifyProvHashChain(activities, { requireAgreement, consentPolicyUids });
     if (!chainCheck.valid) {
       for (const err of chainCheck.errors) {
         invalid.push(`${err.id ?? `${id}#${err.index}`}: ${err.kind}: ${err.detail}`);

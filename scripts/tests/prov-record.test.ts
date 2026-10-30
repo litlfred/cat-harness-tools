@@ -9,11 +9,14 @@ import { join } from "node:path";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { complete, enabled, startInstance } from "../../src/workflow/instance.js";
 import {
+  ProvConsentDecisionRecordSchema,
+  ProvConsentRefSchema,
   ProvDecisionRecordSchema,
   appendProvDecisionRecord,
   buildProvHashChain,
   computeProvRecordHash,
   provActivityFor,
+  provConsentDecisionRecordFor,
   provDecisionRecordFor,
   verifyProvHashChain,
 } from "../../src/workflow/prov-record.js";
@@ -277,5 +280,112 @@ describe("DSA B4: PROV decision records cite agreement + grant and form a hash-c
     const tamperedReport = reportInstance("t", tamperedState, model, roleGraphFor(ROOT), CTX);
     expect(tamperedReport.invalid.length).toBeGreaterThan(0);
     expect(tamperedReport.invalid.some((msg) => msg.includes("broken-link"))).toBe(true);
+  });
+});
+
+describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", () => {
+  const verdict = (over: Partial<TaskAuthVerdict> = {}): TaskAuthVerdict => ({
+    allowed: true,
+    mode: "strict",
+    authenticatedBy: "github",
+    actor: "owner",
+    role: "author",
+    assignment: "unconstrained",
+    authorized: "permit",
+    findings: [],
+    ...over,
+  });
+
+  const agreement = {
+    url: "https://example.org/agreements/who-ministry-dsa-v1.pdf",
+    sha256: "f47ac10b58cc4372a5670e02b2c3d479f47ac10b58cc4372a5670e02b2c3d479",
+    grant: "urn:uuid:grant-2026-002",
+  };
+
+  const consent = {
+    id: "ex-consent-basic-treat",
+    versionId: "3",
+  };
+
+  test("every consent-based decision names its Consent (id + versionId)", () => {
+    expect(ProvConsentRefSchema.safeParse(consent).success).toBe(true);
+    expect(ProvConsentRefSchema.safeParse({ id: "ex-consent-basic-treat", versionId: "" }).success).toBe(false);
+
+    const rec = provConsentDecisionRecordFor({
+      id: "dsa-consent-run#0",
+      at: "2026-10-30T14:00:00.000Z",
+      source: "dsa-document-lifecycle.bpmn",
+      node: "Task_Disclose",
+      verdict: verdict(),
+      policies: ["urn:dsa:agreement:1", "urn:ihe:pcf:consent:ex-consent-basic-treat:v3"],
+      agreement,
+      consent,
+    });
+    expect(rec).toBeDefined();
+    expect(rec!["cat-harness:consent"]).toEqual(consent);
+    expect(rec!["cat-harness:consentBased"]).toBe(true);
+    expect(ProvConsentDecisionRecordSchema.safeParse(rec).success).toBe(true);
+
+    // A consent-based decision without Consent (either via consentBased: true or a PCF consent policy UID) is rejected
+    expect(() =>
+      provDecisionRecordFor({
+        id: "dsa-consent-run#1",
+        at: "2026-10-30T14:05:00.000Z",
+        source: "dsa-document-lifecycle.bpmn",
+        node: "Task_Disclose",
+        verdict: verdict(),
+        policies: ["urn:dsa:agreement:1"],
+        agreement,
+        consentBased: true,
+      }),
+    ).toThrow();
+
+    expect(() =>
+      provDecisionRecordFor({
+        id: "dsa-consent-run#2",
+        at: "2026-10-30T14:05:00.000Z",
+        source: "dsa-document-lifecycle.bpmn",
+        node: "Task_Disclose",
+        verdict: verdict(),
+        policies: ["urn:dsa:agreement:1", "urn:ihe:pcf:consent:ex-consent-basic-treat:v3"],
+        agreement,
+      }),
+    ).toThrow();
+  });
+
+  test("complete() records Consent id + versionId on consent-based steps and reportInstance flags missing Consent", async () => {
+    const { model, state, node } = await firstRoledStep();
+    const step1 = complete(model, state, node.id, {
+      authz: {
+        ctx: CTX,
+        principal: GITHUB,
+        target: "Patient/pat-1",
+        mode: "strict",
+        agreement,
+        consent,
+        consentBased: true,
+      },
+    });
+
+    const entry = step1.history.at(-1)!;
+    expect(entry.prov).toBeDefined();
+    expect(entry.prov!["cat-harness:consent"]).toEqual(consent);
+    expect(entry.prov!["cat-harness:consentBased"]).toBe(true);
+
+    const cleanReport = reportInstance("t", step1, model, roleGraphFor(ROOT), CTX);
+    expect(cleanReport.invalid).toEqual([]);
+
+    // Tamper by stripping cat-harness:consent from a consent-based decision record
+    const strippedProv = { ...entry.prov! } as Record<string, unknown>;
+    delete strippedProv["cat-harness:consent"];
+    const tamperedState = {
+      ...step1,
+      history: [
+        ...step1.history.slice(0, -1),
+        { ...entry, prov: strippedProv as unknown as typeof entry.prov },
+      ],
+    };
+    const tamperedReport = reportInstance("t", tamperedState, model, roleGraphFor(ROOT), CTX);
+    expect(tamperedReport.invalid.some((msg) => msg.includes("missing-consent"))).toBe(true);
   });
 });

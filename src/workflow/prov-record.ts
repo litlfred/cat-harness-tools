@@ -27,11 +27,15 @@
 import { basename } from "node:path";
 import {
   ProvActivitySchema,
+  ProvConsentDecisionRecordSchema,
+  ProvConsentRefSchema,
   ProvDecisionRecordSchema,
   appendProvDecisionRecord,
   buildProvHashChain,
   canonicalProvRecord,
   computeProvRecordHash,
+  isConsentBasedRecord,
+  isConsentPolicyUid,
   stampProvDecisionRecord,
   stampProvRecord,
   verifyProvHashChain,
@@ -41,16 +45,22 @@ import {
   type ProvChainErrorKind,
   type ProvChainVerification,
   type ProvChainVerifyOptions,
+  type ProvConsentDecisionRecord,
+  type ProvConsentRef,
   type ProvDecisionRecord,
 } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { TaskAuthVerdict } from "./authorize.js";
 
 export {
+  ProvConsentDecisionRecordSchema,
+  ProvConsentRefSchema,
   ProvDecisionRecordSchema,
   appendProvDecisionRecord,
   buildProvHashChain,
   canonicalProvRecord,
   computeProvRecordHash,
+  isConsentBasedRecord,
+  isConsentPolicyUid,
   stampProvDecisionRecord,
   stampProvRecord,
   verifyProvHashChain,
@@ -59,6 +69,8 @@ export {
   type ProvChainErrorKind,
   type ProvChainVerification,
   type ProvChainVerifyOptions,
+  type ProvConsentDecisionRecord,
+  type ProvConsentRef,
   type ProvDecisionRecord,
 };
 
@@ -87,6 +99,17 @@ export interface ProvRecordInput {
   /** Optional grant identifier (DSA B5). */
   grant?: string;
   /**
+   * The IHE PCF / FHIR R4 `Consent` (`id` + `versionId`) cited when the
+   * step/decision is consent-based (PCF8, bean `2egb`).
+   */
+  consent?: ProvConsentRef;
+  /**
+   * Whether the step/decision is consent-based (e.g. evaluated under a policy
+   * with an `odrl:obtainConsent` duty). When `true`, `consent` (`id` + `versionId`)
+   * is required.
+   */
+  consentBased?: boolean;
+  /**
    * SHA-256 hex digest of the preceding PROV record in the log (`null` for the
    * first record in a chain). When supplied (or when `agreement` or `chain` is
    * set), stamps `cat-harness:previousHash` and `cat-harness:recordHash`.
@@ -101,6 +124,11 @@ export interface ProvDecisionRecordInput extends ProvRecordInput {
   agreement: ProvAgreementRef;
   /** Optional preceding record in the chain, from which `previousHash` is read. */
   previousRecord?: Pick<ProvActivity, "cat-harness:recordHash"> | null;
+}
+
+export interface ProvConsentDecisionRecordInput extends ProvDecisionRecordInput {
+  /** Required on every consent-based decision record: Consent `id` + `versionId` (PCF8, bean `2egb`). */
+  consent: ProvConsentRef;
 }
 
 /** The activity for an allowed step, or `undefined` when one would have to be invented. */
@@ -121,6 +149,8 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
     "cat-harness:underPolicy": policies.length === 1 ? policies[0]! : policies,
     ...(input.agreement ? { "cat-harness:agreement": input.agreement } : {}),
     ...(input.grant ? { "cat-harness:grant": input.grant } : {}),
+    ...(input.consent ? { "cat-harness:consent": input.consent } : {}),
+    ...(input.consentBased !== undefined ? { "cat-harness:consentBased": input.consentBased } : {}),
   };
   const shouldChain =
     input.agreement !== undefined || input.previousHash !== undefined || input.chain === true;
@@ -135,6 +165,9 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
       ...withPrev,
       "cat-harness:recordHash": recordHash,
     };
+    if (input.agreement && (input.consent || input.consentBased)) {
+      return ProvConsentDecisionRecordSchema.parse(chained);
+    }
     return input.agreement
       ? ProvDecisionRecordSchema.parse(chained)
       : ProvActivitySchema.parse(chained);
@@ -146,7 +179,8 @@ export function provActivityFor(input: ProvRecordInput): ProvActivity | undefine
 
 /**
  * Build a hash-chained PROV decision record (DSA B4, bean `3z44`) naming its
- * agreement (URL + SHA-256 digest, and optional grant id) and chained to
+ * agreement (URL + SHA-256 digest, and optional grant id) — and its Consent
+ * (`id` + `versionId`, PCF8, bean `2egb`) when consent-based — chained to
  * `previousRecord` / `previousHash`. Returns `undefined` when the verdict was
  * refused or lacks actor/role/policies.
  */
@@ -163,4 +197,18 @@ export function provDecisionRecordFor(
     chain: true,
   });
   return act ? ProvDecisionRecordSchema.parse(act) : undefined;
+}
+
+/**
+ * Build a hash-chained consent-based PROV decision record (PCF8, bean `2egb`)
+ * requiring both `agreement` (`url` + `sha256`) and `consent` (`id` + `versionId`).
+ */
+export function provConsentDecisionRecordFor(
+  input: ProvConsentDecisionRecordInput,
+): ProvConsentDecisionRecord | undefined {
+  const rec = provDecisionRecordFor({
+    ...input,
+    consentBased: true,
+  });
+  return rec ? ProvConsentDecisionRecordSchema.parse(rec) : undefined;
 }

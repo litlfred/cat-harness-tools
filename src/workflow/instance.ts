@@ -35,7 +35,7 @@ import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from
 import type { ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import {
@@ -100,6 +100,10 @@ export interface AuthzOptions {
   agreement?: ProvAgreementRef;
   /** Optional grant identifier (DSA B5). */
   grant?: string;
+  /** The IHE PCF / FHIR R4 Consent (`id` + `versionId`) cited when this step is a consent-based decision (PCF8, bean `2egb`). */
+  consent?: ProvConsentRef;
+  /** Whether this step is a consent-based decision requiring a Consent citation (`id` + `versionId`). */
+  consentBased?: boolean;
   /** Link this step's `prov:Activity` into the instance's hash chain. Automatically enabled when `agreement` is supplied or when a prior step in `history` is hash-chained. */
   chain?: boolean;
 }
@@ -923,6 +927,8 @@ export function complete(
           target: opts.authz.target,
           ...(opts.authz.agreement ? { agreement: opts.authz.agreement } : {}),
           ...(opts.authz.grant ? { grant: opts.authz.grant } : {}),
+          ...(opts.authz.consent ? { consent: opts.authz.consent } : {}),
+          ...(opts.authz.consentBased !== undefined ? { consentBased: opts.authz.consentBased } : {}),
           ...(shouldChain ? { previousHash, chain: true } : {}),
         })
       : undefined;
