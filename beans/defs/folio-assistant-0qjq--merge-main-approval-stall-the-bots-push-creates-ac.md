@@ -214,3 +214,10 @@ Lane B scrapped the cat-harness-tools copy because the subject lives in folio-as
 Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/merge-main.yml` and the `stage` (Feature Staging) run, and its own correction names the remaining fix as the GitHub App token (folio-assistant #1829, D1). The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
 
 _2026-10-16T06:30:00Z_ — Scrapped in this store too (Owner ruling 2026-10-16, item 7), overriding the 2026-10-10 note above that kept this copy open. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+
+
+
+## Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/merge-main.yml` and the `stage` (Feature Staging) run, and its own correction names the remaining fix as the GitHub App token (folio-assistant #1829, D1). The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.

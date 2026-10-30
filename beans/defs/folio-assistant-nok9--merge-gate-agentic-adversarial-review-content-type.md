@@ -6,7 +6,7 @@ status: completed
 type: feature
 priority: normal
 created_at: 2026-10-02T16:29:09Z
-updated_at: 2026-10-21T17:18:00Z
+updated_at: 2026-10-23T13:45:00Z
 parent: folio-assistant-hfag
 ---
 
@@ -170,3 +170,37 @@ cat-harness). Close this when w8jq closes. The rollup check would reject it
 before then.
 
 Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+## Closed 2026-10-10 on landed evidence
+All 12 child beans completed and merged into main:
+1. `w8jq`: Adversarial review check and verdict sidecar.
+2. `xqdi`: Content compile gates for Lean, SUSHI, JSON-LD.
+3. `abmq`: RED FLAG taxonomy and sidecars.
+4. `u7be`: Merge steward fixes and regen pairs.
+5. `uoob`, `zacz`, `ns96`, `i2cx`, `h1uq`, `8j9e`, `7jdm`, `2uj7`: Merge guard, refusal handling, signing, link pagination, and gate reliability.
+6. Child (d) backfill split into `9v5a` and completed.
+
+_2026-10-16T07:15:00Z_ — Reopened: status `completed` → `todo`. Its child `w8jq` was reopened at 06:30Z by the store reconciliation (merge-train composition unverified; Task_Review still names code-node-review), so `check:bean-rollup` failed on a completed container with an open child. Owner chose "Fix the bean first" (Folio Assistant project, theme snippet thread). Session https://claude.ai/code/session_01VkiCsBur8gXoBfdFRjADFd.
+
+_2026-10-21T17:18:00Z_ — Completed (`status: completed`, 8/8 Done-when boxes ticked and all 12/12 child beans completed now that `w8jq` is verified and closed on current `main`).
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Re-measured 2026-10-20 — status `todo` is correct; reopened correctly
+
+Still open only because child `w8jq` is open (see its 2026-10-20
+re-measurement: the BPMN skill ref and merge-train composition remain, both in
+cat-harness). Close this when w8jq closes. The rollup check would reject it
+before then.
+
+Session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr (cat-harness-tools drain lane, 2026-10-20).
+
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-10) — Closed 2026-10-10 on landed evidence: All 12 child beans completed and merged into main:. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-16T07:15:00Z_ — Reopened: status `completed` → `todo`. Its child `w8jq` was reopened at 06:30Z by the store reconciliation (merge-train composition unverified; Task_Review still names code-node-review), so `check:bean-rollup` failed on a completed container with an open child. Owner chose "Fix the bean first" (Folio Assistant project, theme snippet thread). Session https://claude.ai/code/session_01VkiCsBur8gXoBfdFRjADFd.
+
+_2026-10-23T13:45:00Z_ — Status synced from `todo` to `completed` to match the folio-assistant copy of this bean, which is newer and records the work as done there. Only the status changed; the body here is kept as it was. Owner OK in thread "FHIR beans and WHO migration" (https://claude.ai/code/session_01Bye99WLJxQpyCxh2eMgW19).

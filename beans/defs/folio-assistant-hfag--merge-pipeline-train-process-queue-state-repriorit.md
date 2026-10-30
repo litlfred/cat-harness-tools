@@ -6,7 +6,7 @@ status: completed
 type: epic
 priority: high
 created_at: 2026-10-02T17:17:27Z
-updated_at: 2026-10-22T14:20:00Z
+updated_at: 2026-10-23T08:35:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -79,3 +79,31 @@ _2026-10-16T10:40:00Z_ — Block `hfag` → `7x5n` dropped: the merge pipeline i
 _2026-10-21T19:15:00Z_ — Progress update: ticked `a harness tile showing the queue` (`30jr` completed: `merge-queue` declared in `cat-harness.json`, `buildMergeQueueTile` in `harness-tiles.ts`, rendered on `cat-harness/content/docs/state.md` and `cat-harness/content/docs/harness.md`). All 8/8 `Done when` boxes are now ticked; epic stays `in-progress` while child `34cm` remains open.
 
 _2026-10-22T14:20:00Z_ — Completed: all 8/8 `Done when` boxes are ticked and all 33 child beans (including `34cm`, verified with 0% `cat-harness/docs/` conflicts after `builtAtPublish`) are `completed` or `scrapped`.
+
+
+## Counted: a merge with red required CI (2026-10-12, from bean mm4u)
+cat-harness-tools#58 merged on 2026-10-10 with its Typecheck job red: `build-instance-site.ts` passed `publishSite({ into })`, which only bootstrap-tools main had. Every later tools PR then showed a red Typecheck that wasn't its own until the pins caught up. This is one instance for the gate's tally of merges made against red CI; the merge-gate design treats red required CI as blocking.
+
+_2026-10-16T10:40:00Z_ — Block `hfag` → `7x5n` dropped: the merge pipeline is not holding up separation, and a whole epic blocking another read as the separation arc waiting on all six open hfag beans, CI speed-ups included (owner choice 4b, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-21T19:15:00Z_ — Progress update: ticked `a harness tile showing the queue` (`30jr` completed: `merge-queue` declared in `cat-harness.json`, `buildMergeQueueTile` in `harness-tiles.ts`, rendered on `cat-harness/content/docs/state.md` and `cat-harness/content/docs/harness.md`). All 8/8 `Done when` boxes are now ticked; epic stays `in-progress` while child `34cm` remains open.
+
+_2026-10-22T14:20:00Z_ — Completed: all 8/8 `Done when` boxes are ticked and all 33 child beans (including `34cm`, verified with 0% `cat-harness/docs/` conflicts after `builtAtPublish`) are `completed` or `scrapped`.
+
+_2026-10-23T08:31:00Z_ — Re-opened to `in-progress` because child task `folio-assistant-p7mb` (`Whole-repo-derived artefacts still committed go stale on main after concurrent merges: build them at publish`) was opened under `hfag` on 2026-10-23 (`check:bean-rollup` requires an epic with an open child to remain open until its child completes).
+
+_2026-10-23T08:35:00Z_ — Back to `completed`. The 08:31Z re-open was for `p7mb`, whose own `parent:` field lane C moved to `1xhc` at about the same time. hfag again has no open child and all 8/8 Done-when boxes are ticked. Coordinator, session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6.
+
+
+## Counted: a merge with red required CI (2026-10-12, from bean mm4u)
+cat-harness-tools#58 merged on 2026-10-10 with its Typecheck job red: `build-instance-site.ts` passed `publishSite({ into })`, which only bootstrap-tools main had. Every later tools PR then showed a red Typecheck that wasn't its own until the pins caught up. This is one instance for the gate's tally of merges made against red CI; the merge-gate design treats red required CI as blocking.
+
+_2026-10-16T10:40:00Z_ — Block `hfag` → `7x5n` dropped: the merge pipeline is not holding up separation, and a whole epic blocking another read as the separation arc waiting on all six open hfag beans, CI speed-ups included (owner choice 4b, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-21T19:15:00Z_ — Progress update: ticked `a harness tile showing the queue` (`30jr` completed: `merge-queue` declared in `cat-harness.json`, `buildMergeQueueTile` in `harness-tiles.ts`, rendered on `cat-harness/content/docs/state.md` and `cat-harness/content/docs/harness.md`). All 8/8 `Done when` boxes are now ticked; epic stays `in-progress` while child `34cm` remains open.
+
+_2026-10-22T14:20:00Z_ — Completed: all 8/8 `Done when` boxes are ticked and all 33 child beans (including `34cm`, verified with 0% `cat-harness/docs/` conflicts after `builtAtPublish`) are `completed` or `scrapped`.
+
+_2026-10-23T08:31:00Z_ — Re-opened to `in-progress` because child task `folio-assistant-p7mb` (`Whole-repo-derived artefacts still committed go stale on main after concurrent merges: build them at publish`) was opened under `hfag` on 2026-10-23 (`check:bean-rollup` requires an epic with an open child to remain open until its child completes).
+
+_2026-10-23T08:35:00Z_ — Back to `completed`. The 08:31Z re-open was for `p7mb`, whose own `parent:` field lane C moved to `1xhc` at about the same time. hfag again has no open child and all 8/8 Done-when boxes are ticked. Coordinator, session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6.

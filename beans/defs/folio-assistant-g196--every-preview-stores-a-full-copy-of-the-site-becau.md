@@ -6,7 +6,7 @@ status: todo
 type: feature
 priority: normal
 created_at: 2026-09-19T12:53:43Z
-updated_at: 2026-10-16T10:30:00Z
+updated_at: 2026-10-30T12:45:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -584,5 +584,111 @@ No box ticked, no status changed, no threshold edited. The two deferred rows
 stay deferred — their reasoning (causes 2 and 3 are one change, the language
 switcher rebuilds hrefs from the baseurl, ~20 branches live in `docs/`) is
 sound and unaffected by anything above.
+
+_2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+_2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).
+
+---
+
+*2026-10-23* — **Re-read of the deployed tree before proposing causes 2 and 3. One regression found; cause 3 has mostly moved already.**
+
+_Read from `origin/gh-pages` (trees only, no sizes) and from `cat-harness@main`
+(`site-chrome/`). No code changed; a proposal is with the owner._
+
+**The store today.** 6 previews, ~4,900–6,100 HTML pages each (it was ~530 when
+this bean was written). 33,050 HTML entries, 26,247 distinct blobs, only 2,285
+shared by two or more previews. `index.html` of two previews: 206 slug
+occurrences in one 152 KB page.
+
+**Regression of cause 1 (the unbounded half).** `head_custom.html` puts
+`?v={{ site.time | date: '%s' }}` on every first-party CSS and JS link (added
+2026-09-21, the day after this bean measured rebuilds constant, to stop a
+reviewer seeing a cached stylesheet). `site.time` is the build time, so every
+page again differs on every rebuild of one preview. Its own comment names the
+fix: a content hash per asset.
+
+**Cause 3 has mostly moved.** The `fa-translation-index` island was moved to
+the fetched `assets/harness/site.json` on 2026-10-02, which carries `baseurl`
+once per preview. What is still per page: `<meta name="fa-baseurl">` and the
+`relative_url`-built `fa-site-index-src` / `fa-todo-src` metas. `docs-ui.js`
+already derives a base at runtime from its own script address (`SCRIPT_BASE`),
+and `navKey` resolves relative hrefs with `new URL(href, location)`, so the
+language switcher survives document-relative hrefs if `baseurl` keeps coming
+from `site.json`.
+
+**Cause 2 is unchanged** and is now the whole between-preview problem.
+Precedent for document-relative output already ships: the nav rail data is
+loaded as `./assets/navbar/rail-<hash>.js`.
+
+## Measured on two deployed previews, 2026-10-23 16:47Z
+
+Previews `STAGING/claude-g196-measure-a` and `-b` (folio-assistant#2639,
+#2640), both pinned to cat-harness 5c8f6ec = main plus cat-harness#432
+(content-hash `?v=`) and #439 (page-relative links, swap at `post_read`),
+built 25 minutes apart. 5,592 HTML pages each:
+
+| | pages |
+|---|---|
+| byte-identical between the two previews | 2,284 |
+| differ ONLY by the preview's name | 1,954 |
+| — smart-trust IG pages (fhir-harness `stage-ig-sites.ts` writes a literal baseurl into nav JSON and ig-topbar) | 1,514 |
+| — TypeDoc API pages (`--gitRevision` / `--name` per branch, by design) | 294 |
+| — smart-base pages | 146 |
+| differ by `<meta name="fa-tiles">` only (one open-bean count went 133 → 132 between the builds) | 1,353 |
+| `changes/` (per-branch by design) | 1 |
+
+Every Jekyll page is now free of the preview's name. Before the fix, 0 pages
+were shared between two previews.
+
+**New finding: the live counts in `fa-tiles`.** The 12 KB tiles meta inlined
+in every page carries live counts, so one bean opening or closing changes
+every page of the site. cat-harness#434 (gp2f, Page weight thread) moves the
+tiles list out to one cached file, which removes this churn too: no separate
+work here.
+
+**Left for this bean:** the IG nav JSON and topbar (fhir-harness), and
+whether smart-base's 146 come from the same source. TypeDoc and `changes/`
+stay per-branch.
+
+
+_2026-10-26T10:40:00Z_ — Claimed by the cloud thread "Drain beans and open issues across repos" (session https://claude.ai/code/session_01MuDtPYhiVLUpaCdbvwQVL9). Taking the fhir-harness half: `stage-ig-sites.ts` writes a literal baseurl into the IG nav JSON and ig-topbar.
+
+## 2026-10-26: re-measured on the four deployed previews; the fix is written, the pin is not (session https://claude.ai/code/session_01MuDtPYhiVLUpaCdbvwQVL9)
+
+The fhir-harness half named on 10-23 (IG nav JSON and top bar) was already fixed that day: `liquidSiteBase` in `build-ig-site.ts` (fhir-harness 73de11f) hands the staged layout back to the host as `{{ site.baseurl }}`. Nothing more to write there.
+
+Compared the four previews on gh-pages (blob ids from the git tree API):
+
+| pair | HTML pages in both | byte-identical |
+|---|---|---|
+| pages-checks-after-deploy / pages-independent-of-ci | 5,481 | 2,349 |
+| either of those / workflow-steps-accounted | 5,481 | 2,212 |
+| repin-layers-green / any other | 5,414-6,096 | 1 |
+
+Every differing page sampled (smart-trust/artifact 1,466, en/cat-harness 925, uml/overview 244, smart-base 146, proposals) differs only by `/folio-assistant/STAGING/<slug>/` in `relative_url` output: stylesheet and script links, the IG top bar. That is what `site-chrome/_plugins/fa-root-relative.rb` (cat-harness#439) removes. It is not in these builds: folio-assistant main pins cat-harness at a196134 (2026-10-23 19:45), which has no `site-chrome/_plugins/`; #439 merged at 21:36. The previews were built on that pin.
+
+So the next step is the cat-harness re-pin in folio-assistant#2681 (CI speed thread's), then two previews from the new pin and the same comparison. Back to `todo`: nothing here to build until that pin lands.
+---
+
+*2026-10-29* — **Re-measured on deployed previews after folio-assistant#2681 (5827603) pinned the fixes (cat-harness#432, #478, fhir-harness#137).**
+
+_Read from `origin/gh-pages` f1ede3c (git trees and blobs, HTML only)._
+
+- **Cause 2 is fixed in deployed output.** `STAGING/claude-repin-layers-green/` (the #2681 branch, the only preview built with the new pins) has hrefs like `./assets/css/…` and `./assets/qa/…`, and its `index.html` has 0 occurrences of its own slug. A preview built from older pins (`dependabot-…`) still writes `/folio-assistant/STAGING/<slug>/` into every link.
+- **Rebuilds are mostly constant.** The same preview, built 2026-10-26 16:35 and 2026-10-28 12:37 across further layer re-pins: 11,625 common pages, **6,945 byte-identical (59.7 %)**. The differences checked are real content (a count 23→24, a new Schemas link), not build stamps.
+- **Not yet measurable: sharing BETWEEN previews and with the root.** Every other preview and the main-site root were built from pre-#2681 code, so they share 0 identical pages with the new one, as expected. The ~77 MB projection is still unclaimed. It needs two previews (or a preview and the root) built from main at or after 5827603. The `Re-measure STAGING` row stays open for that.
+
+---
+
+*2026-10-29T11:05Z* — **Second reading, gh-pages 51c51bc (after the 10:36Z main publish). Lane D, session https://claude.ai/code/session_01Qmmkt62KVMxDU9gjVV1mm2.**
+
+- `STAGING/claude-repin-lane-e-2/` is now the one preview on current code. Its pages carry no slug, no SHA and no build time (checked on `smart-trust/artifact/ActorDefinition-Holder-testing.html`); the banner reads `staging.json`.
+- **A preview can never share pages with the root as built.** The root was rebuilt from current code at 10:36Z, yet lane-e-2 and the root share 1 of 9,342 HTML pages. The diff is the inline staging-banner script (about 50 lines at the top of every preview page), which root pages do not have. The script is constant, so previews can share with each other, but not with the root. Moving it to a shared `assets/js/staging-banner.js` would not fix this either: the `<script src>` tag itself still differs from the root page. The ~77 MB projection should count preview-to-preview sharing only.
+- Preview-to-preview sharing is still not measurable: it needs a second preview built on current code. The `Re-measure STAGING` row stays open.
+
+_2026-10-30T12:00Z_ — Measured on gh-pages aa92ccd. The two newest previews share 4,694 of 11,897 HTML pages, but they were built from different code, so this is not yet the same-code re-measure. There are two causes whatever the code. (1) About 20% of graph pages embed the preview IRI (`kg-export --base-url` in feature-staging.yml, deliberate). (2) About 45% of pages reference the content-hashed `rail-<hash>.js`, so every railed page changes when the rail does. Owner calls are pending on both. Side finding: smart-base node IRIs differ between the two previews. (https://claude.ai/code/session_01Qmmkt7iaCtGYwZbW9x7eYe)
+
+_2026-10-30T12:45Z_ — Owner, 2026-10-30 12:39Z (card "A. Apply all"): (1) keep the per-preview IRIs in node HTML, because that is deliberate and stops a preview claiming to be the canonical graph. (2) Give the rail data a stable filename and do the cache-busting outside the page, so railed pages stop changing whenever the rail does. Next: build two previews from the same main commit to close the re-measure row. (https://claude.ai/code/session_01Qmmkt7iaCtGYwZbW9x7eYe)
 
 _2026-10-16T10:30:00Z_ — Back to `todo`: nobody is holding this; its last note says it is parked (waiting on a trigger, a ruling or a deferred row), and an untouched `in-progress` claim misleads sibling sessions (owner choice, https://claude.ai/code/session_01NUrhvvMEwU5MmPW4L2w9jP).

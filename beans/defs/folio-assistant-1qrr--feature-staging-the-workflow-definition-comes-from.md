@@ -97,3 +97,61 @@ Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject
 _2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; the owner has not chosen among the three feature-staging shapes. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
 
 _2026-10-22T17:10Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): **resolved.** The owner chose option 1 on 2026-10-22 ("Check out merge ref"). folio-assistant#2624 (merged as 6cf10d9) makes `feature-staging.yml` check out `github.sha` on `pull_request`, which is the PR's test merge commit: the steps and the tree they run against now come from the same merge, so a step added on main runs against a tree that has its script. Push and workflow_dispatch are unchanged. Its own staging run built from the merge commit (0aa9d5f), not the head. The comment from #2618 stays on the checkout step (done-when 3).
+
+## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [x] the hazard is written where somebody debugging a red `stage` will find
+      it, not only in this bean (landed on `main` in `folio-assistant#2618`, `7b7d0736b2`, in `.github/workflows/feature-staging.yml`)
+
+## Note (2026-10-10, drain ml9h)
+
+Lane B scrapped the cat-harness-tools copy because the subject lives in folio-assistant / cat-harness; THIS copy is the owning one and stays open.
+
+_2026-10-22T00:40Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): still live on main (`feature-staging.yml` checks out the PR head under the base's step list). Done-when #3 is up as folio-assistant#2618, a comment on the checkout step and no behaviour change. The owner decision is in that PR: (1, recommended) check out the merge ref, (2) guard each step, (3) document only. Default 3.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/feature-staging.yml` (definition from BASE, checkout from HEAD), and its first done-when is the owner choosing one of its three shapes for that workflow. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; the owner has not chosen among the three feature-staging shapes. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-22T17:10Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): **resolved.** The owner chose option 1 on 2026-10-22 ("Check out merge ref"). folio-assistant#2624 (merged as 6cf10d9) makes `feature-staging.yml` check out `github.sha` on `pull_request`, which is the PR's test merge commit: the steps and the tree they run against now come from the same merge, so a step added on main runs against a tree that has its script. Push and workflow_dispatch are unchanged. Its own staging run built from the merge commit (0aa9d5f), not the head. The comment from #2618 stays on the checkout step (done-when 3).
+```
+
+## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [x] the hazard is written where somebody debugging a red `stage` will find
+      it, not only in this bean (landed on `main` in `folio-assistant#2618`, `7b7d0736b2`, in `.github/workflows/feature-staging.yml`)
+
+## Note (2026-10-10, drain ml9h)
+
+Lane B scrapped the cat-harness-tools copy because the subject lives in folio-assistant / cat-harness; THIS copy is the owning one and stays open.
+
+_2026-10-22T00:40Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): still live on main (`feature-staging.yml` checks out the PR head under the base's step list). Done-when #3 is up as folio-assistant#2618, a comment on the checkout step and no behaviour change. The owner decision is in that PR: (1, recommended) check out the merge ref, (2) guard each step, (3) document only. Default 3.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Reasons for Scrapping
+
+Scrapped 2026-10-10 in the cat-harness-tools store (lane B drain): **the subject is not in this repository.** It concerns folio-assistant's `.github/workflows/feature-staging.yml` (definition from BASE, checkout from HEAD), and its first done-when is the owner choosing one of its three shapes for that workflow. The copy of this bean in the `cat/cat-harness/beans` store (litlfred/folio-assistant) sits with that subject and is the live one. It should stay open there and not be closed as a mirror.
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `scrapped` → `todo` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: todo, cat-harness: scrapped, cat-harness-tools: scrapped). Evidence: same as 197s: scrapped only as "not in this repository"; the owner has not chosen among the three feature-staging shapes. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+
+_2026-10-22T17:10Z_ — Lane C (session https://claude.ai/code/session_018NFVUeJjQJdrEU32AS1Mco): **resolved.** The owner chose option 1 on 2026-10-22 ("Check out merge ref"). folio-assistant#2624 (merged as 6cf10d9) makes `feature-staging.yml` check out `github.sha` on `pull_request`, which is the PR's test merge commit: the steps and the tree they run against now come from the same merge, so a step added on main runs against a tree that has its script. Push and workflow_dispatch are unchanged. Its own staging run built from the merge commit (0aa9d5f), not the head. The comment from #2618 stays on the checkout step (done-when 3).
+```

@@ -6,7 +6,7 @@ status: completed
 type: task
 priority: normal
 created_at: 2026-10-02T16:29:16Z
-updated_at: 2026-10-10T16:47:06Z
+updated_at: 2026-10-22T16:45:00Z
 parent: folio-assistant-nok9
 ---
 
@@ -89,6 +89,52 @@ Design: `merge-gate-2026-10-02.md` §1.1, §6. Tracking bean: `5ge1`.
 *2026-10-22T16:33:47Z* — Owner ruling 2026-10-16, item 9 (session https://claude.ai/code/session_01Kymnx79TxWvxVoLzcAjBRr): the copy in litlfred/folio-assistant (`cat/cat-harness/beans`) is this bean's record, its status included, because its notes carry the later evidence. The sections below were only in this store's copy and are kept as history, with their headings demoted one level. Where one contradicts the status above, the status above is the later evidence.
 
 ### Summary of Changes
+
+Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence.
+
+- [x] **Closed taxonomy:** `cat-harness/schemas/red-flag.ts` defines `RED_FLAG_CATEGORIES`, 8 categories (security, data-loss, correctness, false-green, provenance, scope-breach, irreversible-action, licence). Each has a `definition` and a `historicalExample` from this repository's history in `RED_FLAG_DEFINITIONS`.
+- [x] **Sidecar shape:** `AdversarialFindingSchema` (a blocking finding requires a category and evidence), `AdversarialReviewSchema` and `MergeReviewSchema` (`merge-review/v1`, bound to commit SHAs). `kg-qa/v1` accepts optional `adversarial_reviews[]`.
+- [x] **Override path:** `OverrideDecisionSchema` and `applyRedFlagOverride`. Only a human may override; the finding becomes `overridden` and is never deleted.
+- [x] **Gate behaviour for every state,** `RED_FLAG_GATE_STATES`: would-have-blocked (the warn-only ruling of 2026-10-03), open, resolved, overridden, unknown, stale. Evaluated by `evaluateFinding/Review/MergeReviewGateState`.
+- **Tests:** `scripts/tests/red-flag-taxonomy.test.ts` covers each item above, and passes in the CI-shaped mount.
+- Not part of this bean: 3 failures in the audit-coverage "Adversarial Integration" tests (`adversarial-review-gate.test.ts`). Two are 5-second timeouts and one is an assertion on `adversarialCoverageByGraph`. They belong to the gate's wiring (sibling w8jq).
+
+## Closed 2026-10-09
+
+- **Branch**: `claude/abmq-merge-gate-red-flags`
+- **Commit**: `6785209b1717d508730c9fcc81a011d49a2eff90`
+- **Implementation**:
+  - `schemas/red-flag.ts`:
+    - Defined closed enum `RedFlagCategory` (`security`, `data-loss`, `correctness`, `false-green`, `provenance`, `scope-breach`, `irreversible-action`, `licence`) with `RED_FLAG_CATEGORIES` and `RedFlagCategorySchema`.
+    - Created `RED_FLAG_DEFINITIONS` mapping each category to its exact definition and historical repository defect example (`agent-review.yml`, `de9k`/`c1`, `beans:claim`/`c3d7`, `lean-bare-import`/`dh4f`, `w4tq`, `7u3g`, `plj1`, third-party licence compliance).
+    - Defined `AdversarialFindingSchema` and `AdversarialReviewSchema`, enforcing that findings with `weight: "blocking"` require a valid `RedFlagCategory` and non-empty `evidence`.
+    - Defined `MergeReviewSchema` (`merge-review/v1`) for PR head review records.
+    - Defined human override path (`OverrideDecisionSchema`, `applyRedFlagOverride`), requiring a human reviewer with standing, timestamp, reason, and finding ID, preserving the finding and updating status to `overridden` without deletion.
+    - Defined gate behaviour and state derivations for all 6 states (`open`, `resolved`, `overridden`, `would-have-blocked`, `unknown`, `stale`) across findings, reviews, and merge reviews (`evaluateFindingGateState`, `evaluateReviewGateState`, `evaluateMergeReviewGateState`), implementing the 2026-10-03 owner warn-only ruling.
+  - `schemas/qa-review.ts`: Re-exported all red flag entities from `schemas/red-flag.ts`.
+  - `schemas/kg-qa.ts`: Added optional `adversarial_reviews?: AdversarialReview[]` to `KgQaReport` and `KgQaReportSchema` compatible with `kg-qa/v1`.
+- **Test Evidence**:
+  - `scripts/tests/red-flag-taxonomy.test.ts`: 25 tests passing (133 expect assertions), verifying taxonomy validation, sidecar validation, override structure, and gate state derivation across all 6 states.
+  - `schemas/qa-review.test.ts`: 19 tests passing (24 expect assertions).
+  - `bun run typecheck`: clean pass (`tsc --noEmit -p tsconfig.json`).
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Summary of Changes
+
+Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence.
+
+- [x] **Closed taxonomy:** `cat-harness/schemas/red-flag.ts` defines `RED_FLAG_CATEGORIES`, 8 categories (security, data-loss, correctness, false-green, provenance, scope-breach, irreversible-action, licence). Each has a `definition` and a `historicalExample` from this repository's history in `RED_FLAG_DEFINITIONS`.
+- [x] **Sidecar shape:** `AdversarialFindingSchema` (a blocking finding requires a category and evidence), `AdversarialReviewSchema` and `MergeReviewSchema` (`merge-review/v1`, bound to commit SHAs). `kg-qa/v1` accepts optional `adversarial_reviews[]`.
+- [x] **Override path:** `OverrideDecisionSchema` and `applyRedFlagOverride`. Only a human may override; the finding becomes `overridden` and is never deleted.
+- [x] **Gate behaviour for every state,** `RED_FLAG_GATE_STATES`: would-have-blocked (the warn-only ruling of 2026-10-03), open, resolved, overridden, unknown, stale. Evaluated by `evaluateFinding/Review/MergeReviewGateState`.
+- **Tests:** `scripts/tests/red-flag-taxonomy.test.ts` covers each item above, and passes in the CI-shaped mount.
+- Not part of this bean: 3 failures in the audit-coverage "Adversarial Integration" tests (`adversarial-review-gate.test.ts`). Two are 5-second timeouts and one is an assertion on `adversarialCoverageByGraph`. They belong to the gate's wiring (sibling w8jq).
+
+
+## Summary of Changes
 
 Re-triaged 2026-10-10 (lane B drain). Implemented already; this commit records the evidence.
 

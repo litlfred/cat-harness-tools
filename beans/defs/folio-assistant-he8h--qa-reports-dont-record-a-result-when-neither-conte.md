@@ -45,3 +45,17 @@ back on a miss), not by reporting `miss`/unknown.
 - **Verification**:
   - `bun test scripts/tests/qa-store.test.ts`: 31 tests passed across suite, verifying skipped commits resolve to fallback hit, changed results publish new entries, and force flag bypasses skip.
   - `bun run typecheck`: clean pass (0 errors).
+
+## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [ ] Measured again on qa-reports after a few pushes: no identical repeats added.
+
+_2026-10-05T21:45:56Z_ — Claimed by claude/vibrant-darwin-r6im60 — pushed to main so sibling sessions see it before this branch has a PR (bean 35nj).
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `in-progress` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: in-progress, cat-harness-tools: in-progress). Evidence: closed in the folio-assistant store copy (2026-10-09); commit 231aa7ef is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+```
