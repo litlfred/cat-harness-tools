@@ -27,6 +27,7 @@ import {
   exitCodeFor,
   isJudgeCheck,
   maxPassesFromArgv,
+  mountFirst,
   REGEN_VERDICT_TAG,
   regenExitMeaning,
   regenPass,
@@ -43,6 +44,7 @@ import { loadGates } from "../../gates.ts";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { regenArgs } from "../../merge-base.ts";
 
 function resolveRepoRoot(instance: string): string {
   let cur = repoRootFor(instance);
@@ -723,3 +725,22 @@ describe("judge-mode pairs are distinguished from artefact staleness checks — 
   });
 });
 
+
+// folio-assistant#2247, gap 3: a bare `regen` graded an unmounted branch-kept
+// graph as a real defect. It now mounts first; only a caller that has just
+// mounted — `merge:main` — opts out.
+describe("regen mounts the branch-kept graphs before it grades", () => {
+  test("by default", () => {
+    expect(mountFirst(["bun", "regen-after-merge.ts"])).toBe(true);
+    expect(mountFirst(["bun", "regen-after-merge.ts", "--dry-run", "--fast"])).toBe(true);
+  });
+  test("not with --no-mount", () => {
+    expect(mountFirst(["bun", "regen-after-merge.ts", "--no-mount"])).toBe(false);
+  });
+  test("merge:main, which has just mounted against the merged declarations, passes --no-mount on both paths", () => {
+    expect(mountFirst(["bun", "x", ...regenArgs(undefined)])).toBe(false);
+    expect(mountFirst(["bun", "x", ...regenArgs("abc123")])).toBe(false);
+    expect(regenArgs("abc123")).toContain("--changed");
+    expect(regenArgs("abc123")[regenArgs("abc123").indexOf("--changed") + 1]).toBe("abc123");
+  });
+});
