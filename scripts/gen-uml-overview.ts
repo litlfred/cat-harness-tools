@@ -910,10 +910,12 @@ function page(opts: {
 
 // ── main ──────────────────────────────────────────────────────────────────
 
-async function build(): Promise<Map<string, string>> {
+export async function overviewFilesFor(
+  roots: readonly string[] = instanceRootsIn(REPO),
+): Promise<{ files: Map<string, string>; instances: { name: string; sections: Section[] }[] }> {
   const files = new Map<string, string>();
   const instances: { name: string; sections: Section[] }[] = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of roots) {
     const sections = await sectionsOf(root);
     if (sections.length === 0) continue;
     instances.push({ name: sections[0].instance, sections });
@@ -973,6 +975,11 @@ async function build(): Promise<Map<string, string>> {
       );
     }
   }
+  return { files, instances };
+}
+
+async function build(): Promise<Map<string, string>> {
+  const { files, instances } = await overviewFilesFor();
   files.set(SCHEMAS_PUML, schemasViewPuml(GENERATOR));
   const index = [
     "---",
