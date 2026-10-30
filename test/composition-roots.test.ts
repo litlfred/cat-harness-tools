@@ -246,7 +246,7 @@ describe("built-in content adapters", () => {
       );
       const resolved = await resolveAdapterPreamble(
         "paper",
-        [{ contentType: "paper", instance: "mock", module: modPath, className: "MockPaperAdapter" }],
+        [{ contentType: "paper", instance: "mock", module: modPath, className: "MockPaperAdapter", root: tmp }],
         [],
       );
       expect(resolved).toBe(tplPath);
