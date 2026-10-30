@@ -58,7 +58,6 @@ import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "../schemas/condu
 import {
   COPILOT_AGENT_CHAR_BUDGET,
   DEFAULT_ROOT,
-  ROOT,
   VENDOR_AGENT_BYTE_BUDGET,
   agentNames,
   detailFileName,

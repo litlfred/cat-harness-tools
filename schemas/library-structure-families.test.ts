@@ -5,7 +5,6 @@
  * every one was "library names no $schema family" to kg-validate.
  */
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
 
 import { familyBody, nodeFamilyTag, resolveNodeSchemas, stripAnnotations } from "./kg/kind-validator.ts";
 

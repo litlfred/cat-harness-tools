@@ -112,7 +112,6 @@ describe("computeHeat", () => {
   });
 
   test("is self-contained, so the page can embed exactly this function", () => {
-    // eslint-disable-next-line no-new-func
     const embedded = new Function(`return (${computeHeat.toString()})`)() as typeof computeHeat;
     expect(embedded({ changes, blocks, comments: [] })).toEqual(computeHeat({ changes, blocks, comments: [] }));
   });

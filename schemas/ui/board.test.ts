@@ -21,8 +21,6 @@ import {
   type Board,
 } from "./board.js";
 
-import { requireHarnessRoot } from "../harness-root.ts";
-const ROOT = requireHarnessRoot();
 /** The tools layer, which holds the schema modules this file reads as source (bean `8lcl`). */
 const CODE = resolve(import.meta.dir, "..", "..");
 

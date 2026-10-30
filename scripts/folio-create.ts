@@ -56,7 +56,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import type { DocumentKind } from "../schemas/content/document-kind.ts";
-import { directoryForGraph, folioDir, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { folioDir, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import {
   REFERENCED_SOURCE_SCHEMA_ID,
