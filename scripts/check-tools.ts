@@ -44,6 +44,7 @@ import { resolveImplementingPath } from "@litlfred/cat-harness/schemas/kg/harnes
 import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { resolveScriptCommand } from "./lib/script-command.ts";
+import { missingSiteWorkflows } from "./site-workflow.ts";
 
 /**
  * THIS INSTANCE'S OWN `schemas` directory, or the convention.
@@ -670,6 +671,15 @@ if (import.meta.main) {
       "\n    A node naming a command that does not run is unreachable through its own\n" +
         "    declaration, which is the one thing a Tool node is for.",
     );
+  }
+  // The site workflows the repository DECLARES (`site.workflows` in its own
+  // index.config.json) must exist: `pages-publish` and `feature-staging` run
+  // them through `site:workflow` (owner, 2026-10-30, "Make them generic").
+  const missingWorkflows = missingSiteWorkflows(REPO);
+  if (missingWorkflows.length > 0) {
+    bad = true;
+    console.error(`\n✗ ${missingWorkflows.length} declared site workflow(s) that do not exist:`);
+    for (const m of missingWorkflows) console.error(`    ${m}`);
   }
   // A FINDING, not a failure (bean `tdir`): see `inlineToolFindings`. When
   // every litlfred instance declares its Tools in folders, this sets `bad`.
