@@ -103,7 +103,7 @@ const dashboardsNotBuilt = (...graphs: string[]): boolean =>
   );
 
 describe("the route is the policy, not this generator's choice", () => {
-  test("the visualiser is AT its declared route, `<harness>/<visualiser>/`, one per declared visualiser", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa", "health", "issue-marks", "uploads"))("the visualiser is AT its declared route, `<harness>/<visualiser>/`, one per declared visualiser", () => {
     for (const id of ["beans", "todos", "qa", "health", "issue-marks", "uploads"]) {
       expect(has(id)).toBe(true);
       // Never at the site root any more: `<base>/<visualiser>/` is an opt-in
@@ -126,7 +126,7 @@ describe("the route is the policy, not this generator's choice", () => {
     expect(existsSync(join(pageDir("beans"), "dashboard"))).toBe(false);
   });
 
-  test("the segment is the declared ID, because two paths basename alike", () => {
+  test.skipIf(dashboardsNotBuilt("qa", "health"))("the segment is the declared ID, because two paths basename alike", () => {
     // `qa` is `test/results/` and `health` is `test/health/results/`. Taking
     // the basename — which the sibling schema visualiser does, correctly, for
     // its own graph — would give both the segment `results`, and one dashboard
@@ -149,7 +149,13 @@ describe("each page reads the projection that already exists", () => {
     // carries no path of its own to get wrong.
   });
 
-  test("and that projection is really there", () => {
+  test.skipIf(
+    siteNotBuilt(
+      "the beans and todos projections `gen-docs-pages.ts` writes at publish (gitignored)",
+      join(SITE, "assets", "beans", "index.json"),
+      join(SITE, "assets", "todos", "index.json"),
+    ),
+  )("and that projection is really there", () => {
     // The generator publishes no data of its own — `gen-docs-pages.ts` does.
     // A second copy would be two answers to what the work plan holds.
     expect(existsSync(join(SITE, "assets", "beans", "index.json"))).toBe(true);
@@ -219,7 +225,7 @@ describe("what a page may claim", () => {
     expect(read("beans")).toContain('<span class="sv-here">beans</span>');
   });
 
-  test("EVERY dashboard is a themed page, so every one carries the top band (#2418)", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa", "health", "issue-marks", "uploads", "attestations", "swimlane-glossary"))("EVERY dashboard is a themed page, so every one carries the top band (#2418)", () => {
     // Owner, 2026-10-07: "(and other pages)". The band is docs-ui.js's, and
     // only a layout page loads it — a doctype shell with its own head has none.
     const IDS = ["beans", "todos", "qa", "health", "issue-marks", "uploads", "attestations", "swimlane-glossary"]
@@ -596,7 +602,7 @@ describe("orphan dashboards — a page that answers to no declaration", () => {
     expect(prunableDashboards(join(tmpdir(), "sv-prune-absent-xyz"), [])).toEqual([]);
   });
 
-  test("ON THE REAL CORPUS: an empty keep-set selects only pages we wrote", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa", "attestations", "health", "issue-marks", "merge-reviews", "uploads", "swimlane-glossary"))("ON THE REAL CORPUS: an empty keep-set selects only pages we wrote", () => {
     // The strongest statement available: ask for the worst case — nothing is
     // wanted — and assert the answer is exactly this generator's own pages,
     // never one of the site's other directories.

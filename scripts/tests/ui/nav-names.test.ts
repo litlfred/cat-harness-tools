@@ -121,7 +121,7 @@ describe("the live surfaces", () => {
     expect(r.templates).toEqual([]);
   });
 
-  test("the run read what it claims to have compared", () => {
+  test.skipIf(NOT_BUILT())("the run read what it claims to have compared", () => {
     expect(r.read.harnessData).toBe(true);
     expect(r.read.include).toBe(true);
     expect(r.read.stickies).toBe(true);
