@@ -17,7 +17,7 @@ import { readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { checkBeanParents } from "../../scripts/check-bean-parents.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

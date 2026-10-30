@@ -16,18 +16,18 @@
  * @module pipeline/validate
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { resolve, join, basename, dirname, relative, isAbsolute } from "path";
 import {
   PaperSchema,
   ChapterSchema,
   type ConstraintContext,
-} from "@litlfred/cat-harness/schemas/constraints.ts";
+} from "../schemas/constraints.ts";
 // A block is parsed by the schema its kind is typed by: a vocabulary module's
 // (a layer above cat-harness typing its own kinds), else BlockSchema.
-import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
-import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "@litlfred/cat-harness/schemas/types.ts";
+import { allConstraintRules, parseBlock } from "../schemas/content/vocabulary-modules.ts";
+import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "../schemas/types.ts";
 import { resolveRenderTarget } from "./render-discovery";
 import { readDeclaredFolioProfile } from "./profile-check";
 import { validateDefterms } from "./validate-defterm";

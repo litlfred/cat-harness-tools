@@ -35,7 +35,7 @@ function translationsRoot(repoRoot: string): string {
   return directoryForGraph(repoRoot, "translation-sources") ?? join(repoRoot, "translations");
 }
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph } from "../../schemas/kg/cat-harness.js";
 
 export function registerTranslationTools(server: McpServer, repoRoot: string): void {
 

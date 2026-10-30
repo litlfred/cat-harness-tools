@@ -33,11 +33,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { buildTermMatrix, keywordsOf, tokenize, type Keyword } from "../pipeline/lsi.ts";
-import { readStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
-import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "@litlfred/cat-harness/schemas/library/library-keywords.ts";
+import { readStructure } from "../schemas/content/document-structure.ts";
+import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "../schemas/library/library-keywords.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 export { KEYWORDS_FILE };
-import type { PdfStructure } from "@litlfred/cat-harness/schemas/ui/pdf-structure.ts";
+import type { PdfStructure } from "../schemas/ui/pdf-structure.ts";
 import { readLibraryGraph } from "./library-graph.ts";
 import { unitsOf } from "./lsi.ts";
 

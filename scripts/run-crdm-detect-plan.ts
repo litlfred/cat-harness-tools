@@ -33,9 +33,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.ts";
-import { buildTestRun, UNKNOWN_HASH, type SutRef, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
+import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { TestPlanSchema, type TestPlan } from "../schemas/sdlc/test-plan.ts";
+import { buildTestRun, UNKNOWN_HASH, type SutRef, type TestRun } from "../schemas/sdlc/test-run.ts";
 import {
   TEST_REPORT_SCHEMA_ID,
   TestReportSchema,
@@ -44,7 +44,7 @@ import {
   testReportPath,
   type TestCaseVerdict,
   type TestReport,
-} from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
+} from "../schemas/sdlc/test-report.ts";
 import { detect, type Verdict } from "../src/crdm/detect-signals.ts";
 import { loadProcessModel } from "../src/workflow/process-model.ts";
 import { complete, enabled, startInstance, type InstanceState } from "../src/workflow/instance.ts";
@@ -56,7 +56,7 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 export interface CorpusItem { number: number; title: string; isFeature: boolean; why: string; text: string }
 
 /** The system under test — `cat-harness/scenarios/actors/crdm-detect-signals.json`. */
-export const SUT: SutRef = { actor: "crdm-detect-signals", version: "1", reach: "air-gapped" };
+export const SUT: SutRef = { kind: "skill", actor: "crdm-detect-signals", version: "1", reach: "air-gapped" };
 
 /** The tester: this script, on the CI pipeline's authority — never the system under test. */
 export const TESTER = { kind: "script" as const, id: "cat-harness-tools/scripts/run-crdm-detect-plan.ts", actor: "ci-pipeline" };

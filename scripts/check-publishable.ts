@@ -51,7 +51,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 
 /**
  * The publication state. `unknown` is about THIS RUN, not about the instance.

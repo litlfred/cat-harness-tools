@@ -44,9 +44,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, docsSourceDirFor, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { siteNodeSitePath } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { checkoutDependentsOf } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { declarationPathIn, docsSourceDirFor, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { siteNodeSitePath } from "../../schemas/kg/jsonld.ts";
+import { checkoutDependentsOf } from "../../schemas/kg/harness-config.ts";
 
 /** One declared docs source: where its pages are authored and where they render. */
 export interface DocsSource {

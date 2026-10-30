@@ -16,8 +16,8 @@ import {
   SESSION_CONTEXT_SCHEMA_TAG,
   SessionContextSchema,
   parseSessionContext,
-} from "@litlfred/cat-harness/schemas/sdlc/session-context.js";
-import { defaultGraphTypologies, graphTypologyIri, graphLayer, processMayWrite } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../../schemas/sdlc/session-context.js";
+import { defaultGraphTypologies, graphTypologyIri, graphLayer, processMayWrite } from "../../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 /** The smallest record that parses — an idle session, which is the common one. */

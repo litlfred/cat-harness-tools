@@ -22,7 +22,7 @@ import {
   buildTestRun,
   hashBasis,
   hashesReproduce,
-} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
+} from "./sdlc/test-run.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -249,7 +249,7 @@ describe("a run may name the plan it executed and the system under test (bean yg
     const root = fixture({ "d.json": "[]", "p.ts": "//" });
     return buildTestRun({ root, skill: "s", subject: "s", dataInputs: ["d.json"], processInputs: ["p.ts"], outcome: {} });
   };
-  const sut = { actor: "claude-code", version: "2.1.0", reach: "internet" as const };
+  const sut = { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "2.1.0", reach: "internet" as const };
 
   test("a run recorded before plans existed still parses, with neither field", () => {
     // The shape `crdm-detect-eval.test-run.json` was recorded in, as a
@@ -296,6 +296,26 @@ describe("a run may name the plan it executed and the system under test (bean yg
     const plan = { id: "p", version: "1" };
     expect(TestRunSchema.safeParse({ ...base(), plan, sut: { ...sut, reach: "unknown" } }).success).toBe(true);
     expect(TestRunSchema.safeParse({ ...base(), plan, sut: { ...sut, reach: "online" } }).success).toBe(false);
+  });
+
+  // FR-002 (owner, 2026-10-30, option A): an agent names its model and configuration; any other kind names neither.
+  test("SC-002: an agent run without a model or a configuration is refused", () => {
+    const plan = { id: "p", version: "1" };
+    const { model: _m, ...noModel } = sut;
+    const { configuration: _c, ...noConfiguration } = sut;
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut }).success).toBe(true);
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: noModel }).success).toBe(false);
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: noConfiguration }).success).toBe(false);
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: { ...sut, model: "Claude Opus" } }).success).toBe(false);
+  });
+
+  test("a skill names no model, and a system under test must say its kind", () => {
+    const plan = { id: "p", version: "1" };
+    const script = { kind: "skill", actor: "crdm-detect-signals", version: "1", reach: "air-gapped" };
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: script }).success).toBe(true);
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: { ...script, model: "claude-opus-5" } }).success).toBe(false);
+    const { kind: _k, ...noKind } = script;
+    expect(TestRunSchema.safeParse({ ...base(), plan, sut: noKind }).success).toBe(false);
   });
 
   test("the plan ref carries a version, because a case id means nothing across plan versions", () => {

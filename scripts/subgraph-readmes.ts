@@ -71,10 +71,10 @@ import {
   type Plan,
   plan,
 } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { instanceDirectories, declaredAssetPath, INSTANCE_README_ROLE, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
+import { instanceDirectories, declaredAssetPath, INSTANCE_README_ROLE, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { mountScopeFor } from "../schemas/kg/remote-mount.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
+import { contentIsOffCheckout } from "../schemas/kg/subgraph-source.ts";
 import { forDirectory, processIndex, resolveProcess, type ProcessIndex } from "./governing-process.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, mayLeaveMain, writeQaResult } from "./qa-results.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

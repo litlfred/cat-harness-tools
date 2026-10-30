@@ -31,7 +31,7 @@ import {
 /** Skip content-repo assertions when no folio is attached. */
 const folio = hasFolio();
 
-import { LEAN_PACKAGES } from "@litlfred/cat-harness/schemas/lean-packages.js";
+import { LEAN_PACKAGES } from "../../schemas/lean-packages.js";
 
 // ── Root workspace ──────────────────────────────────────────────
 

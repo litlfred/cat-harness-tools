@@ -129,12 +129,12 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import jsonld from "jsonld";
 import { buildContext, buildExport, graphTypologyId } from "./kg-export.js";
 import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js";
-import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
+import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
 import {
   HEAVY_POINTERS,
   PAYLOAD_MEDIA_TYPES,
@@ -149,7 +149,7 @@ import {
   SUBGRAPH_INDEX_FILE,
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
-} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
+} from "../schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";

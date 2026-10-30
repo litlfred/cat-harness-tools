@@ -38,8 +38,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { ROUTE_SEGMENT, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { toolSubjects } from "./gen-tools-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
@@ -122,7 +122,7 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
  * Since fhir-harness#124 an IG instance commits no index; `ig-index:build`
  * writes it at publish. A site that builds an IG's index owes that IG's
  * artefact pages. A site that mounts the IG layer and builds none (a
- * document folio such as smart-ra, mounting the DAK layer) owes none: the
+ * document folio such as a reference-architecture folio mounting the DAK layer) owes none: the
  * directory's other files (a README, retired sidecars) are not an index the
  * writer can draw. Owner, 2026-10-30, smart-ra#103: "this is not an IG".
  */

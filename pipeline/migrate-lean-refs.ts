@@ -20,10 +20,10 @@
  * @module pipeline/migrate-lean-refs
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
-import { LEAN_PACKAGES } from "@litlfred/cat-harness/schemas/lean-packages.ts";
+import { LEAN_PACKAGES } from "../schemas/lean-packages.ts";
 import { findContentRepoRoot } from "./repo-root";
 
 // Was rooted at this file's own location, which is the PLATFORM — but every

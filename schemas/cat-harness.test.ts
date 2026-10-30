@@ -6,18 +6,18 @@
  * directories without restating them.
  */
 import { describe, it, test, expect, beforeAll, afterAll } from "bun:test";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
-import { registerFolioGraphTypology } from "@litlfred/cat-harness/schemas/kg/folio-graph-typology.ts";
-import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.ts";
-import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
-import { TODO_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.ts";
-import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { registerFolioGraphTypology } from "./kg/folio-graph-typology.ts";
+import { THEMES } from "./ui/themes.ts";
+import { BEAN_GRAPH_FILE } from "./sdlc/bean-graph.ts";
+import { TODO_GRAPH_FILE } from "./sdlc/todo-graph.ts";
+import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "./kg/cat-harness.ts";
 import { writeDeclaration } from "../test/support/instance-fixture.js";
-import { checkoutDirectories, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { checkoutDirectories, corpusDirectoriesForGraph } from "./kg/harness-config.ts";
 
 const TMP = join(import.meta.dir, "__test_agent_harness__");
 const INSTANCE_ROOT = HARNESS_ROOT;
@@ -203,11 +203,11 @@ describe("layering", () => {
     // The namespace comes from the leaf `./namespaces` instead — it sits beside
     // this module since bean `f8wp` (placement PR8) moved it into `schemas/kg/`;
     // `schemas/namespaces.ts` is now only a one-release re-export of it.
-    const src = readFileSync(join(HARNESS_ROOT, "schemas", "kg", "cat-harness.ts"), "utf-8");
+    const src = readFileSync(join(TOOLS_ROOT, "schemas", "kg", "cat-harness.ts"), "utf-8");
     expect(src).not.toMatch(/from "\.\/jsonld"/);
     expect(src).not.toMatch(/from "\.\.?\/block-kinds"/);
     expect(src).toMatch(/from "\.\/namespaces(\.js)?"/);
-    expect(existsSync(join(HARNESS_ROOT, "schemas", "kg", "namespaces.ts"))).toBe(true);
+    expect(existsSync(join(TOOLS_ROOT, "schemas", "kg", "namespaces.ts"))).toBe(true);
   });
 });
 

@@ -51,7 +51,7 @@ import {
   workflowInstancePage,
   workflowHubPage,
 } from "../state-visualizer.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import {
   existingPageDir,

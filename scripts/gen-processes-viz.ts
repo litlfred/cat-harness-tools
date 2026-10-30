@@ -72,7 +72,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
@@ -85,12 +85,12 @@ import {
   type LaneBinding,
   type RoleGraph,
   type SkillProvenance,
-} from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+} from "../schemas/process/role-graph.js";
+import { ownElementPattern } from "../schemas/kg/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
-import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileCountsForPages, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { workflowInstanceLinks } from "./state-visualizer.ts";
 import { instancesByProcess, type InstanceLink } from "./workflow-view.ts";

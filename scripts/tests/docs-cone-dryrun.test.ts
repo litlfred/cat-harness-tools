@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { RENDERED_IMPACT_TAG, RenderedImpactSchema } from "@litlfred/cat-harness/schemas/ui/rendered-impact.js";
+import { RENDERED_IMPACT_TAG, RenderedImpactSchema } from "../../schemas/ui/rendered-impact.js";
 import { collectInputs, intoCheckout, judge, measureDeploy, nameStatus, stampedHash, summary } from "../docs-cone-dryrun.js";
 
 const tmp = mkdtempSync(join(tmpdir(), "docs-cone-dryrun-"));

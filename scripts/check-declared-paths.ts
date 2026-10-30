@@ -160,8 +160,9 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { docsSourceDirFor, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { docsSourceDirFor, readDeclaration, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
+import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { isJsonManifest } from "../pipeline/json-manifest.ts";
 
@@ -568,7 +569,14 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
         continue;
       }
 
-      const abs = join(root, value);
+      // A declared path the harness names may be code an implementing layer
+      // holds since bean `8lcl` moved it (`schemas/**/*.ts`); resolve it there
+      // as the readers do (`implementingRootFor`), so the witness survives.
+      let abs = join(root, value);
+      if (!existsSync(abs)) {
+        const r = resolveImplementingPath(root, value);
+        if (r.state === "found") abs = join(r.root, value);
+      }
       if (!existsSync(abs)) {
         refused.push({ ...site, why: "names nothing that resolves" });
         continue;

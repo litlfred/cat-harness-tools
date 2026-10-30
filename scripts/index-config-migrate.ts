@@ -56,7 +56,7 @@
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { INDEX_LOCK_FILENAME, findDeclarationFile, lockFilesIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { INDEX_LOCK_FILENAME, findDeclarationFile, lockFilesIn } from "../schemas/kg/instance-roots.js";
 import {
   INDEX_CONFIG_FILENAME,
   buildIndexConfig,
@@ -68,7 +68,7 @@ import {
   type IndexConfig,
   type IndexInstance,
   type IndexMigration,
-} from "@litlfred/cat-harness/schemas/kg/index-config.js";
+} from "../schemas/kg/index-config.js";
 
 import { overlayConfig } from "./instance-config.ts";
 

@@ -140,7 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(bun -e '
-            import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
+            import { subgraphIndexPackage } from "@litlfred/cat-harness-tools/schemas/kg/subgraph-manifest.ts";
             const [repo, sha, inst] = process.argv.slice(1);
             console.log(subgraphIndexPackage(repo, sha, inst).tag);
           ' "$REPO" "$SHA" "$INSTANCE")"

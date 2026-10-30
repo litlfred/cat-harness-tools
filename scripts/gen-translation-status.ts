@@ -51,16 +51,16 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
-import { siteRootFrom } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
+import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileDirectories, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
 import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
 

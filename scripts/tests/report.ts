@@ -20,7 +20,7 @@ import type {
   TestResult,
   TestSummary,
   TestCategory,
-} from "@litlfred/cat-harness/schemas/formalization-types.ts";
+} from "../../schemas/formalization-types.ts";
 
 const startTime = Date.now();
 const now = new Date().toISOString();

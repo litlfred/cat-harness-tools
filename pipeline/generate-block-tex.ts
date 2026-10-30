@@ -29,7 +29,7 @@
  */
 
 import { readFileSync } from "fs";
-import type { Paper, Block } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper, Block } from "../schemas/types.ts";
 import { renderBlock } from "./render-latex";
 
 // ── Annotation macros to strip from standalone output ────────────────────────

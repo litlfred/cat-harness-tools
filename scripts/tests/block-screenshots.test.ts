@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
+import { DIFF_RENDERERS } from "../../schemas/ui/diff-renderers.js";
 import { VISUAL_KINDS, comparePixels, pageIn, pageOf, safeName, visualChanges } from "../block-screenshots.js";
 
 const img = (w: number, h: number, rgba: [number, number, number, number]) => ({

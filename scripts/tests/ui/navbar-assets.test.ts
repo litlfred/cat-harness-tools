@@ -8,7 +8,7 @@ import { PIN_FILE } from "../../check-bun-pin.ts";
 import { NAVBAR_JS, RAIL_DATA_DIR, expandRail, injectRail, railPageOf } from "../../lib/harness-rail.ts";
 import { NAVBAR_CSS } from "../../lib/navbar.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "../../../schemas/kg/cat-harness.js";
 
 /**
  * The rail from shared data — bean `lnoy`. Owner, 2026-10-05: *"4. Option 3

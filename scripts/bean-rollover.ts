@@ -77,7 +77,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
 import { git, parseMemberSpec, resolveMember } from "./merge-pipeline-git.ts";
 import { pathClass, differsOnlyInRegions } from "./merge-pipeline-paths.ts";
 

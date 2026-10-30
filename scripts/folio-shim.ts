@@ -22,7 +22,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readDeclaredFolioProfile } from "../pipeline/profile-check.ts";
 import { missingReexports, shimAssistant } from "./lib/folio-shim.ts";
 

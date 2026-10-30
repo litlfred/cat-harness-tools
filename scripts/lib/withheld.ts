@@ -15,7 +15,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
-import { WithheldSchema } from "@litlfred/cat-harness/schemas/content/withheld.js";
+import { WithheldSchema } from "../../schemas/content/withheld.js";
 
 export const WITHHELD_FILE = "withheld.json";
 

@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readDeclaration } from "../../schemas/kg/cat-harness.js";
 
 /** One page build the render needs first. */
 export interface PagesBuild {

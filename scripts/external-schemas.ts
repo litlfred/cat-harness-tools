@@ -29,15 +29,15 @@ import {
   undeclaredNamespaces,
   unusedNamespaces,
   type ExternalSchema,
-} from "@litlfred/cat-harness/schemas/kg/external-schema.js";
+} from "../schemas/kg/external-schema.js";
 
-import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
-import { directoriesForGraph, instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPACES, WORKFLOWS_NS } from "../schemas/kg/namespaces.js";
+import { ownNamespaceValues } from "../schemas/kg/graph-typology-registry.js";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
+import { directoriesForGraph, instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

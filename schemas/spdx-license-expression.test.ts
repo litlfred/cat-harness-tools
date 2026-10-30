@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { judgeSourceLicence, type LicenceReport } from "../scripts/check-source-licence.ts";
 import { snapshotOf } from "../scripts/pin-spdx-license-list.ts";
-import { checkLicenceExpression, loadSpdxLicenseList, spdxLicenseListOf } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
+import { checkLicenceExpression, loadSpdxLicenseList, spdxLicenseListOf } from "./library/spdx-license-expression.ts";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 

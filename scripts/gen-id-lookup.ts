@@ -41,8 +41,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { buildIdLookup, CatalogueNodeReadSchema, type IdEntry } from "@litlfred/cat-harness/schemas/kg/id-lookup.js";
+import { checkoutDirectories } from "../schemas/kg/harness-config.ts";
+import { buildIdLookup, CatalogueNodeReadSchema, type IdEntry } from "../schemas/kg/id-lookup.js";
 
 const TOOLS = resolve(import.meta.dir, "..");
 const REPO = resolve(TOOLS, "..");

@@ -23,8 +23,8 @@ import {
   type PayloadPlan,
   type SubgraphPlan,
 } from "../gen-subgraph-jsonld.js";
-import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { termIri } from "../../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import jsonld from "jsonld";
 import { exportIdentity } from "../kg-export.js";
 import { expandFindings, type localLoader } from "../publish-verify.js";
@@ -40,10 +40,10 @@ import {
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
   type PayloadLink,
-} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
+} from "../../schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
-import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
+import { toolIri } from "../../schemas/tools/tool-folders.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 /** This instance's published document: its own nodes are fragments of it. */

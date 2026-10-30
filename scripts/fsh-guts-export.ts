@@ -43,13 +43,13 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import {
   artefactStub,
   readDeclaration,
-  repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { contentSourceContext } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
-import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
+  repoRootFor } from "../schemas/kg/cat-harness.js";
+import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { contentSourceContext } from "../schemas/kg/subgraph-source.js";
+import { fshGutsDirectories, isFrozenSubtree, readFshGutsNode } from "../schemas/kg/fsh-guts.js";
 import { exitUnlessMounted } from "./branch-store.js";
-import { STANDARD_PREFIXES, contextBindings, vocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
+import { STANDARD_PREFIXES, contextBindings, vocabMapping } from "../schemas/content/vocab-mapping.js";
 import { declaredSubgraphNode } from "./kg-export.js";
 import { memberOf, subgraphContainer } from "./subgraph-node.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

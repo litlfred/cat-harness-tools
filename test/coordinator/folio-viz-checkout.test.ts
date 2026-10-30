@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */

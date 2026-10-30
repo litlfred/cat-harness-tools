@@ -47,8 +47,8 @@
 import { readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { StateManifestSchema, type StateManifest } from "@litlfred/cat-harness/schemas/kg/state-manifest.ts";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { StateManifestSchema, type StateManifest } from "../schemas/kg/state-manifest.ts";
 
 import { BranchStore, storeOptionsFor, tipLocations, type BranchKeying, type FileRead } from "./branch-store.ts";
 import { REPO_ROOT } from "./lib/roots.ts";

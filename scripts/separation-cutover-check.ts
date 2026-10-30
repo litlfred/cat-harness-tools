@@ -46,7 +46,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
 
 import { checkDeclarationResolution } from "./check-declaration-resolution.ts";
 import { analyse as importDirection } from "./check-import-direction.ts";

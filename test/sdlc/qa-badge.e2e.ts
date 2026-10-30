@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { badgeRunFor, indexUrlOf, indexWithRows } from "../support/qa-badge-fixture.js";
 import { docsPageOf, docsSources } from "../../scripts/lib/docs-sources.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /**

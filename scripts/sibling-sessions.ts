@@ -61,7 +61,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */

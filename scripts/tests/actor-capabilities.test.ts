@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkoutActors, neededActors } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
+import { checkoutActors, neededActors } from "../../schemas/process/scenario-overlay.js";
 import { declaredCapabilityIds, unresolvedActorCapabilities } from "../lib/actor-capabilities.ts";
 
 const SCENARIOS = [{ id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] }];

@@ -10,7 +10,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptTable } from "../../schemas/sdlc/script-table.ts";
 
 /** `run-script.ts`, beside the scripts that call it. */
 export const RUN_SCRIPT = resolve(import.meta.dir, "..", "run-script.ts");

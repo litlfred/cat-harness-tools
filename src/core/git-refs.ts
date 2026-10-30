@@ -26,8 +26,8 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { readEffectiveConfig } from "../../schemas/kg/harness-config.ts";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 
 /**
  * Run a git command in `root`, or `undefined` if it fails.

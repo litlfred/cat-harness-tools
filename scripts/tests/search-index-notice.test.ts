@@ -36,7 +36,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 
 const JS = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
 const CSS = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/docs-ui.css")), "utf8");

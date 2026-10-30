@@ -38,14 +38,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import type { CheckerHit, CheckerPaths, CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { folioDir } from "../schemas/kg/cat-harness.js";
+import type { CheckerHit, CheckerPaths, CheckerResult } from "../schemas/sdlc/block-qa.ts";
 
 import { parseManifestStringArray } from "./qa-checkers-extended";
 import { readBlockManifest, walkBlocks } from "./qa-utils";
 import { findContentRepoRoot } from "./repo-root";
 import { parseStringField } from "./uses-field";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 // ── Corpus label index (built once per process) ─────────────────
 

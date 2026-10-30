@@ -73,7 +73,7 @@ describe("gen-openapi-viewer --site", () => {
   const read = (f: string): string => readFileSync(join(site, route, f), "utf8");
 
   it("the Tool declares the kind it renders and takes no required input", async () => {
-    const { tools } = await import("@litlfred/cat-harness/tools/index.ts");
+    const { tools } = await import("../../schemas/tools/harness-tools.ts");
     const t = tools().find((x) => x.id === TOOL_ID)!;
     expect(t.renders).toContain("openapi");
     expect(t.io?.inputs?.filter((i) => i.required) ?? []).toEqual([]);

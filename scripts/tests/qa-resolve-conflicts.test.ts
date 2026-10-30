@@ -27,8 +27,8 @@ import {
   unmergedStages,
   type SideScan,
 } from "../qa-resolve-conflicts.ts";
-import { attestationKeyForDerived, attestationPath, writeCriteriaAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { attestationKeyForDerived, attestationPath, writeCriteriaAttestations } from "../../schemas/sdlc/qa-attestations.ts";
+import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -303,8 +303,8 @@ describe("the qa directory is resolved, not assembled", () => {
     // It FAILED OPEN, which is the shape the command exists to prevent, in the
     // command itself. It was found on its first real conflict rather than by a
     // test, so the shape of the return value is asserted here directly.
-    const { directoryForGraph, repoRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.ts");
-    await import("@litlfred/cat-harness/schemas/kg/folio-graph-typology.js");
+    const { directoryForGraph, repoRootFor } = await import("../../schemas/kg/cat-harness.ts");
+    await import("../../schemas/kg/folio-graph-typology.js");
     const instance = join(HARNESS_ROOT);
     const qa = directoryForGraph(instance, "qa");
     expect(qa).toBeDefined();

@@ -15,14 +15,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { tools } from "../../../tools/discover.js";
-import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
-import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import { ToolDefinitionSchema, alternativesWithoutSelection, deriveAlternatives } from "../../../schemas/tools/tool.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypeIri, toolTypeNameOf } from "../../../schemas/tools/tool-types.js";
 import { checkTools, danglingStorageTools, knownSkills, contractRequires } from "../../check-tools.js";
 import { knownSkills as canonicalKnownSkills } from "../../known-skills.js";
 import { buildExport } from "../../kg-export.js";
 import { buildToolTypeFiles, buildToolTypes, buildToolSchema, buildSkillIoContracts, skillIoIri, staleSkillIoIds } from "../../harness-schema-export.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
+import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 import { hostSchemaBase } from "../../lib/host-schema.ts";
 

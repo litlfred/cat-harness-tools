@@ -77,8 +77,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { fshGutsDirectories } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
+import { directoriesForGraph } from "../schemas/kg/cat-harness.ts";
+import { fshGutsDirectories } from "../schemas/kg/fsh-guts.ts";
 import { exitUnlessMounted } from "./branch-store.ts";
 
 const ROOT = resolve(import.meta.dir, "..", "..");

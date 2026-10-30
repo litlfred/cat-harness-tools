@@ -19,7 +19,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
-import { CONTENT_CONTEXT } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { CONTENT_CONTEXT } from "../schemas/kg/jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // NOT a folio root: `content` here names the content VOCABULARY, and this

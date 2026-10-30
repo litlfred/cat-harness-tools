@@ -41,13 +41,13 @@
  */
 import { join } from "node:path";
 
-import { allAvatars, AVATARS, GENERIC, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
+import { allAvatars, AVATARS, GENERIC, hasAvatar } from "../schemas/content/avatars.js";
 import {
   BASE_GRAPH_TYPOLOGIES,
   defaultGraphTypologies,
   isPublishedGraphTypology,
   readDeclaration,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { renderAvatarsCss } from "./gen-avatars-css.js";
 import {
   buildQaResult,

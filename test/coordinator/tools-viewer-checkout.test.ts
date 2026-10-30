@@ -12,8 +12,8 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { declarationPathIn } from "../../schemas/kg/cat-harness.js";
+import { gitCorpus } from "../../schemas/sdlc/git-corpus.js";
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
@@ -61,7 +61,7 @@ const docsPagesFor = (kind: string): string[] => {
   );
 };
 
-const { tools } = (await import("@litlfred/cat-harness/tools/index.js")) as { tools: () => unknown[] };
+const { tools } = (await import("../../schemas/tools/harness-tools.js")) as { tools: () => unknown[] };
 const rows = toolRows(tools());
 
 describe("the tools graph is not documented by the skills page", () => {

@@ -40,8 +40,8 @@
 import { availableParallelism } from "node:os";
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { mountScopeFor } from "../schemas/kg/remote-mount.js";
 import { againstOrUsage, judgeUsage } from "./qa-results.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";

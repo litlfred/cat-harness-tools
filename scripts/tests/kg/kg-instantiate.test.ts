@@ -15,7 +15,7 @@ import { harnessHome, instantiate, stateDirectoriesOf, unsafePathReason } from "
 import { subscribedHarnesses, subscribedTile } from "../../subscribed-harnesses.ts";
 import { partRecordsIn, type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";
 import { render, subscriptionCards } from "../../subscriptions-viz.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 

@@ -4,9 +4,9 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CatHarnessDeclarationSchema, ExactVersionSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.ts";
-import { applyBump, clearsFloor, comparable, diffSurface, surfaceOf } from "@litlfred/cat-harness/schemas/kg/version-bump.ts";
+import { CatHarnessDeclarationSchema, ExactVersionSchema } from "./kg/cat-harness.ts";
+import { dependsOnFor } from "./kg/depends-on.ts";
+import { applyBump, clearsFloor, comparable, diffSurface, surfaceOf } from "./kg/version-bump.ts";
 import { auditVersionBumps, releaseTags } from "../scripts/check-version-bump";
 import { auditPublishable, formatReport } from "../scripts/check-publishable";
 

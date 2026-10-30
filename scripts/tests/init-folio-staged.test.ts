@@ -16,7 +16,7 @@ import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { CatHarnessDeclarationSchema } from "../../schemas/kg/cat-harness.js";
 import { initStaged } from "../init-folio.js";
 
 const temps: string[] = [];

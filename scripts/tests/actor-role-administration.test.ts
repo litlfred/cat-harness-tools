@@ -19,7 +19,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "path";
 
 import { loadProcessModel } from "../../src/workflow/process-model";
-import { fulfilmentKindsForBpmnType, findRole } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { fulfilmentKindsForBpmnType, findRole } from "../../schemas/process/role-graph.ts";
 import { roleGraphFor } from "../known-skills";
 import { workflowFile } from "../known-skills.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
