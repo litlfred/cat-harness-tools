@@ -47,7 +47,7 @@ function makeSyntheticCatalog(): {
   const igPubBytes = new TextEncoder().encode("fake-ig-publisher-jar");
   const sushiBytes = new TextEncoder().encode("fake-fsh-sushi-tgz");
   const nodeBytes = new TextEncoder().encode("fake-node-22-archive");
-  const leanBytes = new TextEncoder().encode("leanprover/lean4:v4.12.0\n");
+  const leanBytes = new TextEncoder().encode("leanprover/lean4:v4.35.0\n");
 
   const jre17: ToolRelease = {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
@@ -82,7 +82,7 @@ function makeSyntheticCatalog(): {
   const node22: ToolRelease = {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
     name: "node",
-    version: "22.11.0",
+    version: "22.23.4",
     role: "runtime",
     kind: "archive",
     source: { type: "url", url: "https://example.invalid/node-22.tar.xz" },
@@ -90,17 +90,17 @@ function makeSyntheticCatalog(): {
     licence: "MIT",
     licenceSource: "test fixture: no real artefact behind it",
     platform: { os: "linux", arch: "x64" },
-    entry: { template: "{home}/bin/node", home: "node-v22.11.0-linux-x64" },
+    entry: { template: "{home}/bin/node", home: "node-v22.23.4-linux-x64" },
     runtimes: [],
   };
 
   const plantuml: ToolRelease = {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
     name: "plantuml",
-    version: "1.2024.7",
+    version: "1.2026.9",
     role: "tool",
     kind: "jar",
-    source: { type: "url", url: "https://example.invalid/plantuml-1.2024.7.jar" },
+    source: { type: "url", url: "https://example.invalid/plantuml-1.2026.9.jar" },
     digest: { algorithm: "sha256", digest: sha256Hex(plantumlBytes), verifiedAt: "2026-10-07" },
     licence: "GPL-3.0-or-later",
     licenceSource: "test fixture: no real artefact behind it",
@@ -121,31 +121,31 @@ function makeSyntheticCatalog(): {
     entry: { template: "java -jar {path}" },
     runtimes: [
       { release: "temurin-jre@17.0.12+7", inject: "JAVA_HOME" },
-      { release: "fsh-sushi@3.13.0", inject: "PATH" },
+      { release: "fsh-sushi@3.21.0", inject: "PATH" },
     ],
   };
 
   const fshSushi: ToolRelease = {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
     name: "fsh-sushi",
-    version: "3.13.0",
+    version: "3.21.0",
     role: "tool",
     kind: "archive",
-    source: { type: "url", url: "https://example.invalid/fsh-sushi-3.13.0.tgz" },
+    source: { type: "url", url: "https://example.invalid/fsh-sushi-3.21.0.tgz" },
     digest: { algorithm: "sha256", digest: sha256Hex(sushiBytes), verifiedAt: "2026-10-07" },
     licence: "MIT",
     licenceSource: "test fixture: no real artefact behind it",
     entry: { template: "node {home}/dist/app.js", home: "package" },
-    runtimes: [{ release: "node@22.11.0", inject: "PATH" }],
+    runtimes: [{ release: "node@22.23.4", inject: "PATH" }],
   };
 
   const lean: ToolRelease = {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
     name: "lean-toolchain",
-    version: "4.12.0",
+    version: "4.35.0",
     role: "tool",
     kind: "toolchain-file",
-    source: { type: "url", url: "https://example.invalid/lean-4.12.0" },
+    source: { type: "url", url: "https://example.invalid/lean-4.35.0" },
     digest: { algorithm: "sha256", digest: sha256Hex(leanBytes), verifiedAt: "2026-10-07" },
     licence: "Apache-2.0",
     licenceSource: "test fixture: no real artefact behind it",
@@ -158,10 +158,10 @@ function makeSyntheticCatalog(): {
     name: "dual-java",
     description: "PlantUML on Java 21 alongside IG Publisher on Java 17 and SUSHI on Node 22.",
     tools: {
-      plantuml: "plantuml@1.2024.7",
+      plantuml: "plantuml@1.2026.9",
       "fhir-ig-publisher": "fhir-ig-publisher@1.6.20",
-      "fsh-sushi": "fsh-sushi@3.13.0",
-      "lean-toolchain": "lean-toolchain@4.12.0",
+      "fsh-sushi": "fsh-sushi@3.21.0",
+      "lean-toolchain": "lean-toolchain@4.35.0",
     },
   };
 
@@ -215,10 +215,10 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
       // All 7 releases in the transitive closure (4 tools + 3 runtimes) are provisioned.
       expect(res.runReleases.map((r) => r.release).sort()).toEqual([
         "fhir-ig-publisher@1.6.20",
-        "fsh-sushi@3.13.0",
-        "lean-toolchain@4.12.0",
-        "node@22.11.0",
-        "plantuml@1.2024.7",
+        "fsh-sushi@3.21.0",
+        "lean-toolchain@4.35.0",
+        "node@22.23.4",
+        "plantuml@1.2026.9",
         "temurin-jre@17.0.12+7",
         "temurin-jre@21.0.4+7",
       ]);
@@ -233,14 +233,14 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
       // whichTool injects JAVA_HOME=jre21 for plantuml and JAVA_HOME=jre17 + PATH(fsh-sushi) for fhir-ig-publisher.
       const plantumlWhich = await whichTool(loaded, "plantuml", { profile: "dual-java", cacheRoot, mode: "resolve-only" });
       expect(plantumlWhich.env.JAVA_HOME).toContain("21.0.4+7-");
-      expect(plantumlWhich.entryCommand).toContain("plantuml-1.2024.7.jar");
+      expect(plantumlWhich.entryCommand).toContain("plantuml-1.2026.9.jar");
 
       const igWhich = await whichTool(loaded, "fhir-ig-publisher", { profile: "dual-java", cacheRoot, mode: "resolve-only" });
       expect(igWhich.env.JAVA_HOME).toContain("17.0.12+7-");
       expect(igWhich.env.PATH).toContain("fsh-sushi");
 
       const sushiWhich = await whichTool(loaded, "fsh-sushi", { profile: "dual-java", cacheRoot, mode: "resolve-only" });
-      expect(sushiWhich.env.PATH).toContain("node-v22.11.0-linux-x64/bin");
+      expect(sushiWhich.env.PATH).toContain("node-v22.23.4-linux-x64/bin");
     } finally {
       rmSync(cacheRoot, { recursive: true, force: true });
     }
@@ -252,7 +252,7 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
       const { loaded, releases, artefacts } = makeSyntheticCatalog();
       const res = await resolveTools(
         loaded,
-        { refs: ["plantuml@1.2024.7"] },
+        { refs: ["plantuml@1.2026.9"] },
         {
           cacheRoot,
           mode: "provision",
@@ -266,7 +266,7 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
         },
       );
 
-      const puml = res.runReleases.find((r) => r.release === "plantuml@1.2024.7")!;
+      const puml = res.runReleases.find((r) => r.release === "plantuml@1.2026.9")!;
       expect(puml.state).toBe("could-not-provision");
       if (puml.state === "could-not-provision") {
         expect(puml.reason).toContain("sha256 mismatch");
@@ -298,7 +298,7 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
 
       const res = await resolveTools(
         loaded,
-        { refs: ["plantuml@1.2024.7"] },
+        { refs: ["plantuml@1.2026.9"] },
         {
           cacheRoot,
           mode: "provision",
@@ -306,7 +306,7 @@ describe("Step 2 — resolver, content-addressed cache & per-tool runtime inject
       );
 
       const jreState = res.runReleases.find((r) => r.release === "temurin-jre@21.0.4+7")!;
-      const pumlState = res.runReleases.find((r) => r.release === "plantuml@1.2024.7")!;
+      const pumlState = res.runReleases.find((r) => r.release === "plantuml@1.2026.9")!;
       expect(jreState.state).toBe("provisioned");
       expect(pumlState.state).toBe("could-not-provision");
       if (pumlState.state === "could-not-provision") {
@@ -360,15 +360,15 @@ describe("Step 3 — RunContext & PROV-O `prov:used` emission (`C1 = a`)", () =>
 
       // fsh-sushi failed to provision, and fhir-ig-publisher depends on fsh-sushi so both are unprovisioned.
       const unprov = unprovisioned(built.context).map((r) => r.release);
-      expect(unprov).toContain("fsh-sushi@3.13.0");
+      expect(unprov).toContain("fsh-sushi@3.21.0");
       expect(unprov).toContain("fhir-ig-publisher@1.6.20");
 
       const used = provUsedFromRunContext(built.context);
-      expect(used).toContain("plantuml@1.2024.7");
+      expect(used).toContain("plantuml@1.2026.9");
       expect(used).toContain("temurin-jre@21.0.4+7");
       expect(used).toContain("temurin-jre@17.0.12+7");
-      expect(used).toContain("node@22.11.0");
-      expect(used).not.toContain("fsh-sushi@3.13.0");
+      expect(used).toContain("node@22.23.4");
+      expect(used).not.toContain("fsh-sushi@3.21.0");
       expect(used).not.toContain("fhir-ig-publisher@1.6.20");
 
       const baseActivity: ProvActivity = {
@@ -395,7 +395,7 @@ describe("Step 3 — RunContext & PROV-O `prov:used` emission (`C1 = a`)", () =>
       });
       expect(projectQaToolchain(fullBuilt.context, { fhirVersion: "4.0.1" })).toEqual({
         publisher: "1.6.20",
-        sushi: "3.13.0",
+        sushi: "3.21.0",
         fhirVersion: "4.0.1",
       });
     } finally {
@@ -445,7 +445,7 @@ describe("Step 4 — `tools:sbom` SPDX 3.0.1 JSON-LD export", () => {
       const packages = graph.filter((n) => n.type === "software_Package");
       expect(packages).toHaveLength(releases.length);
       const plantumlPkg = packages.find((p) => p.name === "plantuml")!;
-      expect(plantumlPkg.spdxId).toBe(packageSpdxId("plantuml@1.2024.7"));
+      expect(plantumlPkg.spdxId).toBe(packageSpdxId("plantuml@1.2026.9"));
       expect(plantumlPkg.verifiedUsing).toEqual([
         {
           type: "Hash",
@@ -465,7 +465,7 @@ describe("Step 4 — `tools:sbom` SPDX 3.0.1 JSON-LD export", () => {
       const igDepends = dependsOnRels.find((r) => r.from === packageSpdxId("fhir-ig-publisher@1.6.20"))!;
       expect(igDepends.to).toEqual([
         packageSpdxId("temurin-jre@17.0.12+7"),
-        packageSpdxId("fsh-sushi@3.13.0"),
+        packageSpdxId("fsh-sushi@3.21.0"),
       ]);
 
       // RunContext produces a build_Build and a LifecycleScopedRelationship usesTool (scope: "build").
@@ -509,14 +509,24 @@ describe("Step 6 — `upstream-pins` assessment for tool-release pins", () => {
     if (!pinDef) throw new Error("cat-harness upstream-pins.json declares no `plantuml` pin");
     const fileText = readFileSync(join(HARNESS_ROOT, pinDef.pinnedIn), "utf8");
     const pinned = readPin(fileText, pinDef.pattern);
-    expect(pinned).toBe("1.2024.7");
+    // The version itself is not asserted: this test runs against whichever
+    // cat-harness is mounted, and moving the pin there must not break it here.
+    // What is asserted is that the pattern reads a PlantUML version out of the
+    // real release file, and that the tag pattern accepts it.
+    if (pinned === undefined) throw new Error(`no version read from ${pinDef.pinnedIn}`);
+    expect(pinned).toMatch(/^1\.\d{4}\.\d+$/);
+    const year = Number(pinned.split(".")[1]);
+    const older = `v1.${year - 1}.0`;
+    const tag = `v${pinned}`;
+    const newer = `v1.${year + 1}.0`;
+    expect(new RegExp(pinDef.tagPattern).test(tag)).toBe(true);
 
-    const current = assessPin(pinDef, pinned, ["v1.2024.6", "v1.2024.7"]);
+    const current = assessPin(pinDef, pinned, [older, tag]);
     expect(current.state).toBe("current");
 
-    const behind = assessPin(pinDef, pinned, ["v1.2024.7", "v1.2025.0"]);
+    const behind = assessPin(pinDef, pinned, [tag, newer]);
     expect(behind.state).toBe("behind");
-    expect(behind.behindBy).toEqual(["v1.2025.0"]);
+    expect(behind.behindBy).toEqual([newer]);
 
     const unknown = assessPin(pinDef, pinned, undefined);
     expect(unknown.state).toBe("unknown");
@@ -530,7 +540,7 @@ describe("Step 8 — `test:itb-export` GITB TAR projection", () => {
       const { loaded, artefacts } = makeSyntheticCatalog();
       const res = await resolveTools(
         loaded,
-        { refs: ["plantuml@1.2024.7"] },
+        { refs: ["plantuml@1.2026.9"] },
         {
           cacheRoot,
           mode: "provision",
