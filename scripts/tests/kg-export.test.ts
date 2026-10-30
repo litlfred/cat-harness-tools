@@ -26,8 +26,8 @@
  * has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { EXTERNAL_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/kg/external-schema.ts";
+import { readRoleGraph } from "../../schemas/process/role-graph.ts";
+import { EXTERNAL_SCHEMA_TAG } from "../../schemas/kg/external-schema.ts";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { workflowFiles } from "../known-skills.ts";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -41,14 +41,14 @@ import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishe
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { termIri } from "../../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
-import { toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
-import { TOOL_TYPES } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import { toolIri } from "../../schemas/tools/tool-folders.js";
+import { TOOL_TYPES } from "../../schemas/tools/tool-types.js";
 import { dirname } from "node:path";
 
 /**

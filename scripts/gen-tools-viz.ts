@@ -75,12 +75,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
-import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
-import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { tileCounts } from "../schemas/ui/tile-count.js";
+import { KG_QA_DIRNAME, kgQaSidecarPath } from "../schemas/sdlc/kg-qa.js";
+import { visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { discoverTools, toolsOf } from "../tools/discover.ts";
 import { baseDocsDir } from "./compose-docs.js";

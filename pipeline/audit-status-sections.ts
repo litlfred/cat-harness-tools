@@ -39,7 +39,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from "fs";
 import { join, dirname, basename } from "path";
 import { checkStatusSectionHeader } from "./qa-checkers-voice";
-import { BLOCK_KIND_ALT } from "@litlfred/cat-harness/schemas/types.ts";
+import { BLOCK_KIND_ALT } from "../schemas/types.ts";
 import { requirePaper } from "./repo-root";
 import { paperArg } from "./cli-args";
 

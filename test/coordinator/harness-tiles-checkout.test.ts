@@ -27,13 +27,27 @@ describe("an instance's OWN theme tones its tile (bean v8n5)", () => {
   const tiles = harnessTiles(REPO, HOST, ["who-iris", "cat-harness", "bootstrap"]);
 
   test("who-iris's tile tone is the hue of its own theme's accent, not the avatar's", async () => {
-    const { themeByRef } = await import("@litlfred/cat-harness/schemas/ui/theme-by-ref.js");
-    const { hexHue } = await import("@litlfred/cat-harness/schemas/ui/theme.js");
+    const { themeByRef } = await import("../../schemas/ui/theme-by-ref.js");
+    const { hexHue } = await import("../../schemas/ui/theme.js");
     const r = themeByRef({ instance: "who-iris", themeId: "iris-sticky" }, REPO);
     expect(r.ok).toBe(true);
     const who = tiles.find((t) => t.name === "who-iris")!;
     expect(who.toneFrom).toBe("theme");
     expect(who.tone).toBe(hexHue(r.ok ? r.theme.palette.accent : "")!);
     expect(who.findings.join(" ")).not.toContain("not installed");
+  });
+});
+
+describe("a site sub-graph links where its index.md is PUBLISHED (fa#2739)", () => {
+  // cat-harness's `docs/start/index.md` is served at `/docs/cat-harness/start/`
+  // by the site's permalink defaults. The tile linked its source path,
+  // `/start/`, and nothing is served there.
+  const REPO = join(ORIGIN_DIR, "..", "..", "..");
+  const tiles = harnessTiles(REPO, join(REPO, "cat-harness"), ["cat-harness"]);
+
+  test("the Doc group row opens the published start page", () => {
+    const cat = tiles.find((t) => t.name === "cat-harness")!;
+    const group = (cat.visualisations ?? []).find((v) => v.kind === "doc-group");
+    expect(group?.path).toBe("/docs/cat-harness/start/");
   });
 });

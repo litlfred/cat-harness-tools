@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { gitScan } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitScan } from "../../schemas/sdlc/git-corpus.ts";
 
 /** The directory this test was written in (`cat-harness/schemas/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

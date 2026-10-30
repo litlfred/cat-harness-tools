@@ -41,8 +41,8 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { directoriesForGraph } from "../schemas/kg/cat-harness.js";
 import type { CorpusScope } from "./known-skills.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it

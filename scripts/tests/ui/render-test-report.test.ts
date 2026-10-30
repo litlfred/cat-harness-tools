@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup, type TestCaseVerdict } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
+import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup, type TestCaseVerdict } from "../../../schemas/sdlc/test-report.ts";
 import { renderTestReport, testReportBadge } from "../../render-test-report.ts";
 
 const reviewer = { kind: "script" as const, id: "runner.ts", actor: "ci-pipeline" };
@@ -13,7 +13,7 @@ const report = (cases: Record<string, TestCaseVerdict[]>, status: "completed" | 
   TestReportSchema.parse({
     $schema: TEST_REPORT_SCHEMA_ID,
     plan: { id: "demo-plan", version: "1" },
-    sut: { actor: "demo-sut", version: "1", reach: "air-gapped" },
+    sut: { kind: "tool" as const, actor: "demo-sut", version: "1", reach: "air-gapped" },
     run: { id: "r-abc-def", data: "abc", process: "def" },
     status,
     started_at: "2026-10-11T08:00:00Z",

@@ -14,8 +14,8 @@ import {
 } from "fs";
 import { join, resolve } from "path";
 import { execFileSync } from "child_process";
-import { findDeclarationFile, graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { findDeclarationFile, graphLayer, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
 import { criterionSourceHash } from "./qa-criterion-hash";
 import { maskStringsAndComments, parseStringField } from "./uses-field";
 import {
@@ -23,7 +23,7 @@ import {
   listFormalSourceFiles,
   resolveCanonicalFormal,
   type FormalTreeCache,
-} from "@litlfred/cat-harness/schemas/formal-ref.js";
+} from "../schemas/formal-ref.js";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import type {
@@ -33,9 +33,9 @@ import type {
   QaScriptSidecar,
   CompanionRole,
   QaCriterionDefinition,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { COMPANION_ROLES } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/sdlc/block-qa.ts";
+import { COMPANION_ROLES } from "../schemas/sdlc/block-qa.ts";
+import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "../schemas/content/block-kinds.ts";
 import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";
@@ -1746,4 +1746,21 @@ export const LOCAL_SWEEP_ACTOR = "local-sweep";
 // input-site: env CI,GITHUB_ACTIONS #eddec1a1 — which sweep actor is named in a sidecar
 export function sweepActor(env: Record<string, string | undefined> = process.env): string {
   return env.CI === "true" || env.GITHUB_ACTIONS === "true" ? CI_SWEEP_ACTOR : LOCAL_SWEEP_ACTOR;
+}
+
+/**
+ * Where the script sidecars go: the `--script-sidecar-root` the caller gave,
+ * else the platform folder when it is the platform's own checkout, else
+ * nowhere (`null`).
+ *
+ * A folio runs this sweep from a remote-mounted copy of the platform
+ * (`cat-harness-tools/` at its root, laid down by `remote-mount.ts`). That
+ * copy has no `.git` and is fixity-checked against the lock, so a sidecar
+ * written into it is a change nobody can commit, and the next mount refuses
+ * the copy as "somebody's work" (smart-ra, 2026-10-30: a local
+ * `qa-sweep.ts folio` blocked the staging publish).
+ */
+export function scriptSidecarTarget(explicit: string | undefined, platformRoot: string): string | null {
+  if (explicit !== undefined) return explicit;
+  return existsSync(join(platformRoot, ".git")) ? platformRoot : null;
 }

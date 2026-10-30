@@ -52,11 +52,11 @@
 import { spawnSync } from "node:child_process";
 import { basename, relative, resolve } from "node:path";
 
-import { readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { resolveInstanceGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
+import { resolveInstanceGraph } from "../schemas/kg/harness-config.js";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import "../schemas/kg/folio-graph-typology.js";
 
 import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
 import { auditInstance as auditAssets } from "./check-declared-assets.ts";

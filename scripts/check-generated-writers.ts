@@ -37,10 +37,10 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "../schemas/kg/cat-harness.ts";
+import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.ts";
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { collectTaskWrites, type TaskWrites } from "./task-io.ts";
 
 const REPO = resolve(import.meta.dir, "../..");

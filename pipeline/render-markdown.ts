@@ -35,9 +35,9 @@ import { resolveLiquidValues } from "./liquid-values";
 import { existsSync, readFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 
-import type { Block, Chapter, Paper, Section } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block, Chapter, Paper, Section } from "../schemas/types.ts";
 import { isSectionRef } from "../adapters/manifest-entries";
-import { kindHeading } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { kindHeading } from "../schemas/content/translation.ts";
 import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
 import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } from "./po-inject";
 

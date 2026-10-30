@@ -51,7 +51,7 @@ import {
   neighbors,
   searchGraph,
 } from "./graph-index";
-import type { GraphEdgeTerm } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import type { GraphEdgeTerm } from "../schemas/kg/jsonld.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { buildLsi, query as lsiQuery, tokenize } from "./lsi";
 

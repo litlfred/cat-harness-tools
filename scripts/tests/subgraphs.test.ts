@@ -29,10 +29,10 @@ import {
   resolveDirectories,
   siteDirFor,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../../schemas/kg/cat-harness.ts";
 import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
-import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "../../schemas/kg/graph-typology-registry.ts";
+import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

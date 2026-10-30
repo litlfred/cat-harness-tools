@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 
-import { RunContextRefSchema, RunContextSchema, unprovisioned } from "@litlfred/cat-harness/schemas/sdlc/run-context.ts";
-import { TOOL_RELEASE_SCHEMA_TAG, type ToolRelease } from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
-import { TOOL_PROFILE_SCHEMA_TAG, type ToolProfile } from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
-import { TEST_RUN_SCHEMA_ID, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
-import { TEST_REPORT_SCHEMA_ID, type TestReport } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
+import { RunContextRefSchema, RunContextSchema, unprovisioned } from "../../schemas/sdlc/run-context.ts";
+import { TOOL_RELEASE_SCHEMA_TAG, type ToolRelease } from "../../schemas/tools/tool-release.ts";
+import { TOOL_PROFILE_SCHEMA_TAG, type ToolProfile } from "../../schemas/tools/tool-profile.ts";
+import { TEST_RUN_SCHEMA_ID, type TestRun } from "../../schemas/sdlc/test-run.ts";
+import { TEST_REPORT_SCHEMA_ID, type TestReport } from "../../schemas/sdlc/test-report.ts";
+import type { ProvActivity } from "../../schemas/content/prov.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { assessPin, readPin, type PinDef } from "../../src/upstream/pins.ts";
 import { resolvePlantumlRelease, PLANTUML } from "../plantuml-render.ts";
@@ -569,7 +569,7 @@ describe("Step 8 — `test:itb-export` GITB TAR projection", () => {
       const testReport: TestReport = {
         $schema: TEST_REPORT_SCHEMA_ID,
         plan: { id: "crdm-detect", version: "1.0" },
-        sut: { actor: "claude-code", version: "1.0", reach: "internet" },
+        sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "1.0", reach: "internet" },
         run: { id: "run-1", data: "abcdef012345", process: "fedcba543210" },
         status: "completed",
         started_at: "2026-10-07T00:00:00Z",

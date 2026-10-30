@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { complete, enabled, startInstance, WorkflowError, type EnabledActivity } from "./instance.js";
 import { loadProcessModel } from "./process-model.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { RoleGraph } from "../../schemas/process/role-graph.js";
 
 const testRoleGraph: RoleGraph = {
   name: "test-role-graph",

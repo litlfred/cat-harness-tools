@@ -44,8 +44,8 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { checkoutDirectories, instanceConfigFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { checkoutDirectories, instanceConfigFor } from "../schemas/kg/harness-config.js";
+import type { ToolDefinition } from "../schemas/tools/tool.js";
 
 import { discoverTools } from "../tools/discover.ts";
 import { runWriter, type WriterOutcome } from "./derive-at-publish.ts";

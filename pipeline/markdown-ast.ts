@@ -34,7 +34,7 @@ import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
 import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import type { Root } from "mdast";
-import type { Block } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block } from "../schemas/types.ts";
 // Type-only, for their side effect: each augments mdast's `RootContentMap`
 // with the node types its remark plugin produces.
 import type {} from "mdast-util-math";

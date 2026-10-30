@@ -30,8 +30,8 @@ import {
   BINARY_RELEASE_SCHEMA_TAG,
   BinaryReleaseSchema,
   type BinaryRelease,
-} from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/sdlc/binary-release.js";
+import { readDeclaration } from "../schemas/kg/cat-harness.js";
 
 // declared-path-literal: the pack-time exclusions for the binary assets a
 // PACKAGED instance may hold, written into that package's ignore list. They

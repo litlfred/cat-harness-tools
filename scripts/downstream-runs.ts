@@ -29,9 +29,9 @@
  * Adding a member is one entry here plus the Tool's declaration; the criteria
  * need no change.
  */
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
-import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "@litlfred/cat-harness/schemas/tools/tool-run.ts";
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import type { ToolDefinition } from "../schemas/tools/tool.ts";
+import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "../schemas/tools/tool-run.ts";
+import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.ts";
 import { graphVerdict, LSI_TOOL_ID, proseGraphs, targetOf } from "./lsi.ts";
 
 /** One target of a downstream tool, as its member reads it. */

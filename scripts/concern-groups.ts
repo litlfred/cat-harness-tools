@@ -36,13 +36,13 @@
  * reason a group's directory is its code.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { SkillTopicsSchema } from "@litlfred/cat-harness/schemas/kg/skill-topics.ts";
+import { checkoutRootFor, findInstanceRoot, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { ConcernGroupsSchema } from "../schemas/kg/concern-groups.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
+import { checkoutDirectories, orderedDependencies } from "../schemas/kg/harness-config.ts";
+import { SkillTopicsSchema } from "../schemas/kg/skill-topics.ts";
 
 /** The code list every group id is drawn from, by its `id`. */
 export const CONCERN_GROUP_LIST = "concern-group";
@@ -138,6 +138,40 @@ export function groupsOfDeclaration(raw: unknown, kind: string, file: string): D
 const inheritedCache = new Map<string, DeclaredGroup[]>();
 
 /**
+ * When `inst` is a standalone clone in a multi-repo sibling workspace (like
+ * `implementingInstancesOf` in `harness-config.ts`, bean `nn8e`), walk its
+ * declared `needs` by exact name in `dirname(inst)` so inherited concern
+ * groups still resolve when dependencies sit beside the clone rather than
+ * mounted inside it (bean `t5zb`).
+ */
+function siblingNeedsDeps(inst: string): string[] {
+  const parent = dirname(resolve(inst));
+  const seen = new Set<string>([resolve(inst)]);
+  let queue: string[] = [];
+  try {
+    queue = [...(readDeclaration(inst)?.needs ?? [])];
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  while (queue.length > 0) {
+    const name = queue.shift()!;
+    const candidate = join(parent, name);
+    if (seen.has(candidate) || !existsSync(candidate)) continue;
+    try {
+      const decl = readDeclaration(candidate);
+      if (decl?.name !== name) continue;
+      seen.add(candidate);
+      out.push(candidate);
+      for (const n of decl.needs ?? []) queue.push(n);
+    } catch {
+      continue;
+    }
+  }
+  return out.reverse();
+}
+
+/**
  * The groups declared in the SAME-NAMED directory of every instance `dir`'s
  * instance depends on — what `dir` inherits, whether or not it holds them.
  * A lower instance's malformed file is that instance's finding, not this
@@ -156,6 +190,9 @@ export function inheritedGroupsFor(dir: string, kind: string, registry: GraphTyp
       deps = orderedDependencies(inst).map((d) => d.rootPath);
     } catch {
       deps = [];
+    }
+    if (deps.length === 0 && resolve(checkoutRootFor(inst)) === resolve(inst)) {
+      deps = siblingNeedsDeps(inst);
     }
     for (const dep of deps) {
       const same = join(dep, rel);

@@ -55,31 +55,31 @@ import {
   isPublishedGraphTypology,
   ownPrefixTable,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+} from "../schemas/kg/cat-harness.js";
+import "../schemas/kg/folio-graph-typology.js";
 import {
   LEGACY_FOLIO_NS,
   namespaceForLayer,
   prefixForLayer,
   replacementIri,
   termIri,
-} from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/namespaces.js";
+import { REGISTRY_GROUPS } from "../schemas/kg/kg-node.js";
+import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
-import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content/content-context.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
-import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
+import { discoverBlockKinds } from "../schemas/content/block-kinds.js";
+import { defaultInstancePrefixes } from "../schemas/content/content-context.js";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
 import {
   CLASS_GLOSSES,
   PROPERTY_GLOSSES,
   TERM_LAYERS,
   type TermGloss,
   type TermLayer,
-} from "@litlfred/cat-harness/schemas/content/vocabulary.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+} from "../schemas/content/vocabulary.js";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // The instance that declares the `core` term layer's kinds — the content layer
@@ -223,9 +223,12 @@ export function mintedTermsFromSource(root = ROOT): Set<string> {
   // `xd1g`. Measured at the conversion: **936 before, 935 after** — the one it
   // drops is a gitignored `dist/index.d.ts`, and a generated declaration file
   // minting a term would be a term nobody wrote. Nothing gained.
-  for (const p of gitFiles(root, (rel) =>
+  // Since bean `8lcl` the harness's code lives in cat-harness-tools, so the
+  // harness's own minting sites are read there as well as here.
+  const roots = root === ROOT ? [ROOT, resolve(TOOLS_ROOT)] : [root];
+  for (const p of roots.flatMap((r) => gitFiles(r, (rel) =>
     rel.endsWith(".ts") && !rel.endsWith(".test.ts") && !rel.split("/").some((s) => s.startsWith(".")),
-  ).files) {
+  ).files)) {
     // COMMENTS ARE STRIPPED FIRST, and this is not fussiness: the first
     // version scanned raw source and reported `Name` as an undefined term,
     // matched from THIS function's own comment describing the pattern it looks

@@ -12,11 +12,11 @@
  * @module pipeline/migrate-cites
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { join} from "path";
 import { extractCitations } from "./citations";
-import { BLOCK_KIND_ALT } from "@litlfred/cat-harness/schemas/types.ts";
+import { BLOCK_KIND_ALT } from "../schemas/types.ts";
 import { findContentRepoRoot } from "./repo-root";
 
 /** Builder call identifying a block's kind — see `BLOCK_KIND_ALT`. */

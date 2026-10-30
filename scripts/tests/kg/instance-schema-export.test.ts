@@ -37,7 +37,7 @@ import {
 } from "../../harness-schema-export.js";
 import { instanceExportPlan } from "../../instance-exports.js";
 import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../../kg-export.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readDeclaration } from "../../../schemas/kg/cat-harness.js";
 import { hostSchemaBase } from "../../lib/host-schema.ts";
 import { INSTANCE, checkoutHolding, inAggregate } from "../../../test/support/checkout.js";
 

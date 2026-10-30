@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { auditRenderedBloat, classifyCandidate, extractHtmlBlocks, CRITERION_ID } from "../audit-rendered-bloat.js";
-import { KgQaReportSchema, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { KgQaReportSchema, KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.js";
 
 describe("redundant-rendered-content-audit registration", () => {
   test("criterion is registered in KG_CRITERIA_BY_ID with expected properties", () => {

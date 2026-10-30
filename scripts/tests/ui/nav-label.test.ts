@@ -25,7 +25,7 @@ import {
   stripQualifier,
   tileLabel,
 } from "../../lib/nav-label.js";
-import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { GraphTypologyRegistry } from "../../../schemas/kg/graph-typology-registry.js";
 import { subjectSection } from "../../viewer-page.js";
 
 describe("a kind is called by its display name, never its kind word", () => {

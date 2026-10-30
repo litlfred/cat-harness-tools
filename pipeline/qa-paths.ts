@@ -47,7 +47,7 @@
 import { basename, dirname, join, relative } from "node:path";
 import { existsSync, statSync } from "node:fs";
 
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
 import { manifestPath } from "./json-manifest.ts";
 
 /** Where block verdicts live now, relative to the instance root. */

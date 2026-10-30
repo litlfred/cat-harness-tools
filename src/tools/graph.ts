@@ -31,7 +31,7 @@
 import { join, relative } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { conventionalFolioDir, directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { conventionalFolioDir, directoriesForGraph, folioDir } from "../../schemas/kg/cat-harness.js";
 
 import { executeGraphTool } from "../../adapters/mcp-server/tools/graph.js";
 

@@ -108,9 +108,10 @@ describe("a gate can see work that is not committed yet", () => {
   });
 
   test("the extension filter narrows without changing the set's origin", () => {
-    const ts = repoFilesWithExt(ROOT, ["schemas"], [".ts"]);
-    expect(ts.length).toBeGreaterThan(0);
-    expect(ts.every((f) => f.endsWith(".ts"))).toBe(true);
+    // `.json`, not `.ts`: since bean `8lcl` the harness's schemas/ holds data only.
+    const json = repoFilesWithExt(ROOT, ["schemas"], [".json"]);
+    expect(json.length).toBeGreaterThan(0);
+    expect(json.every((f) => f.endsWith(".json"))).toBe(true);
   });
 });
 

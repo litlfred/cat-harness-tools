@@ -29,7 +29,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildVocabulary } from "../../ns-export.ts";
-import { CONTENT_CONTEXT, DCTERMS_NS, SKOS_NS } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { CONTENT_CONTEXT, DCTERMS_NS, SKOS_NS } from "../../../schemas/kg/jsonld.ts";
 
 type Node = Record<string, unknown>;
 interface Doc {

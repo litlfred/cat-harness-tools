@@ -25,7 +25,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
 import { extractMarkdown, extractFromManifest, formatPot } from "../../pipeline/pot-extract.ts";
 import { parsePo, injectMarkdown } from "../../pipeline/po-inject.ts";
-import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph, deferResolution} from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 // ── Configuration ───────────────────────────────────────────────

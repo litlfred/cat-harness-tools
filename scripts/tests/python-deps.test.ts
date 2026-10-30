@@ -18,7 +18,7 @@ import {
   depsForTier,
   importNameOf,
   requirementsPath,
-} from "@litlfred/cat-harness/schemas/sdlc/python-deps.ts";
+} from "../../schemas/sdlc/python-deps.ts";
 import { checkPythonDeps, scanImports } from "../check-python-deps.ts";
 import { dockerfileFindings, dockerfileOf, generatedPaths, imageFindings, requirementsBody, staleTiers } from "../gen-python-deps.ts";
 import { tools } from "../../tools/discover.ts";

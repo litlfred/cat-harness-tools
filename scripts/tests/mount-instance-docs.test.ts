@@ -23,7 +23,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
+import { publishedPath } from "../../schemas/kg/url-space.js";
 
 import {
   declaredEntries,

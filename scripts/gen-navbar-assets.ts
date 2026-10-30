@@ -28,7 +28,7 @@
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { PIN_FILE, readPinFile } from "./check-bun-pin.ts";
 import { NAVBAR_JS, RAIL_DATA_DIR, railPageOf } from "./lib/harness-rail.ts";
 import { NAVBAR_CSS, navbarCss } from "./lib/navbar.ts";

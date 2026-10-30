@@ -21,7 +21,7 @@
  * the compiler to compare.
  */
 import { describe, test, expect, afterAll } from "bun:test";
-import { BLOCK_KINDS, BLOCK_KIND_ALT } from "@litlfred/cat-harness/schemas/types.ts";
+import { BLOCK_KINDS, BLOCK_KIND_ALT } from "../../schemas/types.ts";
 import { readBlockManifest } from "../../pipeline/qa-utils";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";

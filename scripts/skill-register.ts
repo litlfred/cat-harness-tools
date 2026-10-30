@@ -223,7 +223,7 @@ import { fileURLToPath } from "node:url";
 import { corpusScopeFor, declaredKgDirectories, kgDirectories } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { buildQaResult, writeQaResult } from "./qa-results.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, REPO_ROOT, resolveWorkingInstanceRoot, runnerRootFor } from "./lib/roots.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 

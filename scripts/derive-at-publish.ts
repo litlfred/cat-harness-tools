@@ -120,12 +120,12 @@ import { join, resolve } from "node:path";
 
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { dirname } from "node:path";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { FileDigests, TRACKED, fingerprint, trackedTreeDigest, type Fingerprint } from "./input-hash.ts";
 import { TASK_IO } from "./task-io.ts";
 import {

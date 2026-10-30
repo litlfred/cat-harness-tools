@@ -19,7 +19,7 @@ import {
   frozenSubtreeNote,
   isFrozenSubtree,
   withoutFrozenSubtrees,
-} from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
+} from "../../schemas/kg/fsh-guts.ts";
 import { gutsFiles, page } from "../gen-fsh-guts-viz.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "fsh-guts-frozen-"));

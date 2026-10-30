@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { directoryForGraph } from "../../schemas/kg/cat-harness.ts";
 import {
   basisOverlap,
   hashesReproduce,
   TEST_RUN_SCHEMA_ID,
   TestRunSchema,
   UNKNOWN_HASH,
-} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
+} from "../../schemas/sdlc/test-run.ts";
 import {
   evaluateForcedVsManaged,
   HARNESS_ROOT,

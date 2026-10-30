@@ -19,8 +19,8 @@ import {
   applyVocabMapping,
   expandCurie,
   type VocabMapping,
-} from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+} from "../../schemas/content/vocab-mapping.ts";
+import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { tableFindings } from "../vocab-mappings";
 
 /** The `sl9u` scheme row: one label, SKOS authoritative, DC a derived copy. */

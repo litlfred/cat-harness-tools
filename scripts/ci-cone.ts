@@ -104,9 +104,9 @@ import {
   type Fingerprint,
   type PairIO,
 } from "./input-hash.ts";
-import { openTrace } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import { collectTaskIo } from "./task-io.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 2;

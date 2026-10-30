@@ -38,7 +38,7 @@
 
 import { join, resolve } from "node:path";
 
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { visualiserRoute } from "../schemas/kg/visualiser-route.js";
 
 import { PAGE_LOCALE, declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
 

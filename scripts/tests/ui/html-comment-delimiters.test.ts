@@ -24,7 +24,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Glob } from "bun";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "../../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

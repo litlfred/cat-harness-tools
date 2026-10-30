@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ensureLandingSticky } from "../ensure-landing-sticky.ts";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
+import { mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
 
 const SHA = "a".repeat(40);
 const DIGEST = "b".repeat(64);

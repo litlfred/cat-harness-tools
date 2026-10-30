@@ -38,10 +38,10 @@
  * @covers folio
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
-import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
+import { documentContext } from "../schemas/content/content-context.ts";
 import { atInstanceContext } from "./instance-document-context.ts";
 import {
   resolveLabel,
@@ -49,11 +49,11 @@ import {
   resolveReferenceKey,
   typesForKind,
   parseReference,
-} from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+} from "../schemas/kg/jsonld.ts";
 import { loadBlocksUnder, reportLoadFailures, type LoadedBlock } from "./block-module";
 import { contributionsRoot, findContentRepoRoot, findPapers } from "./repo-root";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
 import { paperArg } from "./cli-args";
 
 /** A reference that could not be resolved to an IRI, with where it came from. */

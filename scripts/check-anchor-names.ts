@@ -70,7 +70,7 @@
 import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { findDeclarationFile, repoRootFor } from "../schemas/kg/cat-harness.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

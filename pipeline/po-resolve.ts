@@ -23,8 +23,8 @@ import {
   readHarnessConfig,
   orderedDependencies,
   type HarnessConfig,
-} from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/harness-config.ts";
+import { directoryForGraph } from "../schemas/kg/cat-harness.js";
 
 // ── Types ───────────────────────────────────────────────────────
 

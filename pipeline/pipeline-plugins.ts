@@ -49,10 +49,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { directoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import type { TabularCsvwTables } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import { directoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
+import type { TabularCsvwTables } from "../schemas/library/tabular-csvw.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -309,6 +309,23 @@ export function resolveLeanFile(tsPath: string, src: string, leanRoot: string): 
 /** `lean-coverage` slot: sorry-freedom and validation state of a `.lean` file. */
 export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin["leanFileStatus"]> {
   return pipelinePlugin("lean-coverage").leanFileStatus(leanPath);
+}
+
+/** `lean-coverage` slot: coverage statistics for a paper. */
+export function computeStats(paperDir: string, contentRoot: string): {
+  provable: { total: number; with_lean_file: number; sorry_free: number; percent_sorry_free: number };
+  conjectures: {
+    total: number;
+    with_lean_file: number;
+    class_axiomatized: number;
+    percent_class_axiomatized: number;
+    primary: number;
+    primary_class_axiomatized: number;
+    percent_primary_class_axiomatized: number;
+  };
+  definitions: { total: number; with_lean_file: number };
+} {
+  return pipelinePlugin("lean-coverage").computeStats(paperDir, contentRoot) as ReturnType<typeof computeStats>;
 }
 
 /**

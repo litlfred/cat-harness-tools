@@ -29,8 +29,8 @@
  */
 import { relative, resolve } from "node:path";
 
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { STANDARD_PREFIXES, expandCurie, loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { STANDARD_PREFIXES, expandCurie, loadVocabMappings, vocabMappingDirs, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.

@@ -61,7 +61,7 @@ import {
   RenderedImpactSchema,
   type RenderedFile,
   type RenderedImpact,
-} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
+} from "../schemas/ui/rendered-impact.ts";
 
 export const DOCS_CONE_DRYRUN_TAG = "docs-cone-dryrun/v1" as const;
 

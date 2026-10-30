@@ -19,7 +19,7 @@ import {
   remotePlatformLayers,
   type InitFolioOptions,
 } from "../../scripts/init-folio.ts";
-import { declarationChain, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { declarationChain, resolveSkillDirs } from "../../schemas/kg/harness-config.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

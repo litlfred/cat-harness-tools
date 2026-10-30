@@ -62,11 +62,11 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "../schemas/content/avatars.js";
+import { hexHue, resolveThemeBackdrop } from "../schemas/ui/theme.js";
+import { PLATFORM_THEME_OWNER, themeByRef } from "../schemas/ui/theme-by-ref.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
+import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import {
   type CatHarnessDeclaration,
   type NavbarIcon,
@@ -81,12 +81,13 @@ import {
   defaultGraphTypologies,
   instanceDirectories,
   nestedDirectories,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";
+import { publishedPagePath } from "./lib/jekyll-permalink.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The
@@ -789,9 +790,13 @@ function tileFor(
       const abs = join(instanceDir, d.path);
       const rel = relative(siteDir, abs);
       if (rel === "" || rel.startsWith("..")) continue;
-      if (existsSync(join(abs, "index.html")) || existsSync(join(abs, "index.md"))) {
-        return publishedUrlOf(`${rel.split(sep).join("/").replace(/\/*$/, "")}/`);
-      }
+      const dir = rel.split(sep).join("/").replace(/\/*$/, "");
+      if (existsSync(join(abs, "index.html"))) return publishedUrlOf(`${dir}/`);
+      // An `index.md` is published where the site's permalink defaults put
+      // it, not at its source path: `docs/start/index.md` is served at
+      // `/docs/cat-harness/start/` (bean `kc7k`), and the tile linked a
+      // `/start/` nothing serves (fa#2739).
+      if (existsSync(join(abs, "index.md"))) return publishedUrlOf(publishedPagePath(siteDir, `${dir}/index`));
     }
     return undefined;
   };

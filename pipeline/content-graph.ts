@@ -73,7 +73,7 @@
  * @module pipeline/content-graph
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { walkBlocks } from "./qa-utils";

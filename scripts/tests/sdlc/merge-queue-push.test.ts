@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { BranchStore, mountTip } from "../../branch-store.ts";
-import { MERGE_QUEUE_ENTRY_TAG } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+import { MERGE_QUEUE_ENTRY_TAG } from "../../../schemas/sdlc/merge-queue.ts";
 import { readQueueStore, recordDecision } from "../../merge-queue-store.ts";
 
 // Each test builds a bare remote, seeds the branch, mounts it and pushes

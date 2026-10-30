@@ -20,7 +20,7 @@
  * @module folio-assistant/workflow/arm-forced
  */
 
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { RoleGraph } from "../../schemas/process/role-graph.js";
 import type { ProcessModel } from "./process-model.js";
 import {
   complete,

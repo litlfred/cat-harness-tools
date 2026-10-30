@@ -13,7 +13,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { DECL_KINDS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { DECL_KINDS } from "../../schemas/ui/site-indexes.ts";
 import type { DeclKind } from "../schema-graph.ts";
 
 /** Exhaustive over `DeclKind`: adding a kind there and not here fails `tsc`. */

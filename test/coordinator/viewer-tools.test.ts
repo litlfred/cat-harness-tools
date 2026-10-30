@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { join, resolve } from "node:path";
-import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../schemas/kg/cat-harness.ts";
 // Every instance's Tools: a viewer Tool may live in a dependency's `tools`
 // graph (fhir-harness's `ig-pages`).
 import { tools } from "../../tools/discover.js";
