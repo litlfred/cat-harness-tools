@@ -23,10 +23,12 @@ import {
 import { makeIri, migrationTombstones, writeSubjectDocuments } from "../kg-export.ts";
 import { SEARCH_EXCLUDE_MARKER } from "../publish-verify.ts";
 import { subgraphIri } from "../subgraph-node.ts";
+import { diagramPages, owningProcess } from "../lib/diagram-pages.ts";
 import { PUBLISHED_ELSEWHERE } from "../instance-exports.ts";
 
 const HOST = "https://x.test/site/cat-harness.jsonld";
 const CORE = "https://x.test/site/folio-assistant-core/folio-assistant-core.jsonld";
+const BASE = "https://x.test/site/folio-assistant-core";
 
 describe("the form", () => {
   test("a subject is <doc dir>/<kind>/<id> — the owner's own example", () => {
@@ -232,5 +234,37 @@ describe("every subject loads: its own .jsonld and page", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+  test("a process, its steps and its lanes link to the diagram; nothing else does (#638, owner's 3a)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subject-diagram-"));
+    try {
+      const diagram = "https://x.test/site/en/cat-harness/processes/p.html";
+      writeSubjectDocuments(published, join(dir, "folio-assistant-core.jsonld"), undefined, new Map([[`${BASE}/process/P`, diagram]]));
+      const link = `<a href="${diagram}">diagram</a>`;
+      for (const f of ["process/P.html", "process/P/index.html", "process/P/node/T.html", "process/P/lane/L.html"]) {
+        expect(readFileSync(join(dir, f), "utf-8")).toContain(link);
+      }
+      expect(readFileSync(join(dir, "skill/a.html"), "utf-8")).not.toContain(">diagram</a>");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the diagram page a subject links to", () => {
+  test("a step and a lane belong to their process; a skill to none", () => {
+    expect(owningProcess(`${BASE}/process/P/node/T`, "process/P/node/T")).toBe(`${BASE}/process/P`);
+    expect(owningProcess(`${BASE}/process/P/lane/L`, "process/P/lane/L")).toBe(`${BASE}/process/P`);
+    expect(owningProcess(`${BASE}/process/P`, "process/P")).toBe(`${BASE}/process/P`);
+    expect(owningProcess(`${BASE}/skill/a`, "skill/a")).toBeUndefined();
+  });
+  test("found from the depiction, never guessed: no published picture, no link", () => {
+    const pages = diagramPages({
+      "@graph": [
+        { "@id": `${BASE}/process/Q`, depiction: "https://x.test/site/assets/img/workflows/no-such-diagram-xyz.svg" },
+        { "@id": `${BASE}/process/R` },
+      ],
+    });
+    expect(pages.size).toBe(0);
   });
 });
