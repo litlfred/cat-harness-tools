@@ -644,18 +644,18 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     },
     skip: (pair: Pair) => {
       if (passIndex <= 1) {
-        return ownPassed(pair) ? { skip: true, why: "passed in audit pass" } : { skip: false };
+        return ownPassed(pair) ? { skip: true, why: "passed in audit pass" } : { skip: false, why: "not yet passed in audit pass" };
       }
       if (!ownPassed(pair)) {
         return lastCommittedMoves.size > 0 || lastPublishMoves.size > 0
-          ? { skip: false }
+          ? { skip: false, why: "files moved in previous pass" }
           : { skip: true, why: "no files moved in previous pass" };
       }
       if (lastCommittedMoves.size === 0) {
         return { skip: true, why: "already current and no committed files moved" };
       }
       return committedHitsPair(pair, lastCommittedMoves)
-        ? { skip: false }
+        ? { skip: false, why: "a declared input moved in previous pass" }
         : { skip: true, why: "no declared input moved in previous pass" };
     },
   });
