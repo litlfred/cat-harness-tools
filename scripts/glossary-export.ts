@@ -395,10 +395,13 @@ export function legacyGlossaryDocuments(
   const root = siteRootOf(out, glossaryPath(id.docPath));
   if (root === undefined) return undefined;
   const oldIri = glossaryIri(id.base, id.legacyDocPath);
+  // A lane usage is a fragment of the glossary document since #961; its
+  // pre-move address was a fragment of the old root graph document.
+  const glossaryDoc = String(doc["@id"]);
   const pairs = ((doc["@graph"] ?? []) as Array<Record<string, unknown>>)
     .map((n) => String(n["@id"]))
-    .filter((iri) => iri.startsWith(`${id.docIri}#`))
-    .map((iri) => [`${id.legacyDocIri}${iri.slice(id.docIri.length)}`, iri] as const);
+    .filter((iri) => iri.startsWith(`${glossaryDoc}#`))
+    .map((iri) => [`${id.legacyDocIri}${iri.slice(glossaryDoc.length)}`, iri] as const);
   const file = join(root, glossaryPath(id.legacyDocPath));
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(movedDocument(doc["@context"], oldIri, String(doc["@id"]), pairs), null, 2)}\n`);
@@ -512,12 +515,15 @@ export function buildGlossary(opts: {
   //
   // A usage is a node of the SKOS glossary, and the glossary keeps `#`
   // (#603: vocabularies and the glossary are the exception to path IRIs), so
-  // it keeps the fragment it always had — `legacyFragmentIri` of the one
-  // minter's answer, never a second spelling. The concepts it links (roles,
-  // lanes) are graph subjects and take paths.
+  // it is a fragment — of the GLOSSARY document, which holds it
+  // (litlfred/cat-harness-tools#961). Until then it was a fragment of the
+  // graph document, which holds no such node, so no usage IRI resolved.
+  // Spelled by the one minter (`legacyFragmentIri` of `makeIri`), never a
+  // second spelling. The concepts it links (roles, lanes) are graph subjects
+  // and take paths.
   const usageIri = (l: LaneOccurrence): string => {
-    const iri = makeIri(id.docIri, "glossary-usage", `${l.processId}/${l.laneId}`);
-    return legacyFragmentIri(iri, id.docIri) ?? iri;
+    const iri = makeIri(schemeIri, "glossary-usage", `${l.processId}/${l.laneId}`);
+    return legacyFragmentIri(iri, schemeIri) ?? iri;
   };
 
   // Which field becomes which predicate is DECLARED, in the `vocab-mapping`
