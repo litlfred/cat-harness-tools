@@ -55,6 +55,7 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
@@ -356,8 +357,18 @@ describe("smart-trust, against the platform's real harness data", () => {
 describe("the IG site's shell (compose-docs --shell), end to end", () => {
   const out = mkdtempSync(join(tmpdir(), "foreign-shell-"));
   const r = compose(out, REPO, { shell: true, foreign: { instance: "smart-trust", platformBase: BASE } });
+  // The shell is smart-trust's, a higher instance a standalone checkout does
+  // not hold; and what it leaves out or scopes is the platform's BUILT site,
+  // written at publish and gitignored (bean w1gy F18). Either absent, the
+  // composition has nothing to scope.
+  const noSmartTrust = (): boolean =>
+    !existsSync(SMART_TRUST) && notApplicableAlone("smart-trust's checkout, whose IG site the shell composes (a higher instance)");
+  const PLATFORM_SITE = join(CAT_HARNESS, siteDirFor(CAT_HARNESS));
 
-  test("the platform's count projections are not shipped as the folio's", () => {
+  test.skipIf(
+    noSmartTrust() ||
+      siteNotBuilt("the platform's beans count projection `docs:pages` writes at publish (gitignored)", join(PLATFORM_SITE, "assets", "beans", "count.json")),
+  )("the platform's count projections are not shipped as the folio's", () => {
     expect(existsSync(join(out, "assets", "beans", "count.json"))).toBe(false);
     expect(existsSync(join(out, "assets", "todos", "count.json"))).toBe(false);
     expect(r.scoped?.hostProjections).toContain("assets/beans/count.json");
@@ -365,7 +376,7 @@ describe("the IG site's shell (compose-docs --shell), end to end", () => {
     expect(existsSync(join(out, "assets", "todos", "todo-page.js"))).toBe(true);
   });
 
-  test("(c) the platform's translation sweep and index are not shipped as the folio's", () => {
+  test.skipIf(noSmartTrust())("(c) the platform's translation sweep and index are not shipped as the folio's", () => {
     for (const rel of Object.keys(HOST_DATA_PROJECTIONS)) {
       expect(existsSync(join(out, rel))).toBe(false);
       expect(r.scoped?.hostProjections).toContain(rel);
@@ -397,7 +408,9 @@ describe("the IG site's shell (compose-docs --shell), end to end", () => {
     expect(JSON.parse(readFileSync(p, "utf-8"))).toEqual(EMPTY_TODO_LISTING);
   });
 
-  test("its harness data is scoped: no count, no unresolved root-relative href", () => {
+  const noHarnessData = (): boolean =>
+    noSmartTrust() || siteNotBuilt("the platform's harness data `docs:harness` writes at publish (gitignored)", PLATFORM_DATA);
+  test.skipIf(noHarnessData())("its harness data is scoped: no count, no unresolved root-relative href", () => {
     const d = JSON.parse(readFileSync(join(out, "_data", "harness.json"), "utf-8")) as { tiles: { count?: number }[] };
     expect(d.tiles.filter((t) => t.count !== undefined)).toEqual([]);
     const known = new Set(["/artifacts.html"]); // smart-trust's own, under its baseurl
@@ -461,7 +474,13 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     ensureThemesCss(HARNESS_ROOT);
   });
 
-  test("its icon row names no platform work plan and no root-relative destination", () => {
+  // The icon row is the harness data's `navbar`, which `docs:harness` writes at publish (gitignored).
+  test.skipIf(
+    siteNotBuilt(
+      "the harness data `docs:harness` writes at publish (gitignored), whose `navbar` is the icon row",
+      join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+    ),
+  )("its icon row names no platform work plan and no root-relative destination", () => {
     const root = mkdtempSync(join(tmpdir(), "foreign-rail-"));
     mkdirSync(join(root, "doc"), { recursive: true });
     writeFileSync(join(root, "doc", "index.html"), "<!doctype html>\n<html><head><title>t</title></head><body><h1>Doc</h1></body></html>\n");

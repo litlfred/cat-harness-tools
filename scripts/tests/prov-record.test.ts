@@ -12,14 +12,17 @@ import {
   ProvConsentDecisionRecordSchema,
   ProvConsentRefSchema,
   ProvDecisionRecordSchema,
+  agreementDistribution,
+  agreementsCited,
   computeProvRecordHash,
+  grantsCited,
   provActivityFor,
   provConsentDecisionRecordFor,
   provDecisionRecordFor,
   verifyProvHashChain,
 } from "../../src/workflow/prov-record.js";
 import { loadAccessContext, type Principal } from "../../src/core/access.js";
-import { ProvActivitySchema, ProvAgreementRefSchema } from "../../schemas/content/prov.js";
+import { ProvActivitySchema, ProvAgreementDistributionSchema } from "../../schemas/content/prov.js";
 import { reportInstance } from "../prov-qaqc.js";
 import { roleGraphFor, workflowFile } from "../known-skills.js";
 import type { TaskAuthVerdict } from "../../src/workflow/authorize.js";
@@ -124,13 +127,14 @@ describe("DSA B4: PROV decision records cite agreement + grant and form a hash-c
     ...over,
   });
 
-  const agreement = {
-    url: "https://example.org/dsa/who-ministry-2026-v1.pdf",
-    sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    grant: "urn:uuid:grant-b5-001",
-  };
+  const agreement = agreementDistribution(
+    "https://example.org/dsa/who-ministry-2026-v1#pdf",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "https://example.org/dsa/who-ministry-2026-v1.pdf",
+  );
+  const grantId = "urn:uuid:7f1c2a52-6d1e-4b8e-9b0e-0c4b2b5d1a01";
 
-  test("every decision record names its agreement (url + sha256, optional grant) and its hash", () => {
+  test("every decision record cites its agreement (prov:used DCAT distribution + spdx:checksum), its VC grant, and its hash", () => {
     const r0 = provDecisionRecordFor({
       id: "dsa-run#0",
       at: "2026-10-30T12:00:00.000Z",
@@ -140,25 +144,30 @@ describe("DSA B4: PROV decision records cite agreement + grant and form a hash-c
       policies: ["urn:dsa:agreement:1"],
       target: "dataset:surveillance-2026",
       agreement,
-      grant: "urn:uuid:grant-b5-001",
+      grant: grantId,
     });
     expect(r0).toBeDefined();
     expect(ProvDecisionRecordSchema.safeParse(r0).success).toBe(true);
-    expect(r0!["cat-harness:agreement"]).toEqual(agreement);
-    expect(r0!["cat-harness:grant"]).toBe("urn:uuid:grant-b5-001");
+    expect(r0!["prov:used"]).toEqual([
+      "dataset:surveillance-2026",
+      agreement,
+      { "@id": grantId, "@type": ["prov:Entity", "cred:VerifiableCredential"] },
+    ]);
+    expect(agreementsCited(r0!)).toEqual([agreement]);
+    expect(grantsCited(r0!).map((g) => g["@id"])).toEqual([grantId]);
     expect(r0!["cat-harness:previousHash"]).toBeNull();
     expect(r0!["cat-harness:recordHash"]).toBe(computeProvRecordHash(r0!));
 
     // Omitting agreement fails ProvDecisionRecordSchema and verifyProvHashChain
-    const { "cat-harness:agreement": _noAgreement, ...withoutAgreement } = r0!;
+    const withoutAgreement = { ...r0!, "prov:used": r0!["prov:used"]!.filter((u) => agreementsCited({ "prov:used": [u] }).length === 0) };
     expect(ProvDecisionRecordSchema.safeParse(withoutAgreement).success).toBe(false);
     const missingAgCheck = verifyProvHashChain([withoutAgreement]);
     expect(missingAgCheck.valid).toBe(false);
     expect(missingAgCheck.errors.some((e) => e.kind === "missing-agreement")).toBe(true);
 
-    // Invalid agreement URL or non-64-char sha256 is refused
-    expect(ProvAgreementRefSchema.safeParse({ url: "not-a-uri", sha256: agreement.sha256 }).success).toBe(false);
-    expect(ProvAgreementRefSchema.safeParse({ url: agreement.url, sha256: "1234" }).success).toBe(false);
+    // A distribution @id that is not an absolute IRI, or a checksum of the wrong length, is refused
+    expect(ProvAgreementDistributionSchema.safeParse({ ...agreement, "@id": "not-a-uri" }).success).toBe(false);
+    expect(() => agreementDistribution(agreement["@id"], "1234")).toThrow();
 
     // Omitting recordHash fails ProvDecisionRecordSchema and verifyProvHashChain
     const { "cat-harness:recordHash": _noHash, ...withoutHash } = r0!;
@@ -253,7 +262,7 @@ describe("DSA B4: PROV decision records cite agreement + grant and form a hash-c
   test("complete() chains PROV decision records across workflow steps and reportInstance flags tampering", async () => {
     const { model, state, node } = await firstRoledStep();
     const step1 = complete(model, state, node.id, {
-      authz: { ctx: CTX, principal: GITHUB, target: "block-1", mode: "strict", agreement, grant: agreement.grant },
+      authz: { ctx: CTX, principal: GITHUB, target: "block-1", mode: "strict", agreement, grant: grantId },
     });
     const nextEnabled = enabled(model, step1).find((x) => x.kind === "activity" && model.nodes.get(x.node)?.roleRef);
     expect(nextEnabled).toBeDefined();
@@ -294,11 +303,10 @@ describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", 
     ...over,
   });
 
-  const agreement = {
-    url: "https://example.org/agreements/who-ministry-dsa-v1.pdf",
-    sha256: "f47ac10b58cc4372a5670e02b2c3d479f47ac10b58cc4372a5670e02b2c3d479",
-    grant: "urn:uuid:grant-2026-002",
-  };
+  const agreement = agreementDistribution(
+    "https://example.org/agreements/who-ministry-dsa-v1#pdf",
+    "f47ac10b58cc4372a5670e02b2c3d479f47ac10b58cc4372a5670e02b2c3d479",
+  );
 
   const consent = {
     id: "ex-consent-basic-treat",

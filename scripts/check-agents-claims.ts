@@ -160,6 +160,15 @@ export function resolveModule(repo: string, cited: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolve a module an AGENTS.md cites: against the checkout's roots, then
+ * against this tools layer, which holds the code a harness AGENTS.md names
+ * since it moved here (beans `70lx`, `8lcl`).
+ */
+export function resolveCitedModule(repo: string, cited: string): string | undefined {
+  return resolveModule(repo, cited) ?? resolveModule(TOOLS_ROOT, cited);
+}
+
 /** Does `module` declare `symbol`? `A.B` asks for a member of `A`. */
 export function declares(src: string, symbol: string): boolean {
   const [head, member] = symbol.split(".");
@@ -233,8 +242,7 @@ export function checkClaims(repo: string, md: string): { claims: Claim[]; findin
 
   for (const c of claims) {
     if (c.kind === "location") {
-      // bean 70lx: the code a harness AGENTS.md names moved here
-      const file = resolveModule(repo, c.module!) ?? resolveModule(TOOLS_ROOT, c.module!);
+      const file = resolveCitedModule(repo, c.module!);
       if (file === undefined) {
         findings.push({ claim: c, reason: `no such module: ${c.module}` });
         continue;

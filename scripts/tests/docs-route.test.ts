@@ -32,6 +32,7 @@ import {
   scopeApplies,
 } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
 import { dirname, relative, sep } from "node:path";
 
@@ -133,17 +134,24 @@ describe("what moves and what stays — read off the real tree", () => {
     for (const l of LOCALES) expect(url(`${l}/index.md`)).toBe(`/${l}/index.html`);
   });
 
-  test("kind directories and viewers stay where they are", () => {
-    for (const rel of [
-      // Visualisers at their DECLARED routes (owner, 2026-10-09).
-      visualiserPage("processes"),
-      visualiserPage("glossary", "folio-assistant-core"),
-      "proposals/index.md",
-      "requirements/index.md",
-      visualiserPage("methodologies"),
-      "bootstrap/initialization.md",
-      "fr/folio-assistant-core/glossary/index.md",
-    ]) {
+  // Visualisers at their DECLARED routes (owner, 2026-10-09). These are written
+  // at publish and gitignored, the glossary's from folio-assistant-core's
+  // terms: standing alone they are not built (bean w1gy F18).
+  const BUILT = [
+    visualiserPage("processes"),
+    visualiserPage("glossary", "folio-assistant-core"),
+    visualiserPage("methodologies"),
+    "fr/folio-assistant-core/glossary/index.md",
+  ];
+  // Authored and committed, so never a reason to skip.
+  const AUTHORED = ["proposals/index.md", "requirements/index.md", "bootstrap/initialization.md"];
+  test.skipIf(
+    siteNotBuilt(
+      "the visualiser pages the site build writes at publish (gitignored; the glossary's from folio-assistant-core)",
+      ...BUILT.map((rel) => join(SITE, rel)),
+    ),
+  )("kind directories and viewers stay where they are", () => {
+    for (const rel of [...BUILT, ...AUTHORED]) {
       expect(url(rel).startsWith(`/${ROUTE}/`), rel).toBe(false);
     }
   });

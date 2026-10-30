@@ -21,6 +21,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { MANIFEST_SCHEMA } from "../branch-store.js";
 import { authorityOf, compareRoute } from "../route-authority.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -109,11 +110,16 @@ const seeded = (authoritative: boolean, keyedBy = "route") => ({
 });
 
 describe("with no `storage`, the verdict is the on-disk comparison it replaces", () => {
-  test("file for file, over the REAL repository's uml pages", () => {
+  const umlPages = join(REPO, "cat-harness/docs/uml/overview");
+  // Standing alone the uml pages are not built: `uml:overview` writes them at
+  // publish and `docs/uml/overview/` is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt("the uml overview pages gen-uml-overview writes at publish (gitignored)", umlPages),
+  )("file for file, over the REAL repository's uml pages", () => {
     // THE falsifier for adopting this at all. Every directory in this repository
     // resolves `checkout` today, so if these two disagreed the cutover would be
     // changing live verdicts while claiming to change none.
-    const root = join(REPO, "cat-harness/docs/uml/overview");
+    const root = umlPages;
     expect(existsSync(root)).toBe(true);
     const pages = new Map<string, string>();
     const walk = (d: string): void => {

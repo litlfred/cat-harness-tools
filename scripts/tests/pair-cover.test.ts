@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { foldable, settleCovered } from "../pair-cover.ts";
-import { regenPass, type Pair, type Runner } from "../regen-after-merge.ts";
+import { isJudgeCheck, regenPass, type Pair, type Runner } from "../regen-after-merge.ts";
 import { CHECKS } from "../skill-register.ts";
 import { instanceRootsIn, repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
@@ -61,7 +61,10 @@ describe("regenPass with folds", () => {
     expect(asked).toContain("skill:register:declarations:check");
     expect(asked).not.toContain("kg:audit:check");
     expect(asked).toContain("kg:audit:all:check");
-    expect(results.every((r) => r.outcome === "current")).toBe(true);
+    // Every one passes: `current`, or `judged` for a judge check (bean `loxz`),
+    // which passes without asserting an artefact matches its writer.
+    const wrong = results.filter((r) => r.outcome !== (isJudgeCheck(r.check) ? "judged" : "current"));
+    expect(wrong.map((r) => `${r.check}: ${r.outcome}`)).toEqual([]);
   });
 
   test("a red coverer is NEVER a green covered check — through two levels of folding", async () => {

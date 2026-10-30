@@ -24,6 +24,12 @@ import { join } from "node:path";
 import { avatarFor } from "../../schemas/content/avatars.ts";
 import { KIND_TABLE_DOC, KIND_TABLE_HEADER } from "../kind-table.ts";
 import { STEPS, authoredGaps, hueReport } from "../kind-register.ts";
+import { notApplicableAlone } from "../../test/support/checkout.js";
+
+/** who-iris and smart-base declare their own avatars (bean sod4 #4); only a composed checkout holds them. */
+const NO_WHO_INSTANCES = notApplicableAlone(
+  "who-iris and smart-base, whose own declarations carry the WHO-blue avatars this convention is read from",
+);
 
 /**
  * A root whose graph-typology table has the header and NO rows — built here rather
@@ -93,6 +99,9 @@ describe("hue is reported and never graded", () => {
     // than "= 11" on purpose — the number moves with every kind added, and a
     // count in a test is the claim `audit-coverage` says not to make.
     expect(collisions.length).toBeGreaterThan(0);
+  });
+
+  test.skipIf(NO_WHO_INSTANCES)("the shared WHO tone is a convention declared in the data", () => {
     // The evidence that it is a convention is IN the data, not inferred.
     expect(avatarFor("who-iris").reads).toContain("WHO blue");
     expect(avatarFor("smart-base").reads).toContain("WHO blue");

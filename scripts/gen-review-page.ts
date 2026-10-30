@@ -125,22 +125,36 @@ const STYLE = `
      The intrinsic size is remembered once an entry has rendered. Measured:
      0.6-0.8 s for both cases (test/review-budget.e2e.ts). */
   #changes li[data-label] { content-visibility: auto; contain-intrinsic-size: auto 14rem; }
-  .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; }
-  @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; } }
+  /* The pane gets main's own gutters, so it does not sit flush on the rail. */
+  .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; padding: 2rem 0 1rem 1.5rem; }
+  @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; padding: 1rem 1.5rem 0; } }
   .outline ol { list-style: none; padding-left: .75rem; margin: .25rem 0; }
   .outline > ol { padding-left: 0; }
   .ol-doc { font-weight: 600; } .ol-ch { font-weight: 600; margin-top: .4rem; }
   .outline li { border: 0; padding: .1rem 0; }
   .badges { color: var(--muted); font-size: .9rem; }
-  .minimap ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
-  .minimap li { border: 0; padding: 0; }
-  .minimap .cell { display: block; width: 100%; min-height: 1.4rem; padding: 0 .4rem; text-align: left; font-size: .8rem; line-height: 1.4rem; border: 1px solid var(--rule); border-radius: .2rem; }
+  /* The minimap is a MAP: small square cells that wrap, one per block, so a
+     900-block document fits in a screen instead of a 23,000px column of
+     empty full-width bars. A cell with glyphs widens to fit them, so the
+     glyphs still repeat the colour. On a narrow screen the pane sits above
+     the list, so the map scrolls in its own box rather than pushing the
+     changes off the screen. */
+  .minimap h2 { margin-top: 1.5rem; }
+  .minimap ol { list-style: none; padding: 2px; margin: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+  .minimap li { border: 0; padding: 0; display: block; }
+  .minimap .cell { display: block; box-sizing: border-box; min-width: .85rem; height: .85rem; padding: 0 .1rem; font: 700 .6rem/.75rem system-ui, sans-serif; text-align: center; border: 1px solid var(--rule); border-radius: 2px; cursor: pointer; }
+  .minimap .cell.h0 { background: transparent; color: var(--fg); }
+  /* A cell with something to look at is filled (.h1-.h3 below). */
+  .minimap .cell:not(.h0) { border-color: transparent; }
   .minimap .cell:focus-visible { outline: 3px solid var(--link); outline-offset: 1px; }
+  @media (max-width: 62rem) { .minimap ol { max-height: 40vh; overflow: auto; } }
   a { color: var(--link); }
   a:focus-visible, button:focus-visible, li:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
   .nav { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; align-items: center; }
-  /* Control rules are scoped to .layout: the harness rail's own controls sit outside it. */
-  .layout button { font: inherit; padding: .5rem 1rem; min-height: 2.75rem; border: 1px solid var(--muted); border-radius: .4rem; background: transparent; color: var(--fg); cursor: pointer; }
+  /* Control rules are scoped to .layout: the harness rail's own controls sit outside it.
+     Minimap cells are excluded: this rule's transparent background beat the
+     .h1-.h3 fills, so a changed block looked the same as an unchanged one. */
+  .layout button:where(:not(.cell)) { font: inherit; padding: .5rem 1rem; min-height: 2.75rem; border: 1px solid var(--muted); border-radius: .4rem; background: transparent; color: var(--fg); cursor: pointer; }
   h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid var(--rule); padding-bottom: .25rem; }
   ul { list-style: none; padding: 0; }
   li { padding: .5rem .25rem; border-bottom: 1px solid var(--rule); }

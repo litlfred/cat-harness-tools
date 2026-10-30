@@ -35,6 +35,7 @@ import { join, resolve } from "node:path";
 import { baseDocsDir } from "../../compose-docs.js";
 import { page, pageRelPath, skillIds, toolRows } from "../../gen-tools-viz.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 import { PAGE_LOCALE } from "../../viewer-declarations.js";
 import { dirname } from "node:path";
 
@@ -117,10 +118,20 @@ describe("the generator writes where the declaration says", () => {
   it("resolves its page path from the declaration, not a literal", () => {
     const rel = pageRelPath(REPO);
     expect(rel).toBeDefined();
-    // Declared under the page locale. Until the committed site is regenerated
-    // (folio-assistant#2527) the page is still at the address without it.
+    // Declared under the page locale.
     expect(rel!.startsWith(`${PAGE_LOCALE}/`)).toBe(true);
-    const committed = [rel!, rel!.slice(`${PAGE_LOCALE}/`.length)];
+  });
+
+  // Until the committed site is regenerated (folio-assistant#2527) the page is
+  // still at the address without the locale. Standing alone it is at neither:
+  // it is built at publish and gitignored (bean w1gy F18).
+  const declared = pageRelPath(REPO);
+  const committed = declared === undefined ? [] : [declared, declared.slice(`${PAGE_LOCALE}/`.length)];
+  it.skipIf(
+    declared !== undefined &&
+      !committed.some((r) => existsSync(join(DOCS, r))) &&
+      siteNotBuilt("the Tools page `tools:viz` writes at publish (gitignored)", join(DOCS, declared)),
+  )("and the page is at that path", () => {
     expect(committed.some((r) => existsSync(join(DOCS, r)))).toBe(true);
   });
 });

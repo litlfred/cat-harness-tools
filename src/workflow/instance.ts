@@ -35,7 +35,7 @@ import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from
 import type { ConventionScope } from "../../schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "../../schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementDistribution, type ProvConsentRef } from "../../schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import {
@@ -96,9 +96,9 @@ export interface AuthzOptions {
   /** The content the step acts on. */
   target?: string;
   mode?: "advisory" | "strict";
-  /** The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id) this step is decided under (DSA B4, bean `3z44`). */
-  agreement?: ProvAgreementRef;
-  /** Optional grant identifier (DSA B5). */
+  /** The agreement this step is decided under (DSA B4, beans `3z44`, `yy40`): its DCAT distribution + `spdx:checksum`, cited in `prov:used`. */
+  agreement?: ProvAgreementDistribution;
+  /** The grant's W3C VC 2.0 credential `id` (DSA B5), cited in `prov:used`. */
   grant?: string;
   /** The IHE PCF / FHIR R4 Consent (`id` + `versionId`) cited when this step is a consent-based decision (PCF8, bean `2egb`). */
   consent?: ProvConsentRef;

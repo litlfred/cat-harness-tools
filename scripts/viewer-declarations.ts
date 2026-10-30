@@ -276,7 +276,8 @@ export interface RecordedRoute {
  * stays the authority whenever it can be read. This answers the narrower
  * question "which pages here say which Tool drew them", from the page's own
  * front matter (`rendered-by:`, or `generated: <path>/<tool>.ts`) at
- * `<site>/<harness>/<visualiser>/index.{md,html}` — the same self-declaration
+ * `<site>/<locale>/<harness>/<visualiser>/index.{md,html}` (or, on a site drawn
+ * before the pages moved under the page locale, without it) — the same self-declaration
  * `check:reference-direction` trusts when it skips generator output. It
  * resolves no directory, so the module rule above is untouched.
  */
@@ -292,14 +293,24 @@ export function routesRecordedInSite(site: string): RecordedRoute[] {
       return [];
     }
   };
-  for (const harness of dirs(site)) {
-    for (const visualiser of dirs(join(site, harness))) {
-      for (const file of ["index.md", "index.html"]) {
-        const p = join(site, harness, visualiser, file);
-        if (!existsSync(p)) continue;
-        const by = recordedRenderer(readFileSync(p, "utf-8"));
-        if (by !== undefined) out.push({ harness, visualiser, renderedBy: by });
-        break;
+  const seen = new Set<string>();
+  // A page is at `<locale>/<harness>/<visualiser>/` since the pages moved
+  // under the page locale (the glossary on 2026-10-16), and at
+  // `<harness>/<visualiser>/` on a site drawn before; both are read, so the
+  // record does not go blind on a current site.
+  for (const base of [join(site, PAGE_LOCALE), site]) {
+    for (const harness of dirs(base)) {
+      for (const visualiser of dirs(join(base, harness))) {
+        for (const file of ["index.md", "index.html"]) {
+          const p = join(base, harness, visualiser, file);
+          if (!existsSync(p)) continue;
+          const by = recordedRenderer(readFileSync(p, "utf-8"));
+          if (by !== undefined && !seen.has(`${harness}/${visualiser}`)) {
+            seen.add(`${harness}/${visualiser}`);
+            out.push({ harness, visualiser, renderedBy: by });
+          }
+          break;
+        }
       }
     }
   }

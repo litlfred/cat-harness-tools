@@ -25,7 +25,7 @@ import { makeRepo, type Repo } from "../merge-pipeline-fixture.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const GEN = "cat-harness/docs/en/folio-assistant-core/glossary/index.md";
+const GEN = "cat-harness/docs/en/cat-harness/lsi/index.md"; // `glossary` (its literal lsi glob): take-base in every layout, unlike the core glossary route (bean w1gy F18)
 
 /** The shape `merge-base.ts` prints, copied from its `describe` and abort lines. */
 const REFUSED_LOG = `merge-base: 3 conflicted path(s) merging abc

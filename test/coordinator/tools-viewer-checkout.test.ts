@@ -18,6 +18,7 @@ import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
 import { discoverTools } from "../../tools/discover.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -52,7 +53,12 @@ const docsPagesFor = (kind: string): string[] => {
   // the index repository's git, so `ls-files` from the root lists none of
   // cat-harness's pages. `gitCorpus` counts a mount's files as a submodule's
   // were counted, which is what "the checkout's pages" means since the split.
-  const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? []).map((f) => relative(REPO, f));
+  // Standing alone the checkout root holds sibling clones and is no git work
+  // tree, so git cannot answer there; cat-harness's own clone can, and its
+  // pages are the ones asked about (bean w1gy F18).
+  const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? gitCorpus(join(REPO, "cat-harness"), ["*.md", "*.html"]) ?? []).map((f) =>
+    relative(REPO, f),
+  );
   return documentingPages(
     { instance: "cat-harness", id: e.id ?? "", graphTypologies: e.graphTypologies ?? [] },
     docsPages(REPO, tracked),
@@ -164,7 +170,12 @@ describe("the generator writes where the declaration says", () => {
   // read by auto-discovery, with one sub-graph page per instance.
   const { subjects, empty } = toolSubjects(REPO);
 
-  it("and the committed page is current", () => {
+  // Standing alone the page is not built: `tools:viz` writes it at publish and
+  // `tools/` is gitignored (bean w1gy F18).
+  const toolsPage = pageRelPath(REPO);
+  it.skipIf(
+    toolsPage !== undefined && siteNotBuilt("the Tools page `tools:viz` writes at publish (gitignored)", join(DOCS, toolsPage)),
+  )("and the committed page is current", () => {
     // The gate runs this too; asserting it here means a stale page fails the
     // unit suite rather than only the gate, which is where it is noticed first.
     const rel = pageRelPath(REPO)!;
@@ -173,7 +184,17 @@ describe("the generator writes where the declaration says", () => {
     expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(publishedPage(all, skillIds(REPO), REPO, scope));
   });
 
-  it("draws one current page per instance that declares Tools, and none for an empty graph", () => {
+  // Standing alone the per-instance pages are not built: `tools:viz` writes
+  // them at publish and `tools/` is gitignored (bean w1gy F18). A subject with
+  // no page route guards nothing, so the assertion below still names it.
+  const subjectPages = subjects.flatMap((x) => {
+    const rel = pageRelPath(REPO, x.name);
+    return rel === undefined ? [] : [join(DOCS, rel)];
+  });
+  it.skipIf(
+    subjectPages.length > 0 &&
+      siteNotBuilt("the per-instance Tools pages `tools:viz` writes at publish (gitignored)", ...subjectPages),
+  )("draws one current page per instance that declares Tools, and none for an empty graph", () => {
     // Vacuity guard: more than cat-harness's own graph is drawn.
     expect(subjects.length).toBeGreaterThan(1);
     for (const x of subjects) {

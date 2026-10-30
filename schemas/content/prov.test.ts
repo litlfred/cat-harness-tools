@@ -9,6 +9,11 @@ import {
   ProvConsentDecisionRecordSchema,
   ProvConsentRefSchema,
   ProvDecisionRecordSchema,
+  agreementDistribution,
+  agreementsCited,
+  grantCredential,
+  grantsCited,
+  ProvAgreementDistributionSchema,
   appendProvDecisionRecord,
   buildProvHashChain,
   stampProvDecisionRecord,
@@ -31,24 +36,26 @@ const run = {
 
 describe("PROV-O decision records and hash chain (DSA B4, bean 3z44)", () => {
   test("DSA B4 decision records cite agreement URL + SHA-256 (and optional grant) and enforce the hash chain", () => {
-    const agreement = {
-      url: "https://example.org/agreements/who-ministry-dsa-v1.pdf",
-      sha256: "a".repeat(64),
-      grant: "urn:uuid:grant-001",
-    };
+    const agreement = agreementDistribution(
+      "https://example.org/agreements/who-ministry-dsa-v1#pdf",
+      "a".repeat(64),
+      "https://example.org/agreements/who-ministry-dsa-v1.pdf",
+    );
+    const grant = grantCredential("urn:uuid:3978344f-8596-4c3a-a978-8fcaba3903c5");
+    const used = (...x: unknown[]) => ({ "prov:used": [...run["prov:used"], ...x] as never });
 
-    // Every decision record must name its agreement (url + sha256) and hash
+    // Every decision record must cite its agreement (prov:used DCAT distribution + spdx:checksum) and hash
     expect(ProvDecisionRecordSchema.safeParse(run).success).toBe(false);
 
     const chain = buildProvHashChain([
-      { ...run, "@id": "urn:run:1", "cat-harness:agreement": agreement, "cat-harness:grant": "urn:uuid:grant-001" },
-      { ...run, "@id": "urn:run:2", "prov:startedAtTime": "2026-09-23T19:40:00Z", "cat-harness:agreement": agreement },
+      { ...run, "@id": "urn:run:1", ...used(agreement, grant) },
+      { ...run, "@id": "urn:run:2", "prov:startedAtTime": "2026-09-23T19:40:00Z", ...used(agreement) },
     ]);
     const fullChain = appendProvDecisionRecord(chain, {
       ...run,
       "@id": "urn:run:3",
       "prov:startedAtTime": "2026-09-23T19:45:00Z",
-      "cat-harness:agreement": agreement,
+      ...used(agreement),
     });
 
     expect(fullChain).toHaveLength(3);
@@ -56,6 +63,39 @@ describe("PROV-O decision records and hash chain (DSA B4, bean 3z44)", () => {
     expect(fullChain[1]!["cat-harness:previousHash"]).toBe(fullChain[0]!["cat-harness:recordHash"]);
     expect(fullChain[2]!["cat-harness:previousHash"]).toBe(fullChain[1]!["cat-harness:recordHash"]);
     expect(verifyProvHashChain(fullChain).valid).toBe(true);
+
+    // The agreement and grant are standard-term prov:used entities, not fields of ours
+    expect(agreementsCited(fullChain[0]!)).toEqual([agreement]);
+    expect(grantsCited(fullChain[0]!)).toEqual([grant]);
+    expect(agreement["spdx:checksum"]).toEqual({
+      "@type": "spdx:Checksum",
+      "spdx:algorithm": "spdx:checksumAlgorithm_sha256",
+      "spdx:checksumValue": "a".repeat(64),
+    });
+    expect(Object.keys(fullChain[0]!).filter((k) => /agreement|grant/.test(k))).toEqual([]);
+
+    // A record whose only "agreement" is a plain string is not an agreement citation
+    expect(() => buildProvHashChain([{ ...run, "@id": "urn:run:s" }] as never)).toThrow(/agreement/);
+    expect(
+      ProvAgreementDistributionSchema.safeParse({ ...agreement, "spdx:checksum": { ...agreement["spdx:checksum"], "spdx:checksumValue": "abcd" } })
+        .success,
+    ).toBe(false);
+    expect(ProvAgreementDistributionSchema.safeParse({ ...agreement, "@id": "not-an-iri" }).success).toBe(false);
+
+    // Swapping the agreement text's checksum breaks the chain
+    const swapped = [
+      {
+        ...fullChain[0]!,
+        "prov:used": [
+          ...run["prov:used"],
+          agreementDistribution("https://example.org/agreements/who-ministry-dsa-v1#pdf", "c".repeat(64)),
+          grant,
+        ],
+      },
+      fullChain[1]!,
+      fullChain[2]!,
+    ];
+    expect(verifyProvHashChain(swapped).errors.some((e) => e.kind === "hash-mismatch")).toBe(true);
 
     // Editing any past record fails the chain check
     const edited = [
@@ -89,10 +129,8 @@ describe("PROV-O decision records and hash chain (DSA B4, bean 3z44)", () => {
 });
 
 describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", () => {
-  const agreement = {
-    url: "https://example.org/agreements/who-ministry-dsa-v1.pdf",
-    sha256: "b".repeat(64),
-  };
+  const agreement = agreementDistribution("https://example.org/agreements/who-ministry-dsa-v1#pdf", "b".repeat(64));
+  const used = { "prov:used": [...run["prov:used"], agreement] as never };
 
   test("ProvConsentRefSchema requires non-empty id and versionId", () => {
     expect(ProvConsentRefSchema.safeParse({ id: "consent-basic-1", versionId: "3" }).success).toBe(true);
@@ -110,7 +148,7 @@ describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", 
       ...run,
       "@id": "urn:run:consent-1",
       "cat-harness:underPolicy": ["urn:dsa:pcf6", "urn:ihe:pcf:consent:ex-consent-basic-treat:v2"],
-      "cat-harness:agreement": agreement,
+      ...used,
       "cat-harness:consent": consent,
       "cat-harness:consentBased": true,
     });
@@ -133,7 +171,7 @@ describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", 
     expect(() =>
       stampProvDecisionRecord({
         ...run,
-        "cat-harness:agreement": agreement,
+        ...used,
         "cat-harness:consentBased": true,
       }),
     ).toThrow(/Consent/);
@@ -144,7 +182,7 @@ describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", 
         ...run,
         "@id": "urn:run:c1",
         "cat-harness:underPolicy": "urn:dsa:pcf6",
-        "cat-harness:agreement": agreement,
+        ...used,
         "cat-harness:consent": { id: "c-101", versionId: "1" },
         "cat-harness:consentBased": true,
       },
@@ -153,7 +191,7 @@ describe("PROV decision record cites Consent id + versionId (PCF8, bean 2egb)", 
         "@id": "urn:run:c2",
         "prov:startedAtTime": "2026-09-23T19:40:00Z",
         "cat-harness:underPolicy": "urn:dsa:pcf6",
-        "cat-harness:agreement": agreement,
+        ...used,
         "cat-harness:consent": { id: "c-101", versionId: "2" },
         "cat-harness:consentBased": true,
       },

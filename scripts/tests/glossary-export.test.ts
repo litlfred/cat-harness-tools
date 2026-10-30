@@ -43,6 +43,17 @@ import { LEDGER_KEY, LedgerSchema } from "../../schemas/library/glossary-ledger.
 import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
+import { notApplicableAlone } from "../../test/support/checkout.js";
+
+/**
+ * The committed ledger is the retirement record of the CHECKOUT's roles: it is
+ * written with the higher instances present, and standing alone their roles
+ * (sci's Lean and compute agents, fhir-harness's fhir-modeller, ...) read as
+ * newly retired. Only a composed checkout can say whether it is current.
+ */
+const NO_HIGHER_ROLES = notApplicableAlone(
+  "the roles the higher instances declare (folio-assistant-sci, folio-assistant-core, fhir-harness), which the committed swimlane-glossary ledger records",
+);
 
 const REPO =
   [resolve(import.meta.dir, "..", "..", "..", "..", ".."), resolve(dirname(HARNESS_ROOT))].find((d) =>
@@ -287,7 +298,7 @@ describe("retirement — reported, never deleted", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  test("the committed ledger is CURRENT — this is the staleness gate", () => {
+  test.skipIf(NO_HIGHER_ROLES)("the committed ledger is CURRENT — this is the staleness gate", () => {
     expect(buildGlossary({ today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
     expect(buildGlossary({ instanceRoot: BOOTSTRAP, today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
   });

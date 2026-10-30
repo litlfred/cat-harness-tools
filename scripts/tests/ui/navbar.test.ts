@@ -49,6 +49,7 @@ import { declaredGraphs, toRootFor, visualiserHref } from "../../mount-instance-
 import { kindTitle } from "../../lib/nav-label.js";
 import { graphTypologyRowDecor } from "../../lib/graph-typology-nav.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 // Typed WITH its middle region, because this fixture is a mounted page's
 // navbar and a mounted page always has one. `graphs` became optional for the
@@ -797,7 +798,12 @@ describe("a coverage path is a SOURCE file, not a URL — `publishedUrlOf`", () 
     );
   });
 
-  it("no harness tab link ends in `.md`, over the REAL committed data", () => {
+  it.skipIf(
+    siteNotBuilt(
+      "the harness data `docs:harness` writes at publish (gitignored)",
+      join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+    ),
+  )("no harness tab link ends in `.md`, over the REAL committed data", () => {
     // The regression guard, run over what actually ships rather than over a
     // fixture: a fixture would have passed throughout the defect.
     // Derived, never spelled out — `site-dir-single-answer` refuses a literal

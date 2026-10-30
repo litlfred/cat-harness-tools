@@ -14,6 +14,7 @@ import { OPEN_BEANS_UNIT, OPEN_STATUSES, openBeanCount } from "../bean-store-rea
 import { readTileCounts } from "../../schemas/ui/tile-count.ts";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
@@ -33,7 +34,12 @@ describe("openBeanCount", () => {
 });
 
 describe("the two projections every Beans badge reads agree", () => {
-  test("index.json's tile count (the glass and launcher tiles) equals count.json's (the icon row)", () => {
+  // Standing alone, neither is built: `docs:pages` writes both at publish from
+  // the composed bean store, and `assets/beans/` is gitignored (bean w1gy F18).
+  const notBuilt = (...rels: string[]): boolean =>
+    siteNotBuilt("the beans projections `docs:pages` writes at publish (gitignored)", ...rels.map((r) => join(SITE, r)));
+
+  test.skipIf(notBuilt("assets/beans/index.json", "assets/beans/count.json"))("index.json's tile count (the glass and launcher tiles) equals count.json's (the icon row)", () => {
     const tile = readTileCounts(json("assets/beans/index.json")).get("beans");
     const row = readTileCounts(json("assets/beans/count.json")).get("beans");
     expect(tile).toBeDefined();
@@ -41,7 +47,7 @@ describe("the two projections every Beans badge reads agree", () => {
     expect(tile!.unit).toBe(OPEN_BEANS_UNIT);
   });
 
-  test("and equals openBeanCount over the index's own items", () => {
+  test.skipIf(notBuilt("assets/beans/index.json"))("and equals openBeanCount over the index's own items", () => {
     const doc = json("assets/beans/index.json") as { items: { status?: string }[] };
     expect(readTileCounts(doc).get("beans")!.count).toBe(openBeanCount(doc.items));
   });

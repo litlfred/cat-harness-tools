@@ -20,6 +20,7 @@ import {
   type InitFolioOptions,
 } from "../../scripts/init-folio.ts";
 import { declarationChain, resolveSkillDirs } from "../../schemas/kg/harness-config.js";
+import { notApplicableAlone } from "../support/checkout.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -170,14 +171,24 @@ describe("a scaffold says what it stands on (zmdo)", () => {
   });
 });
 
+/**
+ * The document and paper adapters are declared by folio-assistant-core and
+ * folio-assistant-sci, which only a composed checkout holds; standing alone
+ * the derivation has no adapter to read (its logic is pinned over fixtures
+ * in scripts/tests/init-folio.test.ts).
+ */
+const NO_CONTENT_ADAPTERS = notApplicableAlone(
+  "folio-assistant-core and folio-assistant-sci, whose declared document and paper adapters these remote mounts are derived from",
+);
+
 describe("remote mounts derived from the checkout's declarations (--link remote)", () => {
   // Pins the derivation against the composed checkout: the same list, in the
   // same order, as the names init-folio used to hard-code.
   const PLATFORM = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"];
-  test("a document folio mounts the platform and the document adapter's instance", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("a document folio mounts the platform and the document adapter's instance", () => {
     expect(remotePlatformLayers("document")).toEqual([...PLATFORM, "folio-assistant-core"]);
   });
-  test("a paper folio mounts the paper adapter's instance after what it needs", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("a paper folio mounts the paper adapter's instance after what it needs", () => {
     expect(remotePlatformLayers("paper")).toEqual([...PLATFORM, "folio-assistant-core", "folio-assistant-sci"]);
   });
   test("a contentless instance mounts the platform alone", () => {
