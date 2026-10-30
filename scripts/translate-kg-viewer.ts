@@ -266,7 +266,7 @@ export function manifest(loc: string, translated: number, sourceHash: string): s
       "by string, so nothing renders blank in the meantime."
     : "Unofficial until a person signs it off, which the .po header declares " +
       "and the page itself tells the reader.";
-  return `import type { TranslationNode } from "../../schemas/translation";
+  return `import type { TranslationNode } from "../../schemas/content/translation";
 
 /**
  * ${localeName(loc)} (${loc}) translation of the knowledge-graph viewer's chrome.

@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { MEMORY_SCHEMA_TAG, MemoryNodeSchema } from "@litlfred/cat-harness/schemas/memory.js";
+import { MEMORY_SCHEMA_TAG, MemoryNodeSchema } from "@litlfred/cat-harness/schemas/conduct/memory.js";
 import { EMPTY_NOTE_TAGS } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
 import {
   COPILOT_AGENT_CHAR_BUDGET,
