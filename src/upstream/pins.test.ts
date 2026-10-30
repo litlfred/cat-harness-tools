@@ -4,7 +4,20 @@
  * @module src/upstream/pins.test
  */
 import { describe, expect, test } from "bun:test";
-import { assessPin, compareVersions, exitCode, readPin, releases, render, type PinDef } from "./pins.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  assessPin,
+  compareVersions,
+  exitCode,
+  locatePins,
+  missingFileVerdict,
+  readPin,
+  releases,
+  render,
+  type PinDef,
+  type PinRegistry,
+} from "./pins.js";
 
 const THEME: PinDef = {
   id: "just-the-docs",
@@ -176,5 +189,59 @@ describe("tagPrefix", () => {
     // defaults to "", so a pin whose literal IS its tag compares as before.
     expect(assessPin(THEME, "v0.11.2", TAGS).state).toBe("behind");
     expect(assessPin(THEME, "v0.12.0", TAGS).state).toBe("current");
+  });
+});
+
+describe("locatePins — each row resolves against the layer that declares it (folio-assistant#1481)", () => {
+  const PDF: PinDef = { ...THEME, id: "pdfjs", title: "pdf.js", pinnedIn: "scripts/pdf-viewer.ts" };
+
+  test("a row resolves against ITS registry's root, not the harness's", () => {
+    const located = locatePins(
+      [
+        { layer: "cat-harness", root: "/h", pins: [THEME] },
+        { layer: "cat-harness-tools", root: "/t", pins: [PDF] },
+      ],
+      join,
+    );
+    expect(located.map((l) => [l.pin.id, l.layer, l.file])).toEqual([
+      ["just-the-docs", "cat-harness", "/h/docs/_config.yml"],
+      ["pdfjs", "cat-harness-tools", "/t/scripts/pdf-viewer.ts"],
+    ]);
+  });
+
+  test("the same id in two registries is reported twice, never merged", () => {
+    const located = locatePins(
+      [
+        { layer: "cat-harness", root: "/h", pins: [PDF] },
+        { layer: "cat-harness-tools", root: "/t", pins: [PDF] },
+      ],
+      join,
+    );
+    expect(located).toHaveLength(2);
+  });
+
+  test("a missing file is unknown, and says the file is missing rather than that the pattern drifted", () => {
+    const [located] = locatePins([{ layer: "cat-harness", root: "/h", pins: [PDF] }], join);
+    const v = missingFileVerdict(located);
+    expect(v.state).toBe("unknown");
+    expect(v.detail).toContain("scripts/pdf-viewer.ts is not in cat-harness");
+    expect(v.detail).not.toContain("pattern has drifted");
+    expect(exitCode([v])).toBe(2);
+  });
+});
+
+describe("this layer's own registry", () => {
+  // The guard that was missing: the pdfjs row pointed at a file that had moved
+  // layers, and nothing noticed until the weekly watchdog went red.
+  const toolsRoot = join(import.meta.dir, "..", "..");
+  const registry: PinRegistry = JSON.parse(readFileSync(join(toolsRoot, "upstream", "upstream-pins.json"), "utf8"));
+
+  test("every row's pinnedIn file is in this layer, and its pattern reads a ref out of it", () => {
+    expect(registry.pins.length).toBeGreaterThan(0);
+    for (const pin of registry.pins) {
+      const file = join(toolsRoot, pin.pinnedIn);
+      expect(existsSync(file)).toBe(true);
+      expect(readPin(readFileSync(file, "utf8"), pin.pattern)).toMatch(/\d/);
+    }
   });
 });

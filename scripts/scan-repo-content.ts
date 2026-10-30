@@ -44,14 +44,38 @@
  * `audit_refutation`, `derivation_note`) with source location, rationale, and link status
  * (identifying orphaned evidence unlinked to any block in the content tree).
  *
+ * ## Markers — what the harness COULD declare (bean `folio-assistant-dscv`)
+ *
+ * The fourth section, `markers`, answers a different question from the three
+ * buckets: not "where would this file go" but "what in this repository could
+ * a harness be told to pay attention to". Owner, 2026-10-30T12:41Z, verbatim:
+ * *"a harness can point to a repo, but doesnt want to automatically slurpo up
+ * all content in a repo. harness desclares what it it pays attention to in the
+ * repo."*
+ *
+ * So for each content marker found — `sushi-config.yaml`, a legacy
+ * `dak.json`, `.bpmn` processes, a beans store, `library/`, Lean, folio
+ * manifests — it reports the paths, whether `index.config.json` (or a local
+ * instance's declaration) ALREADY declares it, and the snippet that would.
+ * It suggests; it never declares. The pick is the person's, made on
+ * `Task_ChooseHarnessed` in `getting-started.bpmn`, and a marker nobody picked
+ * stays undeclared. See `lib/content-markers.ts`.
+ *
  * ## It never writes
  *
  * No moves, no mkdir, no git. Ingestion is a separate process with its own
  * diagram (`document-ingestion.bpmn`) and its own gate.
  *
  * Usage:
- *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir]           # report
- *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --json    # facts
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir]             # report
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --json      # facts
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers   # markers only:
+ *     "what else could this harness declare?" on an instance that already exists
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers --json   # markers only, as facts
+ *   bun run cat scan:repo [dir] [--markers] [--json]                          # the same, from an instance root
+ *
+ * `--json` with `--markers` prints the {@link MarkerScan} of
+ * `lib/content-markers.ts`; without it, the whole scan, `markers` included.
  *
  * @module scripts/scan-repo-content
  */
@@ -62,6 +86,7 @@ import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { CONFIG_SUFFIX, isReservedIndexFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
+import { formatMarkers, scanMarkers, type MarkerScan } from "./lib/content-markers.ts";
 
 export type Bucket = "library" | "content" | "unclassified";
 
@@ -128,6 +153,11 @@ export interface ScanResult {
   skipped: number;
   /** Mathematical and computational artifacts detected outside the content tree. */
   mathCandidates: MathCandidate[];
+  /**
+   * Content markers a harness could declare, and whether it already does.
+   * Reported, never declared: see the module docs.
+   */
+  markers: MarkerScan;
 }
 
 /** Extensions that are source material whoever authored them. */
@@ -229,7 +259,7 @@ export function classify(rel: string): { bucket: Bucket; why: string } {
 }
 
 /** Prefer git's view of the tree: it already honours `.gitignore`. */
-function listFiles(root: string): { files: string[]; source: "git" | "filesystem" } {
+export function listFiles(root: string): { files: string[]; source: "git" | "filesystem" } {
   const NUL = String.fromCharCode(0);
   const r = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "buffer" });
   if (r.status === 0 && r.stdout) {
@@ -511,8 +541,9 @@ export function scanRepo(root: string): ScanResult {
   );
 
   const mathCandidates = scanMathCandidates(abs, files);
+  const markers = scanMarkers(abs, files);
 
-  return { root: abs, source, entries, groups, totals, skipped, mathCandidates };
+  return { root: abs, source, entries, groups, totals, skipped, mathCandidates, markers };
 }
 
 const human = (n: number): string => {
@@ -592,19 +623,31 @@ export function formatScan(r: ScanResult): string {
     out.push("");
   }
 
+  out.push(formatMarkers(r.markers));
+  out.push("");
+
   out.push("This scan wrote nothing. Next: skills/conduct/conduct-core/repo-conversion.md §2 — three");
-  out.push("questions (import or not; library or content; leave in place or reorganise).");
+  out.push("questions (import or not; library or content; leave in place or reorganise) — and §2a,");
+  out.push("which of the markers above the harness should declare. Nothing is declared unpicked.");
   return out.join("\n");
 }
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
+  const markersOnly = args.includes("--markers");
   const dir = args.find((a) => !a.startsWith("--")) ?? ".";
   if (!existsSync(dir)) {
     console.error(`No such directory: ${dir}`);
     process.exit(2);
   }
-  const result = scanRepo(dir);
-  console.log(json ? JSON.stringify(result, null, 2) : formatScan(result));
+  if (markersOnly) {
+    // The post-setup question — "what else could I declare?" — needs no
+    // bucket walk, so it does not pay for one.
+    const m = scanMarkers(resolve(dir), listFiles(resolve(dir)).files);
+    console.log(json ? JSON.stringify(m, null, 2) : formatMarkers(m));
+  } else {
+    const result = scanRepo(dir);
+    console.log(json ? JSON.stringify(result, null, 2) : formatScan(result));
+  }
 }

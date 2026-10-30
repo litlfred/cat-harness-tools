@@ -89,6 +89,7 @@ export const WORKFLOW_COMPLETE_HANDOVER: Record<string, FieldSpec> = {
   facts: "control",
   actor: "control",
   target: { role: "control", pattern: WORKFLOW_TARGET },
+  activities: "control",
   note: "data",
 };
 
@@ -374,15 +375,22 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
         ),
       target: z.string().optional().describe("The content the step acted on: a block id, path or bean id"),
       note: z.string().optional().describe("What happened, for the instance history"),
+      activities: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          "PROV-O activities a Tool returned while doing this step, verbatim (e.g. skill_update's " +
+            "`activity`). Kept on the step's history entry; each must name this step as its plan",
+        ),
     },
-    async ({ instance, node, outcome, facts, actor, target, note: rawNote }) => {
+    async ({ instance, node, outcome, facts, actor, target, note: rawNote, activities }) => {
       // The arguments are a hand-over from the calling agent (H3, H9; bean
       // `cztn`). Everything but `note` steers the engine, `facts` included,
       // since a decision table branches on it, so a finding there REFUSES.
       // `note` is read later by another agent (the bean body, the log), so a
       // finding there QUARANTINES: kept verbatim, marked, and reported back.
       const screen = screenHandover(
-        { instance, node, outcome, facts, actor, target, note: rawNote },
+        { instance, node, outcome, facts, actor, target, note: rawNote, activities },
         { fields: WORKFLOW_COMPLETE_HANDOVER },
       );
       if (screen.state === "refused") {
@@ -425,6 +433,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
           actor: actor ?? principal.account,
           note,
           authz: { ctx: accessContext(root), principal, target, mode: ENGINE_MODE },
+          activities: seen.activities as unknown[] | undefined,
         });
       } catch (e) {
         // Bean `v49e`: a refusal is recorded on the instance, so a gate that

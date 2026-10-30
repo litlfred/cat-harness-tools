@@ -6,7 +6,7 @@ status: completed
 type: task
 priority: normal
 created_at: 2026-09-30T19:48:10Z
-updated_at: 2026-10-11T06:52:45Z
+updated_at: 2026-10-22T16:45:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -109,3 +109,46 @@ Re-litigating `8zsb`'s two fixes. They landed and are verified.
 ### Owner ruling 2026-10-11 (relayed by lane A)
 
 Never look outside the checkout. Sibling lookup for the ROOT instance stops at the checkout root, and the two callers that compose `repoRootFor` unconditionally are fixed to honour that.
+
+
+
+## Owner ruling 2026-10-11 (relayed by lane A)
+
+Never look outside the checkout. Sibling lookup for the ROOT instance stops at the checkout root, and the two callers that compose `repoRootFor` unconditionally are fixed to honour that.
+
+## Summary of Changes
+
+- cat-harness#136 (merged): `siblingScopeFor` now returns the instance itself when it is its own checkout (`isForeignCheckout`: its own `.git`, not a declared submodule), instead of `dirname`. Tests cover the `/tmp` case and the submodule case.
+- The two callers this bean named, `rootForScope("repository")` and `declaredKindsEntryRoot`, already went through `checkoutRootFor` since g43f. Verified, no change needed.
+
+## Merged from the folio-assistant copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+````text
+## Closed 2026-10-09
+
+- **Root Cause Identified**: In `resolveDirectories` (`cat-harness/schemas/cat-harness.ts:4801`), directory path resolution computed `absPath: resolve(rootForScope(link.root, dir.scope), dir.path)`. `rootForScope` previously called `repoRootFor(instanceRoot)`, which climbs out to `dirname(instanceRoot)` when the instance root is already at the repository root.
+- **Resolution**: Under bean `g43f`, `rootForScope` was updated to use `checkoutRootFor(instanceRoot)`:
+  ```ts
+  export function rootForScope(instanceRoot: string, scope?: DeclarationScope): string {
+    return scope === "repository" ? checkoutRootFor(instanceRoot) : instanceRoot;
+  }
+  ```
+  `declaredKindsEntryRoot` similarly resolves through `rootForScope`, ensuring that repository-scoped paths on root instances never escape to the checkout parent directory.
+- **Verification**:
+  - `bun test ./cat-harness-tools/schemas/instance-roots-worktrees.test.ts` passed (18 pass, 0 fail).
+  - Explicit test: `rootForScope: a \`scope: "repository"\` path on the root instance resolves inside it` verifies that for both root worktree instances and nested instances, repository scope resolves to the checkout root, not the parent.
+
+## Summary of Changes
+
+Done by drain lane B on the owner's ruling (never outside the checkout): cat-harness#136.
+
+## From the cat-harness-tools store copy (reverse reconciliation, 2026-10-22)
+
+_These sections existed only in the cat-harness-tools copy and are carried here under owner ruling 2026-10-16 item 9, which keeps notes that only one copy has. They are historical and do not change this bean's status. The forward direction is litlfred/cat-harness-tools#558. Session https://claude.ai/code/session_01BiusQ9uAZiHP6TUhfwZ2h6._
+
+### Explicitly out of scope
+````

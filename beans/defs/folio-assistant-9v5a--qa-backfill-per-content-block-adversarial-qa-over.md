@@ -70,3 +70,15 @@ Landed on branch `claude/lvlv-content-block-adversarial-qa` (commit `91aee02e`):
 2. `audit:coverage` measures adversarial coverage per kind.
 3. Risk-ranked backfill runner implemented in `scripts/adversarial-backfill.ts`.
 4. Unit tests passing (`adversarial-checklist.test.ts`, `adversarial-review-gate.test.ts`, `audit-coverage.test.ts`).
+
+## Merged from the cat-harness copy (bean dedupe, 2026-10-30)
+
+These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.
+
+Where: (three-way hunk)
+
+```text
+- [ ] the owner agrees what coverage level finishes this
+
+_2026-10-16T06:30:00Z_ — Store reconciliation: status `todo` → `completed` (Owner ruling 2026-10-16, item 9: "based on semantic content"; the copies said folio-assistant: completed, cat-harness: todo, cat-harness-tools: todo). Evidence: closed in the folio-assistant store copy (2026-10-10); commit 91aee02e is on cat-harness main. Session https://claude.ai/code/session_01Pc8vSeXCwp5Ckvmz56cMDs.
+```

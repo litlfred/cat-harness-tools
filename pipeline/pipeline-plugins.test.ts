@@ -255,7 +255,6 @@ describe("this repository", () => {
     // catches that only once the files have moved; this catches it now.
     const filled = [
       "lean-lexer",
-      "_folio-chapter-profiles.qou",
       "latex-preflight",
       "lean-coverage",
     ];

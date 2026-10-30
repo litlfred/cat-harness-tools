@@ -48,12 +48,33 @@ describe("an absent results directory is not 'no runs' (audit C5, bean 2gst)", (
     expect(r.looked).toBe(false);
     expect(r.runs).toBe(0);
   });
-  test("present but empty: looked is true — a determined zero the caller may call n/a", () => {
+  test("present but empty: NOT looked — another writer may have made it (cat-harness-tools#759)", () => {
     const empty = mkdtempSync(join(tmpdir(), "test-runs-empty-"));
     try {
       const r = checkTestRuns(INSTANCE, empty, SKILLS);
+      expect(r.looked).toBe(false);
+      expect(r.runs).toBe(0);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+  test("present but empty when determined (qa:refresh, or a committed directory): looked — a determined zero the caller may call n/a", () => {
+    const empty = mkdtempSync(join(tmpdir(), "test-runs-empty-"));
+    try {
+      const r = checkTestRuns(INSTANCE, empty, SKILLS, undefined, { determined: true });
       expect(r.looked).toBe(true);
       expect(r.runs).toBe(0);
+      // determined never conjures a directory that is not there
+      expect(checkTestRuns(INSTANCE, join(empty, "never-created"), SKILLS, undefined, { determined: true }).looked).toBe(false);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+  test("present but empty, store hit: the store's runs are checked", () => {
+    const empty = mkdtempSync(join(tmpdir(), "test-runs-empty-"));
+    try {
+      const r = checkTestRuns(INSTANCE, empty, SKILLS, () => ({ looked: true, files: [] }));
+      expect(r.looked).toBe(true);
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }

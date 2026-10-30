@@ -15,17 +15,17 @@
   "licence": "MPL-2.0",
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
-    "test/a11y.e2e.ts",
     "test/beans-page-search.e2e.ts",
-    "test/discarded-items.e2e.ts",
+    "test/content/a11y.e2e.ts",
+    "test/content/discarded-items.e2e.ts",
+    "test/content/glass-navigation.e2e.ts",
+    "test/content/table-filter.e2e.ts",
     "test/glass-card-open.e2e.ts",
-    "test/glass-navigation.e2e.ts",
     "test/library-entry-iri.e2e.ts",
-    "test/library-viewer-scope.e2e.ts",
-    "test/state-dashboards.e2e.ts",
+    "test/library/library-viewer-scope.e2e.ts",
     "test/sticky-todo-graph.e2e.ts",
-    "test/table-filter.e2e.ts",
     "test/themed-viewers.e2e.ts",
-    "test/todos-page-board.e2e.ts"
+    "test/todos-page-board.e2e.ts",
+    "test/ui/state-dashboards.e2e.ts"
   ]
 }

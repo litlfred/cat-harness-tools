@@ -12,7 +12,7 @@
  * and its gate.
  *
  *   bun run cat libraries:derive                       write every layer that declares a software-library directory
- *   bun run cat libraries:derive --instance <name>     write one
+ *   bun run cat libraries:derive --instance <name>     write one (a held layer too: `--instance bootstrap-tools`)
  *   bun run cat libraries:check                        fail on anything `libraries:derive` would change, and on what it cannot place
  *
  * Exit 0 clean · 1 a finding · 2 nothing to judge (no layer declares a
@@ -24,7 +24,7 @@
  * |---|---|
  * | `name`, `range`, `dev` | the layer's `package.json`: `dependencies` and `devDependencies` |
  * | `version`, `digest`, `source` | the layer's `bun.lock`: the package's resolved `name@version`, its `sha512-` integrity (re-spelled in hex), and its registry tarball |
- * | `licence` | the INSTALLED package's own `package.json` — `license`, or the old `licenses` array — found the way Node resolves it, from the layer upwards |
+ * | `licence` | the INSTALLED package's own `package.json` — `license`, or the old `licenses` array — found the way Node resolves it, from the layer upwards; when it says `SEE LICENSE IN <file>`, that file, read as a vendored bundle's is (a listed licence's text is its id, any other `LicenseRef-<name>`) |
  * | `usedBy` | every code file of the layer whose imports name the package (parsed with the TypeScript compiler, so an import inside a comment or a string is not one) |
  * | `shim` | the `types/*.d.ts` whose `declare module "<name>"` declares it |
  *
@@ -96,6 +96,7 @@ import { z } from "zod";
 import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import {
+  HELD_DIR,
   LIBRARY_FILE_SUFFIX,
   SoftwareLibrarySchema,
   libraryFileName,
@@ -113,8 +114,11 @@ export const LIBRARY_KIND = "software-library";
 /** Where an npm registry entry with no registry of its own (`""` in `bun.lock`) is fetched from. */
 export const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 
-/** What `licenceSource` says for every node: the field is read from the installed package's own manifest. */
+/** What `licenceSource` says for a node whose licence is read from the installed package's own manifest. */
 export const LICENCE_SOURCE = "the installed package's own package.json (`license`)";
+
+/** What `licenceSource` says when the installed package's own package.json names a licence file (`SEE LICENSE IN LICENSE`). */
+export const SEE_LICENCE_SOURCE = "the licence file the installed package's own package.json names";
 
 /** A code file whose imports are read. `.d.ts` included: a declaration file may import a package too. */
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/;
@@ -197,6 +201,8 @@ export interface LibraryLayer {
   name: string;
   root: string;
   dir: string;
+  /** Set on a layer below the kind: the layer whose `libraries/held/<name>/` holds its nodes. */
+  heldBy?: LibraryLayer;
 }
 
 /** What deriving one layer produced. */
@@ -463,6 +469,109 @@ function isOwnOrBuiltin(spec: string): boolean {
 }
 
 /**
+ * ## A layer below the kind is held here
+ *
+ * Owner, 2026-10-30 (bootstrap-tools#44, "A. Holder records, keyed by
+ * layer"). A layer that does not reach the kind's own layer through `needs`
+ * (bootstrap-tools needs only bootstrap) may not name `software-library`, so
+ * it declares no `libraries/`. This layer, which owns the writer and the gate,
+ * holds its nodes instead, under `libraries/held/<layer>/`, each stamped
+ * `software-library/1.2.0` with `layer: "<layer>"`. It is the glossary's rule
+ * (bean `q3n9`: core holds the schemes of the layers below its typology, keyed
+ * by their owning instance), applied to libraries.
+ *
+ * The held set is DERIVED, never listed: every instance in the checkout that
+ * has a `package.json`, declares no `software-library` directory, is not
+ * {@link KIND_OWNER}, and does not reach it through `needs`. A layer that does
+ * reach it declares its own `libraries/` instead, and is never held. The nodes
+ * are derived at the holder's pins, so they move with a re-pin of the layer
+ * they describe, in the same PR.
+ */
+
+/** The layer that owns the `software-library` kind. A layer that reaches it through `needs` declares its own `libraries/`. */
+export const KIND_OWNER = "cat-harness";
+
+/** The layer that holds the nodes of the layers below the kind: this script's own. */
+export const HOLDER = basename(resolve(import.meta.dir, ".."));
+
+/** `needs` as each instance in the checkout declares it, by instance name. */
+function needsByInstance(repoRoot: string): Map<string, { root: string; needs: string[] }> {
+  const out = new Map<string, { root: string; needs: string[] }>();
+  for (const root of instanceRootsIn(repoRoot)) {
+    const name = basename(root);
+    const decl = join(root, `${name}.json`);
+    let needs: string[] = [];
+    try {
+      const d = JSON.parse(readFileSync(decl, "utf-8")) as { needs?: unknown };
+      if (Array.isArray(d.needs)) needs = d.needs.filter((n): n is string => typeof n === "string");
+    } catch {
+      // No readable declaration: no `needs` to follow. The instance is still listed.
+    }
+    out.set(name, { root, needs });
+  }
+  return out;
+}
+
+/** Does `name` reach `target` through `needs` (itself included)? */
+function reaches(graph: Map<string, { needs: string[] }>, name: string, target: string): boolean {
+  const seen = new Set<string>();
+  const stack = [name];
+  while (stack.length > 0) {
+    const n = stack.pop()!;
+    if (n === target) return true;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    stack.push(...(graph.get(n)?.needs ?? []));
+  }
+  return false;
+}
+
+/**
+ * The layers the holder records, each as a {@link LibraryLayer} whose `dir`
+ * is `<holder libraries>/held/<layer>/` (§"A layer below the kind is held
+ * here"). `own` is the holder's own entry from {@link libraryLayers}; with no
+ * holder in the checkout nothing is held.
+ */
+export function heldLayers(repoRoot: string, own: readonly LibraryLayer[], holder: string = HOLDER): LibraryLayer[] {
+  const holderLayer = own.find((l) => l.name === holder && !l.heldBy);
+  if (!holderLayer) return [];
+  const declaring = new Set(own.map((l) => l.name));
+  const graph = needsByInstance(repoRoot);
+  const out: LibraryLayer[] = [];
+  for (const [name, { root }] of [...graph.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    if (declaring.has(name) || name === KIND_OWNER || reaches(graph, name, KIND_OWNER)) continue;
+    if (!existsSync(join(root, "package.json"))) continue;
+    out.push({ name, root, dir: join(holderLayer.dir, HELD_DIR, name), heldBy: holderLayer });
+  }
+  return out;
+}
+
+/** The held directories on disk that no held layer in the checkout accounts for. */
+export function strayHeldDirs(holder: LibraryLayer, held: readonly LibraryLayer[]): string[] {
+  const dir = join(holder.dir, HELD_DIR);
+  if (!existsSync(dir)) return [];
+  const known = new Set(held.map((l) => l.name));
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !known.has(e.name))
+    .map((e) => e.name)
+    .sort();
+}
+
+/**
+ * A held layer's nodes: each says which layer it describes and is stamped the
+ * version that has `layer`. `usedBy` and `shim` stay relative to that layer.
+ */
+export function asHeld(derived: DerivedLayer, layer: string): DerivedLayer {
+  const nodes = new Map<string, SoftwareLibrary>();
+  for (const [f, n] of derived.nodes) {
+    const { $schema: _s, ...rest } = n;
+    const node = { $schema: librarySchemaTag({ ...rest, layer }), layer, ...rest } as SoftwareLibrary;
+    nodes.set(f, node);
+  }
+  return { ...derived, nodes };
+}
+
+/**
  * Derive one layer's nodes from its `package.json`, `bun.lock`, installed
  * packages and code. Never throws for a problem in the inputs: each is a
  * `problems` entry.
@@ -550,10 +659,24 @@ export function deriveLayer(root: string): DerivedLayer {
       out.problems.push(`${name}: not installed, so its licence could not be read — run \`bun install\``);
       continue;
     }
-    const licence = licenceOf(installed.manifest);
+    let licence = licenceOf(installed.manifest);
+    let licenceSource = LICENCE_SOURCE;
     if (!licence) {
       out.problems.push(`${name}: its installed package.json states no licence`);
       continue;
+    }
+    // npm's "SEE LICENSE IN <file>" names a licence file instead of an id: read
+    // that file, as a vendored bundle's is (a listed licence's text is its id,
+    // any other is `LicenseRef-<name>`).
+    const see = /^SEE LICEN[CS]E IN (\S+)$/i.exec(licence);
+    if (see) {
+      const file = join(dirname(installed.path), see[1]);
+      if (!existsSync(file)) {
+        out.problems.push(`${name}: its package.json says \`${licence}\`, and the installed package has no such file`);
+        continue;
+      }
+      licence = recogniseLicenceText(readFileSync(file, "utf-8")) ?? licenseRefFor(name);
+      licenceSource = `${SEE_LICENCE_SOURCE} (\`${see[1]}\`)`;
     }
     if (installed.manifest.version !== resolved.version) {
       out.notes.push(`${name}: licence read from the installed ${String(installed.manifest.version)}; the layer locks ${resolved.version}`);
@@ -575,7 +698,7 @@ export function deriveLayer(root: string): DerivedLayer {
       digest: { algorithm: "sha512", digest },
       source: { type: "url", url: tarballUrl(typeof entry[1] === "string" ? entry[1] : "", resolved.name, resolved.version) },
       licence,
-      licenceSource: LICENCE_SOURCE,
+      licenceSource,
       ...(shim ? { shim } : {}),
       usedBy: [...(usedBy.get(name) ?? [])].sort(),
     } as SoftwareLibrary);
@@ -631,7 +754,9 @@ function existingNodeFiles(dir: string): string[] {
  * Pure over the directory's current files, so a test can call it.
  */
 export function layerFindings(layer: LibraryLayer, derived: DerivedLayer, spdx: Parameters<typeof libraryLicenceProblem>[1] | string): string[] {
-  const where = (f: string): string => relative(layer.root, join(layer.dir, f)).split(sep).join("/");
+  const base = layer.heldBy ?? layer;
+  const label = base.name;
+  const where = (f: string): string => relative(base.root, join(layer.dir, f)).split(sep).join("/");
   const findings = derived.problems.map((p) => `${layer.name}: ${p}`);
   const onDisk = existingNodeFiles(layer.dir);
   for (const f of onDisk) {
@@ -640,22 +765,22 @@ export function layerFindings(layer: LibraryLayer, derived: DerivedLayer, spdx: 
     try {
       raw = JSON.parse(text);
     } catch (e) {
-      findings.push(`${layer.name}/${where(f)}: not JSON — ${(e as Error).message}`);
+      findings.push(`${label}/${where(f)}: not JSON — ${(e as Error).message}`);
       continue;
     }
     const parsed = SoftwareLibrarySchema.safeParse(raw);
     if (!parsed.success) {
-      findings.push(`${layer.name}/${where(f)}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      findings.push(`${label}/${where(f)}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
     } else if (typeof spdx !== "string") {
       const problem = libraryLicenceProblem(parsed.data, spdx);
-      if (problem) findings.push(`${layer.name}/${where(f)}: licence \`${parsed.data.licence}\` — ${problem}`);
+      if (problem) findings.push(`${label}/${where(f)}: licence \`${parsed.data.licence}\` — ${problem}`);
     }
     const want = derived.nodes.get(f);
-    if (!want) findings.push(`${layer.name}/${where(f)}: stale — no dependency of the layer is this library; run \`bun run cat libraries:derive\``);
-    else if (renderNode(want) !== text) findings.push(`${layer.name}/${where(f)}: stale — \`libraries:derive\` would rewrite it`);
+    if (!want) findings.push(`${label}/${where(f)}: stale — no dependency of the layer is this library; run \`bun run cat libraries:derive\``);
+    else if (renderNode(want) !== text) findings.push(`${label}/${where(f)}: stale — \`libraries:derive\` would rewrite it`);
   }
   for (const f of derived.nodes.keys()) {
-    if (!onDisk.includes(f)) findings.push(`${layer.name}/${where(f)}: missing — \`${derived.nodes.get(f)!.name}\` is a dependency with no node; run \`bun run cat libraries:derive\``);
+    if (!onDisk.includes(f)) findings.push(`${label}/${where(f)}: missing — \`${derived.nodes.get(f)!.name}\` is a dependency with no node; run \`bun run cat libraries:derive\``);
   }
   if (typeof spdx === "string") findings.push(`${layer.name}: licences could not be checked — ${spdx}`);
   for (const [p, files] of derived.unknownImports) {
@@ -692,7 +817,9 @@ export function writeLayer(layer: LibraryLayer, derived: DerivedLayer): { writte
 export function main(argv: readonly string[], repoRoot = resolve(import.meta.dir, "..", "..")): number {
   const check = argv.includes("--check");
   const only = argv.includes("--instance") ? argv[argv.indexOf("--instance") + 1] : undefined;
-  let layers = libraryLayers(repoRoot);
+  const own = libraryLayers(repoRoot);
+  const held = heldLayers(repoRoot, own);
+  let layers = [...own, ...held];
   if (only) layers = layers.filter((l) => l.name === only || resolve(l.root) === resolve(only));
   if (layers.length === 0) {
     console.error(
@@ -705,7 +832,7 @@ export function main(argv: readonly string[], repoRoot = resolve(import.meta.dir
   const spdx = loadSpdxLicenseList(repoRoot);
   const findings: string[] = [];
   for (const layer of layers) {
-    const derived = deriveLayer(layer.root);
+    const derived = layer.heldBy ? asHeld(deriveLayer(layer.root), layer.name) : deriveLayer(layer.root);
     for (const n of derived.notes) console.log(`  · ${layer.name}: ${n}`);
     if (!check) {
       const { written, removed } = writeLayer(layer, derived);
@@ -714,6 +841,14 @@ export function main(argv: readonly string[], repoRoot = resolve(import.meta.dir
       console.log(`${layer.name}: ${derived.nodes.size} librar${derived.nodes.size === 1 ? "y" : "ies"} derived for ${relative(repoRoot, layer.dir)}/`);
     }
     findings.push(...layerFindings(layer, derived, spdx));
+  }
+  // A held directory for a layer the checkout does not hold: could not
+  // determine whether it is current, never a pass, and never deleted here.
+  const holder = own.find((l) => l.name === HOLDER);
+  if (holder && !only) {
+    for (const d of strayHeldDirs(holder, held)) {
+      findings.push(`${HOLDER}/${relative(holder.root, join(holder.dir, HELD_DIR, d)).split(sep).join("/")}: no layer named \`${d}\` below the kind is in this checkout — could not determine whether its nodes are current`);
+    }
   }
   if (findings.length > 0) {
     console.error(`\n✗ ${findings.length} finding(s):`);

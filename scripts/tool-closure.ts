@@ -222,11 +222,14 @@ export function toolClosure(instances: readonly ClosureInstance[], choices: read
       continue;
     }
     for (const t of choice.tools) {
-      const defs = choice.toolDirs.map((d) => joinRel(declarer.path, d, t.id, `${t.id}.ts`)).filter((r) => host.isFile(abs(r)));
+      // A Tool is declared as `<id>.json` data or a `<id>.ts` module (bean `y9r6`).
+      const defs = choice.toolDirs
+        .flatMap((d) => [`${t.id}.json`, `${t.id}.ts`].map((f) => joinRel(declarer.path, d, t.id, f)))
+        .filter((r) => host.isFile(abs(r)));
       if (defs.length !== 1) {
         problems.push(
           defs.length === 0
-            ? `Tool \`${t.id}\`: \`${choice.instance}\` holds no \`${t.id}/${t.id}.ts\` in its tools director${choice.toolDirs.length === 1 ? "y" : "ies"} (${choice.toolDirs.map((d) => `\`${strip(d)}/\``).join(", ") || "none declared"})`
+            ? `Tool \`${t.id}\`: \`${choice.instance}\` holds no \`${t.id}/${t.id}.json\` (or \`.ts\`) in its tools director${choice.toolDirs.length === 1 ? "y" : "ies"} (${choice.toolDirs.map((d) => `\`${strip(d)}/\``).join(", ") || "none declared"})`
             : `Tool \`${t.id}\`: two definitions, ${defs.join(" and ")} — the folder, the file and the id are one name`,
         );
         continue;

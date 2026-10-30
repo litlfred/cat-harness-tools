@@ -58,6 +58,57 @@ export interface PinRegistry {
   pins: PinDef[];
 }
 
+/** One registry file, read: the layer that declares it and the root its `pinnedIn` paths resolve against. */
+export interface LoadedRegistry {
+  /** The instance that declares the registry, e.g. `cat-harness`. */
+  layer: string;
+  /** That instance's root on disk; every row's `pinnedIn` resolves against it. */
+  root: string;
+  pins: PinDef[];
+}
+
+/** A row ready to check: the pin, its layer, and the absolute path of its `pinnedIn` file. */
+export interface LocatedPin {
+  pin: PinDef;
+  layer: string;
+  file: string;
+}
+
+/**
+ * Every row of every registry, each resolved against ITS OWN layer's root.
+ *
+ * Each layer declares the pins whose files it holds. A harness row cannot
+ * name a file in the tool layer above it, because that is a wrong-direction
+ * reference (`check:reference-direction`). When bean `70lx` moved
+ * `scripts/pdf-viewer.ts` up into cat-harness-tools, the harness row could no
+ * longer find it, and the watchdog reported `unknown` every week from
+ * 2026-10-20 (folio-assistant#1481).
+ *
+ * The same `id` in two registries is returned twice, so the caller reports
+ * both rows. That is the expected state while a row moves between layers: the
+ * row whose file is gone stays `unknown` until it is deleted, and nothing is
+ * silently merged.
+ */
+export function locatePins(registries: readonly LoadedRegistry[], join: (root: string, rel: string) => string): LocatedPin[] {
+  return registries.flatMap((r) => r.pins.map((pin) => ({ pin, layer: r.layer, file: join(r.root, pin.pinnedIn) })));
+}
+
+/**
+ * The verdict for a row whose `pinnedIn` file is not on disk.
+ *
+ * Kept apart from "no ref matched", because the two need different fixes. A
+ * missing file means the row points at the wrong layer or path. A pattern
+ * that matches nothing means the line in the file changed.
+ */
+export function missingFileVerdict(located: LocatedPin): PinVerdict {
+  return {
+    id: located.pin.id,
+    title: located.pin.title,
+    state: "unknown",
+    detail: `${located.pin.pinnedIn} is not in ${located.layer} (looked at ${located.file}). The file moved or the row is in the wrong layer's registry; each layer declares the pins whose files it holds.`,
+  };
+}
+
 export type PinState = "current" | "behind" | "unknown";
 
 export interface PinVerdict {

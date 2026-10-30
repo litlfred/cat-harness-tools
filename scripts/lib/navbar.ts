@@ -330,8 +330,14 @@ export interface NavbarModel {
   graphs?: NavGroup;
   /** The instantiated harnesses. The expandable group in the fixed bottom. */
   harnesses?: NavGroup;
-  /** Home, last in the fixed bottom. `"keep home at bottom for who iris."` */
-  home?: NavItem;
+  /**
+   * Where the header goes: the site's landing page. Owner, 2026-10-30: *"who
+   * eblmen not clicable to go to landing page. also dont need home on bottomof
+   * harnes navbars."* So the instance's mark and name in the header are the
+   * home link, and the separate home row at the foot of the bar is gone.
+   * Absent, the header is only the open/close control, as before.
+   */
+  headHref?: string;
   /**
    * HOW an href is written — the difference between the two surfaces, DECLARED.
    *
@@ -429,12 +435,21 @@ export { NAV_MARK_PX as NAV_GLYPH_PX } from "./navbar-geometry.js";
  */
 export function navbarCss(): string {
   return [
+    // THE PALETTE FOLLOWS THE PAGE'S SCHEME (owner, 2026-10-30: *"light mode
+    // navbar is not working"*). It was dark on every page, so a light page had
+    // a dark bar beside it. The scheme is read the way the theme reads it:
+    // `data-fa-scheme` when the page sets it, else the OS. Light is GitHub's
+    // light palette; the dead-row dim is stronger there because `.55` of
+    // #1f2328 over #f6f8fa is 3.6:1, under 4.5:1, while `.72` is 6.1:1.
+    `.fa-nav{--fa-nav-bg:#1f2328;--fa-nav-ink:#e6edf3;--fa-nav-line:#30363d;--fa-nav-hover:#30363d;--fa-nav-dim:.55}`,
+    `:root[data-fa-scheme="light"] .fa-nav{--fa-nav-bg:#f6f8fa;--fa-nav-ink:#1f2328;--fa-nav-line:#d0d7de;--fa-nav-hover:#eaeef2;--fa-nav-dim:.72}`,
+    `@media(prefers-color-scheme:light){:root:not([data-fa-scheme]) .fa-nav{--fa-nav-bg:#f6f8fa;--fa-nav-ink:#1f2328;--fa-nav-line:#d0d7de;--fa-nav-hover:#eaeef2;--fa-nav-dim:.72}}`,
     // The page sits beside the strip; on desktop (>= NAV_STRIP_MQ_PX), opening
     // shrinks/pushes content beside it so they do not overlap (bean `ei4q`).
     // Phone stays an overlay drawer.
     `body{padding-left:${NAV_COLLAPSED_PX}px}`,
     `.fa-nav{position:fixed;top:0;left:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
-    `background:#1f2328;color:#e6edf3;overflow:hidden;transition:width .14s ease;`,
+    `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
     `font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}`,
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_PX}px}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
@@ -456,14 +471,30 @@ export function navbarCss(): string {
     `.fa-nav-in{width:${NAV_OPEN_PX}px;height:100%;display:flex;flex-direction:column}`,
     `.fa-nav-top{flex:0 0 auto}`,
     `.fa-nav-graphs{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}`,
-    `.fa-nav-bottom{flex:0 0 auto;border-top:1px solid #30363d}`,
+    `.fa-nav-bottom{flex:0 0 auto;border-top:1px solid var(--fa-nav-line)}`,
     `.fa-nav-head{display:flex;align-items:center;gap:8px;padding:10px ${NAV_PAD_PX}px;`,
-    `border-bottom:1px solid #30363d;cursor:pointer;user-select:none}`,
+    `border-bottom:1px solid var(--fa-nav-line);cursor:pointer;user-select:none}`,
     // The header is a <label>, which is not in the tab order; the checkbox it
     // drives is, clipped in place. So the keyboard's focus ring is drawn on
     // the header while the box has focus, or a keyboard user toggles a
     // control they cannot see is focused.
     `.fa-nav:has(.fa-nav-open:focus-visible) .fa-nav-head{outline:2px solid #58a6ff;outline-offset:-2px}`,
+    // THE HEADER AS HOME LINK (owner, 2026-10-30). The label lies over the
+    // link at rest, so a touch screen's first tap opens the bar. Where the
+    // pointer can HOVER, hovering already opens the bar, so there the label
+    // gets out of the way and a click is the home link; on a touch screen it
+    // waits for the pin. A keyboard reaches the link by Tab whatever lies
+    // over it. A pinned-open bar shows the label as a small close control.
+    `.fa-nav-head--home{position:relative;padding:0;cursor:default}`,
+    `.fa-nav .fa-nav-head-link{flex:1 1 auto;min-width:0;padding:10px ${NAV_PAD_PX}px}`,
+    `.fa-nav .fa-nav-head-link:hover{background:var(--fa-nav-hover)}`,
+    `.fa-nav-head-toggle{position:absolute;inset:0;cursor:pointer}`,
+    `.fa-nav-head-toggle>span[aria-hidden]{display:none}`,
+    `@media(hover:hover){.fa-nav:hover .fa-nav-head-toggle{display:none}}`,
+    `.fa-nav:has(.fa-nav-open:checked) .fa-nav-head-toggle{display:inline-flex;position:static;align-items:center;justify-content:center;`,
+    `min-width:24px;min-height:24px;margin-right:${NAV_PAD_PX - 4}px;border-radius:4px;font-size:18px}`,
+    `.fa-nav:has(.fa-nav-open:checked) .fa-nav-head-toggle>span[aria-hidden]{display:inline}`,
+    `.fa-nav-head-toggle:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav-glyph{flex:0 0 ${NAV_GLYPH_PX}px;text-align:center;font-size:16px}`,
     `.fa-nav-glyph.fa-nav-blank{height:${NAV_GLYPH_PX}px;display:inline-block}`,
     `.fa-nav-glyph img{width:${NAV_GLYPH_PX}px;height:${NAV_GLYPH_PX}px;display:block}`,
@@ -476,9 +507,9 @@ export function navbarCss(): string {
     `.fa-nav-crop img{position:absolute;width:auto;height:auto;max-width:none}`,
     `.fa-nav-name{font-weight:600}`,
     `.fa-nav a{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
-    `color:#e6edf3;text-decoration:none;white-space:nowrap}`,
-    `.fa-nav a:hover{background:#30363d}`,
-    `.fa-nav a[aria-current="page"]{background:#30363d;font-weight:600}`,
+    `color:var(--fa-nav-ink);text-decoration:none;white-space:nowrap}`,
+    `.fa-nav a:hover{background:var(--fa-nav-hover)}`,
+    `.fa-nav a[aria-current="page"]{background:var(--fa-nav-hover);font-weight:600}`,
     // An item with nowhere to go is NOT a link -- `pb04`: a dead link is worse
     // than no link, because it invites a click and then reads as broken.
     // THE DIM STAYS, AND IT WAS NEVER THE PROBLEM. `opacity:.55` over
@@ -489,7 +520,7 @@ export function navbarCss(): string {
     // with no words anywhere on this surface. `.fa-nav-note` is the words.
     // `cursor:default` so the pointer does not promise a click either.
     `.fa-nav-dead{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
-    `opacity:.55;cursor:default}`,
+    `opacity:var(--fa-nav-dim);cursor:default}`,
     // The reason sits BESIDE the label, not under it: the strip is one row per
     // item, and a second line would make these the only rows in the navbar
     // with a different height. At 11px it is small text, so it needs 4.5:1 in
@@ -520,7 +551,7 @@ export function navbarCss(): string {
     `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden;text-overflow:ellipsis}`,
     `.fa-nav-twisty{display:none;align-items:center;justify-content:center;min-width:24px;min-height:24px;`,
     `margin-right:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
-    `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:#30363d}`,
+    `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:var(--fa-nav-hover)}`,
     `.fa-nav-twisty>span{display:inline-block;transition:transform .12s}`,
     `.fa-nav-twisty[aria-expanded="true"]>span{transform:rotate(90deg)}`,
     // The control is hidden with the labels rather than on its own timer: at
@@ -539,7 +570,7 @@ export function navbarCss(): string {
     `.fa-nav-group>summary{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
     `cursor:pointer;user-select:none;list-style:none}`,
     `.fa-nav-group>summary::-webkit-details-marker{display:none}`,
-    `.fa-nav-group>summary:hover{background:#30363d}`,
+    `.fa-nav-group>summary:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav-group[open]>summary{font-weight:600}`,
     `.fa-nav-group .fa-nav-sub a{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
     // A graph-typology row carries its OWN mark (bean `yag0`), so it sits in the
@@ -894,10 +925,23 @@ export function fshGutsHtml(f: { label: string }): string {
 
 export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   const item: NavItem = { label: m.instance, ...(m.mark ?? {}) };
+  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(m.instance)}</span>`;
+  if (m.headHref === undefined) {
+    return `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` + inner + `</label>`;
+  }
+  // THE HEADER IS THE HOME LINK (owner, 2026-10-30), and the open/close label
+  // stays beside it. At rest the label covers the whole header, so a tap on a
+  // touch screen, which has no hover, still opens the bar. Open, the label
+  // shrinks to a small close control at the right and the mark and name
+  // become the link to the landing page.
   return (
-    `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` +
-    mark(item, c) +
-    `<span class="fa-nav-name fa-nav-label">${esc(m.instance)}</span></label>`
+    `<div class="fa-nav-head fa-nav-head--home">` +
+    `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(m.instance)}: landing page">` +
+    inner +
+    `</a>` +
+    `<label class="fa-nav-head-toggle" for="fa-nav-open" aria-label="Open or close navigation" data-fa-tip="Open or close navigation">` +
+    `<span aria-hidden="true">\u2039</span></label>` +
+    `</div>`
   );
 }
 
@@ -936,10 +980,7 @@ export function navbarRegionsHtml(m: NavbarModel): string {
         (graphs ? groupHtml(graphsOnArrival(graphs, m.visualiser !== undefined), c) : "") +
         `</div>`
       : "") +
-    `<div class="fa-nav-bottom">` +
-    (m.harnesses ? groupHtml(m.harnesses, c) : "") +
-    (m.home ? itemHtml(m.home, c) : "") +
-    `</div>` +
+    (m.harnesses ? `<div class="fa-nav-bottom">` + groupHtml(m.harnesses, c) + `</div>` : "") +
     `</div>`
   );
 }

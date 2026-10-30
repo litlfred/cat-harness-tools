@@ -79,7 +79,7 @@ const model: NavbarModel & { graphs: NavGroup } = {
     ],
     collapsible: true,
   },
-  home: { href: "../", label: "folio-assistant", icon: "⌂" },
+  headHref: "../",
 };
 
 /**
@@ -127,7 +127,7 @@ describe("three regions, and only the middle one scrolls", () => {
     expect(html.indexOf("fa-nav-graphs")).toBeLessThan(html.indexOf("fa-nav-bottom"));
   });
 
-  it("puts the graphs in the MIDDLE and the harnesses and home in the BOTTOM", () => {
+  it("puts the graphs in the MIDDLE and the harnesses in the BOTTOM", () => {
     // The regions are structural, so an item in the wrong one is a real
     // defect: a harness in the scrollable middle scrolls away, and a graph in
     // the fixed bottom eats the space the middle needs.
@@ -135,7 +135,6 @@ describe("three regions, and only the middle one scrolls", () => {
     expect(region(html, "fa-nav-graphs")).toContain("../docs/who-iris/");
     const bottom = html.slice(html.indexOf('<div class="fa-nav-bottom">'));
     expect(bottom).toContain("Harnesses");
-    expect(bottom).toContain("folio-assistant");
     expect(region(html, "fa-nav-graphs")).not.toContain("Harnesses");
   });
 
@@ -194,10 +193,16 @@ describe("three regions, and only the middle one scrolls", () => {
     expect(graphs).not.toContain('href="undefined"');
   });
 
-  it("home is LAST in the bottom — the owner asked for it there by name", () => {
-    // "keep home at bottom for who iris."
-    const bottom = navbarHtml(model).slice(navbarHtml(model).indexOf('<div class="fa-nav-bottom">'));
-    expect(bottom.indexOf("Harnesses")).toBeLessThan(bottom.lastIndexOf("folio-assistant"));
+  it("no home row: the header's mark and name are the link to the landing page (owner, 2026-10-30)", () => {
+    // "who eblmen not clicable to go to landing page. also dont need home on
+    // bottomof harnes navbars."
+    const html = navbarHtml(model);
+    const bottom = html.slice(html.indexOf('<div class="fa-nav-bottom">'));
+    expect(bottom).not.toContain("\u2302");
+    const head = region(html, "fa-nav-top");
+    expect(head).toContain('<a class="fa-nav-head-link" href="../"');
+    // The open/close label stays, so a touch screen can still open the bar.
+    expect(head).toContain('<label class="fa-nav-head-toggle" for="fa-nav-open"');
   });
 });
 
@@ -277,12 +282,16 @@ describe("at rest it is a strip, and opens three ways", () => {
     expect(css).not.toContain(".fa-nav-close");
   });
 
-  it("ONE control drives the checkbox, and it is the header", () => {
+  it("ONE control drives the checkbox, and it is in the header", () => {
     const html = navbarHtml(model);
     const id = /<input[^>]*class="fa-nav-open"[^>]*id="([^"]+)"/.exec(html)?.[1];
     expect(id).toBeDefined();
     const labels = [...html.matchAll(new RegExp(`<label class="([^"]+)" for="${id}"`, "g"))];
-    expect(labels.map((m) => m[1])).toEqual(["fa-nav-head"]);
+    // With a landing page the header is the home link and the label sits in
+    // it (owner, 2026-10-30); without one the header is the label.
+    expect(labels.map((m) => m[1])).toEqual(["fa-nav-head-toggle"]);
+    const bare = navbarHtml({ ...model, headHref: undefined });
+    expect([...bare.matchAll(new RegExp(`<label class="([^"]+)" for="${id}"`, "g"))].map((m) => m[1])).toEqual(["fa-nav-head"]);
   });
 
   it("the header carries the instance's mark — its initial when no avatar is declared", () => {
@@ -347,7 +356,7 @@ describe("the rail is an adapter, not a second navbar", () => {
     expect(m.instance).toBe("who-iris");
     expect(m.graphs.items).toEqual(model.graphs.items);
     expect(m.graphs.collapsible).toBe(true);
-    expect(m.home?.href).toBe("../");
+    expect(m.headHref).toBe("../");
   });
 
   it("OMITS the harnesses region when it could not be read", () => {
@@ -935,7 +944,7 @@ describe("the two surfaces differ by DECLARATION, not by branch", () => {
       // The Jekyll theme renders its own `<nav id="site-nav">` page tree in
       // this slot. An empty disclosure there would be a second, emptier answer
       // to the same question.
-      const m: NavbarModel = { instance: "folio-assistant", home: { href: "/", label: "Home" } };
+      const m: NavbarModel = { instance: "folio-assistant", harnesses: { label: "Harnesses", items: [{ label: "x" }] } };
       const html = navbarRegionsHtml(m);
       expect(html).not.toContain("fa-nav-graphs");
       expect(html).toContain("fa-nav-bottom");
