@@ -43,6 +43,7 @@ import {
 import { NETWORK_REACHES } from "./cat-harness";
 import { SkillNameSchema } from "../tools/tool-types.js";
 import { SutKindSchema } from "../sdlc/test-plan";
+import type { SutRef } from "../sdlc/test-run";
 
 // ─── Enumerations ────────────────────────────────────────────────────────────
 
@@ -152,16 +153,26 @@ export type SystemUnderTestFacet = z.infer<typeof SystemUnderTestFacetSchema>;
 export const SUT_ACTOR_KINDS = ["agent", "system"] as const;
 
 /**
- * The `sut` a `folio-test-run/v1` records for this actor: id, version, reach.
- * `undefined` when the actor declares no facet — it has not said it can be
- * tested, and a run against it is a finding rather than a default.
+ * The `sut` a `folio-test-run/v1` records for this actor: kind, id, version,
+ * reach, and for an `agent` the model and configuration the run used, which
+ * only the run knows (FR-002). `undefined` when the actor declares no facet —
+ * it has not said it can be tested, and a run against it is a finding rather
+ * than a default. An agent without `run` throws: a ref without its model
+ * would be refused anyway, and saying so here names the cause.
  */
 export function sutRefFor(
   actor: { id: string; reach?: (typeof NETWORK_REACHES)[number]; systemUnderTest?: SystemUnderTestFacet },
   version?: string,
-): { actor: string; version: string; reach: (typeof NETWORK_REACHES)[number] | "unknown" } | undefined {
-  if (actor.systemUnderTest === undefined) return undefined;
-  return { actor: actor.id, version: version ?? actor.systemUnderTest.version, reach: actor.reach ?? "unknown" };
+  run?: { model: string; configuration: string },
+): SutRef | undefined {
+  const facet = actor.systemUnderTest;
+  if (facet === undefined) return undefined;
+  const base = { actor: actor.id, version: version ?? facet.version, reach: actor.reach ?? ("unknown" as const) };
+  if (facet.kind !== "agent") return { kind: facet.kind, ...base };
+  if (run === undefined) {
+    throw new Error(`sutRefFor: ${actor.id} is an agent, so its run names the model and configuration it used (FR-002)`);
+  }
+  return { kind: "agent", ...base, model: run.model, configuration: run.configuration };
 }
 
 // ─── ActorDefinition ─────────────────────────────────────────────────────────

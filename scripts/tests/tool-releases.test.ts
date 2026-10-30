@@ -569,7 +569,7 @@ describe("Step 8 — `test:itb-export` GITB TAR projection", () => {
       const testReport: TestReport = {
         $schema: TEST_REPORT_SCHEMA_ID,
         plan: { id: "crdm-detect", version: "1.0" },
-        sut: { actor: "claude-code", version: "1.0", reach: "internet" },
+        sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "1.0", reach: "internet" },
         run: { id: "run-1", data: "abcdef012345", process: "fedcba543210" },
         status: "completed",
         started_at: "2026-10-07T00:00:00Z",
