@@ -554,6 +554,7 @@
     "serve:rendering:py": "python3 cat-harness-tools/scripts/serve-rendering.py",
     "sessions": "bun run cat-harness-tools/scripts/sibling-sessions.ts",
     "site:links": "bun run cat-harness-tools/scripts/site-links.ts",
+    "site:dead-links": "bun run cat-harness-tools/scripts/site-dead-links.ts",
     "site:viz": "bun run cat-harness-tools/scripts/gen-site-viz.ts",
     "skill:register": "bun run cat-harness-tools/scripts/skill-register.ts",
     "skill:register:check": "bun run cat-harness-tools/scripts/skill-register.ts --check",

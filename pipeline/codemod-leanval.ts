@@ -49,7 +49,7 @@
  * @module pipeline/codemod-leanval
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync, statSync, readdirSync } from "fs";
 import { resolve, join, extname } from "path";
 import {

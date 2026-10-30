@@ -5,7 +5,7 @@ import { join } from "node:path";
 import {
   BeanFrontMatterSchema,
   BeanTargetsSchema,
-} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+} from "../../schemas/sdlc/bean-graph.ts";
 import {
   buildTraceability,
   collectBeans,

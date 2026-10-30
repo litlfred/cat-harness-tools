@@ -80,25 +80,25 @@ import {
 } from "./qa-criteria-registry";
 import { discoverBlockCheckers } from "./qa-checker-discovery";
 import { isCriterionSourceMiss, resolveCriterionSource } from "./criterion-source";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, composedKindOwner, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../schemas/kg/harness-config.ts";
+import { ContributionRegistry, composedKindOwner, type FolioContribution } from "../schemas/content/contributions.ts";
 import { usesGraphHash } from "./uses-graph-hash";
 import { blockQaPath, findContentRepoRoot } from "./qa-paths";
 import { PRIOR_FROM_FLAG, priorFromOrExit } from "../scripts/qa-results.ts";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "../schemas/sdlc/qa-attestations.ts";
 import { contributionsRoot } from "./repo-root";
 
 
-import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { BlockQaReport, CheckerResult, CompanionRole, QaCriterionEntry, QaScriptSidecar} from "../schemas/sdlc/block-qa.ts";
 import {
   criterionAdapters,
   criterionProfiles,
   profileExcludesCriterion,
   voiceExcludesCriterion,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { adapterForKind } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/sdlc/block-qa.ts";
+import { adapterForKind } from "../schemas/content/block-kinds.ts";
 import { readDeclaredFolioProfile } from "./profile-check";
-import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
+import { readActiveVoices } from "../schemas/content/voices.ts";
 import { isJsonManifest } from "./json-manifest.ts";
 
 

@@ -22,7 +22,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { applyFilters, buildValueScope, LIQUID_VALUE, resolveKey, type ValueProvenance, type ValueScope } from "./liquid-values";
 import { findContentRepoRoot } from "./repo-root";
 

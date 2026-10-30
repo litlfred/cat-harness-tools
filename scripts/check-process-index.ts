@@ -52,8 +52,8 @@ import { join, relative, resolve, sep } from "node:path";
 
 import { workflowFiles } from "./known-skills.ts";
 import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
-import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
-import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
+import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { buildSubgraphs, publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";

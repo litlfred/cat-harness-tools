@@ -54,16 +54,16 @@ import {
   ARCHIVE_CONTENTS_SCHEMA_ID,
   ArchiveContentsSchema,
   isArchiveMimetype,
-} from "@litlfred/cat-harness/schemas/library/archive-contents.ts";
-import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "@litlfred/cat-harness/schemas/content/attribution.ts";
-import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "@litlfred/cat-harness/schemas/content/narrative.ts";
-import { STRUCTURE_FILENAME, structureOf } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
+} from "../schemas/library/archive-contents.ts";
+import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "../schemas/content/attribution.ts";
+import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "../schemas/content/narrative.ts";
+import { STRUCTURE_FILENAME, structureOf } from "../schemas/content/document-structure.ts";
 import {
   TABULAR_RECORDS_SCHEMA_ID,
   TabularRecordsSchema,
   isTabularMimetype,
-} from "@litlfred/cat-harness/schemas/library/tabular-records.ts";
-import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+} from "../schemas/library/tabular-records.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
   RECORDING_SCHEMA_ID,
@@ -74,20 +74,20 @@ import {
   isRecordingMimetype,
   segmentsCanonical,
   type Transcript,
-} from "@litlfred/cat-harness/schemas/library/recording.ts";
-import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
-import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "@litlfred/cat-harness/schemas/content/vector-labels.ts";
+} from "../schemas/library/recording.ts";
+import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "../schemas/content/document-image.ts";
+import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "../schemas/content/vector-labels.ts";
 import {
   VECTOR_FIGURES_DIR,
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
-} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
+} from "../schemas/content/vector-figure.ts";
 import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
-import { readHarnessConfig, TranslationConfigSchema } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../schemas/kg/harness-config.ts";
 
 /**
  * A slot's state(s) for a one-line detail: one state for the single form,
@@ -98,16 +98,16 @@ function slotStates(slot: NarrativeSlot): string {
     .map((n) => (n.lang ? `${n.lang}:${n.state}` : n.state))
     .join(", ");
 }
-import { SUMMARIES_FILE } from "@litlfred/cat-harness/schemas/content/block-summary.ts";
-import { KEYWORDS_FILE } from "@litlfred/cat-harness/schemas/library/library-keywords.ts";
+import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
+import { KEYWORDS_FILE } from "../schemas/library/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
-import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
-import { corpusDirectoriesForGraph, instanceConfigFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
+import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
 

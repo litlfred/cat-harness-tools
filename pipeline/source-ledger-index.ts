@@ -44,14 +44,14 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import type { LedgerEntry, SourceLedger, SourceRef } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import type { LedgerEntry, SourceLedger, SourceRef } from "../schemas/library/bib-verification.ts";
 import {
   readSourceLedger,
   SOURCE_LEDGER_AUTHORITATIVE_FOR,
   SOURCE_LEDGER_SCHEMA,
   writeSourceLedger,
-} from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
-import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/library/bib-attestations.ts";
+import { directoryForGraph, deferResolution} from "../schemas/kg/cat-harness.js";
 import { entryUrl, referenceEntries } from "./reference-entries.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();

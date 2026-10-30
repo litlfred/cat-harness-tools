@@ -48,11 +48,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { BOARD_SCHEMA_TAG, wholeFolioBoard } from "@litlfred/cat-harness/schemas/ui/board.js";
-import { isExemptFrom, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
-import { checkoutTopLevelDirs } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { BOARD_SCHEMA_TAG, wholeFolioBoard } from "../schemas/ui/board.js";
+import { isExemptFrom, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
+import { TODO_GRAPH_FILE, parseTodoGraph } from "../schemas/sdlc/todo-graph.js";
+import { checkoutTopLevelDirs } from "../schemas/sdlc/git-corpus.ts";
 import { TODO_ROOT } from "./todos.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

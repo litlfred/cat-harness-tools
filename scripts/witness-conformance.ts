@@ -30,12 +30,12 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { Glob } from "bun";
-import { directoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
 import {
   ComputationWitnessConformanceSchema,
   ComputationWitnessSchema,
   WITNESS_SUFFIX,
-} from "@litlfred/cat-harness/schemas/computation-witness.ts";
+} from "../schemas/computation-witness.ts";
 import { findContentRepoRoot } from "../pipeline/repo-root.ts";
 
 export interface ConformanceReport {

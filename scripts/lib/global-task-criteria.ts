@@ -16,7 +16,7 @@
  *   process again, and one that nothing calls is dead.
  */
 import { relative } from "node:path";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import type { KgFinding } from "../../schemas/sdlc/kg-qa.js";
 import type { GlobalTaskDef, ProcessModel } from "../../src/workflow/process-model.ts";
 
 /** `global-task-shared`: each global task in `defs` that fewer than two of `processes` call. */

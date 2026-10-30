@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { exitCodeFor, siteLinks, verifySiteLinks } from "../../site-links.js";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const DECL = { name: "folio-assistant", stub: "folio-assistant" };

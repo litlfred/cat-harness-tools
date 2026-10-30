@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { actionGraph, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { actionGraph, type OdrlPolicy } from "../../schemas/content/odrl.js";
 import type { AccessContext } from "../core/access.js";
 import { SKILL_UPDATE, sha256, skillUpdate, type SkillUpdateDeps, type SkillUpdateRequest } from "./skill-update.js";
 

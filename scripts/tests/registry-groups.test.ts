@@ -21,8 +21,8 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
-import { CLASS_GLOSSES } from "@litlfred/cat-harness/schemas/content/vocabulary.ts";
+import { REGISTRY_GROUPS } from "../../schemas/kg/kg-node.ts";
+import { CLASS_GLOSSES } from "../../schemas/content/vocabulary.ts";
 import { mintedTermsFromSource } from "../ns-export.ts";
 
 describe("a minted class is a defined class", () => {

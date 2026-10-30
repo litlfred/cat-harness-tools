@@ -27,8 +27,8 @@ describe("an instance's OWN theme tones its tile (bean v8n5)", () => {
   const tiles = harnessTiles(REPO, HOST, ["who-iris", "cat-harness", "bootstrap"]);
 
   test("who-iris's tile tone is the hue of its own theme's accent, not the avatar's", async () => {
-    const { themeByRef } = await import("@litlfred/cat-harness/schemas/ui/theme-by-ref.js");
-    const { hexHue } = await import("@litlfred/cat-harness/schemas/ui/theme.js");
+    const { themeByRef } = await import("../../schemas/ui/theme-by-ref.js");
+    const { hexHue } = await import("../../schemas/ui/theme.js");
     const r = themeByRef({ instance: "who-iris", themeId: "iris-sticky" }, REPO);
     expect(r.ok).toBe(true);
     const who = tiles.find((t) => t.name === "who-iris")!;

@@ -78,7 +78,7 @@ import { z } from "zod";
 import type { BeanNode } from "./beans.ts";
 import { childrenOf } from "./check-bean-rollup.ts";
 import { CLOSED_STATUSES, OPEN_STATUSES } from "./bean-store-read.ts";
-import { MilestonePlanSchema, MilestoneRollupSchema } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { MilestonePlanSchema, MilestoneRollupSchema } from "../schemas/sdlc/bean-graph.ts";
 
 /** The type whose beans are the roots of this report. */
 export const MILESTONE_TYPE = "milestone";

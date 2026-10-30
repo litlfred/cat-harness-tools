@@ -50,10 +50,10 @@ import {
   type Pair,
   type Runner,
 } from "./regen-after-merge.ts";
-import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
-import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { isBuiltAtPublish, type BuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { scriptsOf as scriptTableOf } from "../schemas/sdlc/script-table.ts";
 import { pairIO } from "./task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

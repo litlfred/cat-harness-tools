@@ -81,7 +81,7 @@ import {
   type TranslationIndex,
 } from "../pipeline/translation-index.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = HARNESS_ROOT;

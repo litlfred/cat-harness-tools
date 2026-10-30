@@ -31,7 +31,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { OpenApiConfigSchema, type OpenApiConfig } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
+import { OpenApiConfigSchema, type OpenApiConfig } from "../schemas/openapi.ts";
 
 import { pagesForGraph, type Written } from "./gen-openapi-pages.ts";
 import { CONFIG_FILE } from "./ingest-openapi.ts";

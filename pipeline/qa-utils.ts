@@ -14,8 +14,8 @@ import {
 } from "fs";
 import { join, resolve } from "path";
 import { execFileSync } from "child_process";
-import { findDeclarationFile, graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { findDeclarationFile, graphLayer, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
 import { criterionSourceHash } from "./qa-criterion-hash";
 import { maskStringsAndComments, parseStringField } from "./uses-field";
 import {
@@ -23,7 +23,7 @@ import {
   listFormalSourceFiles,
   resolveCanonicalFormal,
   type FormalTreeCache,
-} from "@litlfred/cat-harness/schemas/formal-ref.js";
+} from "../schemas/formal-ref.js";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import type {
@@ -33,9 +33,9 @@ import type {
   QaScriptSidecar,
   CompanionRole,
   QaCriterionDefinition,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { COMPANION_ROLES } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/sdlc/block-qa.ts";
+import { COMPANION_ROLES } from "../schemas/sdlc/block-qa.ts";
+import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "../schemas/content/block-kinds.ts";
 import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";

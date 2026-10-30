@@ -18,8 +18,8 @@ import type { Data as CSLData } from "csl-json";
 import { cslToBibtex } from "./bibtex-format";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
-import { readSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readSourceLedger } from "../schemas/library/bib-attestations.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 
 // Content repo root (was import-relative, which pointed at
 // folio-assistant and made every content path below miss).
@@ -61,8 +61,8 @@ export function folioBibtexTitle(repoRoot: string = REPO_ROOT): string {
 // `annotation = {...}` field that LaTeX / biblatex / pandoc can
 // display in the rendered bibliography.
 
-import type { Verifier } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
-import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+import type { Verifier } from "../schemas/library/bib-verification.ts";
+import { verifierLabel } from "../schemas/library/bib-verification.ts";
 
 interface VerifEntry {
   id: string;

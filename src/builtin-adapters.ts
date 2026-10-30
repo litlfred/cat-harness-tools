@@ -64,7 +64,7 @@ import {
   instanceRootsIn,
   repoRootFor,
   type ContentAdapterDeclaration,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

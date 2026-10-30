@@ -19,11 +19,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { BASE_GRAPH_TYPOLOGIES, GRAPH_TYPOLOGY_ALIASES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { graphTypologyLayer } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { BASE_GRAPH_TYPOLOGIES, GRAPH_TYPOLOGY_ALIASES, defaultGraphTypologies } from "../schemas/kg/cat-harness.js";
+import { graphTypologyLayer } from "../schemas/kg/graph-typology-registry.ts";
 // `folio` is registered as a load-time side effect; `glossary` is a node in the
 // content layer's `typologies/` graph since folio-assistant#2598.
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import "../schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The instance root this reader is relative to. */

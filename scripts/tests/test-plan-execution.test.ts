@@ -26,10 +26,10 @@ import { join, resolve } from "node:path";
 import { loadProcessModel, type ProcessModel } from "../../src/workflow/process-model";
 import { complete, enabled, startInstance, type InstanceState } from "../../src/workflow/instance";
 import { evaluate, loadDecisionTable } from "../../src/workflow/decision-table";
-import { readRoleGraph, readActors } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { ActorDefinitionSchema, sutRefFor } from "@litlfred/cat-harness/schemas/kg/skill-package.ts";
-import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.ts";
-import { buildTestRun, UNKNOWN_HASH, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
+import { readRoleGraph, readActors } from "../../schemas/process/role-graph.ts";
+import { ActorDefinitionSchema, sutRefFor } from "../../schemas/kg/skill-package.ts";
+import { TestPlanSchema, type TestPlan } from "../../schemas/sdlc/test-plan.ts";
+import { buildTestRun, UNKNOWN_HASH, type TestRun } from "../../schemas/sdlc/test-run.ts";
 import {
   TEST_REPORT_SCHEMA_ID,
   TestReportSchema,
@@ -37,10 +37,10 @@ import {
   computeRollup,
   type TestCaseVerdict,
   type TestReport,
-} from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
+} from "../../schemas/sdlc/test-report.ts";
 import { auditTestPlans, dmnRefResolves, type SutActor } from "../test-plan-audit";
 import { openTrackedBean } from "../test-plan-execution";
-import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { drainSubprocess } from "./helpers.ts";
 

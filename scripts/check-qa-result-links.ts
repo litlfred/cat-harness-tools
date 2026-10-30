@@ -57,7 +57,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { resolveQaLocation } from "./qa-store.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 export interface QaDirDecl {
   /** Repo-relative, no trailing slash. */

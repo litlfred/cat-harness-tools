@@ -20,7 +20,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import type { OpenApiRenderedProvenance } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
+import type { OpenApiRenderedProvenance } from "../schemas/openapi.ts";
 import { localDirOf, openapiDir, provenanceForRendered, readConfig } from "./ingest-openapi.ts";
 
 /** What fetching one URL yields: its bytes, or why there are none. */

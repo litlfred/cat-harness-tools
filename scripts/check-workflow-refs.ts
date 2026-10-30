@@ -37,7 +37,7 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { beanCallFindings, noteTakers, type DiagramFacts } from "./check-bean-lifecycle-calls.ts";
 
 interface Dangling { file: string; node: string; ref: string }
@@ -292,7 +292,7 @@ if (adjTotal > 0) {
  * re-render skipped it silently and a skipped diagram is indistinguishable
  * from a diagram that needed no work.
  */
-const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("@litlfred/cat-harness/schemas/library/translation-tools.js");
+const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("../schemas/library/translation-tools.js");
 const missingDeclared: string[] = [];
 for (const ct of CONTENT_TYPE_TRANSLATIONS) {
   for (const rel of ct.bpmnDiagrams ?? []) {

@@ -15,8 +15,9 @@ import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
 import { INSTANCE_ROOT, FOLIO_ROOT, hasFolio, REPO_ROOT } from "./helpers";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 import { maskComments } from "../../pipeline/uses-field";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /** Skip folio-side assertions when no content repo is attached. */
@@ -199,12 +200,12 @@ describe("tests anchor repo paths at import.meta.dir, not process.cwd()", () => 
 
 describe("Schema files", () => {
   test("formalization-types.ts exists", () => {
-    expect(existsSync(join(INSTANCE_ROOT, "schemas/formalization-types.ts"))).toBe(true);
+    expect(existsSync(join(TOOLS_ROOT, "schemas/formalization-types.ts"))).toBe(true);
   });
 
   test("formalization-types.ts exports all key types", () => {
     const content = readFileSync(
-      join(INSTANCE_ROOT, "schemas/formalization-types.ts"),
+      join(TOOLS_ROOT, "schemas/formalization-types.ts"),
       "utf-8"
     );
     // Proof pipeline types
@@ -223,7 +224,7 @@ describe("Schema files", () => {
     // The science layer's kinds (definition, theorem, …) are typed by its
     // vocabulary module since 2026-10-22, not by constraints.ts.
     const content = readFileSync(
-      join(INSTANCE_ROOT, "schemas/constraints.ts"),
+      join(TOOLS_ROOT, "schemas/constraints.ts"),
       "utf-8"
     );
     for (const schema of [

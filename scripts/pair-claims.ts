@@ -46,7 +46,7 @@ import { dirname, join, relative } from "node:path";
 import { absenceClaims, checkClaims, declares, locationClaims, normalise } from "./check-agents-claims.js";
 import type { ProseCodePair } from "./prose-code-pairs.js";
 import { bpmnIds, workflowBpmn } from "./workflow-bpmn.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export type ClaimOutcome = "holds" | "false" | "undetermined";

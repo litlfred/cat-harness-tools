@@ -41,7 +41,7 @@ import {
   type MemberFacts,
   type PriorityClass,
   type Readiness,
-} from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+} from "../schemas/sdlc/merge-queue.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The table, beside the diagram whose gateway reads it. */

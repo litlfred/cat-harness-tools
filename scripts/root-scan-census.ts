@@ -71,9 +71,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import * as gitCorpusModule from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import * as gitCorpusModule from "../schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.ts";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 

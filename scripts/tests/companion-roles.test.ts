@@ -24,7 +24,7 @@ import {
   COMPANION_ROLES,
   TEXTUAL_COMPANION_ROLES,
   type CompanionRole,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+} from "../../schemas/sdlc/block-qa.ts";
 import {
   applicabilityGap,
   missingCompanionNote,
@@ -34,9 +34,9 @@ import {
   entryIsFresh,
 } from "../../pipeline/qa-utils";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
-import { CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
-import { criterionAdapters } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { CONTENT_ADAPTERS } from "../../schemas/content/block-kinds.ts";
+import { criterionAdapters } from "../../schemas/sdlc/block-qa.ts";
+import type { QaCriterionEntry } from "../../schemas/sdlc/block-qa.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "companion-roles-"));
 const STEM = join(DIR, "dt-anc-01");

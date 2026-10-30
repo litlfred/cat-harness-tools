@@ -69,13 +69,13 @@ import { join, relative, resolve } from "node:path";
 
 import { readInstances, ownerOf, type Instance } from "./check-import-direction.ts";
 import { isSkillMd, skillMdDirs } from "./known-skills.ts";
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
-import { ACTORS_DIRNAME, ROLE_GRAPH_FILENAME } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { directoriesForGraph } from "../schemas/kg/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds } from "../schemas/kg/layer-direction.js";
+import { ACTORS_DIRNAME, ROLE_GRAPH_FILENAME } from "../schemas/process/role-graph.js";
 import { BASELINE, type BindingBaselineEntry } from "./process-bindings.baseline.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 

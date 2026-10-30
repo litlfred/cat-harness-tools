@@ -31,9 +31,9 @@ import type { Root, RootContent, Parent, Table, TableRow, ListItem } from "mdast
 // type-check against the base union.
 import type {} from "mdast-util-math";
 import type {} from "mdast-util-directive";
-import type { Block, Chapter, Section, RenderOptions } from "@litlfred/cat-harness/schemas/types.ts";
-import { isCrossPaperRef, leanStatusBucket } from "@litlfred/cat-harness/schemas/types.ts";
-import { parseLeanRef } from "@litlfred/cat-harness/schemas/lean-packages.ts";
+import type { Block, Chapter, Section, RenderOptions } from "../schemas/types.ts";
+import { isCrossPaperRef, leanStatusBucket } from "../schemas/types.ts";
+import { parseLeanRef } from "../schemas/lean-packages.ts";
 import { parseMdCached } from "./markdown-ast";
 import { resolveLiquidValues } from "./liquid-values";
 import { extractCitations } from "./citations";

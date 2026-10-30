@@ -61,6 +61,7 @@ describe("stage-local", () => {
     mkdirSync(join(p, "a-harness", "scripts"), { recursive: true });
     mkdirSync(join(p, "b-content", "schemas"), { recursive: true });
     writeFileSync(join(p, "b-content", "schemas", "changeset.ts"), "");
+    // declared-path-literal: test input — a fixed path the test passes in, not one read from a declaration
     expect(inPlatform(p, "schemas/changeset.ts")).toBe(join(p, "b-content", "schemas", "changeset.ts"));
     expect(inPlatform(p, "scripts/nothing.ts")).toBeUndefined();
     expect(inPlatform(join(p, "missing"), "x")).toBeUndefined();

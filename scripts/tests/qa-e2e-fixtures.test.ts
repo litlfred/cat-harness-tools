@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { QA_FAMILIES } from "../../pipeline/qa-witness.ts";
-import { QaIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { QaIndexSchema } from "../../schemas/ui/site-indexes.ts";
 
 const DIR = join(import.meta.dir, "..", "..", "test", "support", "fixtures", "qa-e2e");
 const read = (name: string): Record<string, unknown> => JSON.parse(readFileSync(join(DIR, name), "utf8"));

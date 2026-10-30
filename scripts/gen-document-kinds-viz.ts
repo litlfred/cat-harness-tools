@@ -38,8 +38,8 @@ import {
   DocumentKindSchema,
   type DocumentKind,
   type DocumentKindCoverage,
-} from "@litlfred/cat-harness/schemas/content/document-kind.ts";
-import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/content/document-kind.ts";
+import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -112,7 +112,7 @@ export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs:
  * only one that declares a kind: the harness tiles link `<route>/<instance>/`
  * for each declared directory, so an instance whose directory holds only a
  * coverage report (an IG realising its base layer's kind) or nothing yet
- * still gets its page. Until then smart-trust and smart-immunizations were
+ * still gets its page. Until then two IG instances above this layer were
  * linked from the home page and never drawn. A subject's page shows the kinds
  * it declares and the kinds it reports coverage of.
  */

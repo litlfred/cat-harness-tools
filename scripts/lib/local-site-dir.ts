@@ -13,7 +13,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { directoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph, siteDirFor } from "../../schemas/kg/cat-harness.js";
 
 export function localSiteDir(root: string): string | undefined {
   let rel: string;

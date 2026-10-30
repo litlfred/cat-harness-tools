@@ -17,7 +17,7 @@
  * @graphNode script
  */
 import { tools } from "../tools/discover.js";
-import { remediesFor } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { remediesFor } from "../schemas/tools/tool.js";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

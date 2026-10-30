@@ -24,7 +24,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync } from "fs";
 import { resolve, join, extname, relative } from "path";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
-import { readSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
+import { readSourceLedger } from "../schemas/library/bib-attestations.ts";
 import type { Data as CSLData, Person as CSLPerson } from "csl-json";
 
 // Content repo root (was import-relative, which pointed at
@@ -363,9 +363,9 @@ async function checkUrl(
 // folio-assistant import edge (the content pipeline must stay in the
 // content/ tree).  The shapes must stay in sync.
 
-import type { Verifier, VerificationStatus } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
-import { verifierLabel } from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
-import { directoryForGraph, folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { Verifier, VerificationStatus } from "../schemas/library/bib-verification.ts";
+import { verifierLabel } from "../schemas/library/bib-verification.ts";
+import { directoryForGraph, folioDir, folioDirDeferred } from "../schemas/kg/cat-harness.js";
 
 interface VerificationEntry {
   id: string;

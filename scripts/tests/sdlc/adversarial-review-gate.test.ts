@@ -11,7 +11,7 @@ import {
   type AdversarialReview,
   type MergeReview,
   type RedFlagCategory,
-} from "@litlfred/cat-harness/schemas/sdlc/red-flag.ts";
+} from "../../../schemas/sdlc/red-flag.ts";
 
 const BASE_SHA = "1111111111111111111111111111111111111111";
 const HEAD_SHA = "2222222222222222222222222222222222222222";

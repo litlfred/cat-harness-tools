@@ -14,10 +14,10 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } from "../todo-listing.js";
-import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import { TodoIndexItemSchema } from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 
 /** The minimum a note needs to be a valid `TodoIndexItem`. */
 function item(over: Record<string, unknown> = {}) {
