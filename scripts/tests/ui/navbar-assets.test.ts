@@ -111,6 +111,44 @@ describe("a page railed from shared data", () => {
     expect(nav).not.toContain('href="../cat-harness/library/"');
     expect(nav).toContain('href="../cat-harness/schemas/"');
   });
+
+  test("the page HTML stays byte-identical when the rail's links, pages, harnesses or row change (bean g196)", () => {
+    // Owner, 2026-10-30: "Give the rail data a stable filename and do the
+    // cache-busting outside the page, so railed pages stop changing whenever
+    // the rail does."
+    const beforeFiles = new Map<string, string>();
+    const afterFiles = new Map<string, string>();
+    const beforeHtml = injectRail(SHELL, {
+      ...opts(".."),
+      pages: [{ label: "Home", href: "../" }, { label: "Guide", href: "../guide/" }],
+      navbarRow: { icons: ["beans"], counts: { beans: 10 } },
+      shareNavbarRow: true,
+      emitRailData: (f, b) => void beforeFiles.set(f, b),
+    })!;
+    const afterHtml = injectRail(SHELL, {
+      ...opts(".."),
+      mark: { tone: 210 },
+      links: [
+        { label: "Library", href: "../cat-harness/library/", description: "Updated description" },
+        { label: "Catalogue", note: "no viewer by design" },
+      ],
+      pages: [{ label: "Home", href: "../" }, { label: "Guide", href: "../guide/" }, { label: "New page", href: "../new/" }],
+      harnesses: [{ label: "WHO IRIS", href: "../who-iris/" }, { label: "SMART Base", href: "../smart-base/" }],
+      navbarRow: { icons: ["beans"], counts: { beans: 11 } },
+      shareNavbarRow: true,
+      emitRailData: (f, b) => void afterFiles.set(f, b),
+    })!;
+    expect(afterHtml).toBe(beforeHtml);
+    expect([...afterFiles.keys()].sort()).toEqual([...beforeFiles.keys()].sort());
+    const readAfter = (name: string): string | undefined => {
+      const body = afterFiles.get(`${RAIL_DATA_DIR}/${name}.js`);
+      return body === undefined ? undefined : (JSON.parse(body.slice(body.indexOf("]=") + 2, body.lastIndexOf(";"))) as string);
+    };
+    const expanded = navOf(expandRail(afterHtml, readAfter));
+    expect(expanded).toContain("no viewer by design");
+    expect(expanded).toContain("New page");
+    expect(expanded).toContain("SMART Base");
+  });
 });
 
 describe("the committed rail data and the pages that name it agree (bean lnoy)", () => {

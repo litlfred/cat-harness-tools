@@ -310,9 +310,11 @@ export const NAVBAR_ROW_SRC = "data-fa-row-src";
  * The row's shared file: a script that fills the page's empty island with the
  * row's JSON (as text — the readers parse it, exactly as they parse an inlined
  * one) and drops the name, so a filled island and an inlined one look alike.
+ * Named by a constant rather than the row's content (bean `g196`, owner
+ * 2026-10-30) so a count or note change does not rewrite every railed page.
  */
 export function navbarRowAsset(json: string): { name: string; file: string; body: string } {
-  const name = `row-${contentHash(json)}`;
+  const name = `row-${contentHash(json && "shared")}`;
   const body =
     `(function(n){if(n&&n.getAttribute(${JSON.stringify(NAVBAR_ROW_SRC)})===${JSON.stringify(name)}&&!n.textContent)` +
     `{n.textContent=${JSON.stringify(json)};n.removeAttribute(${JSON.stringify(NAVBAR_ROW_SRC)})}})` +
@@ -495,9 +497,32 @@ export function railSharedJson(o: RailOptions, root: string, documentIndex?: Nav
   return o.toRoot === root ? json : json.split(`"${o.toRoot}/`).join(`"${RAIL_TO_ROOT}/`);
 }
 
-/** The shared data file's name and its script body. */
+/**
+ * The shared data file's name and its script body.
+ *
+ * Named by the rail's SCOPE (`instance`, `root`, whether `pages` is whole-site
+ * or scoped, and the declared `documentIndex`'s identity), never by its
+ * contents (`links`, `pages`, `harnesses`, `mark`, `homeLabel`): when a graph,
+ * page tree, harness or note changes, only the shared `.js` file changes and
+ * every railed HTML page stays byte-identical (bean `g196`, owner 2026-10-30).
+ */
 export function railDataAsset(json: string): { name: string; file: string; body: string } {
-  const name = `rail-${contentHash(json)}`;
+  const s = JSON.parse(json) as RailShared;
+  const k = JSON.stringify({
+    instance: s.instance,
+    ...(s.root ? { root: { href: s.root.href, current: !!s.root.current } } : {}),
+    ...(s.pages?.length ? { pages: s.pages[0]?.href === "@fa-rail-root@/" || s.pages[0]?.href === "@fa-rail-to-root@/" ? "root" : "scoped" } : {}),
+    ...(s.documentIndex
+      ? {
+          documentIndex: {
+            label: s.documentIndex.label,
+            first: s.documentIndex.items[0]?.label,
+            current: s.documentIndex.items.findIndex((item) => !item.href),
+          },
+        }
+      : {}),
+  });
+  const name = `rail-${contentHash(k)}`;
   const body = `(self.FaRailData=self.FaRailData||{})[${JSON.stringify(name)}]=${JSON.stringify(json)};\n`;
   return { name, file: `${RAIL_DATA_DIR}/${name}.js`, body };
 }
