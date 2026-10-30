@@ -221,7 +221,7 @@ describe("a declared mark is drawn, never replaced by the letter — bean `2vpn`
 
   it("a glyph mark renders as an <svg> in the header", () => {
     const html = headed({ glyphPath: "M3 18h18", tone: 199 });
-    const head = /<label class="fa-nav-head"[\s\S]*?<\/label>/.exec(html)![0];
+    const head = /<div class="fa-nav-head[\s\S]*?<\/a>/.exec(html)![0];
     expect(head).toContain("<svg");
     expect(layoutFlags(html, new Set(["WHO IRIS"]))).toEqual([]);
   });
