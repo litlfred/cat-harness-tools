@@ -234,10 +234,16 @@ permissions:
   contents: read
 
 # One run per PR (or ref), the newest. The group is this workflow's own, so it
-# never collides with a group a caller may still declare.
+# never collides with a group a caller may still declare. Only a PR's runs
+# cancel each other (owner, 2026-10-30, "Both"): a push to main is never
+# cancelled by the next one, because each main's run stores the answer that
+# the PRs based on THAT commit are judged against (cat-harness-tools#930). A
+# run of a PR that is closed or merged is cancelled by the `closed` event,
+# here for a caller that triggers on it, and for every workflow on the head
+# branch by `layer-cancel-on-close.yml`.
 concurrency:
   group: layer-pr-checks-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
 # repository's name, which is the instance's name for every layer.
