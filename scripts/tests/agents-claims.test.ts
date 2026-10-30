@@ -30,6 +30,7 @@ import {
   declares,
   locationClaims,
   normalise,
+  resolveCitedModule,
   resolveModule,
 } from "../check-agents-claims.js";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
@@ -94,8 +95,12 @@ describe("parsing — a claim must carry a backticked symbol and a shape", () =>
 
 describe("resolution", () => {
   test("a module is resolved against each root a path may be written from", () => {
-    expect(resolveModule(REPO, "schemas/kg/cat-harness.ts")).toBeDefined();
+    // A module the harness's AGENTS.md cites lives in this tools layer since
+    // bean `8lcl`, so it resolves through the layer, as the checker reads it;
+    // a path the checkout itself holds still resolves against the checkout.
+    expect(resolveCitedModule(REPO, "schemas/kg/cat-harness.ts")).toBeDefined();
     expect(resolveModule(REPO, "schemas/no-such-module.ts")).toBeUndefined();
+    expect(resolveCitedModule(REPO, "schemas/no-such-module.ts")).toBeUndefined();
   });
 
   test("`declares` finds each declaration form, and misses none of them", () => {

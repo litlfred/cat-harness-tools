@@ -23,6 +23,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { loadManifestValue, manifestPath } from "../pipeline/json-manifest.ts";
 
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
@@ -74,7 +75,9 @@ function manifestsIn(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
-    .map((d) => join(dir, d.name, `${d.name}.ts`))
+    // `<slug>.json` since y9r6 step 4b (cat-harness#751), else `<slug>.ts`,
+    // chosen as gen-docs-pages.ts chooses it.
+    .map((d) => manifestPath(join(dir, d.name), d.name))
     .filter((f) => existsSync(f))
     .sort();
 }
@@ -98,7 +101,7 @@ async function presentationsIn(src: DocsSource, out: Map<string, Presentation[]>
   for (const manifest of manifestsIn(src.srcDir)) {
     // input-site: traced #e8ca3daa — a docs page manifest, loaded by path
     inputSiteReached("process-presentations: computed load");
-    const page = ((await import(manifest)) as { default: PageManifest }).default;
+    const page = (await loadManifestValue(manifest)) as PageManifest;
     for (const node of page.nodes) {
       if (node.asset?.kind !== "bpmn") continue;
       const k = key(node.asset.source);

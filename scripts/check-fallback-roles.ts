@@ -61,6 +61,7 @@ import { fulfilmentKindsForBpmnType } from "../schemas/process/role-graph.js";
 import { isActivity, loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
 import { CAPABILITIES_DIRNAME, capabilitiesDir } from "../schemas/process/role-graph.ts";
 import { instanceDirectoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { skillDefinitionDirs } from "../schemas/kg/skill-definitions-dir.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -68,7 +69,7 @@ const ROOT = resolve(HARNESS_ROOT);
 /** One `degradation: "fallback"` occurrence, with enough to find it again. */
 export interface FallbackUse {
   file: string;
-  /** The skill id, taken from the module basename. */
+  /** The skill id: the module basename, or a JSON definition's `id`. */
   skill: string;
   capabilityId: string;
 }
@@ -248,6 +249,31 @@ export function fallbackUses(root: string, dirs: string[]): FallbackUse[] {
           file: relative(root, f),
           skill: basename(f, ".ts"),
           capabilityId: cap?.[1] ?? "(unparsed)",
+        });
+      }
+    }
+  }
+  // The JSON skill definitions (y9r6 step 4a turned cat-harness's TypeScript
+  // ones, `qa-report-signing` among them, into `skills/skill-definitions/*.json`).
+  // Read as data: a `requiredCapabilities` entry whose `degradation` is
+  // `fallback`, the same fact the line scan above reads from a module.
+  for (const dir of skillDefinitionDirs(root)) {
+    for (const e of readdirSync(dir).sort()) {
+      if (!e.endsWith(".json")) continue;
+      const f = join(dir, e);
+      let def: { id?: unknown; requiredCapabilities?: unknown };
+      try {
+        def = JSON.parse(readFileSync(f, "utf-8")) as typeof def;
+      } catch {
+        continue; // a malformed definition is `skills:validate`'s finding
+      }
+      if (!Array.isArray(def.requiredCapabilities)) continue;
+      for (const c of def.requiredCapabilities as { capabilityId?: unknown; degradation?: unknown }[]) {
+        if (c?.degradation !== "fallback") continue;
+        out.push({
+          file: relative(root, f),
+          skill: typeof def.id === "string" ? def.id : basename(e, ".json"),
+          capabilityId: typeof c.capabilityId === "string" ? c.capabilityId : "(unparsed)",
         });
       }
     }

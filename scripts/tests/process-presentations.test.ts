@@ -19,6 +19,12 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 import { subjectHref } from "../lib/subject-pages.ts";
 import { docsSources } from "../lib/docs-sources.ts";
 import { PAGE_LOCALE } from "../viewer-declarations.ts";
+import { notApplicableAlone } from "../../test/support/checkout.js";
+
+/** guides/document-ingestion, which presents ingest-theme, is folio-assistant-core's page; only a composed checkout holds it. */
+const NO_CORE_DOCS = notApplicableAlone(
+  "folio-assistant-core's docs source, whose guides/document-ingestion page presents processes/ui/ingest-theme.bpmn",
+);
 
 const ROOT = resolve(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -58,6 +64,10 @@ describe("this repository, right now", () => {
     // its address carries that instance's name (`lib/docs-sources.ts`).
     const idx = await checkoutProcessPresentations(ROOT);
     expect(idx.size).toBeGreaterThan(0);
+  });
+
+  test.skipIf(NO_CORE_DOCS)("a process presented by an instance above is addressed under that instance", async () => {
+    const idx = await checkoutProcessPresentations(ROOT);
     const theme = idx.get("processes/ui/ingest-theme.bpmn") ?? [];
     expect(theme.map((x) => `${x.page}#${x.node}`)).toEqual(["guides/document-ingestion#ingest-the-theme"]);
     expect(theme[0]!.href.endsWith("guides/document-ingestion.html")).toBe(true);
