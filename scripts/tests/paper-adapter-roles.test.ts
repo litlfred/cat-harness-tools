@@ -15,6 +15,12 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone } from "../../test/support/checkout.js";
+
+/** cat-harness's own scenarios/roles.json does not declare the three paper roles; folio-assistant-sci's does, and only a composed checkout holds it. */
+const NO_PAPER_LAYER = notApplicableAlone(
+  "folio-assistant-sci's scenarios/roles.json, which declares the three paper roles",
+);
 
 const ROOT = resolve(HARNESS_ROOT);
 function findCoordinatorRoot(startDir: string): string {
@@ -44,7 +50,7 @@ describe("folio-paper-adapter role modelling (bean 3025)", () => {
   };
   const allRoles = [...harnessRoles.roles, ...(paperRoles.roles ?? [])];
 
-  test("the three paper roles are declared, by the harness or the paper layer, with personas", () => {
+  test.skipIf(NO_PAPER_LAYER)("the three paper roles are declared, by the harness or the paper layer, with personas", () => {
     const roleIds = new Set(allRoles.map((r) => r.id));
     for (const id of ["lean-authoring-agent", "proof-review-agent", "compute-authoring-agent"]) {
       expect(roleIds.has(id)).toBe(true);
