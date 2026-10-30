@@ -28,6 +28,7 @@ import {
   instanceDocPath,
   instanceExportPlan,
   instanceSitePath,
+  ownCodeListsDocument,
   publishesInstanceSchema,
   type PlannedExport,
 } from "../instance-exports.js";
@@ -391,5 +392,38 @@ describe("an instance declaring `enabled: false` is not planned", () => {
   test("FALSIFIED: the same instance with `enabled: true` is planned again", () => {
     writeDeclaration(join(repo, "off"), { name: "off", directories: [], enabled: true });
     expect(instanceExportPlan(repo).map((p) => p.name)).toEqual(["off", "on"]);
+  });
+});
+
+describe("a layer's own code lists are published beside its document (#960)", () => {
+  test("each concept is a fragment of that document; a layer with none writes nothing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "own-code-lists-"));
+    try {
+      writeDeclaration(dir, {
+        name: "demo",
+        title: "demo",
+        version: "0.1.0",
+        directories: [{ id: "demo-code-lists", path: "code-lists", graphTypologies: ["code-list"] }],
+      });
+      const doc = "https://x.test/site/demo/demo-code-lists.jsonld";
+      expect(ownCodeListsDocument(dir, "demo", doc)).toBeUndefined();
+      mkdirSync(join(dir, "code-lists"), { recursive: true });
+      writeFileSync(
+        join(dir, "code-lists", "level.json"),
+        JSON.stringify({
+          $schema: "folio-code-list/v1",
+          id: "level",
+          title: "Level",
+          description: "How high a thing is.",
+          source: { note: "test" },
+          codes: [{ code: "high", label: "High", definition: "Higher than most things." }],
+        }),
+      );
+      const built = ownCodeListsDocument(dir, "demo", doc)!;
+      expect(built["@id"]).toBe(doc);
+      expect((built["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"])).toEqual([`${doc}#level`, `${doc}#level/high`]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

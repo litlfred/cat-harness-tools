@@ -37,6 +37,7 @@ import { readTileCounts } from "../../../schemas/ui/tile-count.ts";
 import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import "../../../schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../../test/support/checkout.ts";
 
 /**
  * Resolved, never written down. `check:site-root` forbids the literal in
@@ -54,14 +55,24 @@ function projection(seg: string): Record<string, unknown> {
   >;
 }
 
+/**
+ * Standing alone, whether the projections a test reads are unbuilt: the site
+ * build writes `assets/<graph>/index.json` at publish, and they are gitignored.
+ */
+const notBuilt = (...segs: string[]): boolean =>
+  siteNotBuilt(
+    `the ${segs.join(", ")} projection${segs.length > 1 ? "s" : ""} the site build writes at publish (gitignored)`,
+    ...segs.map((seg) => join(SITE, "assets", seg, "index.json")),
+  );
+
 describe("scoped counts partition their graph — they never over-count it", () => {
-  test("the library projection is readable, so what follows is not vacuous", () => {
+  test.skipIf(notBuilt("library"))("the library projection is readable, so what follows is not vacuous", () => {
     const p = projection("library");
     expect(Array.isArray(p.entries)).toBe(true);
     expect(readTileCounts(p).size).toBeGreaterThan(0);
   });
 
-  test("library: the entry counts do not exceed the entries", () => {
+  test.skipIf(notBuilt("library"))("library: the entry counts do not exceed the entries", () => {
     const p = projection("library");
     const total = (p.entries as unknown[]).length;
     // `uploads` is excluded BY ITS UNIT, not by its name. It counts waiting
@@ -75,7 +86,7 @@ describe("scoped counts partition their graph — they never over-count it", () 
     expect(sum).toBeLessThanOrEqual(total);
   });
 
-  test("schemas: the module counts do not exceed the modules", () => {
+  test.skipIf(notBuilt("schemas"))("schemas: the module counts do not exceed the modules", () => {
     const p = projection("schemas");
     const total = (p.modules as unknown[]).length;
     const sum = [...readTileCounts(p).values()]
@@ -84,7 +95,12 @@ describe("scoped counts partition their graph — they never over-count it", () 
     expect(sum).toBeLessThanOrEqual(total);
   });
 
-  test("and more than one instance contributes, so the sum can actually fail", () => {
+  // More than one instance is a property of the COMPOSED build: a standalone
+  // clone that builds its own site projects only itself, so this is not
+  // applicable standing alone even with the projection present.
+  test.skipIf(
+    notApplicableAlone("a schema projection built over more than one instance (only the composed checkout's build has one)"),
+  )("and more than one instance contributes, so the sum can actually fail", () => {
     // Without this, both assertions above would pass trivially on a corpus
     // with a single instance — one scoped count carrying the whole graph would
     // equal the total and nothing would notice. Measured rather than assumed,
@@ -98,7 +114,7 @@ describe("scoped counts partition their graph — they never over-count it", () 
 });
 
 describe("a unit is pluralised by the declarer", () => {
-  test("no count of one carries a plural unit", () => {
+  test.skipIf(notBuilt("library", "schemas", "beans", "todos", "qa", "voices"))("no count of one carries a plural unit", () => {
     // `tile-count.ts` puts pluralisation on the declarer, because only it
     // knows whether its unit pluralises regularly. This is the visible half:
     // a tile reading "1 entries" makes a careful reader trust the number less,

@@ -26,6 +26,11 @@
  * accessor is written so that "unconfigured" reads as **`n/a` — no expectation
  * recorded**, never as "expectation met".
  *
+ * The q-usage checkers that read these profiles are the science layer's
+ * (https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-q-usage.ts, bean `saqd`); this
+ * registry stays here because it is the generic DI point, and sci's
+ * `lean-audit.ts` reads `leanModuleChapter` from it too.
+ *
  * That distinction is the whole point. `qa-checkers-q-usage` already treats a
  * chapter absent from the map as unscored, so an empty registry makes the
  * chapter-profile criteria uniformly `n/a` rather than silently passing —

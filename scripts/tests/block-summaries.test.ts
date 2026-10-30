@@ -37,6 +37,7 @@ import { checkEntry } from "../check-l1-complete.ts";
 import { readEntryBlocks } from "../library-graph.ts";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const AGENT = { kind: "agent" as const, id: "claude-code", model: "test-model" };
@@ -332,8 +333,13 @@ describe("the viewer carries the extract AND the summary", () => {
     expect(b.summary).toEqual({ status: "not-summarised" });
   });
 
-  test("the committed projection of the drained entry carries both", () => {
-    const f = join(ROOT, siteDirFor(ROOT), "assets", "library", "entries", "arxiv-2312.07755v1.json");
+  const DRAINED = join(ROOT, siteDirFor(ROOT), "assets", "library", "entries", "arxiv-2312.07755v1.json");
+  // Standing alone the entry projection is not built: `library:viz` writes it
+  // at publish, and `assets/library/` is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt("the drained entry's library projection `library:viz` writes at publish (gitignored)", DRAINED),
+  )("the committed projection of the drained entry carries both", () => {
+    const f = DRAINED;
     const blocks = JSON.parse(readFileSync(f, "utf-8")).blocks as { kind: string; content: string | null; summary: { text?: string } | null }[];
     const both = blocks.filter((b) => b.kind === "prose" && b.content && b.summary?.text);
     expect(both.length).toBeGreaterThan(0);

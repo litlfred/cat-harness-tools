@@ -108,6 +108,8 @@ import {
 import { parseOutsideSoftwareRef } from "../schemas/library/outside-software.ts";
 import { loadSpdxLicenseList } from "../schemas/library/spdx-license-expression.ts";
 
+import { reaches } from "./lib/needs-reach.ts";
+
 /** The graph typology a `libraries/` directory is declared with. */
 export const LIBRARY_KIND = "software-library";
 
@@ -512,20 +514,6 @@ function needsByInstance(repoRoot: string): Map<string, { root: string; needs: s
   return out;
 }
 
-/** Does `name` reach `target` through `needs` (itself included)? */
-function reaches(graph: Map<string, { needs: string[] }>, name: string, target: string): boolean {
-  const seen = new Set<string>();
-  const stack = [name];
-  while (stack.length > 0) {
-    const n = stack.pop()!;
-    if (n === target) return true;
-    if (seen.has(n)) continue;
-    seen.add(n);
-    stack.push(...(graph.get(n)?.needs ?? []));
-  }
-  return false;
-}
-
 /**
  * The layers the holder records, each as a {@link LibraryLayer} whose `dir`
  * is `<holder libraries>/held/<layer>/` (§"A layer below the kind is held
@@ -537,9 +525,10 @@ export function heldLayers(repoRoot: string, own: readonly LibraryLayer[], holde
   if (!holderLayer) return [];
   const declaring = new Set(own.map((l) => l.name));
   const graph = needsByInstance(repoRoot);
+  const needsOf = new Map([...graph].map(([n, { needs }]) => [n, needs] as const));
   const out: LibraryLayer[] = [];
   for (const [name, { root }] of [...graph.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (declaring.has(name) || name === KIND_OWNER || reaches(graph, name, KIND_OWNER)) continue;
+    if (declaring.has(name) || name === KIND_OWNER || reaches(needsOf, name, KIND_OWNER)) continue;
     if (!existsSync(join(root, "package.json"))) continue;
     out.push({ name, root, dir: join(holderLayer.dir, HELD_DIR, name), heldBy: holderLayer });
   }

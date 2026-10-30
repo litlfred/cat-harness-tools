@@ -116,13 +116,17 @@ describe("renderMountedMarkdown", () => {
       mkdirSync(join(docs, "guide"), { recursive: true });
       writeFileSync(join(docs, "guide", "README.md"), "# Guide\n");
       writeFileSync(join(docs, "a.md"), text);
+      // `dest` is the mount's copy of `docs`, as mount-instance-docs makes it.
+      mkdirSync(join(dest, "assets"), { recursive: true });
+      mkdirSync(join(dest, "guide"), { recursive: true });
+      writeFileSync(join(dest, "guide", "README.md"), "# Guide\n");
       writeFileSync(join(dest, "a.md"), text);
       const { rendered, unresolved } = await renderMountedMarkdown(dest, {
         dir: docs,
         instanceDir: instance,
         repository: "example/who-iris",
       });
-      expect(rendered).toEqual(["a.html"]);
+      expect(rendered).toEqual(["a.html", "guide/README.html", "guide/index.html"]);
       const html = readFileSync(join(dest, "a.html"), "utf-8");
       expect(html).toContain('href="https://github.com/example/who-iris/tree/HEAD/library/"');
       expect(html).toContain('href="https://github.com/example/who-iris/blob/HEAD/AGENTS.md#top"');
@@ -132,6 +136,35 @@ describe("renderMountedMarkdown", () => {
       expect(html).toContain('href="https://github.com/example/who-iris/tree/HEAD/docs/assets/"');
       expect(html).toContain('href="guide/"');
       expect(unresolved).toEqual(['a.md: "../../AGENTS.md" climbs out of the instance']);
+    } finally {
+      rmSync(instance, { recursive: true, force: true });
+      rmSync(dest, { recursive: true, force: true });
+    }
+  });
+
+  it("a link to what the copy left out, or to a Jekyll page it never renders, becomes a repository URL", async () => {
+    // who-iris's docs README linked `catalogue/` (a held visualiser page) and
+    // `site-home.md` (a Jekyll page): both were dead on smart-trust's site.
+    const instance = mkdtempSync(join(tmpdir(), "mount-md-inst-"));
+    const dest = mkdtempSync(join(tmpdir(), "mount-md-site-"));
+    try {
+      const text = "# Docs\n\n[catalogue](catalogue/) [home](site-home.md) [guide](style-guide.md)\n";
+      const docs = join(instance, siteDir({ name: "who-iris" }));
+      mkdirSync(join(docs, "catalogue"), { recursive: true });
+      writeFileSync(join(docs, "catalogue", "index.html"), "<p>catalogue</p>");
+      writeFileSync(join(docs, "site-home.md"), "---\nlayout: home\n---\n{% include x.html %}\n");
+      writeFileSync(join(docs, "style-guide.md"), "# Style\n");
+      writeFileSync(join(docs, "README.md"), text);
+      // The copy: `catalogue/` held back, the rest as they are.
+      writeFileSync(join(dest, "site-home.md"), "---\nlayout: home\n---\n{% include x.html %}\n");
+      writeFileSync(join(dest, "style-guide.md"), "# Style\n");
+      writeFileSync(join(dest, "README.md"), text);
+      const { unresolved } = await renderMountedMarkdown(dest, { dir: docs, instanceDir: instance, repository: "example/who-iris" });
+      const html = readFileSync(join(dest, "README.html"), "utf-8");
+      expect(html).toContain('href="https://github.com/example/who-iris/tree/HEAD/docs/catalogue/"');
+      expect(html).toContain('href="https://github.com/example/who-iris/blob/HEAD/docs/site-home.md"');
+      expect(html).toContain('href="style-guide.html"');
+      expect(unresolved).toEqual([]);
     } finally {
       rmSync(instance, { recursive: true, force: true });
       rmSync(dest, { recursive: true, force: true });
