@@ -11,8 +11,8 @@
     "scripts/validate-skills.ts": 1
   },
   "resolves": [
-    "docs/source/guides-beans-and-todos/guides-beans-and-todos.ts::processes/sdlc/bean-lifecycle.bpmn",
-    "docs/source/process-crdm-methodology/process-crdm-methodology.ts::processes/process/crdm-requirements.bpmn",
+    "docs/source/guides-beans-and-todos/guides-beans-and-todos.json::processes/sdlc/bean-lifecycle.bpmn",
+    "docs/source/process-crdm-methodology/process-crdm-methodology.json::processes/process/crdm-requirements.bpmn",
     "schemas/kg/detangle.ts::schemas/kg/detangle.ts",
     "schemas/kg/graph-typology-registry.ts::schemas/conduct/interaction.ts",
     "schemas/kg/graph-typology-registry.ts::schemas/conduct/waiver.ts",

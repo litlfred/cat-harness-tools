@@ -12,8 +12,8 @@ describe("check:content-code-free", () => {
   });
 
   test("shipped browser assets are not code; build plugins are", () => {
-    for (const f of ["site-chrome/assets/js/navbar.js", "site-chrome/_includes/mermaid_config.js", "docs/assets/js/vendor/sqlite-wasm/index.mjs"]) expect(isCode(f)).toBe(false);
-    for (const f of ["site-chrome/_plugins/fa-root-relative.rb", "docs/assets/x.ts", "tools/x.js"]) expect(isCode(f)).toBe(true);
+    for (const f of ["site-chrome/assets/js/widget.js", "site-chrome/_includes/snippet.js", "docs/assets/js/vendor/lib.mjs"]) expect(isCode(f)).toBe(false);
+    for (const f of ["site-chrome/_plugins/plugin.rb", "docs/assets/x.ts", "tools/x.js"]) expect(isCode(f)).toBe(true);
   });
 
   test("an unlisted file is added; a listed file that is gone is only reported", () => {

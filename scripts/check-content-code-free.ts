@@ -43,6 +43,7 @@ export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-b
 export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py", ".sh", ".rb"] as const;
 
 /** Directories whose `.js`/`.mjs` files are shipped browser assets, not code. */
+// declared-path-literal: subdirectories within site-chrome/ and docs/ whose shipped browser assets (.js/.mjs) are exempted; the instance declaration only names site-chrome/ and docs/ at their root
 export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
 
 export const isBrowserAsset = (rel: string): boolean =>
